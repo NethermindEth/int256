@@ -2,7 +2,7 @@
 
 namespace Nethermind.Int256
 {
-    public class Class1
+    public struct Int256
     {
     }
 }
