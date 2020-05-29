@@ -1,2 +1,2 @@
-# uint
-.NET Int256
+# int256
+.NET Int256 and UInt256
