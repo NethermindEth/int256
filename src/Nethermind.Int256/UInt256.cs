@@ -129,9 +129,9 @@ namespace Nethermind.Int256
             carry = (carry >> 32) + a0 * b1;
             ulong r2 = carry >> 32;
             carry = (uint)carry + a1 * b0;
-            high = carry << 32 | r0;
-            low = (carry >> 32) + r2 + a1 * b1;
-            Debug.Assert((BigInteger)(high << 32) + low == (BigInteger)a * b);
+            low = carry << 32 | r0;
+            high = (carry >> 32) + r2 + a1 * b1;
+            // Debug.Assert((BigInteger)(high << 32) + low == (BigInteger)a * b);
         }
         
         internal static void Multiply64(ulong a, ulong b, ulong c, out ulong high, out ulong low)

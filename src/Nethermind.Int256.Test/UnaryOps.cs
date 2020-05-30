@@ -23,5 +23,18 @@ namespace Nethermind.Int256.Test
             TestNumbers.UInt192Max,
             TestNumbers.UInt256Max,
         };
+        
+        public static ulong[] ULongTestCases =
+        {
+            0ul,
+            1ul,
+            2ul,
+            3ul,
+            ushort.MaxValue,
+            int.MaxValue,
+            uint.MaxValue,
+            long.MaxValue,
+            ulong.MaxValue,
+        };
     }
 }

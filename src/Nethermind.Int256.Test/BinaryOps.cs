@@ -18,5 +18,19 @@ namespace Nethermind.Int256.Test
                 }
             }
         }
+        
+        public static IEnumerable<(ulong, ulong)> ULongTestCases
+        {
+            get
+            {
+                for (int i = 0; i < UnaryOps.ULongTestCases.Length; i++)
+                {
+                    for (int j = 0; j < UnaryOps.ULongTestCases.Length; j++)
+                    {
+                        yield return (UnaryOps.ULongTestCases[i], UnaryOps.ULongTestCases[j]);
+                    }    
+                }
+            }
+        }
     }
 }

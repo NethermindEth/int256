@@ -59,6 +59,15 @@ namespace Nethermind.Int256.Test
             resUInt256.Should().Be(resBigInt);
         }
         
+        [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.ULongTestCases))]
+        public void MultiplyULong((ulong A, ulong B) test)
+        {
+            BigInteger resBigInt = (BigInteger)test.A * test.B % (BigInteger.One << 256);
+            UInt256.Multiply64(test.A, test.B, out ulong high, out ulong low);
+            BigInteger resUInt256 = high * (BigInteger.One << 64) + low;
+            resUInt256.Should().Be(resBigInt);
+        }
+        
         [TestCaseSource(typeof(UnaryOps), nameof(UnaryOps.TestCases))]
         public void ToBigIntegerAndBack(BigInteger test)
         {
