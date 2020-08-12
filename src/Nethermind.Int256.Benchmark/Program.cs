@@ -13,6 +13,7 @@ namespace Nethermind.Int256.Benchmark
             // #else
 
             IConfig config = Debugger.IsAttached ? new DebugInProcessConfig() : DefaultConfig.Instance;
+
             BenchmarkRunner.Run<AddUnsigned>(config);
             BenchmarkRunner.Run<SubtractUnsigned>(config);
             BenchmarkRunner.Run<AddModUnsinged>(config);

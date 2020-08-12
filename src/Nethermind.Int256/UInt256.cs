@@ -229,7 +229,7 @@ namespace Nethermind.Int256
             return (a >> n1) >> n2;
         }
 
-        // udivrem divides u by d and produces both quotient and remainder.
+        // Udivrem divides u by d and produces both quotient and remainder.
         // The quotient is stored in provided quot - len(u)-len(d)+1 words.
         // It loosely follows the Knuth's division algorithm (sometimes referenced as "schoolbook" division) using 64-bit words.
         // See Knuth, Volume 2, section 4.3.1, Algorithm D.
@@ -319,7 +319,7 @@ namespace Nethermind.Int256
                 else
                 {
                     (qhat, rhat) = Udivrem2by1(u2, u1, dh, reciprocal);
-                    Multiply64(qhat, dl, out ulong ph, out ulong pl);
+                    (ulong ph, ulong pl) = Multiply64(qhat, dl);
                     if (ph > rhat || (ph == rhat && pl > u0))
                     {
                         qhat--;
@@ -347,7 +347,7 @@ namespace Nethermind.Int256
             {
                 ulong s = 0, borrow1 = 0;
                 SubtractWithBorrow(x[i], borrow, ref borrow1, out s);
-                Multiply64(y[i], multiplier, out ulong ph, out ulong pl);
+                (ulong ph, ulong pl) = Multiply64(y[i], multiplier);
                 ulong t = 0, borrow2 = 0;
                 SubtractWithBorrow(s, pl, ref borrow2, out t);
                 x[i] = t;
@@ -390,7 +390,7 @@ namespace Nethermind.Int256
         // "Improved division by invariant integers", Algorithm 4.
         private static (ulong quot, ulong rem) Udivrem2by1(ulong uh, ulong ul, ulong d, ulong reciprocal)
         {
-            Multiply64(reciprocal, uh, out ulong qh, out ulong ql);
+            (ulong qh, ulong ql) = Multiply64(reciprocal, uh);
             ulong carry = 0;
             AddWithCarry(ql, ul, ref carry, out ql);
             AddWithCarry(qh, uh, ref carry, out qh);
@@ -466,7 +466,7 @@ namespace Nethermind.Int256
             ulong carry;
             ulong res1, res2, res3, r0, r1, r2, r3;
 
-            Multiply64(x[0], y[0], out carry, out r0);
+            (carry, r0) = Multiply64(x[0], y[0]);
             UmulHop(carry, x[1], y[0], out carry, out res1);
             UmulHop(carry, x[2], y[0], out carry, out res2);
             res3 = x[3] * y[0] + carry;
@@ -520,7 +520,7 @@ namespace Nethermind.Int256
             ulong carry0, carry1, carry2;
             ulong res1, res2;
 
-            (carry0, res[0]) = Mulitply64i(z.u0, z.u0);
+            (carry0, res[0]) = Multiply64(z.u0, z.u0);
             (carry0, res1) = UmulHopi(carry0, z.u0, z.u1);
             (carry0, res2) = UmulHopi(carry0, z.u0, z.u2);
 
@@ -599,7 +599,7 @@ namespace Nethermind.Int256
             ulong carry, carry4, carry5, carry6;
             ulong res1, res2, res3, res4, res5;
 
-            (carry, res[0]) = Mulitply64i(x.u0, y.u0);
+            (carry, res[0]) = Multiply64(x.u0, y.u0);
             (carry, res1) = UmulHopi(carry, x.u1, y.u0);
             (carry, res2) = UmulHopi(carry, x.u2, y.u0);
             (carry4, res3) = UmulHopi(carry, x.u3, y.u0);
@@ -623,7 +623,7 @@ namespace Nethermind.Int256
         // UmulStep computes (hi * 2^64 + lo) = z + (x * y) + carry.
         private static void UmulStep(ulong z, ulong x, ulong y, ulong carry, out ulong high, out ulong low)
         {
-            Multiply64(x, y, out high, out low);
+            (high, low) = Multiply64(x, y);
             ulong c = 0;
             AddWithCarry(low, carry, ref c, out low);
             AddWithCarry(high, 0, ref c, out high);
@@ -649,13 +649,13 @@ namespace Nethermind.Int256
         // UmulHop computes (hi * 2^64 + lo) = z + (x * y)
         private static void UmulHop(ulong z, ulong x, ulong y, out ulong high, out ulong low)
         {
-            Multiply64(x, y, out high, out low);
+            (high, low) = Multiply64(x, y);
             ulong carry = 0ul;
             AddWithCarry(low, z, ref carry, out low);
             AddWithCarry(high, 0, ref carry, out high);
         }
 
-        internal static void Multiply64(ulong a, ulong b, out ulong high, out ulong low)
+        internal static (ulong high, ulong low) Multiply64(ulong a, ulong b)
         {
             ulong a0 = (uint)a;
             ulong a1 = a >> 32;
@@ -666,19 +666,14 @@ namespace Nethermind.Int256
             carry = (carry >> 32) + a0 * b1;
             ulong r2 = carry >> 32;
             carry = (uint)carry + a1 * b0;
-            low = carry << 32 | r0;
-            high = (carry >> 32) + r2 + a1 * b1;
+            var low = carry << 32 | r0;
+            var high = (carry >> 32) + r2 + a1 * b1;
+            return (high, low);
         }
 
-        internal static (ulong hi, ulong lo) Mulitply64i(ulong a, ulong b)
-        {
-            Multiply64(a, b, out ulong hi, out ulong lo);
-            return (hi, lo);
-        }
-
-        // Div sets res to the quotient x/y.
+        // Divide sets res to the quotient x/y.
         // If y == 0, z is set to 0
-        public static void Div(in UInt256 x, in UInt256 y, out UInt256 res)
+        public static void Divide(in UInt256 x, in UInt256 y, out UInt256 res)
         {
             if (y.IsZero || y > x)
             {
@@ -706,10 +701,7 @@ namespace Nethermind.Int256
             res = new UInt256(quot);
         }
 
-        public void Divide(in UInt256 a, out UInt256 res)
-        {
-            Div(this, a, out res);
-        }
+        public void Divide(in UInt256 a, out UInt256 res) => Divide(this, a, out res);
 
         internal static (ulong quo, ulong rem) Div64(ulong hi, ulong lo, ulong y)
         {
@@ -761,22 +753,6 @@ namespace Nethermind.Int256
             }
 
             return (q1 * two32 + q0, Rsh((un21 * two32 + un0 - q0 * y), s));
-        }
-
-        internal static void Multiply64(ulong a, ulong b, ulong c, out ulong high, out ulong low)
-        {
-            ulong a0 = (uint)a;
-            ulong a1 = a >> 32;
-            ulong b0 = (uint)b;
-            ulong b1 = b >> 32;
-            ulong carry = a0 * b0 + (uint)c;
-            uint r0 = (uint)carry;
-            carry = (carry >> 32) + a0 * b1 + (c >> 32);
-            ulong r2 = carry >> 32;
-            carry = (uint)carry + a1 * b0;
-            high = carry << 32 | r0;
-            low = (carry >> 32) + r2 + a1 * b1;
-            Debug.Assert((BigInteger)(high << 32) + low == (BigInteger)(a * b + c));
         }
 
         public static void Lsh(in UInt256 x, int n, out UInt256 res)

@@ -228,7 +228,7 @@ namespace Nethermind.Int256.Benchmark
         [Benchmark]
         public UInt256 AddMod_Int256()
         {
-            UInt256.AddMod(UInt256A, UInt256B, UInt256C, out UInt256 res);
+            UInt256.SubtractMod(UInt256A, UInt256B, UInt256C, out UInt256 res);
             return res;
         }
     }
@@ -246,7 +246,7 @@ namespace Nethermind.Int256.Benchmark
         [Benchmark]
         public Int256 AddMod_Int256()
         {
-            Int256.AddMod(Int256A, Int256B, Int256C, out Int256 res);
+            Int256.SubtractMod(Int256A, Int256B, Int256C, out Int256 res);
             return res;
         }
     }
@@ -336,7 +336,7 @@ namespace Nethermind.Int256.Benchmark
         [Benchmark]
         public UInt256 Multiply_Int256()
         {
-            UInt256.Div(UInt256A, UInt256B, out UInt256 res);
+            UInt256.Divide(UInt256A, UInt256B, out UInt256 res);
             return res;
         }
     }

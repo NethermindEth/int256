@@ -77,13 +77,6 @@ namespace Nethermind.Int256
 
         public void Add(in Int256 a, out Int256 res) => Add(this, a, out res);
 
-        public static bool AddOverflow(in Int256 a, in Int256 b, out Int256 res)
-        {
-            bool result = UInt256.AddOverflow(a.value, b.value, out UInt256 ures);
-            res = new Int256(ures);
-            return result;
-        }
-
         public static void AddMod(in Int256 x, in Int256 y, in Int256 m, out Int256 res)
         {
             var mt = m;
@@ -166,13 +159,6 @@ namespace Nethermind.Int256
 
         public void SubtractMod(in Int256 a, in Int256 m, out Int256 res) => SubtractMod(this, a, m, out res);
 
-        public static bool SubtractUnderflow(in Int256 a, in Int256 b, out Int256 res)
-        {
-            bool result = UInt256.SubtractUnderflow(a.value, b.value, out UInt256 ures);
-            res = new Int256(ures);
-            return result;
-        }
-
         public static void Multiply(in Int256 a, in Int256 b, out Int256 res)
         {
             Int256 av = a, bv = b;
@@ -195,12 +181,84 @@ namespace Nethermind.Int256
 
         public void Multiply(in Int256 a, out Int256 res) => Multiply(this, a, out res);
 
-        public static bool MultiplyOverflow(in Int256 a, in Int256 b, out Int256 res)
+        public static void MultiplyMod(in Int256 x, in Int256 y, in Int256 m, out Int256 res)
         {
-            bool result = UInt256.MultiplyOverflow(a.value, b.value, out UInt256 ures);
-            res = new Int256(ures);
-            return result;
+            var mAbs = m;
+            if (m.Sign < 0)
+            {
+                m.Neg(out mAbs);
+            }
+            if ((x.Sign < 0 && y.Sign >= 0) || (x.Sign >= 0 && y.Sign < 0))
+            {
+                var xAbs = x;
+                var yAbs = y;
+                if (x.Sign < 0)
+                {
+                    x.Neg(out xAbs);
+                }
+                else
+                {
+                    y.Neg(out yAbs);
+                }
+                xAbs.value.MultiplyMod(yAbs.value, mAbs.value, out UInt256 ures);
+                res = new Int256(ures);
+                res.Neg(out res);
+            }
+            else
+            {
+                var xAbs = x;
+                var yAbs = y;
+                if (x.Sign < 0)
+                {
+                    x.Neg(out xAbs);
+                    y.Neg(out yAbs);
+                }
+                xAbs.value.MultiplyMod(yAbs.value, mAbs.value, out UInt256 ures);
+                res = new Int256(ures);
+            }
         }
+
+        public void MultiplyMod(in Int256 a, in Int256 m, out Int256 res) => MultiplyMod(this, a, m, out res);
+
+        public static void Divide(in Int256 n, in Int256 d, out Int256 res)
+        {
+            UInt256 value;
+            if (n.Sign >= 0)
+            {
+                if (d.Sign >= 0)
+                {
+                    // pos / pos
+                    UInt256.Divide(n.value, d.value, out value);
+                    res = new Int256(value);
+                    return;
+                }
+                else
+                {
+                    // pos / neg
+                    Neg(d, out Int256 neg);
+                    UInt256.Divide(n.value, neg.value, out value);
+                    res = new Int256(value);
+                    res.Neg(out res);
+                    return;
+                }
+            }
+
+            Neg(n, out Int256 nNeg);
+            if (d.Sign < 0)
+            {
+                // neg / neg
+                Neg(d, out Int256 dNeg);
+                UInt256.Divide(nNeg.value, dNeg.value, out value);
+                res = new Int256(value);
+                return;
+            }
+            // neg / pos
+            UInt256.Divide(nNeg.value, d.value, out value);
+            res = new Int256(value);
+            res.Neg(out res);
+        }
+
+        public void Divide(in Int256 a, out Int256 res) => Divide(this, a, out res);
 
         public static void Exp(in Int256 b, in Int256 e, out Int256 res)
         {
@@ -259,49 +317,64 @@ namespace Nethermind.Int256
 
         public void ExpMod(in Int256 exp, in Int256 m, out Int256 res) => ExpMod(this, exp, m, out res);
 
-        public static void MultiplyMod(in Int256 x, in Int256 y, in Int256 m, out Int256 res)
-        {
-            var mAbs = m;
-            if (m.Sign < 0)
-            {
-                m.Neg(out mAbs);
-            }
-            if ((x.Sign < 0 && y.Sign >= 0) || (x.Sign >= 0 && y.Sign < 0))
-            {
-                var xAbs = x;
-                var yAbs = y;
-                if (x.Sign < 0)
-                {
-                    x.Neg(out xAbs);
-                }
-                else
-                {
-                    y.Neg(out yAbs);
-                }
-                xAbs.value.MultiplyMod(yAbs.value, mAbs.value, out UInt256 ures);
-                res = new Int256(ures);
-                res.Neg(out res);
-            }
-            else
-            {
-                var xAbs = x;
-                var yAbs = y;
-                if (x.Sign < 0)
-                {
-                    x.Neg(out xAbs);
-                    y.Neg(out yAbs);
-                }
-                xAbs.value.MultiplyMod(yAbs.value, mAbs.value, out UInt256 ures);
-                res = new Int256(ures);
-            }
-        }
-
-        public void MultiplyMod(in Int256 a, in Int256 m, out Int256 res) => MultiplyMod(this, a, m, out res);
-
         public static void LeftShift(in Int256 x, int n, out Int256 res)
         {
             x.value.LeftShift(n, out UInt256 ures);
             res = new Int256(ures);
+        }
+
+        // Mod sets res to (sign x) * { abs(x) modulus abs(y) }
+        // If y == 0, z is set to 0 (OBS: differs from the big.Int)
+        public static void Mod(in Int256 x, in Int256 y, out Int256 res)
+        {
+            Int256 xIn = x, yIn = y;
+            int xs = x.Sign;
+
+            // abs x
+            if (xs == -1)
+            {
+                Neg(x, out xIn);
+            }
+            // abs y
+            if (y.Sign == -1)
+            {
+                Neg(y, out yIn);
+            }
+            UInt256.Mod((UInt256)xIn, (UInt256)yIn, out UInt256 value);
+            res = new Int256(value);
+            if (xs == -1)
+            {
+                Neg(res, out res);
+            }
+        }
+
+        public void Mod(in Int256 m, out Int256 res) => Mod(this, m, out res);
+
+        // Abs sets res to the absolute value
+        //   Abs(0)        = 0
+        //   Abs(1)        = 1
+        //   Abs(2**255)   = -2**255
+        //   Abs(2**256-1) = -1
+        public void Abs(out Int256 res)
+        {
+            var sign = Sign;
+            if (sign >= 0)
+            {
+                res = this;
+            }
+            Zero.Subtract(this, out res);
+        }
+
+        // Neg returns -x mod 2**256.
+        public static void Neg(in Int256 x, out Int256 neg)
+        {
+            UInt256.Subtract(UInt256.Zero, x.value, out UInt256 value);
+            neg = new Int256(value);
+        }
+
+        public void Neg(out Int256 res)
+        {
+            Neg(this, out res);
         }
 
         public void LeftShift(int n, out Int256 res) => LeftShift(this, n, out res);
@@ -328,7 +401,7 @@ namespace Nethermind.Int256
             res = new Int256(new UInt256(this.value.u3, ulong.MaxValue, ulong.MaxValue, ulong.MaxValue));
         }
 
-        public static void Rsh(in Int256 x, int n, out Int256 res)
+        private static void Rsh(in Int256 x, int n, out Int256 res)
         {
             if (x.Sign >= 0)
             {
@@ -472,101 +545,6 @@ namespace Nethermind.Int256
         public bool IsOne => this == One;
 
         public Int256 MaximalValue => Max;
-
-        public static void Divide(in Int256 n, in Int256 d, out Int256 res)
-        {
-            UInt256 value;
-            if (n.Sign >= 0)
-            {
-                if (d.Sign >= 0)
-                {
-                    // pos / pos
-                    UInt256.Div(n.value, d.value, out value);
-                    res = new Int256(value);
-                    return;
-                }
-                else
-                {
-                    // pos / neg
-                    Neg(d, out Int256 neg);
-                    UInt256.Div(n.value, neg.value, out value);
-                    res = new Int256(value);
-                    res.Neg(out res);
-                    return;
-                }
-            }
-
-            Neg(n, out Int256 nNeg);
-            if (d.Sign < 0)
-            {
-                // neg / neg
-                Neg(d, out Int256 dNeg);
-                UInt256.Div(nNeg.value, dNeg.value, out value);
-                res = new Int256(value);
-                return;
-            }
-            // neg / pos
-            UInt256.Div(nNeg.value, d.value, out value);
-            res = new Int256(value);
-            res.Neg(out res);
-        }
-
-        public void Divide(in Int256 a, out Int256 res) => Divide(this, a, out res);
-
-        // Mod sets res to (sign x) * { abs(x) modulus abs(y) }
-        // If y == 0, z is set to 0 (OBS: differs from the big.Int)
-        public static void Mod(in Int256 x, in Int256 y, out Int256 res)
-        {
-            Int256 xIn = x, yIn = y;
-            int xs = x.Sign;
-
-            // abs x
-            if (xs == -1)
-            {
-                Neg(x, out xIn);
-            }
-            // abs y
-            if (y.Sign == -1)
-            {
-                Neg(y, out yIn);
-            }
-            UInt256.Mod((UInt256)xIn, (UInt256)yIn, out UInt256 value);
-            res = new Int256(value);
-            if (xs == -1)
-            {
-                Neg(res, out res);
-            }
-        }
-
-        public void Mod(in Int256 m, out Int256 res) => Mod(this, m, out res);
-
-
-        // Abs sets res to the absolute value
-        //   Abs(0)        = 0
-        //   Abs(1)        = 1
-        //   Abs(2**255)   = -2**255
-        //   Abs(2**256-1) = -1
-        public void Abs(out Int256 res)
-        {
-            var sign = Sign;
-            if (sign >= 0)
-            {
-                res = this;
-            }
-            Zero.Subtract(this, out res);
-        }
-
-        // Neg returns -x mod 2**256.
-        public static void Neg(in Int256 x, out Int256 neg)
-        {
-            UInt256.Subtract(UInt256.Zero, x.value, out UInt256 value);
-            neg = new Int256(value);
-        }
-
-        public void Neg(out Int256 res)
-        {
-            Neg(this, out res);
-        }
 
         public static explicit operator UInt256(Int256 z) => z.value;
 
