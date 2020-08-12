@@ -23,9 +23,9 @@ namespace Nethermind.Int256.Test
         {
             get
             {
-                foreach (var case1 in UnaryOps.TestCasesSigned)
+                foreach (var case1 in UnaryOps.SignedTestCases)
                 {
-                    foreach (var case2 in UnaryOps.TestCasesSigned)
+                    foreach (var case2 in UnaryOps.SignedTestCases)
                     {
                         yield return (case1, case2);
                     }
@@ -65,7 +65,7 @@ namespace Nethermind.Int256.Test
         {
             get
             {
-                foreach (var n in UnaryOps.TestCasesSigned)
+                foreach (var n in UnaryOps.SignedTestCases)
                 {
                     foreach (var s in UnaryOps.ShiftTestCases)
                     {

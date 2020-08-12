@@ -107,10 +107,6 @@ namespace Nethermind.Int256.Benchmark
         public Int256 Int256D;
     }
 
-    // [SimpleJob(RuntimeMoniker.NetCoreApp31)]
-    // [SimpleJob(launchCount: 1, warmupCount: 1, targetCount: 1)]
-    // [SimpleJob(BenchmarkDotNet.Engines.RunStrategy.ColdStart, launchCount: 1, warmupCount: 1, targetCount: 1)]
-    // [MemoryDiagnoser]
     [SimpleJob(RuntimeMoniker.NetCoreApp31)]
     [MemoryDiagnoser]
     public class AddUnsigned : UnsignedTwoParamBenchmarkBase
@@ -129,8 +125,6 @@ namespace Nethermind.Int256.Benchmark
         }
     }
 
-    // [SimpleJob(BenchmarkDotNet.Engines.RunStrategy.ColdStart, launchCount: 1, warmupCount: 1, targetCount: 1)]
-    // [MemoryDiagnoser]
     [SimpleJob(RuntimeMoniker.NetCoreApp31)]
     [MemoryDiagnoser]
     public class AddSigned : SignedTwoParamBenchmarkBase
@@ -149,9 +143,6 @@ namespace Nethermind.Int256.Benchmark
         }
     }
 
-    // [SimpleJob(launchCount: 3, warmupCount: 10, targetCount: 30)]
-    // [SimpleJob(BenchmarkDotNet.Engines.RunStrategy.ColdStart, launchCount: 1, warmupCount: 1, targetCount: 1)]
-    // [MemoryDiagnoser]
     [SimpleJob(RuntimeMoniker.NetCoreApp31)]
     [MemoryDiagnoser]
     public class SubtractUnsigned : UnsignedTwoParamBenchmarkBase
@@ -170,9 +161,6 @@ namespace Nethermind.Int256.Benchmark
         }
     }
 
-    // [SimpleJob(launchCount: 3, warmupCount: 10, targetCount: 30)]
-    // [SimpleJob(BenchmarkDotNet.Engines.RunStrategy.ColdStart, launchCount: 1, warmupCount: 1, targetCount: 1)]
-    // [MemoryDiagnoser]
     [SimpleJob(RuntimeMoniker.NetCoreApp31)]
     [MemoryDiagnoser]
     public class SubtractSigned : SignedTwoParamBenchmarkBase
@@ -191,8 +179,6 @@ namespace Nethermind.Int256.Benchmark
         }
     }
 
-    // [SimpleJob(BenchmarkDotNet.Engines.RunStrategy.ColdStart, launchCount: 1, warmupCount: 1, targetCount: 1)]
-    // [MemoryDiagnoser]
     [SimpleJob(RuntimeMoniker.NetCoreApp31)]
     [MemoryDiagnoser]
     public class AddModUnsinged : UnsignedThreeParamBenchmarkBase
@@ -211,8 +197,6 @@ namespace Nethermind.Int256.Benchmark
         }
     }
 
-    // [SimpleJob(BenchmarkDotNet.Engines.RunStrategy.ColdStart, launchCount: 1, warmupCount: 1, targetCount: 1)]
-    // [MemoryDiagnoser]
     [SimpleJob(RuntimeMoniker.NetCoreApp31)]
     [MemoryDiagnoser]
     public class AddModSinged : SignedThreeParamBenchmarkBase
@@ -231,8 +215,6 @@ namespace Nethermind.Int256.Benchmark
         }
     }
 
-    // [SimpleJob(BenchmarkDotNet.Engines.RunStrategy.ColdStart, launchCount: 1, warmupCount: 1, targetCount: 1)]
-    // [MemoryDiagnoser]
     [SimpleJob(RuntimeMoniker.NetCoreApp31)]
     [MemoryDiagnoser]
     public class SubtractModUnsinged : UnsignedThreeParamBenchmarkBase
@@ -240,7 +222,7 @@ namespace Nethermind.Int256.Benchmark
         [Benchmark(Baseline = true)]
         public BigInteger SubtractMod_BigInteger()
         {
-            return ( (A - B) % C ) % Numbers.TwoTo256;
+            return ((A - B) % C) % Numbers.TwoTo256;
         }
 
         [Benchmark]
@@ -251,8 +233,6 @@ namespace Nethermind.Int256.Benchmark
         }
     }
 
-    // [SimpleJob(BenchmarkDotNet.Engines.RunStrategy.ColdStart, launchCount: 1, warmupCount: 1, targetCount: 1)]
-    // [MemoryDiagnoser]
     [SimpleJob(RuntimeMoniker.NetCoreApp31)]
     [MemoryDiagnoser]
     public class SubtractModSigned : SignedThreeParamBenchmarkBase
@@ -271,8 +251,6 @@ namespace Nethermind.Int256.Benchmark
         }
     }
 
-    // [SimpleJob(BenchmarkDotNet.Engines.RunStrategy.ColdStart, launchCount: 1, warmupCount: 1, targetCount: 1)]
-    // [MemoryDiagnoser]
     [SimpleJob(RuntimeMoniker.NetCoreApp31)]
     [MemoryDiagnoser]
     public class MultiplyUnsigned : UnsignedTwoParamBenchmarkBase
@@ -280,7 +258,7 @@ namespace Nethermind.Int256.Benchmark
         [Benchmark(Baseline = true)]
         public BigInteger Multiply_BigInteger()
         {
-            return ( A * B ) % Numbers.TwoTo256;
+            return (A * B) % Numbers.TwoTo256;
         }
 
         [Benchmark]
@@ -291,8 +269,6 @@ namespace Nethermind.Int256.Benchmark
         }
     }
 
-    // [SimpleJob(BenchmarkDotNet.Engines.RunStrategy.ColdStart, launchCount: 1, warmupCount: 1, targetCount: 1)]
-    // [MemoryDiagnoser]
     [SimpleJob(RuntimeMoniker.NetCoreApp31)]
     [MemoryDiagnoser]
     public class MultiplySigned : SignedTwoParamBenchmarkBase
@@ -311,8 +287,6 @@ namespace Nethermind.Int256.Benchmark
         }
     }
 
-    // [SimpleJob(BenchmarkDotNet.Engines.RunStrategy.ColdStart, launchCount: 1, warmupCount: 1, targetCount: 1)]
-    // [MemoryDiagnoser]
     [SimpleJob(RuntimeMoniker.NetCoreApp31)]
     [MemoryDiagnoser]
     public class MultiplyModUnsigned : UnsignedThreeParamBenchmarkBase
@@ -320,7 +294,7 @@ namespace Nethermind.Int256.Benchmark
         [Benchmark(Baseline = true)]
         public BigInteger MultiplyMod_BigInteger()
         {
-            return ( (A * B) % C ) % Numbers.TwoTo256;
+            return ((A * B) % C) % Numbers.TwoTo256;
         }
 
         [Benchmark]
@@ -331,8 +305,6 @@ namespace Nethermind.Int256.Benchmark
         }
     }
 
-    // [SimpleJob(BenchmarkDotNet.Engines.RunStrategy.ColdStart, launchCount: 1, warmupCount: 1, targetCount: 1)]
-    // [MemoryDiagnoser]
     [SimpleJob(RuntimeMoniker.NetCoreApp31)]
     [MemoryDiagnoser]
     public class MultiplyModSigned : SignedThreeParamBenchmarkBase
@@ -351,8 +323,6 @@ namespace Nethermind.Int256.Benchmark
         }
     }
 
-    // [SimpleJob(BenchmarkDotNet.Engines.RunStrategy.ColdStart, launchCount: 1, warmupCount: 1, targetCount: 1)]
-    // [MemoryDiagnoser]
     [SimpleJob(RuntimeMoniker.NetCoreApp31)]
     [MemoryDiagnoser]
     public class DivideUnsigned : UnsignedTwoParamBenchmarkBase
@@ -360,7 +330,7 @@ namespace Nethermind.Int256.Benchmark
         [Benchmark(Baseline = true)]
         public BigInteger Divide_BigInteger()
         {
-            return ( A / B );
+            return (A / B);
         }
 
         [Benchmark]
@@ -371,8 +341,6 @@ namespace Nethermind.Int256.Benchmark
         }
     }
 
-    // [SimpleJob(BenchmarkDotNet.Engines.RunStrategy.ColdStart, launchCount: 1, warmupCount: 1, targetCount: 1)]
-    // [MemoryDiagnoser]
     [SimpleJob(RuntimeMoniker.NetCoreApp31)]
     [MemoryDiagnoser]
     public class DivideSigned : SignedTwoParamBenchmarkBase
@@ -391,8 +359,6 @@ namespace Nethermind.Int256.Benchmark
         }
     }
 
-    // [SimpleJob(BenchmarkDotNet.Engines.RunStrategy.ColdStart, launchCount: 1, warmupCount: 1, targetCount: 1)]
-    // [MemoryDiagnoser]
     [SimpleJob(RuntimeMoniker.NetCoreApp31)]
     [MemoryDiagnoser]
     public class ExpUnsigned : UnsignedIntTwoParamBenchmarkBase
@@ -411,8 +377,6 @@ namespace Nethermind.Int256.Benchmark
         }
     }
 
-    // [SimpleJob(BenchmarkDotNet.Engines.RunStrategy.ColdStart, launchCount: 1, warmupCount: 1, targetCount: 1)]
-    // [MemoryDiagnoser]
     [SimpleJob(RuntimeMoniker.NetCoreApp31)]
     [MemoryDiagnoser]
     public class ExpSigned : SignedIntTwoParamBenchmarkBase
@@ -431,8 +395,6 @@ namespace Nethermind.Int256.Benchmark
         }
     }
 
-    // [SimpleJob(BenchmarkDotNet.Engines.RunStrategy.ColdStart, launchCount: 1, warmupCount: 1, targetCount: 1)]
-    // [MemoryDiagnoser]
     [SimpleJob(RuntimeMoniker.NetCoreApp31)]
     [MemoryDiagnoser]
     public class ExpModUnsigned : UnsignedThreeParamBenchmarkBase
@@ -451,8 +413,6 @@ namespace Nethermind.Int256.Benchmark
         }
     }
 
-    // [SimpleJob(BenchmarkDotNet.Engines.RunStrategy.ColdStart, launchCount: 1, warmupCount: 1, targetCount: 1)]
-    // [MemoryDiagnoser]
     [SimpleJob(RuntimeMoniker.NetCoreApp31)]
     [MemoryDiagnoser]
     public class ExpModSigned : SignedThreeParamBenchmarkBase
@@ -471,8 +431,6 @@ namespace Nethermind.Int256.Benchmark
         }
     }
 
-    // [SimpleJob(BenchmarkDotNet.Engines.RunStrategy.ColdStart, launchCount: 1, warmupCount: 1, targetCount: 1)]
-    // [MemoryDiagnoser]
     [SimpleJob(RuntimeMoniker.NetCoreApp31)]
     [MemoryDiagnoser]
     public class LeftShiftUnsigned : UnsignedIntTwoParamBenchmarkBase
@@ -491,8 +449,6 @@ namespace Nethermind.Int256.Benchmark
         }
     }
 
-    // [SimpleJob(BenchmarkDotNet.Engines.RunStrategy.ColdStart, launchCount: 1, warmupCount: 1, targetCount: 1)]
-    // [MemoryDiagnoser]
     [SimpleJob(RuntimeMoniker.NetCoreApp31)]
     [MemoryDiagnoser]
     public class LeftShiftSigned : SignedIntTwoParamBenchmarkBase
@@ -511,7 +467,6 @@ namespace Nethermind.Int256.Benchmark
         }
     }
 
-    // [SimpleJob(BenchmarkDotNet.Engines.RunStrategy.ColdStart, launchCount: 1, warmupCount: 1, targetCount: 1)]
     [SimpleJob(RuntimeMoniker.NetCoreApp31)]
     [MemoryDiagnoser]
     public class RightShiftUnsigned : UnsignedIntTwoParamBenchmarkBase
@@ -530,9 +485,6 @@ namespace Nethermind.Int256.Benchmark
         }
     }
 
-    // [SimpleJob(BenchmarkDotNet.Engines.RunStrategy.ColdStart, launchCount: 1, warmupCount: 1, targetCount: 1)]
-    // [IterationTime(1)]
-    // [MemoryDiagnoser]
     [SimpleJob(RuntimeMoniker.NetCoreApp31)]
     [MemoryDiagnoser]
     public class RightShiftSigned : SignedIntTwoParamBenchmarkBase

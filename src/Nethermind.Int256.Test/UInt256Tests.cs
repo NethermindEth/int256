@@ -216,7 +216,7 @@ namespace Nethermind.Int256.Test
 
     public class UInt256ImplTests : UInt256Tests<UInt256>
     {
-        public UInt256ImplTests() : base((BigInteger x) => (UInt256)x, (int x) => (UInt256)x, x => x, TestNumbers.UInt256Max) {}
+        public UInt256ImplTests() : base((BigInteger x) => (UInt256)x, (int x) => (UInt256)x, x => x, TestNumbers.UInt256Max) { }
 
         [Test]
         public virtual void Zero_is_min_value()
@@ -263,7 +263,7 @@ namespace Nethermind.Int256.Test
         private static BigInteger Postprocess(BigInteger big)
         {
             var bytes = big.ToByteArray();
-            return new BigInteger(bytes.AsSpan().Slice(0, Math.Min(256/8, bytes.Length)));
+            return new BigInteger(bytes.AsSpan().Slice(0, Math.Min(256 / 8, bytes.Length)));
         }
 
         public Int256ImplTests() : base((BigInteger x) => new Int256(x), (int x) => new Int256(x), Postprocess, TestNumbers.Int256Max)
@@ -320,10 +320,10 @@ namespace Nethermind.Int256.Test
         [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.SignedShiftTestCases))]
         public override void Rsh((BigInteger A, int n) test) => base.Rsh(test);
 
-        [TestCaseSource(typeof(UnaryOps), nameof(UnaryOps.TestCasesSigned))]
+        [TestCaseSource(typeof(UnaryOps), nameof(UnaryOps.SignedTestCases))]
         public override void ToBigIntegerAndBack(BigInteger test) => base.ToBigIntegerAndBack(test);
 
-        [TestCaseSource(typeof(UnaryOps), nameof(UnaryOps.TestCasesSigned))]
+        [TestCaseSource(typeof(UnaryOps), nameof(UnaryOps.SignedTestCases))]
         public override void ToString(BigInteger test) => base.ToString(test);
     }
 }

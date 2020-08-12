@@ -6,8 +6,7 @@ namespace Nethermind.Int256.Test
 {
     public static class UnaryOps
     {
-        public static IEnumerable<BigInteger> TestCases =
-            Enumerable.Concat(
+        public static IEnumerable<BigInteger> TestCases = Enumerable.Concat(
         new[]{
             0,
             1,
@@ -29,8 +28,7 @@ namespace Nethermind.Int256.Test
         RandomUnsinged(5)
                               );
 
-        public static IEnumerable<BigInteger> TestCasesSigned =
-            Enumerable.Concat(
+        public static IEnumerable<BigInteger> SignedTestCases = Enumerable.Concat(
         new[]{
             0,
             1,

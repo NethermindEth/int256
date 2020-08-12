@@ -8,9 +8,9 @@ namespace Nethermind.Int256.Benchmark
     {
         static void Main(string[] args)
         {
-// #if DEBUG
+            // #if DEBUG
             //         => BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args, new DebugInProcessConfig());
-// #else
+            // #else
 
             IConfig config = Debugger.IsAttached ? new DebugInProcessConfig() : DefaultConfig.Instance;
             BenchmarkRunner.Run<AddUnsigned>(config);

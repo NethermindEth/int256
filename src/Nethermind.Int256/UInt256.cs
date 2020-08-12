@@ -64,7 +64,7 @@ namespace Nethermind.Int256
             }
         }
 
-        public UInt256(ulong n) : this(n, 0, 0, 0) {}
+        public UInt256(ulong n) : this(n, 0, 0, 0) { }
 
         public (ulong value, bool overflow) UlongWithOverflow => (this.u0, (this.u1 | this.u2 | this.u3) != 0);
 
@@ -571,7 +571,8 @@ namespace Nethermind.Int256
         // sets res to its result.
         public static void MultiplyMod(in UInt256 x, in UInt256 y, in UInt256 m, out UInt256 res)
         {
-            if (x.IsZero || y.IsZero || m.IsZero) {
+            if (x.IsZero || y.IsZero || m.IsZero)
+            {
                 res = Zero;
                 return;
             }
@@ -778,8 +779,10 @@ namespace Nethermind.Int256
             Debug.Assert((BigInteger)(high << 32) + low == (BigInteger)(a * b + c));
         }
 
-        public static void Lsh(in UInt256 x, int n, out UInt256 res) {
-            if ((n % 64) == 0) {
+        public static void Lsh(in UInt256 x, int n, out UInt256 res)
+        {
+            if ((n % 64) == 0)
+            {
                 switch (n)
                 {
                     case 0:
@@ -806,7 +809,8 @@ namespace Nethermind.Int256
             // Big swaps first
             if (n > 192)
             {
-                if (n > 256) {
+                if (n > 256)
+                {
                     res = Zero;
                     return;
                 }
@@ -860,15 +864,18 @@ namespace Nethermind.Int256
             return res;
         }
 
-        public bool Bit(int n) {
+        public bool Bit(int n)
+        {
             var bucket = (n / 64) % 4;
             var position = n % 64;
-            return ( this[bucket] & ((ulong)1 << position) ) != 0;
+            return (this[bucket] & ((ulong)1 << position)) != 0;
         }
 
-        public static void Rsh(in UInt256 x, int n, out UInt256 res) {
+        public static void Rsh(in UInt256 x, int n, out UInt256 res)
+        {
             // n % 64 == 0
-            if ((n & 0x3f) == 0) {
+            if ((n & 0x3f) == 0)
+            {
                 switch (n)
                 {
                     case 0:
@@ -895,7 +902,8 @@ namespace Nethermind.Int256
             // Big swaps first
             if (n > 192)
             {
-                if (n > 256) {
+                if (n > 256)
+                {
                     res = Zero;
                     return;
                 }
@@ -942,7 +950,7 @@ namespace Nethermind.Int256
 
         sh64:
             b = Lsh(res.u2, 64 - n);
-            z2 = Rsh(res.u2,  n) | a;
+            z2 = Rsh(res.u2, n) | a;
 
         sh128:
             a = Lsh(res.u1, 64 - n);
@@ -1006,7 +1014,8 @@ namespace Nethermind.Int256
             res = new UInt256(a.u0 | b.u0, a.u1 | b.u1, a.u2 | b.u2, a.u3 | b.u3);
         }
 
-        public static UInt256 operator |(in UInt256 a, in UInt256 b) {
+        public static UInt256 operator |(in UInt256 a, in UInt256 b)
+        {
             Or(a, b, out UInt256 res);
             return res;
         }
@@ -1085,7 +1094,7 @@ namespace Nethermind.Int256
             {
                 throw new ArgumentException("n < 0");
             }
-            return new UInt256((ulong)n, 0, 0 ,0);
+            return new UInt256((ulong)n, 0, 0, 0);
         }
 
         private bool Equals(in UInt256 other)
@@ -1139,7 +1148,7 @@ namespace Nethermind.Int256
 
         public void Convert(out BigInteger big)
         {
-            big = (BigInteger) this;
+            big = (BigInteger)this;
         }
     }
 }

@@ -1,13 +1,8 @@
 using System.Runtime.CompilerServices;
 using System.Numerics;
 
-[assembly: InternalsVisibleTo("Nethermind.Int256.Test")]
 namespace Nethermind.Int256
 {
-    // public interface IToInteger<T> {
-    //     IInteger<T> Integer();
-    // }
-
     public interface IInteger<T> where T : IInteger<T>
     {
         void Add(in T a, out T res);

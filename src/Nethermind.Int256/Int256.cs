@@ -8,7 +8,7 @@ namespace Nethermind.Int256
     {
         public static readonly Int256 Zero = (Int256)0ul;
         public static readonly Int256 One = (Int256)1ul;
-        public static readonly Int256 Max = new Int256(((BigInteger.One << 255)-1));
+        public static readonly Int256 Max = new Int256(((BigInteger.One << 255) - 1));
 
         private readonly UInt256 value;
 
@@ -17,10 +17,11 @@ namespace Nethermind.Int256
             this.value = value;
         }
 
-        public Int256(BigInteger big) {
+        public Int256(BigInteger big)
+        {
             if (big.Sign < 0)
             {
-                (new Int256((UInt256) ( - big ))).Neg(out Int256 neg);
+                (new Int256((UInt256)(-big))).Neg(out Int256 neg);
                 this.value = neg.value;
             }
             else
@@ -60,7 +61,7 @@ namespace Nethermind.Int256
                 {
                     return 0;
                 }
-                if (value[value.Len-1] < 0x8000000000000000ul)
+                if (value[value.Len - 1] < 0x8000000000000000ul)
                 {
                     return 1;
                 }
@@ -128,7 +129,8 @@ namespace Nethermind.Int256
 
         public void Subtract(in Int256 a, out Int256 res) => Subtract(this, a, out res);
 
-        public static void SubtractMod(in Int256 x, in Int256 y, in Int256 m, out Int256 res) {
+        public static void SubtractMod(in Int256 x, in Int256 y, in Int256 m, out Int256 res)
+        {
             var mt = m;
             if (mt.IsOne)
             {
@@ -191,7 +193,7 @@ namespace Nethermind.Int256
             res.Neg(out res);
         }
 
-        public void Multiply(in Int256 a, out Int256 res) => Multiply(this, a, out  res);
+        public void Multiply(in Int256 a, out Int256 res) => Multiply(this, a, out res);
 
         public static bool MultiplyOverflow(in Int256 a, in Int256 b, out Int256 res)
         {
@@ -249,7 +251,7 @@ namespace Nethermind.Int256
             }
             UInt256.ExpMod(bv.value, exp.value, mAbs.value, out UInt256 ures);
             res = new Int256(ures);
-            if ( switchSign )
+            if (switchSign)
             {
                 res.Neg(out res);
             }
@@ -318,7 +320,7 @@ namespace Nethermind.Int256
 
         private void Srsh128(out Int256 res)
         {
-            res = new Int256(new UInt256(this.value.u2, this.value.u3,  ulong.MaxValue, ulong.MaxValue));
+            res = new Int256(new UInt256(this.value.u2, this.value.u3, ulong.MaxValue, ulong.MaxValue));
         }
 
         private void Srsh192(out Int256 res)
@@ -334,7 +336,8 @@ namespace Nethermind.Int256
                 res = new Int256(ures);
                 return;
             }
-            if (n % 64 == 0) {
+            if (n % 64 == 0)
+            {
                 switch (n)
                 {
                     case 0:
