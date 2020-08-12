@@ -11,7 +11,7 @@ namespace Nethermind.Int256
             value.ToBytes32(bytes32.AsSpan(), isBigEndian);
             return bytes32;
         }
-        
+
         public static void ToBytes32(this BigInteger value, Span<byte> target, bool isBigEndian)
         {
             if (!isBigEndian)
@@ -23,7 +23,7 @@ namespace Nethermind.Int256
             {
                 throw new ArgumentException($"Target length should be 32 and is {target.Length}", nameof(target));
             }
-            
+
             ReadOnlySpan<byte> bytes = value.ToByteArray(true, true);
             if (bytes.Length > 32)
             {

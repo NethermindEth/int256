@@ -9,26 +9,68 @@ namespace Nethermind.Int256.Test
         {
             get
             {
-                for (int i = 0; i < UnaryOps.TestCases.Length; i++)
+                foreach (var case1 in UnaryOps.TestCases)
                 {
-                    for (int j = 0; j < UnaryOps.TestCases.Length; j++)
+                    foreach (var case2 in UnaryOps.TestCases)
                     {
-                        yield return (UnaryOps.TestCases[i], UnaryOps.TestCases[j]);
-                    }    
+                        yield return (case1, case2);
+                    }
                 }
             }
         }
-        
+
+        public static IEnumerable<(BigInteger, BigInteger)> SignedTestCases
+        {
+            get
+            {
+                foreach (var case1 in UnaryOps.TestCasesSigned)
+                {
+                    foreach (var case2 in UnaryOps.TestCasesSigned)
+                    {
+                        yield return (case1, case2);
+                    }
+                }
+            }
+        }
+
         public static IEnumerable<(ulong, ulong)> ULongTestCases
         {
             get
             {
-                for (int i = 0; i < UnaryOps.ULongTestCases.Length; i++)
+                foreach (var case1 in UnaryOps.ULongTestCases)
                 {
-                    for (int j = 0; j < UnaryOps.ULongTestCases.Length; j++)
+                    foreach (var case2 in UnaryOps.ULongTestCases)
                     {
-                        yield return (UnaryOps.ULongTestCases[i], UnaryOps.ULongTestCases[j]);
-                    }    
+                        yield return (case1, case2);
+                    }
+                }
+            }
+        }
+
+        public static IEnumerable<(BigInteger, int)> ShiftTestCases
+        {
+            get
+            {
+                foreach (var n in UnaryOps.TestCases)
+                {
+                    foreach (var s in UnaryOps.ShiftTestCases)
+                    {
+                        yield return (n, s);
+                    }
+                }
+            }
+        }
+
+        public static IEnumerable<(BigInteger, int)> SignedShiftTestCases
+        {
+            get
+            {
+                foreach (var n in UnaryOps.TestCasesSigned)
+                {
+                    foreach (var s in UnaryOps.ShiftTestCases)
+                    {
+                        yield return (n, s);
+                    }
                 }
             }
         }

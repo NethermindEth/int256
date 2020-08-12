@@ -11,5 +11,8 @@ namespace Nethermind.Int256.Test
         public static readonly BigInteger UInt192Max = TwoTo192 - 1;
         public static readonly BigInteger TwoTo256 = TwoTo128 * TwoTo128;
         public static readonly BigInteger UInt256Max = TwoTo256 - 1;
+
+        public static readonly BigInteger Int256Min = BigInteger.One << 255;
+        public static readonly BigInteger Int256Max = Int256Max - 1;
     }
 }
