@@ -13,48 +13,37 @@ namespace Nethermind.Int256.Benchmark
 
         public IEnumerable<UInt256> ValuesUint256 => Values.Select(x => (UInt256)x);
 
+        public IEnumerable<(BigInteger, UInt256)> ValuesTuple => Values.Zip(Values.Select(x => (UInt256)x), (x, y) => (x, y));
+
         public IEnumerable<int> ValuesInt => UnaryOps.RandomInt(3);
 
         public IEnumerable<UInt256> ValuesIntUint256 => ValuesInt.Select(x => (UInt256)x);
+
+        public IEnumerable<(int, UInt256)> ValuesIntTuple => ValuesInt.Zip(ValuesInt.Select(x => (UInt256)x), (x, y) => (x, y));
     }
 
     public class UnsignedIntTwoParamBenchmarkBase : UnsingedBenchmarkBase
     {
-        [ParamsSource(nameof(Values))]
-        public BigInteger A;
+        [ParamsSource(nameof(ValuesTuple))]
+        public (BigInteger, UInt256) A;
 
-        [ParamsSource(nameof(ValuesUint256))]
-        public UInt256 UInt256A;
-
-        [ParamsSource(nameof(ValuesInt))]
-        public int D;
-
-        [ParamsSource(nameof(ValuesIntUint256))]
-        public UInt256 UInt256D;
+        [ParamsSource(nameof(ValuesIntTuple))]
+        public (int, UInt256) D;
     }
 
     public class UnsignedTwoParamBenchmarkBase : UnsingedBenchmarkBase
     {
-        [ParamsSource(nameof(Values))]
-        public BigInteger A;
+        [ParamsSource(nameof(ValuesTuple))]
+        public (BigInteger, UInt256) A;
 
-        [ParamsSource(nameof(Values))]
-        public BigInteger B;
-
-        [ParamsSource(nameof(ValuesUint256))]
-        public UInt256 UInt256A;
-
-        [ParamsSource(nameof(ValuesUint256))]
-        public UInt256 UInt256B;
+        [ParamsSource(nameof(ValuesTuple))]
+        public (BigInteger, UInt256) B;
     }
 
     public class UnsignedThreeParamBenchmarkBase : UnsignedTwoParamBenchmarkBase
     {
-        [ParamsSource(nameof(Values))]
-        public BigInteger C;
-
-        [ParamsSource(nameof(ValuesUint256))]
-        public UInt256 UInt256C;
+        [ParamsSource(nameof(ValuesTuple))]
+        public (BigInteger, UInt256) C;
     }
 
     public class SignedBenchmarkBase
@@ -63,48 +52,37 @@ namespace Nethermind.Int256.Benchmark
 
         public IEnumerable<Int256> ValuesInt256 => Values.Select(x => (Int256)x);
 
+        public IEnumerable<(BigInteger, Int256)> ValuesTuple => Values.Zip(Values.Select(x => (Int256)x), (big, int256) => (big, int256));
+
         public IEnumerable<int> ValuesInt => UnaryOps.RandomInt(3);
 
         public IEnumerable<Int256> ValuesIntInt256 => ValuesInt.Select(x => (Int256)x);
+
+        public IEnumerable<(int, Int256)> ValuesIntTuple => ValuesInt.Zip(ValuesInt.Select(x => (Int256)x), (x, y) => (x, y));
     }
 
     public class SignedTwoParamBenchmarkBase : SignedBenchmarkBase
     {
-        [ParamsSource(nameof(Values))]
-        public BigInteger A;
+        [ParamsSource(nameof(ValuesTuple))]
+        public (BigInteger, Int256) A;
 
-        [ParamsSource(nameof(Values))]
-        public BigInteger B;
-
-        [ParamsSource(nameof(ValuesInt256))]
-        public Int256 Int256A;
-
-        [ParamsSource(nameof(ValuesInt256))]
-        public Int256 Int256B;
+        [ParamsSource(nameof(ValuesTuple))]
+        public (BigInteger, Int256) B;
     }
 
     public class SignedThreeParamBenchmarkBase : SignedTwoParamBenchmarkBase
     {
-        [ParamsSource(nameof(Values))]
-        public BigInteger C;
-
-        [ParamsSource(nameof(ValuesInt256))]
-        public Int256 Int256C;
+        [ParamsSource(nameof(ValuesTuple))]
+        public (BigInteger, Int256) C;
     }
 
     public class SignedIntTwoParamBenchmarkBase : SignedBenchmarkBase
     {
-        [ParamsSource(nameof(Values))]
-        public BigInteger A;
+        [ParamsSource(nameof(ValuesTuple))]
+        public (BigInteger, Int256) A;
 
-        [ParamsSource(nameof(ValuesInt256))]
-        public Int256 Int256A;
-
-        [ParamsSource(nameof(ValuesInt))]
-        public int D;
-
-        [ParamsSource(nameof(ValuesIntInt256))]
-        public Int256 Int256D;
+        [ParamsSource(nameof(ValuesIntTuple))]
+        public (int, Int256) D;
     }
 
     [SimpleJob(RuntimeMoniker.NetCoreApp31)]
@@ -114,13 +92,13 @@ namespace Nethermind.Int256.Benchmark
         [Benchmark(Baseline = true)]
         public BigInteger Add_BigInteger()
         {
-            return (A + B) % Numbers.TwoTo256;
+            return (A.Item1 + B.Item1) % Numbers.TwoTo256;
         }
 
         [Benchmark]
         public UInt256 Add_Int256()
         {
-            UInt256.Add(UInt256A, UInt256B, out UInt256 res);
+            UInt256.Add(A.Item2, B.Item2, out UInt256 res);
             return res;
         }
     }
@@ -132,13 +110,13 @@ namespace Nethermind.Int256.Benchmark
         [Benchmark(Baseline = true)]
         public BigInteger Add_BigInteger()
         {
-            return (A + B) % Numbers.TwoTo256;
+            return (A.Item1 + B.Item1) % Numbers.TwoTo256;
         }
 
         [Benchmark]
         public Int256 Add_Int256()
         {
-            Int256.Add(Int256A, Int256B, out Int256 res);
+            Int256.Add(A.Item2, B.Item2, out Int256 res);
             return res;
         }
     }
@@ -150,13 +128,13 @@ namespace Nethermind.Int256.Benchmark
         [Benchmark(Baseline = true)]
         public BigInteger Subtract_BigInteger()
         {
-            return (A - B) % Numbers.TwoTo256;
+            return (A.Item1 - B.Item1) % Numbers.TwoTo256;
         }
 
         [Benchmark]
         public UInt256 Subtract_Int256()
         {
-            UInt256.Subtract(UInt256A, UInt256B, out UInt256 res);
+            UInt256.Subtract(A.Item2, B.Item2, out UInt256 res);
             return res;
         }
     }
@@ -168,13 +146,13 @@ namespace Nethermind.Int256.Benchmark
         [Benchmark(Baseline = true)]
         public BigInteger Subtract_BigInteger()
         {
-            return (A - B) % Numbers.TwoTo256;
+            return (A.Item1 - B.Item1) % Numbers.TwoTo256;
         }
 
         [Benchmark]
         public Int256 Subtract_Int256()
         {
-            Int256.Subtract(Int256A, Int256B, out Int256 res);
+            Int256.Subtract(A.Item2, B.Item2, out Int256 res);
             return res;
         }
     }
@@ -186,13 +164,13 @@ namespace Nethermind.Int256.Benchmark
         [Benchmark(Baseline = true)]
         public BigInteger AddMod_BigInteger()
         {
-            return ((A + B) % C) % Numbers.TwoTo256;
+            return ((A.Item1 + B.Item1) % C.Item1) % Numbers.TwoTo256;
         }
 
         [Benchmark]
         public UInt256 AddMod_Int256()
         {
-            UInt256.AddMod(UInt256A, UInt256B, UInt256C, out UInt256 res);
+            UInt256.AddMod(A.Item2, B.Item2, C.Item2, out UInt256 res);
             return res;
         }
     }
@@ -204,13 +182,13 @@ namespace Nethermind.Int256.Benchmark
         [Benchmark(Baseline = true)]
         public BigInteger AddMod_BigInteger()
         {
-            return ((A + B) % C) % Numbers.TwoTo256;
+            return ((A.Item1 + B.Item1) % C.Item1) % Numbers.TwoTo256;
         }
 
         [Benchmark]
         public Int256 AddMod_Int256()
         {
-            Int256.AddMod(Int256A, Int256B, Int256C, out Int256 res);
+            Int256.AddMod(A.Item2, B.Item2, C.Item2, out Int256 res);
             return res;
         }
     }
@@ -222,13 +200,13 @@ namespace Nethermind.Int256.Benchmark
         [Benchmark(Baseline = true)]
         public BigInteger SubtractMod_BigInteger()
         {
-            return ((A - B) % C) % Numbers.TwoTo256;
+            return ((A.Item1 - B.Item1) % C.Item1) % Numbers.TwoTo256;
         }
 
         [Benchmark]
         public UInt256 AddMod_Int256()
         {
-            UInt256.SubtractMod(UInt256A, UInt256B, UInt256C, out UInt256 res);
+            UInt256.SubtractMod(A.Item2, B.Item2, C.Item2, out UInt256 res);
             return res;
         }
     }
@@ -240,13 +218,13 @@ namespace Nethermind.Int256.Benchmark
         [Benchmark(Baseline = true)]
         public BigInteger SubtractMod_BigInteger()
         {
-            return ((A - B) % C) % Numbers.TwoTo256;
+            return ((A.Item1 - B.Item1) % C.Item1) % Numbers.TwoTo256;
         }
 
         [Benchmark]
         public Int256 AddMod_Int256()
         {
-            Int256.SubtractMod(Int256A, Int256B, Int256C, out Int256 res);
+            Int256.SubtractMod(A.Item2, B.Item2, C.Item2, out Int256 res);
             return res;
         }
     }
@@ -258,13 +236,13 @@ namespace Nethermind.Int256.Benchmark
         [Benchmark(Baseline = true)]
         public BigInteger Multiply_BigInteger()
         {
-            return (A * B) % Numbers.TwoTo256;
+            return (A.Item1 * B.Item1) % Numbers.TwoTo256;
         }
 
         [Benchmark]
         public UInt256 Multiply_Int256()
         {
-            UInt256.Multiply(UInt256A, UInt256B, out UInt256 res);
+            UInt256.Multiply(A.Item2, B.Item2, out UInt256 res);
             return res;
         }
     }
@@ -276,13 +254,13 @@ namespace Nethermind.Int256.Benchmark
         [Benchmark(Baseline = true)]
         public BigInteger Multiply_BigInteger()
         {
-            return (A * B) % Numbers.TwoTo256;
+            return (A.Item1 * B.Item1) % Numbers.TwoTo256;
         }
 
         [Benchmark]
         public Int256 Multiply_Int256()
         {
-            Int256.Multiply(Int256A, Int256B, out Int256 res);
+            Int256.Multiply(A.Item2, B.Item2, out Int256 res);
             return res;
         }
     }
@@ -294,13 +272,13 @@ namespace Nethermind.Int256.Benchmark
         [Benchmark(Baseline = true)]
         public BigInteger MultiplyMod_BigInteger()
         {
-            return ((A * B) % C) % Numbers.TwoTo256;
+            return ((A.Item1 * B.Item1) % C.Item1) % Numbers.TwoTo256;
         }
 
         [Benchmark]
         public UInt256 Multiply_Int256()
         {
-            UInt256.MultiplyMod(UInt256A, UInt256B, UInt256C, out UInt256 res);
+            UInt256.MultiplyMod(A.Item2, B.Item2, C.Item2, out UInt256 res);
             return res;
         }
     }
@@ -312,13 +290,13 @@ namespace Nethermind.Int256.Benchmark
         [Benchmark(Baseline = true)]
         public BigInteger MultiplyMod_BigInteger()
         {
-            return ((A * B) % C) % Numbers.TwoTo256;
+            return ((A.Item1 * B.Item1) % C.Item1) % Numbers.TwoTo256;
         }
 
         [Benchmark]
         public Int256 Multiply_Int256()
         {
-            Int256.MultiplyMod(Int256A, Int256B, Int256C, out Int256 res);
+            Int256.MultiplyMod(A.Item2, B.Item2, C.Item2, out Int256 res);
             return res;
         }
     }
@@ -330,13 +308,13 @@ namespace Nethermind.Int256.Benchmark
         [Benchmark(Baseline = true)]
         public BigInteger Divide_BigInteger()
         {
-            return (A / B);
+            return (A.Item1 / B.Item1);
         }
 
         [Benchmark]
         public UInt256 Multiply_Int256()
         {
-            UInt256.Divide(UInt256A, UInt256B, out UInt256 res);
+            UInt256.Divide(A.Item2, B.Item2, out UInt256 res);
             return res;
         }
     }
@@ -348,13 +326,13 @@ namespace Nethermind.Int256.Benchmark
         [Benchmark(Baseline = true)]
         public BigInteger Divide_BigInteger()
         {
-            return (A / B);
+            return (A.Item1 / B.Item1);
         }
 
         [Benchmark]
         public Int256 Multiply_Int256()
         {
-            Int256.Divide(Int256A, Int256B, out Int256 res);
+            Int256.Divide(A.Item2, B.Item2, out Int256 res);
             return res;
         }
     }
@@ -366,13 +344,13 @@ namespace Nethermind.Int256.Benchmark
         [Benchmark(Baseline = true)]
         public BigInteger ExpMod_BigInteger()
         {
-            return BigInteger.Pow(A, D) % Numbers.TwoTo64;
+            return BigInteger.Pow(A.Item1, D.Item1) % Numbers.TwoTo64;
         }
 
         [Benchmark]
         public UInt256 ExpMod_Int256()
         {
-            UInt256.Exp(UInt256A, UInt256D, out UInt256 res);
+            UInt256.Exp(A.Item2, D.Item2, out UInt256 res);
             return res;
         }
     }
@@ -384,13 +362,13 @@ namespace Nethermind.Int256.Benchmark
         [Benchmark(Baseline = true)]
         public BigInteger ExpMod_BigInteger()
         {
-            return BigInteger.Pow(A, D) % Numbers.TwoTo64;
+            return BigInteger.Pow(A.Item1, D.Item1) % Numbers.TwoTo64;
         }
 
         [Benchmark]
         public Int256 ExpMod_Int256()
         {
-            Int256.Exp(Int256A, Int256D, out Int256 res);
+            Int256.Exp(A.Item2, D.Item2, out Int256 res);
             return res;
         }
     }
@@ -402,13 +380,13 @@ namespace Nethermind.Int256.Benchmark
         [Benchmark(Baseline = true)]
         public BigInteger ExpMod_BigInteger()
         {
-            return BigInteger.ModPow(A, B, C) % Numbers.TwoTo64;
+            return BigInteger.ModPow(A.Item1, B.Item1, C.Item1) % Numbers.TwoTo64;
         }
 
         [Benchmark]
         public UInt256 ExpMod_Int256()
         {
-            UInt256.ExpMod(UInt256A, UInt256B, UInt256C, out UInt256 res);
+            UInt256.ExpMod(A.Item2, B.Item2, C.Item2, out UInt256 res);
             return res;
         }
     }
@@ -420,13 +398,13 @@ namespace Nethermind.Int256.Benchmark
         [Benchmark(Baseline = true)]
         public BigInteger ExpMod_BigInteger()
         {
-            return BigInteger.ModPow(A, B, C) % Numbers.TwoTo64;
+            return BigInteger.ModPow(A.Item1, B.Item1, C.Item1) % Numbers.TwoTo64;
         }
 
         [Benchmark]
         public Int256 ExpMod_Int256()
         {
-            Int256.ExpMod(Int256A, Int256B, Int256C, out Int256 res);
+            Int256.ExpMod(A.Item2, B.Item2, C.Item2, out Int256 res);
             return res;
         }
     }
@@ -438,13 +416,13 @@ namespace Nethermind.Int256.Benchmark
         [Benchmark(Baseline = true)]
         public BigInteger LeftShift_BigInteger()
         {
-            return (A << D) % Numbers.TwoTo64;
+            return (A.Item1 << D.Item1) % Numbers.TwoTo64;
         }
 
         [Benchmark]
         public UInt256 LeftShift_Int256()
         {
-            UInt256A.LeftShift(D, out UInt256 res);
+            A.Item2.LeftShift(D.Item1, out UInt256 res);
             return res;
         }
     }
@@ -456,13 +434,13 @@ namespace Nethermind.Int256.Benchmark
         [Benchmark(Baseline = true)]
         public BigInteger LeftShift_BigInteger()
         {
-            return (A << D) % Numbers.TwoTo64;
+            return (A.Item1 << D.Item1) % Numbers.TwoTo64;
         }
 
         [Benchmark]
         public Int256 LeftShift_Int256()
         {
-            Int256A.LeftShift(D, out Int256 res);
+            A.Item2.LeftShift(D.Item1, out Int256 res);
             return res;
         }
     }
@@ -474,13 +452,13 @@ namespace Nethermind.Int256.Benchmark
         [Benchmark(Baseline = true)]
         public BigInteger RightShift_BigInteger()
         {
-            return (A >> D) % Numbers.TwoTo64;
+            return (A.Item1 >> D.Item1) % Numbers.TwoTo64;
         }
 
         [Benchmark]
         public UInt256 RightShift_Int256()
         {
-            UInt256A.RightShift(D, out UInt256 res);
+            A.Item2.RightShift(D.Item1, out UInt256 res);
             return res;
         }
     }
@@ -492,13 +470,13 @@ namespace Nethermind.Int256.Benchmark
         [Benchmark(Baseline = true)]
         public BigInteger LeftShift_BigInteger()
         {
-            return (A >> D) % Numbers.TwoTo64;
+            return (A.Item1 >> D.Item1) % Numbers.TwoTo64;
         }
 
         [Benchmark]
         public Int256 RightShift_Int256()
         {
-            Int256A.RightShift(D, out Int256 res);
+            A.Item2.RightShift(D.Item1, out Int256 res);
             return res;
         }
     }
