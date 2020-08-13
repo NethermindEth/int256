@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Buffers.Binary;
+using System.ComponentModel.Design;
 using System.Globalization;
 using System.Linq;
 using System.Numerics;
@@ -16,7 +17,7 @@ namespace Nethermind.Int256
         public static readonly UInt256 MinValue = Zero;
         public static readonly UInt256 MaxValue = ~Zero;
 
-        /* in little endian order so u4 is the most significant ulong */
+        /* in little endian order so u3 is the most significant ulong */
         public readonly ulong u0;
         public readonly ulong u1;
         public readonly ulong u2;
@@ -29,7 +30,7 @@ namespace Nethermind.Int256
             u2 = (ulong) r5 << 32 | r4;
             u3 = (ulong) r7 << 32 | r6;
         }
-        
+
         public UInt256(ulong u0, ulong u1, ulong u2, ulong u3)
         {
             this.u0 = u0;
@@ -40,19 +41,92 @@ namespace Nethermind.Int256
 
         public UInt256(ReadOnlySpan<byte> bytes, bool isBigEndian = false)
         {
-            if (isBigEndian)
+            if (bytes.Length == 32)
             {
-                u3 = BinaryPrimitives.ReadUInt64BigEndian(bytes.Slice(0, 8));
-                u2 = BinaryPrimitives.ReadUInt64BigEndian(bytes.Slice(8, 8));
-                u1 = BinaryPrimitives.ReadUInt64BigEndian(bytes.Slice(16, 8));
-                u0 = BinaryPrimitives.ReadUInt64BigEndian(bytes.Slice(24, 8));
+                if (isBigEndian)
+                {
+                    u3 = BinaryPrimitives.ReadUInt64BigEndian(bytes.Slice(0, 8));
+                    u2 = BinaryPrimitives.ReadUInt64BigEndian(bytes.Slice(8, 8));
+                    u1 = BinaryPrimitives.ReadUInt64BigEndian(bytes.Slice(16, 8));
+                    u0 = BinaryPrimitives.ReadUInt64BigEndian(bytes.Slice(24, 8));
+                }
+                else
+                {
+                    u0 = BinaryPrimitives.ReadUInt64LittleEndian(bytes.Slice(0, 8));
+                    u1 = BinaryPrimitives.ReadUInt64LittleEndian(bytes.Slice(8, 8));
+                    u2 = BinaryPrimitives.ReadUInt64LittleEndian(bytes.Slice(16, 8));
+                    u3 = BinaryPrimitives.ReadUInt64LittleEndian(bytes.Slice(24, 8));
+                }
             }
             else
             {
-                u0 = BinaryPrimitives.ReadUInt64LittleEndian(bytes.Slice(0, 8));
-                u1 = BinaryPrimitives.ReadUInt64LittleEndian(bytes.Slice(8, 8));
-                u2 = BinaryPrimitives.ReadUInt64LittleEndian(bytes.Slice(16, 8));
-                u3 = BinaryPrimitives.ReadUInt64LittleEndian(bytes.Slice(24, 8));
+                int byteCount = bytes.Length;
+                int unalignedBytes = byteCount % 8;
+                int dwordCount = byteCount / 8 + (unalignedBytes == 0 ? 0 : 1);
+
+                ulong cs0 = 0;
+                ulong cs1 = 0;
+                ulong cs2 = 0;
+                ulong cs3 = 0;
+
+                if (dwordCount == 0)
+                {
+                    u0 = u1 = u2 = u3 = 0;
+                    return;
+                }
+
+                if (dwordCount >= 1)
+                {
+                    for (int j = 8; j > 0; j--)
+                    {
+                        cs0 = cs0 << 8;
+                        if (j <= byteCount)
+                        {
+                            cs0 = cs0 | bytes[byteCount - j];
+                        }
+                    }
+                }
+
+                if (dwordCount >= 2)
+                {
+                    for (int j = 16; j > 8; j--)
+                    {
+                        cs1 = cs1 << 8;
+                        if (j <= byteCount)
+                        {
+                            cs1 = cs1 | bytes[byteCount - j];
+                        }
+                    }
+                }
+
+                if (dwordCount >= 3)
+                {
+                    for (int j = 24; j > 16; j--)
+                    {
+                        cs2 = cs2 << 8;
+                        if (j <= byteCount)
+                        {
+                            cs2 = cs2 | bytes[byteCount - j];
+                        }
+                    }
+                }
+
+                if (dwordCount >= 4)
+                {
+                    for (int j = 32; j > 24; j--)
+                    {
+                        cs3 = cs3 << 8;
+                        if (j <= byteCount)
+                        {
+                            cs3 = cs3 | bytes[byteCount - j];
+                        }
+                    }
+                }
+
+                u0 = cs0;
+                u1 = cs1;
+                u2 = cs2;
+                u3 = cs3;
             }
         }
 
@@ -77,7 +151,7 @@ namespace Nethermind.Int256
         public UInt256(ulong n) : this(n, 0, 0, 0)
         {
         }
-        
+
         public static explicit operator double(in UInt256 a)
         {
             if (a.u1 == 0)
@@ -133,7 +207,7 @@ namespace Nethermind.Int256
             Rsh(in a, shift, out UInt256 aShift);
             return new decimal((int) aShift.r0, (int) aShift.r1, (int) aShift.r2, false, (byte) shift);
         }
-        
+
         public static explicit operator UInt256(decimal a)
         {
             var bits = decimal.GetBits(decimal.Truncate(a));
@@ -285,7 +359,7 @@ namespace Nethermind.Int256
             ToBigEndian(bytes);
             return bytes;
         }
-        
+
         public void ToBigEndian(Span<byte> target)
         {
             if (target.Length == 32)
@@ -1209,21 +1283,21 @@ namespace Nethermind.Int256
             Add(in a, in b, out UInt256 res);
             return res;
         }
-        
+
         public static UInt256 operator ++(UInt256 a)
         {
             Add(in a, 1, out UInt256 res);
             return res;
         }
-        
+
         public static UInt256 operator -(in UInt256 a, in UInt256 b)
         {
             if (SubtractUnderflow(in a, in b, out UInt256 c))
             {
-                return c;
+                throw new ArithmeticException("Underflow in subtraction");
             }
 
-            throw new ArithmeticException("Underflow in subtraction");
+            return c;
         }
 
         public static bool operator ==(in UInt256 a, in UInt256 b) => a.Equals(b);
@@ -1321,14 +1395,14 @@ namespace Nethermind.Int256
             Multiply(in a, in b, out UInt256 c);
             return c;
         }
-        
+
         public static UInt256 operator /(UInt256 a, uint b)
         {
             UInt256 ub = b;
             Multiply(in a, in ub, out UInt256 c);
             return c;
         }
-        
+
         public static UInt256 operator /(UInt256 a, UInt256 b)
         {
             Divide(in a, in b, out UInt256 c);
@@ -1682,7 +1756,7 @@ namespace Nethermind.Int256
         }
 
         public override string ToString() => ((BigInteger) this).ToString();
-        
+
         public int CompareTo(object obj)
         {
             if (!(obj is UInt256))
