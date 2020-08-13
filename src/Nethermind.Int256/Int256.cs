@@ -61,7 +61,7 @@ namespace Nethermind.Int256
                 {
                     return 0;
                 }
-                if (value[value.Len - 1] < 0x8000000000000000ul)
+                if (value[UInt256.Len - 1] < 0x8000000000000000ul)
                 {
                     return 1;
                 }
@@ -575,12 +575,11 @@ namespace Nethermind.Int256
 
         public static explicit operator BigInteger(Int256 x)
         {
-            var xv = (Span<ulong>)x.value;
             Span<byte> bytes = stackalloc byte[32];
-            BinaryPrimitives.WriteUInt64LittleEndian(bytes.Slice(0, 8), xv[0]);
-            BinaryPrimitives.WriteUInt64LittleEndian(bytes.Slice(8, 8), xv[1]);
-            BinaryPrimitives.WriteUInt64LittleEndian(bytes.Slice(16, 8), xv[2]);
-            BinaryPrimitives.WriteUInt64LittleEndian(bytes.Slice(24, 8), xv[3]);
+            BinaryPrimitives.WriteUInt64LittleEndian(bytes.Slice(0, 8), x.value.u0);
+            BinaryPrimitives.WriteUInt64LittleEndian(bytes.Slice(8, 8), x.value.u1);
+            BinaryPrimitives.WriteUInt64LittleEndian(bytes.Slice(16, 8), x.value.u2);
+            BinaryPrimitives.WriteUInt64LittleEndian(bytes.Slice(24, 8), x.value.u3);
             return new BigInteger(bytes);
         }
 
