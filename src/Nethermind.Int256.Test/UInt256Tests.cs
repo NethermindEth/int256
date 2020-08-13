@@ -1,35 +1,62 @@
+using System;
 using System.Numerics;
 using FluentAssertions;
 using NUnit.Framework;
 
 namespace Nethermind.Int256.Test
 {
-    public class UInt256Tests
+    public partial class UInt256TestsTemplate<T> where T : IInteger<T>
     {
-        [SetUp]
-        public void Setup()
+        protected readonly Func<BigInteger, T> convert;
+        protected readonly Func<int, T> convertFromInt;
+        protected readonly Func<BigInteger, BigInteger> postprocess;
+        protected readonly BigInteger maxValue;
+
+        protected UInt256TestsTemplate(Func<BigInteger, T> convert, Func<int, T> convertFromInt, Func<BigInteger, BigInteger> postprocess, BigInteger maxValue)
         {
+            this.convert = convert;
+            this.convertFromInt = convertFromInt;
+            this.postprocess = postprocess;
+            this.maxValue = maxValue;
         }
 
         [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
-        public void Add((BigInteger A, BigInteger B) test)
+        public virtual void Add((BigInteger A, BigInteger B) test)
         {
             BigInteger resBigInt = test.A + test.B;
             resBigInt = resBigInt % (BigInteger.One << 256);
-            
-            UInt256 uint256a = (UInt256) test.A;
-            UInt256 uint256b = (UInt256) test.B;
-            UInt256.Add(uint256a, uint256b, out UInt256 res);
-            BigInteger resUInt256 = (BigInteger)res;
+            resBigInt = postprocess(resBigInt);
+
+            T a = convert(test.A);
+            T b = convert(test.B);
+            a.Add(b, out T res);
+            res.Convert(out BigInteger resUInt256);
 
             resUInt256.Should().Be(resBigInt);
-            
-            BigInteger resUInt256Op = (BigInteger)(uint256a + uint256b);
-            resUInt256Op.Should().Be(resBigInt);
         }
-        
+
+        [TestCaseSource(typeof(TernaryOps), nameof(TernaryOps.TestCases))]
+        public virtual void AddMod((BigInteger A, BigInteger B, BigInteger M) test)
+        {
+            if (test.M.IsZero)
+            {
+                return;
+            }
+            BigInteger resBigInt = (test.A + test.B) % test.M;
+            resBigInt = resBigInt % (BigInteger.One << 256);
+            resBigInt = postprocess(resBigInt);
+
+            T uint256a = convert(test.A);
+            T uint256b = convert(test.B);
+            T uint256m = convert(test.M);
+            uint256a.AddMod(uint256b, uint256m, out T res);
+            res.Convert(out BigInteger resUInt256);
+
+            resUInt256.Should().Be(resBigInt);
+        }
+
         [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
-        public void Subtract((BigInteger A, BigInteger B) test)
+        public virtual void Subtract((BigInteger A, BigInteger B) test)
         {
             if (test.A < test.B)
             {
@@ -37,88 +64,196 @@ namespace Nethermind.Int256.Test
             }
 
             BigInteger resBigInt = test.A - test.B;
-            
-            UInt256 uint256a = (UInt256) test.A;
-            UInt256 uint256b = (UInt256) test.B;
-            UInt256.Subtract(uint256a, uint256b, out UInt256 res);
-            BigInteger resUInt256 = (BigInteger) res;
+            resBigInt %= BigInteger.One << 256;
+            resBigInt = postprocess(resBigInt);
+
+            T uint256a = convert(test.A);
+            T uint256b = convert(test.B);
+            uint256a.Subtract(uint256b, out T res);
+            res.Convert(out BigInteger resUInt256);
 
             resUInt256.Should().Be(resBigInt);
         }
-        
+
         [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
-        public void Multiply((BigInteger A, BigInteger B) test)
+        public virtual void Multiply((BigInteger A, BigInteger B) test)
         {
-            BigInteger resBigInt = test.A * test.B % (BigInteger.One << 256);
-            
-            UInt256 uint256a = (UInt256) test.A;
-            UInt256 uint256b = (UInt256) test.B;
-            UInt256.Add(uint256a, uint256b, out UInt256 res);
-            BigInteger resUInt256 = (BigInteger) res;
+            BigInteger resBigInt = (test.A * test.B) % (BigInteger.One << 256);
+            resBigInt = postprocess(resBigInt);
+
+            T uint256a = convert(test.A);
+            T uint256b = convert(test.B);
+            uint256a.Multiply(uint256b, out T res);
+            res.Convert(out BigInteger resUInt256);
 
             resUInt256.Should().Be(resBigInt);
         }
-        
-        [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.ULongTestCases))]
-        public void MultiplyULong((ulong A, ulong B) test)
+
+        [TestCaseSource(typeof(TernaryOps), nameof(TernaryOps.TestCases))]
+        public virtual void MultiplyMod((BigInteger A, BigInteger B, BigInteger M) test)
         {
-            BigInteger resBigInt = (BigInteger)test.A * test.B % (BigInteger.One << 256);
-            UInt256.Multiply64(test.A, test.B, out ulong high, out ulong low);
-            BigInteger resUInt256 = high * (BigInteger.One << 64) + low;
+            if (test.M.IsZero)
+            {
+                return;
+            }
+            BigInteger resBigInt = ((test.A * test.B) % test.M) % (BigInteger.One << 256);
+            resBigInt = postprocess(resBigInt);
+
+            T uint256a = convert(test.A);
+            T uint256b = convert(test.B);
+            T uint256m = convert(test.M);
+            uint256a.MultiplyMod(uint256b, uint256m, out T res);
+            res.Convert(out BigInteger resUInt256);
+
             resUInt256.Should().Be(resBigInt);
         }
-        
-        [TestCaseSource(typeof(UnaryOps), nameof(UnaryOps.TestCases))]
-        public void ToBigIntegerAndBack(BigInteger test)
+
+        [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
+        public virtual void Div((BigInteger A, BigInteger B) test)
         {
-            UInt256 uint256 = (UInt256)test;
-            BigInteger res = (BigInteger)uint256;
+            if (test.B.IsZero)
+            {
+                return;
+            }
+            BigInteger resBigInt = (test.A / test.B) % (BigInteger.One << 256);
+            resBigInt = postprocess(resBigInt);
+
+            T uint256a = convert(test.A);
+            T uint256b = convert(test.B);
+            uint256a.Divide(uint256b, out T res);
+            res.Convert(out BigInteger resUInt256);
+
+            resUInt256.Should().Be(resBigInt);
+        }
+
+        [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.ShiftTestCases))]
+        public virtual void Exp((BigInteger A, int n) test)
+        {
+            BigInteger resBigInt = BigInteger.Pow(test.A, test.n);
+            resBigInt = resBigInt % (BigInteger.One << 256);
+            resBigInt = postprocess(resBigInt);
+
+            T uint256a = convert(test.A);
+
+            uint256a.Exp(convertFromInt(test.n), out T res);
+            res.Convert(out BigInteger resUInt256);
+
+            resUInt256.Should().Be(resBigInt);
+        }
+
+        [TestCaseSource(typeof(TernaryOps), nameof(TernaryOps.TestCases))]
+        public virtual void ExpMod((BigInteger A, BigInteger B, BigInteger M) test)
+        {
+            if (test.M.IsZero || test.B < 0)
+            {
+                return;
+            }
+            BigInteger resBigInt = BigInteger.ModPow(test.A, test.B, test.M);
+            resBigInt = resBigInt % (BigInteger.One << 256);
+            resBigInt = postprocess(resBigInt);
+
+            T uint256a = convert(test.A);
+            T uint256b = convert(test.B);
+            T uint256m = convert(test.M);
+
+            uint256a.ExpMod(uint256b, uint256m, out T res);
+            res.Convert(out BigInteger resUInt256);
+
+            resUInt256.Should().Be(resBigInt);
+        }
+
+        [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.ShiftTestCases))]
+        public virtual void Lsh((BigInteger A, int n) test)
+        {
+            if (test.n == 0)
+            {
+                return;
+            }
+            BigInteger resBigInt = test.A << test.n;
+            resBigInt = resBigInt % (BigInteger.One << 256);
+            resBigInt = postprocess(resBigInt);
+
+            T uint256a = convert(test.A);
+            uint256a.LeftShift(test.n, out T res);
+            res.Convert(out BigInteger resUInt256);
+
+            resUInt256.Should().Be(resBigInt);
+        }
+
+        [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.ShiftTestCases))]
+        public virtual void Rsh((BigInteger A, int n) test)
+        {
+            if (test.n == 0)
+            {
+                return;
+            }
+            BigInteger resBigInt = test.A >> test.n;
+            resBigInt = resBigInt % (BigInteger.One << 256);
+            resBigInt = postprocess(resBigInt);
+
+            T uint256a = convert(test.A);
+            uint256a.RightShift(test.n, out T res);
+            res.Convert(out BigInteger resUInt256);
+
+            resUInt256.Should().Be(resBigInt);
+        }
+
+        [TestCaseSource(typeof(UnaryOps), nameof(UnaryOps.TestCases))]
+        public virtual void ToBigIntegerAndBack(BigInteger test)
+        {
+            T uint256 = convert(test);
+            uint256.Convert(out BigInteger res);
             res.Should().Be(test);
         }
-        
+
         [TestCaseSource(typeof(UnaryOps), nameof(UnaryOps.TestCases))]
-        public void ToString(BigInteger test)
+        public virtual void ToString(BigInteger test)
         {
-            UInt256 uint256 = (UInt256)test;
+            T uint256 = convert(test);
             uint256.ToString().Should().Be(test.ToString());
         }
-        
+    }
+
+    public class UInt256Tests : UInt256TestsTemplate<UInt256>
+    {
+        public UInt256Tests() : base((BigInteger x) => (UInt256)x, (int x) => (UInt256)x, x => x, TestNumbers.UInt256Max) { }
+
         [Test]
-        public void Zero_is_min_value()
+        public virtual void Zero_is_min_value()
         {
-            UInt256.Zero.Should().Be(UInt256.MinValue);
+            convert(1).ZeroValue.Should().Be(UInt256.MinValue);
         }
-        
+
         [Test]
-        public void Zero_is_zero()
+        public virtual void Zero_is_zero()
         {
-            UInt256.Zero.Should().Be((UInt256)BigInteger.Zero);
+            convert(1).ZeroValue.Should().Be(convert(BigInteger.Zero));
         }
-        
+
         [Test]
-        public void Is_zero()
+        public virtual void Is_zero()
         {
-            UInt256.Zero.IsZero.Should().BeTrue();
+            convert(1).ZeroValue.IsZero.Should().BeTrue();
             UInt256.One.IsZero.Should().BeFalse();
         }
-        
+
         [Test]
-        public void One_is_one()
+        public virtual void One_is_one()
         {
-            UInt256.One.Should().Be((UInt256)BigInteger.One);
+            convert(1).OneValue.Should().Be(convert(BigInteger.One));
         }
-        
+
         [Test]
-        public void Is_one()
+        public virtual void Is_one()
         {
-            UInt256.One.IsOne.Should().BeTrue();
-            UInt256.Zero.IsOne.Should().BeFalse();
+            convert(1).OneValue.IsOne.Should().BeTrue();
+            convert(1).ZeroValue.IsOne.Should().BeFalse();
         }
-        
+
         [Test]
-        public void Max_value_is_correct()
+        public virtual void Max_value_is_correct()
         {
-            UInt256.MaxValue.Should().Be((UInt256)TestNumbers.UInt256Max);
+            convert(1).MaximalValue.Should().Be(convert(maxValue));
         }
     }
 }
