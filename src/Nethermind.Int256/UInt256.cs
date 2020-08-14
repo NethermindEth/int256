@@ -1294,7 +1294,7 @@ namespace Nethermind.Int256
         {
             if (SubtractUnderflow(in a, in b, out UInt256 c))
             {
-                throw new ArithmeticException("Underflow in subtraction");
+                throw new ArithmeticException($"Underflow in subtraction {a} - {b}");
             }
 
             return c;
