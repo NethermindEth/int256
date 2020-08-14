@@ -12,8 +12,8 @@ namespace Nethermind.Int256
 {
     public readonly struct UInt256 : IComparable, IComparable<UInt256>, IInteger<UInt256>
     {
-        public static readonly UInt256 Zero = (UInt256) 0ul;
-        public static readonly UInt256 One = (UInt256) 1ul;
+        public static readonly UInt256 Zero = 0ul;
+        public static readonly UInt256 One = 1ul;
         public static readonly UInt256 MinValue = Zero;
         public static readonly UInt256 MaxValue = ~Zero;
 
@@ -384,6 +384,7 @@ namespace Nethermind.Int256
             if (x.IsZero || y.IsZero || y.IsOne)
             {
                 res = Zero;
+                return;
             }
 
             switch (x.CompareTo(y))
