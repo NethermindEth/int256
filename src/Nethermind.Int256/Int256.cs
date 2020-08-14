@@ -528,12 +528,7 @@ namespace Nethermind.Int256
 
         public override string ToString()
         {
-            if (Sign < 0)
-            {
-                Abs(out Int256 res);
-                return "-" + res.ToString();
-            }
-            return value.ToString();
+            return $"{(Sign == -1 ? "-" : "")}{value.ToString()}";
         }
 
         private bool Equals(in Int256 other) => value.Equals(other.value);
