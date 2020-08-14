@@ -599,9 +599,7 @@ namespace Nethermind.Int256
                 return true;
             }
             
-            return z.Sign < 0 ?
-                z.value > x.value
-                : z.value < x.value;
+            return z.value < x.value;
         }
         public static bool operator >(in Int256 z, in Int256 x) => x < z;
 
