@@ -363,12 +363,15 @@ namespace Nethermind.Int256
         //   Abs(2**256-1) = -1
         public void Abs(out Int256 res)
         {
-            var sign = Sign;
+            int sign = Sign;
             if (sign >= 0)
             {
                 res = this;
             }
-            Zero.Subtract(this, out res);
+            else
+            {
+                Zero.Subtract(this, out res);
+            }
         }
 
         // Neg returns -x mod 2**256.
