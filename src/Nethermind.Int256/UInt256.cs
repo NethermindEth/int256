@@ -1856,6 +1856,13 @@ namespace Nethermind.Int256
                 return a;
             return b;
         }
+        
+        public static UInt256 Min(UInt256 a, UInt256 b)
+        {
+            if (LessThan(in b, in a))
+                return b;
+            return a;
+        }
 
         public const int Len = 4;
 
