@@ -12,6 +12,11 @@ namespace Nethermind.Int256
 
         private readonly UInt256 value;
 
+        public Int256(ReadOnlySpan<byte> bytes, bool isBigEndian)
+        {
+            this.value = new UInt256(bytes, isBigEndian);
+        }
+        
         public Int256(UInt256 value)
         {
             this.value = value;
@@ -545,6 +550,21 @@ namespace Nethermind.Int256
         public bool IsOne => this == One;
 
         public Int256 MaximalValue => Max;
+        
+        public int CompareTo(Int256 b)
+        {
+            if (this < b)
+            {
+                return -1;
+            }
+
+            if (Equals(b))
+            {
+                return 0;
+            }
+
+            return 1;
+        }
 
         public static explicit operator UInt256(Int256 z) => z.value;
 
