@@ -533,7 +533,7 @@ namespace Nethermind.Int256
             return value.ToString();
         }
 
-        private bool Equals(in Int256 other) => this.value.Equals(other);
+        private bool Equals(in Int256 other) => value.Equals(other.value);
 
         public override bool Equals(object obj)
         {
@@ -595,7 +595,10 @@ namespace Nethermind.Int256
             {
                 return true;
             }
-            return z.value < x.value;
+            
+            return z.Sign < 0 ?
+                z.value > x.value
+                : z.value < x.value;
         }
         public static bool operator >(in Int256 z, in Int256 x) => x < z;
 
