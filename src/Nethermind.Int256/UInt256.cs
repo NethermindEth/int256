@@ -1399,7 +1399,7 @@ namespace Nethermind.Int256
         public static UInt256 operator /(UInt256 a, uint b)
         {
             UInt256 ub = b;
-            Multiply(in a, in ub, out UInt256 c);
+            Divide(in a, in ub, out UInt256 c);
             return c;
         }
 
