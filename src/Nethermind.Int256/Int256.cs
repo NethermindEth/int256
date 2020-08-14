@@ -4,10 +4,11 @@ using System.Numerics;
 
 namespace Nethermind.Int256
 {
-    public readonly struct Int256 : IInteger<Int256>
+    public readonly struct Int256 : IComparable, IComparable<Int256>, IInteger<Int256>
     {
-        public static readonly Int256 Zero = (Int256)0ul;
-        public static readonly Int256 One = (Int256)1ul;
+        public static readonly Int256 Zero = (Int256)0UL;
+        public static readonly Int256 One = (Int256)1UL;
+        public static readonly Int256 MinusOne = -1L;
         public static readonly Int256 Max = new Int256(((BigInteger.One << 255) - 1));
 
         private readonly UInt256 value;
@@ -551,6 +552,16 @@ namespace Nethermind.Int256
 
         public Int256 MaximalValue => Max;
         
+        public int CompareTo(object obj)
+        {
+            if (!(obj is Int256))
+            {
+                throw new InvalidOperationException();
+            }
+
+            return CompareTo((Int256) obj);
+        }
+        
         public int CompareTo(Int256 b)
         {
             if (this < b)
@@ -591,6 +602,11 @@ namespace Nethermind.Int256
         public static explicit operator Int256(ulong value)
         {
             return new Int256((UInt256)value);
+        }
+        
+        public static implicit operator Int256(long value)
+        {
+            return new Int256(value);
         }
 
         public static explicit operator BigInteger(Int256 x)
