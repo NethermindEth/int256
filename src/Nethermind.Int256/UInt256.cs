@@ -359,6 +359,13 @@ namespace Nethermind.Int256
             ToBigEndian(bytes);
             return bytes;
         }
+        
+        public byte[] ToLittleEndian()
+        {
+            byte[] bytes = new byte[32];
+            ToLittleEndian(bytes);
+            return bytes;
+        }
 
         public void ToBigEndian(Span<byte> target)
         {
@@ -374,6 +381,21 @@ namespace Nethermind.Int256
                 BinaryPrimitives.WriteUInt32BigEndian(target.Slice(0, 4), (uint) u2);
                 BinaryPrimitives.WriteUInt64BigEndian(target.Slice(4, 8), u1);
                 BinaryPrimitives.WriteUInt64BigEndian(target.Slice(12, 8), u0);
+            }
+        }
+        
+        public void ToLittleEndian(Span<byte> target)
+        {
+            if (target.Length == 32)
+            {
+                BinaryPrimitives.WriteUInt64LittleEndian(target.Slice(0, 8), u3);
+                BinaryPrimitives.WriteUInt64LittleEndian(target.Slice(8, 8), u2);
+                BinaryPrimitives.WriteUInt64LittleEndian(target.Slice(16, 8), u1);
+                BinaryPrimitives.WriteUInt64LittleEndian(target.Slice(24, 8), u0);
+            }
+            else
+            {
+                throw new NotSupportedException();
             }
         }
 
