@@ -15,6 +15,7 @@ namespace Nethermind.Int256
         public static readonly UInt256 One = 1ul;
         public static readonly UInt256 MinValue = Zero;
         public static readonly UInt256 MaxValue = ~Zero;
+        public static readonly UInt256 UInt128MaxValue = new UInt256(ulong.MaxValue, ulong.MaxValue, 0, 0);
 
         /* in little endian order so u3 is the most significant ulong */
         public readonly ulong u0;
