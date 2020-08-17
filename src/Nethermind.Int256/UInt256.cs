@@ -383,7 +383,7 @@ namespace Nethermind.Int256
                 BinaryPrimitives.WriteUInt64BigEndian(target.Slice(12, 8), u0);
             }
         }
-        
+
         public void ToLittleEndian(Span<byte> target)
         {
             if (target.Length == 32)
@@ -440,19 +440,17 @@ namespace Nethermind.Int256
         public static int Len64(ulong x)
         {
             int n = 0;
-            if (x >= (((ulong) 1) << 32))
+            if (x >= (1ul << 32))
             {
                 x >>= 32;
                 n = 32;
             }
-
-            if (x >= (((ulong) 1) << 16))
+            if (x >= (1ul << 16))
             {
                 x >>= 16;
                 n += 16;
             }
-
-            if (x >= (((ulong) 1) << 8))
+            if (x >= (1ul << 8))
             {
                 x >>= 8;
                 n += 8;
@@ -461,7 +459,7 @@ namespace Nethermind.Int256
             int len = 0;
             for (int i = 0; i < 8; i++)
             {
-                if ((x & (((ulong) 1) << i)) > 0)
+                if ((x & (1ul << i)) > 0)
                 {
                     len = i + 1;
                 }
