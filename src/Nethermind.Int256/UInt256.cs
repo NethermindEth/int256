@@ -802,9 +802,7 @@ namespace Nethermind.Int256
             result = new UInt256(res);
         }
 
-        private delegate void MultiplyDelegate(in UInt256 a, in UInt256 b, out UInt256 res);
-
-        private static void Exp(in UInt256 b, in UInt256 e, MultiplyDelegate multiply, out UInt256 result)
+        public static void Exp(in UInt256 b, in UInt256 e, out UInt256 result)
         {
             result = One;
             UInt256 bs = b;
@@ -813,14 +811,11 @@ namespace Nethermind.Int256
             {
                 if (e.Bit(i))
                 {
-                    multiply(result, bs, out result);
+                    Multiply(result, bs, out result);
                 }
-
-                multiply(bs, bs, out bs);
+                Multiply(bs, bs, out bs);
             }
         }
-
-        public static void Exp(in UInt256 b, in UInt256 e, out UInt256 res) => Exp(b, e, Multiply, out res);
 
         public void Exp(in UInt256 exp, out UInt256 res) => Exp(this, exp, out res);
 
@@ -831,9 +826,17 @@ namespace Nethermind.Int256
                 result = Zero;
                 return;
             }
-
-            var mTmp = m;
-            Exp(b, e, (in UInt256 x, in UInt256 y, out UInt256 r) => MultiplyMod(x, y, mTmp, out r), out result);
+            result = One;
+            UInt256 bs = b;
+            var len = e.BitLen;
+            for (var i = 0; i < len; i++)
+            {
+                if (e.Bit(i))
+                {
+                    MultiplyMod(result, bs, m, out result);
+                }
+                MultiplyMod(bs, bs, m, out bs);
+            }
         }
 
         public void ExpMod(in UInt256 exp, in UInt256 m, out UInt256 res) => ExpMod(this, exp, m, out res);
