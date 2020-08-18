@@ -1348,40 +1348,69 @@ namespace Nethermind.Int256
 
         public static explicit operator sbyte(UInt256 a)
         {
+            if (a.u1 > 0 || a.u2 > 0 || a.u3 > 0 || a.u0 > (long)sbyte.MaxValue)
+            {
+                throw new OverflowException("Cannot convert UInt256 value to sbyte.");
+            }
+            
             return (sbyte) a.u0;
         }
 
         public static explicit operator byte(UInt256 a)
         {
+            if (a.u1 > 0 || a.u2 > 0 || a.u3 > 0 || a.u0 > byte.MaxValue)
+            {
+                throw new OverflowException("Cannot convert UInt256 value to byte.");
+            }
+            
             return (byte) a.u0;
         }
 
         public static explicit operator short(UInt256 a)
         {
+            if (a.u1 > 0 || a.u2 > 0 || a.u3 > 0 || a.u0 > (long)short.MaxValue)
+            {
+                throw new OverflowException("Cannot convert UInt256 value to short.");
+            }
+            
             return (short) a.u0;
         }
 
         public static explicit operator ushort(UInt256 a)
         {
+            if (a.u1 > 0 || a.u2 > 0 || a.u3 > 0 || a.u0 > ushort.MaxValue)
+            {
+                throw new OverflowException("Cannot convert UInt256 value to ushort.");
+            }
+            
             return (ushort) a.u0;
         }
 
         public static explicit operator int(UInt256 a)
         {
+            if (a.u1 > 0 || a.u2 > 0 || a.u3 > 0 || a.u0 > int.MaxValue)
+            {
+                throw new OverflowException("Cannot convert UInt256 value to int.");
+            }
+            
             return (int) a.u0;
         }
 
         public static explicit operator uint(UInt256 a)
         {
+            if (a.u1 > 0 || a.u2 > 0 || a.u3 > 0 || a.u0 > uint.MaxValue)
+            {
+                throw new OverflowException("Cannot convert UInt256 value to uint.");
+            }
+            
             return (uint) a.u0;
         }
 
         public static explicit operator long(UInt256 a)
         {
-            // TODO: look at this before making it into a Nugget as this is not what people expect to happen 
             if (a.u1 > 0 || a.u2 > 0 || a.u3 > 0 || a.u0 > long.MaxValue)
             {
-                return long.MaxValue;
+                throw new OverflowException("Cannot convert UInt256 value to long.");
             }
 
             return (long) a.u0;
@@ -1389,10 +1418,9 @@ namespace Nethermind.Int256
 
         public static explicit operator ulong(UInt256 a)
         {
-        // TODO: look at this before making it into a Nugget as this is not what people expect to happen
             if (a.u1 > 0 || a.u2 > 0 || a.u3 > 0)
             {
-                return ulong.MaxValue;
+                throw new OverflowException("Cannot convert UInt256 value to ulong.");
             }
             
             return a.u0;
