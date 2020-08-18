@@ -18,10 +18,10 @@ namespace Nethermind.Int256
         public static readonly UInt256 UInt128MaxValue = new UInt256(ulong.MaxValue, ulong.MaxValue, 0, 0);
 
         /* in little endian order so u3 is the most significant ulong */
-        internal readonly ulong u0;
-        internal readonly ulong u1;
-        internal readonly ulong u2;
-        internal readonly ulong u3;
+        public readonly ulong u0;
+        public readonly ulong u1;
+        public readonly ulong u2;
+        public readonly ulong u3;
 
         public UInt256(uint r0, uint r1, uint r2, uint r3, uint r4, uint r5, uint r6, uint r7)
         {
