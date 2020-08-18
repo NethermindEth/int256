@@ -1378,11 +1378,23 @@ namespace Nethermind.Int256
 
         public static explicit operator long(UInt256 a)
         {
+            // TODO: look at this before making it into a Nugget as this is not what people expect to happen 
+            if (a.u1 > 0 || a.u2 > 0 || a.u3 > 0 || a.u0 > long.MaxValue)
+            {
+                return long.MaxValue;
+            }
+
             return (long) a.u0;
         }
 
         public static explicit operator ulong(UInt256 a)
         {
+        // TODO: look at this before making it into a Nugget as this is not what people expect to happen
+            if (a.u1 > 0 || a.u2 > 0 || a.u3 > 0)
+            {
+                return ulong.MaxValue;
+            }
+            
             return a.u0;
         }
 
