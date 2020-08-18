@@ -9,7 +9,7 @@ namespace Nethermind.Int256.Benchmark
 {
     public class UnsingedBenchmarkBase
     {
-        public IEnumerable<BigInteger> Values => System.Linq.Enumerable.Concat(new[] { Numbers.UInt256Max }, UnaryOps.RandomUnsinged(2));
+        public IEnumerable<BigInteger> Values => System.Linq.Enumerable.Concat(new[] { Numbers.UInt256Max }, UnaryOps.RandomUnsigned(2));
 
         public IEnumerable<UInt256> ValuesUint256 => Values.Select(x => (UInt256)x);
 
@@ -48,7 +48,7 @@ namespace Nethermind.Int256.Benchmark
 
     public class SignedBenchmarkBase
     {
-        public IEnumerable<BigInteger> Values => System.Linq.Enumerable.Concat(new[] { Numbers.UInt256Max }, UnaryOps.RandomUnsinged(2));
+        public IEnumerable<BigInteger> Values => System.Linq.Enumerable.Concat(new[] { Numbers.UInt256Max }, UnaryOps.RandomUnsigned(2));
 
         public IEnumerable<Int256> ValuesInt256 => Values.Select(x => (Int256)x);
 
@@ -342,13 +342,13 @@ namespace Nethermind.Int256.Benchmark
     public class ExpUnsigned : UnsignedIntTwoParamBenchmarkBase
     {
         [Benchmark(Baseline = true)]
-        public BigInteger ExpMod_BigInteger()
+        public BigInteger Exp_BigInteger()
         {
-            return BigInteger.Pow(A.Item1, D.Item1) % Numbers.TwoTo64;
+            return BigInteger.ModPow(A.Item1, D.Item1, Numbers.TwoTo256);
         }
 
         [Benchmark]
-        public UInt256 ExpMod_Int256()
+        public UInt256 Exp_Int256()
         {
             UInt256.Exp(A.Item2, D.Item2, out UInt256 res);
             return res;
@@ -360,13 +360,13 @@ namespace Nethermind.Int256.Benchmark
     public class ExpSigned : SignedIntTwoParamBenchmarkBase
     {
         [Benchmark(Baseline = true)]
-        public BigInteger ExpMod_BigInteger()
+        public BigInteger Exp_BigInteger()
         {
-            return BigInteger.Pow(A.Item1, D.Item1) % Numbers.TwoTo64;
+            return BigInteger.ModPow(A.Item1, D.Item1, Numbers.TwoTo256);
         }
 
         [Benchmark]
-        public Int256 ExpMod_Int256()
+        public Int256 Exp_Int256()
         {
             Int256.Exp(A.Item2, D.Item2, out Int256 res);
             return res;
@@ -380,7 +380,7 @@ namespace Nethermind.Int256.Benchmark
         [Benchmark(Baseline = true)]
         public BigInteger ExpMod_BigInteger()
         {
-            return BigInteger.ModPow(A.Item1, B.Item1, C.Item1) % Numbers.TwoTo64;
+            return BigInteger.ModPow(A.Item1, B.Item1, C.Item1);
         }
 
         [Benchmark]
@@ -398,7 +398,7 @@ namespace Nethermind.Int256.Benchmark
         [Benchmark(Baseline = true)]
         public BigInteger ExpMod_BigInteger()
         {
-            return BigInteger.ModPow(A.Item1, B.Item1, C.Item1) % Numbers.TwoTo64;
+            return BigInteger.ModPow(A.Item1, B.Item1, C.Item1);
         }
 
         [Benchmark]
@@ -416,7 +416,7 @@ namespace Nethermind.Int256.Benchmark
         [Benchmark(Baseline = true)]
         public BigInteger LeftShift_BigInteger()
         {
-            return (A.Item1 << D.Item1) % Numbers.TwoTo64;
+            return (A.Item1 << D.Item1) % Numbers.TwoTo256;
         }
 
         [Benchmark]
@@ -434,7 +434,7 @@ namespace Nethermind.Int256.Benchmark
         [Benchmark(Baseline = true)]
         public BigInteger LeftShift_BigInteger()
         {
-            return (A.Item1 << D.Item1) % Numbers.TwoTo64;
+            return (A.Item1 << D.Item1) % Numbers.TwoTo256;
         }
 
         [Benchmark]
@@ -452,7 +452,7 @@ namespace Nethermind.Int256.Benchmark
         [Benchmark(Baseline = true)]
         public BigInteger RightShift_BigInteger()
         {
-            return (A.Item1 >> D.Item1) % Numbers.TwoTo64;
+            return (A.Item1 >> D.Item1) % Numbers.TwoTo256;
         }
 
         [Benchmark]
@@ -470,7 +470,7 @@ namespace Nethermind.Int256.Benchmark
         [Benchmark(Baseline = true)]
         public BigInteger LeftShift_BigInteger()
         {
-            return (A.Item1 >> D.Item1) % Numbers.TwoTo64;
+            return (A.Item1 >> D.Item1) % Numbers.TwoTo256;
         }
 
         [Benchmark]

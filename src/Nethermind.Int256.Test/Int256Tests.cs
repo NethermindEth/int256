@@ -19,13 +19,13 @@ namespace Nethermind.Int256.Test
         [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.SignedTestCases))]
         public override void Add((BigInteger A, BigInteger B) test) => base.Add(test);
 
-        [TestCaseSource(typeof(TernaryOps), nameof(TernaryOps.SignedTestCases))]
+        [TestCaseSource(typeof(TernaryOps), nameof(TernaryOps.SignedModTestCases))]
         public override void AddMod((BigInteger A, BigInteger B, BigInteger M) test) => base.AddMod(test);
 
         [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.SignedTestCases))]
         public override void Subtract((BigInteger A, BigInteger B) test) => base.Subtract(test);
 
-        [TestCaseSource(typeof(TernaryOps), nameof(TernaryOps.SignedTestCases))]
+        [TestCaseSource(typeof(TernaryOps), nameof(TernaryOps.SignedModTestCases))]
         public void SubtractMod((BigInteger A, BigInteger B, BigInteger M) test)
         {
             if (test.M.IsZero)
@@ -48,7 +48,7 @@ namespace Nethermind.Int256.Test
         [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.SignedTestCases))]
         public override void Multiply((BigInteger A, BigInteger B) test) => base.Multiply(test);
 
-        [TestCaseSource(typeof(TernaryOps), nameof(TernaryOps.SignedTestCases))]
+        [TestCaseSource(typeof(TernaryOps), nameof(TernaryOps.SignedModTestCases))]
         public override void MultiplyMod((BigInteger A, BigInteger B, BigInteger M) test) => base.MultiplyMod(test);
 
         [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.SignedTestCases))]
@@ -57,7 +57,7 @@ namespace Nethermind.Int256.Test
         [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.SignedShiftTestCases))]
         public override void Exp((BigInteger A, int n) test) => base.Exp(test);
 
-        [TestCaseSource(typeof(TernaryOps), nameof(TernaryOps.SignedTestCases))]
+        [TestCaseSource(typeof(TernaryOps), nameof(TernaryOps.SignedModTestCases))]
         public override void ExpMod((BigInteger A, BigInteger B, BigInteger M) test) => base.ExpMod(test);
 
         [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.SignedShiftTestCases))]

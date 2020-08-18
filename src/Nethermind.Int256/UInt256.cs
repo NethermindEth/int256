@@ -383,7 +383,7 @@ namespace Nethermind.Int256
                 BinaryPrimitives.WriteUInt64BigEndian(target.Slice(12, 8), u0);
             }
         }
-        
+
         public void ToLittleEndian(Span<byte> target)
         {
             if (target.Length == 32)
@@ -440,19 +440,17 @@ namespace Nethermind.Int256
         public static int Len64(ulong x)
         {
             int n = 0;
-            if (x >= (((ulong) 1) << 32))
+            if (x >= (1ul << 32))
             {
                 x >>= 32;
                 n = 32;
             }
-
-            if (x >= (((ulong) 1) << 16))
+            if (x >= (1ul << 16))
             {
                 x >>= 16;
                 n += 16;
             }
-
-            if (x >= (((ulong) 1) << 8))
+            if (x >= (1ul << 8))
             {
                 x >>= 8;
                 n += 8;
@@ -461,7 +459,7 @@ namespace Nethermind.Int256
             int len = 0;
             for (int i = 0; i < 8; i++)
             {
-                if ((x & (((ulong) 1) << i)) > 0)
+                if ((x & (1ul << i)) > 0)
                 {
                     len = i + 1;
                 }
@@ -802,9 +800,7 @@ namespace Nethermind.Int256
             result = new UInt256(res);
         }
 
-        private delegate void MultiplyDelegate(in UInt256 a, in UInt256 b, out UInt256 res);
-
-        private static void Exp(in UInt256 b, in UInt256 e, MultiplyDelegate multiply, out UInt256 result)
+        public static void Exp(in UInt256 b, in UInt256 e, out UInt256 result)
         {
             result = One;
             UInt256 bs = b;
@@ -813,14 +809,11 @@ namespace Nethermind.Int256
             {
                 if (e.Bit(i))
                 {
-                    multiply(result, bs, out result);
+                    Multiply(result, bs, out result);
                 }
-
-                multiply(bs, bs, out bs);
+                Multiply(bs, bs, out bs);
             }
         }
-
-        public static void Exp(in UInt256 b, in UInt256 e, out UInt256 res) => Exp(b, e, Multiply, out res);
 
         public void Exp(in UInt256 exp, out UInt256 res) => Exp(this, exp, out res);
 
@@ -831,9 +824,17 @@ namespace Nethermind.Int256
                 result = Zero;
                 return;
             }
-
-            var mTmp = m;
-            Exp(b, e, (in UInt256 x, in UInt256 y, out UInt256 r) => MultiplyMod(x, y, mTmp, out r), out result);
+            result = One;
+            UInt256 bs = b;
+            var len = e.BitLen;
+            for (var i = 0; i < len; i++)
+            {
+                if (e.Bit(i))
+                {
+                    MultiplyMod(result, bs, m, out result);
+                }
+                MultiplyMod(bs, bs, m, out bs);
+            }
         }
 
         public void ExpMod(in UInt256 exp, in UInt256 m, out UInt256 res) => ExpMod(this, exp, m, out res);
