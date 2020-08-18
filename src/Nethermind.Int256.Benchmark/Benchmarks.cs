@@ -9,7 +9,7 @@ namespace Nethermind.Int256.Benchmark
 {
     public class UnsingedBenchmarkBase
     {
-        public IEnumerable<BigInteger> Values => System.Linq.Enumerable.Concat(new[] { Numbers.UInt256Max }, UnaryOps.RandomUnsigned(2));
+        public IEnumerable<BigInteger> Values => System.Linq.Enumerable.Concat(new[] { Numbers.UInt256Max }, UnaryOps.RandomUnsigned(6));
 
         public IEnumerable<UInt256> ValuesUint256 => Values.Select(x => (UInt256)x);
 
@@ -48,7 +48,7 @@ namespace Nethermind.Int256.Benchmark
 
     public class SignedBenchmarkBase
     {
-        public IEnumerable<BigInteger> Values => System.Linq.Enumerable.Concat(new[] { Numbers.UInt256Max }, UnaryOps.RandomUnsigned(2));
+        public IEnumerable<BigInteger> Values => System.Linq.Enumerable.Concat(new[] { Numbers.Int256Max, Numbers.Int256Min }, UnaryOps.RandomUnsigned(1));
 
         public IEnumerable<Int256> ValuesInt256 => Values.Select(x => (Int256)x);
 
@@ -87,6 +87,7 @@ namespace Nethermind.Int256.Benchmark
 
     [SimpleJob(RuntimeMoniker.NetCoreApp31)]
     [MemoryDiagnoser]
+    // [DryJob]
     public class AddUnsigned : UnsignedTwoParamBenchmarkBase
     {
         [Benchmark(Baseline = true)]
@@ -96,7 +97,7 @@ namespace Nethermind.Int256.Benchmark
         }
 
         [Benchmark]
-        public UInt256 Add_Int256()
+        public UInt256 Add_UInt256()
         {
             UInt256.Add(A.Item2, B.Item2, out UInt256 res);
             return res;
@@ -132,7 +133,7 @@ namespace Nethermind.Int256.Benchmark
         }
 
         [Benchmark]
-        public UInt256 Subtract_Int256()
+        public UInt256 Subtract_UInt256()
         {
             UInt256.Subtract(A.Item2, B.Item2, out UInt256 res);
             return res;
@@ -168,7 +169,7 @@ namespace Nethermind.Int256.Benchmark
         }
 
         [Benchmark]
-        public UInt256 AddMod_Int256()
+        public UInt256 AddMod_UInt256()
         {
             UInt256.AddMod(A.Item2, B.Item2, C.Item2, out UInt256 res);
             return res;
@@ -204,7 +205,7 @@ namespace Nethermind.Int256.Benchmark
         }
 
         [Benchmark]
-        public UInt256 AddMod_Int256()
+        public UInt256 AddMod_UInt256()
         {
             UInt256.SubtractMod(A.Item2, B.Item2, C.Item2, out UInt256 res);
             return res;
@@ -240,7 +241,7 @@ namespace Nethermind.Int256.Benchmark
         }
 
         [Benchmark]
-        public UInt256 Multiply_Int256()
+        public UInt256 Multiply_UInt256()
         {
             UInt256.Multiply(A.Item2, B.Item2, out UInt256 res);
             return res;
@@ -276,7 +277,7 @@ namespace Nethermind.Int256.Benchmark
         }
 
         [Benchmark]
-        public UInt256 Multiply_Int256()
+        public UInt256 Multiply_UInt256()
         {
             UInt256.MultiplyMod(A.Item2, B.Item2, C.Item2, out UInt256 res);
             return res;
@@ -312,7 +313,7 @@ namespace Nethermind.Int256.Benchmark
         }
 
         [Benchmark]
-        public UInt256 Multiply_Int256()
+        public UInt256 Multiply_UInt256()
         {
             UInt256.Divide(A.Item2, B.Item2, out UInt256 res);
             return res;
@@ -348,7 +349,7 @@ namespace Nethermind.Int256.Benchmark
         }
 
         [Benchmark]
-        public UInt256 Exp_Int256()
+        public UInt256 Exp_UInt256()
         {
             UInt256.Exp(A.Item2, D.Item2, out UInt256 res);
             return res;
@@ -384,7 +385,7 @@ namespace Nethermind.Int256.Benchmark
         }
 
         [Benchmark]
-        public UInt256 ExpMod_Int256()
+        public UInt256 ExpMod_UInt256()
         {
             UInt256.ExpMod(A.Item2, B.Item2, C.Item2, out UInt256 res);
             return res;
@@ -420,7 +421,7 @@ namespace Nethermind.Int256.Benchmark
         }
 
         [Benchmark]
-        public UInt256 LeftShift_Int256()
+        public UInt256 LeftShift_UInt256()
         {
             A.Item2.LeftShift(D.Item1, out UInt256 res);
             return res;
@@ -456,7 +457,7 @@ namespace Nethermind.Int256.Benchmark
         }
 
         [Benchmark]
-        public UInt256 RightShift_Int256()
+        public UInt256 RightShift_UInt256()
         {
             A.Item2.RightShift(D.Item1, out UInt256 res);
             return res;
