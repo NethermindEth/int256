@@ -25,7 +25,7 @@ namespace Nethermind.Int256.Test
             TestNumbers.UInt192Max,
             TestNumbers.UInt256Max,
         },
-        RandomUnsinged(5)
+        RandomUnsigned(5)
                               );
 
         public static IEnumerable<BigInteger> SignedTestCases = Enumerable.Concat(
@@ -46,6 +46,7 @@ namespace Nethermind.Int256.Test
             TestNumbers.UInt128Max,
             TestNumbers.UInt192Max,
             TestNumbers.Int256Max,
+            TestNumbers.Int256Min,
         },
         RandomSinged(5)
                               );
@@ -63,16 +64,7 @@ namespace Nethermind.Int256.Test
             ulong.MaxValue,
         };
 
-        public static IEnumerable<int> ShiftTestCases
-        {
-            get
-            {
-                for (int i = 0; i <= 256; i++)
-                {
-                    yield return i;
-                }
-            }
-        }
+        public static IEnumerable<int> ShiftTestCases => Enumerable.Range(0, 257);
 
         public static IEnumerable<BigInteger> RandomSinged(int count)
         {
@@ -85,7 +77,7 @@ namespace Nethermind.Int256.Test
             }
         }
 
-        public static IEnumerable<BigInteger> RandomUnsinged(int count)
+        public static IEnumerable<BigInteger> RandomUnsigned(int count)
         {
             var rand = new System.Random();
             byte[] data = new byte[256 / 8];

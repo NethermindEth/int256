@@ -4,14 +4,20 @@ using System.Numerics;
 
 namespace Nethermind.Int256
 {
-    public readonly struct Int256 : IInteger<Int256>
+    public readonly struct Int256 : IComparable, IComparable<Int256>, IInteger<Int256>
     {
-        public static readonly Int256 Zero = (Int256)0ul;
-        public static readonly Int256 One = (Int256)1ul;
+        public static readonly Int256 Zero = (Int256)0UL;
+        public static readonly Int256 One = (Int256)1UL;
+        public static readonly Int256 MinusOne = -1L;
         public static readonly Int256 Max = new Int256(((BigInteger.One << 255) - 1));
 
         private readonly UInt256 value;
 
+        public Int256(ReadOnlySpan<byte> bytes, bool isBigEndian)
+        {
+            this.value = new UInt256(bytes, isBigEndian);
+        }
+        
         public Int256(UInt256 value)
         {
             this.value = value;
@@ -61,7 +67,7 @@ namespace Nethermind.Int256
                 {
                     return 0;
                 }
-                if (value[value.Len - 1] < 0x8000000000000000ul)
+                if (value[UInt256.Len - 1] < 0x8000000000000000ul)
                 {
                     return 1;
                 }
@@ -262,7 +268,7 @@ namespace Nethermind.Int256
 
         public static void Exp(in Int256 b, in Int256 e, out Int256 res)
         {
-            if (e < Zero)
+            if (e.Sign < 0)
             {
                 throw new ArgumentException("exponent must be non-negative");
             }
@@ -357,12 +363,15 @@ namespace Nethermind.Int256
         //   Abs(2**256-1) = -1
         public void Abs(out Int256 res)
         {
-            var sign = Sign;
+            int sign = Sign;
             if (sign >= 0)
             {
                 res = this;
             }
-            Zero.Subtract(this, out res);
+            else
+            {
+                Zero.Subtract(this, out res);
+            }
         }
 
         // Neg returns -x mod 2**256.
@@ -521,13 +530,13 @@ namespace Nethermind.Int256
         {
             if (Sign < 0)
             {
-                Abs(out Int256 res);
+                Neg(out Int256 res);
                 return "-" + res.ToString();
             }
             return value.ToString();
         }
 
-        private bool Equals(in Int256 other) => this.value.Equals(other);
+        private bool Equals(in Int256 other) => value.Equals(other.value);
 
         public override bool Equals(object obj)
         {
@@ -545,6 +554,31 @@ namespace Nethermind.Int256
         public bool IsOne => this == One;
 
         public Int256 MaximalValue => Max;
+        
+        public int CompareTo(object obj)
+        {
+            if (!(obj is Int256))
+            {
+                throw new InvalidOperationException();
+            }
+
+            return CompareTo((Int256) obj);
+        }
+        
+        public int CompareTo(Int256 b)
+        {
+            if (this < b)
+            {
+                return -1;
+            }
+
+            if (Equals(b))
+            {
+                return 0;
+            }
+
+            return 1;
+        }
 
         public static explicit operator UInt256(Int256 z) => z.value;
 
@@ -564,6 +598,7 @@ namespace Nethermind.Int256
             {
                 return true;
             }
+            
             return z.value < x.value;
         }
         public static bool operator >(in Int256 z, in Int256 x) => x < z;
@@ -572,15 +607,19 @@ namespace Nethermind.Int256
         {
             return new Int256((UInt256)value);
         }
+        
+        public static implicit operator Int256(long value)
+        {
+            return new Int256(value);
+        }
 
         public static explicit operator BigInteger(Int256 x)
         {
-            var xv = (Span<ulong>)x.value;
             Span<byte> bytes = stackalloc byte[32];
-            BinaryPrimitives.WriteUInt64LittleEndian(bytes.Slice(0, 8), xv[0]);
-            BinaryPrimitives.WriteUInt64LittleEndian(bytes.Slice(8, 8), xv[1]);
-            BinaryPrimitives.WriteUInt64LittleEndian(bytes.Slice(16, 8), xv[2]);
-            BinaryPrimitives.WriteUInt64LittleEndian(bytes.Slice(24, 8), xv[3]);
+            BinaryPrimitives.WriteUInt64LittleEndian(bytes.Slice(0, 8), x.value.u0);
+            BinaryPrimitives.WriteUInt64LittleEndian(bytes.Slice(8, 8), x.value.u1);
+            BinaryPrimitives.WriteUInt64LittleEndian(bytes.Slice(16, 8), x.value.u2);
+            BinaryPrimitives.WriteUInt64LittleEndian(bytes.Slice(24, 8), x.value.u3);
             return new BigInteger(bytes);
         }
 

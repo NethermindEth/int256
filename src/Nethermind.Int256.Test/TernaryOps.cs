@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Numerics;
+using System.Linq;
 
 namespace Nethermind.Int256.Test
 {
@@ -32,6 +33,8 @@ namespace Nethermind.Int256.Test
                 }
             }
         }
+
+        public static IEnumerable<(BigInteger, BigInteger, BigInteger)> SignedModTestCases => SignedTestCases.Where(v => v.Item3 >= 0);
 
         public static IEnumerable<(ulong, ulong, ulong)> ULongTestCases
         {
