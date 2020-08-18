@@ -531,7 +531,7 @@ namespace Nethermind.Int256
             if (Sign < 0)
             {
                 Neg(out Int256 res);
-                return "-" + res.ToString();
+                return "-" + res.value.ToString();
             }
             return value.ToString();
         }
