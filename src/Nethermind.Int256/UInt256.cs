@@ -483,6 +483,7 @@ namespace Nethermind.Int256
         private static int LeadingZeros(ulong x) => 64 - Len64(x);
 
         // It avoids c#'s way of shifting a 64-bit number by 64-bit, i.e. in c# a << 64 == a, in our version a << 64 == 0.
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static ulong Lsh(ulong a, int n)
         {
             var n1 = n >> 2;
@@ -490,6 +491,7 @@ namespace Nethermind.Int256
             return (a << n1) << n2;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static ulong Rsh(ulong a, int n)
         {
             var n1 = n >> 2;
@@ -502,7 +504,7 @@ namespace Nethermind.Int256
         // It loosely follows the Knuth's division algorithm (sometimes referenced as "schoolbook" division) using 64-bit words.
         // See Knuth, Volume 2, section 4.3.1, Algorithm D.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static void Udivrem(Span<ulong> quot, Span<ulong> u, in UInt256 d, out UInt256 rem)
+        private static void Udivrem(Span<ulong> quot, Span<ulong> u, in UInt256 d, out UInt256 rem)
         {
             int dLen = 0;
             for (int i = Len - 1; i >= 0; i--)
@@ -771,9 +773,8 @@ namespace Nethermind.Int256
         public static bool MultiplyOverflow(in UInt256 x, in UInt256 y, out UInt256 res)
         {
             Span<ulong> p = stackalloc ulong[8];
-            Umul(x, y, ref p);
-            res = new UInt256(p);
-            return (p[4] | p[5] | p[6] | p[7]) != 0;
+            Umul(x, y, out res, out UInt256 high);
+            return !high.IsZero;
         }
 
         public int BitLen
@@ -859,14 +860,20 @@ namespace Nethermind.Int256
 
         public void ExpMod(in UInt256 exp, in UInt256 m, out UInt256 res) => ExpMod(this, exp, m, out res);
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void ToSpan(ref Span<ulong> res)
+        {
+            res[0] = u0;
+            res[1] = u1;
+            res[2] = u2;
+            res[3] = u3;
+        }
+
         // MulMod calculates the modulo-m multiplication of x and y and
         // sets res to its result.
         public static void MultiplyMod(in UInt256 x, in UInt256 y, in UInt256 m, out UInt256 res)
         {
-            Span<ulong> p = stackalloc ulong[8];
-            Umul(x, y, ref p);
-            UInt256 pl = new UInt256(p.Slice(0, 4));
-            UInt256 ph = new UInt256(p.Slice(4, 4));
+            Umul(x, y, out UInt256 pl, out UInt256 ph);
 
             // If the multiplication is within 256 bits use Mod().
             if (ph.IsZero)
@@ -875,6 +882,11 @@ namespace Nethermind.Int256
                 return;
             }
 
+            Span<ulong> p = stackalloc ulong[8];
+            var pLow = p.Slice(0, 4);
+            pl.ToSpan(ref pLow);
+            var pHigh = p.Slice(4, 4);
+            ph.ToSpan(ref pHigh);
             Span<ulong> quot = stackalloc ulong[8];
             Udivrem(quot, p, m, out res);
         }
@@ -882,30 +894,34 @@ namespace Nethermind.Int256
         public void MultiplyMod(in UInt256 a, in UInt256 m, out UInt256 res) => MultiplyMod(this, a, m, out res);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static void Umul(in UInt256 x, in UInt256 y, ref Span<ulong> res)
+        private static void Umul(in UInt256 x, in UInt256 y, out UInt256 low, out UInt256 high)
         {
             ulong carry, carry4, carry5, carry6;
             ulong res1, res2, res3, res4, res5;
+            ulong l0, l1, l2, l3;
+            ulong h0, h1, h2, h3;
 
-            (carry, res[0]) = Multiply64(x.u0, y.u0);
+            (carry, l0) = Multiply64(x.u0, y.u0);
             (carry, res1) = UmulHopi(carry, x.u1, y.u0);
             (carry, res2) = UmulHopi(carry, x.u2, y.u0);
             (carry4, res3) = UmulHopi(carry, x.u3, y.u0);
 
-            (carry, res[1]) = UmulHopi(res1, x.u0, y.u1);
+            (carry, l1) = UmulHopi(res1, x.u0, y.u1);
             (carry, res2) = UmulStepi(res2, x.u1, y.u1, carry);
             (carry, res3) = UmulStepi(res3, x.u2, y.u1, carry);
             (carry5, res4) = UmulStepi(carry4, x.u3, y.u1, carry);
 
-            (carry, res[2]) = UmulHopi(res2, x.u0, y.u2);
+            (carry, l2) = UmulHopi(res2, x.u0, y.u2);
             (carry, res3) = UmulStepi(res3, x.u1, y.u2, carry);
             (carry, res4) = UmulStepi(res4, x.u2, y.u2, carry);
             (carry6, res5) = UmulStepi(carry5, x.u3, y.u2, carry);
 
-            (carry, res[3]) = UmulHopi(res3, x.u0, y.u3);
-            (carry, res[4]) = UmulStepi(res4, x.u1, y.u3, carry);
-            (carry, res[5]) = UmulStepi(res5, x.u2, y.u3, carry);
-            (res[7], res[6]) = UmulStepi(carry6, x.u3, y.u3, carry);
+            (carry, l3) = UmulHopi(res3, x.u0, y.u3);
+            (carry, h0) = UmulStepi(res4, x.u1, y.u3, carry);
+            (carry, h1) = UmulStepi(res5, x.u2, y.u3, carry);
+            (h3, h2) = UmulStepi(carry6, x.u3, y.u3, carry);
+            low = new UInt256(l0, l1, l2, l3);
+            high = new UInt256(h0, h1, h2, h3);
         }
 
         // UmulStep computes (hi * 2^64 + lo) = z + (x * y) + carry.
