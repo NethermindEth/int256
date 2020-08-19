@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Buffers.Binary;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 
 namespace Nethermind.Int256
 {
@@ -17,7 +18,7 @@ namespace Nethermind.Int256
         {
             this.value = new UInt256(bytes, isBigEndian);
         }
-        
+
         public Int256(UInt256 value)
         {
             this.value = value;
@@ -67,7 +68,7 @@ namespace Nethermind.Int256
                 {
                     return 0;
                 }
-                if (value[UInt256.Len - 1] < 0x8000000000000000ul)
+                if (value.u3 < 0x8000000000000000ul)
                 {
                     return 1;
                 }
@@ -178,7 +179,9 @@ namespace Nethermind.Int256
             }
             UInt256.Multiply(av.value, bv.value, out UInt256 ures);
             res = new Int256(ures);
-            if ((a.Sign < 0 && b.Sign < 0) || (a.Sign >= 0 && b.Sign >= 0))
+            int aSign = a.Sign;
+            int bSign = b.Sign;
+            if ((aSign < 0 && bSign < 0) || (aSign >= 0 && bSign >= 0))
             {
                 return;
             }
@@ -194,11 +197,13 @@ namespace Nethermind.Int256
             {
                 m.Neg(out mAbs);
             }
-            if ((x.Sign < 0 && y.Sign >= 0) || (x.Sign >= 0 && y.Sign < 0))
+            int xSign = x.Sign;
+            int ySign = y.Sign;
+            if ((xSign < 0 && ySign >= 0) || (xSign >= 0 && ySign < 0))
             {
                 var xAbs = x;
                 var yAbs = y;
-                if (x.Sign < 0)
+                if (xSign < 0)
                 {
                     x.Neg(out xAbs);
                 }
@@ -214,7 +219,7 @@ namespace Nethermind.Int256
             {
                 var xAbs = x;
                 var yAbs = y;
-                if (x.Sign < 0)
+                if (xSign < 0)
                 {
                     x.Neg(out xAbs);
                     y.Neg(out yAbs);
@@ -363,14 +368,13 @@ namespace Nethermind.Int256
         //   Abs(2**256-1) = -1
         public void Abs(out Int256 res)
         {
-            int sign = Sign;
-            if (sign >= 0)
+            if (Sign >= 0)
             {
                 res = this;
             }
             else
             {
-                Zero.Subtract(this, out res);
+                Neg(this, out res);
             }
         }
 
@@ -381,13 +385,11 @@ namespace Nethermind.Int256
             neg = new Int256(value);
         }
 
-        public void Neg(out Int256 res)
-        {
-            Neg(this, out res);
-        }
+        public void Neg(out Int256 res) => Neg(this, out res);
 
         public void LeftShift(int n, out Int256 res) => LeftShift(this, n, out res);
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static long Rsh(long a, int n)
         {
             var n1 = n / 2;
@@ -410,6 +412,7 @@ namespace Nethermind.Int256
             res = new Int256(new UInt256(this.value.u3, ulong.MaxValue, ulong.MaxValue, ulong.MaxValue));
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void Rsh(in Int256 x, int n, out Int256 res)
         {
             if (x.Sign >= 0)
@@ -554,7 +557,7 @@ namespace Nethermind.Int256
         public bool IsOne => this == One;
 
         public Int256 MaximalValue => Max;
-        
+
         public int CompareTo(object obj)
         {
             if (!(obj is Int256))
@@ -564,7 +567,7 @@ namespace Nethermind.Int256
 
             return CompareTo((Int256) obj);
         }
-        
+
         public int CompareTo(Int256 b)
         {
             if (this < b)
@@ -598,7 +601,7 @@ namespace Nethermind.Int256
             {
                 return true;
             }
-            
+
             return z.value < x.value;
         }
         public static bool operator >(in Int256 z, in Int256 x) => x < z;
@@ -607,7 +610,7 @@ namespace Nethermind.Int256
         {
             return new Int256((UInt256)value);
         }
-        
+
         public static implicit operator Int256(long value)
         {
             return new Int256(value);
