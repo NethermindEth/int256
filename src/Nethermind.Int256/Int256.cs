@@ -17,7 +17,7 @@ namespace Nethermind.Int256
         {
             this.value = new UInt256(bytes, isBigEndian);
         }
-        
+
         public Int256(UInt256 value)
         {
             this.value = value;
@@ -554,7 +554,7 @@ namespace Nethermind.Int256
         public bool IsOne => this == One;
 
         public Int256 MaximalValue => Max;
-        
+
         public int CompareTo(object obj)
         {
             if (!(obj is Int256))
@@ -564,7 +564,7 @@ namespace Nethermind.Int256
 
             return CompareTo((Int256) obj);
         }
-        
+
         public int CompareTo(Int256 b)
         {
             if (this < b)
@@ -598,7 +598,7 @@ namespace Nethermind.Int256
             {
                 return true;
             }
-            
+
             return z.value < x.value;
         }
         public static bool operator >(in Int256 z, in Int256 x) => x < z;
@@ -607,7 +607,7 @@ namespace Nethermind.Int256
         {
             return new Int256((UInt256)value);
         }
-        
+
         public static implicit operator Int256(long value)
         {
             return new Int256(value);
