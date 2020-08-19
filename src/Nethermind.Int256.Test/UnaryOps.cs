@@ -48,7 +48,7 @@ namespace Nethermind.Int256.Test
             TestNumbers.Int256Max,
             TestNumbers.Int256Min,
         },
-        RandomSinged(5)
+        RandomSigned(5)
                               );
 
         public static IEnumerable<ulong> ULongTestCases =
@@ -66,7 +66,7 @@ namespace Nethermind.Int256.Test
 
         public static IEnumerable<int> ShiftTestCases => Enumerable.Range(0, 257);
 
-        public static IEnumerable<BigInteger> RandomSinged(int count)
+        public static IEnumerable<BigInteger> RandomSigned(int count)
         {
             var rand = new System.Random();
             byte[] data = new byte[256 / 8];
