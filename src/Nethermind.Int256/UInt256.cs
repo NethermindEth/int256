@@ -333,10 +333,9 @@ namespace Nethermind.Int256
                 Span<ulong> sum = stackalloc ulong[5] {res.u0, res.u1, res.u2, res.u3, 1};
                 Span<ulong> quot = stackalloc ulong[5];
                 Udivrem(quot, sum, in m, out res);
-                return;
+            } else {
+                Mod(res, m, out res);
             }
-
-            Mod(res, m, out res);
         }
 
         public void AddMod(in UInt256 a, in UInt256 m, out UInt256 res) => AddMod(this, a, m, out res);
@@ -486,7 +485,7 @@ namespace Nethermind.Int256
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static ulong Lsh(ulong a, int n)
         {
-            var n1 = n >> 2;
+            var n1 = n >> 1;
             var n2 = n - n1;
             return (a << n1) << n2;
         }
@@ -494,7 +493,7 @@ namespace Nethermind.Int256
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static ulong Rsh(ulong a, int n)
         {
-            var n1 = n >> 2;
+            var n1 = n >> 1;
             var n2 = n - n1;
             return (a >> n1) >> n2;
         }
@@ -507,25 +506,27 @@ namespace Nethermind.Int256
         private static void Udivrem(Span<ulong> quot, Span<ulong> u, in UInt256 d, out UInt256 rem)
         {
             int dLen = 0;
-            for (int i = Len - 1; i >= 0; i--)
+            int shift = 0;
+            if (d.u3 != 0)
             {
-                if (d[i] != 0)
-                {
-                    dLen = i + 1;
-                    break;
-                }
+                dLen = 4;
+                shift = LeadingZeros(d.u3);
             }
-
-            var shift = LeadingZeros(d[dLen - 1]);
-
-            Span<ulong> dnStorage = stackalloc ulong[4];
-            var dn = dnStorage.Slice(0, dLen);
-            for (int i = dLen - 1; i > 0; i--)
+            else if (d.u2 != 0)
             {
-                dn[i] = Lsh(d[i], shift) | Rsh(d[i - 1], 64 - shift);
+                dLen = 3;
+                shift = LeadingZeros(d.u2);
             }
-
-            dn[0] = Lsh(d[0], shift);
+            else if (d.u1 != 0)
+            {
+                dLen = 2;
+                shift = LeadingZeros(d.u1);
+            }
+            else if (d.u0 != 0)
+            {
+                dLen = 1;
+                shift = LeadingZeros(d.u0);
+            }
 
             int uLen = 0;
             for (int i = u.Length - 1; i >= 0; i--)
@@ -539,7 +540,7 @@ namespace Nethermind.Int256
 
             Span<ulong> un = stackalloc ulong[9];
             un = un.Slice(0, uLen + 1);
-            un[uLen] = Rsh(u[uLen - 1], (64 - shift));
+            un[uLen] = Rsh(u[uLen - 1], 64 - shift);
             for (int i = uLen - 1; i > 0; i--)
             {
                 un[i] = Lsh(u[i], shift) | Rsh(u[i - 1], 64 - shift);
@@ -551,22 +552,60 @@ namespace Nethermind.Int256
 
             if (dLen == 1)
             {
-                ulong r = UdivremBy1(quot, un, dn[0]);
+                ulong dnn0 = Lsh(d.u0, shift);
+                ulong r = UdivremBy1(quot, un, dnn0);
                 r = Rsh(r, shift);
-                rem = (UInt256) r;
+                rem = (UInt256)r;
                 return;
             }
 
-            UdivremKnuth(quot, un, dn);
-            Span<ulong> remMem = stackalloc ulong[4];
-            for (int i = 0; i < dLen - 1; i++)
+            ulong dn0 = Lsh(d.u0, shift);
+            ulong dn1 = 0;
+            ulong dn2 = 0;
+            ulong dn3 = 0;
+            switch (dLen)
             {
-                remMem[i] = Rsh(un[i], shift) | Lsh(un[i + 1], 64 - shift);
+                case 4:
+                    dn3 = Lsh(d.u3, shift) | Rsh(d.u2, 64 - shift);
+                    goto case 3;
+                case 3:
+                    dn2 = Lsh(d.u2, shift) | Rsh(d.u1, 64 - shift);
+                    goto case 2;
+                case 2:
+                    dn1 = Lsh(d.u1, shift) | Rsh(d.u0, 64 - shift);
+                    break;
+            }
+            Span<ulong> dnS = stackalloc ulong[4]{dn0, dn1, dn2, dn3};
+            dnS = dnS.Slice(0, dLen);
+
+            UdivremKnuth(quot, un, dnS);
+
+            ulong rem0 = 0, rem1 = 0, rem2 = 0, rem3 = 0;
+            switch (dLen)
+            {
+                case 1:
+                    rem0 = Rsh(un[dLen - 1], shift);
+                    goto r0;
+                case 2:
+                    rem1 = Rsh(un[dLen - 1], shift);
+                    goto r1;
+                case 3:
+                    rem2 = Rsh(un[dLen - 1], shift);
+                    goto r2;
+                case 4:
+                    rem3 = Rsh(un[dLen - 1], shift);
+                    goto r3;
             }
 
-            remMem[dLen - 1] = Rsh(un[dLen - 1], shift);
+        r3:
+            rem2 = Rsh(un[2], shift) | Lsh(un[3], 64 - shift);
+        r2:
+            rem1 = Rsh(un[1], shift) | Lsh(un[2], 64 - shift);
+        r1:
+            rem0 = Rsh(un[0], shift) | Lsh(un[1], 64 - shift);
+        r0:
 
-            rem = new UInt256(remMem[0], remMem[1], remMem[2], remMem[3]);
+            rem = new UInt256(rem0, rem1, rem2, rem3);
         }
 
         // UdivremKnuth implements the division of u by normalized multiple word d from the Knuth's division algorithm.
