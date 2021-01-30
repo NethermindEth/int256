@@ -541,7 +541,7 @@ namespace Nethermind.Int256
 
         private bool Equals(in Int256 other) => value.Equals(other.value);
 
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
             return obj is Int256 other && Equals(other);
         }
@@ -558,7 +558,7 @@ namespace Nethermind.Int256
 
         public Int256 MaximalValue => Max;
 
-        public int CompareTo(object obj)
+        public int CompareTo(object? obj)
         {
             if (!(obj is Int256))
             {

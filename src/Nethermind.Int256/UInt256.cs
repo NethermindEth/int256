@@ -1903,7 +1903,7 @@ namespace Nethermind.Int256
 
         public override string ToString() => ((BigInteger) this).ToString();
 
-        public int CompareTo(object obj)
+        public int CompareTo(object? obj)
         {
             if (!(obj is UInt256))
             {
@@ -1969,7 +1969,7 @@ namespace Nethermind.Int256
             return 1;
         }
 
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
             return obj is UInt256 other && Equals(other);
         }
