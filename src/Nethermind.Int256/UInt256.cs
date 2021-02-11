@@ -591,7 +591,7 @@ namespace Nethermind.Int256
             Span<ulong> dnS = stackalloc ulong[4] { dn0, dn1, dn2, dn3 };
             dnS = dnS.Slice(0, dLen);
 
-            UdivremKnuth(MemoryMarshal.CreateSpan(ref quot, length), un, dnS); //TODO: scooletz, replace create span with a proper by ref
+            UdivremKnuth(ref quot, un, dnS);
 
             ulong rem0 = 0, rem1 = 0, rem2 = 0, rem3 = 0;
             switch (dLen)
@@ -625,7 +625,7 @@ namespace Nethermind.Int256
         // The quotient is stored in provided quot - len(u)-len(d) words.
         // Updates u to contain the remainder - len(d) words.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static void UdivremKnuth(Span<ulong> quot, Span<ulong> u, Span<ulong> d)
+        private static void UdivremKnuth(ref ulong quot, Span<ulong> u, Span<ulong> d)
         {
             var dh = d[d.Length - 1];
             var dl = d[d.Length - 2];
@@ -664,7 +664,7 @@ namespace Nethermind.Int256
                     u[j + d.Length] += AddTo(u.Slice(j), d);
                 }
 
-                quot[j] = qhat; // Store quotient digit.
+                Unsafe.Add(ref quot, j) = qhat; // Store quotient digit.
             }
         }
 
