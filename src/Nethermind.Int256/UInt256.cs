@@ -1020,17 +1020,7 @@ namespace Nethermind.Int256
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static (ulong high, ulong low) Multiply64(ulong a, ulong b)
         {
-            ulong a0 = (uint)a;
-            ulong a1 = a >> 32;
-            ulong b0 = (uint)b;
-            ulong b1 = b >> 32;
-            ulong carry = a0 * b0;
-            uint r0 = (uint)carry;
-            carry = (carry >> 32) + a0 * b1;
-            ulong r2 = carry >> 32;
-            carry = (uint)carry + a1 * b0;
-            var low = carry << 32 | r0;
-            var high = (carry >> 32) + r2 + a1 * b1;
+            ulong high = Math.BigMul(a, b, out ulong low);
             return (high, low);
         }
 
