@@ -566,7 +566,7 @@ namespace Nethermind.Int256
             if (dLen == 1)
             {
                 ulong dnn0 = Lsh(d.u0, shift);
-                ulong r = UdivremBy1(MemoryMarshal.CreateSpan(ref quot, length), un, dnn0); //TODO: scooletz, replace create span with a proper by ref
+                ulong r = UdivremBy1(ref quot, un, dnn0);
                 r = Rsh(r, shift);
                 rem = (UInt256)r;
                 return;
@@ -699,14 +699,14 @@ namespace Nethermind.Int256
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static ulong UdivremBy1(Span<ulong> quot, Span<ulong> u, ulong d)
+        private static ulong UdivremBy1(ref ulong quot, Span<ulong> u, ulong d)
         {
             var reciprocal = Reciprocal2by1(d);
             ulong rem;
             rem = u[u.Length - 1]; // Set the top word as remainder.
             for (int j = u.Length - 2; j >= 0; j--)
             {
-                (quot[j], rem) = Udivrem2by1(rem, u[j], d, reciprocal);
+                (Unsafe.Add(ref quot, j), rem) = Udivrem2by1(rem, u[j], d, reciprocal);
             }
 
             return rem;
