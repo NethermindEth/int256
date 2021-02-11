@@ -443,8 +443,7 @@ namespace Nethermind.Int256
 
             const int length = 4;
             Span<ulong> quot = stackalloc ulong[length];
-            Span<ulong> xSpan = stackalloc ulong[length] { x.u0, x.u1, x.u2, x.u3 };
-            Udivrem(ref MemoryMarshal.GetReference(quot), ref MemoryMarshal.GetReference(xSpan), length, y, out res);
+            Udivrem(ref MemoryMarshal.GetReference(quot), ref Unsafe.As<UInt256, ulong>(ref Unsafe.AsRef(in x)), length, y, out res);
         }
 
         public void Mod(in UInt256 m, out UInt256 res) => Mod(this, m, out res);
