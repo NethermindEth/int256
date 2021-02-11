@@ -339,9 +339,10 @@ namespace Nethermind.Int256
 
             if (AddOverflow(x, y, out res))
             {
-                Span<ulong> sum = stackalloc ulong[5] { res.u0, res.u1, res.u2, res.u3, 1 };
-                Span<ulong> quot = stackalloc ulong[5];
-                Udivrem(quot, sum, in m, out res);
+                const int length = 5;
+                Span<ulong> sum = stackalloc ulong[length] { res.u0, res.u1, res.u2, res.u3, 1 };
+                Span<ulong> quot = stackalloc ulong[length];
+                Udivrem(ref MemoryMarshal.GetReference(quot), ref MemoryMarshal.GetReference(sum), length, in m, out res);
             }
             else
             {
@@ -440,9 +441,9 @@ namespace Nethermind.Int256
                 return;
             }
 
-            Span<ulong> quot = stackalloc ulong[4];
-            Span<ulong> xSpan = stackalloc ulong[4] { x.u0, x.u1, x.u2, x.u3 };
-            Udivrem(quot, xSpan, y, out res);
+            const int length = 4;
+            Span<ulong> quot = stackalloc ulong[length];
+            Udivrem(ref MemoryMarshal.GetReference(quot), ref Unsafe.As<UInt256, ulong>(ref Unsafe.AsRef(in x)), length, y, out res);
         }
 
         public void Mod(in UInt256 m, out UInt256 res) => Mod(this, m, out res);
@@ -514,7 +515,7 @@ namespace Nethermind.Int256
         // It loosely follows the Knuth's division algorithm (sometimes referenced as "schoolbook" division) using 64-bit words.
         // See Knuth, Volume 2, section 4.3.1, Algorithm D.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static void Udivrem(Span<ulong> quot, Span<ulong> u, in UInt256 d, out UInt256 rem)
+        private static void Udivrem(ref ulong quot, ref ulong u, int length, in UInt256 d, out UInt256 rem)
         {
             int dLen = 0;
             int shift = 0;
@@ -540,31 +541,30 @@ namespace Nethermind.Int256
             }
 
             int uLen = 0;
-            for (int i = u.Length - 1; i >= 0; i--)
+            for (int i = length - 1; i >= 0; i--)
             {
-                if (u[i] != 0)
+                if (Unsafe.Add(ref u,i) != 0)
                 {
                     uLen = i + 1;
                     break;
                 }
             }
 
-            Span<ulong> un = stackalloc ulong[9];
-            un = un.Slice(0, uLen + 1);
-            un[uLen] = Rsh(u[uLen - 1], 64 - shift);
+            Span<ulong> un = stackalloc ulong[uLen + 1];
+            un[uLen] = Rsh(Unsafe.Add(ref u, uLen - 1), 64 - shift);
             for (int i = uLen - 1; i > 0; i--)
             {
-                un[i] = Lsh(u[i], shift) | Rsh(u[i - 1], 64 - shift);
+                un[i] = Lsh(Unsafe.Add(ref u, i), shift) | Rsh(Unsafe.Add(ref u, i - 1), 64 - shift);
             }
 
-            un[0] = Lsh(u[0], shift);
+            un[0] = Lsh(u, shift);
 
             // TODO: Skip the highest word of numerator if not significant.
 
             if (dLen == 1)
             {
                 ulong dnn0 = Lsh(d.u0, shift);
-                ulong r = UdivremBy1(quot, un, dnn0);
+                ulong r = UdivremBy1(ref quot, un, dnn0);
                 r = Rsh(r, shift);
                 rem = (UInt256)r;
                 return;
@@ -589,7 +589,7 @@ namespace Nethermind.Int256
             Span<ulong> dnS = stackalloc ulong[4] { dn0, dn1, dn2, dn3 };
             dnS = dnS.Slice(0, dLen);
 
-            UdivremKnuth(quot, un, dnS);
+            UdivremKnuth(ref quot, un, dnS);
 
             ulong rem0 = 0, rem1 = 0, rem2 = 0, rem3 = 0;
             switch (dLen)
@@ -623,7 +623,7 @@ namespace Nethermind.Int256
         // The quotient is stored in provided quot - len(u)-len(d) words.
         // Updates u to contain the remainder - len(d) words.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static void UdivremKnuth(Span<ulong> quot, Span<ulong> u, Span<ulong> d)
+        private static void UdivremKnuth(ref ulong quot, Span<ulong> u, Span<ulong> d)
         {
             var dh = d[d.Length - 1];
             var dl = d[d.Length - 2];
@@ -662,7 +662,7 @@ namespace Nethermind.Int256
                     u[j + d.Length] += AddTo(u.Slice(j), d);
                 }
 
-                quot[j] = qhat; // Store quotient digit.
+                Unsafe.Add(ref quot, j) = qhat; // Store quotient digit.
             }
         }
 
@@ -697,14 +697,14 @@ namespace Nethermind.Int256
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static ulong UdivremBy1(Span<ulong> quot, Span<ulong> u, ulong d)
+        private static ulong UdivremBy1(ref ulong quot, Span<ulong> u, ulong d)
         {
             var reciprocal = Reciprocal2by1(d);
             ulong rem;
             rem = u[u.Length - 1]; // Set the top word as remainder.
             for (int j = u.Length - 2; j >= 0; j--)
             {
-                (quot[j], rem) = Udivrem2by1(rem, u[j], d, reciprocal);
+                (Unsafe.Add(ref quot, j), rem) = Udivrem2by1(rem, u[j], d, reciprocal);
             }
 
             return rem;
@@ -935,13 +935,14 @@ namespace Nethermind.Int256
                 return;
             }
 
-            Span<ulong> p = stackalloc ulong[8];
+            const int length = 8;
+            Span<ulong> p = stackalloc ulong[length];
             var pLow = p.Slice(0, 4);
             pl.ToSpan(ref pLow);
             var pHigh = p.Slice(4, 4);
             ph.ToSpan(ref pHigh);
-            Span<ulong> quot = stackalloc ulong[8];
-            Udivrem(quot, p, m, out res);
+            Span<ulong> quot = stackalloc ulong[length];
+            Udivrem(ref MemoryMarshal.GetReference(quot), ref MemoryMarshal.GetReference(p), length, m, out res);
         }
 
         public void MultiplyMod(in UInt256 a, in UInt256 m, out UInt256 res) => MultiplyMod(this, a, m, out res);
@@ -1059,10 +1060,9 @@ namespace Nethermind.Int256
             // At this point, we know
             // x/y ; x > y > 0
 
-            Span<ulong> quot = stackalloc ulong[4];
-            Span<ulong> xSpan = stackalloc ulong[4] { x.u0, x.u1, x.u2, x.u3 };
-            Udivrem(quot, xSpan, y, out UInt256 _);
-            res = new UInt256(quot);
+            res = default; // initialize with zeros
+            const int length = 4;
+            Udivrem(ref Unsafe.As<UInt256, ulong>(ref res), ref Unsafe.As<UInt256, ulong>(ref Unsafe.AsRef(in x)), length, y, out UInt256 _);
         }
 
         public void Divide(in UInt256 a, out UInt256 res) => Divide(this, a, out res);
