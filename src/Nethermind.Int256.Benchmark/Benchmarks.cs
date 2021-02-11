@@ -493,4 +493,26 @@ namespace Nethermind.Int256.Benchmark
             return res;
         }
     }
+
+    [SimpleJob(RuntimeMoniker.NetCoreApp50)]
+    [MemoryDiagnoser]
+    public class IsZeroOne
+    {
+        public UInt256[] Values { get; } = {UInt256.Zero, UInt256.One, UInt256.MaxValue};
+
+        [ParamsSource(nameof(Values))]
+        public UInt256 A;
+
+        [Benchmark]
+        public bool IsZero()
+        {
+            return A.IsZero;
+        }
+        
+        [Benchmark]
+        public bool IsOne()
+        {
+            return A.IsOne;
+        }
+    }
 }

@@ -273,12 +273,14 @@ namespace Nethermind.Int256
 
         public (ulong value, bool overflow) UlongWithOverflow => (this.u0, (this.u1 | this.u2 | this.u3) != 0);
 
-        public bool IsZero => this == Zero;
+        public bool IsZero => (u0 | u1 | u2 | u3) == 0;
+        
+        public bool IsOne => ((u0 ^ 1UL) | u1 | u2 | u3) == 0;
+
+        public bool IsZeroOrOne => ((u0 >> 1) | u1 | u2 | u3) == 0;
 
         public UInt256 ZeroValue => Zero;
-
-        public bool IsOne => this == One;
-
+        
         public UInt256 OneValue => One;
 
         public UInt256 MaximalValue => MaxValue;
@@ -411,7 +413,7 @@ namespace Nethermind.Int256
         // If y == 0, z is set to 0 (OBS: differs from the big.Int)
         public static void Mod(in UInt256 x, in UInt256 y, out UInt256 res)
         {
-            if (x.IsZero || y.IsZero || y.IsOne)
+            if (x.IsZero || y.IsZeroOrOne)
             {
                 res = Zero;
                 return;
