@@ -1062,12 +1062,9 @@ namespace Nethermind.Int256
             // At this point, we know
             // x/y ; x > y > 0
 
-            res = default;
+            res = default; // initialize with zeros
             const int length = 4;
-            Span<ulong> quot = stackalloc ulong[length];
-            Span<ulong> xSpan = stackalloc ulong[length] { x.u0, x.u1, x.u2, x.u3 };
-            Udivrem(ref MemoryMarshal.GetReference(quot), ref MemoryMarshal.GetReference(xSpan), length, y, out UInt256 _);
-            res = new UInt256(quot);
+            Udivrem(ref Unsafe.As<UInt256, ulong>(ref res), ref Unsafe.As<UInt256, ulong>(ref Unsafe.AsRef(in x)), length, y, out UInt256 _);
         }
 
         public void Divide(in UInt256 a, out UInt256 res) => Divide(this, a, out res);
