@@ -551,8 +551,7 @@ namespace Nethermind.Int256
                 }
             }
 
-            Span<ulong> un = stackalloc ulong[9];
-            un = un.Slice(0, uLen + 1);
+            Span<ulong> un = stackalloc ulong[uLen + 1];
             un[uLen] = Rsh(Unsafe.Add(ref u, uLen - 1), 64 - shift);
             for (int i = uLen - 1; i > 0; i--)
             {
