@@ -66,9 +66,11 @@ namespace Nethermind.Int256.Test
 
         public static IEnumerable<int> ShiftTestCases => Enumerable.Range(0, 257);
 
+        const int Seed = 0;
+        
         public static IEnumerable<BigInteger> RandomSigned(int count)
         {
-            var rand = new System.Random();
+            var rand = new System.Random(Seed);
             byte[] data = new byte[256 / 8];
             for (int i = 0; i < count; i++)
             {
@@ -79,7 +81,7 @@ namespace Nethermind.Int256.Test
 
         public static IEnumerable<BigInteger> RandomUnsigned(int count)
         {
-            var rand = new System.Random();
+            var rand = new System.Random(Seed);
             byte[] data = new byte[256 / 8];
             for (int i = 0; i < count; i++)
             {
@@ -91,7 +93,7 @@ namespace Nethermind.Int256.Test
 
         public static IEnumerable<int> RandomInt(int count)
         {
-            var rand = new System.Random();
+            var rand = new System.Random(Seed);
             for (int i = 0; i < count; i++)
             {
                 yield return rand.Next();
