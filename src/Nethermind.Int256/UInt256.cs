@@ -46,7 +46,7 @@ namespace Nethermind.Int256
             this.u3 = u3;
         }
 
-        public UInt256(ReadOnlySpan<byte> bytes, bool isBigEndian = false)
+        public UInt256(in ReadOnlySpan<byte> bytes, bool isBigEndian = false)
         {
             if (bytes.Length == 32)
             {
@@ -137,7 +137,7 @@ namespace Nethermind.Int256
             }
         }
 
-        public UInt256(ReadOnlySpan<ulong> data, bool isBigEndian = false)
+        public UInt256(in ReadOnlySpan<ulong> data, bool isBigEndian = false)
         {
             if (isBigEndian)
             {
@@ -623,7 +623,7 @@ namespace Nethermind.Int256
         // The quotient is stored in provided quot - len(u)-len(d) words.
         // Updates u to contain the remainder - len(d) words.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static void UdivremKnuth(ref ulong quot, Span<ulong> u, Span<ulong> d)
+        private static void UdivremKnuth(ref ulong quot, Span<ulong> u, in Span<ulong> d)
         {
             var dh = d[d.Length - 1];
             var dl = d[d.Length - 2];
@@ -667,7 +667,7 @@ namespace Nethermind.Int256
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static ulong SubMulTo(Span<ulong> x, Span<ulong> y, ulong multiplier)
+        private static ulong SubMulTo(Span<ulong> x, in Span<ulong> y, ulong multiplier)
         {
             ulong borrow = 0;
             for (int i = 0; i < y.Length; i++)
@@ -685,7 +685,7 @@ namespace Nethermind.Int256
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static ulong AddTo(Span<ulong> x, Span<ulong> y)
+        private static ulong AddTo(Span<ulong> x, in Span<ulong> y)
         {
             ulong carry = 0;
             for (int i = 0; i < y.Length; i++)
@@ -1191,7 +1191,7 @@ namespace Nethermind.Int256
             Lsh(this, n, out res);
         }
 
-        public static UInt256 operator <<(UInt256 a, int n)
+        public static UInt256 operator <<(in UInt256 a, int n)
         {
             a.LeftShift(n, out UInt256 res);
             return res;
@@ -1298,7 +1298,7 @@ namespace Nethermind.Int256
 
         public void RightShift(int n, out UInt256 res) => Rsh(this, n, out res);
 
-        public static UInt256 operator >>(UInt256 a, int n)
+        public static UInt256 operator >>(in UInt256 a, int n)
         {
             a.RightShift(n, out UInt256 res);
             return res;
@@ -1390,7 +1390,7 @@ namespace Nethermind.Int256
             return res;
         }
 
-        public static UInt256 operator ++(UInt256 a)
+        public static UInt256 operator ++(in UInt256 a)
         {
             Add(in a, 1, out UInt256 res);
             return res;
@@ -1412,13 +1412,13 @@ namespace Nethermind.Int256
 
         public static implicit operator UInt256(ulong value) => new UInt256(value, 0ul, 0ul, 0ul);
 
-        public static explicit operator UInt256(BigInteger value)
+        public static explicit operator UInt256(in BigInteger value)
         {
             byte[] bytes32 = value.ToBytes32(true);
             return new UInt256(bytes32, true);
         }
 
-        public static explicit operator BigInteger(UInt256 value)
+        public static explicit operator BigInteger(in UInt256 value)
         {
             Span<byte> bytes = stackalloc byte[32];
             BinaryPrimitives.WriteUInt64LittleEndian(bytes.Slice(0, 8), value.u0);
@@ -1428,7 +1428,7 @@ namespace Nethermind.Int256
             return new BigInteger(bytes, true);
         }
 
-        public static explicit operator sbyte(UInt256 a)
+        public static explicit operator sbyte(in UInt256 a)
         {
             if (a.u1 > 0 || a.u2 > 0 || a.u3 > 0 || a.u0 > (long)sbyte.MaxValue)
             {
@@ -1437,7 +1437,7 @@ namespace Nethermind.Int256
             return (sbyte)a.u0;
         }
 
-        public static explicit operator byte(UInt256 a)
+        public static explicit operator byte(in UInt256 a)
         {
             if (a.u1 > 0 || a.u2 > 0 || a.u3 > 0 || a.u0 > byte.MaxValue)
             {
@@ -1447,7 +1447,7 @@ namespace Nethermind.Int256
             return (byte)a.u0;
         }
 
-        public static explicit operator short(UInt256 a)
+        public static explicit operator short(in UInt256 a)
         {
             if (a.u1 > 0 || a.u2 > 0 || a.u3 > 0 || a.u0 > (long)short.MaxValue)
             {
@@ -1457,7 +1457,7 @@ namespace Nethermind.Int256
             return (short)a.u0;
         }
 
-        public static explicit operator ushort(UInt256 a)
+        public static explicit operator ushort(in UInt256 a)
         {
             if (a.u1 > 0 || a.u2 > 0 || a.u3 > 0 || a.u0 > ushort.MaxValue)
             {
@@ -1467,7 +1467,7 @@ namespace Nethermind.Int256
             return (ushort)a.u0;
         }
 
-        public static explicit operator int(UInt256 a)
+        public static explicit operator int(in UInt256 a)
         {
             if (a.u1 > 0 || a.u2 > 0 || a.u3 > 0 || a.u0 > int.MaxValue)
             {
@@ -1477,7 +1477,7 @@ namespace Nethermind.Int256
             return (int)a.u0;
         }
 
-        public static explicit operator uint(UInt256 a)
+        public static explicit operator uint(in UInt256 a)
         {
             if (a.u1 > 0 || a.u2 > 0 || a.u3 > 0 || a.u0 > uint.MaxValue)
             {
@@ -1487,7 +1487,7 @@ namespace Nethermind.Int256
             return (uint)a.u0;
         }
 
-        public static explicit operator long(UInt256 a)
+        public static explicit operator long(in UInt256 a)
         {
             if (a.u1 > 0 || a.u2 > 0 || a.u3 > 0 || a.u0 > long.MaxValue)
             {
@@ -1497,7 +1497,7 @@ namespace Nethermind.Int256
             return (long)a.u0;
         }
 
-        public static explicit operator ulong(UInt256 a)
+        public static explicit operator ulong(in UInt256 a)
         {
             if (a.u1 > 0 || a.u2 > 0 || a.u3 > 0)
             {
@@ -1507,48 +1507,48 @@ namespace Nethermind.Int256
             return a.u0;
         }
 
-        public static UInt256 operator *(UInt256 a, uint b)
+        public static UInt256 operator *(in UInt256 a, uint b)
         {
             UInt256 ub = b;
             Multiply(in a, in ub, out UInt256 c);
             return c;
         }
 
-        public static UInt256 operator *(uint a, UInt256 b)
+        public static UInt256 operator *(uint a, in UInt256 b)
         {
             UInt256 ua = a;
             Multiply(in ua, in b, out UInt256 c);
             return c;
         }
 
-        public static UInt256 operator *(UInt256 a, ulong b)
+        public static UInt256 operator *(in UInt256 a, ulong b)
         {
             UInt256 ub = b;
             Multiply(in a, in ub, out UInt256 c);
             return c;
         }
 
-        public static UInt256 operator *(ulong a, UInt256 b)
+        public static UInt256 operator *(ulong a, in UInt256 b)
         {
             UInt256 ua = a;
             Multiply(in ua, in b, out UInt256 c);
             return c;
         }
 
-        public static UInt256 operator *(UInt256 a, UInt256 b)
+        public static UInt256 operator *(in UInt256 a, in UInt256 b)
         {
             Multiply(in a, in b, out UInt256 c);
             return c;
         }
 
-        public static UInt256 operator /(UInt256 a, uint b)
+        public static UInt256 operator /(in UInt256 a, uint b)
         {
             UInt256 ub = b;
             Divide(in a, in ub, out UInt256 c);
             return c;
         }
 
-        public static UInt256 operator /(UInt256 a, UInt256 b)
+        public static UInt256 operator /(in UInt256 a, in UInt256 b)
         {
             Divide(in a, in b, out UInt256 c);
             return c;
@@ -1987,27 +1987,27 @@ namespace Nethermind.Int256
                 switch (index)
                 {
                     case 0:
-                        return this.u0;
+                        return u0;
                     case 1:
-                        return this.u1;
+                        return u1;
                     case 2:
-                        return this.u2;
+                        return u2;
                     case 3:
-                        return this.u3;
+                        return u3;
                 }
 
                 throw new IndexOutOfRangeException();
             }
         }
 
-        public static UInt256 Max(UInt256 a, UInt256 b)
+        public static UInt256 Max(in UInt256 a, in UInt256 b)
         {
             if (LessThan(in b, in a))
                 return a;
             return b;
         }
 
-        public static UInt256 Min(UInt256 a, UInt256 b)
+        public static UInt256 Min(in UInt256 a, in UInt256 b)
         {
             if (LessThan(in b, in a))
                 return b;
@@ -2028,7 +2028,7 @@ namespace Nethermind.Int256
             return c;
         }
 
-        public static UInt256 Parse(ReadOnlySpan<char> value, NumberStyles numberStyles)
+        public static UInt256 Parse(in ReadOnlySpan<char> value, NumberStyles numberStyles)
         {
             if (!TryParse(value, numberStyles, CultureInfo.InvariantCulture, out UInt256 c))
                 throw new FormatException();
@@ -2050,7 +2050,7 @@ namespace Nethermind.Int256
             return TryParse(value.AsSpan(), style, provider, out result);
         }
 
-        public static bool TryParse(ReadOnlySpan<char> value, NumberStyles style, IFormatProvider provider, out UInt256 result)
+        public static bool TryParse(in ReadOnlySpan<char> value, NumberStyles style, IFormatProvider provider, out UInt256 result)
         {
             BigInteger a;
             bool bigParsedProperly;
