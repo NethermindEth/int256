@@ -399,10 +399,10 @@ namespace Nethermind.Int256
         {
             if (target.Length == 32)
             {
-                BinaryPrimitives.WriteUInt64LittleEndian(target.Slice(0, 8), u3);
-                BinaryPrimitives.WriteUInt64LittleEndian(target.Slice(8, 8), u2);
-                BinaryPrimitives.WriteUInt64LittleEndian(target.Slice(16, 8), u1);
-                BinaryPrimitives.WriteUInt64LittleEndian(target.Slice(24, 8), u0);
+                BinaryPrimitives.WriteUInt64LittleEndian(target.Slice(0, 8), u0);
+                BinaryPrimitives.WriteUInt64LittleEndian(target.Slice(8, 8), u1);
+                BinaryPrimitives.WriteUInt64LittleEndian(target.Slice(16, 8), u2);
+                BinaryPrimitives.WriteUInt64LittleEndian(target.Slice(24, 8), u3);
             }
             else
             {
