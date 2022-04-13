@@ -255,5 +255,37 @@ namespace Nethermind.Int256.Test
         {
             convert(1).MaximalValue.Should().Be(convert(maxValue));
         }
+        
+        [Test]
+        public virtual void ToBigEndian_And_Back()
+        {
+            byte[] bidEndian = convert(1000000000000000000).ToBigEndian();
+            new UInt256(bidEndian, true).Should().Be(convert(1000000000000000000));
+        }
+        
+        [Test]
+        public virtual void ToLittleEndian_And_Back()
+        {
+            byte[] bidEndian = convert(1000000000000000000).ToLittleEndian();
+            new UInt256(bidEndian).Should().Be(convert(1000000000000000000));
+        }
+        
+        [Test]
+        public virtual void Check_For_Correct_Big_And_Little_Endian()
+        {
+            byte[] bigEndianRepresentation =
+            {
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13, 224, 182, 179, 167, 100,
+                0, 0
+            };
+            convert(1000000000000000000).ToBigEndian().Should().BeEquivalentTo(bigEndianRepresentation);
+            
+            byte[] littleEndianRepresentation =
+            {
+                0, 0, 100, 167, 179, 182, 224, 13, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            };
+            convert(1000000000000000000).ToLittleEndian().Should().BeEquivalentTo(littleEndianRepresentation);
+           
+        }
     }
 }
