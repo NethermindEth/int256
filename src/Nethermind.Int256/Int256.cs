@@ -549,7 +549,7 @@ namespace Nethermind.Int256
                     return false;
                 }
             }
-            if (xSign >= 0)
+            else if (xSign >= 0)
             {
                 return true;
             }

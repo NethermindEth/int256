@@ -294,18 +294,21 @@ namespace Nethermind.Int256.Test
             string Expected(string valueString)
             {
                 string expected = valueString.Replace(",", "");
-                return type == typeof(float) ? expected[..Math.Min(7, expected.Length)] : type == typeof(double) ? expected[..Math.Min(15, expected.Length)] : expected;
+                return type == typeof(float) ? expected[..Math.Min(7, expected.Length)] : type == typeof(double) ? expected[..Math.Min(14, expected.Length)] : expected;
             }
 
             string valueString = value.ToString()!;
-            try
+            if (!valueString.StartsWith('-'))
             {
-                UInt256 item = (UInt256)BigInteger.Parse(valueString);
-                string expected = expectedString ?? Expected(valueString);
-                string convertedValue = Expected(System.Convert.ChangeType(item, type).ToString());
-                convertedValue.Should().BeEquivalentTo(expected);
+                try
+                {
+                    UInt256 item = (UInt256)BigInteger.Parse(valueString);
+                    string expected = expectedString ?? Expected(valueString);
+                    string convertedValue = Expected(System.Convert.ChangeType(item, type).ToString());
+                    convertedValue.Should().BeEquivalentTo(expected);
+                }
+                catch (Exception e) when (e.GetType() == expectedException) { }
             }
-            catch (Exception e) when(e.GetType() == expectedException) { }
         }
     }
 }

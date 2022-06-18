@@ -154,7 +154,11 @@ namespace Nethermind.Int256
             }
         }
 
-        public static explicit operator double(in UInt256 a) => a.u1 == 0 ? a.u0 : a.u1 * (double)ulong.MaxValue + a.u0;
+        public static explicit operator double(in UInt256 a)
+        {
+            double multiplier = ulong.MaxValue;
+            return (((a.u3 * multiplier) + a.u2) * multiplier + a.u1) * multiplier + a.u0;
+        }
 
         public static explicit operator UInt256(double a)
         {
