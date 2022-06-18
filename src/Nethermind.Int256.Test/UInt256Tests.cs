@@ -5,7 +5,7 @@ using NUnit.Framework;
 
 namespace Nethermind.Int256.Test
 {
-    public partial class UInt256TestsTemplate<T> where T : IInteger<T>
+    public abstract class UInt256TestsTemplate<T> where T : IInteger<T>
     {
         protected readonly Func<BigInteger, T> convert;
         protected readonly Func<int, T> convertFromInt;
@@ -24,7 +24,7 @@ namespace Nethermind.Int256.Test
         public virtual void Add((BigInteger A, BigInteger B) test)
         {
             BigInteger resBigInt = test.A + test.B;
-            resBigInt = resBigInt % (BigInteger.One << 256);
+            resBigInt %= (BigInteger.One << 256);
             resBigInt = postprocess(resBigInt);
 
             T a = convert(test.A);
@@ -43,7 +43,7 @@ namespace Nethermind.Int256.Test
                 return;
             }
             BigInteger resBigInt = (test.A + test.B) % test.M;
-            resBigInt = resBigInt % (BigInteger.One << 256);
+            resBigInt %= (BigInteger.One << 256);
             resBigInt = postprocess(resBigInt);
 
             T uint256a = convert(test.A);
@@ -130,7 +130,7 @@ namespace Nethermind.Int256.Test
         public virtual void Exp((BigInteger A, int n) test)
         {
             BigInteger resBigInt = BigInteger.Pow(test.A, test.n);
-            resBigInt = resBigInt % (BigInteger.One << 256);
+            resBigInt %= (BigInteger.One << 256);
             resBigInt = postprocess(resBigInt);
 
             T uint256a = convert(test.A);
@@ -149,7 +149,7 @@ namespace Nethermind.Int256.Test
                 return;
             }
             BigInteger resBigInt = BigInteger.ModPow(test.A, test.B, test.M);
-            resBigInt = resBigInt % (BigInteger.One << 256);
+            resBigInt %= (BigInteger.One << 256);
             resBigInt = postprocess(resBigInt);
 
             T uint256a = convert(test.A);
@@ -170,7 +170,7 @@ namespace Nethermind.Int256.Test
                 return;
             }
             BigInteger resBigInt = test.A << test.n;
-            resBigInt = resBigInt % (BigInteger.One << 256);
+            resBigInt %= (BigInteger.One << 256);
             resBigInt = postprocess(resBigInt);
 
             T uint256a = convert(test.A);
@@ -188,7 +188,7 @@ namespace Nethermind.Int256.Test
                 return;
             }
             BigInteger resBigInt = test.A >> test.n;
-            resBigInt = resBigInt % (BigInteger.One << 256);
+            resBigInt %= (BigInteger.One << 256);
             resBigInt = postprocess(resBigInt);
 
             T uint256a = convert(test.A);
@@ -214,6 +214,7 @@ namespace Nethermind.Int256.Test
         }
     }
 
+    [Parallelizable(ParallelScope.All)]
     public class UInt256Tests : UInt256TestsTemplate<UInt256>
     {
         public UInt256Tests() : base((BigInteger x) => (UInt256)x, (int x) => (UInt256)x, x => x, TestNumbers.UInt256Max) { }
@@ -285,7 +286,29 @@ namespace Nethermind.Int256.Test
                 0, 0, 100, 167, 179, 182, 224, 13, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
             };
             convert(1000000000000000000).ToLittleEndian().Should().BeEquivalentTo(littleEndianRepresentation);
-           
+        }
+        
+        [TestCaseSource(typeof(Convertibles), nameof(Convertibles.SignedTestCases))]
+        public void Convert(Type type, object value, Type expectedException, string expectedString)
+        {
+            string Expected(string valueString)
+            {
+                string expected = valueString.Replace(",", "");
+                return type == typeof(float) ? expected[..Math.Min(7, expected.Length)] : type == typeof(double) ? expected[..Math.Min(14, expected.Length)] : expected;
+            }
+
+            string valueString = value.ToString()!;
+            if (!valueString.StartsWith('-'))
+            {
+                try
+                {
+                    UInt256 item = (UInt256)BigInteger.Parse(valueString);
+                    string expected = expectedString ?? Expected(valueString);
+                    string convertedValue = Expected(System.Convert.ChangeType(item, type).ToString());
+                    convertedValue.Should().BeEquivalentTo(expected);
+                }
+                catch (Exception e) when (e.GetType() == expectedException) { }
+            }
         }
     }
 }

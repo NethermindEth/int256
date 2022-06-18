@@ -5,6 +5,7 @@ using NUnit.Framework;
 
 namespace Nethermind.Int256.Test
 {
+    [Parallelizable(ParallelScope.All)]
     public class Int256Tests : UInt256TestsTemplate<Int256>
     {
 
@@ -71,5 +72,25 @@ namespace Nethermind.Int256.Test
 
         [TestCaseSource(typeof(UnaryOps), nameof(UnaryOps.SignedTestCases))]
         public override void ToString(BigInteger test) => base.ToString(test);
+
+        [TestCaseSource(typeof(Convertibles), nameof(Convertibles.SignedTestCases))]
+        public void Convert(Type type, object value, Type expectedException, string expectedString)
+        {
+            string Expected(string valueString)
+            {
+                string expected = valueString.Replace(",", "");
+                return type == typeof(float) ? expected[..Math.Min(7, expected.Length)] : type == typeof(double) ? expected[..Math.Min(15, expected.Length)] : expected;
+            }
+
+            string valueString = value.ToString()!;
+            Int256 item = (Int256)BigInteger.Parse(valueString);
+            try
+            {
+                string expected = expectedString ?? Expected(valueString);
+                string convertedValue = Expected(System.Convert.ChangeType(item, type).ToString());
+                convertedValue.Should().BeEquivalentTo(expected);
+            }
+            catch (Exception e) when(e.GetType() == expectedException) { }
+        }
     }
 }
