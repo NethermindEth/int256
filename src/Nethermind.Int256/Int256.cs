@@ -5,23 +5,23 @@ using System.Runtime.CompilerServices;
 
 namespace Nethermind.Int256
 {
-    public readonly struct Int256 : IComparable, IComparable<Int256>, IInteger<Int256>
+    public readonly struct Int256 : IComparable, IComparable<Int256>, IInteger<Int256>, IConvertible
     {
         public static readonly Int256 Zero = (Int256)0UL;
         public static readonly Int256 One = (Int256)1UL;
         public static readonly Int256 MinusOne = -1L;
         public static readonly Int256 Max = new Int256(((BigInteger.One << 255) - 1));
 
-        private readonly UInt256 value;
+        private readonly UInt256 _value;
 
         public Int256(ReadOnlySpan<byte> bytes, bool isBigEndian)
         {
-            this.value = new UInt256(bytes, isBigEndian);
+            _value = new UInt256(bytes, isBigEndian);
         }
 
         public Int256(UInt256 value)
         {
-            this.value = value;
+            _value = value;
         }
 
         public Int256(BigInteger big)
@@ -29,11 +29,11 @@ namespace Nethermind.Int256
             if (big.Sign < 0)
             {
                 (new Int256((UInt256)(-big))).Neg(out Int256 neg);
-                this.value = neg.value;
+                _value = neg._value;
             }
             else
             {
-                this.value = (UInt256)big;
+                _value = (UInt256)big;
             }
         }
 
@@ -41,44 +41,28 @@ namespace Nethermind.Int256
         {
             if (n < 0)
             {
-                var value = new Int256(new UInt256((ulong)-n));
+                Int256 value = new(new UInt256((ulong)-n));
                 value.Neg(out Int256 res);
-                this.value = res.value;
+                _value = res._value;
             }
             else
             {
-                this.value = new UInt256((ulong)n);
+                _value = new UInt256((ulong)n);
             }
         }
 
-        public static explicit operator Int256(int n)
-        {
-            return new Int256(n);
-        }
+        public static explicit operator Int256(int n) => new Int256(n);
 
         public Int256 OneValue => One;
 
         public Int256 ZeroValue => Zero;
 
-        public int Sign
-        {
-            get
-            {
-                if (value.IsZero)
-                {
-                    return 0;
-                }
-                if (value.u3 < 0x8000000000000000ul)
-                {
-                    return 1;
-                }
-                return -1;
-            }
-        }
+        public int Sign => _value.IsZero ? 0 : _value.u3 < 0x8000000000000000ul ? 1 : -1;
+        public bool IsNegative => Sign < 0;
 
         public static void Add(in Int256 a, in Int256 b, out Int256 res)
         {
-            UInt256.Add(a.value, b.value, out UInt256 ures);
+            UInt256.Add(a._value, b._value, out UInt256 ures);
             res = new Int256(ures);
         }
 
@@ -86,10 +70,10 @@ namespace Nethermind.Int256
 
         public static void AddMod(in Int256 x, in Int256 y, in Int256 m, out Int256 res)
         {
-            var mt = m;
+            Int256 mt = m;
             if (mt.IsOne)
             {
-                res = Int256.Zero;
+                res = Zero;
                 return;
             }
 
@@ -103,13 +87,13 @@ namespace Nethermind.Int256
             {
                 x.Neg(out Int256 xNeg);
                 y.Neg(out Int256 yNeg);
-                xNeg.value.AddMod(yNeg.value, mt.value, out UInt256 ures);
+                xNeg._value.AddMod(yNeg._value, mt._value, out UInt256 ures);
                 res = new Int256(ures);
                 res.Neg(out res);
             }
             else if (xSign > 0 && ySign > 0)
             {
-                x.value.AddMod(y.value, mt.value, out UInt256 ures);
+                x._value.AddMod(y._value, mt._value, out UInt256 ures);
                 res = new Int256(ures);
             }
             else
@@ -123,7 +107,7 @@ namespace Nethermind.Int256
 
         public static void Subtract(in Int256 a, in Int256 b, out Int256 res)
         {
-            a.value.Subtract(b.value, out UInt256 ures);
+            a._value.Subtract(b._value, out UInt256 ures);
             res = new Int256(ures);
         }
 
@@ -147,14 +131,14 @@ namespace Nethermind.Int256
             if (xSign < 0 && ySign > 0)
             {
                 x.Neg(out Int256 xNeg);
-                xNeg.value.AddMod(y.value, mt.value, out UInt256 ures);
+                xNeg._value.AddMod(y._value, mt._value, out UInt256 ures);
                 res = new Int256(ures);
                 res.Neg(out res);
             }
             else if (xSign > 0 && ySign < 0)
             {
                 y.Neg(out Int256 yNeg);
-                x.value.AddMod(yNeg.value, mt.value, out UInt256 ures);
+                x._value.AddMod(yNeg._value, mt._value, out UInt256 ures);
                 res = new Int256(ures);
             }
             else
@@ -177,7 +161,7 @@ namespace Nethermind.Int256
             {
                 b.Neg(out bv);
             }
-            UInt256.Multiply(av.value, bv.value, out UInt256 ures);
+            UInt256.Multiply(av._value, bv._value, out UInt256 ures);
             res = new Int256(ures);
             int aSign = a.Sign;
             int bSign = b.Sign;
@@ -211,7 +195,7 @@ namespace Nethermind.Int256
                 {
                     y.Neg(out yAbs);
                 }
-                xAbs.value.MultiplyMod(yAbs.value, mAbs.value, out UInt256 ures);
+                xAbs._value.MultiplyMod(yAbs._value, mAbs._value, out UInt256 ures);
                 res = new Int256(ures);
                 res.Neg(out res);
             }
@@ -224,7 +208,7 @@ namespace Nethermind.Int256
                     x.Neg(out xAbs);
                     y.Neg(out yAbs);
                 }
-                xAbs.value.MultiplyMod(yAbs.value, mAbs.value, out UInt256 ures);
+                xAbs._value.MultiplyMod(yAbs._value, mAbs._value, out UInt256 ures);
                 res = new Int256(ures);
             }
         }
@@ -239,7 +223,7 @@ namespace Nethermind.Int256
                 if (d.Sign >= 0)
                 {
                     // pos / pos
-                    UInt256.Divide(n.value, d.value, out value);
+                    UInt256.Divide(n._value, d._value, out value);
                     res = new Int256(value);
                     return;
                 }
@@ -247,7 +231,7 @@ namespace Nethermind.Int256
                 {
                     // pos / neg
                     Neg(d, out Int256 neg);
-                    UInt256.Divide(n.value, neg.value, out value);
+                    UInt256.Divide(n._value, neg._value, out value);
                     res = new Int256(value);
                     res.Neg(out res);
                     return;
@@ -259,12 +243,12 @@ namespace Nethermind.Int256
             {
                 // neg / neg
                 Neg(d, out Int256 dNeg);
-                UInt256.Divide(nNeg.value, dNeg.value, out value);
+                UInt256.Divide(nNeg._value, dNeg._value, out value);
                 res = new Int256(value);
                 return;
             }
             // neg / pos
-            UInt256.Divide(nNeg.value, d.value, out value);
+            UInt256.Divide(nNeg._value, d._value, out value);
             res = new Int256(value);
             res.Neg(out res);
         }
@@ -280,8 +264,8 @@ namespace Nethermind.Int256
             if (b.Sign < 0)
             {
                 b.Neg(out Int256 neg);
-                UInt256.Exp(neg.value, e.value, out UInt256 ures);
-                if (!e.value.Bit(0))
+                UInt256.Exp(neg._value, e._value, out UInt256 ures);
+                if (!e._value.Bit(0))
                 {
                     res = new Int256(ures);
                 }
@@ -293,7 +277,7 @@ namespace Nethermind.Int256
             }
             else
             {
-                UInt256.Exp(b.value, e.value, out UInt256 ures);
+                UInt256.Exp(b._value, e._value, out UInt256 ures);
                 res = new Int256(ures);
             }
         }
@@ -311,14 +295,14 @@ namespace Nethermind.Int256
             if (bs.Sign < 0)
             {
                 bv.Neg(out bv);
-                switchSign = exp.value.Bit(0);
+                switchSign = exp._value.Bit(0);
             }
             var mAbs = m;
             if (mAbs.Sign < 0)
             {
                 mAbs.Neg(out mAbs);
             }
-            UInt256.ExpMod(bv.value, exp.value, mAbs.value, out UInt256 ures);
+            UInt256.ExpMod(bv._value, exp._value, mAbs._value, out UInt256 ures);
             res = new Int256(ures);
             if (switchSign)
             {
@@ -330,7 +314,7 @@ namespace Nethermind.Int256
 
         public static void LeftShift(in Int256 x, int n, out Int256 res)
         {
-            x.value.LeftShift(n, out UInt256 ures);
+            x._value.LeftShift(n, out UInt256 ures);
             res = new Int256(ures);
         }
 
@@ -381,7 +365,7 @@ namespace Nethermind.Int256
         // Neg returns -x mod 2**256.
         public static void Neg(in Int256 x, out Int256 neg)
         {
-            UInt256.Subtract(UInt256.Zero, x.value, out UInt256 value);
+            UInt256.Subtract(UInt256.Zero, x._value, out UInt256 value);
             neg = new Int256(value);
         }
 
@@ -399,17 +383,17 @@ namespace Nethermind.Int256
 
         private void Srsh64(out Int256 res)
         {
-            res = new Int256(new UInt256(this.value.u1, this.value.u2, this.value.u3, ulong.MaxValue));
+            res = new Int256(new UInt256(_value.u1, _value.u2, _value.u3, ulong.MaxValue));
         }
 
         private void Srsh128(out Int256 res)
         {
-            res = new Int256(new UInt256(this.value.u2, this.value.u3, ulong.MaxValue, ulong.MaxValue));
+            res = new Int256(new UInt256(_value.u2, _value.u3, ulong.MaxValue, ulong.MaxValue));
         }
 
         private void Srsh192(out Int256 res)
         {
-            res = new Int256(new UInt256(this.value.u3, ulong.MaxValue, ulong.MaxValue, ulong.MaxValue));
+            res = new Int256(new UInt256(_value.u3, ulong.MaxValue, ulong.MaxValue, ulong.MaxValue));
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -417,7 +401,7 @@ namespace Nethermind.Int256
         {
             if (x.Sign >= 0)
             {
-                x.value.RightShift(n, out UInt256 ures);
+                x._value.RightShift(n, out UInt256 ures);
                 res = new Int256(ures);
                 return;
             }
@@ -443,7 +427,7 @@ namespace Nethermind.Int256
                 }
             }
             res = x;
-            ulong z0 = x.value.u0, z1 = x.value.u1, z2 = x.value.u2, z3 = x.value.u3;
+            ulong z0 = x._value.u0, z1 = x._value.u1, z2 = x._value.u2, z3 = x._value.u3;
             ulong a = UInt256.Lsh(ulong.MaxValue, 64 - (n % 64));
             // Big swaps first
             if (n > 192)
@@ -454,64 +438,61 @@ namespace Nethermind.Int256
                     return;
                 }
                 x.Srsh192(out res);
-                z0 = res.value.u0;
-                z1 = res.value.u1;
-                z2 = res.value.u2;
-                z3 = res.value.u3;
+                z0 = res._value.u0;
+                z1 = res._value.u1;
+                z2 = res._value.u2;
+                z3 = res._value.u3;
                 n -= 192;
                 goto sh192;
             }
             else if (n > 128)
             {
                 x.Srsh128(out res);
-                z0 = res.value.u0;
-                z1 = res.value.u1;
-                z2 = res.value.u2;
-                z3 = res.value.u3;
+                z0 = res._value.u0;
+                z1 = res._value.u1;
+                z2 = res._value.u2;
+                z3 = res._value.u3;
                 n -= 128;
                 goto sh128;
             }
             else if (n > 64)
             {
                 x.Srsh64(out res);
-                z0 = res.value.u0;
-                z1 = res.value.u1;
-                z2 = res.value.u2;
-                z3 = res.value.u3;
+                z0 = res._value.u0;
+                z1 = res._value.u1;
+                z2 = res._value.u2;
+                z3 = res._value.u3;
                 n -= 64;
                 goto sh64;
             }
             else
             {
                 res = x;
-                z0 = res.value.u0;
-                z1 = res.value.u1;
-                z2 = res.value.u2;
-                z3 = res.value.u3;
+                z0 = res._value.u0;
+                z1 = res._value.u1;
+                z2 = res._value.u2;
+                z3 = res._value.u3;
             }
 
             // remaining shifts
-            z3 = UInt256.Rsh(res.value.u3, n) | a;
-            a = UInt256.Lsh(res.value.u3, 64 - n);
+            z3 = UInt256.Rsh(res._value.u3, n) | a;
+            a = UInt256.Lsh(res._value.u3, 64 - n);
 
         sh64:
-            z2 = UInt256.Rsh(res.value.u2, n) | a;
-            a = UInt256.Lsh(res.value.u2, 64 - n);
+            z2 = UInt256.Rsh(res._value.u2, n) | a;
+            a = UInt256.Lsh(res._value.u2, 64 - n);
 
         sh128:
-            z1 = UInt256.Rsh(res.value.u1, n) | a;
-            a = UInt256.Lsh(res.value.u1, 64 - n);
+            z1 = UInt256.Rsh(res._value.u1, n) | a;
+            a = UInt256.Lsh(res._value.u1, 64 - n);
 
         sh192:
-            z0 = UInt256.Rsh(res.value.u0, n) | a;
+            z0 = UInt256.Rsh(res._value.u0, n) | a;
 
             res = new Int256(new UInt256(z0, z1, z2, z3));
         }
 
-        public static void RightShift(in Int256 x, int n, out Int256 res)
-        {
-            Rsh(x, n, out res);
-        }
+        public static void RightShift(in Int256 x, int n, out Int256 res) => Rsh(x, n, out res);
 
         public void RightShift(int n, out Int256 res) => RightShift(this, n, out res);
 
@@ -520,33 +501,25 @@ namespace Nethermind.Int256
             if (Sign < 0)
             {
                 Abs(out Int256 res);
-                res.value.Convert(out big);
+                res._value.Convert(out big);
                 big = -big;
             }
             else
             {
-                value.Convert(out big);
+                _value.Convert(out big);
             }
         }
 
         public override string ToString()
         {
-            if (Sign < 0)
-            {
-                Neg(out Int256 res);
-                return "-" + res.value.ToString();
-            }
-            return value.ToString();
+            return ToString(null);
         }
 
-        private bool Equals(in Int256 other) => value.Equals(other.value);
+        private bool Equals(in Int256 other) => _value.Equals(other._value);
 
-        public override bool Equals(object? obj)
-        {
-            return obj is Int256 other && Equals(other);
-        }
+        public override bool Equals(object? obj) => obj is Int256 other && Equals(other);
 
-        public override int GetHashCode() => value.GetHashCode();
+        public override int GetHashCode() => _value.GetHashCode();
 
         public static bool operator ==(in Int256 a, in Int256 b) => a.Equals(b);
 
@@ -558,32 +531,11 @@ namespace Nethermind.Int256
 
         public Int256 MaximalValue => Max;
 
-        public int CompareTo(object? obj)
-        {
-            if (!(obj is Int256))
-            {
-                throw new InvalidOperationException();
-            }
+        public int CompareTo(object? obj) => obj is not Int256 int256 ? throw new InvalidOperationException() : CompareTo(int256);
 
-            return CompareTo((Int256) obj);
-        }
+        public int CompareTo(Int256 b) => this < b ? -1 : Equals(b) ? 0 : 1;
 
-        public int CompareTo(Int256 b)
-        {
-            if (this < b)
-            {
-                return -1;
-            }
-
-            if (Equals(b))
-            {
-                return 0;
-            }
-
-            return 1;
-        }
-
-        public static explicit operator UInt256(Int256 z) => z.value;
+        public static explicit operator UInt256(Int256 z) => z._value;
 
         public static bool operator <(in Int256 z, in Int256 x)
         {
@@ -597,38 +549,61 @@ namespace Nethermind.Int256
                     return false;
                 }
             }
-            else if (xSign >= 0)
+            if (xSign >= 0)
             {
                 return true;
             }
 
-            return z.value < x.value;
+            return z._value < x._value;
         }
         public static bool operator >(in Int256 z, in Int256 x) => x < z;
 
-        public static explicit operator Int256(ulong value)
-        {
-            return new Int256((UInt256)value);
-        }
+        public static explicit operator Int256(ulong value) => new((UInt256)value);
 
-        public static implicit operator Int256(long value)
-        {
-            return new Int256(value);
-        }
+        public static implicit operator Int256(long value) => new(value);
 
         public static explicit operator BigInteger(Int256 x)
         {
             Span<byte> bytes = stackalloc byte[32];
-            BinaryPrimitives.WriteUInt64LittleEndian(bytes.Slice(0, 8), x.value.u0);
-            BinaryPrimitives.WriteUInt64LittleEndian(bytes.Slice(8, 8), x.value.u1);
-            BinaryPrimitives.WriteUInt64LittleEndian(bytes.Slice(16, 8), x.value.u2);
-            BinaryPrimitives.WriteUInt64LittleEndian(bytes.Slice(24, 8), x.value.u3);
+            BinaryPrimitives.WriteUInt64LittleEndian(bytes.Slice(0, 8), x._value.u0);
+            BinaryPrimitives.WriteUInt64LittleEndian(bytes.Slice(8, 8), x._value.u1);
+            BinaryPrimitives.WriteUInt64LittleEndian(bytes.Slice(16, 8), x._value.u2);
+            BinaryPrimitives.WriteUInt64LittleEndian(bytes.Slice(24, 8), x._value.u3);
             return new BigInteger(bytes);
         }
 
-        public static explicit operator Int256(BigInteger big)
+        public static explicit operator Int256(BigInteger big) => new(big);
+
+        public TypeCode GetTypeCode() => TypeCode.Object;
+        public bool ToBoolean(IFormatProvider? provider) => !IsZero;
+        public byte ToByte(IFormatProvider? provider) => System.Convert.ToByte(ToDecimal(provider), provider);
+        public char ToChar(IFormatProvider? provider) => System.Convert.ToChar(ToDecimal(provider), provider);
+        public DateTime ToDateTime(IFormatProvider? provider) => System.Convert.ToDateTime(ToDecimal(provider), provider);
+        public decimal ToDecimal(IFormatProvider? provider) => (decimal)(BigInteger)this;
+        public double ToDouble(IFormatProvider? provider) => (double)(BigInteger)this;
+        public short ToInt16(IFormatProvider? provider) => System.Convert.ToInt16(ToDecimal(provider), provider);
+        public int ToInt32(IFormatProvider? provider) => System.Convert.ToInt32(ToDecimal(provider), provider);
+        public long ToInt64(IFormatProvider? provider) => System.Convert.ToInt64(ToDecimal(provider), provider);
+        public sbyte ToSByte(IFormatProvider? provider) => System.Convert.ToSByte(ToDecimal(provider), provider);
+        public float ToSingle(IFormatProvider? provider) => (float)(BigInteger)this;
+        public object ToType(Type conversionType, IFormatProvider? provider) => conversionType == typeof(BigInteger)
+            ? (BigInteger)this
+            : System.Convert.ChangeType(ToDecimal(provider), conversionType, provider);
+        public ushort ToUInt16(IFormatProvider? provider) => System.Convert.ToUInt16(ToDecimal(provider), provider);
+        public uint ToUInt32(IFormatProvider? provider) => System.Convert.ToUInt32(ToDecimal(provider), provider);
+        public ulong ToUInt64(IFormatProvider? provider) => System.Convert.ToUInt64(ToDecimal(provider), provider);
+
+        public string ToString(IFormatProvider? provider)
         {
-            return new Int256(big);
+            if (IsNegative)
+            {
+                Neg(out Int256 res);
+                return "-" + res._value.ToString(provider);
+            }
+            return _value.ToString(provider);
         }
+
+        
+
     }
 }

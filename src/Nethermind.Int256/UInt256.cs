@@ -11,16 +11,15 @@ using System.Runtime.InteropServices;
 namespace Nethermind.Int256
 {
     [StructLayout(LayoutKind.Explicit)]
-    public readonly struct UInt256 : IComparable, IComparable<UInt256>, IInteger<UInt256>
+    public readonly struct UInt256 : IComparable, IComparable<UInt256>, IInteger<UInt256>, IConvertible
     {
         public static readonly UInt256 Zero = 0ul;
         public static readonly UInt256 One = 1ul;
         public static readonly UInt256 MinValue = Zero;
         public static readonly UInt256 MaxValue = ~Zero;
-        public static readonly UInt256 UInt128MaxValue = new UInt256(ulong.MaxValue, ulong.MaxValue, 0, 0);
+        public static readonly UInt256 UInt128MaxValue = new(ulong.MaxValue, ulong.MaxValue);
 
         /* in little endian order so u3 is the most significant ulong */
-
         [FieldOffset(0)]
         public readonly ulong u0;
         [FieldOffset(8)]
@@ -30,7 +29,7 @@ namespace Nethermind.Int256
         [FieldOffset(24)]
         public readonly ulong u3;
 
-        public UInt256(uint r0, uint r1, uint r2, uint r3, uint r4, uint r5, uint r6, uint r7)
+        public UInt256(uint r0 = 0, uint r1 = 0, uint r2 = 0, uint r3 = 0, uint r4 = 0, uint r5 = 0, uint r6 = 0, uint r7 = 0)
         {
             u0 = (ulong)r1 << 32 | r0;
             u1 = (ulong)r3 << 32 | r2;
@@ -38,7 +37,7 @@ namespace Nethermind.Int256
             u3 = (ulong)r7 << 32 | r6;
         }
 
-        public UInt256(ulong u0, ulong u1, ulong u2, ulong u3)
+        public UInt256(ulong u0 = 0, ulong u1 = 0, ulong u2 = 0, ulong u3 = 0)
         {
             this.u0 = u0;
             this.u1 = u1;
@@ -86,10 +85,10 @@ namespace Nethermind.Int256
                 {
                     for (int j = 8; j > 0; j--)
                     {
-                        cs0 = cs0 << 8;
+                        cs0 <<= 8;
                         if (j <= byteCount)
                         {
-                            cs0 = cs0 | bytes[byteCount - j];
+                            cs0 |= bytes[byteCount - j];
                         }
                     }
                 }
@@ -98,10 +97,10 @@ namespace Nethermind.Int256
                 {
                     for (int j = 16; j > 8; j--)
                     {
-                        cs1 = cs1 << 8;
+                        cs1 <<= 8;
                         if (j <= byteCount)
                         {
-                            cs1 = cs1 | bytes[byteCount - j];
+                            cs1 |= bytes[byteCount - j];
                         }
                     }
                 }
@@ -110,10 +109,10 @@ namespace Nethermind.Int256
                 {
                     for (int j = 24; j > 16; j--)
                     {
-                        cs2 = cs2 << 8;
+                        cs2 <<= 8;
                         if (j <= byteCount)
                         {
-                            cs2 = cs2 | bytes[byteCount - j];
+                            cs2 |= bytes[byteCount - j];
                         }
                     }
                 }
@@ -122,10 +121,10 @@ namespace Nethermind.Int256
                 {
                     for (int j = 32; j > 24; j--)
                     {
-                        cs3 = cs3 << 8;
+                        cs3 <<= 8;
                         if (j <= byteCount)
                         {
-                            cs3 = cs3 | bytes[byteCount - j];
+                            cs3 |= bytes[byteCount - j];
                         }
                     }
                 }
@@ -155,16 +154,7 @@ namespace Nethermind.Int256
             }
         }
 
-        public UInt256(ulong n) : this(n, 0, 0, 0)
-        {
-        }
-
-        public static explicit operator double(in UInt256 a)
-        {
-            if (a.u1 == 0)
-                return a.u0;
-            return a.u1 * (double)ulong.MaxValue + a.u0;
-        }
+        public static explicit operator double(in UInt256 a) => a.u1 == 0 ? a.u0 : a.u1 * (double)ulong.MaxValue + a.u0;
 
         public static explicit operator UInt256(double a)
         {
@@ -206,43 +196,34 @@ namespace Nethermind.Int256
         private uint r2 => (uint)u1;
         private uint r3 => (uint)(u1 >> 32);
 
-        public static explicit operator decimal(in UInt256 a)
-        {
-            if (a.u1 == 0)
-                return a.u0;
-            var shift = Math.Max(0, 32 - GetBitLength(a.u1));
-            Rsh(in a, shift, out UInt256 aShift);
-            return new decimal((int)aShift.r0, (int)aShift.r1, (int)aShift.r2, false, (byte)shift);
-        }
+        public static explicit operator decimal(in UInt256 a) => (decimal)(BigInteger)a;
 
         public static explicit operator UInt256(decimal a)
         {
-            var bits = decimal.GetBits(decimal.Truncate(a));
-            UInt256 c = new UInt256((uint)bits[0], (uint)bits[1], (uint)bits[2], 0, 0, 0, 0, 0);
+            int[] bits = decimal.GetBits(decimal.Truncate(a));
+            UInt256 c = new((uint)bits[0], (uint)bits[1], (uint)bits[2]);
             return a < 0 ? Negate(c) : c;
         }
 
         private static int GetBitLength(ulong value)
         {
-            var r1 = value >> 32;
-            if (r1 != 0)
-                return GetBitLength((uint)r1) + 32;
-            return GetBitLength((uint)value);
+            ulong r1 = value >> 32;
+            return r1 != 0 ? GetBitLength((uint)r1) + 32 : GetBitLength((uint)value);
         }
 
         private static int GetBitLength(uint value)
         {
-            var tt = value >> 16;
+            uint tt = value >> 16;
             if (tt != 0)
             {
-                var t = tt >> 8;
+                uint t = tt >> 8;
                 if (t != 0)
                     return bitLength[t] + 24;
                 return bitLength[tt] + 16;
             }
             else
             {
-                var t = value >> 8;
+                uint t = value >> 8;
                 if (t != 0)
                     return bitLength[t] + 8;
                 return bitLength[value];
@@ -271,7 +252,7 @@ namespace Nethermind.Int256
             return new UInt256(cs0, cs1, cs2, cs3);
         }
 
-        public (ulong value, bool overflow) UlongWithOverflow => (this.u0, (this.u1 | this.u2 | this.u3) != 0);
+        public (ulong value, bool overflow) UlongWithOverflow => (u0, (u1 | u2 | u3) != 0);
 
         public bool IsZero => (u0 | u1 | u2 | u3) == 0;
         
@@ -354,11 +335,11 @@ namespace Nethermind.Int256
 
         public byte[] PaddedBytes(int n)
         {
-            var b = new byte[n];
+            byte[] b = new byte[n];
 
             for (int i = 0; i < 32 && i < n; i++)
             {
-                b[n - 1 - i] = (byte)(this[i / 8] >> (int)(8 * (i % 8)));
+                b[n - 1 - i] = (byte)(this[i / 8] >> (8 * (i % 8)));
             }
 
             return b;
@@ -437,7 +418,7 @@ namespace Nethermind.Int256
             // Shortcut trivial case
             if (x.IsUint64)
             {
-                res = (UInt256)(((ulong)x) % ((ulong)y));
+                res = (((ulong)x) % ((ulong)y));
                 return;
             }
 
@@ -625,8 +606,8 @@ namespace Nethermind.Int256
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void UdivremKnuth(ref ulong quot, Span<ulong> u, in Span<ulong> d)
         {
-            var dh = d[d.Length - 1];
-            var dl = d[d.Length - 2];
+            var dh = d[^1];
+            var dl = d[^2];
             var reciprocal = Reciprocal2by1(dh);
 
             for (int j = u.Length - d.Length - 1; j >= 0; j--)
@@ -672,11 +653,11 @@ namespace Nethermind.Int256
             ulong borrow = 0;
             for (int i = 0; i < y.Length; i++)
             {
-                ulong s = 0, borrow1 = 0;
-                SubtractWithBorrow(x[i], borrow, ref borrow1, out s);
+                ulong borrow1 = 0;
+                SubtractWithBorrow(x[i], borrow, ref borrow1, out ulong s);
                 (ulong ph, ulong pl) = Multiply64(y[i], multiplier);
-                ulong t = 0, borrow2 = 0;
-                SubtractWithBorrow(s, pl, ref borrow2, out t);
+                ulong borrow2 = 0;
+                SubtractWithBorrow(s, pl, ref borrow2, out ulong t);
                 x[i] = t;
                 borrow = ph + borrow1 + borrow2;
             }
@@ -699,9 +680,8 @@ namespace Nethermind.Int256
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static ulong UdivremBy1(ref ulong quot, Span<ulong> u, ulong d)
         {
-            var reciprocal = Reciprocal2by1(d);
-            ulong rem;
-            rem = u[u.Length - 1]; // Set the top word as remainder.
+            ulong reciprocal = Reciprocal2by1(d);
+            ulong rem = u[^1];
             for (int j = u.Length - 2; j >= 0; j--)
             {
                 (Unsafe.Add(ref quot, j), rem) = Udivrem2by1(rem, u[j], d, reciprocal);
@@ -730,7 +710,7 @@ namespace Nethermind.Int256
             AddWithCarry(qh, uh, ref carry, out qh);
             qh++;
 
-            var r = ul - qh * d;
+            ulong r = ul - qh * d;
 
             if (r > ql)
             {
@@ -801,22 +781,19 @@ namespace Nethermind.Int256
             ref ulong rx = ref Unsafe.As<UInt256, ulong>(ref Unsafe.AsRef(in x));
             ref ulong ry = ref Unsafe.As<UInt256, ulong>(ref Unsafe.AsRef(in y));
 
-            ulong carry;
-            ulong res1, res2, res3, r0, r1, r2, r3;
+            (ulong carry, ulong r0) = Multiply64(rx, ry);
+            UmulHop(carry, Unsafe.Add(ref rx, 1), ry, out carry, out ulong res1);
+            UmulHop(carry, Unsafe.Add(ref rx, 2), ry, out carry, out ulong res2);
+            ulong res3 = Unsafe.Add(ref rx, 3) * ry + carry;
 
-            (carry, r0) = Multiply64(rx, ry);
-            UmulHop(carry, Unsafe.Add(ref rx, 1), ry, out carry, out res1);
-            UmulHop(carry, Unsafe.Add(ref rx, 2), ry, out carry, out res2);
-            res3 = Unsafe.Add(ref rx, 3) * ry + carry;
-
-            UmulHop(res1, rx, Unsafe.Add(ref ry, 1), out carry, out r1);
+            UmulHop(res1, rx, Unsafe.Add(ref ry, 1), out carry, out ulong r1);
             UmulStep(res2, Unsafe.Add(ref rx, 1), Unsafe.Add(ref ry, 1), carry, out carry, out res2);
             res3 = res3 + Unsafe.Add(ref rx, 2) * Unsafe.Add(ref ry, 1) + carry;
 
-            UmulHop(res2, rx, Unsafe.Add(ref ry, 2), out carry, out r2);
+            UmulHop(res2, rx, Unsafe.Add(ref ry, 2), out carry, out ulong r2);
             res3 = res3 + Unsafe.Add(ref rx, 1) * Unsafe.Add(ref ry, 2) + carry;
 
-            r3 = res3 + rx * Unsafe.Add(ref ry, 3);
+            ulong r3 = res3 + rx * Unsafe.Add(ref ry, 3);
 
             res = new UInt256(r0, r1, r2, r3);
         }
@@ -830,45 +807,29 @@ namespace Nethermind.Int256
             return !high.IsZero;
         }
 
-        public int BitLen
-        {
-            get
-            {
-                if (u3 != 0)
-                {
-                    return 192 + Len64(u3);
-                }
-
-                if (u2 != 0)
-                {
-                    return 128 + Len64(u2);
-                }
-
-                if (u1 != 0)
-                {
-                    return 64 + Len64(u1);
-                }
-
-                return Len64(u0);
-            }
-        }
+        public int BitLen =>
+            u3 != 0
+                ? 192 + Len64(u3)
+                : u2 != 0
+                    ? 128 + Len64(u2)
+                    : u1 != 0
+                        ? 64 + Len64(u1)
+                        : Len64(u0);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void Squared(out UInt256 result)
         {
-            var z = this;
+            UInt256 z = this;
             Span<ulong> res = stackalloc ulong[4];
-            ulong carry0, carry1, carry2;
-            ulong res1, res2;
 
-            (carry0, res[0]) = Multiply64(z.u0, z.u0);
-            (carry0, res1) = UmulHopi(carry0, z.u0, z.u1);
-            (carry0, res2) = UmulHopi(carry0, z.u0, z.u2);
+            (ulong carry0, res[0]) = Multiply64(z.u0, z.u0);
+            (carry0, ulong res1) = UmulHopi(carry0, z.u0, z.u1);
+            (carry0, ulong res2) = UmulHopi(carry0, z.u0, z.u2);
 
-            (carry1, res[1]) = UmulHopi(res1, z.u0, z.u1);
+            (ulong carry1, res[1]) = UmulHopi(res1, z.u0, z.u1);
             (carry1, res2) = UmulStepi(res2, z.u1, z.u1, carry1);
 
-            (carry2, res[2]) = UmulHopi(res2, z.u0, z.u2);
+            (ulong carry2, res[2]) = UmulHopi(res2, z.u0, z.u2);
 
             res[3] = 2 * (z.u0 * z.u3 + z.u1 * z.u2) + carry0 + carry1 + carry2;
             result = new UInt256(res);
@@ -878,8 +839,8 @@ namespace Nethermind.Int256
         {
             result = One;
             UInt256 bs = b;
-            var len = e.BitLen;
-            for (var i = 0; i < len; i++)
+            int len = e.BitLen;
+            for (int i = 0; i < len; i++)
             {
                 if (e.Bit(i))
                 {
@@ -900,8 +861,8 @@ namespace Nethermind.Int256
             }
             result = One;
             UInt256 bs = b;
-            var len = e.BitLen;
-            for (var i = 0; i < len; i++)
+            int len = e.BitLen;
+            for (int i = 0; i < len; i++)
             {
                 if (e.Bit(i))
                 {
@@ -937,9 +898,9 @@ namespace Nethermind.Int256
 
             const int length = 8;
             Span<ulong> p = stackalloc ulong[length];
-            var pLow = p.Slice(0, 4);
+            Span<ulong> pLow = p.Slice(0, 4);
             pl.ToSpan(ref pLow);
-            var pHigh = p.Slice(4, 4);
+            Span<ulong> pHigh = p.Slice(4, 4);
             ph.ToSpan(ref pHigh);
             Span<ulong> quot = stackalloc ulong[length];
             Udivrem(ref MemoryMarshal.GetReference(quot), ref MemoryMarshal.GetReference(p), length, m, out res);
@@ -950,30 +911,25 @@ namespace Nethermind.Int256
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void Umul(in UInt256 x, in UInt256 y, out UInt256 low, out UInt256 high)
         {
-            ulong carry, carry4, carry5, carry6;
-            ulong res1, res2, res3, res4, res5;
-            ulong l0, l1, l2, l3;
-            ulong h0, h1, h2, h3;
+            (ulong carry, ulong l0) = Multiply64(x.u0, y.u0);
+            (carry, ulong res1) = UmulHopi(carry, x.u1, y.u0);
+            (carry, ulong res2) = UmulHopi(carry, x.u2, y.u0);
+            (ulong carry4, ulong res3) = UmulHopi(carry, x.u3, y.u0);
 
-            (carry, l0) = Multiply64(x.u0, y.u0);
-            (carry, res1) = UmulHopi(carry, x.u1, y.u0);
-            (carry, res2) = UmulHopi(carry, x.u2, y.u0);
-            (carry4, res3) = UmulHopi(carry, x.u3, y.u0);
-
-            (carry, l1) = UmulHopi(res1, x.u0, y.u1);
+            (carry, ulong l1) = UmulHopi(res1, x.u0, y.u1);
             (carry, res2) = UmulStepi(res2, x.u1, y.u1, carry);
             (carry, res3) = UmulStepi(res3, x.u2, y.u1, carry);
-            (carry5, res4) = UmulStepi(carry4, x.u3, y.u1, carry);
+            (ulong carry5, ulong res4) = UmulStepi(carry4, x.u3, y.u1, carry);
 
-            (carry, l2) = UmulHopi(res2, x.u0, y.u2);
+            (carry, ulong l2) = UmulHopi(res2, x.u0, y.u2);
             (carry, res3) = UmulStepi(res3, x.u1, y.u2, carry);
             (carry, res4) = UmulStepi(res4, x.u2, y.u2, carry);
-            (carry6, res5) = UmulStepi(carry5, x.u3, y.u2, carry);
+            (ulong carry6, ulong res5) = UmulStepi(carry5, x.u3, y.u2, carry);
 
-            (carry, l3) = UmulHopi(res3, x.u0, y.u3);
-            (carry, h0) = UmulStepi(res4, x.u1, y.u3, carry);
-            (carry, h1) = UmulStepi(res5, x.u2, y.u3, carry);
-            (h3, h2) = UmulStepi(carry6, x.u3, y.u3, carry);
+            (carry, ulong l3) = UmulHopi(res3, x.u0, y.u3);
+            (carry, ulong h0) = UmulStepi(res4, x.u1, y.u3, carry);
+            (carry, ulong h1) = UmulStepi(res5, x.u2, y.u3, carry);
+            (ulong h3, ulong h2) = UmulStepi(carry6, x.u3, y.u3, carry);
             low = new UInt256(l0, l1, l2, l3);
             high = new UInt256(h0, h1, h2, h3);
         }
@@ -994,16 +950,14 @@ namespace Nethermind.Int256
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static (ulong hi, ulong lo) UmulStepi(ulong z, ulong x, ulong y, ulong carry)
         {
-            ulong hi, lo;
-            UmulStep(z, x, y, carry, out hi, out lo);
+            UmulStep(z, x, y, carry, out ulong hi, out ulong lo);
             return (hi, lo);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static (ulong hi, ulong low) UmulHopi(ulong z, ulong x, ulong y)
         {
-            ulong hi, lo;
-            UmulHop(z, x, y, out hi, out lo);
+            UmulHop(z, x, y, out ulong hi, out ulong lo);
             return (hi, lo);
         }
 
@@ -1043,7 +997,7 @@ namespace Nethermind.Int256
             // Shortcut some cases
             if (x.IsUint64)
             {
-                res = (UInt256)(((ulong)x) / (ulong)y);
+                res = ((ulong)x) / (ulong)y;
                 return;
             }
 
@@ -1199,8 +1153,8 @@ namespace Nethermind.Int256
 
         public bool Bit(int n)
         {
-            var bucket = (n / 64) % 4;
-            var position = n % 64;
+            int bucket = (n / 64) % 4;
+            int position = n % 64;
             return (this[bucket] & ((ulong)1 << position)) != 0;
         }
 
@@ -1306,34 +1260,34 @@ namespace Nethermind.Int256
 
         internal void Lsh64(out UInt256 res)
         {
-            res = new UInt256(0, this.u0, this.u1, this.u2);
+            res = new UInt256(0, u0, u1, u2);
         }
 
         internal void Lsh128(out UInt256 res)
         {
-            res = new UInt256(0, 0, this.u0, this.u1);
+            res = new UInt256(0, 0, u0, u1);
         }
 
         internal void Lsh192(out UInt256 res)
         {
-            res = new UInt256(0, 0, 0, this.u0);
+            res = new UInt256(0, 0, 0, u0);
         }
 
         internal void Rsh64(out UInt256 res)
         {
-            res = new UInt256(this.u1, this.u2, this.u3, 0);
+            res = new UInt256(u1, u2, u3);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void Rsh128(out UInt256 res)
         {
-            res = new UInt256(this.u2, this.u3, 0, 0);
+            res = new UInt256(u2, u3);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void Rsh192(out UInt256 res)
         {
-            res = new UInt256(this.u3, 0, 0, 0);
+            res = new UInt256(u3);
         }
 
         public static void Not(in UInt256 a, out UInt256 res)
@@ -1428,84 +1382,45 @@ namespace Nethermind.Int256
             return new BigInteger(bytes, true);
         }
 
-        public static explicit operator sbyte(in UInt256 a)
-        {
-            if (a.u1 > 0 || a.u2 > 0 || a.u3 > 0 || a.u0 > (long)sbyte.MaxValue)
-            {
-                throw new OverflowException("Cannot convert UInt256 value to sbyte.");
-            }
-            return (sbyte)a.u0;
-        }
+        public static explicit operator sbyte(in UInt256 a) =>
+            a.u1 > 0 || a.u2 > 0 || a.u3 > 0 || a.u0 > (long)sbyte.MaxValue 
+                ? throw new OverflowException("Cannot convert UInt256 value to sbyte.") 
+                : (sbyte)a.u0;
 
-        public static explicit operator byte(in UInt256 a)
-        {
-            if (a.u1 > 0 || a.u2 > 0 || a.u3 > 0 || a.u0 > byte.MaxValue)
-            {
-                throw new OverflowException("Cannot convert UInt256 value to byte.");
-            }
+        public static explicit operator byte(in UInt256 a) => 
+            a.u1 > 0 || a.u2 > 0 || a.u3 > 0 || a.u0 > byte.MaxValue 
+                ? throw new OverflowException("Cannot convert UInt256 value to byte.")
+                : (byte)a.u0;
 
-            return (byte)a.u0;
-        }
+        public static explicit operator short(in UInt256 a) => 
+            a.u1 > 0 || a.u2 > 0 || a.u3 > 0 || a.u0 > (long)short.MaxValue 
+                ? throw new OverflowException("Cannot convert UInt256 value to short.") 
+                : (short)a.u0;
 
-        public static explicit operator short(in UInt256 a)
-        {
-            if (a.u1 > 0 || a.u2 > 0 || a.u3 > 0 || a.u0 > (long)short.MaxValue)
-            {
-                throw new OverflowException("Cannot convert UInt256 value to short.");
-            }
+        public static explicit operator ushort(in UInt256 a) => 
+            a.u1 > 0 || a.u2 > 0 || a.u3 > 0 || a.u0 > ushort.MaxValue 
+                ? throw new OverflowException("Cannot convert UInt256 value to ushort.") 
+                : (ushort)a.u0;
 
-            return (short)a.u0;
-        }
+        public static explicit operator int(in UInt256 a) => 
+            a.u1 > 0 || a.u2 > 0 || a.u3 > 0 || a.u0 > int.MaxValue 
+                ? throw new OverflowException("Cannot convert UInt256 value to int.") 
+                : (int)a.u0;
 
-        public static explicit operator ushort(in UInt256 a)
-        {
-            if (a.u1 > 0 || a.u2 > 0 || a.u3 > 0 || a.u0 > ushort.MaxValue)
-            {
-                throw new OverflowException("Cannot convert UInt256 value to ushort.");
-            }
+        public static explicit operator uint(in UInt256 a) => 
+            a.u1 > 0 || a.u2 > 0 || a.u3 > 0 || a.u0 > uint.MaxValue 
+                ? throw new OverflowException("Cannot convert UInt256 value to uint.") 
+                : (uint)a.u0;
 
-            return (ushort)a.u0;
-        }
+        public static explicit operator long(in UInt256 a) => 
+            a.u1 > 0 || a.u2 > 0 || a.u3 > 0 || a.u0 > long.MaxValue 
+                ? throw new OverflowException("Cannot convert UInt256 value to long.") 
+                : (long)a.u0;
 
-        public static explicit operator int(in UInt256 a)
-        {
-            if (a.u1 > 0 || a.u2 > 0 || a.u3 > 0 || a.u0 > int.MaxValue)
-            {
-                throw new OverflowException("Cannot convert UInt256 value to int.");
-            }
-
-            return (int)a.u0;
-        }
-
-        public static explicit operator uint(in UInt256 a)
-        {
-            if (a.u1 > 0 || a.u2 > 0 || a.u3 > 0 || a.u0 > uint.MaxValue)
-            {
-                throw new OverflowException("Cannot convert UInt256 value to uint.");
-            }
-
-            return (uint)a.u0;
-        }
-
-        public static explicit operator long(in UInt256 a)
-        {
-            if (a.u1 > 0 || a.u2 > 0 || a.u3 > 0 || a.u0 > long.MaxValue)
-            {
-                throw new OverflowException("Cannot convert UInt256 value to long.");
-            }
-
-            return (long)a.u0;
-        }
-
-        public static explicit operator ulong(in UInt256 a)
-        {
-            if (a.u1 > 0 || a.u2 > 0 || a.u3 > 0)
-            {
-                throw new OverflowException("Cannot convert UInt256 value to ulong.");
-            }
-
-            return a.u0;
-        }
+        public static explicit operator ulong(in UInt256 a) => 
+            a.u1 > 0 || a.u2 > 0 || a.u3 > 0 
+                ? throw new OverflowException("Cannot convert UInt256 value to ulong.") 
+                : a.u0;
 
         public static UInt256 operator *(in UInt256 a, uint b)
         {
@@ -1554,209 +1469,54 @@ namespace Nethermind.Int256
             return c;
         }
 
-        public static bool operator <(in UInt256 a, in UInt256 b)
-        {
-            return LessThan(in a, in b);
-        }
-
-        public static bool operator <(in UInt256 a, int b)
-        {
-            return LessThan(in a, b);
-        }
-
-        public static bool operator <(int a, in UInt256 b)
-        {
-            return LessThan(a, in b);
-        }
-
-        public static bool operator <(in UInt256 a, uint b)
-        {
-            return LessThan(in a, b);
-        }
-
-        public static bool operator <(uint a, in UInt256 b)
-        {
-            return LessThan(a, in b);
-        }
-
-        public static bool operator <(in UInt256 a, long b)
-        {
-            return LessThan(in a, b);
-        }
-
-        public static bool operator <(long a, in UInt256 b)
-        {
-            return LessThan(a, in b);
-        }
-
-        public static bool operator <(in UInt256 a, ulong b)
-        {
-            return LessThan(in a, b);
-        }
-
-        public static bool operator <(ulong a, in UInt256 b)
-        {
-            return LessThan(a, in b);
-        }
-
-        public static bool operator <=(in UInt256 a, in UInt256 b)
-        {
-            return !LessThan(in b, in a);
-        }
-
-        public static bool operator <=(in UInt256 a, int b)
-        {
-            return !LessThan(b, in a);
-        }
-
-        public static bool operator <=(int a, in UInt256 b)
-        {
-            return !LessThan(in b, a);
-        }
-
-        public static bool operator <=(in UInt256 a, uint b)
-        {
-            return !LessThan(b, in a);
-        }
-
-        public static bool operator <=(uint a, in UInt256 b)
-        {
-            return !LessThan(in b, a);
-        }
-
-        public static bool operator <=(in UInt256 a, long b)
-        {
-            return !LessThan(b, in a);
-        }
-
-        public static bool operator <=(long a, in UInt256 b)
-        {
-            return !LessThan(in b, a);
-        }
-
-        public static bool operator <=(in UInt256 a, ulong b)
-        {
-            return !LessThan(b, in a);
-        }
-
-        public static bool operator <=(ulong a, UInt256 b)
-        {
-            return !LessThan(in b, a);
-        }
-
-        public static bool operator >(in UInt256 a, in UInt256 b)
-        {
-            return LessThan(in b, in a);
-        }
-
-        public static bool operator >(in UInt256 a, int b)
-        {
-            return LessThan(b, in a);
-        }
-
-        public static bool operator >(int a, in UInt256 b)
-        {
-            return LessThan(in b, a);
-        }
-
-        public static bool operator >(in UInt256 a, uint b)
-        {
-            return LessThan(b, in a);
-        }
-
-        public static bool operator >(uint a, in UInt256 b)
-        {
-            return LessThan(in b, a);
-        }
-
-        public static bool operator >(in UInt256 a, long b)
-        {
-            return LessThan(b, in a);
-        }
-
-        public static bool operator >(long a, in UInt256 b)
-        {
-            return LessThan(in b, a);
-        }
-
-        public static bool operator >(in UInt256 a, ulong b)
-        {
-            return LessThan(b, in a);
-        }
-
-        public static bool operator >(ulong a, in UInt256 b)
-        {
-            return LessThan(in b, a);
-        }
-
-        public static bool operator >=(in UInt256 a, in UInt256 b)
-        {
-            return !LessThan(in a, in b);
-        }
-
-        public static bool operator >=(in UInt256 a, int b)
-        {
-            return !LessThan(in a, b);
-        }
-
-        public static bool operator >=(int a, in UInt256 b)
-        {
-            return !LessThan(a, in b);
-        }
-
-        public static bool operator >=(in UInt256 a, uint b)
-        {
-            return !LessThan(in a, b);
-        }
-
-        public static bool operator >=(uint a, in UInt256 b)
-        {
-            return !LessThan(a, in b);
-        }
-
-        public static bool operator >=(in UInt256 a, long b)
-        {
-            return !LessThan(in a, b);
-        }
-
-        public static bool operator >=(long a, in UInt256 b)
-        {
-            return !LessThan(a, in b);
-        }
-
-        public static bool operator >=(in UInt256 a, ulong b)
-        {
-            return !LessThan(in a, b);
-        }
-
-        public static bool operator >=(ulong a, in UInt256 b)
-        {
-            return !LessThan(a, in b);
-        }
+        public static bool operator <(in UInt256 a, in UInt256 b) => LessThan(in a, in b);
+        public static bool operator <(in UInt256 a, int b) => LessThan(in a, b);
+        public static bool operator <(int a, in UInt256 b) => LessThan(a, in b);
+        public static bool operator <(in UInt256 a, uint b) => LessThan(in a, b);
+        public static bool operator <(uint a, in UInt256 b) => LessThan(a, in b);
+        public static bool operator <(in UInt256 a, long b) => LessThan(in a, b);
+        public static bool operator <(long a, in UInt256 b) => LessThan(a, in b);
+        public static bool operator <(in UInt256 a, ulong b) => LessThan(in a, b);
+        public static bool operator <(ulong a, in UInt256 b) => LessThan(a, in b);
+        public static bool operator <=(in UInt256 a, in UInt256 b) => !LessThan(in b, in a);
+        public static bool operator <=(in UInt256 a, int b) => !LessThan(b, in a);
+        public static bool operator <=(int a, in UInt256 b) => !LessThan(in b, a);
+        public static bool operator <=(in UInt256 a, uint b) => !LessThan(b, in a);
+        public static bool operator <=(uint a, in UInt256 b) => !LessThan(in b, a);
+        public static bool operator <=(in UInt256 a, long b) => !LessThan(b, in a);
+        public static bool operator <=(long a, in UInt256 b) => !LessThan(in b, a);
+        public static bool operator <=(in UInt256 a, ulong b) => !LessThan(b, in a);
+        public static bool operator <=(ulong a, UInt256 b) => !LessThan(in b, a);
+        public static bool operator >(in UInt256 a, in UInt256 b) => LessThan(in b, in a);
+        public static bool operator >(in UInt256 a, int b) => LessThan(b, in a);
+        public static bool operator >(int a, in UInt256 b) => LessThan(in b, a);
+        public static bool operator >(in UInt256 a, uint b) => LessThan(b, in a);
+        public static bool operator >(uint a, in UInt256 b) => LessThan(in b, a);
+        public static bool operator >(in UInt256 a, long b) => LessThan(b, in a);
+        public static bool operator >(long a, in UInt256 b) => LessThan(in b, a);
+        public static bool operator >(in UInt256 a, ulong b) => LessThan(b, in a);
+        public static bool operator >(ulong a, in UInt256 b) => LessThan(in b, a);
+        public static bool operator >=(in UInt256 a, in UInt256 b) => !LessThan(in a, in b);
+        public static bool operator >=(in UInt256 a, int b) => !LessThan(in a, b);
+        public static bool operator >=(int a, in UInt256 b) => !LessThan(a, in b);
+        public static bool operator >=(in UInt256 a, uint b) => !LessThan(in a, b);
+        public static bool operator >=(uint a, in UInt256 b) => !LessThan(a, in b);
+        public static bool operator >=(in UInt256 a, long b) => !LessThan(in a, b);
+        public static bool operator >=(long a, in UInt256 b) => !LessThan(a, in b);
+        public static bool operator >=(in UInt256 a, ulong b) => !LessThan(in a, b);
+        public static bool operator >=(ulong a, in UInt256 b) => !LessThan(a, in b);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static bool LessThan(in UInt256 a, long b)
-        {
-            return b >= 0 && a.u3 == 0 && a.u2 == 0 && a.u1 == 0 && a.u0 < (ulong)b;
-        }
+        private static bool LessThan(in UInt256 a, long b) => b >= 0 && a.u3 == 0 && a.u2 == 0 && a.u1 == 0 && a.u0 < (ulong)b;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static bool LessThan(long a, in UInt256 b)
-        {
-            return a < 0 || b.u1 != 0 || b.u2 != 0 || b.u3 != 0 || (ulong)a < b.u0;
-        }
+        private static bool LessThan(long a, in UInt256 b) => a < 0 || b.u1 != 0 || b.u2 != 0 || b.u3 != 0 || (ulong)a < b.u0;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static bool LessThan(in UInt256 a, ulong b)
-        {
-            return a.u3 == 0 && a.u2 == 0 && a.u1 == 0 && a.u0 < b;
-        }
+        private static bool LessThan(in UInt256 a, ulong b) => a.u3 == 0 && a.u2 == 0 && a.u1 == 0 && a.u0 < b;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static bool LessThan(ulong a, in UInt256 b)
-        {
-            return b.u3 != 0 || b.u2 != 0 || b.u1 != 0 || a < b.u0;
-        }
+        private static bool LessThan(ulong a, in UInt256 b) => b.u3 != 0 || b.u2 != 0 || b.u1 != 0 || a < b.u0;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static bool LessThan(in UInt256 a, in UInt256 b)
@@ -1770,213 +1530,71 @@ namespace Nethermind.Int256
             return a.u0 < b.u0;
         }
 
-        public static bool operator ==(in UInt256 a, int b)
-        {
-            return a.Equals(b);
-        }
+        public static bool operator ==(in UInt256 a, int b) => a.Equals(b);
+        public static bool operator ==(int a, in UInt256 b) => b.Equals(a);
+        public static bool operator ==(in UInt256 a, uint b) => a.Equals(b);
+        public static bool operator ==(uint a, in UInt256 b) => b.Equals(a);
+        public static bool operator ==(in UInt256 a, long b) => a.Equals(b);
+        public static bool operator ==(long a, in UInt256 b) => b.Equals(a);
+        public static bool operator ==(in UInt256 a, ulong b) => a.Equals(b);
+        public static bool operator ==(ulong a, in UInt256 b) => b.Equals(a);
+        public static bool operator !=(in UInt256 a, int b) => !a.Equals(b);
+        public static bool operator !=(int a, in UInt256 b) => !b.Equals(a);
+        public static bool operator !=(in UInt256 a, uint b) => !a.Equals(b);
+        public static bool operator !=(uint a, in UInt256 b) => !b.Equals(a);
+        public static bool operator !=(in UInt256 a, long b) => !a.Equals(b);
+        public static bool operator !=(long a, in UInt256 b) => !b.Equals(a);
+        public static bool operator !=(in UInt256 a, ulong b) => !a.Equals(b);
+        public static bool operator !=(ulong a, in UInt256 b) => !b.Equals(a);
+        public static explicit operator UInt256(sbyte a) => 
+            a < 0 ? throw new ArgumentException($"Expected a positive number and got {a}", nameof(a)) : new UInt256((ulong)a);
 
-        public static bool operator ==(int a, in UInt256 b)
-        {
-            return b.Equals(a);
-        }
+        public static implicit operator UInt256(byte a) => new(a);
 
-        public static bool operator ==(in UInt256 a, uint b)
-        {
-            return a.Equals(b);
-        }
+        public static explicit operator UInt256(short a) => 
+            a < 0 ? throw new ArgumentException($"Expected a positive number and got {a}", nameof(a)) : new UInt256((ulong)a);
 
-        public static bool operator ==(uint a, in UInt256 b)
-        {
-            return b.Equals(a);
-        }
+        public static implicit operator UInt256(ushort a) => new(a);
 
-        public static bool operator ==(in UInt256 a, long b)
-        {
-            return a.Equals(b);
-        }
+        public static explicit operator UInt256(int n) => 
+            n < 0 ? throw new ArgumentException("n < 0") : new UInt256((ulong)n);
 
-        public static bool operator ==(long a, in UInt256 b)
-        {
-            return b.Equals(a);
-        }
+        public static implicit operator UInt256(uint a) => new(a);
 
-        public static bool operator ==(in UInt256 a, ulong b)
-        {
-            return a.Equals(b);
-        }
-
-        public static bool operator ==(ulong a, in UInt256 b)
-        {
-            return b.Equals(a);
-        }
-
-        public static bool operator !=(in UInt256 a, int b)
-        {
-            return !a.Equals(b);
-        }
-
-        public static bool operator !=(int a, in UInt256 b)
-        {
-            return !b.Equals(a);
-        }
-
-        public static bool operator !=(in UInt256 a, uint b)
-        {
-            return !a.Equals(b);
-        }
-
-        public static bool operator !=(uint a, in UInt256 b)
-        {
-            return !b.Equals(a);
-        }
-
-        public static bool operator !=(in UInt256 a, long b)
-        {
-            return !a.Equals(b);
-        }
-
-        public static bool operator !=(long a, in UInt256 b)
-        {
-            return !b.Equals(a);
-        }
-
-        public static bool operator !=(in UInt256 a, ulong b)
-        {
-            return !a.Equals(b);
-        }
-
-        public static bool operator !=(ulong a, in UInt256 b)
-        {
-            return !b.Equals(a);
-        }
-
-        public static explicit operator UInt256(sbyte a)
-        {
-            if (a < 0)
-            {
-                throw new ArgumentException($"Expected a positive number and got {a}", nameof(a));
-            }
-
-            return new UInt256((ulong)a);
-        }
-
-        public static implicit operator UInt256(byte a)
-        {
-            return new UInt256(a);
-        }
-
-        public static explicit operator UInt256(short a)
-        {
-            if (a < 0)
-            {
-                throw new ArgumentException($"Expected a positive number and got {a}", nameof(a));
-            }
-
-            return new UInt256((ulong)a);
-        }
-
-        public static implicit operator UInt256(ushort a)
-        {
-            return new UInt256(a);
-        }
-
-        public static explicit operator UInt256(int n)
-        {
-            if (n < 0)
-            {
-                throw new ArgumentException("n < 0");
-            }
-
-            return new UInt256((ulong)n, 0, 0, 0);
-        }
-
-        public static implicit operator UInt256(uint a)
-        {
-            return new UInt256(a);
-        }
-
-        public static explicit operator UInt256(long a)
-        {
-            if (a < 0)
-            {
-                throw new ArgumentException($"Expected a positive number and got {a}", nameof(a));
-            }
-
-            return new UInt256((ulong)a);
-        }
+        public static explicit operator UInt256(long a) => 
+            a < 0 ? throw new ArgumentException($"Expected a positive number and got {a}", nameof(a)) : new UInt256((ulong)a);
 
         public override string ToString() => ((BigInteger)this).ToString();
 
-        public int CompareTo(object? obj)
-        {
-            if (!(obj is UInt256))
-            {
-                throw new InvalidOperationException();
-            }
-
-            return CompareTo((UInt256)obj);
-        }
+        public int CompareTo(object? obj) => obj is not UInt256 int256 ? throw new InvalidOperationException() : CompareTo(int256);
 
         public string ToString(string format)
         {
             return ((BigInteger)this).ToString(format);
         }
 
-        public bool IsUint64 => (this.u1 | this.u2 | this.u3) == 0;
+        public bool IsUint64 => (u1 | u2 | u3) == 0;
 
-        public bool Equals(UInt256 other)
-        {
-            return u0 == other.u0 && u1 == other.u1 && u2 == other.u2 && u3 == other.u3;
-        }
+        public bool Equals(UInt256 other) => u0 == other.u0 && u1 == other.u1 && u2 == other.u2 && u3 == other.u3;
 
-        public bool Equals(int other)
-        {
-            return other >= 0 && u0 == (uint)other && u1 == 0 && u2 == 0 && u3 == 0;
-        }
+        public bool Equals(int other) => other >= 0 && u0 == (uint)other && u1 == 0 && u2 == 0 && u3 == 0;
 
-        public bool Equals(uint other)
-        {
-            return u0 == other && u1 == 0 && u2 == 0 && u3 == 0;
-        }
+        public bool Equals(uint other) => u0 == other && u1 == 0 && u2 == 0 && u3 == 0;
 
-        public bool Equals(long other)
-        {
-            return other >= 0 && u0 == (ulong)other && u1 == 0 && u2 == 0 && u3 == 0;
-        }
+        public bool Equals(long other) => other >= 0 && u0 == (ulong)other && u1 == 0 && u2 == 0 && u3 == 0;
 
-        public bool Equals(ulong other)
-        {
-            return u0 == other && u1 == 0 && u2 == 0 && u3 == 0;
-        }
+        public bool Equals(ulong other) => u0 == other && u1 == 0 && u2 == 0 && u3 == 0;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool Equals(in UInt256 other)
-        {
-            return u0 == other.u0 &&
-                   u1 == other.u1 &&
-                   u2 == other.u2 &&
-                   u3 == other.u3;
-        }
+        private bool Equals(in UInt256 other) =>
+            u0 == other.u0 &&
+            u1 == other.u1 &&
+            u2 == other.u2 &&
+            u3 == other.u3;
 
-        public int CompareTo(UInt256 b)
-        {
-            if (this < b)
-            {
-                return -1;
-            }
+        public int CompareTo(UInt256 b) => this < b ? -1 : Equals(b) ? 0 : 1;
 
-            if (this.Equals(b))
-            {
-                return 0;
-            }
-
-            return 1;
-        }
-
-        public override bool Equals(object? obj)
-        {
-            return obj is UInt256 other && Equals(other);
-        }
+        public override bool Equals(object? obj) => obj is UInt256 other && Equals(other);
 
         public override int GetHashCode() => HashCode.Combine(u0, u1, u2, u3);
 
@@ -1994,25 +1612,15 @@ namespace Nethermind.Int256
                         return u2;
                     case 3:
                         return u3;
+                    default:
+                        throw new IndexOutOfRangeException();
                 }
-
-                throw new IndexOutOfRangeException();
             }
         }
 
-        public static UInt256 Max(in UInt256 a, in UInt256 b)
-        {
-            if (LessThan(in b, in a))
-                return a;
-            return b;
-        }
+        public static UInt256 Max(in UInt256 a, in UInt256 b) => LessThan(in b, in a) ? a : b;
 
-        public static UInt256 Min(in UInt256 a, in UInt256 b)
-        {
-            if (LessThan(in b, in a))
-                return b;
-            return a;
-        }
+        public static UInt256 Min(in UInt256 a, in UInt256 b) => LessThan(in b, in a) ? b : a;
 
         public const int Len = 4;
 
@@ -2021,34 +1629,15 @@ namespace Nethermind.Int256
             big = (BigInteger)this;
         }
 
-        public static UInt256 Parse(string value)
-        {
-            if (!TryParse(value, out UInt256 c))
-                throw new FormatException();
-            return c;
-        }
+        public static UInt256 Parse(string value) => !TryParse(value, out UInt256 c) ? throw new FormatException() : c;
 
-        public static UInt256 Parse(in ReadOnlySpan<char> value, NumberStyles numberStyles)
-        {
-            if (!TryParse(value, numberStyles, CultureInfo.InvariantCulture, out UInt256 c))
-                throw new FormatException();
-            return c;
-        }
+        public static UInt256 Parse(in ReadOnlySpan<char> value, NumberStyles numberStyles) => !TryParse(value, numberStyles, CultureInfo.InvariantCulture, out UInt256 c) ? throw new FormatException() : c;
 
-        public static bool TryParse(string value, out UInt256 result)
-        {
-            return TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out result);
-        }
+        public static bool TryParse(string value, out UInt256 result) => TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out result);
 
-        public static bool TryParse(ReadOnlySpan<char> value, out UInt256 result)
-        {
-            return TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out result);
-        }
+        public static bool TryParse(ReadOnlySpan<char> value, out UInt256 result) => TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out result);
 
-        public static bool TryParse(string value, NumberStyles style, IFormatProvider provider, out UInt256 result)
-        {
-            return TryParse(value.AsSpan(), style, provider, out result);
-        }
+        public static bool TryParse(string value, NumberStyles style, IFormatProvider provider, out UInt256 result) => TryParse(value.AsSpan(), style, provider, out result);
 
         public static bool TryParse(in ReadOnlySpan<char> value, NumberStyles style, IFormatProvider provider, out UInt256 result)
         {
@@ -2078,5 +1667,27 @@ namespace Nethermind.Int256
             result = (UInt256)a;
             return true;
         }
+
+        public TypeCode GetTypeCode() => TypeCode.Object;
+        public bool ToBoolean(IFormatProvider? provider) => !IsZero;
+        public byte ToByte(IFormatProvider? provider) => System.Convert.ToByte(ToDecimal(provider), provider);
+        public char ToChar(IFormatProvider? provider)  => System.Convert.ToChar(ToDecimal(provider), provider);
+        public DateTime ToDateTime(IFormatProvider? provider)  => System.Convert.ToDateTime(ToDecimal(provider), provider);
+        public decimal ToDecimal(IFormatProvider? provider) => (decimal)this;
+        public double ToDouble(IFormatProvider? provider) => (double)this;
+        public short ToInt16(IFormatProvider? provider) => System.Convert.ToInt16(ToDecimal(provider), provider);
+        public int ToInt32(IFormatProvider? provider) => System.Convert.ToInt32(ToDecimal(provider), provider);
+        public long ToInt64(IFormatProvider? provider)  => System.Convert.ToInt64(ToDecimal(provider), provider);
+        public sbyte ToSByte(IFormatProvider? provider) => System.Convert.ToSByte(ToDecimal(provider), provider);
+        public float ToSingle(IFormatProvider? provider) => System.Convert.ToSingle(ToDouble(provider), provider);
+        public string ToString(IFormatProvider? provider) => ((BigInteger)this).ToString(provider);
+        public object ToType(Type conversionType, IFormatProvider? provider) =>
+            conversionType == typeof(BigInteger)
+                ? (BigInteger)this
+                : System.Convert.ChangeType(ToDecimal(provider), conversionType, provider);
+
+        public ushort ToUInt16(IFormatProvider? provider) => System.Convert.ToUInt16(ToDecimal(provider), provider);
+        public uint ToUInt32(IFormatProvider? provider) => System.Convert.ToUInt32(ToDecimal(provider), provider);
+        public ulong ToUInt64(IFormatProvider? provider) => System.Convert.ToUInt64(ToDecimal(provider), provider);
     }
 }
