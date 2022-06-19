@@ -288,7 +288,7 @@ namespace Nethermind.Int256.Test
             convert(1000000000000000000).ToLittleEndian().Should().BeEquivalentTo(littleEndianRepresentation);
         }
         
-        [TestCaseSource(typeof(Convertibles), nameof(Convertibles.SignedTestCases))]
+        [TestCaseSource(typeof(Convertibles), nameof(Convertibles.TestCases))]
         public void Convert(Type type, object value, Type expectedException, string expectedString)
         {
             string Expected(string valueString)
