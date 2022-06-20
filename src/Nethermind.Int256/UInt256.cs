@@ -29,7 +29,7 @@ namespace Nethermind.Int256
         [FieldOffset(24)]
         public readonly ulong u3;
 
-        public UInt256(uint r0 = 0, uint r1 = 0, uint r2 = 0, uint r3 = 0, uint r4 = 0, uint r5 = 0, uint r6 = 0, uint r7 = 0)
+        public UInt256(uint r0, uint r1, uint r2, uint r3, uint r4, uint r5, uint r6, uint r7)
         {
             u0 = (ulong)r1 << 32 | r0;
             u1 = (ulong)r3 << 32 | r2;
