@@ -205,7 +205,7 @@ namespace Nethermind.Int256
         public static explicit operator UInt256(decimal a)
         {
             int[] bits = decimal.GetBits(decimal.Truncate(a));
-            UInt256 c = new((uint)bits[0], (uint)bits[1], (uint)bits[2]);
+            UInt256 c = new((uint)bits[0], (uint)bits[1], (uint)bits[2], 0, 0, 0, 0, 0);
             return a < 0 ? Negate(c) : c;
         }
 
