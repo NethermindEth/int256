@@ -806,7 +806,6 @@ namespace Nethermind.Int256
 
         public static bool MultiplyOverflow(in UInt256 x, in UInt256 y, out UInt256 res)
         {
-            Span<ulong> p = stackalloc ulong[8];
             Umul(x, y, out res, out UInt256 high);
             return !high.IsZero;
         }
