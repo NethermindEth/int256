@@ -17,7 +17,7 @@
     <IncludeSymbols>true</IncludeSymbols>
     <PackageId>Nethermind.Numerics.Int256</PackageId>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageProjectUrl>https://github.com/nethermindeth/int256</PackageProjectUrl>
+    <PackageProjectUrl>https://nethermind.io</PackageProjectUrl>
     <RepositoryType>git</RepositoryType>
     <RepositoryUrl>https://github.com/nethermindeth/int256</RepositoryUrl>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
