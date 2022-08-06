@@ -30,15 +30,16 @@ jobs:
           dotnet-version: 6.0.x
 
       - name: Install dependencies
+        working-directory: src
         run: dotnet restore
 
       - name: Build
         working-directory: src/Nethermind.Int256
         run: dotnet build -c ${{ env.BUILD_CONFIG }} --no-restore -p:ContinuousIntegrationBuild=true
     
-      - name: Test
-        working-directory: src/Nethermind.Int256.Test
-        run: dotnet test -c ${{ env.BUILD_CONFIG }} --no-restore
+      #- name: Test
+      #  working-directory: src/Nethermind.Int256.Test
+      #  run: dotnet test -c ${{ env.BUILD_CONFIG }} --no-restore
 
       - name: Publish
         if: ${{ inputs.publish }}
