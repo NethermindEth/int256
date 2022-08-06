@@ -131,6 +131,7 @@ $tf/
 _ReSharper*/
 *.[Rr]e[Ss]harper
 *.DotSettings.user
+*.sln.DotSettings
 
 # TeamCity is a build add-in
 _TeamCity*
@@ -395,4 +396,5 @@ FodyWeavers.xsd
 *.msp
 
 # JetBrains Rider
+.idea/
 *.sln.iml
