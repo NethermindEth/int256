@@ -3,8 +3,8 @@ name: Test and publish
 on:
   push:
     paths:
-      - '.github/workflows/test.yml'
-      - 'Nethermind.*/**'
+      - '.github/workflows/test-publish.yml'
+      - 'src/Nethermind.*/**'
   workflow_dispatch:
     inputs:
       publish:
@@ -30,6 +30,7 @@ jobs:
           dotnet-version: 6.0.x
 
       - name: Install dependencies
+        working-directory: src
         run: dotnet restore
 
       - name: Build
