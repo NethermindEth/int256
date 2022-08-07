@@ -9,8 +9,8 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <Authors>Nethermind, uint256 Authors</Authors>
-    <Copyright>Demerzel Solutions Limited, uint256 Authors</Copyright>
+    <Authors>Nethermind</Authors>
+    <Copyright>Demerzel Solutions Limited</Copyright>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
     <IncludeSymbols>true</IncludeSymbols>
     <PackageId>Nethermind.Numerics.Int256</PackageId>
