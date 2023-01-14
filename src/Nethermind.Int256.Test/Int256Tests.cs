@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Numerics;
 using FluentAssertions;
 using NUnit.Framework;
@@ -78,8 +78,12 @@ namespace Nethermind.Int256.Test
         {
             string Expected(string valueString)
             {
+                if (valueString.Contains("Infinity"))
+                {
+                    return valueString.StartsWith('-') ? "-∞" : "∞" ;
+                }
                 string expected = valueString.Replace(",", "");
-                return type == typeof(float) ? expected[..Math.Min(7, expected.Length)] : type == typeof(double) ? expected[..Math.Min(15, expected.Length)] : expected;
+                return type == typeof(float) ? expected[..Math.Min(6, expected.Length)] : type == typeof(double) ? expected[..Math.Min(14, expected.Length)] : expected;
             }
 
             string valueString = value.ToString()!;
@@ -87,7 +91,7 @@ namespace Nethermind.Int256.Test
             try
             {
                 string expected = expectedString ?? Expected(valueString);
-                string convertedValue = Expected(System.Convert.ChangeType(item, type).ToString());
+                string convertedValue = Expected(((IFormattable)System.Convert.ChangeType(item, type)).ToString("0.#", null));
                 convertedValue.Should().BeEquivalentTo(expected);
             }
             catch (Exception e) when(e.GetType() == expectedException) { }

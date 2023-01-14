@@ -5,6 +5,8 @@ using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Runtime.Intrinsics.X86;
+using System.Runtime.Intrinsics;
 
 [assembly: InternalsVisibleTo("Nethermind.Int256.Test")]
 
@@ -209,41 +211,6 @@ namespace Nethermind.Int256
             return a < 0 ? Negate(c) : c;
         }
 
-        private static int GetBitLength(ulong value)
-        {
-            ulong r1 = value >> 32;
-            return r1 != 0 ? GetBitLength((uint)r1) + 32 : GetBitLength((uint)value);
-        }
-
-        private static int GetBitLength(uint value)
-        {
-            uint tt = value >> 16;
-            if (tt != 0)
-            {
-                uint t = tt >> 8;
-                if (t != 0)
-                    return bitLength[t] + 24;
-                return bitLength[tt] + 16;
-            }
-            else
-            {
-                uint t = value >> 8;
-                if (t != 0)
-                    return bitLength[t] + 8;
-                return bitLength[value];
-            }
-        }
-
-        // TODO: this is very allocaty / slow
-        private static byte[] bitLength = Enumerable.Range(0, byte.MaxValue + 1)
-            .Select(value =>
-            {
-                int count;
-                for (count = 0; value != 0; count++)
-                    value >>= 1;
-                return (byte)count;
-            }).ToArray();
-
         public static UInt256 Negate(in UInt256 a)
         {
             ulong cs0 = 0 - a.u0;
@@ -270,15 +237,137 @@ namespace Nethermind.Int256
 
         public UInt256 MaximalValue => MaxValue;
 
+        private static ReadOnlySpan<byte> s_broadcastLookup => new byte[] {
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+        };
+
         // Add sets res to the sum a+b
         public static void Add(in UInt256 a, in UInt256 b, out UInt256 res)
         {
-            ulong carry = 0ul;
-            AddWithCarry(a.u0, b.u0, ref carry, out ulong res1);
-            AddWithCarry(a.u1, b.u1, ref carry, out ulong res2);
-            AddWithCarry(a.u2, b.u2, ref carry, out ulong res3);
-            AddWithCarry(a.u3, b.u3, ref carry, out ulong res4);
-            res = new UInt256(res1, res2, res3, res4);
+            if (Avx2.IsSupported)
+            {
+                var av = Unsafe.As<UInt256,Vector256<ulong>>(ref Unsafe.AsRef(in a));
+                var bv = Unsafe.As<UInt256,Vector256<ulong>>(ref Unsafe.AsRef(in b));
+
+                var result = Avx2.Add(av, bv);
+
+                var carryFromBothHighBits = Avx2.And(av, bv);
+                var eitherHighBit = Avx2.Or(av, bv);
+                var highBitNotInResult = Avx2.AndNot(result, eitherHighBit);
+
+                // Set high bits where carry occurs
+                var vCarry = Avx2.Or(carryFromBothHighBits, highBitNotInResult);
+                // Move carry from Vector space to int
+                var carry = Avx.MoveMask(Unsafe.As<Vector256<ulong>, Vector256<double>>(ref vCarry));
+
+                // All bits set will cascade another carry when carry is added to it
+                var vCascade = Avx2.CompareEqual(result, Vector256<ulong>.AllBitsSet);
+                // Move cascade from Vector space to int
+                var cascade = Avx.MoveMask(Unsafe.As<Vector256<ulong>, Vector256<double>>(ref vCascade));
+
+                // Use ints to work out the Vector cross lane cascades
+                // Move carry to next bit and add cascade
+                carry = cascade + 2 * carry; // lea
+                // Remove cascades not effected by carry
+                cascade ^= carry;
+                // Choice of 16 vectors
+                cascade &= 0x0f;
+
+                // Lookup the carries to broadcast to the Vectors
+                var cascadedCarries = Unsafe.Add(ref Unsafe.As<byte, Vector256<ulong>>(ref MemoryMarshal.GetReference(s_broadcastLookup)), cascade);
+
+                // Mark res as initalized so we can use it as left said of ref assignment
+                Unsafe.SkipInit(out res);
+                // Add the cascadedCarries to the result
+                Unsafe.As<UInt256,Vector256<ulong>>(ref res) = Avx2.Add(result, cascadedCarries);
+            }
+            else
+            {
+                ulong carry = 0ul;
+                AddWithCarry(a.u0, b.u0, ref carry, out ulong res1);
+                AddWithCarry(a.u1, b.u1, ref carry, out ulong res2);
+                AddWithCarry(a.u2, b.u2, ref carry, out ulong res3);
+                AddWithCarry(a.u3, b.u3, ref carry, out ulong res4);
+                res = new UInt256(res1, res2, res3, res4);
+            }
             // #if DEBUG
             //             Debug.Assert((BigInteger)res == ((BigInteger)a + (BigInteger)b) % ((BigInteger)1 << 256));
             // #endif
@@ -734,13 +823,53 @@ namespace Nethermind.Int256
         // Subtract sets res to the difference a-b
         public static void Subtract(in UInt256 a, in UInt256 b, out UInt256 res)
         {
-            ulong carry = 0ul;
-            SubtractWithBorrow(a.u0, b.u0, ref carry, out ulong res0);
-            SubtractWithBorrow(a.u1, b.u1, ref carry, out ulong res1);
-            SubtractWithBorrow(a.u2, b.u2, ref carry, out ulong res2);
-            SubtractWithBorrow(a.u3, b.u3, ref carry, out ulong res3);
-            res = new UInt256(res0, res1, res2, res3);
+            if (Avx2.IsSupported)
+            {
+                var av = Unsafe.As<UInt256,Vector256<ulong>>(ref Unsafe.AsRef(in a));
+                var bv = Unsafe.As<UInt256,Vector256<ulong>>(ref Unsafe.AsRef(in b));
 
+                var result = Avx2.Subtract(av, bv);
+                // Invert top bits as Avx2.CompareGreaterThan is only available for longs, not unsigned
+                var resultSigned = Avx2.Xor(result, Vector256.Create<ulong>(0x8000_0000_0000_0000));
+                var avSigned = Avx2.Xor(av, Vector256.Create<ulong>(0x8000_0000_0000_0000));
+
+                // Which vectors need to borrow from the next
+                var vBorrow = Avx2.CompareGreaterThan(Unsafe.As<Vector256<ulong>, Vector256<long>>(ref resultSigned),
+                                                      Unsafe.As<Vector256<ulong>, Vector256<long>>(ref avSigned));
+
+                // Move borrow from Vector space to int
+                var borrow = Avx.MoveMask(Unsafe.As<Vector256<long>, Vector256<double>>(ref vBorrow));
+
+                // All zeros will cascade another borrow when borrow is subtracted from it
+                var vCascade = Avx2.CompareEqual(result, Vector256<ulong>.Zero);
+                // Move cascade from Vector space to int
+                var cascade = Avx.MoveMask(Unsafe.As<Vector256<ulong>, Vector256<double>>(ref vCascade));
+
+                // Use ints to work out the Vector cross lane cascades
+                // Move borrow to next bit and add cascade
+                borrow = cascade + 2 * borrow; // lea
+                // Remove cascades not effected by borrow
+                cascade ^= borrow;
+                // Choice of 16 vectors
+                cascade &= 0x0f;
+
+                // Lookup the borrows to broadcast to the Vectors
+                var cascadedBorrows = Unsafe.Add(ref Unsafe.As<byte, Vector256<ulong>>(ref MemoryMarshal.GetReference(s_broadcastLookup)), cascade);
+
+                // Mark res as initalized so we can use it as left said of ref assignment
+                Unsafe.SkipInit(out res);
+                // Subtract the cascadedBorrows from the result
+                Unsafe.As<UInt256,Vector256<ulong>>(ref res) = Avx2.Subtract(result, cascadedBorrows);
+            }
+            else
+            {
+                ulong carry = 0ul;
+                SubtractWithBorrow(a.u0, b.u0, ref carry, out ulong res0);
+                SubtractWithBorrow(a.u1, b.u1, ref carry, out ulong res1);
+                SubtractWithBorrow(a.u2, b.u2, ref carry, out ulong res2);
+                SubtractWithBorrow(a.u3, b.u3, ref carry, out ulong res3);
+                res = new UInt256(res0, res1, res2, res3);
+            }
             // #if DEBUG
             //             Debug.Assert((BigInteger)res == ((BigInteger)a - (BigInteger)b + ((BigInteger)1 << 256)) % ((BigInteger)1 << 256));
             // #endif
