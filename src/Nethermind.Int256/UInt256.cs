@@ -209,41 +209,6 @@ namespace Nethermind.Int256
             return a < 0 ? Negate(c) : c;
         }
 
-        private static int GetBitLength(ulong value)
-        {
-            ulong r1 = value >> 32;
-            return r1 != 0 ? GetBitLength((uint)r1) + 32 : GetBitLength((uint)value);
-        }
-
-        private static int GetBitLength(uint value)
-        {
-            uint tt = value >> 16;
-            if (tt != 0)
-            {
-                uint t = tt >> 8;
-                if (t != 0)
-                    return bitLength[t] + 24;
-                return bitLength[tt] + 16;
-            }
-            else
-            {
-                uint t = value >> 8;
-                if (t != 0)
-                    return bitLength[t] + 8;
-                return bitLength[value];
-            }
-        }
-
-        // TODO: this is very allocaty / slow
-        private static byte[] bitLength = Enumerable.Range(0, byte.MaxValue + 1)
-            .Select(value =>
-            {
-                int count;
-                for (count = 0; value != 0; count++)
-                    value >>= 1;
-                return (byte)count;
-            }).ToArray();
-
         public static UInt256 Negate(in UInt256 a)
         {
             ulong cs0 = 0 - a.u0;
@@ -741,6 +706,23 @@ namespace Nethermind.Int256
             SubtractWithBorrow(a.u3, b.u3, ref carry, out ulong res3);
             res = new UInt256(res0, res1, res2, res3);
 
+                // Lookup the carries to broadcast to the Vectors
+                var cascadedBorrows = Unsafe.Add(ref Unsafe.As<byte, Vector256<ulong>>(ref MemoryMarshal.GetReference(s_broadcastLookup)), cascade);
+
+                // Mark res as initalized so we can use it as left said of ref assignment
+                Unsafe.SkipInit(out res);
+                // Add the cascadedCarries to the result
+                Unsafe.As<UInt256,Vector256<ulong>>(ref res) = Avx2.Subtract(result, cascadedBorrows);
+            }
+            else
+            {
+                ulong carry = 0ul;
+                SubtractWithBorrow(a.u0, b.u0, ref carry, out ulong res0);
+                SubtractWithBorrow(a.u1, b.u1, ref carry, out ulong res1);
+                SubtractWithBorrow(a.u2, b.u2, ref carry, out ulong res2);
+                SubtractWithBorrow(a.u3, b.u3, ref carry, out ulong res3);
+                res = new UInt256(res0, res1, res2, res3);
+            }
             // #if DEBUG
             //             Debug.Assert((BigInteger)res == ((BigInteger)a - (BigInteger)b + ((BigInteger)1 << 256)) % ((BigInteger)1 << 256));
             // #endif
