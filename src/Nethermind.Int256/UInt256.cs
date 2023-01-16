@@ -868,10 +868,16 @@ namespace Nethermind.Int256
         // Subtract sets res to the difference a-b
         public static void Subtract(in UInt256 a, in UInt256 b, out UInt256 res)
         {
+            SubtractImpl(in a, in b, out res);
+        }
+
+        // Subtract sets res to the difference a-b
+        private static bool SubtractImpl(in UInt256 a, in UInt256 b, out UInt256 res)
+        {
             if (Avx2.IsSupported)
             {
-                var av = Unsafe.As<UInt256,Vector256<ulong>>(ref Unsafe.AsRef(in a));
-                var bv = Unsafe.As<UInt256,Vector256<ulong>>(ref Unsafe.AsRef(in b));
+                var av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
+                var bv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
 
                 var result = Avx2.Subtract(av, bv);
                 // Invert top bits as Avx2.CompareGreaterThan is only available for longs, not unsigned
@@ -904,16 +910,18 @@ namespace Nethermind.Int256
                 // Mark res as initalized so we can use it as left said of ref assignment
                 Unsafe.SkipInit(out res);
                 // Subtract the cascadedBorrows from the result
-                Unsafe.As<UInt256,Vector256<ulong>>(ref res) = Avx2.Subtract(result, cascadedBorrows);
+                Unsafe.As<UInt256, Vector256<ulong>>(ref res) = Avx2.Subtract(result, cascadedBorrows);
+                return (borrow & 0b1_0000) != 0;
             }
             else
             {
-                ulong carry = 0ul;
-                SubtractWithBorrow(a.u0, b.u0, ref carry, out ulong res0);
-                SubtractWithBorrow(a.u1, b.u1, ref carry, out ulong res1);
-                SubtractWithBorrow(a.u2, b.u2, ref carry, out ulong res2);
-                SubtractWithBorrow(a.u3, b.u3, ref carry, out ulong res3);
+                ulong borrow = 0ul;
+                SubtractWithBorrow(a.u0, b.u0, ref borrow, out ulong res0);
+                SubtractWithBorrow(a.u1, b.u1, ref borrow, out ulong res1);
+                SubtractWithBorrow(a.u2, b.u2, ref borrow, out ulong res2);
+                SubtractWithBorrow(a.u3, b.u3, ref borrow, out ulong res3);
                 res = new UInt256(res0, res1, res2, res3);
+                return borrow != 0;
             }
             // #if DEBUG
             //             Debug.Assert((BigInteger)res == ((BigInteger)a - (BigInteger)b + ((BigInteger)1 << 256)) % ((BigInteger)1 << 256));
@@ -937,13 +945,7 @@ namespace Nethermind.Int256
         // SubtractUnderflow sets res to the difference a-b and returns true if the operation underflowed
         public static bool SubtractUnderflow(in UInt256 a, in UInt256 b, out UInt256 res)
         {
-            ulong borrow = 0;
-            SubtractWithBorrow(a[0], b[0], ref borrow, out ulong z0);
-            SubtractWithBorrow(a[1], b[1], ref borrow, out ulong z1);
-            SubtractWithBorrow(a[2], b[2], ref borrow, out ulong z2);
-            SubtractWithBorrow(a[3], b[3], ref borrow, out ulong z3);
-            res = new UInt256(z0, z1, z2, z3);
-            return borrow != 0;
+            return SubtractImpl(a, b, out res);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
