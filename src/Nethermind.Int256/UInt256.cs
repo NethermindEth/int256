@@ -883,7 +883,10 @@ namespace Nethermind.Int256
             {
                 Subtract(b, a, out res);
                 Mod(res, m, out res);
-                Subtract(m, res, out res);
+                if (!res.IsZero)
+                {
+                    Subtract(m, res, out res);
+                }
             }
             else
             {
