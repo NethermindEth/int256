@@ -1489,7 +1489,18 @@ namespace Nethermind.Int256
 
         public static void And(in UInt256 a, in UInt256 b, out UInt256 res)
         {
-            res = new UInt256(a.u0 & b.u0, a.u1 & b.u1, a.u2 & b.u2, a.u3 & b.u3);
+            if (Avx2.IsSupported)
+            {
+                var av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
+                var bv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
+                // Mark res as initalized so we can use it as left said of ref assignment
+                Unsafe.SkipInit(out res);
+                Unsafe.As<UInt256, Vector256<ulong>>(ref res) = Avx2.And(av, bv);
+            }
+            else
+            {
+                res = new UInt256(a.u0 & b.u0, a.u1 & b.u1, a.u2 & b.u2, a.u3 & b.u3);
+            }
         }
 
         public static UInt256 operator &(in UInt256 a, in UInt256 b)
