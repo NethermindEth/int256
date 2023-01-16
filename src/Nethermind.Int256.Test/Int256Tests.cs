@@ -27,7 +27,7 @@ namespace Nethermind.Int256.Test
         public override void Subtract((BigInteger A, BigInteger B) test) => base.Subtract(test);
 
         [TestCaseSource(typeof(TernaryOps), nameof(TernaryOps.SignedModTestCases))]
-        public void SubtractMod((BigInteger A, BigInteger B, BigInteger M) test)
+        public override void SubtractMod((BigInteger A, BigInteger B, BigInteger M) test)
         {
             if (test.M.IsZero)
             {
