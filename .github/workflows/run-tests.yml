@@ -11,12 +11,12 @@ on:
   pull_request:
   workflow_dispatch:
 
-env:
-  BUILD_CONFIG: release
-
 jobs:
   int256-tests:
     name: 'Run Int256 tests'
+    strategy:
+      matrix:
+        BUILD_CONFIG: ["release", "debug"]
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
@@ -28,4 +28,4 @@ jobs:
         dotnet-version: 7
     - name: Nethermind.Int256.Test
       run: |
-        dotnet test src/Nethermind.Int256.Test/Nethermind.Int256.Test.csproj -c ${{ env.BUILD_CONFIG }}
+        dotnet test src/Nethermind.Int256.Test/Nethermind.Int256.Test.csproj -c ${{ matrix.BUILD_CONFIG }}
