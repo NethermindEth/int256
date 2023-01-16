@@ -225,9 +225,37 @@ namespace Nethermind.Int256
 
         public (ulong value, bool overflow) UlongWithOverflow => (u0, (u1 | u2 | u3) != 0);
 
-        public bool IsZero => (u0 | u1 | u2 | u3) == 0;
-        
-        public bool IsOne => ((u0 ^ 1UL) | u1 | u2 | u3) == 0;
+        public bool IsZero
+        {
+            get
+            {
+                if (Avx.IsSupported)
+                {
+                    var v = Unsafe.As<ulong, Vector256<ulong>>(ref Unsafe.AsRef(in u0));
+                    return Avx.TestZ(v, v);
+                }
+                else
+                {
+                    return (u0 | u1 | u2 | u3) == 0;
+                }
+            }
+        }
+
+        public bool IsOne
+        {
+            get
+            {
+                if (Avx.IsSupported)
+                {
+                    var v = Unsafe.As<ulong, Vector256<ulong>>(ref Unsafe.AsRef(in u0));
+                    return v == Vector256.CreateScalar(1UL);
+                }
+                else
+                {
+                    return ((u0 ^ 1UL) | u1 | u2 | u3) == 0;
+                }
+            }
+        }
 
         public bool IsZeroOrOne => ((u0 >> 1) | u1 | u2 | u3) == 0;
 
