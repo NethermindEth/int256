@@ -550,10 +550,17 @@ namespace Nethermind.Int256
         {
             if (target.Length == 32)
             {
-                BinaryPrimitives.WriteUInt64LittleEndian(target.Slice(0, 8), u0);
-                BinaryPrimitives.WriteUInt64LittleEndian(target.Slice(8, 8), u1);
-                BinaryPrimitives.WriteUInt64LittleEndian(target.Slice(16, 8), u2);
-                BinaryPrimitives.WriteUInt64LittleEndian(target.Slice(24, 8), u3);
+                if (Avx.IsSupported)
+                {
+                    Unsafe.As<byte, Vector256<ulong>>(ref MemoryMarshal.GetReference(target)) = Unsafe.As<ulong, Vector256<ulong>>(ref Unsafe.AsRef(in u0));
+                }
+                else
+                {
+                    BinaryPrimitives.WriteUInt64LittleEndian(target.Slice(0, 8), u0);
+                    BinaryPrimitives.WriteUInt64LittleEndian(target.Slice(8, 8), u1);
+                    BinaryPrimitives.WriteUInt64LittleEndian(target.Slice(16, 8), u2);
+                    BinaryPrimitives.WriteUInt64LittleEndian(target.Slice(24, 8), u3);
+                }
             }
             else
             {
@@ -1544,11 +1551,7 @@ namespace Nethermind.Int256
 
         public static explicit operator BigInteger(in UInt256 value)
         {
-            Span<byte> bytes = stackalloc byte[32];
-            BinaryPrimitives.WriteUInt64LittleEndian(bytes.Slice(0, 8), value.u0);
-            BinaryPrimitives.WriteUInt64LittleEndian(bytes.Slice(8, 8), value.u1);
-            BinaryPrimitives.WriteUInt64LittleEndian(bytes.Slice(16, 8), value.u2);
-            BinaryPrimitives.WriteUInt64LittleEndian(bytes.Slice(24, 8), value.u3);
+            ReadOnlySpan<byte> bytes = MemoryMarshal.CreateReadOnlySpan(ref Unsafe.As<UInt256, byte>(ref Unsafe.AsRef(in value)), 32);
             return new BigInteger(bytes, true);
         }
 
