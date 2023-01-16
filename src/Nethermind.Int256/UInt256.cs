@@ -1469,11 +1469,21 @@ namespace Nethermind.Int256
 
         public static void Not(in UInt256 a, out UInt256 res)
         {
-            ulong u0 = ~a.u0;
-            ulong u1 = ~a.u1;
-            ulong u2 = ~a.u2;
-            ulong u3 = ~a.u3;
-            res = new UInt256(u0, u1, u2, u3);
+            if (Avx2.IsSupported)
+            {
+                var av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
+                // Mark res as initalized so we can use it as left said of ref assignment
+                Unsafe.SkipInit(out res);
+                Unsafe.As<UInt256, Vector256<ulong>>(ref res) = Avx2.Xor(av, Vector256<ulong>.AllBitsSet);
+            }
+            else
+            {
+                ulong u0 = ~a.u0;
+                ulong u1 = ~a.u1;
+                ulong u2 = ~a.u2;
+                ulong u3 = ~a.u3;
+                res = new UInt256(u0, u1, u2, u3);
+            }
         }
 
         public static void Or(in UInt256 a, in UInt256 b, out UInt256 res)
