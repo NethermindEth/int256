@@ -27,24 +27,7 @@ namespace Nethermind.Int256.Test
         public override void Subtract((BigInteger A, BigInteger B) test) => base.Subtract(test);
 
         [TestCaseSource(typeof(TernaryOps), nameof(TernaryOps.SignedModTestCases))]
-        public override void SubtractMod((BigInteger A, BigInteger B, BigInteger M) test)
-        {
-            if (test.M.IsZero)
-            {
-                return;
-            }
-
-            BigInteger resBigInt = ((test.A - test.B) % test.M) % (BigInteger.One << 256);
-            resBigInt = postprocess(resBigInt);
-
-            Int256 uint256a = convert(test.A);
-            Int256 uint256b = convert(test.B);
-            Int256 uint256m = convert(test.M);
-            uint256a.SubtractMod(uint256b, uint256m, out Int256 res);
-            res.Convert(out BigInteger resUInt256);
-
-            resUInt256.Should().Be(resBigInt);
-        }
+        public override void SubtractMod((BigInteger A, BigInteger B, BigInteger M) test) => base.SubtractModCore(test, false);
 
         [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.SignedTestCases))]
         public override void Multiply((BigInteger A, BigInteger B) test) => base.Multiply(test);

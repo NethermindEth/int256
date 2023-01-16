@@ -78,16 +78,23 @@ namespace Nethermind.Int256.Test
         [TestCaseSource(typeof(TernaryOps), nameof(TernaryOps.TestCases))]
         public virtual void SubtractMod((BigInteger A, BigInteger B, BigInteger M) test)
         {
+            SubtractModCore(test, true);
+        }
+
+        protected void SubtractModCore((BigInteger A, BigInteger B, BigInteger M) test, bool convertToUnsigned)
+        {
             if (test.M.IsZero)
             {
                 return;
             }
             BigInteger resBigInt = (test.A - test.B) % test.M;
+
             // convert to unsigned modular value
-            if (resBigInt.Sign == -1)
+            if (convertToUnsigned && resBigInt.Sign == -1)
             {
                 resBigInt = test.M + resBigInt;
             }
+
             resBigInt %= (BigInteger.One << 256);
             resBigInt = postprocess(resBigInt);
 
@@ -96,7 +103,7 @@ namespace Nethermind.Int256.Test
             T uint256m = convert(test.M);
             uint256a.SubtractMod(uint256b, uint256m, out T res);
             res.Convert(out BigInteger resUInt256);
-            
+
             resUInt256.Should().Be(resBigInt);
         }
 
