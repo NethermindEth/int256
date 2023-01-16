@@ -167,6 +167,48 @@ namespace Nethermind.Int256.Test
 
             resUInt256.Should().Be(resBigInt);
         }
+        
+        [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
+        public virtual void And((BigInteger A, BigInteger B) test)
+        {
+            BigInteger resBigInt = test.A & test.B;
+            resBigInt = postprocess(resBigInt);
+
+            T uint256a = convert(test.A);
+            T uint256b = convert(test.B);
+            T.And(uint256a, uint256b, out T res);
+            res.Convert(out BigInteger resUInt256);
+
+            resUInt256.Should().Be(resBigInt);
+        }
+
+        [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
+        public virtual void Or((BigInteger A, BigInteger B) test)
+        {
+            BigInteger resBigInt = test.A | test.B;
+            resBigInt = postprocess(resBigInt);
+
+            T uint256a = convert(test.A);
+            T uint256b = convert(test.B);
+            T.Or(uint256a, uint256b, out T res);
+            res.Convert(out BigInteger resUInt256);
+
+            resUInt256.Should().Be(resBigInt);
+        }
+
+        [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
+        public virtual void Xor((BigInteger A, BigInteger B) test)
+        {
+            BigInteger resBigInt = test.A ^ test.B;
+            resBigInt = postprocess(resBigInt);
+
+            T uint256a = convert(test.A);
+            T uint256b = convert(test.B);
+            T.Xor(uint256a, uint256b, out T res);
+            res.Convert(out BigInteger resUInt256);
+
+            resUInt256.Should().Be(resBigInt);
+        }
 
         [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.ShiftTestCases))]
         public virtual void Exp((BigInteger A, int n) test)

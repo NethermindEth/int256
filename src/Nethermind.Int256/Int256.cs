@@ -603,7 +603,28 @@ namespace Nethermind.Int256
             return _value.ToString(provider);
         }
 
-        
+        public static void And(in Int256 a, in Int256 b, out Int256 res)
+        {
+            UInt256.And(in a._value, in b._value, out var o);
+            res = new Int256(o);
+        }
 
+        public static void Xor(in Int256 a, in Int256 b, out Int256 res)
+        {
+            UInt256.Xor(in a._value, in b._value, out var o);
+            res = new Int256(o);
+        }
+
+        public static void Or(in Int256 a, in Int256 b, out Int256 res)
+        {
+            UInt256.Or(in a._value, in b._value, out var o);
+            res = new Int256(o);
+        }
+
+        public static void Not(in Int256 a, out Int256 res)
+        {
+            UInt256.Not(in a._value, out var o);
+            res = new Int256(o);
+        }
     }
 }
