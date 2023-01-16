@@ -1748,22 +1748,53 @@ namespace Nethermind.Int256
 
         public bool IsUint64 => (u1 | u2 | u3) == 0;
 
-        public bool Equals(UInt256 other) => u0 == other.u0 && u1 == other.u1 && u2 == other.u2 && u3 == other.u3;
+        public bool Equals(UInt256 other)
+        {
+            var v1 = Unsafe.As<ulong, Vector256<ulong>>(ref Unsafe.AsRef(in u0));
+            var v2 = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in other));
+            return v1 == v2;
+        }
 
-        public bool Equals(int other) => other >= 0 && u0 == (uint)other && u1 == 0 && u2 == 0 && u3 == 0;
+        public bool Equals(int other)
+        {
+            return other >= 0 && Equals((uint)other);
+        }
 
-        public bool Equals(uint other) => u0 == other && u1 == 0 && u2 == 0 && u3 == 0;
+        public bool Equals(uint other)
+        {
+            if (Avx.IsSupported)
+            {
+                var v = Unsafe.As<ulong, Vector256<uint>>(ref Unsafe.AsRef(in u0));
+                return v == Vector256.CreateScalar(other);
+            }
+            else
+            {
+                return u0 == other && u1 == 0 && u2 == 0 && u3 == 0;
+            }
+        }
 
-        public bool Equals(long other) => other >= 0 && u0 == (ulong)other && u1 == 0 && u2 == 0 && u3 == 0;
+        public bool Equals(long other) => other >= 0 && Equals((ulong)other);
 
-        public bool Equals(ulong other) => u0 == other && u1 == 0 && u2 == 0 && u3 == 0;
+        public bool Equals(ulong other)
+        {
+            if (Avx.IsSupported)
+            {
+                var v = Unsafe.As<ulong, Vector256<ulong>>(ref Unsafe.AsRef(in u0));
+                return v == Vector256.CreateScalar(other);
+            }
+            else
+            {
+                return u0 == other && u1 == 0 && u2 == 0 && u3 == 0;
+            }
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool Equals(in UInt256 other) =>
-            u0 == other.u0 &&
-            u1 == other.u1 &&
-            u2 == other.u2 &&
-            u3 == other.u3;
+        private bool Equals(in UInt256 other)
+        {
+            var v1 = Unsafe.As<ulong, Vector256<ulong>>(ref Unsafe.AsRef(in u0));
+            var v2 = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in other));
+            return v1 == v2;
+        }
 
         public int CompareTo(UInt256 b) => this < b ? -1 : Equals(b) ? 0 : 1;
 
