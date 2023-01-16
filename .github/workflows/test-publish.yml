@@ -37,9 +37,9 @@ jobs:
         working-directory: src/Nethermind.Int256
         run: dotnet build -c ${{ env.BUILD_CONFIG }} --no-restore -p:ContinuousIntegrationBuild=true
     
-      #- name: Test
-      #  working-directory: src/Nethermind.Int256.Test
-      #  run: dotnet test -c ${{ env.BUILD_CONFIG }} --no-restore
+      - name: Test
+        working-directory: src/Nethermind.Int256.Test
+        run: dotnet test -c ${{ env.BUILD_CONFIG }} --no-restore
 
       - name: Publish
         if: ${{ inputs.publish }}
