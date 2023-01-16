@@ -291,6 +291,21 @@ namespace Nethermind.Int256.Test
         }
 
         [TestCaseSource(typeof(UnaryOps), nameof(UnaryOps.TestCases))]
+        public virtual void Not(BigInteger test)
+        {
+            BigInteger resBigInt = ~test;
+            resBigInt %= (BigInteger.One << 256);
+            if (typeof(T) == typeof(UInt256))
+            {
+                ((Int256)resBigInt)._value.Convert(out resBigInt);
+            }
+            T uint256 = convert(test);
+            T.Not(uint256, out T res);
+            res.Convert(out BigInteger resUInt256);
+            resUInt256.Should().Be(resBigInt);
+        }
+
+        [TestCaseSource(typeof(UnaryOps), nameof(UnaryOps.TestCases))]
         public virtual void ToString(BigInteger test)
         {
             T uint256 = convert(test);
