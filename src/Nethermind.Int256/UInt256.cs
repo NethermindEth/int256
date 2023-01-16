@@ -882,9 +882,16 @@ namespace Nethermind.Int256
             if (SubtractUnderflow(a, b, out res))
             {
                 Subtract(b, a, out res);
+                Mod(res, m, out res);
+                if (!res.IsZero)
+                {
+                    Subtract(m, res, out res);
+                }
             }
-
-            Mod(res, m, out res);
+            else
+            {
+                Mod(res, m, out res);
+            }
         }
 
         public void SubtractMod(in UInt256 a, in UInt256 m, out UInt256 res) => SubtractMod(this, a, m, out res);
