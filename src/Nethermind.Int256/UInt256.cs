@@ -1,12 +1,12 @@
 ﻿using System;
 using System.Buffers.Binary;
 using System.Globalization;
-using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics.X86;
 using System.Runtime.Intrinsics;
+using System.Diagnostics.CodeAnalysis;
 
 [assembly: InternalsVisibleTo("Nethermind.Int256.Test")]
 
@@ -480,7 +480,7 @@ namespace Nethermind.Int256
             }
             else
             {
-                throw new NotSupportedException();
+                ThrowNotSupportedException();
             }
         }
 
@@ -1150,12 +1150,12 @@ namespace Nethermind.Int256
             const ulong mask32 = two32 - 1;
             if (y == 0)
             {
-                throw new DivideByZeroException("y == 0");
+                ThrowDivideByZeroException();
             }
 
             if (y <= hi)
             {
-                throw new OverflowException("y <= hi");
+                ThrowOverflowException();
             }
 
             var s = LeadingZeros(y);
@@ -1486,7 +1486,7 @@ namespace Nethermind.Int256
         {
             if (SubtractUnderflow(in a, in b, out UInt256 c))
             {
-                throw new ArithmeticException($"Underflow in subtraction {a} - {b}");
+                ThrowArithmeticException(in a, in b);
             }
 
             return c;
@@ -1730,25 +1730,15 @@ namespace Nethermind.Int256
 
         public override int GetHashCode() => HashCode.Combine(u0, u1, u2, u3);
 
-        public ulong this[int index]
+        public ulong this[int index] => index switch
         {
-            get
-            {
-                switch (index)
-                {
-                    case 0:
-                        return u0;
-                    case 1:
-                        return u1;
-                    case 2:
-                        return u2;
-                    case 3:
-                        return u3;
-                    default:
-                        throw new IndexOutOfRangeException();
-                }
-            }
-        }
+            0 => u0,
+            1 => u1,
+            2 => u2,
+            3 => u3,
+            _ => ThrowIndexOutOfRangeException(),
+        };
+
 
         public static UInt256 Max(in UInt256 a, in UInt256 b) => LessThan(in b, in a) ? a : b;
 
@@ -1821,5 +1811,20 @@ namespace Nethermind.Int256
         public ushort ToUInt16(IFormatProvider? provider) => System.Convert.ToUInt16(ToDecimal(provider), provider);
         public uint ToUInt32(IFormatProvider? provider) => System.Convert.ToUInt32(ToDecimal(provider), provider);
         public ulong ToUInt64(IFormatProvider? provider) => System.Convert.ToUInt64(ToDecimal(provider), provider);
+
+        [DoesNotReturn]
+        private static void ThrowDivideByZeroException() => throw new DivideByZeroException("y == 0");
+
+        [DoesNotReturn]
+        private static void ThrowArithmeticException(in UInt256 a, in UInt256 b) => throw new ArithmeticException($"Underflow in subtraction {a} - {b}");
+
+        [DoesNotReturn]
+        private static void ThrowOverflowException() => throw new OverflowException("y <= hi");
+
+        [DoesNotReturn]
+        private static void ThrowNotSupportedException() => throw new NotSupportedException();
+
+        [DoesNotReturn]
+        private static ulong ThrowIndexOutOfRangeException() => throw new IndexOutOfRangeException();
     }
 }
