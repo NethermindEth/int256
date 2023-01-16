@@ -76,6 +76,48 @@ namespace Nethermind.Int256.Test
         }
 
         [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
+        public virtual void SubtractOverflow((BigInteger A, BigInteger B) test)
+        {
+            BigInteger resUInt256;
+            BigInteger resBigInt = test.A - test.B;
+            resBigInt %= BigInteger.One << 256;
+            resBigInt = postprocess(resBigInt);
+            T uint256a = convert(test.A);
+            T uint256b = convert(test.B);
+
+            if (test.A >= test.B)
+            {
+                if (uint256a is UInt256 a && uint256b is UInt256 b)
+                {
+                    UInt256 res = a - b;
+                    res.Convert(out resUInt256);
+                }
+                else
+                {
+                    uint256a.Subtract(uint256b, out T res);
+                    res.Convert(out resUInt256);
+                }
+                resUInt256.Should().Be(resBigInt);
+            }
+            else
+            {
+                if (uint256a is UInt256 a && uint256b is UInt256 b)
+                {
+                    a.Invoking(y => y - b)
+                        .Should().Throw<ArithmeticException>()
+                        .WithMessage($"Underflow in subtraction {a} - {b}");
+                }
+                else
+                {
+                    uint256a.Subtract(uint256b, out T res);
+                    res.Convert(out resUInt256);
+                    resUInt256.Should().Be(resBigInt);
+                }
+            }
+
+        }
+
+        [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
         public virtual void Multiply((BigInteger A, BigInteger B) test)
         {
             BigInteger resBigInt = (test.A * test.B) % (BigInteger.One << 256);
