@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Numerics;
 using FluentAssertions;
 using NUnit.Framework;
@@ -74,6 +74,80 @@ namespace Nethermind.Int256.Test
 
             resUInt256.Should().Be(resBigInt);
         }
+        
+        [TestCaseSource(typeof(TernaryOps), nameof(TernaryOps.TestCases))]
+        public virtual void SubtractMod((BigInteger A, BigInteger B, BigInteger M) test)
+        {
+            SubtractModCore(test, true);
+        }
+
+        protected void SubtractModCore((BigInteger A, BigInteger B, BigInteger M) test, bool convertToUnsigned)
+        {
+            if (test.M.IsZero)
+            {
+                return;
+            }
+            BigInteger resBigInt = (test.A - test.B) % test.M;
+
+            // convert to unsigned modular value
+            if (convertToUnsigned && resBigInt.Sign == -1)
+            {
+                resBigInt = test.M + resBigInt;
+            }
+
+            resBigInt %= (BigInteger.One << 256);
+            resBigInt = postprocess(resBigInt);
+
+            T uint256a = convert(test.A);
+            T uint256b = convert(test.B);
+            T uint256m = convert(test.M);
+            uint256a.SubtractMod(uint256b, uint256m, out T res);
+            res.Convert(out BigInteger resUInt256);
+
+            resUInt256.Should().Be(resBigInt);
+        }
+
+        [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
+        public virtual void SubtractOverflow((BigInteger A, BigInteger B) test)
+        {
+            BigInteger resUInt256;
+            BigInteger resBigInt = test.A - test.B;
+            resBigInt %= BigInteger.One << 256;
+            resBigInt = postprocess(resBigInt);
+            T uint256a = convert(test.A);
+            T uint256b = convert(test.B);
+
+            if (test.A >= test.B)
+            {
+                if (uint256a is UInt256 a && uint256b is UInt256 b)
+                {
+                    UInt256 res = a - b;
+                    res.Convert(out resUInt256);
+                }
+                else
+                {
+                    uint256a.Subtract(uint256b, out T res);
+                    res.Convert(out resUInt256);
+                }
+                resUInt256.Should().Be(resBigInt);
+            }
+            else
+            {
+                if (uint256a is UInt256 a && uint256b is UInt256 b)
+                {
+                    a.Invoking(y => y - b)
+                        .Should().Throw<ArithmeticException>()
+                        .WithMessage($"Underflow in subtraction {a} - {b}");
+                }
+                else
+                {
+                    uint256a.Subtract(uint256b, out T res);
+                    res.Convert(out resUInt256);
+                    resUInt256.Should().Be(resBigInt);
+                }
+            }
+
+        }
 
         [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
         public virtual void Multiply((BigInteger A, BigInteger B) test)
@@ -121,6 +195,48 @@ namespace Nethermind.Int256.Test
             T uint256a = convert(test.A);
             T uint256b = convert(test.B);
             uint256a.Divide(uint256b, out T res);
+            res.Convert(out BigInteger resUInt256);
+
+            resUInt256.Should().Be(resBigInt);
+        }
+        
+        [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
+        public virtual void And((BigInteger A, BigInteger B) test)
+        {
+            BigInteger resBigInt = test.A & test.B;
+            resBigInt = postprocess(resBigInt);
+
+            T uint256a = convert(test.A);
+            T uint256b = convert(test.B);
+            T.And(uint256a, uint256b, out T res);
+            res.Convert(out BigInteger resUInt256);
+
+            resUInt256.Should().Be(resBigInt);
+        }
+
+        [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
+        public virtual void Or((BigInteger A, BigInteger B) test)
+        {
+            BigInteger resBigInt = test.A | test.B;
+            resBigInt = postprocess(resBigInt);
+
+            T uint256a = convert(test.A);
+            T uint256b = convert(test.B);
+            T.Or(uint256a, uint256b, out T res);
+            res.Convert(out BigInteger resUInt256);
+
+            resUInt256.Should().Be(resBigInt);
+        }
+
+        [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
+        public virtual void Xor((BigInteger A, BigInteger B) test)
+        {
+            BigInteger resBigInt = test.A ^ test.B;
+            resBigInt = postprocess(resBigInt);
+
+            T uint256a = convert(test.A);
+            T uint256b = convert(test.B);
+            T.Xor(uint256a, uint256b, out T res);
             res.Convert(out BigInteger resUInt256);
 
             resUInt256.Should().Be(resBigInt);
@@ -204,6 +320,21 @@ namespace Nethermind.Int256.Test
             T uint256 = convert(test);
             uint256.Convert(out BigInteger res);
             res.Should().Be(test);
+        }
+
+        [TestCaseSource(typeof(UnaryOps), nameof(UnaryOps.TestCases))]
+        public virtual void Not(BigInteger test)
+        {
+            BigInteger resBigInt = ~test;
+            resBigInt %= (BigInteger.One << 256);
+            if (typeof(T) == typeof(UInt256))
+            {
+                ((Int256)resBigInt)._value.Convert(out resBigInt);
+            }
+            T uint256 = convert(test);
+            T.Not(uint256, out T res);
+            res.Convert(out BigInteger resUInt256);
+            resUInt256.Should().Be(resBigInt);
         }
 
         [TestCaseSource(typeof(UnaryOps), nameof(UnaryOps.TestCases))]
@@ -293,8 +424,12 @@ namespace Nethermind.Int256.Test
         {
             string Expected(string valueString)
             {
+                if (valueString.Contains("Infinity"))
+                {
+                    return valueString.StartsWith('-') ? "-∞" : "∞" ;
+                }
                 string expected = valueString.Replace(",", "");
-                return type == typeof(float) ? expected[..Math.Min(7, expected.Length)] : type == typeof(double) ? expected[..Math.Min(14, expected.Length)] : expected;
+                return type == typeof(float) ? expected[..Math.Min(6, expected.Length)] : type == typeof(double) ? expected[..Math.Min(14, expected.Length)] : expected;
             }
 
             string valueString = value.ToString()!;
@@ -304,7 +439,7 @@ namespace Nethermind.Int256.Test
                 {
                     UInt256 item = (UInt256)BigInteger.Parse(valueString);
                     string expected = expectedString ?? Expected(valueString);
-                    string convertedValue = Expected(System.Convert.ChangeType(item, type).ToString());
+                    string convertedValue = Expected(((IFormattable)System.Convert.ChangeType(item, type)).ToString("0.#", null));
                     convertedValue.Should().BeEquivalentTo(expected);
                 }
                 catch (Exception e) when (e.GetType() == expectedException) { }

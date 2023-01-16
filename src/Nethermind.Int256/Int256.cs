@@ -3,6 +3,8 @@ using System.Buffers.Binary;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 
+[assembly: InternalsVisibleTo("Nethermind.Int256.Test")]
+
 namespace Nethermind.Int256
 {
     public readonly struct Int256 : IComparable, IComparable<Int256>, IInteger<Int256>, IConvertible
@@ -12,7 +14,7 @@ namespace Nethermind.Int256
         public static readonly Int256 MinusOne = -1L;
         public static readonly Int256 Max = new Int256(((BigInteger.One << 255) - 1));
 
-        private readonly UInt256 _value;
+        internal readonly UInt256 _value;
 
         public Int256(ReadOnlySpan<byte> bytes, bool isBigEndian)
         {
@@ -603,7 +605,28 @@ namespace Nethermind.Int256
             return _value.ToString(provider);
         }
 
-        
+        public static void And(in Int256 a, in Int256 b, out Int256 res)
+        {
+            UInt256.And(in a._value, in b._value, out var o);
+            res = new Int256(o);
+        }
 
+        public static void Xor(in Int256 a, in Int256 b, out Int256 res)
+        {
+            UInt256.Xor(in a._value, in b._value, out var o);
+            res = new Int256(o);
+        }
+
+        public static void Or(in Int256 a, in Int256 b, out Int256 res)
+        {
+            UInt256.Or(in a._value, in b._value, out var o);
+            res = new Int256(o);
+        }
+
+        public static void Not(in Int256 a, out Int256 res)
+        {
+            UInt256.Not(in a._value, out var o);
+            res = new Int256(o);
+        }
     }
 }
