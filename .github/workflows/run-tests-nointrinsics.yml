@@ -1,4 +1,4 @@
-name: '[Test] Int256'
+name: '[Test] No Intrinsics'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
@@ -10,6 +10,9 @@ on:
        - master
   pull_request:
   workflow_dispatch:
+
+env:
+  DOTNET_EnableHWIntrinsic: 0
 
 jobs:
   int256-tests:

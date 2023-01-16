@@ -108,6 +108,48 @@ namespace Nethermind.Int256.Test
         }
 
         [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
+        public virtual void SubtractOverflow((BigInteger A, BigInteger B) test)
+        {
+            BigInteger resUInt256;
+            BigInteger resBigInt = test.A - test.B;
+            resBigInt %= BigInteger.One << 256;
+            resBigInt = postprocess(resBigInt);
+            T uint256a = convert(test.A);
+            T uint256b = convert(test.B);
+
+            if (test.A >= test.B)
+            {
+                if (uint256a is UInt256 a && uint256b is UInt256 b)
+                {
+                    UInt256 res = a - b;
+                    res.Convert(out resUInt256);
+                }
+                else
+                {
+                    uint256a.Subtract(uint256b, out T res);
+                    res.Convert(out resUInt256);
+                }
+                resUInt256.Should().Be(resBigInt);
+            }
+            else
+            {
+                if (uint256a is UInt256 a && uint256b is UInt256 b)
+                {
+                    a.Invoking(y => y - b)
+                        .Should().Throw<ArithmeticException>()
+                        .WithMessage($"Underflow in subtraction {a} - {b}");
+                }
+                else
+                {
+                    uint256a.Subtract(uint256b, out T res);
+                    res.Convert(out resUInt256);
+                    resUInt256.Should().Be(resBigInt);
+                }
+            }
+
+        }
+
+        [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
         public virtual void Multiply((BigInteger A, BigInteger B) test)
         {
             BigInteger resBigInt = (test.A * test.B) % (BigInteger.One << 256);
@@ -153,6 +195,48 @@ namespace Nethermind.Int256.Test
             T uint256a = convert(test.A);
             T uint256b = convert(test.B);
             uint256a.Divide(uint256b, out T res);
+            res.Convert(out BigInteger resUInt256);
+
+            resUInt256.Should().Be(resBigInt);
+        }
+        
+        [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
+        public virtual void And((BigInteger A, BigInteger B) test)
+        {
+            BigInteger resBigInt = test.A & test.B;
+            resBigInt = postprocess(resBigInt);
+
+            T uint256a = convert(test.A);
+            T uint256b = convert(test.B);
+            T.And(uint256a, uint256b, out T res);
+            res.Convert(out BigInteger resUInt256);
+
+            resUInt256.Should().Be(resBigInt);
+        }
+
+        [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
+        public virtual void Or((BigInteger A, BigInteger B) test)
+        {
+            BigInteger resBigInt = test.A | test.B;
+            resBigInt = postprocess(resBigInt);
+
+            T uint256a = convert(test.A);
+            T uint256b = convert(test.B);
+            T.Or(uint256a, uint256b, out T res);
+            res.Convert(out BigInteger resUInt256);
+
+            resUInt256.Should().Be(resBigInt);
+        }
+
+        [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
+        public virtual void Xor((BigInteger A, BigInteger B) test)
+        {
+            BigInteger resBigInt = test.A ^ test.B;
+            resBigInt = postprocess(resBigInt);
+
+            T uint256a = convert(test.A);
+            T uint256b = convert(test.B);
+            T.Xor(uint256a, uint256b, out T res);
             res.Convert(out BigInteger resUInt256);
 
             resUInt256.Should().Be(resBigInt);
@@ -236,6 +320,21 @@ namespace Nethermind.Int256.Test
             T uint256 = convert(test);
             uint256.Convert(out BigInteger res);
             res.Should().Be(test);
+        }
+
+        [TestCaseSource(typeof(UnaryOps), nameof(UnaryOps.TestCases))]
+        public virtual void Not(BigInteger test)
+        {
+            BigInteger resBigInt = ~test;
+            resBigInt %= (BigInteger.One << 256);
+            if (typeof(T) == typeof(UInt256))
+            {
+                ((Int256)resBigInt)._value.Convert(out resBigInt);
+            }
+            T uint256 = convert(test);
+            T.Not(uint256, out T res);
+            res.Convert(out BigInteger resUInt256);
+            resUInt256.Should().Be(resBigInt);
         }
 
         [TestCaseSource(typeof(UnaryOps), nameof(UnaryOps.TestCases))]

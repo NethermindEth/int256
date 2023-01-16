@@ -1,12 +1,12 @@
 ﻿using System;
 using System.Buffers.Binary;
 using System.Globalization;
-using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics.X86;
 using System.Runtime.Intrinsics;
+using System.Diagnostics.CodeAnalysis;
 
 [assembly: InternalsVisibleTo("Nethermind.Int256.Test")]
 
@@ -33,18 +33,40 @@ namespace Nethermind.Int256
 
         public UInt256(uint r0, uint r1, uint r2, uint r3, uint r4, uint r5, uint r6, uint r7)
         {
-            u0 = (ulong)r1 << 32 | r0;
-            u1 = (ulong)r3 << 32 | r2;
-            u2 = (ulong)r5 << 32 | r4;
-            u3 = (ulong)r7 << 32 | r6;
+            if (Avx2.IsSupported)
+            {
+                Unsafe.SkipInit(out this.u0);
+                Unsafe.SkipInit(out this.u1);
+                Unsafe.SkipInit(out this.u2);
+                Unsafe.SkipInit(out this.u3);
+                Unsafe.As<ulong, Vector256<uint>>(ref this.u0) = Vector256.Create(r0, r1, r2, r3, r4, r5, r6, r7);
+            }
+            else
+            {
+                u0 = (ulong)r1 << 32 | r0;
+                u1 = (ulong)r3 << 32 | r2;
+                u2 = (ulong)r5 << 32 | r4;
+                u3 = (ulong)r7 << 32 | r6;
+            }
         }
 
         public UInt256(ulong u0 = 0, ulong u1 = 0, ulong u2 = 0, ulong u3 = 0)
         {
-            this.u0 = u0;
-            this.u1 = u1;
-            this.u2 = u2;
-            this.u3 = u3;
+            if (Avx2.IsSupported)
+            {
+                Unsafe.SkipInit(out this.u0);
+                Unsafe.SkipInit(out this.u1);
+                Unsafe.SkipInit(out this.u2);
+                Unsafe.SkipInit(out this.u3);
+                Unsafe.As<ulong, Vector256<ulong>>(ref this.u0) = Vector256.Create(u0, u1, u2, u3);
+            }
+            else
+            {
+                this.u0 = u0;
+                this.u1 = u1;
+                this.u2 = u2;
+                this.u3 = u3;
+            }
         }
 
         public UInt256(in ReadOnlySpan<byte> bytes, bool isBigEndian = false)
@@ -60,82 +82,98 @@ namespace Nethermind.Int256
                 }
                 else
                 {
-                    u0 = BinaryPrimitives.ReadUInt64LittleEndian(bytes.Slice(0, 8));
-                    u1 = BinaryPrimitives.ReadUInt64LittleEndian(bytes.Slice(8, 8));
-                    u2 = BinaryPrimitives.ReadUInt64LittleEndian(bytes.Slice(16, 8));
-                    u3 = BinaryPrimitives.ReadUInt64LittleEndian(bytes.Slice(24, 8));
+                    if (Avx2.IsSupported)
+                    {
+                        Unsafe.SkipInit(out this.u0);
+                        Unsafe.SkipInit(out this.u1);
+                        Unsafe.SkipInit(out this.u2);
+                        Unsafe.SkipInit(out this.u3);
+                        Unsafe.As<ulong, Vector256<byte>>(ref this.u0) = Vector256.Create<byte>(bytes);
+                    }
+                    else
+                    {
+                        u0 = BinaryPrimitives.ReadUInt64LittleEndian(bytes.Slice(0, 8));
+                        u1 = BinaryPrimitives.ReadUInt64LittleEndian(bytes.Slice(8, 8));
+                        u2 = BinaryPrimitives.ReadUInt64LittleEndian(bytes.Slice(16, 8));
+                        u3 = BinaryPrimitives.ReadUInt64LittleEndian(bytes.Slice(24, 8));
+                    }
                 }
             }
             else
             {
-                int byteCount = bytes.Length;
-                int unalignedBytes = byteCount % 8;
-                int dwordCount = byteCount / 8 + (unalignedBytes == 0 ? 0 : 1);
-
-                ulong cs0 = 0;
-                ulong cs1 = 0;
-                ulong cs2 = 0;
-                ulong cs3 = 0;
-
-                if (dwordCount == 0)
-                {
-                    u0 = u1 = u2 = u3 = 0;
-                    return;
-                }
-
-                if (dwordCount >= 1)
-                {
-                    for (int j = 8; j > 0; j--)
-                    {
-                        cs0 <<= 8;
-                        if (j <= byteCount)
-                        {
-                            cs0 |= bytes[byteCount - j];
-                        }
-                    }
-                }
-
-                if (dwordCount >= 2)
-                {
-                    for (int j = 16; j > 8; j--)
-                    {
-                        cs1 <<= 8;
-                        if (j <= byteCount)
-                        {
-                            cs1 |= bytes[byteCount - j];
-                        }
-                    }
-                }
-
-                if (dwordCount >= 3)
-                {
-                    for (int j = 24; j > 16; j--)
-                    {
-                        cs2 <<= 8;
-                        if (j <= byteCount)
-                        {
-                            cs2 |= bytes[byteCount - j];
-                        }
-                    }
-                }
-
-                if (dwordCount >= 4)
-                {
-                    for (int j = 32; j > 24; j--)
-                    {
-                        cs3 <<= 8;
-                        if (j <= byteCount)
-                        {
-                            cs3 |= bytes[byteCount - j];
-                        }
-                    }
-                }
-
-                u0 = cs0;
-                u1 = cs1;
-                u2 = cs2;
-                u3 = cs3;
+                Create(bytes, out u0, out u1, out u2, out u3);
             }
+        }
+
+        private static void Create(in ReadOnlySpan<byte> bytes, out ulong u0, out ulong u1, out ulong u2, out ulong u3)
+        {
+            int byteCount = bytes.Length;
+            int unalignedBytes = byteCount % 8;
+            int dwordCount = byteCount / 8 + (unalignedBytes == 0 ? 0 : 1);
+
+            ulong cs0 = 0;
+            ulong cs1 = 0;
+            ulong cs2 = 0;
+            ulong cs3 = 0;
+
+            if (dwordCount == 0)
+            {
+                u0 = u1 = u2 = u3 = 0;
+                return;
+            }
+
+            if (dwordCount >= 1)
+            {
+                for (int j = 8; j > 0; j--)
+                {
+                    cs0 <<= 8;
+                    if (j <= byteCount)
+                    {
+                        cs0 |= bytes[byteCount - j];
+                    }
+                }
+            }
+
+            if (dwordCount >= 2)
+            {
+                for (int j = 16; j > 8; j--)
+                {
+                    cs1 <<= 8;
+                    if (j <= byteCount)
+                    {
+                        cs1 |= bytes[byteCount - j];
+                    }
+                }
+            }
+
+            if (dwordCount >= 3)
+            {
+                for (int j = 24; j > 16; j--)
+                {
+                    cs2 <<= 8;
+                    if (j <= byteCount)
+                    {
+                        cs2 |= bytes[byteCount - j];
+                    }
+                }
+            }
+
+            if (dwordCount >= 4)
+            {
+                for (int j = 32; j > 24; j--)
+                {
+                    cs3 <<= 8;
+                    if (j <= byteCount)
+                    {
+                        cs3 |= bytes[byteCount - j];
+                    }
+                }
+            }
+
+            u0 = cs0;
+            u1 = cs1;
+            u2 = cs2;
+            u3 = cs3;
         }
 
         public UInt256(in ReadOnlySpan<ulong> data, bool isBigEndian = false)
@@ -149,10 +187,21 @@ namespace Nethermind.Int256
             }
             else
             {
-                u0 = data[0];
-                u1 = data[1];
-                u2 = data[2];
-                u3 = data[3];
+                if (Avx2.IsSupported)
+                {
+                    Unsafe.SkipInit(out this.u0);
+                    Unsafe.SkipInit(out this.u1);
+                    Unsafe.SkipInit(out this.u2);
+                    Unsafe.SkipInit(out this.u3);
+                    Unsafe.As<ulong, Vector256<ulong>>(ref this.u0) = Vector256.Create<ulong>(data);
+                }
+                else
+                {
+                    u0 = data[0];
+                    u1 = data[1];
+                    u2 = data[2];
+                    u3 = data[3];
+                }
             }
         }
 
@@ -225,9 +274,37 @@ namespace Nethermind.Int256
 
         public (ulong value, bool overflow) UlongWithOverflow => (u0, (u1 | u2 | u3) != 0);
 
-        public bool IsZero => (u0 | u1 | u2 | u3) == 0;
-        
-        public bool IsOne => ((u0 ^ 1UL) | u1 | u2 | u3) == 0;
+        public bool IsZero
+        {
+            get
+            {
+                if (Avx.IsSupported)
+                {
+                    var v = Unsafe.As<ulong, Vector256<ulong>>(ref Unsafe.AsRef(in u0));
+                    return Avx.TestZ(v, v);
+                }
+                else
+                {
+                    return (u0 | u1 | u2 | u3) == 0;
+                }
+            }
+        }
+
+        public bool IsOne
+        {
+            get
+            {
+                if (Avx.IsSupported)
+                {
+                    var v = Unsafe.As<ulong, Vector256<ulong>>(ref Unsafe.AsRef(in u0));
+                    return v == Vector256.CreateScalar(1UL);
+                }
+                else
+                {
+                    return ((u0 ^ 1UL) | u1 | u2 | u3) == 0;
+                }
+            }
+        }
 
         public bool IsZeroOrOne => ((u0 >> 1) | u1 | u2 | u3) == 0;
 
@@ -473,14 +550,21 @@ namespace Nethermind.Int256
         {
             if (target.Length == 32)
             {
-                BinaryPrimitives.WriteUInt64LittleEndian(target.Slice(0, 8), u0);
-                BinaryPrimitives.WriteUInt64LittleEndian(target.Slice(8, 8), u1);
-                BinaryPrimitives.WriteUInt64LittleEndian(target.Slice(16, 8), u2);
-                BinaryPrimitives.WriteUInt64LittleEndian(target.Slice(24, 8), u3);
+                if (Avx.IsSupported)
+                {
+                    Unsafe.As<byte, Vector256<ulong>>(ref MemoryMarshal.GetReference(target)) = Unsafe.As<ulong, Vector256<ulong>>(ref Unsafe.AsRef(in u0));
+                }
+                else
+                {
+                    BinaryPrimitives.WriteUInt64LittleEndian(target.Slice(0, 8), u0);
+                    BinaryPrimitives.WriteUInt64LittleEndian(target.Slice(8, 8), u1);
+                    BinaryPrimitives.WriteUInt64LittleEndian(target.Slice(16, 8), u2);
+                    BinaryPrimitives.WriteUInt64LittleEndian(target.Slice(24, 8), u3);
+                }
             }
             else
             {
-                throw new NotSupportedException();
+                ThrowNotSupportedException();
             }
         }
 
@@ -522,50 +606,11 @@ namespace Nethermind.Int256
 
         public void Mod(in UInt256 m, out UInt256 res) => Mod(this, m, out res);
 
-        private static readonly byte[] len8tab = new byte[] {
-          0x00, 0x01, 0x02, 0x02, 0x03, 0x03, 0x03, 0x03, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04,
-          0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05,
-          0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06,
-          0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06,
-          0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07,
-          0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07,
-          0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07,
-          0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07,
-          0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
-          0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
-          0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
-          0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
-          0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
-          0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
-          0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
-          0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
-        };
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static int Len64(ulong x) => 64 - BitOperations.LeadingZeroCount(x);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static int Len64(ulong x)
-        {
-            int n = 0;
-            if (x >= (1ul << 32))
-            {
-                x >>= 32;
-                n = 32;
-            }
-            if (x >= (1ul << 16))
-            {
-                x >>= 16;
-                n += 16;
-            }
-            if (x >= (1ul << 8))
-            {
-                x >>= 8;
-                n += 8;
-            }
-
-            return n + len8tab[x];
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static int LeadingZeros(ulong x) => 64 - Len64(x);
+        private static int LeadingZeros(ulong x) => BitOperations.LeadingZeroCount(x);
 
         // It avoids c#'s way of shifting a 64-bit number by 64-bit, i.e. in c# a << 64 == a, in our version a << 64 == 0.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -823,10 +868,16 @@ namespace Nethermind.Int256
         // Subtract sets res to the difference a-b
         public static void Subtract(in UInt256 a, in UInt256 b, out UInt256 res)
         {
+            SubtractImpl(in a, in b, out res);
+        }
+
+        // Subtract sets res to the difference a-b
+        private static bool SubtractImpl(in UInt256 a, in UInt256 b, out UInt256 res)
+        {
             if (Avx2.IsSupported)
             {
-                var av = Unsafe.As<UInt256,Vector256<ulong>>(ref Unsafe.AsRef(in a));
-                var bv = Unsafe.As<UInt256,Vector256<ulong>>(ref Unsafe.AsRef(in b));
+                var av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
+                var bv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
 
                 var result = Avx2.Subtract(av, bv);
                 // Invert top bits as Avx2.CompareGreaterThan is only available for longs, not unsigned
@@ -859,16 +910,18 @@ namespace Nethermind.Int256
                 // Mark res as initalized so we can use it as left said of ref assignment
                 Unsafe.SkipInit(out res);
                 // Subtract the cascadedBorrows from the result
-                Unsafe.As<UInt256,Vector256<ulong>>(ref res) = Avx2.Subtract(result, cascadedBorrows);
+                Unsafe.As<UInt256, Vector256<ulong>>(ref res) = Avx2.Subtract(result, cascadedBorrows);
+                return (borrow & 0b1_0000) != 0;
             }
             else
             {
-                ulong carry = 0ul;
-                SubtractWithBorrow(a.u0, b.u0, ref carry, out ulong res0);
-                SubtractWithBorrow(a.u1, b.u1, ref carry, out ulong res1);
-                SubtractWithBorrow(a.u2, b.u2, ref carry, out ulong res2);
-                SubtractWithBorrow(a.u3, b.u3, ref carry, out ulong res3);
+                ulong borrow = 0ul;
+                SubtractWithBorrow(a.u0, b.u0, ref borrow, out ulong res0);
+                SubtractWithBorrow(a.u1, b.u1, ref borrow, out ulong res1);
+                SubtractWithBorrow(a.u2, b.u2, ref borrow, out ulong res2);
+                SubtractWithBorrow(a.u3, b.u3, ref borrow, out ulong res3);
                 res = new UInt256(res0, res1, res2, res3);
+                return borrow != 0;
             }
             // #if DEBUG
             //             Debug.Assert((BigInteger)res == ((BigInteger)a - (BigInteger)b + ((BigInteger)1 << 256)) % ((BigInteger)1 << 256));
@@ -899,13 +952,7 @@ namespace Nethermind.Int256
         // SubtractUnderflow sets res to the difference a-b and returns true if the operation underflowed
         public static bool SubtractUnderflow(in UInt256 a, in UInt256 b, out UInt256 res)
         {
-            ulong borrow = 0;
-            SubtractWithBorrow(a[0], b[0], ref borrow, out ulong z0);
-            SubtractWithBorrow(a[1], b[1], ref borrow, out ulong z1);
-            SubtractWithBorrow(a[2], b[2], ref borrow, out ulong z2);
-            SubtractWithBorrow(a[3], b[3], ref borrow, out ulong z3);
-            res = new UInt256(z0, z1, z2, z3);
-            return borrow != 0;
+            return SubtractImpl(a, b, out res);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1157,12 +1204,12 @@ namespace Nethermind.Int256
             const ulong mask32 = two32 - 1;
             if (y == 0)
             {
-                throw new DivideByZeroException("y == 0");
+                ThrowDivideByZeroException();
             }
 
             if (y <= hi)
             {
-                throw new OverflowException("y <= hi");
+                ThrowOverflowException();
             }
 
             var s = LeadingZeros(y);
@@ -1431,16 +1478,37 @@ namespace Nethermind.Int256
 
         public static void Not(in UInt256 a, out UInt256 res)
         {
-            ulong u0 = ~a.u0;
-            ulong u1 = ~a.u1;
-            ulong u2 = ~a.u2;
-            ulong u3 = ~a.u3;
-            res = new UInt256(u0, u1, u2, u3);
+            if (Avx2.IsSupported)
+            {
+                var av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
+                // Mark res as initalized so we can use it as left said of ref assignment
+                Unsafe.SkipInit(out res);
+                Unsafe.As<UInt256, Vector256<ulong>>(ref res) = Avx2.Xor(av, Vector256<ulong>.AllBitsSet);
+            }
+            else
+            {
+                ulong u0 = ~a.u0;
+                ulong u1 = ~a.u1;
+                ulong u2 = ~a.u2;
+                ulong u3 = ~a.u3;
+                res = new UInt256(u0, u1, u2, u3);
+            }
         }
 
         public static void Or(in UInt256 a, in UInt256 b, out UInt256 res)
         {
-            res = new UInt256(a.u0 | b.u0, a.u1 | b.u1, a.u2 | b.u2, a.u3 | b.u3);
+            if (Avx2.IsSupported)
+            {
+                var av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
+                var bv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
+                // Mark res as initalized so we can use it as left said of ref assignment
+                Unsafe.SkipInit(out res);
+                Unsafe.As<UInt256, Vector256<ulong>>(ref res) = Avx2.Or(av, bv);
+            }
+            else
+            {
+                res = new UInt256(a.u0 | b.u0, a.u1 | b.u1, a.u2 | b.u2, a.u3 | b.u3);
+            }
         }
 
         public static UInt256 operator |(in UInt256 a, in UInt256 b)
@@ -1451,7 +1519,18 @@ namespace Nethermind.Int256
 
         public static void And(in UInt256 a, in UInt256 b, out UInt256 res)
         {
-            res = new UInt256(a.u0 & b.u0, a.u1 & b.u1, a.u2 & b.u2, a.u3 & b.u3);
+            if (Avx2.IsSupported)
+            {
+                var av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
+                var bv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
+                // Mark res as initalized so we can use it as left said of ref assignment
+                Unsafe.SkipInit(out res);
+                Unsafe.As<UInt256, Vector256<ulong>>(ref res) = Avx2.And(av, bv);
+            }
+            else
+            {
+                res = new UInt256(a.u0 & b.u0, a.u1 & b.u1, a.u2 & b.u2, a.u3 & b.u3);
+            }
         }
 
         public static UInt256 operator &(in UInt256 a, in UInt256 b)
@@ -1462,7 +1541,18 @@ namespace Nethermind.Int256
 
         public static void Xor(in UInt256 a, in UInt256 b, out UInt256 res)
         {
-            res = new UInt256(a.u0 ^ b.u0, a.u1 ^ b.u1, a.u2 ^ b.u2, a.u3 ^ b.u3);
+            if (Avx2.IsSupported)
+            {
+                var av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
+                var bv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
+                // Mark res as initalized so we can use it as left said of ref assignment
+                Unsafe.SkipInit(out res);
+                Unsafe.As<UInt256, Vector256<ulong>>(ref res) = Avx2.Xor(av, bv);
+            }
+            else
+            {
+                res = new UInt256(a.u0 ^ b.u0, a.u1 ^ b.u1, a.u2 ^ b.u2, a.u3 ^ b.u3);
+            }
         }
 
         public static UInt256 operator ^(in UInt256 a, in UInt256 b)
@@ -1493,7 +1583,7 @@ namespace Nethermind.Int256
         {
             if (SubtractUnderflow(in a, in b, out UInt256 c))
             {
-                throw new ArithmeticException($"Underflow in subtraction {a} - {b}");
+                ThrowArithmeticException(in a, in b);
             }
 
             return c;
@@ -1513,11 +1603,7 @@ namespace Nethermind.Int256
 
         public static explicit operator BigInteger(in UInt256 value)
         {
-            Span<byte> bytes = stackalloc byte[32];
-            BinaryPrimitives.WriteUInt64LittleEndian(bytes.Slice(0, 8), value.u0);
-            BinaryPrimitives.WriteUInt64LittleEndian(bytes.Slice(8, 8), value.u1);
-            BinaryPrimitives.WriteUInt64LittleEndian(bytes.Slice(16, 8), value.u2);
-            BinaryPrimitives.WriteUInt64LittleEndian(bytes.Slice(24, 8), value.u3);
+            ReadOnlySpan<byte> bytes = MemoryMarshal.CreateReadOnlySpan(ref Unsafe.As<UInt256, byte>(ref Unsafe.AsRef(in value)), 32);
             return new BigInteger(bytes, true);
         }
 
@@ -1714,22 +1800,53 @@ namespace Nethermind.Int256
 
         public bool IsUint64 => (u1 | u2 | u3) == 0;
 
-        public bool Equals(UInt256 other) => u0 == other.u0 && u1 == other.u1 && u2 == other.u2 && u3 == other.u3;
+        public bool Equals(UInt256 other)
+        {
+            var v1 = Unsafe.As<ulong, Vector256<ulong>>(ref Unsafe.AsRef(in u0));
+            var v2 = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in other));
+            return v1 == v2;
+        }
 
-        public bool Equals(int other) => other >= 0 && u0 == (uint)other && u1 == 0 && u2 == 0 && u3 == 0;
+        public bool Equals(int other)
+        {
+            return other >= 0 && Equals((uint)other);
+        }
 
-        public bool Equals(uint other) => u0 == other && u1 == 0 && u2 == 0 && u3 == 0;
+        public bool Equals(uint other)
+        {
+            if (Avx.IsSupported)
+            {
+                var v = Unsafe.As<ulong, Vector256<uint>>(ref Unsafe.AsRef(in u0));
+                return v == Vector256.CreateScalar(other);
+            }
+            else
+            {
+                return u0 == other && u1 == 0 && u2 == 0 && u3 == 0;
+            }
+        }
 
-        public bool Equals(long other) => other >= 0 && u0 == (ulong)other && u1 == 0 && u2 == 0 && u3 == 0;
+        public bool Equals(long other) => other >= 0 && Equals((ulong)other);
 
-        public bool Equals(ulong other) => u0 == other && u1 == 0 && u2 == 0 && u3 == 0;
+        public bool Equals(ulong other)
+        {
+            if (Avx.IsSupported)
+            {
+                var v = Unsafe.As<ulong, Vector256<ulong>>(ref Unsafe.AsRef(in u0));
+                return v == Vector256.CreateScalar(other);
+            }
+            else
+            {
+                return u0 == other && u1 == 0 && u2 == 0 && u3 == 0;
+            }
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool Equals(in UInt256 other) =>
-            u0 == other.u0 &&
-            u1 == other.u1 &&
-            u2 == other.u2 &&
-            u3 == other.u3;
+        private bool Equals(in UInt256 other)
+        {
+            var v1 = Unsafe.As<ulong, Vector256<ulong>>(ref Unsafe.AsRef(in u0));
+            var v2 = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in other));
+            return v1 == v2;
+        }
 
         public int CompareTo(UInt256 b) => this < b ? -1 : Equals(b) ? 0 : 1;
 
@@ -1737,25 +1854,15 @@ namespace Nethermind.Int256
 
         public override int GetHashCode() => HashCode.Combine(u0, u1, u2, u3);
 
-        public ulong this[int index]
+        public ulong this[int index] => index switch
         {
-            get
-            {
-                switch (index)
-                {
-                    case 0:
-                        return u0;
-                    case 1:
-                        return u1;
-                    case 2:
-                        return u2;
-                    case 3:
-                        return u3;
-                    default:
-                        throw new IndexOutOfRangeException();
-                }
-            }
-        }
+            0 => u0,
+            1 => u1,
+            2 => u2,
+            3 => u3,
+            _ => ThrowIndexOutOfRangeException(),
+        };
+
 
         public static UInt256 Max(in UInt256 a, in UInt256 b) => LessThan(in b, in a) ? a : b;
 
@@ -1828,5 +1935,20 @@ namespace Nethermind.Int256
         public ushort ToUInt16(IFormatProvider? provider) => System.Convert.ToUInt16(ToDecimal(provider), provider);
         public uint ToUInt32(IFormatProvider? provider) => System.Convert.ToUInt32(ToDecimal(provider), provider);
         public ulong ToUInt64(IFormatProvider? provider) => System.Convert.ToUInt64(ToDecimal(provider), provider);
+
+        [DoesNotReturn]
+        private static void ThrowDivideByZeroException() => throw new DivideByZeroException("y == 0");
+
+        [DoesNotReturn]
+        private static void ThrowArithmeticException(in UInt256 a, in UInt256 b) => throw new ArithmeticException($"Underflow in subtraction {a} - {b}");
+
+        [DoesNotReturn]
+        private static void ThrowOverflowException() => throw new OverflowException("y <= hi");
+
+        [DoesNotReturn]
+        private static void ThrowNotSupportedException() => throw new NotSupportedException();
+
+        [DoesNotReturn]
+        private static ulong ThrowIndexOutOfRangeException() => throw new IndexOutOfRangeException();
     }
 }
