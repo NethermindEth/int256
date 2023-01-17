@@ -7,12 +7,13 @@ using System.Runtime.CompilerServices;
 
 namespace Nethermind.Int256
 {
-    public readonly struct Int256 : IComparable, IComparable<Int256>, IInteger<Int256>, IConvertible
+    public readonly partial struct Int256 : IComparable, IComparable<Int256>, IInteger<Int256>, IConvertible
     {
         public static readonly Int256 Zero = (Int256)0UL;
         public static readonly Int256 One = (Int256)1UL;
         public static readonly Int256 MinusOne = -1L;
         public static readonly Int256 Max = new Int256(((BigInteger.One << 255) - 1));
+        public static readonly bool IsFinate = true;
 
         internal readonly UInt256 _value;
 
@@ -596,13 +597,16 @@ namespace Nethermind.Int256
         public ulong ToUInt64(IFormatProvider? provider) => System.Convert.ToUInt64(ToDecimal(provider), provider);
 
         public string ToString(IFormatProvider? provider)
+            => this.ToString(string.Empty, provider);
+
+        public string ToString(string? format, IFormatProvider? provider)
         {
             if (IsNegative)
             {
                 Neg(out Int256 res);
-                return "-" + res._value.ToString(provider);
+                return "-" + res._value.ToString(format, provider);
             }
-            return _value.ToString(provider);
+            return _value.ToString(format, provider);
         }
 
         public static void And(in Int256 a, in Int256 b, out Int256 res)
@@ -628,5 +632,11 @@ namespace Nethermind.Int256
             UInt256.Not(in a._value, out var o);
             res = new Int256(o);
         }
+
+        public static Int256 MaxOf(in Int256 a, in Int256 b)
+            => a > b ? a : b;
+        public static Int256 MinOf(in Int256 a, in Int256 b)
+            => a < b ? a : b;
+
     }
 }
