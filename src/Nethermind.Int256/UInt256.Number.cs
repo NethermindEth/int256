@@ -70,7 +70,7 @@ namespace Nethermind.Int256
 
         static UInt256 INumberBase<UInt256>.One => UInt256.One;
 
-        static int INumberBase<UInt256>.Radix => throw new NotImplementedException();
+        static int INumberBase<UInt256>.Radix => Radix;
 
         static UInt256 INumberBase<UInt256>.Zero => UInt256.Zero;
 
@@ -182,6 +182,12 @@ namespace Nethermind.Int256
             return res;
         }
 
+        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
+        {
+            return ((BigInteger)this).TryFormat(destination, out charsWritten, format, provider);
+
+        }
+
         static bool INumberBase<UInt256>.IsSubnormal(UInt256 value)
         {
             throw new NotImplementedException();
@@ -220,12 +226,5 @@ namespace Nethermind.Int256
         {
             throw new NotImplementedException();
         }
-
-
-        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
-        {
-            throw new NotImplementedException();
-        }
-
     }
 }

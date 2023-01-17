@@ -12,6 +12,7 @@ namespace Nethermind.Int256
         public static readonly Int256 Zero = (Int256)0UL;
         public static readonly Int256 One = (Int256)1UL;
         public static readonly Int256 MinusOne = -1L;
+        public static readonly int Radix = 10;
         public static readonly Int256 Max = new Int256(((BigInteger.One << 255) - 1));
         public static readonly bool IsFinate = true;
 

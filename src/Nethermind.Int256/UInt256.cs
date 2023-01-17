@@ -18,6 +18,7 @@ namespace Nethermind.Int256
         public static readonly UInt256 One = 1ul;
         public static readonly UInt256 MinValue = Zero;
         public static readonly UInt256 MaxValue = ~Zero;
+        public static readonly int Radix = 10;
         public static readonly UInt256 UInt128MaxValue = new(ulong.MaxValue, ulong.MaxValue);
         public static readonly bool IsFinite = true;
 
@@ -1887,7 +1888,7 @@ namespace Nethermind.Int256
 
         public static bool TryParse(ReadOnlySpan<char> value, out UInt256 result) => TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out result);
 
-        public static bool TryParse(string value, NumberStyles style, IFormatProvider provider, out UInt256 result) => TryParse(value.AsSpan(), style, provider, out result);
+        public static bool TryParse(string? s, NumberStyles style, IFormatProvider? provider, out UInt256 result) => TryParse(s.AsSpan(), style, provider ?? CultureInfo.InvariantCulture, out result);
 
         public static bool TryParse(in ReadOnlySpan<char> value, NumberStyles style, IFormatProvider provider, out UInt256 result)
         {

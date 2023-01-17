@@ -10,7 +10,7 @@ namespace Nethermind.Int256
     public readonly partial struct Int256 : INumber<Int256>
     {
         static Int256 INumberBase<Int256>.One => One;
-        static int INumberBase<Int256>.Radix => throw new NotImplementedException();
+        static int INumberBase<Int256>.Radix => Radix;
         static Int256 INumberBase<Int256>.Zero => Zero;
         static Int256 IAdditiveIdentity<Int256, Int256>.AdditiveIdentity => Zero;
         static Int256 IMultiplicativeIdentity<Int256, Int256>.MultiplicativeIdentity => One;
@@ -265,7 +265,7 @@ namespace Nethermind.Int256
 
         bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
         {
-            throw new NotImplementedException();
+            return ((BigInteger)this).TryFormat(destination, out charsWritten, format, provider);
         }
 
         static bool INumberBase<Int256>.TryConvertFromChecked<TOther>(TOther value, out Int256 result)
