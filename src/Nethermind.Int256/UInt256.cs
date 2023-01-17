@@ -4,22 +4,22 @@ using System.Globalization;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using System.Runtime.Intrinsics.X86;
 using System.Runtime.Intrinsics;
-using System.Diagnostics.CodeAnalysis;
+using System.Runtime.Intrinsics.X86;
 
 [assembly: InternalsVisibleTo("Nethermind.Int256.Test")]
 
 namespace Nethermind.Int256
 {
     [StructLayout(LayoutKind.Explicit)]
-    public readonly struct UInt256 : IComparable, IComparable<UInt256>, IInteger<UInt256>, IConvertible
+    public readonly partial struct UInt256 : IComparable, IComparable<UInt256>, IInteger<UInt256>, IConvertible
     {
         public static readonly UInt256 Zero = 0ul;
         public static readonly UInt256 One = 1ul;
         public static readonly UInt256 MinValue = Zero;
         public static readonly UInt256 MaxValue = ~Zero;
         public static readonly UInt256 UInt128MaxValue = new(ulong.MaxValue, ulong.MaxValue);
+        public static readonly bool IsFinite = true;
 
         /* in little endian order so u3 is the most significant ulong */
         [FieldOffset(0)]
@@ -309,91 +309,91 @@ namespace Nethermind.Int256
         public bool IsZeroOrOne => ((u0 >> 1) | u1 | u2 | u3) == 0;
 
         public UInt256 ZeroValue => Zero;
-        
+
         public UInt256 OneValue => One;
 
         public UInt256 MaximalValue => MaxValue;
 
         private static ReadOnlySpan<byte> s_broadcastLookup => new byte[] {
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 
-            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 
-            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 
-            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 
-            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 
-            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 
-            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 
-            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 
-            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         };
 
         // Add sets res to the sum a+b
@@ -401,8 +401,8 @@ namespace Nethermind.Int256
         {
             if (Avx2.IsSupported)
             {
-                var av = Unsafe.As<UInt256,Vector256<ulong>>(ref Unsafe.AsRef(in a));
-                var bv = Unsafe.As<UInt256,Vector256<ulong>>(ref Unsafe.AsRef(in b));
+                var av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
+                var bv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
 
                 var result = Avx2.Add(av, bv);
 
@@ -434,7 +434,7 @@ namespace Nethermind.Int256
                 // Mark res as initalized so we can use it as left said of ref assignment
                 Unsafe.SkipInit(out res);
                 // Add the cascadedCarries to the result
-                Unsafe.As<UInt256,Vector256<ulong>>(ref res) = Avx2.Add(result, cascadedCarries);
+                Unsafe.As<UInt256, Vector256<ulong>>(ref res) = Avx2.Add(result, cascadedCarries);
             }
             else
             {
@@ -662,7 +662,7 @@ namespace Nethermind.Int256
             int uLen = 0;
             for (int i = length - 1; i >= 0; i--)
             {
-                if (Unsafe.Add(ref u,i) != 0)
+                if (Unsafe.Add(ref u, i) != 0)
                 {
                     uLen = i + 1;
                     break;
@@ -727,13 +727,13 @@ namespace Nethermind.Int256
                     goto r3;
             }
 
-            r3:
+        r3:
             rem2 = Rsh(un[2], shift) | Lsh(un[3], 64 - shift);
-            r2:
+        r2:
             rem1 = Rsh(un[1], shift) | Lsh(un[2], 64 - shift);
-            r1:
+        r1:
             rem0 = Rsh(un[0], shift) | Lsh(un[1], 64 - shift);
-            r0:
+        r0:
 
             rem = new UInt256(rem0, rem1, rem2, rem3);
         }
@@ -1312,15 +1312,15 @@ namespace Nethermind.Int256
             a = Rsh(res.u0, 64 - n);
             z0 = Lsh(res.u0, n);
 
-            sh64:
+        sh64:
             b = Rsh(res.u1, 64 - n);
             z1 = Lsh(res.u1, n) | a;
 
-            sh128:
+        sh128:
             a = Rsh(res.u2, 64 - n);
             z2 = Lsh(res.u2, n) | b;
 
-            sh192:
+        sh192:
             z3 = Lsh(res.u3, n) | a;
 
             res = new UInt256(z0, z1, z2, z3);
@@ -1422,15 +1422,15 @@ namespace Nethermind.Int256
             a = Lsh(res.u3, 64 - n);
             z3 = Rsh(res.u3, n);
 
-            sh64:
+        sh64:
             b = Lsh(res.u2, 64 - n);
             z2 = Rsh(res.u2, n) | a;
 
-            sh128:
+        sh128:
             a = Lsh(res.u1, 64 - n);
             z1 = Rsh(res.u1, n) | b;
 
-            sh192:
+        sh192:
             z0 = Rsh(res.u0, n) | a;
 
             res = new UInt256(z0, z1, z2, z3);
@@ -1608,43 +1608,43 @@ namespace Nethermind.Int256
         }
 
         public static explicit operator sbyte(in UInt256 a) =>
-            a.u1 > 0 || a.u2 > 0 || a.u3 > 0 || a.u0 > (long)sbyte.MaxValue 
-                ? throw new OverflowException("Cannot convert UInt256 value to sbyte.") 
+            a.u1 > 0 || a.u2 > 0 || a.u3 > 0 || a.u0 > (long)sbyte.MaxValue
+                ? throw new OverflowException("Cannot convert UInt256 value to sbyte.")
                 : (sbyte)a.u0;
 
-        public static explicit operator byte(in UInt256 a) => 
-            a.u1 > 0 || a.u2 > 0 || a.u3 > 0 || a.u0 > byte.MaxValue 
+        public static explicit operator byte(in UInt256 a) =>
+            a.u1 > 0 || a.u2 > 0 || a.u3 > 0 || a.u0 > byte.MaxValue
                 ? throw new OverflowException("Cannot convert UInt256 value to byte.")
                 : (byte)a.u0;
 
-        public static explicit operator short(in UInt256 a) => 
-            a.u1 > 0 || a.u2 > 0 || a.u3 > 0 || a.u0 > (long)short.MaxValue 
-                ? throw new OverflowException("Cannot convert UInt256 value to short.") 
+        public static explicit operator short(in UInt256 a) =>
+            a.u1 > 0 || a.u2 > 0 || a.u3 > 0 || a.u0 > (long)short.MaxValue
+                ? throw new OverflowException("Cannot convert UInt256 value to short.")
                 : (short)a.u0;
 
-        public static explicit operator ushort(in UInt256 a) => 
-            a.u1 > 0 || a.u2 > 0 || a.u3 > 0 || a.u0 > ushort.MaxValue 
-                ? throw new OverflowException("Cannot convert UInt256 value to ushort.") 
+        public static explicit operator ushort(in UInt256 a) =>
+            a.u1 > 0 || a.u2 > 0 || a.u3 > 0 || a.u0 > ushort.MaxValue
+                ? throw new OverflowException("Cannot convert UInt256 value to ushort.")
                 : (ushort)a.u0;
 
-        public static explicit operator int(in UInt256 a) => 
-            a.u1 > 0 || a.u2 > 0 || a.u3 > 0 || a.u0 > int.MaxValue 
-                ? throw new OverflowException("Cannot convert UInt256 value to int.") 
+        public static explicit operator int(in UInt256 a) =>
+            a.u1 > 0 || a.u2 > 0 || a.u3 > 0 || a.u0 > int.MaxValue
+                ? throw new OverflowException("Cannot convert UInt256 value to int.")
                 : (int)a.u0;
 
-        public static explicit operator uint(in UInt256 a) => 
-            a.u1 > 0 || a.u2 > 0 || a.u3 > 0 || a.u0 > uint.MaxValue 
-                ? throw new OverflowException("Cannot convert UInt256 value to uint.") 
+        public static explicit operator uint(in UInt256 a) =>
+            a.u1 > 0 || a.u2 > 0 || a.u3 > 0 || a.u0 > uint.MaxValue
+                ? throw new OverflowException("Cannot convert UInt256 value to uint.")
                 : (uint)a.u0;
 
-        public static explicit operator long(in UInt256 a) => 
-            a.u1 > 0 || a.u2 > 0 || a.u3 > 0 || a.u0 > long.MaxValue 
-                ? throw new OverflowException("Cannot convert UInt256 value to long.") 
+        public static explicit operator long(in UInt256 a) =>
+            a.u1 > 0 || a.u2 > 0 || a.u3 > 0 || a.u0 > long.MaxValue
+                ? throw new OverflowException("Cannot convert UInt256 value to long.")
                 : (long)a.u0;
 
-        public static explicit operator ulong(in UInt256 a) => 
-            a.u1 > 0 || a.u2 > 0 || a.u3 > 0 
-                ? throw new OverflowException("Cannot convert UInt256 value to ulong.") 
+        public static explicit operator ulong(in UInt256 a) =>
+            a.u1 > 0 || a.u2 > 0 || a.u3 > 0
+                ? throw new OverflowException("Cannot convert UInt256 value to ulong.")
                 : a.u0;
 
         public static UInt256 operator *(in UInt256 a, uint b)
@@ -1771,24 +1771,23 @@ namespace Nethermind.Int256
         public static bool operator !=(long a, in UInt256 b) => !b.Equals(a);
         public static bool operator !=(in UInt256 a, ulong b) => !a.Equals(b);
         public static bool operator !=(ulong a, in UInt256 b) => !b.Equals(a);
-        public static explicit operator UInt256(sbyte a) => 
+        public static explicit operator UInt256(sbyte a) =>
             a < 0 ? throw new ArgumentException($"Expected a positive number and got {a}", nameof(a)) : new UInt256((ulong)a);
 
         public static implicit operator UInt256(byte a) => new(a);
 
-        public static explicit operator UInt256(short a) => 
+        public static explicit operator UInt256(short a) =>
             a < 0 ? throw new ArgumentException($"Expected a positive number and got {a}", nameof(a)) : new UInt256((ulong)a);
 
         public static implicit operator UInt256(ushort a) => new(a);
 
-        public static explicit operator UInt256(int n) => 
+        public static explicit operator UInt256(int n) =>
             n < 0 ? throw new ArgumentException("n < 0") : new UInt256((ulong)n);
 
         public static implicit operator UInt256(uint a) => new(a);
 
-        public static explicit operator UInt256(long a) => 
+        public static explicit operator UInt256(long a) =>
             a < 0 ? throw new ArgumentException($"Expected a positive number and got {a}", nameof(a)) : new UInt256((ulong)a);
-
         public override string ToString() => ((BigInteger)this).ToString();
 
         public int CompareTo(object? obj) => obj is not UInt256 int256 ? throw new InvalidOperationException() : CompareTo(int256);
@@ -1796,6 +1795,11 @@ namespace Nethermind.Int256
         public string ToString(string format)
         {
             return ((BigInteger)this).ToString(format);
+        }
+
+        public string ToString(string? format, IFormatProvider? formatProvider)
+        {
+            return ((BigInteger)this).ToString(format, formatProvider);
         }
 
         public bool IsUint64 => (u1 | u2 | u3) == 0;
@@ -1917,13 +1921,13 @@ namespace Nethermind.Int256
         public TypeCode GetTypeCode() => TypeCode.Object;
         public bool ToBoolean(IFormatProvider? provider) => !IsZero;
         public byte ToByte(IFormatProvider? provider) => System.Convert.ToByte(ToDecimal(provider), provider);
-        public char ToChar(IFormatProvider? provider)  => System.Convert.ToChar(ToDecimal(provider), provider);
-        public DateTime ToDateTime(IFormatProvider? provider)  => System.Convert.ToDateTime(ToDecimal(provider), provider);
+        public char ToChar(IFormatProvider? provider) => System.Convert.ToChar(ToDecimal(provider), provider);
+        public DateTime ToDateTime(IFormatProvider? provider) => System.Convert.ToDateTime(ToDecimal(provider), provider);
         public decimal ToDecimal(IFormatProvider? provider) => (decimal)this;
         public double ToDouble(IFormatProvider? provider) => (double)this;
         public short ToInt16(IFormatProvider? provider) => System.Convert.ToInt16(ToDecimal(provider), provider);
         public int ToInt32(IFormatProvider? provider) => System.Convert.ToInt32(ToDecimal(provider), provider);
-        public long ToInt64(IFormatProvider? provider)  => System.Convert.ToInt64(ToDecimal(provider), provider);
+        public long ToInt64(IFormatProvider? provider) => System.Convert.ToInt64(ToDecimal(provider), provider);
         public sbyte ToSByte(IFormatProvider? provider) => System.Convert.ToSByte(ToDecimal(provider), provider);
         public float ToSingle(IFormatProvider? provider) => System.Convert.ToSingle(ToDouble(provider), provider);
         public string ToString(IFormatProvider? provider) => ((BigInteger)this).ToString(provider);
@@ -1935,20 +1939,5 @@ namespace Nethermind.Int256
         public ushort ToUInt16(IFormatProvider? provider) => System.Convert.ToUInt16(ToDecimal(provider), provider);
         public uint ToUInt32(IFormatProvider? provider) => System.Convert.ToUInt32(ToDecimal(provider), provider);
         public ulong ToUInt64(IFormatProvider? provider) => System.Convert.ToUInt64(ToDecimal(provider), provider);
-
-        [DoesNotReturn]
-        private static void ThrowDivideByZeroException() => throw new DivideByZeroException("y == 0");
-
-        [DoesNotReturn]
-        private static void ThrowArithmeticException(in UInt256 a, in UInt256 b) => throw new ArithmeticException($"Underflow in subtraction {a} - {b}");
-
-        [DoesNotReturn]
-        private static void ThrowOverflowException() => throw new OverflowException("y <= hi");
-
-        [DoesNotReturn]
-        private static void ThrowNotSupportedException() => throw new NotSupportedException();
-
-        [DoesNotReturn]
-        private static ulong ThrowIndexOutOfRangeException() => throw new IndexOutOfRangeException();
     }
 }
