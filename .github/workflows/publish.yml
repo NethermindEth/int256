@@ -1,23 +1,13 @@
-name: Test and publish
+name: Publish
 
 on:
-  push:
-    paths:
-      - '.github/workflows/test-publish.yml'
-      - 'src/Nethermind.*/**'
   workflow_dispatch:
-    inputs:
-      publish:
-        description: 'Publish package'
-        default: false
-        required: false 
-        type: boolean
 
 jobs:
-  test-publish:
+  publish:
     env:
       BUILD_CONFIG: release
-    name: Test and publish if required
+    name: Test and publish
     runs-on: ubuntu-latest
     steps:
     
@@ -42,7 +32,6 @@ jobs:
         run: dotnet test -c ${{ env.BUILD_CONFIG }} --no-restore
 
       - name: Publish
-        if: ${{ inputs.publish }}
         working-directory: src/Nethermind.Int256
         run: |
           dotnet pack -c ${{ env.BUILD_CONFIG }} --no-build
