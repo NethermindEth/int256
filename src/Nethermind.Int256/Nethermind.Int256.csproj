@@ -11,11 +11,13 @@
   <PropertyGroup>
     <Authors>Nethermind</Authors>
     <Copyright>Demerzel Solutions Limited</Copyright>
+    <Description>A high-performance implementation of 256-bit integer — signed and unsigned</Description>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
     <IncludeSymbols>true</IncludeSymbols>
     <PackageId>Nethermind.Numerics.Int256</PackageId>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://nethermind.io</PackageProjectUrl>
+    <PackageTags>int256 uint256</PackageTags>
     <RepositoryType>git</RepositoryType>
     <RepositoryUrl>https://github.com/nethermindeth/int256</RepositoryUrl>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
