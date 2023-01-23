@@ -62,6 +62,19 @@ namespace Nethermind.Int256
         public int Sign => _value.IsZero ? 0 : _value.u3 < 0x8000000000000000ul ? 1 : -1;
         public bool IsNegative => Sign < 0;
 
+        public static Int256 operator +(in Int256 a, in Int256 b)
+        {
+            Add(in a, in b, out Int256 res);
+            return res;
+        }
+        
+        public static bool AddOverflow(in Int256 a, in Int256 b, out Int256 res)
+        {
+            var overflow = UInt256.AddOverflow(a._value, b._value, out UInt256 ures);
+            res = new Int256(ures);
+            return overflow;
+        }
+
         public static void Add(in Int256 a, in Int256 b, out Int256 res)
         {
             UInt256.Add(a._value, b._value, out UInt256 ures);

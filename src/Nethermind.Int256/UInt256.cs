@@ -399,6 +399,11 @@ namespace Nethermind.Int256
         // Add sets res to the sum a+b
         public static void Add(in UInt256 a, in UInt256 b, out UInt256 res)
         {
+            AddImpl(in a, in b, out res);
+        }
+
+        public static bool AddImpl(in UInt256 a, in UInt256 b, out UInt256 res)
+        {
             if (Avx2.IsSupported)
             {
                 var av = Unsafe.As<UInt256,Vector256<ulong>>(ref Unsafe.AsRef(in a));
@@ -435,6 +440,8 @@ namespace Nethermind.Int256
                 Unsafe.SkipInit(out res);
                 // Add the cascadedCarries to the result
                 Unsafe.As<UInt256,Vector256<ulong>>(ref res) = Avx2.Add(result, cascadedCarries);
+
+                return (carry & 0b1_0000) != 0;
             }
             else
             {
@@ -444,6 +451,8 @@ namespace Nethermind.Int256
                 AddWithCarry(a.u2, b.u2, ref carry, out ulong res3);
                 AddWithCarry(a.u3, b.u3, ref carry, out ulong res4);
                 res = new UInt256(res1, res2, res3, res4);
+
+                return carry != 0;
             }
             // #if DEBUG
             //             Debug.Assert((BigInteger)res == ((BigInteger)a + (BigInteger)b) % ((BigInteger)1 << 256));
@@ -461,13 +470,7 @@ namespace Nethermind.Int256
         /// <returns></returns>
         public static bool AddOverflow(in UInt256 a, in UInt256 b, out UInt256 res)
         {
-            ulong carry = 0ul;
-            AddWithCarry(a.u0, b.u0, ref carry, out ulong res1);
-            AddWithCarry(a.u1, b.u1, ref carry, out ulong res2);
-            AddWithCarry(a.u2, b.u2, ref carry, out ulong res3);
-            AddWithCarry(a.u3, b.u3, ref carry, out ulong res4);
-            res = new UInt256(res1, res2, res3, res4);
-            return carry != 0;
+            return AddImpl(in a, in b, out res);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
