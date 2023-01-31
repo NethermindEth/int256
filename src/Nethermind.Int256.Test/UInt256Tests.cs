@@ -35,6 +35,31 @@ namespace Nethermind.Int256.Test
             resUInt256.Should().Be(resBigInt);
         }
 
+        [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
+        public virtual void AddOverflow((BigInteger A, BigInteger B) test)
+        {
+            BigInteger resUInt256;
+            BigInteger resBigInt = test.A + test.B;
+            resBigInt %= (BigInteger.One << 256);
+            resBigInt = postprocess(resBigInt);
+            T uint256a = convert(test.A);
+            T uint256b = convert(test.B);
+
+            bool overflow = T.AddOverflow(uint256a, uint256b, out T res);
+            res.Convert(out resUInt256);
+
+            resUInt256.Should().Be(resBigInt);
+
+            if (test.A + test.B <= (BigInteger)UInt256.MaxValue)
+            {
+                overflow.Should().Be(false);
+            }
+            else
+            {
+                overflow.Should().Be(true);
+            }
+        }
+
         [TestCaseSource(typeof(TernaryOps), nameof(TernaryOps.TestCases))]
         public virtual void AddMod((BigInteger A, BigInteger B, BigInteger M) test)
         {
@@ -146,7 +171,6 @@ namespace Nethermind.Int256.Test
                     resUInt256.Should().Be(resBigInt);
                 }
             }
-
         }
 
         [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]

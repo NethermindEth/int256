@@ -22,6 +22,7 @@ namespace Nethermind.Int256
         void LeftShift(int n, out T res);
         void RightShift(int n, out T res);
 
+        abstract static bool AddOverflow(in T a, in T b, out T res);
         abstract static void And(in T a, in T b, out T res);
         abstract static void Or(in T a, in T b, out T res);
         abstract static void Xor(in T a, in T b, out T res);
