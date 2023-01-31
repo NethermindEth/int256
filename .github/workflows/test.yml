@@ -11,8 +11,6 @@ on:
     branches: [ 'master' ]
   workflow_dispatch:
   
-env:
-  DOTNET_EnableHWIntrinsic: ${{ matrix.JIT_INTRINSICS }}
 
 jobs:
   test:
@@ -21,6 +19,9 @@ jobs:
       matrix:
         BUILD_CONFIG: ["release", "debug"]
         JIT_INTRINSICS: [0, 1]
+    env:
+      DOTNET_EnableHWIntrinsic: ${{ matrix.JIT_INTRINSICS }}
+
     runs-on: ubuntu-latest
     steps:
     
