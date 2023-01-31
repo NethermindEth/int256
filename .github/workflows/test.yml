@@ -1,31 +1,25 @@
 name: Test
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
-  cancel-in-progress: true
-
 on:
   push:
-    branches:
-       - master
-  pull_request:
+    paths:
+      - 'src/Nethermind.*/**'
   workflow_dispatch:
 
 jobs:
   test:
     name: Test
-    strategy:
-      matrix:
-        BUILD_CONFIG: ["release", "debug"]
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-      with:
-        submodules: true
-    - name: Set up .NET
-      uses: actions/setup-dotnet@v3
-      with:
-        dotnet-version: 7
-    - name: test
-      run: |
-        dotnet test src/Nethermind.Int256.Test/Nethermind.Int256.Test.csproj -c ${{ matrix.BUILD_CONFIG }}
+    
+      - name: Check out repository
+        uses: actions/checkout@v3
+    
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: 7
+
+      - name: Test
+        working-directory: src/Nethermind.Int256.Test
+        run: dotnet test -c release
