@@ -6,10 +6,17 @@ on:
     paths:
       - 'src/Nethermind.*/**'
   workflow_dispatch:
+  
+env:
+  DOTNET_EnableHWIntrinsic: ${{ matrix.JIT_INTRINSICS }}
 
 jobs:
   test:
     name: Test
+    strategy:
+      matrix:
+        BUILD_CONFIG: ["release", "debug"]
+        JIT_INTRINSICS: [0, 1]
     runs-on: ubuntu-latest
     steps:
     
@@ -23,4 +30,4 @@ jobs:
 
       - name: Test
         working-directory: src/Nethermind.Int256.Test
-        run: dotnet test -c release
+        run: dotnet test -c ${{ matrix.BUILD_CONFIG }}
