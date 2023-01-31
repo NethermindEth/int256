@@ -1,18 +1,26 @@
 name: Test
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   pull_request:
   push:
-    paths:
-      - 'src/Nethermind.*/**'
+    branches: [master]
   workflow_dispatch:
 
 jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        build-config: [debug, release]
+        hardware-intrinsics: [0, 1]
+    env:
+      DOTNET_EnableHWIntrinsic: ${{ matrix.hardware-intrinsics }}
     steps:
-    
       - name: Check out repository
         uses: actions/checkout@v3
     
@@ -23,4 +31,4 @@ jobs:
 
       - name: Test
         working-directory: src/Nethermind.Int256.Test
-        run: dotnet test -c release
+        run: dotnet test -c ${{ matrix.build-config }}
