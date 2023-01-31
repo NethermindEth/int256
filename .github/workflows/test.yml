@@ -8,9 +8,6 @@ on:
   pull_request:
   push:
     branches: [master]
-    paths:
-      - '.github/workflows/test.yml'
-      - 'src/Nethermind.*/**'
   workflow_dispatch:
 
 jobs:
