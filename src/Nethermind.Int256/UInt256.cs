@@ -1372,8 +1372,7 @@ namespace Nethermind.Int256
                 }
             }
 
-            res = Zero;
-            ulong z0 = res.u0, z1 = res.u1, z2 = res.u2, z3 = res.u3;
+            ulong z0 = 0, z1 = 0, z2 = 0, z3 = 0;
             ulong a = 0, b = 0;
             // Big swaps first
             if (n > 192)
