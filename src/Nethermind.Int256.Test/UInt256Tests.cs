@@ -33,6 +33,11 @@ namespace Nethermind.Int256.Test
             res.Convert(out BigInteger resUInt256);
 
             resUInt256.Should().Be(resBigInt);
+
+            a.Add(b, out a);
+            a.Convert(out resUInt256);
+
+            resUInt256.Should().Be(resBigInt);
         }
 
         [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
@@ -50,6 +55,19 @@ namespace Nethermind.Int256.Test
 
             resUInt256.Should().Be(resBigInt);
 
+            if (test.A + test.B <= (BigInteger)UInt256.MaxValue)
+            {
+                overflow.Should().Be(false);
+            }
+            else
+            {
+                overflow.Should().Be(true);
+            }
+
+            overflow = T.AddOverflow(uint256a, uint256b, out uint256a);
+            uint256a.Convert(out resUInt256);
+
+            resUInt256.Should().Be(resBigInt);
             if (test.A + test.B <= (BigInteger)UInt256.MaxValue)
             {
                 overflow.Should().Be(false);
@@ -78,6 +96,11 @@ namespace Nethermind.Int256.Test
             res.Convert(out BigInteger resUInt256);
 
             resUInt256.Should().Be(resBigInt);
+
+            uint256a.AddMod(uint256b, uint256m, out uint256a);
+            uint256a.Convert(out resUInt256);
+
+            resUInt256.Should().Be(resBigInt);
         }
 
         [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
@@ -96,6 +119,11 @@ namespace Nethermind.Int256.Test
             T uint256b = convert(test.B);
             uint256a.Subtract(uint256b, out T res);
             res.Convert(out BigInteger resUInt256);
+
+            resUInt256.Should().Be(resBigInt);
+
+            uint256a.Subtract(uint256b, out uint256a);
+            uint256a.Convert(out resUInt256);
 
             resUInt256.Should().Be(resBigInt);
         }
@@ -130,6 +158,11 @@ namespace Nethermind.Int256.Test
             res.Convert(out BigInteger resUInt256);
 
             resUInt256.Should().Be(resBigInt);
+
+            uint256a.SubtractMod(uint256b, uint256m, out uint256a);
+            uint256a.Convert(out resUInt256);
+
+            resUInt256.Should().Be(resBigInt);
         }
 
         [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
@@ -148,13 +181,18 @@ namespace Nethermind.Int256.Test
                 {
                     UInt256 res = a - b;
                     res.Convert(out resUInt256);
+                    resUInt256.Should().Be(resBigInt);
                 }
                 else
                 {
                     uint256a.Subtract(uint256b, out T res);
                     res.Convert(out resUInt256);
+                    resUInt256.Should().Be(resBigInt);
+
+                    uint256a.Subtract(uint256b, out uint256a);
+                    uint256a.Convert(out resUInt256);
+                    resUInt256.Should().Be(resBigInt);
                 }
-                resUInt256.Should().Be(resBigInt);
             }
             else
             {
@@ -168,6 +206,10 @@ namespace Nethermind.Int256.Test
                 {
                     uint256a.Subtract(uint256b, out T res);
                     res.Convert(out resUInt256);
+                    resUInt256.Should().Be(resBigInt);
+
+                    uint256a.Subtract(uint256b, out uint256a);
+                    uint256a.Convert(out resUInt256);
                     resUInt256.Should().Be(resBigInt);
                 }
             }
@@ -183,6 +225,11 @@ namespace Nethermind.Int256.Test
             T uint256b = convert(test.B);
             uint256a.Multiply(uint256b, out T res);
             res.Convert(out BigInteger resUInt256);
+
+            resUInt256.Should().Be(resBigInt);
+
+            uint256a.Multiply(uint256b, out uint256a);
+            uint256a.Convert(out resUInt256);
 
             resUInt256.Should().Be(resBigInt);
         }
@@ -204,6 +251,11 @@ namespace Nethermind.Int256.Test
             res.Convert(out BigInteger resUInt256);
 
             resUInt256.Should().Be(resBigInt);
+
+            uint256a.MultiplyMod(uint256b, uint256m, out uint256a);
+            uint256a.Convert(out resUInt256);
+
+            resUInt256.Should().Be(resBigInt);
         }
 
         [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
@@ -222,6 +274,11 @@ namespace Nethermind.Int256.Test
             res.Convert(out BigInteger resUInt256);
 
             resUInt256.Should().Be(resBigInt);
+
+            uint256a.Divide(in uint256b, out uint256a);
+            uint256a.Convert(out resUInt256);
+
+            resUInt256.Should().Be(resBigInt);
         }
         
         [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
@@ -234,6 +291,11 @@ namespace Nethermind.Int256.Test
             T uint256b = convert(test.B);
             T.And(uint256a, uint256b, out T res);
             res.Convert(out BigInteger resUInt256);
+
+            resUInt256.Should().Be(resBigInt);
+
+            T.And(uint256a, uint256b, out uint256a);
+            uint256a.Convert(out resUInt256);
 
             resUInt256.Should().Be(resBigInt);
         }
@@ -250,6 +312,11 @@ namespace Nethermind.Int256.Test
             res.Convert(out BigInteger resUInt256);
 
             resUInt256.Should().Be(resBigInt);
+
+            T.Or(uint256a, uint256b, out uint256a);
+            uint256a.Convert(out resUInt256);
+
+            resUInt256.Should().Be(resBigInt);
         }
 
         [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
@@ -262,6 +329,11 @@ namespace Nethermind.Int256.Test
             T uint256b = convert(test.B);
             T.Xor(uint256a, uint256b, out T res);
             res.Convert(out BigInteger resUInt256);
+
+            resUInt256.Should().Be(resBigInt);
+
+            T.Xor(uint256a, uint256b, out uint256a);
+            uint256a.Convert(out resUInt256);
 
             resUInt256.Should().Be(resBigInt);
         }
@@ -277,6 +349,11 @@ namespace Nethermind.Int256.Test
 
             uint256a.Exp(convertFromInt(test.n), out T res);
             res.Convert(out BigInteger resUInt256);
+
+            resUInt256.Should().Be(resBigInt);
+
+            uint256a.Exp(convertFromInt(test.n), out uint256a);
+            uint256a.Convert(out resUInt256);
 
             resUInt256.Should().Be(resBigInt);
         }
@@ -300,6 +377,11 @@ namespace Nethermind.Int256.Test
             res.Convert(out BigInteger resUInt256);
 
             resUInt256.Should().Be(resBigInt);
+
+            uint256a.ExpMod(uint256b, uint256m, out uint256a);
+            uint256a.Convert(out resUInt256);
+
+            resUInt256.Should().Be(resBigInt);
         }
 
         [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.ShiftTestCases))]
@@ -318,6 +400,11 @@ namespace Nethermind.Int256.Test
             res.Convert(out BigInteger resUInt256);
 
             resUInt256.Should().Be(resBigInt);
+
+            uint256a.LeftShift(test.n, out uint256a);
+            uint256a.Convert(out resUInt256);
+
+            resUInt256.Should().Be(resBigInt);
         }
 
         [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.ShiftTestCases))]
@@ -334,6 +421,11 @@ namespace Nethermind.Int256.Test
             T uint256a = convert(test.A);
             uint256a.RightShift(test.n, out T res);
             res.Convert(out BigInteger resUInt256);
+
+            resUInt256.Should().Be(resBigInt);
+
+            uint256a.RightShift(test.n, out uint256a);
+            uint256a.Convert(out resUInt256);
 
             resUInt256.Should().Be(resBigInt);
         }
@@ -358,6 +450,10 @@ namespace Nethermind.Int256.Test
             T uint256 = convert(test);
             T.Not(uint256, out T res);
             res.Convert(out BigInteger resUInt256);
+            resUInt256.Should().Be(resBigInt);
+
+            T.Not(in uint256, out uint256);
+            uint256.Convert(out resUInt256);
             resUInt256.Should().Be(resBigInt);
         }
 
