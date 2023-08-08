@@ -933,7 +933,7 @@ namespace Nethermind.Int256
 
         public void Subtract(in UInt256 b, out UInt256 res) => Subtract(this, b, out res);
 
-        public static void SubtractMod(in UInt256 a, in UInt256 b, in UInt256 m, out UInt256 res)
+        public static void SubtractMod(UInt256 a, in UInt256 b, in UInt256 m, out UInt256 res)
         {
             if (SubtractUnderflow(a, b, out res))
             {
@@ -1024,24 +1024,23 @@ namespace Nethermind.Int256
             result = new UInt256(res);
         }
 
-        public static void Exp(in UInt256 b, in UInt256 e, out UInt256 result)
+        public static void Exp(UInt256 b, in UInt256 e, out UInt256 result)
         {
             result = One;
-            UInt256 bs = b;
             int len = e.BitLen;
             for (int i = 0; i < len; i++)
             {
                 if (e.Bit(i))
                 {
-                    Multiply(result, bs, out result);
+                    Multiply(result, b, out result);
                 }
-                bs.Squared(out bs);
+                b.Squared(out b);
             }
         }
 
         public void Exp(in UInt256 exp, out UInt256 res) => Exp(this, exp, out res);
 
-        public static void ExpMod(in UInt256 b, in UInt256 e, in UInt256 m, out UInt256 result)
+        public static void ExpMod(UInt256 b, in UInt256 e, in UInt256 m, out UInt256 result)
         {
             if (m.IsOne)
             {
@@ -1049,15 +1048,14 @@ namespace Nethermind.Int256
                 return;
             }
             result = One;
-            UInt256 bs = b;
             int len = e.BitLen;
             for (int i = 0; i < len; i++)
             {
                 if (e.Bit(i))
                 {
-                    MultiplyMod(result, bs, m, out result);
+                    MultiplyMod(result, b, m, out result);
                 }
-                MultiplyMod(bs, bs, m, out bs);
+                MultiplyMod(b, b, m, out b);
             }
         }
 
@@ -1193,9 +1191,10 @@ namespace Nethermind.Int256
             // At this point, we know
             // x/y ; x > y > 0
 
-            res = default; // initialize with zeros
             const int length = 4;
-            Udivrem(ref Unsafe.As<UInt256, ulong>(ref res), ref Unsafe.As<UInt256, ulong>(ref Unsafe.AsRef(in x)), length, y, out UInt256 _);
+            UInt256 quot = default;
+            Udivrem(ref Unsafe.As<UInt256, ulong>(ref quot), ref Unsafe.As<UInt256, ulong>(ref Unsafe.AsRef(in x)), length, y, out UInt256 _);
+            res = quot;
         }
 
         public void Divide(in UInt256 a, out UInt256 res) => Divide(this, a, out res);
@@ -1278,8 +1277,7 @@ namespace Nethermind.Int256
                 }
             }
 
-            res = Zero;
-            ulong z0 = res.u0, z1 = res.u1, z2 = res.u2, z3 = res.u3;
+            ulong z0 = 0, z1 = 0, z2 = 0, z3 = 0;
             ulong a = 0, b = 0;
             // Big swaps first
             if (n > 192)

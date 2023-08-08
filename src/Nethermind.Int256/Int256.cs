@@ -177,9 +177,9 @@ namespace Nethermind.Int256
                 b.Neg(out bv);
             }
             UInt256.Multiply(av._value, bv._value, out UInt256 ures);
-            res = new Int256(ures);
             int aSign = a.Sign;
             int bSign = b.Sign;
+            res = new Int256(ures);
             if ((aSign < 0 && bSign < 0) || (aSign >= 0 && bSign >= 0))
             {
                 return;
