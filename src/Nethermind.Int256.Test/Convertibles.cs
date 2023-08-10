@@ -80,6 +80,9 @@ public class Convertibles
     public static IEnumerable<TestCaseData> TestCases => GenerateTestCases(Numbers, BigInteger.Zero);
     public static IEnumerable<TestCaseData> SignedTestCases => GenerateTestCases(SignedNumbers);
     
+
+    public static IEnumerable<TestCaseData> TestCasesConvertFrom => GenerateTestCasesConvertFrom(Numbers);
+
     private static IEnumerable<TestCaseData> GenerateTestCases(IEnumerable<(object, string)> numbers, BigInteger? minValue = null)
     {
         Type ExpectedException(BigInteger value, BigInteger? min, BigInteger? max) =>
@@ -108,6 +111,33 @@ public class Convertibles
                 string expectedString = ExpectedString(type, value, min, ref expectedException);
                 string testName = $"Convert({name}, {type.Name}){(expectedException is not null || expectedString?.Contains('∞') == true ? " over/under flow" : "")}";
                 yield return new TestCaseData(type, number, expectedException, expectedString) { TestName = testName };
+            }
+        }
+    }
+
+    private static IEnumerable<TestCaseData> GenerateTestCasesConvertFrom(IEnumerable<(object, string)> numbers)
+    {
+        BigInteger Convert(Type type, BigInteger number) =>
+            type switch
+            {
+                var t when type == typeof(float) => (BigInteger)(float)number,
+                var t when type == typeof(double) => (BigInteger)(double)number,
+                _ => number
+            };
+
+        foreach ((object number, string name) in numbers)
+        {
+            foreach ((Type type, BigInteger? min, BigInteger? max) in ConvertibleTypes)
+            {
+                BigInteger value = BigInteger.Parse(number.ToString()!);
+                if (type != typeof(BigInteger) && (value <= min || value >= max))
+                    continue;
+
+                // we need this because of rounding errors
+                value = Convert(type, value);
+
+                string testName = $"Convert({name}, {type.Name})";
+                yield return new TestCaseData(type, value) { TestName = testName };
             }
         }
     }

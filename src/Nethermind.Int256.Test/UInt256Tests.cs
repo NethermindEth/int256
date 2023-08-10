@@ -565,5 +565,32 @@ namespace Nethermind.Int256.Test
                 catch (Exception e) when (e.GetType() == expectedException) { }
             }
         }
+
+        [TestCaseSource(typeof(Convertibles), nameof(Convertibles.TestCasesConvertFrom))]
+        public void ConvertFrom(Type type, BigInteger bigIntValue)
+        {
+            UInt256 ConvertToUInt256(Type type, BigInteger number) =>
+                type switch
+                {
+                    var t when type == typeof(byte) => (UInt256)(byte)number,
+                    var t when type == typeof(sbyte) => (UInt256)(sbyte)number,
+                    var t when type == typeof(short) => (UInt256)(short)number,
+                    var t when type == typeof(ushort) => (UInt256)(ushort)number,
+                    var t when type == typeof(int) => (UInt256)(int)number,
+                    var t when type == typeof(uint) => (UInt256)(uint)number,
+                    var t when type == typeof(long) => (UInt256)(long)number,
+                    var t when type == typeof(ulong) => (UInt256)(ulong)number,
+                    var t when type == typeof(float) => (UInt256)(float)number,
+                    var t when type == typeof(double) => (UInt256)(double)number,
+                    var t when type == typeof(decimal) => (UInt256)(decimal)number,
+                    var t when type == typeof(BigInteger) => (UInt256)(BigInteger)number,
+                    _ => throw new ArgumentOutOfRangeException(nameof(type), type, null)
+                };
+
+            UInt256 res = ConvertToUInt256(type, bigIntValue);
+            res.Convert(out BigInteger resUInt256);
+
+            resUInt256.Should().BeEquivalentTo(bigIntValue);
+        }
     }
 }
