@@ -221,17 +221,14 @@ namespace Nethermind.Int256
                 a = -a;
             }
 
-            if (a <= ulong.MaxValue)
+            // don't use (a <= ulong.MaxValue) - this will result in different output on Mac and linux
+            if (a < ulong.MaxValue)
             {
                 ulong cu0 = (ulong)a;
                 ulong cu1 = 0;
                 ulong cu2 = 0;
                 ulong cu3 = 0;
                 c = new UInt256(cu0, cu1, cu2, cu3);
-
-                // fix difference with BigInteger
-                if (a == ulong.MaxValue)
-                    c.Add(1, out c);
             }
             else
             {
