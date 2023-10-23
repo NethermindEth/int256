@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Numerics;
 using FluentAssertions;
 using NUnit.Framework;
@@ -468,6 +468,14 @@ namespace Nethermind.Int256.Test
                 }
                 catch (Exception e) when (e.GetType() == expectedException) { }
             }
+        }
+        [Test]
+        public virtual void ParseLongNumber()
+        {
+            string hexValueWith66Zeroes = "0x" + new string('0', 66);
+            BigInteger bigIntWith66Zeroes = BigInteger.Parse(hexValueWith66Zeroes.Substring(2), NumberStyles.HexNumber);
+            var UintParsedValue = UInt256.Parse(hexValueWith66Zeroes);
+            Assert.AreEqual((UInt256)bigIntWith66Zeroes, UintParsedValue);
         }
     }
 }
