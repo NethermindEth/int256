@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Buffers.Binary;
 using System.Globalization;
 using System.Numerics;
@@ -1882,9 +1882,11 @@ namespace Nethermind.Int256
 
         public static UInt256 Parse(in ReadOnlySpan<char> value, NumberStyles numberStyles) => !TryParse(value, numberStyles, CultureInfo.InvariantCulture, out UInt256 c) ? throw new FormatException() : c;
 
-        public static bool TryParse(string value, out UInt256 result) => TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out result);
+        public static bool TryParse(string value, out UInt256 result) => TryParse(value.AsSpan(), out result);
 
-        public static bool TryParse(ReadOnlySpan<char> value, out UInt256 result) => TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out result);
+        public static bool TryParse(ReadOnlySpan<char> value, out UInt256 result) => value.StartsWith("0x", StringComparison.OrdinalIgnoreCase)
+            ? TryParse(value.Slice(2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out result)
+            : TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out result);
 
         public static bool TryParse(string value, NumberStyles style, IFormatProvider provider, out UInt256 result) => TryParse(value.AsSpan(), style, provider, out result);
 
