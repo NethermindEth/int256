@@ -1,2 +1,1 @@
-# Set default behavior to automatically normalize line endings.
-* text=auto eol=lf
+* text=auto eol=lf working-tree-encoding=utf-8
