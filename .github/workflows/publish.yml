@@ -1,6 +1,8 @@
 name: Publish
 
 on:
+  release:
+    types: [published]
   workflow_dispatch:
 
 jobs:
@@ -12,12 +14,10 @@ jobs:
     steps:
     
       - name: Check out repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
     
       - name: Set up .NET
         uses: actions/setup-dotnet@v3
-        with:
-          dotnet-version: 7
 
       - name: Install dependencies
         working-directory: src
@@ -25,7 +25,7 @@ jobs:
 
       - name: Build
         working-directory: src/Nethermind.Int256
-        run: dotnet build -c ${{ env.BUILD_CONFIG }} --no-restore -p:ContinuousIntegrationBuild=true
+        run: dotnet build -c ${{ env.BUILD_CONFIG }} --no-restore -p:Commit=$GITHUB_SHA
     
       - name: Test
         working-directory: src/Nethermind.Int256.Test
