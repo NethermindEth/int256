@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Globalization;
 using System.Numerics;
 using FluentAssertions;
@@ -476,7 +476,7 @@ namespace Nethermind.Int256.Test
             string hexValueWith66Zeroes = "0x" + new string('0', 66);
             BigInteger bigIntWith66Zeroes = BigInteger.Parse(hexValueWith66Zeroes.Substring(2), NumberStyles.HexNumber);
             var UintParsedValue = UInt256.Parse(hexValueWith66Zeroes);
-            Assert.AreEqual((UInt256)bigIntWith66Zeroes, UintParsedValue);
+            Assert.That((UInt256)bigIntWith66Zeroes, Is.EqualTo(UintParsedValue));
         }
     }
 }
