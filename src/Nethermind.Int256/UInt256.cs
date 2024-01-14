@@ -13,7 +13,7 @@ using System.Diagnostics.CodeAnalysis;
 namespace Nethermind.Int256
 {
     [StructLayout(LayoutKind.Explicit)]
-    public readonly struct UInt256 : IComparable, IComparable<UInt256>, IInteger<UInt256>, IConvertible
+    public readonly struct UInt256 : IComparable, IComparable<UInt256>, IInteger<UInt256>, IConvertible, IUnsignedNumber<UInt256>
     {
         public static readonly UInt256 Zero = 0ul;
         public static readonly UInt256 One = 1ul;
@@ -1598,6 +1598,10 @@ namespace Nethermind.Int256
 
         public static implicit operator UInt256(ulong value) => new UInt256(value, 0ul, 0ul, 0ul);
 
+        public static implicit operator UInt256(Int128 value) => new((ulong)(value & ulong.MaxValue), (ulong)(value >> 64));
+
+        public static implicit operator UInt256(UInt128 value) => new((ulong)(value & ulong.MaxValue), (ulong)(value >> 64));
+
         public static explicit operator UInt256(in BigInteger value)
         {
             byte[] bytes32 = value.ToBytes32(true);
@@ -1649,6 +1653,16 @@ namespace Nethermind.Int256
             a.u1 > 0 || a.u2 > 0 || a.u3 > 0 
                 ? throw new OverflowException("Cannot convert UInt256 value to ulong.") 
                 : a.u0;
+
+        public static explicit operator Int128(in UInt256 a) =>
+            a.u2 > 0 || a.u3 > 0
+                ? throw new OverflowException("Cannot convert UInt256 value to UInt128.")
+                : new Int128(a.u1, a.u0);
+
+        public static explicit operator UInt128(in UInt256 a) =>
+            a.u2 > 0 || a.u3 > 0
+                ? throw new OverflowException("Cannot convert UInt256 value to UInt128.")
+                : new UInt128(a.u1, a.u0);
 
         public static UInt256 operator *(in UInt256 a, uint b)
         {
@@ -1706,6 +1720,10 @@ namespace Nethermind.Int256
         public static bool operator <(long a, in UInt256 b) => LessThan(a, in b);
         public static bool operator <(in UInt256 a, ulong b) => LessThan(in a, b);
         public static bool operator <(ulong a, in UInt256 b) => LessThan(a, in b);
+        public static bool operator <(in UInt256 a, Int128 b) => LessThan(in a, b);
+        public static bool operator <(Int128 a, in UInt256 b) => LessThan(a, in b);
+        public static bool operator <(in UInt256 a, UInt128 b) => LessThan(in a, b);
+        public static bool operator <(UInt128 a, in UInt256 b) => LessThan(a, in b);
         public static bool operator <=(in UInt256 a, in UInt256 b) => !LessThan(in b, in a);
         public static bool operator <=(in UInt256 a, int b) => !LessThan(b, in a);
         public static bool operator <=(int a, in UInt256 b) => !LessThan(in b, a);
@@ -1715,6 +1733,10 @@ namespace Nethermind.Int256
         public static bool operator <=(long a, in UInt256 b) => !LessThan(in b, a);
         public static bool operator <=(in UInt256 a, ulong b) => !LessThan(b, in a);
         public static bool operator <=(ulong a, UInt256 b) => !LessThan(in b, a);
+        public static bool operator <=(in UInt256 a, UInt128 b) => !LessThan(b, in a);
+        public static bool operator <=(UInt128 a, UInt256 b) => !LessThan(in b, a);
+        public static bool operator <=(in UInt256 a, Int128 b) => !LessThan(b, in a);
+        public static bool operator <=(Int128 a, UInt256 b) => !LessThan(in b, a);
         public static bool operator >(in UInt256 a, in UInt256 b) => LessThan(in b, in a);
         public static bool operator >(in UInt256 a, int b) => LessThan(b, in a);
         public static bool operator >(int a, in UInt256 b) => LessThan(in b, a);
@@ -1724,6 +1746,10 @@ namespace Nethermind.Int256
         public static bool operator >(long a, in UInt256 b) => LessThan(in b, a);
         public static bool operator >(in UInt256 a, ulong b) => LessThan(b, in a);
         public static bool operator >(ulong a, in UInt256 b) => LessThan(in b, a);
+        public static bool operator >(Int128 a, in UInt256 b) => LessThan(in b, a);
+        public static bool operator >(in UInt256 a, Int128 b) => LessThan(b, in a);
+        public static bool operator >(UInt128 a, in UInt256 b) => LessThan(in b, a);
+        public static bool operator >(in UInt256 a, UInt128 b) => LessThan(b, in a);
         public static bool operator >=(in UInt256 a, in UInt256 b) => !LessThan(in a, in b);
         public static bool operator >=(in UInt256 a, int b) => !LessThan(in a, b);
         public static bool operator >=(int a, in UInt256 b) => !LessThan(a, in b);
@@ -1733,6 +1759,22 @@ namespace Nethermind.Int256
         public static bool operator >=(long a, in UInt256 b) => !LessThan(a, in b);
         public static bool operator >=(in UInt256 a, ulong b) => !LessThan(in a, b);
         public static bool operator >=(ulong a, in UInt256 b) => !LessThan(a, in b);
+        public static bool operator >=(in UInt256 a, Int128 b) => !LessThan(in a, b);
+        public static bool operator >=(Int128 a, in UInt256 b) => !LessThan(a, in b);
+        public static bool operator >=(in UInt256 a, UInt128 b) => !LessThan(in a, b);
+        public static bool operator >=(UInt128 a, in UInt256 b) => !LessThan(a, in b);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool LessThan(in UInt256 a, int b) => b >= 0 && a.u3 == 0 && a.u2 == 0 && a.u1 == 0 && a.u0 < (ulong)b;
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool LessThan(int a, in UInt256 b) => b.u3 != 0 || b.u2 != 0 || b.u1 != 0 || (ulong)a < b.u0;
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool LessThan(in UInt256 a, uint b) => b >= 0 && a.u3 == 0 && a.u2 == 0 && a.u1 == 0 && a.u0 < b;
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool LessThan(uint a, in UInt256 b) => b.u3 != 0 || b.u2 != 0 || b.u1 != 0 || a < b.u0;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static bool LessThan(in UInt256 a, long b) => b >= 0 && a.u3 == 0 && a.u2 == 0 && a.u1 == 0 && a.u0 < (ulong)b;
@@ -1745,6 +1787,18 @@ namespace Nethermind.Int256
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static bool LessThan(ulong a, in UInt256 b) => b.u3 != 0 || b.u2 != 0 || b.u1 != 0 || a < b.u0;
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool LessThan(in UInt256 a, Int128 b) => a.u3 == 0 && a.u2 == 0 && a.u1 == 0 && a.u0 < b;
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool LessThan(Int128 a, in UInt256 b) => b.u3 != 0 || b.u2 != 0 || b.u1 != 0 || a < b.u0;
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool LessThan(in UInt256 a, UInt128 b) => a.u3 == 0 && a.u2 == 0 && a.u1 == 0 && a.u0 < b;
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool LessThan(UInt128 a, in UInt256 b) => b.u3 != 0 || b.u2 != 0 || b.u1 != 0 || a < b.u0;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static bool LessThan(in UInt256 a, in UInt256 b)
@@ -1792,16 +1846,48 @@ namespace Nethermind.Int256
         public static explicit operator UInt256(long a) => 
             a < 0 ? throw new ArgumentException($"Expected a positive number and got {a}", nameof(a)) : new UInt256((ulong)a);
 
-        public override string ToString() => ((BigInteger)this).ToString();
+        static UInt256 IAdditionOperators<UInt256, UInt256, UInt256>.operator +(UInt256 left, UInt256 right) => left + right;
+
+        static UInt256 IDecrementOperators<UInt256>.operator --(UInt256 value)
+        {
+            Subtract(in value, 1, out UInt256 res);
+            return res;
+        }
+
+        static UInt256 IDivisionOperators<UInt256, UInt256, UInt256>.operator /(UInt256 left, UInt256 right) => left / right;
+
+        static bool IEqualityOperators<UInt256, UInt256, bool>.operator ==(UInt256 left, UInt256 right) => left == right;
+
+        static bool IEqualityOperators<UInt256, UInt256, bool>.operator !=(UInt256 left, UInt256 right) => left != right;
+
+        static UInt256 IIncrementOperators<UInt256>.operator ++(UInt256 value) => value++;
+
+        static UInt256 IMultiplyOperators<UInt256, UInt256, UInt256>.operator *(UInt256 left, UInt256 right) => left * right;
+
+        static UInt256 ISubtractionOperators<UInt256, UInt256, UInt256>.operator -(UInt256 left, UInt256 right) => left - right;
+
+        static UInt256 IUnaryNegationOperators<UInt256, UInt256>.operator -(UInt256 value) => throw new NotSupportedException();
+
+        static UInt256 IUnaryPlusOperators<UInt256, UInt256>.operator +(UInt256 value) => value;
+
+        public override string ToString() => ToString(default, default);
 
         public int CompareTo(object? obj) => obj is not UInt256 int256 ? throw new InvalidOperationException() : CompareTo(int256);
 
-        public string ToString(string format)
-        {
-            return ((BigInteger)this).ToString(format);
-        }
+        public string ToString(string? format, IFormatProvider? formatProvider = default) =>
+            ((BigInteger)this).ToString(format, formatProvider);
 
         public bool IsUint64 => (u1 | u2 | u3) == 0;
+
+        static UInt256 INumberBase<UInt256>.One => One;
+
+        static int INumberBase<UInt256>.Radix => throw new NotImplementedException();
+
+        static UInt256 INumberBase<UInt256>.Zero => Zero;
+
+        static UInt256 IAdditiveIdentity<UInt256, UInt256>.AdditiveIdentity => throw new NotImplementedException();
+
+        static UInt256 IMultiplicativeIdentity<UInt256, UInt256>.MultiplicativeIdentity => throw new NotImplementedException();
 
         public bool Equals(UInt256 other)
         {
@@ -1888,9 +1974,9 @@ namespace Nethermind.Int256
             ? TryParse(value.Slice(2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out result)
             : TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out result);
 
-        public static bool TryParse(string value, NumberStyles style, IFormatProvider provider, out UInt256 result) => TryParse(value.AsSpan(), style, provider, out result);
+        //public static bool TryParse(string value, NumberStyles style, IFormatProvider provider, out UInt256 result) => TryParse(value.AsSpan(), style, provider, out result);
 
-        public static bool TryParse(in ReadOnlySpan<char> value, NumberStyles style, IFormatProvider provider, out UInt256 result)
+        public static bool TryParse(in ReadOnlySpan<char> value, NumberStyles style, IFormatProvider? provider, out UInt256 result)
         {
             BigInteger a;
             bool bigParsedProperly;
@@ -1955,5 +2041,372 @@ namespace Nethermind.Int256
 
         [DoesNotReturn]
         private static ulong ThrowIndexOutOfRangeException() => throw new IndexOutOfRangeException();
+
+        static UInt256 INumberBase<UInt256>.Abs(UInt256 value) => value;
+
+        static bool INumberBase<UInt256>.IsCanonical(UInt256 value) => true;
+
+        static bool INumberBase<UInt256>.IsComplexNumber(UInt256 value) => false;
+
+        static bool INumberBase<UInt256>.IsEvenInteger(UInt256 value) => (value & 1) == 0;
+
+        static bool INumberBase<UInt256>.IsFinite(UInt256 value) => true;
+
+        static bool INumberBase<UInt256>.IsImaginaryNumber(UInt256 value) => false;
+
+        static bool INumberBase<UInt256>.IsInfinity(UInt256 value) => false;
+
+        static bool INumberBase<UInt256>.IsInteger(UInt256 value) => true;
+
+        static bool INumberBase<UInt256>.IsNaN(UInt256 value) => false;
+
+        static bool INumberBase<UInt256>.IsNegative(UInt256 value) => value < 0;
+
+        static bool INumberBase<UInt256>.IsNegativeInfinity(UInt256 value) => false;
+
+        static bool INumberBase<UInt256>.IsNormal(UInt256 value) => value != Zero;
+
+        static bool INumberBase<UInt256>.IsOddInteger(UInt256 value) => (value & 1) != Zero;
+
+        static bool INumberBase<UInt256>.IsPositive(UInt256 value) => value > 0;
+
+        static bool INumberBase<UInt256>.IsPositiveInfinity(UInt256 value) => false;
+
+        static bool INumberBase<UInt256>.IsRealNumber(UInt256 value) => true;
+
+        static bool INumberBase<UInt256>.IsSubnormal(UInt256 value) => false;
+
+        static bool INumberBase<UInt256>.IsZero(UInt256 value) => value == Zero;
+
+        static UInt256 INumberBase<UInt256>.MaxMagnitude(UInt256 x, UInt256 y) => Max(in x, in y);
+
+        static UInt256 INumberBase<UInt256>.MaxMagnitudeNumber(UInt256 x, UInt256 y) => Max(in x, in y);
+
+        static UInt256 INumberBase<UInt256>.MinMagnitude(UInt256 x, UInt256 y) => Min(in x, in y);
+
+        static UInt256 INumberBase<UInt256>.MinMagnitudeNumber(UInt256 x, UInt256 y) => Min(in x, in y);
+
+        static UInt256 INumberBase<UInt256>.Parse(ReadOnlySpan<char> s, NumberStyles style, IFormatProvider? provider) =>
+            TryParse(in s, style, provider, out UInt256 r) ? r : throw new FormatException();
+
+        static UInt256 INumberBase<UInt256>.Parse(string s, NumberStyles style, IFormatProvider? provider) =>
+            TryParse(s.AsSpan(), style, provider, out UInt256 r) ? r : throw new FormatException();
+
+        static bool INumberBase<UInt256>.TryConvertFromChecked<TOther>(TOther value, out UInt256 result)
+        {
+            if (typeof(TOther) == typeof(byte))
+            {
+                byte actualValue = (byte)(object)value;
+                result = actualValue;
+                return true;
+            }
+            else if (typeof(TOther) == typeof(char))
+            {
+                char actualValue = (char)(object)value;
+                result = actualValue;
+                return true;
+            }
+            else if (typeof(TOther) == typeof(decimal))
+            {
+                decimal actualValue = (decimal)(object)value;
+                result = checked((ulong)actualValue);
+                return true;
+            }
+            else if (typeof(TOther) == typeof(ushort))
+            {
+                ushort actualValue = (ushort)(object)value;
+                result = actualValue;
+                return true;
+            }
+            else if (typeof(TOther) == typeof(uint))
+            {
+                uint actualValue = (uint)(object)value;
+                result = actualValue;
+                return true;
+            }
+            else if (typeof(TOther) == typeof(UInt128))
+            {
+                UInt128 actualValue = (UInt128)(object)value;
+                result = checked((ulong)actualValue);
+                return true;
+            }
+            else if (typeof(TOther) == typeof(nuint))
+            {
+                nuint actualValue = (nuint)(object)value;
+                result = actualValue;
+                return true;
+            }
+            else
+            {
+                result = default;
+                return false;
+            }
+        }
+
+        static bool INumberBase<UInt256>.TryConvertFromSaturating<TOther>(TOther value, out UInt256 result)
+        {
+            if (typeof(TOther) == typeof(byte))
+            {
+                byte actualValue = (byte)(object)value;
+                result = actualValue;
+                return true;
+            }
+            else if (typeof(TOther) == typeof(char))
+            {
+                char actualValue = (char)(object)value;
+                result = actualValue;
+                return true;
+            }
+            else if (typeof(TOther) == typeof(ushort))
+            {
+                ushort actualValue = (ushort)(object)value;
+                result = actualValue;
+                return true;
+            }
+            else if (typeof(TOther) == typeof(uint))
+            {
+                uint actualValue = (uint)(object)value;
+                result = actualValue;
+                return true;
+            }
+            else if (typeof(TOther) == typeof(UInt128))
+            {
+                UInt128 actualValue = (UInt128)(object)value;
+                result = (actualValue >= MaxValue) ? MaxValue : (ulong)actualValue;
+                return true;
+            }
+            else if (typeof(TOther) == typeof(nuint))
+            {
+                nuint actualValue = (nuint)(object)value;
+                result = actualValue;
+                return true;
+            }
+            else
+            {
+                result = default;
+                return false;
+            }
+        }
+
+        static bool INumberBase<UInt256>.TryConvertFromTruncating<TOther>(TOther value, out UInt256 result)
+        {
+            if (typeof(TOther) == typeof(byte))
+            {
+                byte actualValue = (byte)(object)value;
+                result = actualValue;
+                return true;
+            }
+            else if (typeof(TOther) == typeof(char))
+            {
+                char actualValue = (char)(object)value;
+                result = actualValue;
+                return true;
+            }
+            else if (typeof(TOther) == typeof(ushort))
+            {
+                ushort actualValue = (ushort)(object)value;
+                result = actualValue;
+                return true;
+            }
+            else if (typeof(TOther) == typeof(uint))
+            {
+                uint actualValue = (uint)(object)value;
+                result = actualValue;
+                return true;
+            }
+            else if (typeof(TOther) == typeof(UInt128))
+            {
+                UInt128 actualValue = (UInt128)(object)value;
+                result = (ulong)actualValue;
+                return true;
+            }
+            else if (typeof(TOther) == typeof(nuint))
+            {
+                nuint actualValue = (nuint)(object)value;
+                result = actualValue;
+                return true;
+            }
+            else
+            {
+                result = default;
+                return false;
+            }
+        }
+
+        static bool INumberBase<UInt256>.TryConvertToChecked<TOther>(UInt256 value, [MaybeNullWhen(false)] out TOther result)
+        {
+            if (typeof(TOther) == typeof(short))
+            {
+                short actualResult = checked((short)value);
+                result = (TOther)(object)actualResult;
+                return true;
+            }
+            else if (typeof(TOther) == typeof(int))
+            {
+                int actualResult = checked((int)value);
+                result = (TOther)(object)actualResult;
+                return true;
+            }
+            else if (typeof(TOther) == typeof(long))
+            {
+                long actualResult = checked((long)value);
+                result = (TOther)(object)actualResult;
+                return true;
+            }
+            else if (typeof(TOther) == typeof(Int128))
+            {
+                Int128 actualResult = checked((Int128)value);
+                result = (TOther)(object)actualResult;
+                return true;
+            }
+            else if (typeof(TOther) == typeof(UInt128))
+            {
+                UInt128 actualResult = checked((UInt128)value);
+                result = (TOther)(object)actualResult;
+                return true;
+            }
+            else if (typeof(TOther) == typeof(nint))
+            {
+                nint actualResult = checked((nint)value);
+                result = (TOther)(object)actualResult;
+                return true;
+            }
+            else if (typeof(TOther) == typeof(sbyte))
+            {
+                sbyte actualResult = checked((sbyte)value);
+                result = (TOther)(object)actualResult;
+                return true;
+            }
+            else
+            {
+                result = default;
+                return false;
+            }
+        }
+
+        static bool INumberBase<UInt256>.TryConvertToSaturating<TOther>(UInt256 value, [MaybeNullWhen(false)] out TOther result)
+        {
+            if (typeof(TOther) == typeof(short))
+            {
+                short actualResult = (value >= (ulong)short.MaxValue) ? short.MaxValue : (short)value;
+                result = (TOther)(object)actualResult;
+                return true;
+            }
+            else if (typeof(TOther) == typeof(int))
+            {
+                int actualResult = (value >= int.MaxValue) ? int.MaxValue : (int)value;
+                result = (TOther)(object)actualResult;
+                return true;
+            }
+            else if (typeof(TOther) == typeof(long))
+            {
+                long actualResult = (value >= long.MaxValue) ? long.MaxValue : (long)value;
+                result = (TOther)(object)actualResult;
+                return true;
+            }
+            else if (typeof(TOther) == typeof(Int128))
+            {
+                Int128 actualResult = (Int128)value;
+                result = (TOther)(object)actualResult;
+                return true;
+            }
+            else if (typeof(TOther) == typeof(UInt128))
+            {
+                UInt128 actualResult = (UInt128)value;
+                result = (TOther)(object)actualResult;
+                return true;
+            }
+            else if (typeof(TOther) == typeof(nint))
+            {
+                nint actualResult = (value >= (ulong)nint.MaxValue) ? nint.MaxValue : (nint)value;
+                result = (TOther)(object)actualResult;
+                return true;
+            }
+            else if (typeof(TOther) == typeof(sbyte))
+            {
+                sbyte actualResult = (value >= (ulong)sbyte.MaxValue) ? sbyte.MaxValue : (sbyte)value;
+                result = (TOther)(object)actualResult;
+                return true;
+            }
+            else
+            {
+                result = default;
+                return false;
+            }
+        }
+
+        static bool INumberBase<UInt256>.TryConvertToTruncating<TOther>(UInt256 value, [MaybeNullWhen(false)] out TOther result)
+        {
+            if (typeof(TOther) == typeof(short))
+            {
+                short actualResult = (short)value;
+                result = (TOther)(object)actualResult;
+                return true;
+            }
+            else if (typeof(TOther) == typeof(int))
+            {
+                int actualResult = (int)value;
+                result = (TOther)(object)actualResult;
+                return true;
+            }
+            else if (typeof(TOther) == typeof(long))
+            {
+                long actualResult = (long)value;
+                result = (TOther)(object)actualResult;
+                return true;
+            }
+            else if (typeof(TOther) == typeof(Int128))
+            {
+                Int128 actualResult = (Int128)value;
+                result = (TOther)(object)actualResult;
+                return true;
+            }
+            else if (typeof(TOther) == typeof(UInt128))
+            {
+                UInt128 actualResult = (UInt128)value;
+                result = (TOther)(object)actualResult;
+                return true;
+            }
+            else if (typeof(TOther) == typeof(nint))
+            {
+                nint actualResult = (nint)value;
+                result = (TOther)(object)actualResult;
+                return true;
+            }
+            else if (typeof(TOther) == typeof(sbyte))
+            {
+                sbyte actualResult = (sbyte)value;
+                result = (TOther)(object)actualResult;
+                return true;
+            }
+            else
+            {
+                result = default;
+                return false;
+            }
+        }
+
+        static bool INumberBase<UInt256>.TryParse(ReadOnlySpan<char> s, NumberStyles style, IFormatProvider? provider, out UInt256 result) =>
+            TryParse(in s, style, provider, out result);
+
+        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider) =>
+            ((BigInteger)this).TryFormat(destination, out charsWritten, format, provider);
+
+        string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString(format, formatProvider);
+
+        static UInt256 ISpanParsable<UInt256>.Parse(ReadOnlySpan<char> s, IFormatProvider? provider) =>
+            TryParse(s, NumberStyles.Integer, provider, out UInt256 r) ? r : throw new FormatException();
+
+        static bool ISpanParsable<UInt256>.TryParse(ReadOnlySpan<char> s, IFormatProvider? provider, out UInt256 result) =>
+            TryParse(s, NumberStyles.Integer, provider, out result);
+
+        static UInt256 IParsable<UInt256>.Parse(string s, IFormatProvider? provider) =>
+            TryParse(s, NumberStyles.Integer, provider, out UInt256 r) ? r : throw new FormatException();
+
+        static bool IParsable<UInt256>.TryParse(string? s, IFormatProvider? provider, out UInt256 result) =>
+            TryParse(s, NumberStyles.Integer, provider, out result);
+
+        static bool INumberBase<UInt256>.TryParse(string? s, NumberStyles style, IFormatProvider? provider, out UInt256 result) =>
+            TryParse(s.AsSpan(), style, provider, out result);
     }
 }
