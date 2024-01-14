@@ -1789,16 +1789,76 @@ namespace Nethermind.Int256
         private static bool LessThan(ulong a, in UInt256 b) => b.u3 != 0 || b.u2 != 0 || b.u1 != 0 || a < b.u0;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static bool LessThan(in UInt256 a, Int128 b) => a.u3 == 0 && a.u2 == 0 && a.u1 == 0 && a.u0 < b;
+        private static bool LessThan(in UInt256 a, Int128 b)
+        {
+            if (b < 0 || a.u3 != 0 || a.u2 != 0)
+                return false;
+
+            var bHigh = (ulong)(b >> 64);
+            var bLow = (ulong)(b & ulong.MaxValue);
+
+            if (a.u1 > bHigh)
+                return false;
+
+            if (a.u1 < bHigh)
+                return true;
+
+            return a.u0 < bLow;
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static bool LessThan(Int128 a, in UInt256 b) => b.u3 != 0 || b.u2 != 0 || b.u1 != 0 || a < b.u0;
+        private static bool LessThan(Int128 a, in UInt256 b)
+        {
+            if (a < 0 || b.u3 != 0 || b.u2 != 0)
+                return true;
+
+            var aHigh = (ulong)(a >> 64);
+            var aLow = (ulong)(a & ulong.MaxValue);
+
+            if (aHigh > b.u1)
+                return false;
+
+            if (aHigh < b.u1)
+                return true;
+
+            return aLow < b.u0;
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static bool LessThan(in UInt256 a, UInt128 b) => a.u3 == 0 && a.u2 == 0 && a.u1 == 0 && a.u0 < b;
+        private static bool LessThan(in UInt256 a, UInt128 b)
+        {
+            if (a.u3 != 0 || a.u2 != 0)
+                return false;
+
+            var bHigh = (ulong)(b >> 64);
+            var bLow = (ulong)(b & ulong.MaxValue);
+
+            if (a.u1 > bHigh)
+                return false;
+
+            if (a.u1 < bHigh)
+                return true;
+
+            return a.u0 < bLow;
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static bool LessThan(UInt128 a, in UInt256 b) => b.u3 != 0 || b.u2 != 0 || b.u1 != 0 || a < b.u0;
+        private static bool LessThan(UInt128 a, in UInt256 b)
+        {
+            if (b.u3 != 0 || b.u2 != 0)
+                return true;
+
+            var aHigh = (ulong)(a >> 64);
+            var aLow = (ulong)(a & ulong.MaxValue);
+
+            if (aHigh > b.u1)
+                return false;
+
+            if (aHigh < b.u1)
+                return true;
+
+            return aLow < b.u0;
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static bool LessThan(in UInt256 a, in UInt256 b)
