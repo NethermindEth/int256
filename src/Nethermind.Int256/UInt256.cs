@@ -2034,8 +2034,6 @@ namespace Nethermind.Int256
             ? TryParse(value.Slice(2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out result)
             : TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out result);
 
-        //public static bool TryParse(string value, NumberStyles style, IFormatProvider provider, out UInt256 result) => TryParse(value.AsSpan(), style, provider, out result);
-
         public static bool TryParse(in ReadOnlySpan<char> value, NumberStyles style, IFormatProvider? provider, out UInt256 result)
         {
             BigInteger a;
@@ -2166,12 +2164,6 @@ namespace Nethermind.Int256
                 result = actualValue;
                 return true;
             }
-            else if (typeof(TOther) == typeof(decimal))
-            {
-                decimal actualValue = (decimal)(object)value;
-                result = checked((ulong)actualValue);
-                return true;
-            }
             else if (typeof(TOther) == typeof(ushort))
             {
                 ushort actualValue = (ushort)(object)value;
@@ -2187,7 +2179,7 @@ namespace Nethermind.Int256
             else if (typeof(TOther) == typeof(UInt128))
             {
                 UInt128 actualValue = (UInt128)(object)value;
-                result = checked((ulong)actualValue);
+                result = actualValue;
                 return true;
             }
             else if (typeof(TOther) == typeof(nuint))
@@ -2217,6 +2209,12 @@ namespace Nethermind.Int256
                 result = actualValue;
                 return true;
             }
+            else if (typeof(TOther) == typeof(decimal))
+            {
+                decimal actualValue = (decimal)(object)value;
+                result = (actualValue < 0) ? MinValue : (UInt128)actualValue;
+                return true;
+            }
             else if (typeof(TOther) == typeof(ushort))
             {
                 ushort actualValue = (ushort)(object)value;
@@ -2229,10 +2227,16 @@ namespace Nethermind.Int256
                 result = actualValue;
                 return true;
             }
+            else if (typeof(TOther) == typeof(ulong))
+            {
+                ulong actualValue = (ulong)(object)value;
+                result = actualValue;
+                return true;
+            }
             else if (typeof(TOther) == typeof(UInt128))
             {
                 UInt128 actualValue = (UInt128)(object)value;
-                result = (actualValue >= MaxValue) ? MaxValue : (ulong)actualValue;
+                result = actualValue;
                 return true;
             }
             else if (typeof(TOther) == typeof(nuint))
@@ -2274,10 +2278,16 @@ namespace Nethermind.Int256
                 result = actualValue;
                 return true;
             }
+            else if (typeof(TOther) == typeof(ulong))
+            {
+                ulong actualValue = (ulong)(object)value;
+                result = actualValue;
+                return true;
+            }
             else if (typeof(TOther) == typeof(UInt128))
             {
                 UInt128 actualValue = (UInt128)(object)value;
-                result = (ulong)actualValue;
+                result = actualValue;
                 return true;
             }
             else if (typeof(TOther) == typeof(nuint))
@@ -2319,12 +2329,6 @@ namespace Nethermind.Int256
                 result = (TOther)(object)actualResult;
                 return true;
             }
-            else if (typeof(TOther) == typeof(UInt128))
-            {
-                UInt128 actualResult = checked((UInt128)value);
-                result = (TOther)(object)actualResult;
-                return true;
-            }
             else if (typeof(TOther) == typeof(nint))
             {
                 nint actualResult = checked((nint)value);
@@ -2348,43 +2352,37 @@ namespace Nethermind.Int256
         {
             if (typeof(TOther) == typeof(short))
             {
-                short actualResult = (value >= (ulong)short.MaxValue) ? short.MaxValue : (short)value;
+                short actualResult = (value >= new UInt256(0UL, 0UL, 0UL, 0x0000_0000_0000_7FFF)) ? short.MaxValue : (short)value;
                 result = (TOther)(object)actualResult;
                 return true;
             }
             else if (typeof(TOther) == typeof(int))
             {
-                int actualResult = (value >= int.MaxValue) ? int.MaxValue : (int)value;
+                int actualResult = (value >= new UInt256(0UL, 0UL, 0UL, 0x0000_0000_0000_7FFF)) ? int.MaxValue : (int)value;
                 result = (TOther)(object)actualResult;
                 return true;
             }
             else if (typeof(TOther) == typeof(long))
             {
-                long actualResult = (value >= long.MaxValue) ? long.MaxValue : (long)value;
+                long actualResult = (value >= new UInt256(0UL, 0UL, 0UL, 0x0000_0000_0000_7FFF)) ? long.MaxValue : (long)value;
                 result = (TOther)(object)actualResult;
                 return true;
             }
             else if (typeof(TOther) == typeof(Int128))
             {
-                Int128 actualResult = (Int128)value;
+                Int128 actualResult = (value >= new UInt256(0UL, 0UL, 0UL, 0x0000_0000_0000_7FFF)) ? Int128.MaxValue : (Int128)value;
                 result = (TOther)(object)actualResult;
                 return true;
             }
-            else if (typeof(TOther) == typeof(UInt128))
+            else if (typeof(TOther) == typeof(nint)) // 64-bits only
             {
-                UInt128 actualResult = (UInt128)value;
-                result = (TOther)(object)actualResult;
-                return true;
-            }
-            else if (typeof(TOther) == typeof(nint))
-            {
-                nint actualResult = (value >= (ulong)nint.MaxValue) ? nint.MaxValue : (nint)value;
+                nint actualResult = (value >= new UInt256(0UL, 0UL, 0UL, 0x0000_0000_0000_7FFF)) ? nint.MaxValue : (nint)value;
                 result = (TOther)(object)actualResult;
                 return true;
             }
             else if (typeof(TOther) == typeof(sbyte))
             {
-                sbyte actualResult = (value >= (ulong)sbyte.MaxValue) ? sbyte.MaxValue : (sbyte)value;
+                sbyte actualResult = (value >= new UInt256(0UL, 0UL, 0UL, 0x0000_0000_0000_7FFF)) ? sbyte.MaxValue : (sbyte)value;
                 result = (TOther)(object)actualResult;
                 return true;
             }
@@ -2418,12 +2416,6 @@ namespace Nethermind.Int256
             else if (typeof(TOther) == typeof(Int128))
             {
                 Int128 actualResult = (Int128)value;
-                result = (TOther)(object)actualResult;
-                return true;
-            }
-            else if (typeof(TOther) == typeof(UInt128))
-            {
-                UInt128 actualResult = (UInt128)value;
                 result = (TOther)(object)actualResult;
                 return true;
             }
