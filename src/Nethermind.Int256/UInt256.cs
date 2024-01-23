@@ -1586,7 +1586,7 @@ namespace Nethermind.Int256
         {
             if (SubtractUnderflow(in a, in b, out UInt256 c))
             {
-                ThrowOverflowException(in a, in b);
+                ThrowOverflowException();
             }
 
             return c;
@@ -1943,9 +1943,6 @@ namespace Nethermind.Int256
 
         [DoesNotReturn]
         private static void ThrowDivideByZeroException() => throw new DivideByZeroException("y == 0");
-
-        [DoesNotReturn]
-        private static void ThrowOverflowException(in UInt256 a, in UInt256 b) => throw new OverflowException($"Underflow in subtraction {a} - {b}");
 
         [DoesNotReturn]
         private static void ThrowOverflowException() => throw new OverflowException("y <= hi");
