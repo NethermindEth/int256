@@ -1212,7 +1212,7 @@ namespace Nethermind.Int256
 
             if (y <= hi)
             {
-                ThrowOverflowException();
+                ThrowOverflowException("y <= hi");
             }
 
             var s = LeadingZeros(y);
@@ -1586,7 +1586,7 @@ namespace Nethermind.Int256
         {
             if (SubtractUnderflow(in a, in b, out UInt256 c))
             {
-                ThrowOverflowException();
+                ThrowOverflowException($"Underflow in subtraction {a} - {b}");
             }
 
             return c;
@@ -1945,7 +1945,7 @@ namespace Nethermind.Int256
         private static void ThrowDivideByZeroException() => throw new DivideByZeroException("y == 0");
 
         [DoesNotReturn]
-        private static void ThrowOverflowException() => throw new OverflowException("y <= hi");
+        private static void ThrowOverflowException(string message) => throw new OverflowException(message);
 
         [DoesNotReturn]
         private static void ThrowNotSupportedException() => throw new NotSupportedException();

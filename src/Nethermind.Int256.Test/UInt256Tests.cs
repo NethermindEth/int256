@@ -100,7 +100,7 @@ namespace Nethermind.Int256.Test
 
             resUInt256.Should().Be(resBigInt);
         }
-        
+
         [TestCaseSource(typeof(TernaryOps), nameof(TernaryOps.TestCases))]
         public virtual void SubtractMod((BigInteger A, BigInteger B, BigInteger M) test)
         {
@@ -162,7 +162,7 @@ namespace Nethermind.Int256.Test
                 if (uint256a is UInt256 a && uint256b is UInt256 b)
                 {
                     a.Invoking(y => y - b)
-                        .Should().Throw<ArithmeticException>()
+                        .Should().Throw<OverflowException>()
                         .WithMessage($"Underflow in subtraction {a} - {b}");
                 }
                 else
@@ -224,7 +224,7 @@ namespace Nethermind.Int256.Test
 
             resUInt256.Should().Be(resBigInt);
         }
-        
+
         [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
         public virtual void And((BigInteger A, BigInteger B) test)
         {
@@ -412,21 +412,21 @@ namespace Nethermind.Int256.Test
         {
             convert(1).MaximalValue.Should().Be(convert(maxValue));
         }
-        
+
         [Test]
         public virtual void ToBigEndian_And_Back()
         {
             byte[] bidEndian = convert(1000000000000000000).ToBigEndian();
             new UInt256(bidEndian, true).Should().Be(convert(1000000000000000000));
         }
-        
+
         [Test]
         public virtual void ToLittleEndian_And_Back()
         {
             byte[] bidEndian = convert(1000000000000000000).ToLittleEndian();
             new UInt256(bidEndian).Should().Be(convert(1000000000000000000));
         }
-        
+
         [Test]
         public virtual void Check_For_Correct_Big_And_Little_Endian()
         {
@@ -436,14 +436,14 @@ namespace Nethermind.Int256.Test
                 0, 0
             };
             convert(1000000000000000000).ToBigEndian().Should().BeEquivalentTo(bigEndianRepresentation);
-            
+
             byte[] littleEndianRepresentation =
             {
                 0, 0, 100, 167, 179, 182, 224, 13, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
             };
             convert(1000000000000000000).ToLittleEndian().Should().BeEquivalentTo(littleEndianRepresentation);
         }
-        
+
         [TestCaseSource(typeof(Convertibles), nameof(Convertibles.TestCases))]
         public void Convert(Type type, object value, Type expectedException, string expectedString)
         {
