@@ -13,7 +13,7 @@ using System.Diagnostics.CodeAnalysis;
 namespace Nethermind.Int256
 {
     [StructLayout(LayoutKind.Explicit)]
-    public readonly struct UInt256 : IComparable, IComparable<UInt256>, IInteger<UInt256>, IConvertible
+    public readonly struct UInt256 : IEquatable<UInt256>, IComparable, IComparable<UInt256>, IInteger<UInt256>, IConvertible
     {
         public static readonly UInt256 Zero = 0ul;
         public static readonly UInt256 One = 1ul;
@@ -1803,13 +1803,6 @@ namespace Nethermind.Int256
 
         public bool IsUint64 => (u1 | u2 | u3) == 0;
 
-        public bool Equals(UInt256 other)
-        {
-            var v1 = Unsafe.As<ulong, Vector256<ulong>>(ref Unsafe.AsRef(in u0));
-            var v2 = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in other));
-            return v1 == v2;
-        }
-
         public bool Equals(int other)
         {
             return other >= 0 && Equals((uint)other);
@@ -1843,8 +1836,16 @@ namespace Nethermind.Int256
             }
         }
 
+        [OverloadResolutionPriority(1)]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool Equals(in UInt256 other)
+        public bool Equals(in UInt256 other)
+        {
+            var v1 = Unsafe.As<ulong, Vector256<ulong>>(ref Unsafe.AsRef(in u0));
+            var v2 = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in other));
+            return v1 == v2;
+        }
+
+        public bool Equals(UInt256 other)
         {
             var v1 = Unsafe.As<ulong, Vector256<ulong>>(ref Unsafe.AsRef(in u0));
             var v2 = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in other));
