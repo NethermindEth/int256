@@ -7,7 +7,7 @@ using System.Runtime.CompilerServices;
 
 namespace Nethermind.Int256
 {
-    public readonly struct Int256 : IComparable, IComparable<Int256>, IInteger<Int256>, IConvertible
+    public readonly struct Int256 : IEquatable<Int256>, IComparable, IComparable<Int256>, IInteger<Int256>, IConvertible
     {
         public static readonly Int256 Zero = (Int256)0UL;
         public static readonly Int256 One = (Int256)1UL;
@@ -530,7 +530,10 @@ namespace Nethermind.Int256
             return ToString(null);
         }
 
+        [OverloadResolutionPriority(1)]
         private bool Equals(in Int256 other) => _value.Equals(other._value);
+
+        public bool Equals(Int256 other) => _value.Equals(other._value);
 
         public override bool Equals(object? obj) => obj is Int256 other && Equals(other);
 
