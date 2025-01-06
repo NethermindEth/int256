@@ -33,7 +33,7 @@ namespace Nethermind.Int256
 
         public UInt256(uint r0, uint r1, uint r2, uint r3, uint r4, uint r5, uint r6, uint r7)
         {
-            if (Avx2.IsSupported)
+            if (Vector256<uint>.IsSupported)
             {
                 Unsafe.SkipInit(out this.u0);
                 Unsafe.SkipInit(out this.u1);
@@ -52,7 +52,7 @@ namespace Nethermind.Int256
 
         public UInt256(ulong u0 = 0, ulong u1 = 0, ulong u2 = 0, ulong u3 = 0)
         {
-            if (Avx2.IsSupported)
+            if (Vector256<ulong>.IsSupported)
             {
                 Unsafe.SkipInit(out this.u0);
                 Unsafe.SkipInit(out this.u1);
@@ -82,7 +82,7 @@ namespace Nethermind.Int256
                 }
                 else
                 {
-                    if (Avx2.IsSupported)
+                    if (Vector256<byte>.IsSupported)
                     {
                         Unsafe.SkipInit(out this.u0);
                         Unsafe.SkipInit(out this.u1);
@@ -187,7 +187,7 @@ namespace Nethermind.Int256
             }
             else
             {
-                if (Avx2.IsSupported)
+                if (Vector256<ulong>.IsSupported)
                 {
                     Unsafe.SkipInit(out this.u0);
                     Unsafe.SkipInit(out this.u1);
@@ -404,6 +404,21 @@ namespace Nethermind.Int256
 
         public static bool AddImpl(in UInt256 a, in UInt256 b, out UInt256 res)
         {
+            if ((a.u1 | a.u2 | a.u3 | b.u1 | b.u2 | b.u3) == 0)
+            {
+                // Fast add for numbers less than 2^64 (18,446,744,073,709,551,615)
+                ulong u0 = a.u0 + b.u0;
+                // Assignment to res after in case is used as input for a or b (by ref aliasing)
+                res = default;
+                Unsafe.AsRef(in res.u0) = u0;
+                if (u0 < a.u0)
+                {
+                    Unsafe.AsRef(in res.u1) = 1;
+                }
+                // Never overflows UInt256
+                return false;
+            }
+
             if (Avx2.IsSupported)
             {
                 Vector256<ulong> av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
@@ -982,6 +997,17 @@ namespace Nethermind.Int256
         // Multiply sets res to the product x*y
         public static void Multiply(in UInt256 x, in UInt256 y, out UInt256 res)
         {
+            if ((x.u1 | x.u2 | x.u3 | y.u1 | y.u2 | y.u3) == 0)
+            {
+                // Fast multiply for numbers less than 2^64 (18,446,744,073,709,551,615)
+                ulong high = Math.BigMul(x.u0, y.u0, out ulong low);
+                // Assignment to res after multiply in case is used as input for x or y (by ref aliasing)
+                res = default;
+                Unsafe.AsRef(in res.u0) = low;
+                Unsafe.AsRef(in res.u1) = high;
+                return;
+            }
+
             ref ulong rx = ref Unsafe.As<UInt256, ulong>(ref Unsafe.AsRef(in x));
             ref ulong ry = ref Unsafe.As<UInt256, ulong>(ref Unsafe.AsRef(in y));
 
@@ -1019,23 +1045,24 @@ namespace Nethermind.Int256
                         ? 64 + Len64(u1)
                         : Len64(u0);
 
+        [SkipLocalsInit]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void Squared(out UInt256 result)
         {
-            UInt256 z = this;
-            Span<ulong> res = stackalloc ulong[4];
+            (ulong carry0, ulong res0) = Multiply64(u0, u0);
+            (carry0, ulong temp1) = UmulHopi(carry0, u0, u1);
+            (carry0, ulong temp2) = UmulHopi(carry0, u0, u2);
 
-            (ulong carry0, res[0]) = Multiply64(z.u0, z.u0);
-            (carry0, ulong res1) = UmulHopi(carry0, z.u0, z.u1);
-            (carry0, ulong res2) = UmulHopi(carry0, z.u0, z.u2);
+            (ulong carry1, ulong res1) = UmulHopi(temp1, u0, u1);
+            (carry1, temp2) = UmulStepi(temp2,u1 , u1, carry1);
 
-            (ulong carry1, res[1]) = UmulHopi(res1, z.u0, z.u1);
-            (carry1, res2) = UmulStepi(res2, z.u1, z.u1, carry1);
+            (ulong carry2, ulong res2) = UmulHopi(temp2, u0, u2);
 
-            (ulong carry2, res[2]) = UmulHopi(res2, z.u0, z.u2);
+            // Don't care about carry here
+            ulong res3 = 2 * (u0 * u3 + u1 * u2) + carry0 + carry1 + carry2;
 
-            res[3] = 2 * (z.u0 * z.u3 + z.u1 * z.u2) + carry0 + carry1 + carry2;
-            result = new UInt256(res);
+            Unsafe.SkipInit(out result);
+            Unsafe.As<ulong, Vector256<ulong>>(ref Unsafe.AsRef(in result.u0)) = Vector256.Create(res0, res1, res2, res3);
         }
 
         public static void Exp(in UInt256 b, in UInt256 e, out UInt256 result)
@@ -1114,6 +1141,18 @@ namespace Nethermind.Int256
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void Umul(in UInt256 x, in UInt256 y, out UInt256 low, out UInt256 high)
         {
+            if ((x.u1 | x.u2 | x.u3 | y.u1 | y.u2 | y.u3) == 0)
+            {
+                // Fast multiply for numbers less than 2^64 (18,446,744,073,709,551,615)
+                ulong highUL = Math.BigMul(x.u0, y.u0, out ulong lowUL);
+                // Assignment to high, low after multiply in case either is used as input for x or y (by ref aliasing)
+                high = default;
+                low = default;
+                Unsafe.AsRef(in low.u0) = lowUL;
+                Unsafe.AsRef(in low.u1) = highUL;
+                return;
+            }
+
             (ulong carry, ulong l0) = Multiply64(x.u0, y.u0);
             (carry, ulong res1) = UmulHopi(carry, x.u1, y.u0);
             (carry, ulong res2) = UmulHopi(carry, x.u2, y.u0);
