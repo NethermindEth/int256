@@ -1058,6 +1058,7 @@ namespace Nethermind.Int256
 
             (ulong carry2, ulong res2) = UmulHopi(temp2, u0, u2);
 
+            // Don't care about carry here
             ulong res3 = 2 * (u0 * u3 + u1 * u2) + carry0 + carry1 + carry2;
 
             Unsafe.SkipInit(out result);
