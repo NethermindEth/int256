@@ -34,6 +34,18 @@ namespace Nethermind.Int256.Test
             res.Convert(out BigInteger resUInt256);
 
             resUInt256.Should().Be(resBigInt);
+
+            // Test reusing input as output
+            a.Add(b, out a);
+            a.Convert(out resUInt256);
+            resUInt256.Should().Be(resBigInt);
+
+            a = convert(test.A);
+
+            // Test reusing input as output
+            a.Add(b, out b);
+            b.Convert(out resUInt256);
+            resUInt256.Should().Be(resBigInt);
         }
 
         [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
@@ -184,6 +196,19 @@ namespace Nethermind.Int256.Test
             T uint256b = convert(test.B);
             uint256a.Multiply(uint256b, out T res);
             res.Convert(out BigInteger resUInt256);
+
+            resUInt256.Should().Be(resBigInt);
+
+            // Test reusing input as output
+            uint256a.Multiply(uint256b, out uint256a);
+            uint256a.Convert(out resUInt256);
+
+            resUInt256.Should().Be(resBigInt);
+
+            uint256a = convert(test.A);
+
+            uint256a.Multiply(uint256b, out uint256b);
+            uint256b.Convert(out resUInt256);
 
             resUInt256.Should().Be(resBigInt);
         }
