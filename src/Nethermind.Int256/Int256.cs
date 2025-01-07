@@ -168,18 +168,18 @@ namespace Nethermind.Int256
         public static void Multiply(in Int256 a, in Int256 b, out Int256 res)
         {
             Int256 av = a, bv = b;
-            if (a.Sign < 0)
+            int aSign = a.Sign;
+            int bSign = b.Sign;
+            if (aSign < 0)
             {
                 a.Neg(out av);
             }
-            if (b.Sign < 0)
+            if (bSign < 0)
             {
                 b.Neg(out bv);
             }
             UInt256.Multiply(av._value, bv._value, out UInt256 ures);
             res = new Int256(ures);
-            int aSign = a.Sign;
-            int bSign = b.Sign;
             if ((aSign < 0 && bSign < 0) || (aSign >= 0 && bSign >= 0))
             {
                 return;

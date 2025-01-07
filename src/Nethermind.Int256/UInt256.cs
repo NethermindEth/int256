@@ -407,11 +407,12 @@ namespace Nethermind.Int256
             if ((a.u1 | a.u2 | a.u3 | b.u1 | b.u2 | b.u3) == 0)
             {
                 // Fast add for numbers less than 2^64 (18,446,744,073,709,551,615)
-                ulong u0 = a.u0 + b.u0;
+                ulong a0 = a.u0; // copy to local as we need to check after result clear
+                ulong u0 = a0 + b.u0;
                 // Assignment to res after in case is used as input for a or b (by ref aliasing)
                 res = default;
                 Unsafe.AsRef(in res.u0) = u0;
-                if (u0 < a.u0)
+                if (u0 < a0)
                 {
                     Unsafe.AsRef(in res.u1) = 1;
                 }
