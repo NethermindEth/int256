@@ -63,7 +63,7 @@ namespace Nethermind.Int256.Test
             {
                 if (valueString.Contains("Infinity"))
                 {
-                    return valueString.StartsWith('-') ? "-∞" : "∞" ;
+                    return valueString.StartsWith('-') ? "-∞" : "∞";
                 }
                 string expected = valueString.Replace(",", "");
                 return type == typeof(float) ? expected[..Math.Min(6, expected.Length)] : type == typeof(double) ? expected[..Math.Min(14, expected.Length)] : expected;
@@ -77,7 +77,7 @@ namespace Nethermind.Int256.Test
                 string convertedValue = Expected(((IFormattable)System.Convert.ChangeType(item, type)).ToString("0.#", null));
                 convertedValue.Should().BeEquivalentTo(expected);
             }
-            catch (Exception e) when(e.GetType() == expectedException) { }
+            catch (Exception e) when (e.GetType() == expectedException) { }
         }
     }
 }

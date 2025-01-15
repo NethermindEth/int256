@@ -514,16 +514,16 @@ namespace Nethermind.Int256
                 return;
             }
 
-            if (AddOverflow(x, y, out res))
+            if (AddOverflow(x, y, out UInt256 intermediate))
             {
                 const int length = 5;
-                Span<ulong> sum = stackalloc ulong[length] { res.u0, res.u1, res.u2, res.u3, 1 };
+                Span<ulong> sum = stackalloc ulong[length] { intermediate.u0, intermediate.u1, intermediate.u2, intermediate.u3, 1 };
                 Span<ulong> quot = stackalloc ulong[length];
                 Udivrem(ref MemoryMarshal.GetReference(quot), ref MemoryMarshal.GetReference(sum), length, in m, out res);
             }
             else
             {
-                Mod(res, m, out res);
+                Mod(intermediate, m, out res);
             }
         }
 
@@ -965,19 +965,21 @@ namespace Nethermind.Int256
 
         public static void SubtractMod(in UInt256 a, in UInt256 b, in UInt256 m, out UInt256 res)
         {
-            if (SubtractUnderflow(a, b, out res))
+            if (SubtractUnderflow(a, b, out UInt256 intermediate))
             {
-                Subtract(b, a, out res);
-                Mod(res, m, out res);
-                if (!res.IsZero)
+                Subtract(b, a, out intermediate);
+                Mod(intermediate, m, out intermediate);
+                if (!intermediate.IsZero)
                 {
-                    Subtract(m, res, out res);
+                    Subtract(m, intermediate, out intermediate);
                 }
             }
             else
             {
-                Mod(res, m, out res);
+                Mod(intermediate, m, out intermediate);
             }
+
+            res = intermediate;
         }
 
         public void SubtractMod(in UInt256 a, in UInt256 m, out UInt256 res) => SubtractMod(this, a, m, out res);
@@ -1055,7 +1057,7 @@ namespace Nethermind.Int256
             (carry0, ulong temp2) = UmulHopi(carry0, u0, u2);
 
             (ulong carry1, ulong res1) = UmulHopi(temp1, u0, u1);
-            (carry1, temp2) = UmulStepi(temp2,u1 , u1, carry1);
+            (carry1, temp2) = UmulStepi(temp2, u1, u1, carry1);
 
             (ulong carry2, ulong res2) = UmulHopi(temp2, u0, u2);
 
@@ -1090,17 +1092,19 @@ namespace Nethermind.Int256
                 result = Zero;
                 return;
             }
-            result = One;
+            UInt256 intermediate = One;
             UInt256 bs = b;
             int len = e.BitLen;
             for (int i = 0; i < len; i++)
             {
                 if (e.Bit(i))
                 {
-                    MultiplyMod(result, bs, m, out result);
+                    MultiplyMod(intermediate, bs, m, out intermediate);
                 }
                 MultiplyMod(bs, bs, m, out bs);
             }
+
+            result = intermediate;
         }
 
         public void ExpMod(in UInt256 exp, in UInt256 m, out UInt256 res) => ExpMod(this, exp, m, out res);
@@ -1247,9 +1251,10 @@ namespace Nethermind.Int256
             // At this point, we know
             // x/y ; x > y > 0
 
-            res = default; // initialize with zeros
+            UInt256 intermediate = default; // initialize with zeros
             const int length = 4;
-            Udivrem(ref Unsafe.As<UInt256, ulong>(ref res), ref Unsafe.As<UInt256, ulong>(ref Unsafe.AsRef(in x)), length, y, out UInt256 _);
+            Udivrem(ref Unsafe.As<UInt256, ulong>(ref intermediate), ref Unsafe.As<UInt256, ulong>(ref Unsafe.AsRef(in x)), length, y, out UInt256 _);
+            res = intermediate;
         }
 
         public void Divide(in UInt256 a, out UInt256 res) => Divide(this, a, out res);
@@ -1332,8 +1337,7 @@ namespace Nethermind.Int256
                 }
             }
 
-            res = Zero;
-            ulong z0 = res.u0, z1 = res.u1, z2 = res.u2, z3 = res.u3;
+            ulong z0 = 0, z1 = 0, z2 = 0;
             ulong a = 0, b = 0;
             // Big swaps first
             if (n > 192)
@@ -1376,7 +1380,7 @@ namespace Nethermind.Int256
         sh128:
             a = Rsh(res.u2, 64 - n);
             z2 = Lsh(res.u2, n) | b;
-
+            ulong z3;
         sh192:
             z3 = Lsh(res.u3, n) | a;
 
@@ -1426,9 +1430,12 @@ namespace Nethermind.Int256
                 }
             }
 
-            res = Zero;
-            ulong z0 = res.u0, z1 = res.u1, z2 = res.u2, z3 = res.u3;
             ulong a = 0, b = 0;
+            ulong z3;
+            ulong z2;
+            ulong z1;
+
+            ulong z0;
             // Big swaps first
             if (n > 192)
             {

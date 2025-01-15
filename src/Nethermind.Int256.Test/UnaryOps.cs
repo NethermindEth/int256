@@ -62,7 +62,7 @@ namespace Nethermind.Int256.Test
         public static IEnumerable<int> ShiftTestCases => Enumerable.Range(0, 257);
 
         const int Seed = 0;
-        
+
         public static IEnumerable<BigInteger> RandomSigned(int count)
         {
             Random rand = new(Seed);
