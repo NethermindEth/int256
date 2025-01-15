@@ -76,10 +76,10 @@ public class Convertibles
         (typeof(decimal), (BigInteger?)decimal.MinValue, (BigInteger?)decimal.MaxValue),
         (typeof(BigInteger), null, null)
     };
-    
+
     public static IEnumerable<TestCaseData> TestCases => GenerateTestCases(Numbers, BigInteger.Zero);
     public static IEnumerable<TestCaseData> SignedTestCases => GenerateTestCases(SignedNumbers);
-    
+
     private static IEnumerable<TestCaseData> GenerateTestCases(IEnumerable<(object, string)> numbers, BigInteger? minValue = null)
     {
         Type ExpectedException(BigInteger value, BigInteger? min, BigInteger? max) =>

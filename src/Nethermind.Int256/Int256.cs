@@ -67,7 +67,7 @@ namespace Nethermind.Int256
             Add(in a, in b, out Int256 res);
             return res;
         }
-        
+
         public static bool AddOverflow(in Int256 a, in Int256 b, out Int256 res)
         {
             var overflow = UInt256.AddOverflow(a._value, b._value, out UInt256 ures);
