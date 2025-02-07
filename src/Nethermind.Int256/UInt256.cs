@@ -1037,12 +1037,6 @@ namespace Nethermind.Int256
                 Vector256<ulong> vecA = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in x));
                 Vector256<ulong> vecB = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in y));
 
-                // Vectorized branch using AVX-512.
-                // Unpack the four 64-bit limbs (little-endian: u0 is least-significant)
-
-                // --- Compute the 10 64x64–bit partial products using our vectorized method ---
-
-                // Group 1: 8 products
                 Vector512<ulong> vecA1 = Vector512.Create(Avx2.Permute4x64(vecA, 16), Avx2.Permute4x64(vecA, 73));
                 Vector512<ulong> vecB1 = Vector512.Create(Avx2.Permute4x64(vecB, 132), Avx2.Permute4x64(vecB, 177));
                 Mul64Vector(vecA1, vecB1, out Vector512<ulong> lo1, out Vector512<ulong> hi1);
@@ -1054,63 +1048,79 @@ namespace Nethermind.Int256
                 ulong P02_lo = lo1.GetElement(3), P02_hi = hi1.GetElement(3);
                 ulong P11_lo = lo1.GetElement(4), P11_hi = hi1.GetElement(4);
                 ulong P20_lo = lo1.GetElement(5), P20_hi = hi1.GetElement(5);
-                ulong P03_lo = lo1.GetElement(6), P03_hi = hi1.GetElement(6);
-                ulong P12_lo = lo1.GetElement(7), P12_hi = hi1.GetElement(7);
+                ulong P03_lo = lo1.GetElement(6);
+                ulong P12_lo = lo1.GetElement(7);
 
                 // --- Package each 128-bit partial product into a UInt256 (with proper shifting) ---
 
                 UInt256 intermediate;
                 {
-                    // Group with no shift.
-                    UInt256 part0 = new UInt256(P00_lo, P00_hi, 0, 0);
-
-                    // Group shifted left by 64 bits.
                     UInt256 part64a = new UInt256(0, P01_lo, P01_hi, 0);
                     UInt256 part64b = new UInt256(0, P10_lo, P10_hi, 0);
                     UInt256 sum64;
                     AddImpl(part64a, part64b, out sum64);
+
+                    UInt256 part0 = new UInt256(P00_lo, P00_hi, 0, 0);
                     AddImpl(part0, sum64, out intermediate);
                 }
                 {
-                    // Group shifted left by 128 bits.
-                    UInt256 part128a = new UInt256(0, 0, P02_lo, P02_hi);
-                    UInt256 part128b = new UInt256(0, 0, P11_lo, P11_hi);
-                    UInt256 part128c = new UInt256(0, 0, P20_lo, P20_hi);
-                    UInt256 sum128, temp256;
-                    AddImpl(part128a, part128b, out temp256);
-                    AddImpl(temp256, part128c, out sum128);
-                    AddImpl(intermediate, sum128, out intermediate);
+                    // Pack the nonzero (upper 128-bit) parts into Vector128<ulong>
+                    Vector128<ulong> v128a = Vector128.Create(P02_lo, P02_hi);
+                    Vector128<ulong> v128b = Vector128.Create(P11_lo, P11_hi);
+                    Vector128<ulong> v128c = Vector128.Create(P20_lo, P20_hi);
+    
+                    // Use our 128-bit adder to sum these.
+                    // (This helper adds two 128-bit values with proper carry propagation.)
+                    Vector128<ulong> temp128 = Vector128AddWithCarry(v128a, v128b);
+                    Vector128<ulong> sum128 = Vector128AddWithCarry(temp128, v128c);
+    
+                    // Now, these two 64-bit lanes represent the contribution from group 128.
+                    // They belong in the upper half (limbs u2 and u3) of our full 256-bit intermediate result.
+                    // Extract the current upper half of the intermediate sum.
+                    Vector128<ulong> interUpper = Vector128.Create(intermediate.u2, intermediate.u3);
+                    // Add the computed 128-bit group sum to that upper half.
+                    Vector128<ulong> newInterUpper = Vector128AddWithCarry(interUpper, sum128);
+    
+                    // Update the intermediate result—its lower half (u0 and u1) remains unchanged.
+                    intermediate = new UInt256(
+                                        intermediate.u0,
+                                        intermediate.u1,
+                                        newInterUpper.GetElement(0),
+                                        newInterUpper.GetElement(1));
                 }
 
-
-                // Group 2: 2 products
-                // Pack the two 64-bit values from x into a Vector128<ulong>
                 Vector128<ulong> vecA2 = Vector128.Create(x.u2, x.u3);
-                // Pack the two 64-bit values from y into a Vector128<ulong> in the required order.
-                // Here, we want lane 0 to contain b1 (for P21_lo) and lane 1 to contain b0 (for P30_lo).
                 Vector128<ulong> vecB2 = Vector128.Create(y.u1, y.u0);
 
-                // Use MultiplyLow to multiply corresponding lanes and keep only the lower 64 bits.
                 Vector128<ulong> lo2 = Avx512DQ.VL.MultiplyLow(vecA2, vecB2);
                 
                 lo2 = Sse2.Add(lo2, Vector128.Create(P03_lo, P12_lo));
-                // Reinterpret lo2 as a vector of doubles.
                 Vector128<double> lo2Double = lo2.AsDouble();
 
-                // Use Sse2.Shuffle (which is _mm_shuffle_pd) with control mask 0x1 to swap the two lanes.
                 Vector128<double> shufDouble = Sse2.Shuffle(lo2Double, lo2Double, 0x1);
 
-                // Reinterpret back to ulong.
                 Vector128<ulong> shuf = shufDouble.AsUInt64();
 
-                // Add the original vector and the shuffled one.
                 Vector128<ulong> sumVec = Sse2.Add(lo2, shuf);
 
-                // Now the horizontal sum is in lane 0.
                 ulong group192 = intermediate.u3 + sumVec.GetElement(0);
 
                 Unsafe.SkipInit(out res);
-                Unsafe.As<UInt256, Vector256<ulong>>(ref res) = Unsafe.As<UInt256, Vector256<ulong>>(ref intermediate).WithElement(3, group192);
+                Unsafe.As<UInt256, Vector256<ulong>>(ref res) =
+                    Unsafe.As<UInt256, Vector256<ulong>>(ref intermediate).WithElement(3, group192);
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            static Vector128<ulong> Vector128AddWithCarry(Vector128<ulong> a, Vector128<ulong> b)
+            {
+                Vector128<ulong> sum = Sse2.Add(a, b);
+                Vector128<ulong> carryMask = Avx512F.VL.CompareLessThan(sum, a);
+                carryMask = Sse2.ShiftRightLogical(carryMask, 63);
+                ulong s0 = sum.GetElement(0);
+                ulong s1 = sum.GetElement(1);
+                ulong c0 = carryMask.GetElement(0);
+                s1 += c0;
+                return Vector128.Create(s0, s1);
             }
         }
         
