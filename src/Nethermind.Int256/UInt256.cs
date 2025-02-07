@@ -1034,19 +1034,19 @@ namespace Nethermind.Int256
             }
             else
             {
-
+                // Vectorized branch using AVX-512.
                 // Unpack the four 64-bit limbs (little-endian: u0 is least-significant)
                 ulong a0 = x.u0, a1 = x.u1, a2 = x.u2, a3 = x.u3;
                 ulong b0 = y.u0, b1 = y.u1, b2 = y.u2, b3 = y.u3;
 
-                // --- Compute the 10 64x64–bit products using our vectorized method ---
+                // --- Compute the 10 64x64–bit partial products using our vectorized method ---
 
                 // Group 1: 8 products
                 Vector512<ulong> vecA1 = Vector512.Create(a0, a0, a1, a0, a1, a2, a0, a1);
                 Vector512<ulong> vecB1 = Vector512.Create(b0, b1, b0, b2, b1, b0, b3, b2);
                 Mul64Vector(vecA1, vecB1, out Vector512<ulong> lo1, out Vector512<ulong> hi1);
 
-                // Extract products from group1
+                // Extract products from group 1.
                 ulong P00_lo = lo1.GetElement(0), P00_hi = hi1.GetElement(0);
                 ulong P01_lo = lo1.GetElement(1), P01_hi = hi1.GetElement(1);
                 ulong P10_lo = lo1.GetElement(2), P10_hi = hi1.GetElement(2);
@@ -1056,51 +1056,44 @@ namespace Nethermind.Int256
                 ulong P03_lo = lo1.GetElement(6), P03_hi = hi1.GetElement(6);
                 ulong P12_lo = lo1.GetElement(7), P12_hi = hi1.GetElement(7);
 
-                // Group 2: 2 products
-                Vector512<ulong> vecA2 = Vector512.Create(a2, a3, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL);
-                Vector512<ulong> vecB2 = Vector512.Create(b1, b0, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL);
-                Mul64Vector(vecA2, vecB2, out Vector512<ulong> lo2, out Vector512<ulong> hi2);
-                ulong P21_lo = lo2.GetElement(0); // P21_hi is not needed (contributes only above 256 bits)
-                ulong P30_lo = lo2.GetElement(1); // Likewise for P30_hi
-
                 // --- Package each 128-bit partial product into a UInt256 (with proper shifting) ---
-                // (Recall: a 128–bit product is given as (lo, hi), where lo is the lower 64 bits and hi the upper 64 bits.)
 
-                // P00 (no shift)
+                // Group with no shift.
                 UInt256 part0 = new UInt256(P00_lo, P00_hi, 0, 0);
 
-                // P01 and P10 (each shifted left by 64 bits)
+                // Group shifted left by 64 bits.
                 UInt256 part64a = new UInt256(0, P01_lo, P01_hi, 0);
                 UInt256 part64b = new UInt256(0, P10_lo, P10_hi, 0);
                 UInt256 sum64;
                 AddImpl(part64a, part64b, out sum64);
 
-                // P02, P11 and P20 (each shifted left by 128 bits)
+                // Group shifted left by 128 bits.
                 UInt256 part128a = new UInt256(0, 0, P02_lo, P02_hi);
                 UInt256 part128b = new UInt256(0, 0, P11_lo, P11_hi);
                 UInt256 part128c = new UInt256(0, 0, P20_lo, P20_hi);
-                UInt256 sum128, temp;
-                AddImpl(part128a, part128b, out temp);
-                AddImpl(temp, part128c, out sum128);
+                UInt256 sum128, temp256;
+                AddImpl(part128a, part128b, out temp256);
+                AddImpl(temp256, part128c, out sum128);
 
-                // P03, P12, P21 and P30 (shifted left by 192 bits – note only the low 64 bits matter)
-                UInt256 part192a = new UInt256(0, 0, 0, P03_lo);
-                UInt256 part192b = new UInt256(0, 0, 0, P12_lo);
-                UInt256 part192c = new UInt256(0, 0, 0, P21_lo);
-                UInt256 part192d = new UInt256(0, 0, 0, P30_lo);
-                UInt256 sum192;
-                AddImpl(part192a, part192b, out temp);
-                AddImpl(temp, part192c, out temp);
-                AddImpl(temp, part192d, out sum192);
 
-                // --- Sum all the partial products using AddImpl ---
+                // Group 2: 2 products
+                Vector512<ulong> vecA2 = Vector512.Create(a2, a3, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL);
+                Vector512<ulong> vecB2 = Vector512.Create(b1, b0, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL);
+                Mul64Vector(vecA2, vecB2, out Vector512<ulong> lo2, out Vector512<ulong> hi2);
+                ulong P21_lo = lo2.GetElement(0); // Only lower 64 bits matter.
+                ulong P30_lo = lo2.GetElement(1);
+
+                // Group shifted left by 192 bits – only the lower 64 bits contribute.
+                // Any carry is discarded, so just use normal addition.
+                UInt256 part192256 = new UInt256(0, 0, 0, (P03_lo + P12_lo + P21_lo + P30_lo));
+
+                // --- Sum all the partial products using the proven UInt256 adder (AddImpl) ---
                 UInt256 intermediate;
                 AddImpl(part0, sum64, out intermediate);
                 AddImpl(intermediate, sum128, out intermediate);
-                AddImpl(intermediate, sum192, out res);
+                AddImpl(intermediate, part192256, out res);
             }
         }
-
         
         // Vectorized 64x64 multiply: given vectors 'a' and 'b' (each 8 lanes),
         // computes per lane:
