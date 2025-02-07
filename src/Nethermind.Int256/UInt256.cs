@@ -1034,16 +1034,17 @@ namespace Nethermind.Int256
             }
             else
             {
+                Vector256<ulong> vecA = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in x));
+                Vector256<ulong> vecB = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in y));
+
                 // Vectorized branch using AVX-512.
                 // Unpack the four 64-bit limbs (little-endian: u0 is least-significant)
-                ulong a0 = x.u0, a1 = x.u1, a2 = x.u2, a3 = x.u3;
-                ulong b0 = y.u0, b1 = y.u1, b2 = y.u2, b3 = y.u3;
 
                 // --- Compute the 10 64x64–bit partial products using our vectorized method ---
 
                 // Group 1: 8 products
-                Vector512<ulong> vecA1 = Vector512.Create(a0, a0, a1, a0, a1, a2, a0, a1);
-                Vector512<ulong> vecB1 = Vector512.Create(b0, b1, b0, b2, b1, b0, b3, b2);
+                Vector512<ulong> vecA1 = Vector512.Create(Avx2.Permute4x64(vecA, 16), Avx2.Permute4x64(vecA, 73));
+                Vector512<ulong> vecB1 = Vector512.Create(Avx2.Permute4x64(vecB, 132), Avx2.Permute4x64(vecB, 177));
                 Mul64Vector(vecA1, vecB1, out Vector512<ulong> lo1, out Vector512<ulong> hi1);
 
                 // Extract products from group 1.
@@ -1077,6 +1078,8 @@ namespace Nethermind.Int256
 
 
                 // Group 2: 2 products
+                ulong a2 = x.u2, a3 = x.u3;
+                ulong b0 = y.u0, b1 = y.u1;
                 Vector512<ulong> vecA2 = Vector512.Create(a2, a3, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL);
                 Vector512<ulong> vecB2 = Vector512.Create(b1, b0, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL);
                 Mul64Vector(vecA2, vecB2, out Vector512<ulong> lo2, out Vector512<ulong> hi2);
