@@ -1092,18 +1092,25 @@ namespace Nethermind.Int256
 
                 // Use MultiplyLow to multiply corresponding lanes and keep only the lower 64 bits.
                 Vector128<ulong> lo2 = Avx512DQ.VL.MultiplyLow(vecA2, vecB2);
+                
+                lo2 = Sse2.Add(lo2, Vector128.Create(P03_lo, P12_lo));
+                // Reinterpret lo2 as a vector of doubles.
+                Vector128<double> lo2Double = lo2.AsDouble();
 
-                // Extract the results:
-                ulong P21_lo = lo2.GetElement(0);
-                ulong P30_lo = lo2.GetElement(1);
+                // Use Sse2.Shuffle (which is _mm_shuffle_pd) with control mask 0x1 to swap the two lanes.
+                Vector128<double> shufDouble = Sse2.Shuffle(lo2Double, lo2Double, 0x1);
 
-                ulong group192 = P03_lo + P12_lo + P21_lo + P30_lo;
+                // Reinterpret back to ulong.
+                Vector128<ulong> shuf = shufDouble.AsUInt64();
 
-                // Now add that to the most-significant limb of the intermediate result.
-                res = new UInt256(intermediate.u0, 
-                                  intermediate.u1, 
-                                  intermediate.u2, 
-                                  intermediate.u3 + group192);  // any carry here is dropped modulo 2^256
+                // Add the original vector and the shuffled one.
+                Vector128<ulong> sumVec = Sse2.Add(lo2, shuf);
+
+                // Now the horizontal sum is in lane 0.
+                ulong group192 = intermediate.u3 + sumVec.GetElement(0);
+
+                Unsafe.SkipInit(out res);
+                Unsafe.As<UInt256, Vector256<ulong>>(ref res) = Unsafe.As<UInt256, Vector256<ulong>>(ref intermediate).WithElement(3, group192);
             }
         }
         
