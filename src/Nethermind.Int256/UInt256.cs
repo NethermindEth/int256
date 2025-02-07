@@ -1053,45 +1053,41 @@ namespace Nethermind.Int256
 
                 // --- Package each 128-bit partial product into a UInt256 (with proper shifting) ---
 
-                Vector256<ulong> intermediate;
-                {
-                    Vector128<ulong> v128a = Vector128.Create(P01_lo, P01_hi);
-                    Vector128<ulong> v128b = Vector128.Create(P10_lo, P10_hi);
-                    Vector128<ulong> temp128 = Vector128AddWithCarry(v128a, v128b);
+                Vector128<ulong> v128aa = Vector128.Create(P01_lo, P01_hi);
+                Vector128<ulong> v128bb = Vector128.Create(P10_lo, P10_hi);
+                Vector128<ulong> temp128a = Vector128AddWithCarry(v128aa, v128bb);
                     
-                    var hi = temp128.GetElement(1);
-                    var combine = P00_hi + temp128.GetElement(0);
+                var hi = temp128a.GetElement(1);
+                var combine = P00_hi + temp128a.GetElement(0);
                     
-                    intermediate = Vector256.Create(
-                                        P00_lo,
-                                        combine,
-                                        hi + (P00_hi > combine ? 1ul : 0ul),
-                                        P01_hi > hi ? 1ul : 0ul);
-                }
-                {
-                    // Pack the nonzero (upper 128-bit) parts into Vector128<ulong>
-                    Vector128<ulong> v128a = Vector128.Create(P02_lo, P02_hi);
-                    Vector128<ulong> v128b = Vector128.Create(P11_lo, P11_hi);
-    
-                    // Use our 128-bit adder to sum these.
-                    // (This helper adds two 128-bit values with proper carry propagation.)
-                    Vector128<ulong> temp128 = Vector128AddWithCarry(v128a, v128b);
+                Vector256<ulong> intermediate = Vector256.Create(
+                                    P00_lo,
+                                    combine,
+                                    hi + (P00_hi > combine ? 1ul : 0ul),
+                                    P01_hi > hi ? 1ul : 0ul);
 
-                    Vector128<ulong> v128c = Vector128.Create(P20_lo, P20_hi);
-                    Vector128<ulong> sum128 = Vector128AddWithCarry(temp128, v128c);
+                // Pack the nonzero (upper 128-bit) parts into Vector128<ulong>
+                Vector128<ulong> v128a = Vector128.Create(P02_lo, P02_hi);
+                Vector128<ulong> v128b = Vector128.Create(P11_lo, P11_hi);
     
-                    // Now, these two 64-bit lanes represent the contribution from group 128.
-                    // They belong in the upper half (limbs u2 and u3) of our full 256-bit intermediate result.
-                    // Extract the current upper half of the intermediate sum.
-                    Vector128<ulong> interUpper = intermediate.GetUpper();
-                    // Add the computed 128-bit group sum to that upper half.
-                    Vector128<ulong> newInterUpper = Vector128AddWithCarry(interUpper, sum128);
+                // Use our 128-bit adder to sum these.
+                // (This helper adds two 128-bit values with proper carry propagation.)
+                Vector128<ulong> temp128 = Vector128AddWithCarry(v128a, v128b);
+
+                Vector128<ulong> v128c = Vector128.Create(P20_lo, P20_hi);
+                Vector128<ulong> sum128 = Vector128AddWithCarry(temp128, v128c);
     
-                    // Update the intermediate result—its lower half (u0 and u1) remains unchanged.
-                    intermediate = Vector256.Create(
-                                        intermediate.GetLower(),
-                                        newInterUpper);
-                }
+                // Now, these two 64-bit lanes represent the contribution from group 128.
+                // They belong in the upper half (limbs u2 and u3) of our full 256-bit intermediate result.
+                // Extract the current upper half of the intermediate sum.
+                Vector128<ulong> interUpper = intermediate.GetUpper();
+                // Add the computed 128-bit group sum to that upper half.
+                Vector128<ulong> newInterUpper = Vector128AddWithCarry(interUpper, sum128);
+    
+                // Update the intermediate result—its lower half (u0 and u1) remains unchanged.
+                intermediate = Vector256.Create(
+                                    intermediate.GetLower(),
+                                    newInterUpper);
 
                 Vector128<ulong> vecA2 = Vector128.Create(x.u2, x.u3);
                 Vector128<ulong> vecB2 = Vector128.Create(y.u1, y.u0);
