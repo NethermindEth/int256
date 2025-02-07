@@ -1034,80 +1034,107 @@ namespace Nethermind.Int256
             }
             else
             {
-                Vector256<ulong> vecA = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in x));
-                Vector256<ulong> vecB = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in y));
+                // Load the 256‐bit inputs into 256‐bit vector registers.
+                Vector256<ulong> aVector = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in x));
+                Vector256<ulong> bVector = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in y));
 
-                Vector512<ulong> vecA1 = Vector512.Create(Avx2.Permute4x64(vecA, 16), Avx2.Permute4x64(vecA, 73));
-                Vector512<ulong> vecB1 = Vector512.Create(Avx2.Permute4x64(vecB, 132), Avx2.Permute4x64(vecB, 177));
-                Mul64Vector(vecA1, vecB1, out Vector512<ulong> lo1, out Vector512<ulong> hi1);
+                // Rearrange the 64‐bit limbs of each input into 512‐bit vectors.
+                // The chosen permutations align the limbs so that later 64‐bit multiplications yield the correct cross‐products.
+                Vector512<ulong> rearrangedA = Vector512.Create(
+                    Avx2.Permute4x64(aVector, 16),  // Lower part permutation for A
+                    Avx2.Permute4x64(aVector, 73)); // Upper part permutation for A
 
-                // Extract products from group 1.
-                ulong P00_lo = lo1.GetElement(0), P00_hi = hi1.GetElement(0);
-                ulong P01_lo = lo1.GetElement(1), P01_hi = hi1.GetElement(1);
-                ulong P10_lo = lo1.GetElement(2), P10_hi = hi1.GetElement(2);
-                ulong P02_lo = lo1.GetElement(3), P02_hi = hi1.GetElement(3);
-                ulong P11_lo = lo1.GetElement(4), P11_hi = hi1.GetElement(4);
-                ulong P20_lo = lo1.GetElement(5), P20_hi = hi1.GetElement(5);
-                ulong P03_lo = lo1.GetElement(6);
-                ulong P12_lo = lo1.GetElement(7);
+                Vector512<ulong> rearrangedB = Vector512.Create(
+                    Avx2.Permute4x64(bVector, 132), // Lower part permutation for B
+                    Avx2.Permute4x64(bVector, 177)); // Upper part permutation for B
 
-                // --- Package each 128-bit partial product into a UInt256 (with proper shifting) ---
+                // Multiply the corresponding 64‐bit limbs of the rearranged inputs.
+                // Each multiplication yields a 128‐bit product split into a low and high 64‐bit part.
+                Mul64Vector(rearrangedA, rearrangedB, out Vector512<ulong> partialLo, out Vector512<ulong> partialHi);
 
-                Vector128<ulong> v128aa = Vector128.Create(P01_lo, P01_hi);
-                Vector128<ulong> v128bb = Vector128.Create(P10_lo, P10_hi);
-                Vector128<ulong> temp128a = Vector128AddWithCarry(v128aa, v128bb);
-                    
-                var hi = temp128a.GetElement(1);
-                var combine = P00_hi + temp128a.GetElement(0);
-                    
-                Vector256<ulong> intermediate = Vector256.Create(
-                                    P00_lo,
-                                    combine,
-                                    hi + (P00_hi > combine ? 1ul : 0ul),
-                                    P01_hi > hi ? 1ul : 0ul);
+                // --- Extract Partial Products from the First Group ---
+                //
+                // The following partial products (with both low and high parts) result from the 64‐bit multiplications.
+                // They are named to indicate their source position in the multiplication grid.
+                ulong prod00_Lo = partialLo.GetElement(0), prod00_Hi = partialHi.GetElement(0);
+                ulong prod01_Lo = partialLo.GetElement(1), prod01_Hi = partialHi.GetElement(1);
+                ulong prod10_Lo = partialLo.GetElement(2), prod10_Hi = partialHi.GetElement(2);
+                ulong prod02_Lo = partialLo.GetElement(3), prod02_Hi = partialHi.GetElement(3);
+                ulong prod11_Lo = partialLo.GetElement(4), prod11_Hi = partialHi.GetElement(4);
+                ulong prod20_Lo = partialLo.GetElement(5), prod20_Hi = partialHi.GetElement(5);
+                ulong prod03_Lo = partialLo.GetElement(6); // Only lower 64‐bits produced.
+                ulong prod12_Lo = partialLo.GetElement(7); // Only lower 64‐bits produced.
 
-                // Pack the nonzero (upper 128-bit) parts into Vector128<ulong>
-                Vector128<ulong> v128a = Vector128.Create(P02_lo, P02_hi);
-                Vector128<ulong> v128b = Vector128.Create(P11_lo, P11_hi);
-    
-                // Use our 128-bit adder to sum these.
-                // (This helper adds two 128-bit values with proper carry propagation.)
-                Vector128<ulong> temp128 = Vector128AddWithCarry(v128a, v128b);
+                // --- Combine Lower-Group Partial Products into an Intermediate 256-bit Result ---
+                //
+                // The cross-terms prod01 and prod10 contribute to the middle limbs of the full product.
+                // First, add these two 128‐bit values (each stored as two 64‐bit limbs) with proper carry propagation.
+                Vector128<ulong> crossTermA = Vector128.Create(prod01_Lo, prod01_Hi);
+                Vector128<ulong> crossTermB = Vector128.Create(prod10_Lo, prod10_Hi);
+                Vector128<ulong> crossSum = Vector128AddWithCarry(crossTermA, crossTermB);
 
-                Vector128<ulong> v128c = Vector128.Create(P20_lo, P20_hi);
-                Vector128<ulong> sum128 = Vector128AddWithCarry(temp128, v128c);
-    
-                // Now, these two 64-bit lanes represent the contribution from group 128.
-                // They belong in the upper half (limbs u2 and u3) of our full 256-bit intermediate result.
-                // Extract the current upper half of the intermediate sum.
-                Vector128<ulong> interUpper = intermediate.GetUpper();
-                // Add the computed 128-bit group sum to that upper half.
-                Vector128<ulong> newInterUpper = Vector128AddWithCarry(interUpper, sum128);
-    
-                // Update the intermediate result—its lower half (u0 and u1) remains unchanged.
-                intermediate = Vector256.Create(
-                                    intermediate.GetLower(),
-                                    newInterUpper);
+                // The lower 64‐bit lane of the cross‐sum will be added to the high part of prod00.
+                ulong crossLowPart = crossSum.GetElement(0);
+                ulong combinedProd00_Hi = prod00_Hi + crossLowPart;
 
-                Vector128<ulong> vecA2 = Vector128.Create(x.u2, x.u3);
-                Vector128<ulong> vecB2 = Vector128.Create(y.u1, y.u0);
+                // Build the initial 256‐bit intermediate result from the lower-group products:
+                // • Limb 0: prod00_Lo (lowest 64 bits of prod00)
+                // • Limb 1: combinedProd00_Hi (prod00_Hi plus the low cross‐term)
+                // • Limb 2: The high lane of the cross‐sum plus a carry if the addition in limb 1 overflowed.
+                // • Limb 3: A final carry from the cross‐term addition (if prod01_Hi exceeds crossSum’s high lane).
+                Vector256<ulong> intermediateResult = Vector256.Create(
+                    prod00_Lo,
+                    combinedProd00_Hi,
+                    crossSum.GetElement(1) + (prod00_Hi > combinedProd00_Hi ? 1ul : 0ul),
+                    (prod01_Hi > crossSum.GetElement(1) ? 1ul : 0ul));
 
-                Vector128<ulong> lo2 = Avx512DQ.VL.MultiplyLow(vecA2, vecB2);
-                
-                lo2 = Sse2.Add(lo2, Vector128.Create(P03_lo, P12_lo));
-                Vector128<double> lo2Double = lo2.AsDouble();
+                // --- Add Contributions from the Upper Group Partial Products ---
+                //
+                // The products prod02 and prod11 form one 128‐bit group.
+                Vector128<ulong> group2_A = Vector128.Create(prod02_Lo, prod02_Hi);
+                Vector128<ulong> group2_B = Vector128.Create(prod11_Lo, prod11_Hi);
+                Vector128<ulong> group2Sum = Vector128AddWithCarry(group2_A, group2_B);
 
-                Vector128<double> shufDouble = Sse2.Shuffle(lo2Double, lo2Double, 0x1);
+                // Include the contribution from prod20 into the group sum.
+                Vector128<ulong> group2_C = Vector128.Create(prod20_Lo, prod20_Hi);
+                Vector128<ulong> totalGroup2 = Vector128AddWithCarry(group2Sum, group2_C);
 
-                Vector128<ulong> shuf = shufDouble.AsUInt64();
+                // These 128 bits (two 64-bit lanes) belong in the upper half (limbs 2 and 3) of the intermediate result.
+                // Retrieve the current upper 128 bits of the intermediate result and add the group2 sum.
+                Vector128<ulong> currentUpperHalf = intermediateResult.GetUpper();
+                Vector128<ulong> newUpperHalf = Vector128AddWithCarry(currentUpperHalf, totalGroup2);
 
-                Vector128<ulong> sumVec = Sse2.Add(lo2, shuf);
+                // Update the intermediate result with the new upper half (the lower half remains unchanged).
+                intermediateResult = Vector256.Create(
+                    intermediateResult.GetLower(),
+                    newUpperHalf);
 
-                ulong group192 = intermediate.GetElement(3) + sumVec.GetElement(0);
+                // --- Process and Add the Final (Group 3) Contributions ---
+                //
+                // For the remaining contribution, multiply selected limbs from the inputs.
+                // Here, the upper 128 bits of x and the lower 128 bits of y (in reversed order) are multiplied.
+                Vector128<ulong> aHigh = Vector128.Create(x.u2, x.u3);
+                Vector128<ulong> bLow = Vector128.Create(y.u1, y.u0);
+                Vector128<ulong> finalProdLow = Avx512DQ.VL.MultiplyLow(aHigh, bLow);
 
+                // Add the remaining lower parts from prod03 and prod12.
+                finalProdLow = Sse2.Add(finalProdLow, Vector128.Create(prod03_Lo, prod12_Lo));
+
+                // Perform a horizontal add on finalProdLow to collapse its two 64‐bit lanes into one sum.
+                // (This is done by shuffling the 64-bit lanes using a double-precision view and then adding them.)
+                Vector128<double> finalProdAsDouble = finalProdLow.AsDouble();
+                Vector128<double> shuffledDouble = Sse2.Shuffle(finalProdAsDouble, finalProdAsDouble, 0x1);
+                Vector128<ulong> shuffledULong = shuffledDouble.AsUInt64();
+                Vector128<ulong> horizontalSum = Sse2.Add(finalProdLow, shuffledULong);
+
+                // Add the horizontal sum (the final contribution) to the most-significant limb (limb 3) of the intermediate result.
+                ulong updatedMostSignificant = intermediateResult.GetElement(3) + horizontalSum.GetElement(0);
+
+                // Write the final 256-bit product, updating limb 3 with the new value.
                 Unsafe.SkipInit(out res);
                 Unsafe.As<UInt256, Vector256<ulong>>(ref res) =
-                    intermediate.WithElement(3, group192);
+                    intermediateResult.WithElement(3, updatedMostSignificant);
+
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
