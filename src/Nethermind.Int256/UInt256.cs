@@ -1059,22 +1059,28 @@ namespace Nethermind.Int256
 
                 // --- Package each 128-bit partial product into a UInt256 (with proper shifting) ---
 
-                // Group with no shift.
-                UInt256 part0 = new UInt256(P00_lo, P00_hi, 0, 0);
+                UInt256 intermediate;
+                {
+                    // Group with no shift.
+                    UInt256 part0 = new UInt256(P00_lo, P00_hi, 0, 0);
 
-                // Group shifted left by 64 bits.
-                UInt256 part64a = new UInt256(0, P01_lo, P01_hi, 0);
-                UInt256 part64b = new UInt256(0, P10_lo, P10_hi, 0);
-                UInt256 sum64;
-                AddImpl(part64a, part64b, out sum64);
-
-                // Group shifted left by 128 bits.
-                UInt256 part128a = new UInt256(0, 0, P02_lo, P02_hi);
-                UInt256 part128b = new UInt256(0, 0, P11_lo, P11_hi);
-                UInt256 part128c = new UInt256(0, 0, P20_lo, P20_hi);
-                UInt256 sum128, temp256;
-                AddImpl(part128a, part128b, out temp256);
-                AddImpl(temp256, part128c, out sum128);
+                    // Group shifted left by 64 bits.
+                    UInt256 part64a = new UInt256(0, P01_lo, P01_hi, 0);
+                    UInt256 part64b = new UInt256(0, P10_lo, P10_hi, 0);
+                    UInt256 sum64;
+                    AddImpl(part64a, part64b, out sum64);
+                    AddImpl(part0, sum64, out intermediate);
+                }
+                {
+                    // Group shifted left by 128 bits.
+                    UInt256 part128a = new UInt256(0, 0, P02_lo, P02_hi);
+                    UInt256 part128b = new UInt256(0, 0, P11_lo, P11_hi);
+                    UInt256 part128c = new UInt256(0, 0, P20_lo, P20_hi);
+                    UInt256 sum128, temp256;
+                    AddImpl(part128a, part128b, out temp256);
+                    AddImpl(temp256, part128c, out sum128);
+                    AddImpl(intermediate, sum128, out intermediate);
+                }
 
 
                 // Group 2: 2 products
@@ -1091,9 +1097,6 @@ namespace Nethermind.Int256
                 UInt256 part192256 = new UInt256(0, 0, 0, (P03_lo + P12_lo + P21_lo + P30_lo));
 
                 // --- Sum all the partial products using the proven UInt256 adder (AddImpl) ---
-                UInt256 intermediate;
-                AddImpl(part0, sum64, out intermediate);
-                AddImpl(intermediate, sum128, out intermediate);
                 AddImpl(intermediate, part192256, out res);
             }
         }
