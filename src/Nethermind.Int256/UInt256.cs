@@ -1084,20 +1084,26 @@ namespace Nethermind.Int256
 
 
                 // Group 2: 2 products
-                ulong a2 = x.u2, a3 = x.u3;
-                ulong b0 = y.u0, b1 = y.u1;
-                Vector512<ulong> vecA2 = Vector512.Create(a2, a3, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL);
-                Vector512<ulong> vecB2 = Vector512.Create(b1, b0, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL);
-                Mul64Vector(vecA2, vecB2, out Vector512<ulong> lo2, out Vector512<ulong> hi2);
-                ulong P21_lo = lo2.GetElement(0); // Only lower 64 bits matter.
+                // Pack the two 64-bit values from x into a Vector128<ulong>
+                Vector128<ulong> vecA2 = Vector128.Create(x.u2, x.u3);
+                // Pack the two 64-bit values from y into a Vector128<ulong> in the required order.
+                // Here, we want lane 0 to contain b1 (for P21_lo) and lane 1 to contain b0 (for P30_lo).
+                Vector128<ulong> vecB2 = Vector128.Create(y.u1, y.u0);
+
+                // Use MultiplyLow to multiply corresponding lanes and keep only the lower 64 bits.
+                Vector128<ulong> lo2 = Avx512DQ.VL.MultiplyLow(vecA2, vecB2);
+
+                // Extract the results:
+                ulong P21_lo = lo2.GetElement(0);
                 ulong P30_lo = lo2.GetElement(1);
 
-                // Group shifted left by 192 bits – only the lower 64 bits contribute.
-                // Any carry is discarded, so just use normal addition.
-                UInt256 part192256 = new UInt256(0, 0, 0, (P03_lo + P12_lo + P21_lo + P30_lo));
+                ulong group192 = P03_lo + P12_lo + P21_lo + P30_lo;
 
-                // --- Sum all the partial products using the proven UInt256 adder (AddImpl) ---
-                AddImpl(intermediate, part192256, out res);
+                // Now add that to the most-significant limb of the intermediate result.
+                res = new UInt256(intermediate.u0, 
+                                  intermediate.u1, 
+                                  intermediate.u2, 
+                                  intermediate.u3 + group192);  // any carry here is dropped modulo 2^256
             }
         }
         
