@@ -1053,7 +1053,7 @@ namespace Nethermind.Int256
 
                 // --- Package each 128-bit partial product into a UInt256 (with proper shifting) ---
 
-                UInt256 intermediate;
+                Vector256<ulong> intermediate;
                 {
                     Vector128<ulong> v128a = Vector128.Create(P01_lo, P01_hi);
                     Vector128<ulong> v128b = Vector128.Create(P10_lo, P10_hi);
@@ -1062,7 +1062,7 @@ namespace Nethermind.Int256
                     var hi = temp128.GetElement(1);
                     var combine = P00_hi + temp128.GetElement(0);
                     
-                    intermediate = new UInt256(
+                    intermediate = Vector256.Create(
                                         P00_lo,
                                         combine,
                                         hi + (P00_hi > combine ? 1ul : 0ul),
@@ -1083,16 +1083,14 @@ namespace Nethermind.Int256
                     // Now, these two 64-bit lanes represent the contribution from group 128.
                     // They belong in the upper half (limbs u2 and u3) of our full 256-bit intermediate result.
                     // Extract the current upper half of the intermediate sum.
-                    Vector128<ulong> interUpper = Vector128.Create(intermediate.u2, intermediate.u3);
+                    Vector128<ulong> interUpper = intermediate.GetUpper();
                     // Add the computed 128-bit group sum to that upper half.
                     Vector128<ulong> newInterUpper = Vector128AddWithCarry(interUpper, sum128);
     
                     // Update the intermediate result—its lower half (u0 and u1) remains unchanged.
-                    intermediate = new UInt256(
-                                        intermediate.u0,
-                                        intermediate.u1,
-                                        newInterUpper.GetElement(0),
-                                        newInterUpper.GetElement(1));
+                    intermediate = Vector256.Create(
+                                        intermediate.GetLower(),
+                                        newInterUpper);
                 }
 
                 Vector128<ulong> vecA2 = Vector128.Create(x.u2, x.u3);
@@ -1109,11 +1107,11 @@ namespace Nethermind.Int256
 
                 Vector128<ulong> sumVec = Sse2.Add(lo2, shuf);
 
-                ulong group192 = intermediate.u3 + sumVec.GetElement(0);
+                ulong group192 = intermediate.GetElement(3) + sumVec.GetElement(0);
 
                 Unsafe.SkipInit(out res);
                 Unsafe.As<UInt256, Vector256<ulong>>(ref res) =
-                    Unsafe.As<UInt256, Vector256<ulong>>(ref intermediate).WithElement(3, group192);
+                    intermediate.WithElement(3, group192);
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
