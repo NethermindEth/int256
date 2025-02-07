@@ -1055,23 +1055,29 @@ namespace Nethermind.Int256
 
                 UInt256 intermediate;
                 {
-                    UInt256 part64a = new UInt256(0, P01_lo, P01_hi, 0);
-                    UInt256 part64b = new UInt256(0, P10_lo, P10_hi, 0);
-                    UInt256 sum64;
-                    AddImpl(part64a, part64b, out sum64);
-
-                    UInt256 part0 = new UInt256(P00_lo, P00_hi, 0, 0);
-                    AddImpl(part0, sum64, out intermediate);
+                    Vector128<ulong> v128a = Vector128.Create(P01_lo, P01_hi);
+                    Vector128<ulong> v128b = Vector128.Create(P10_lo, P10_hi);
+                    Vector128<ulong> temp128 = Vector128AddWithCarry(v128a, v128b);
+                    
+                    var hi = temp128.GetElement(1);
+                    var combine = P00_hi + temp128.GetElement(0);
+                    
+                    intermediate = new UInt256(
+                                        P00_lo,
+                                        combine,
+                                        hi + (P00_hi > combine ? 1ul : 0ul),
+                                        P01_hi > hi ? 1ul : 0ul);
                 }
                 {
                     // Pack the nonzero (upper 128-bit) parts into Vector128<ulong>
                     Vector128<ulong> v128a = Vector128.Create(P02_lo, P02_hi);
                     Vector128<ulong> v128b = Vector128.Create(P11_lo, P11_hi);
-                    Vector128<ulong> v128c = Vector128.Create(P20_lo, P20_hi);
     
                     // Use our 128-bit adder to sum these.
                     // (This helper adds two 128-bit values with proper carry propagation.)
                     Vector128<ulong> temp128 = Vector128AddWithCarry(v128a, v128b);
+
+                    Vector128<ulong> v128c = Vector128.Create(P20_lo, P20_hi);
                     Vector128<ulong> sum128 = Vector128AddWithCarry(temp128, v128c);
     
                     // Now, these two 64-bit lanes represent the contribution from group 128.
