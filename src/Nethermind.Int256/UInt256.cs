@@ -1122,9 +1122,7 @@ namespace Nethermind.Int256
 
                 // Perform a horizontal add on finalProdLow to collapse its two 64‐bit lanes into one sum.
                 // (This is done by shuffling the 64-bit lanes using a double-precision view and then adding them.)
-                Vector128<double> finalProdAsDouble = finalProdLow.AsDouble();
-                Vector128<double> shuffledDouble = Sse2.Shuffle(finalProdAsDouble, finalProdAsDouble, 0x1);
-                Vector128<ulong> shuffledULong = shuffledDouble.AsUInt64();
+                Vector128<ulong> shuffledULong = Sse2.Shuffle(finalProdLow.AsDouble(), finalProdLow.AsDouble(), 0x1).AsUInt64();
                 Vector128<ulong> horizontalSum = Sse2.Add(finalProdLow, shuffledULong);
 
                 // Add the horizontal sum (the final contribution) to the most-significant limb (limb 3) of the intermediate result.
@@ -1137,17 +1135,41 @@ namespace Nethermind.Int256
 
             }
 
+            /// <summary>
+            /// Adds two 128-bit unsigned integers while propagating an overflow (carry) from the lower 64-bit lane to the higher lane.
+            /// Each 128-bit integer is represented as a <see cref="Vector128{ulong}"/>, with element 0 holding the lower 64 bits
+            /// and element 1 holding the higher 64 bits.
+            /// </summary>
+            /// <param name="operand1">The first 128-bit unsigned integer operand.</param>
+            /// <param name="operand2">The second 128-bit unsigned integer operand.</param>
+            /// <returns>
+            /// A <see cref="Vector128{ulong}"/> representing the sum of the two operands, with any carry from the lower lane added
+            /// into the higher lane.
+            /// </returns>
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            static Vector128<ulong> Vector128AddWithCarry(Vector128<ulong> a, Vector128<ulong> b)
+            static Vector128<ulong> Vector128AddWithCarry(Vector128<ulong> left, Vector128<ulong> right)
             {
-                Vector128<ulong> sum = Sse2.Add(a, b);
-                Vector128<ulong> carryMask = Avx512F.VL.CompareLessThan(sum, a);
-                carryMask = Sse2.ShiftRightLogical(carryMask, 63);
-                ulong s0 = sum.GetElement(0);
-                ulong s1 = sum.GetElement(1);
-                ulong c0 = carryMask.GetElement(0);
-                s1 += c0;
-                return Vector128.Create(s0, s1);
+                // Perform a lane-wise addition of the two operands.
+                Vector128<ulong> sum = Sse2.Add(left, right);
+
+                // For unsigned addition, an overflow in a lane occurs if the result is less than one of the operands.
+                // Comparing 'sum' with 'operand1' produces a mask where each 64-bit lane is all ones if an overflow occurred, or zero otherwise.
+                Vector128<ulong> overflowMask = Avx512F.VL.CompareLessThan(sum, left);
+
+                // Normalize the overflow mask: shift each 64-bit lane right by 63 bits.
+                // This converts a full mask (0xFFFFFFFFFFFFFFFF) to 1, leaving lanes with no overflow as 0.
+                overflowMask = Sse2.ShiftRightLogical(overflowMask, 63);
+
+                // Promote the carry from the lower lane (element 0) into the upper lane.
+                // First, swap the two 64-bit lanes so that the lower lane's carry moves to the higher lane.
+                Vector128<ulong> swappedCarry = Sse2.Shuffle(overflowMask.AsDouble(), overflowMask.AsDouble(), 0x1).AsUInt64();
+
+                // Next, clear the (now swapped) lower lane by blending with a zero vector.
+                // The immediate mask 0x1 indicates that lane 0 should come from the zero vector and lane 1 remains unchanged.
+                Vector128<ulong> promotedCarry = Sse41.Blend(swappedCarry.AsDouble(), Vector128<double>.Zero, 0x1).AsUInt64();
+
+                // Add the propagated carry to the sum.
+                return Sse2.Add(sum, promotedCarry);
             }
         }
         
