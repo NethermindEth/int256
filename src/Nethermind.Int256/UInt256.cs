@@ -1133,27 +1133,20 @@ namespace Nethermind.Int256
             // Extract from index 3 the two lower‐parts from prod03 and prod12 (which we stored in “prod6”):
             // (Note: prod6 already holds both lower parts.)
             finalProdLow = Sse2.Add(finalProdLow, prod6);
-            // Now perform a horizontal add so that the two 64‑bit lanes collapse to a single 64‑bit value.
-            Vector128<ulong> horizontalSum = HorizontalAdd(finalProdLow);
+            // Reinterpret the 64-bit integer vector as a vector of two doubles.
+            // Then use _mm_shuffle_pd (exposed as Sse2.Shuffle for doubles) to swap the two lanes.
+            Vector128<ulong> swapped = Sse2.Shuffle(finalProdLow.AsDouble(), finalProdLow.AsDouble(), 0x1).AsUInt64();
+            // Add the original vector and the swapped vector.
+            // This results in a vector where both lanes equal (vec[0] + vec[1]).
+            Vector128<ulong> horizontalSum = Sse2.Add(finalProdLow, swapped);
             // Add the horizontal sum (broadcast into the high lane) to the most–significant limb of intermediateResult.
-            // 2. Use a shuffle with a zero vector to directly form { 0, horizontalSum[0] }
-            Vector128<ulong> high = Sse2.Shuffle(Vector128<double>.Zero, horizontalSum.AsDouble(), 0).AsUInt64();
+            // 2. Use a unpackHigh with a zero vector to directly form { 0, horizontalSum[0] }
+            Vector128<ulong> high = Sse2.UnpackHigh(Vector128<ulong>.Zero, horizontalSum);
             intermediateResult = Avx2.Add(intermediateResult, Vector256.Create(Vector128<ulong>.Zero, high));
 
             // 10. Write out the final 256‑bit result.
             Unsafe.SkipInit(out res);
             Unsafe.As<UInt256, Vector256<ulong>>(ref res) = intermediateResult;
-
-            static Vector128<ulong> HorizontalAdd(Vector128<ulong> vec)
-            {
-                // Reinterpret the 64-bit integer vector as a vector of two doubles.
-                // Then use _mm_shuffle_pd (exposed as Sse2.Shuffle for doubles) to swap the two lanes.
-                Vector128<ulong> swapped = Sse2.Shuffle(vec.AsDouble(), vec.AsDouble(), 0x1).AsUInt64();
-
-                // Add the original vector and the swapped vector.
-                // This results in a vector where both lanes equal (vec[0] + vec[1]).
-                return Sse2.Add(vec, swapped);
-            }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             static Vector256<ulong> WithUpper(Vector256<ulong> vec, Vector128<ulong> upper)
