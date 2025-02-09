@@ -1090,13 +1090,13 @@ namespace Nethermind.Int256
             Vector128<ulong> prod0Updated = Sse2.Add(prod0, addMask);
 
             // Now, compute the “carry” from that addition. (Again, we must compute a one‐bit flag.)
-            uint carryFlag = (uint)Sse2.MoveMask(Avx512F.VL.CompareLessThan(
+            Vector128<ulong> carryFlag = Sse2.ShiftRightLogical(Avx512F.VL.CompareLessThan(
                 Sse2.UnpackHigh(prod0Updated, prod0Updated), // compare updated high limb...
                 Sse2.UnpackHigh(prod0, prod0)         // ...with the original high limb
-                ).AsByte()) & 1;
+                ), 63);
             // Add the carry to the high half of crossSum. (Broadcast the carry into a 128‑bit vector.)
             Vector128<ulong> csHigh = Sse2.UnpackHigh(crossSum, crossSum);
-            Vector128<ulong> limb2 = Sse2.Add(csHigh, Vector128.CreateScalar((ulong)carryFlag));
+            Vector128<ulong> limb2 = Sse2.Add(csHigh, carryFlag);
 
             // And form limb3 from a comparison of prod01’s high limb with crossSum’s high:
             // Shift right each lane by 63 bits, so that 0 becomes 0 and 0xFFFFFFFFFFFFFFFF becomes 1.
