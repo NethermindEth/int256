@@ -1117,7 +1117,7 @@ namespace Nethermind.Int256
             // Add totalGroup2 into the current upper 128 bits of intermediateResult.
             Vector128<ulong> currentUpper = intermediateResult.GetUpper();
             Vector128<ulong> newUpper = Add128(currentUpper, totalGroup2);
-            intermediateResult = WithUpper(intermediateResult, newUpper);
+            intermediateResult = Avx2.InsertVector128(intermediateResult, newUpper, 1);
 
             // 9. Process group‑3:
             //    Multiply x23 and y10 (with the proper reversed order) then add in the remaining lower parts.
@@ -1147,13 +1147,6 @@ namespace Nethermind.Int256
             // 10. Write out the final 256‑bit result.
             Unsafe.SkipInit(out res);
             Unsafe.As<UInt256, Vector256<ulong>>(ref res) = intermediateResult;
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            static Vector256<ulong> WithUpper(Vector256<ulong> vec, Vector128<ulong> upper)
-            {
-                // Replace the upper 128 bits of vec with upper.
-                return Avx2.InsertVector128(vec, upper, 1);
-            }
 
             /// <summary>
             /// Adds two 128-bit unsigned integers while propagating an overflow (carry) from the lower 64-bit lane to the higher lane.
