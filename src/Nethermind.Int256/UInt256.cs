@@ -1095,7 +1095,7 @@ namespace Nethermind.Int256
                 Sse2.UnpackHigh(prod0, prod0)         // ...with the original high limb
                 ).AsByte()) & 1;
             // Add the carry to the high half of crossSum. (Broadcast the carry into a 128‑bit vector.)
-            Vector128<ulong> csHigh = BroadcastUpper128(crossSum);
+            Vector128<ulong> csHigh = Sse2.UnpackHigh(crossSum, crossSum);
             Vector128<ulong> limb2 = Sse2.Add(csHigh, Vector128.CreateScalar((ulong)carryFlag));
 
             // And form limb3 from a comparison of prod01’s high limb with crossSum’s high:
@@ -1155,12 +1155,6 @@ namespace Nethermind.Int256
                 return Avx2.InsertVector128(vec, upper, 1);
             }
 
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            static Vector128<ulong> BroadcastUpper128(Vector128<ulong> vec)
-            {
-                // Replicate element1 to both lanes.
-                return Sse2.Shuffle(vec.AsDouble(), vec.AsDouble(), 3).AsUInt64(); // 0xFF means both lanes come from the original element1
-            }
             /// <summary>
             /// Adds two 128-bit unsigned integers while propagating an overflow (carry) from the lower 64-bit lane to the higher lane.
             /// Each 128-bit integer is represented as a <see cref="Vector128{ulong}"/>, with element 0 holding the lower 64 bits
