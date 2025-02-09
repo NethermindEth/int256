@@ -1132,12 +1132,10 @@ namespace Nethermind.Int256
 
             // 9. Group 3 cross‑terms:
             // Multiply the high limbs of x (x.u2, x.u3) with the low limbs of y (y.u1, y.u0) in reversed order.
-            Vector128<ulong> xHigh = Vector128.Create(x.u2, x.u3);
-            Vector128<ulong> yLow = Vector128.Create(y.u1, y.u0);
             Vector128<ulong> finalProdLow = Avx512DQ.VL.MultiplyLow(xHigh, yLow);
 
             // Add in the extra lower parts from the upper half of lowerPartial.
-            Vector128<ulong> extraLow = Avx2.ExtractVector128(lowerPartial.GetUpper(), 1);
+            Vector128<ulong> extraLow = Avx512F.ExtractVector128(lowerPartial, 3);
             finalProdLow = Sse2.Add(finalProdLow, extraLow);
             // Perform a horizontal sum so that both lanes contain the same result.
             Vector128<ulong> swappedFinal = Sse2.UnpackLow(finalProdLow, finalProdLow);
