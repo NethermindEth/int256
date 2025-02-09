@@ -1099,16 +1099,16 @@ namespace Nethermind.Int256
             Vector128<ulong> limb2 = Sse2.Add(csHigh, Vector128.CreateScalar((ulong)carryFlag));
 
             // And form limb3 from a comparison of prod01’s high limb with crossSum’s high:
-            uint limb3 = (uint)(Sse2.MoveMask(Avx512F.VL.CompareGreaterThan(
-                Sse2.UnpackHigh(prod1, prod1), csHigh).AsByte()) & 1);
-            Vector128<ulong> limb3Vec = Vector128.CreateScalar((ulong)limb3);
+            // Shift right each lane by 63 bits, so that 0 becomes 0 and 0xFFFFFFFFFFFFFFFF becomes 1.
+            Vector128<ulong> limb3Vec = Sse2.ShiftRightLogical(Avx512F.VL.CompareGreaterThan(
+                Sse2.UnpackHigh(prod1, prod1), csHigh), 63);
 
+            // Pack limb2 into the lower half and limb3 into the upper half.
+            Vector128<ulong> upperIntermediate = Sse2.UnpackLow(limb2, limb3Vec);
             // 7. Build the 256‑bit “intermediate” result from group‑1:
             //    Lower 128 bits = prod00 (with updated high limb)
             //    Upper 128 bits = (limb2, limb3) packed into a 128‑bit vector.
             Vector128<ulong> lowerIntermediate = prod0Updated;
-            // Pack limb2 into the lower half and limb3 into the upper half.
-            Vector128<ulong> upperIntermediate = Sse2.UnpackLow(limb2, limb3Vec);
             Vector256<ulong> intermediateResult = Vector256.Create(lowerIntermediate, upperIntermediate);
 
             // 8. Process group‑2: (prod02, prod11, prod20)
