@@ -1199,14 +1199,9 @@ namespace Nethermind.Int256
                 // Normalize the overflow mask: shift each 64-bit lane right by 63 bits.
                 // This converts a full mask (0xFFFFFFFFFFFFFFFF) to 1, leaving lanes with no overflow as 0.
                 overflowMask = Sse2.ShiftRightLogical(overflowMask, 63);
-
-                // Promote the carry from the lower lane (element 0) into the upper lane.
-                // First, swap the two 64-bit lanes so that the lower lane's carry moves to the higher lane.
-                Vector128<ulong> swappedCarry = Sse2.Shuffle(overflowMask.AsDouble(), overflowMask.AsDouble(), 0x1).AsUInt64();
-
-                // Next, clear the (now swapped) lower lane by blending with a zero vector.
-                // The immediate mask 0x1 indicates that lane 0 should come from the zero vector and lane 1 remains unchanged.
-                Vector128<ulong> promotedCarry = Sse41.Blend(swappedCarry.AsDouble(), Vector128<double>.Zero, 0x1).AsUInt64();
+                // Next, clear the (now swapped) lower lane by shuffle with a zero vector.
+                // The immediate mask 0x0 indicates that lane 0 should come from the zero vector and lane 1 from overflow.
+                Vector128<ulong> promotedCarry = Sse2.Shuffle(Vector128<double>.Zero, overflowMask.AsDouble(), 0).AsUInt64();
 
                 // Add the propagated carry to the sum.
                 return Sse2.Add(sum, promotedCarry);
