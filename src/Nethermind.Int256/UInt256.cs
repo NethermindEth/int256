@@ -1003,6 +1003,7 @@ namespace Nethermind.Int256
         /// <param name="x">The first 256‑bit unsigned integer.</param>
         /// <param name="y">The second 256‑bit unsigned integer.</param>
         /// <param name="res">When this method returns, contains the 256‑bit product of x and y.</param>
+        [SkipLocalsInit]
         public static void Multiply(in UInt256 x, in UInt256 y, out UInt256 res)
         {
             // If both inputs fit in 64 bits, use a simple multiplication routine.
@@ -1041,18 +1042,17 @@ namespace Nethermind.Int256
             }
 
             // Step 1: load the inputs and prepare the mask constant.
-            Vector256<ulong> vecX = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in x));
-            Vector256<ulong> vecY = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in y));
+            Vector512<ulong> xPermute = Vector512.Create(0ul, 0, 1, 0, 1, 2, 0, 1);
+            Vector512<ulong> yPermute = Vector512.Create(0ul, 1, 0, 2, 1, 0, 3, 2);
+            Unsafe.SkipInit(out Vector512<ulong> vecX);
+            Unsafe.SkipInit(out Vector512<ulong> vecY);
+            vecX = Avx512F.InsertVector256(vecX, Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in x)), 0);
+            vecY = Avx512F.InsertVector256(vecY, Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in y)), 0);
             Vector512<ulong> mask32 = Vector512.Create(0xFFFFFFFFUL);
 
             // Step 2: permute x and y. These operations are independent.
-            Vector256<ulong> xPerm1 = Avx2.Permute4x64(vecX, 16);  // [ x0, x0, x1, x0 ]
-            Vector256<ulong> yPerm1 = Avx2.Permute4x64(vecY, 132); // [ y0, y1, y0, y2 ]
-            Vector256<ulong> xPerm2 = Avx2.Permute4x64(vecX, 73);  // [ x1, x2, x0, x1 ]
-            Vector256<ulong> yPerm2 = Avx2.Permute4x64(vecY, 177); // [ y1, y0, y3, y2 ]
-
-            Vector512<ulong> xRearranged = Vector512.Create(xPerm1, xPerm2);
-            Vector512<ulong> yRearranged = Vector512.Create(yPerm1, yPerm2);
+            Vector512<ulong> xRearranged = Avx512F.PermuteVar8x64(vecX, xPermute);
+            Vector512<ulong> yRearranged = Avx512F.PermuteVar8x64(vecY, yPermute);
 
             // Step 3: split each 64‑bit limb into its lower and upper 32‑bit parts.
             Vector512<ulong> xLowerParts = Avx512F.And(xRearranged, mask32);
