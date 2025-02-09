@@ -1194,7 +1194,7 @@ namespace Nethermind.Int256
                 overflowMask = Sse2.ShiftRightLogical(overflowMask, 63);
                 // Next, clear the (now swapped) lower lane by shuffle with a zero vector.
                 // The immediate mask 0x0 indicates that lane 0 should come from the zero vector and lane 1 from overflow.
-                Vector128<ulong> promotedCarry = Sse2.Shuffle(Vector128<double>.Zero, overflowMask.AsDouble(), 0).AsUInt64();
+                Vector128<ulong> promotedCarry = Sse2.UnpackLow(Vector128<ulong>.Zero, overflowMask);
 
                 // Add the propagated carry to the sum.
                 return Sse2.Add(sum, promotedCarry);
