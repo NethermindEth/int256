@@ -1003,6 +1003,7 @@ namespace Nethermind.Int256
         /// <param name="x">The first 256‑bit unsigned integer.</param>
         /// <param name="y">The second 256‑bit unsigned integer.</param>
         /// <param name="res">When this method returns, contains the 256‑bit product of x and y.</param>
+        [SkipLocalsInit]
         public static void Multiply(in UInt256 x, in UInt256 y, out UInt256 res)
         {
             // If both inputs fit in 64 bits, use a simple multiplication routine.
