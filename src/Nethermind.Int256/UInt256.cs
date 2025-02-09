@@ -1049,24 +1049,14 @@ namespace Nethermind.Int256
             Vector512<ulong> u3 = Avx512DQ.MultiplyLow(xHi, yHi);
 
             // Now, compute t = (u0 >> 32) + (u1 & mask32) + (u2 & mask32)
-            Vector512<ulong> u0Hi = Avx512F.ShiftRightLogical(u0, 32);
-            Vector512<ulong> u1Lo = Avx512F.And(u1, mask32);
-            Vector512<ulong> u2Lo = Avx512F.And(u2, mask32);
-            Vector512<ulong> t = Avx512F.Add(Avx512F.Add(u0Hi, u1Lo), u2Lo);
-
-            // The extra carry: c = t >> 32.
-            Vector512<ulong> carry = Avx512F.ShiftRightLogical(t, 32);
+            Vector512<ulong> t = Avx512F.Add(Avx512F.Add(Avx512F.ShiftRightLogical(u0, 32), Avx512F.And(u1, mask32)), Avx512F.And(u2, mask32));
 
             // Now, assemble the lower 64 bits:
             // low part of u0 is u0 & mask32; low 32 bits of t are (t & mask32) shifted left 32.
-            Vector512<ulong> u0Lo = Avx512F.And(u0, mask32);
-            Vector512<ulong> tLo = Avx512F.And(t, mask32);
-            Vector512<ulong> partialLo = Avx512F.Or(u0Lo, Avx512F.ShiftLeftLogical(tLo, 32));
+            Vector512<ulong> partialLo = Avx512F.Or(Avx512F.And(u0, mask32), Avx512F.ShiftLeftLogical(Avx512F.And(t, mask32), 32));
 
-            // The high 64 bits are: u3 + (u1 >> 32) + (u2 >> 32) + c.
-            Vector512<ulong> u1Hi = Avx512F.ShiftRightLogical(u1, 32);
-            Vector512<ulong> u2Hi = Avx512F.ShiftRightLogical(u2, 32);
-            Vector512<ulong> partialHi = Avx512F.Add(Avx512F.Add(Avx512F.Add(u3, u1Hi), u2Hi), carry);
+            // The high 64 bits are: u3 + (u1 >> 32) + (u2 >> 32) + (t >> 32).
+            Vector512<ulong> partialHi = Avx512F.Add(Avx512F.Add(Avx512F.Add(u3, Avx512F.ShiftRightLogical(u1, 32)), Avx512F.ShiftRightLogical(u2, 32)), Avx512F.ShiftRightLogical(t, 32));
 
             // 4. Rearrange the six “group‑1” products (prod00, prod01, prod10, prod02, prod11, prod20)
             //    into 128‑bit quantities. (Here we use the AVX‑512 “extract 128‑bit” function to get two adjacent 64‑bit lanes.)
@@ -1133,7 +1123,7 @@ namespace Nethermind.Int256
             intermediateResult = WithUpper(intermediateResult, newUpper);
 
             // 9. Process group‑3:
-            //    Multiply “aHigh” and “bLow” (with the proper reversed order) then add in the remaining lower parts.
+            //    Multiply x23 and y10 (with the proper reversed order) then add in the remaining lower parts.
             Vector128<ulong> aHigh = Vector128.Create(x.u2, x.u3);
             Vector128<ulong> bLow = Vector128.Create(y.u1, y.u0);
             // Use the AVX512DQ MultiplyLow intrinsic (which multiplies 64‑bit integers and returns the low 64 bits)
@@ -1149,10 +1139,7 @@ namespace Nethermind.Int256
             // Now perform a horizontal add so that the two 64‑bit lanes collapse to a single 64‑bit value.
             Vector128<ulong> horizontalSum = HorizontalAdd(finalProdLow);
             // Add the horizontal sum (broadcast into the high lane) to the most–significant limb of intermediateResult.
-            Vector128<ulong> upperTemp = intermediateResult.GetUpper();
-            Vector128<ulong> hsBroadcast = Sse2.And(BroadcastLower128(horizontalSum), highMask);
-            Vector128<ulong> newUpperTemp = Sse2.Add(upperTemp, hsBroadcast);
-            intermediateResult = WithUpper(intermediateResult, newUpperTemp);
+            intermediateResult = Avx2.Add(intermediateResult, Vector256.Create(default, Sse2.And(horizontalSum, highMask)));
 
             // 10. Write out the final 256‑bit result.
             Unsafe.SkipInit(out res);
