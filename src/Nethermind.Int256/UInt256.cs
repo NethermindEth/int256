@@ -1086,10 +1086,7 @@ namespace Nethermind.Int256
             // 6. Add the low half of crossSum (i.e. its lower 64 bits) to prod00’s high limb.
             //    Instead of extracting a scalar, we broadcast the lower 64 bits to a vector.
             //    (Assume BroadcastLower128 returns a copy with both lanes equal to element0.)
-            Vector128<ulong> csLow = BroadcastLower128(crossSum);
-            // Create a mask to add only to the high lane: mask = {0, ulong.MaxValue}
-            Vector128<ulong> highMask = Vector128.Create(0ul, ulong.MaxValue);
-            Vector128<ulong> addMask = Sse2.And(csLow, highMask);
+            Vector128<ulong> addMask = Sse2.Shuffle(Vector128<double>.Zero, crossSum.AsDouble(), 0).AsUInt64();
             Vector128<ulong> prod0Updated = Sse2.Add(prod0, addMask);
 
             // Now, compute the “carry” from that addition. (Again, we must compute a one‐bit flag.)
@@ -1139,6 +1136,7 @@ namespace Nethermind.Int256
             // Now perform a horizontal add so that the two 64‑bit lanes collapse to a single 64‑bit value.
             Vector128<ulong> horizontalSum = HorizontalAdd(finalProdLow);
             // Add the horizontal sum (broadcast into the high lane) to the most–significant limb of intermediateResult.
+            Vector128<ulong> highMask = Vector128.Create(0ul, ulong.MaxValue);
             intermediateResult = Avx2.Add(intermediateResult, Vector256.Create(default, Sse2.And(horizontalSum, highMask)));
 
             // 10. Write out the final 256‑bit result.
@@ -1170,13 +1168,6 @@ namespace Nethermind.Int256
                 return Sse2.Shuffle(vec.AsUInt32(), 0xEE).AsUInt64();
             }
 
-            // Helpers to “broadcast” the lower or upper 64‐bit lane of a Vector128<ulong>.
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            static Vector128<ulong> BroadcastLower128(Vector128<ulong> vec)
-            {
-                // Replicate element0 to both lanes.
-                return Sse2.Shuffle(vec.AsDouble(), vec.AsDouble(), 0).AsUInt64();
-            }
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             static Vector128<ulong> BroadcastUpper128(Vector128<ulong> vec)
             {
