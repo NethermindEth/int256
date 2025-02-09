@@ -1086,7 +1086,7 @@ namespace Nethermind.Int256
             // 6. Add the low half of crossSum (i.e. its lower 64 bits) to prod00’s high limb.
             //    Instead of extracting a scalar, we broadcast the lower 64 bits to a vector.
             //    (Assume BroadcastLower128 returns a copy with both lanes equal to element0.)
-            Vector128<ulong> addMask = Sse2.Shuffle(Vector128<double>.Zero, crossSum.AsDouble(), 0).AsUInt64();
+            Vector128<ulong> addMask = Sse2.UnpackLow(Vector128<ulong>.Zero, crossSum);
             Vector128<ulong> prod0Updated = Sse2.Add(prod0, addMask);
 
             // Now, compute the “carry” from that addition. (Again, we must compute a one‐bit flag.)
