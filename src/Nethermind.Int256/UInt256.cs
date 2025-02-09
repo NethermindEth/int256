@@ -1091,8 +1091,8 @@ namespace Nethermind.Int256
 
             // Now, compute the “carry” from that addition. (Again, we must compute a one‐bit flag.)
             uint carryFlag = (uint)Sse2.MoveMask(Avx512F.VL.CompareLessThan(
-                ExtractHighLimb(prod0Updated), // compare updated high limb...
-                ExtractHighLimb(prod0)         // ...with the original high limb
+                Sse2.UnpackHigh(prod0Updated, prod0Updated), // compare updated high limb...
+                Sse2.UnpackHigh(prod0, prod0)         // ...with the original high limb
                 ).AsByte()) & 1;
             // Add the carry to the high half of crossSum. (Broadcast the carry into a 128‑bit vector.)
             Vector128<ulong> csHigh = BroadcastUpper128(crossSum);
@@ -1100,7 +1100,7 @@ namespace Nethermind.Int256
 
             // And form limb3 from a comparison of prod01’s high limb with crossSum’s high:
             uint limb3 = (uint)(Sse2.MoveMask(Avx512F.VL.CompareGreaterThan(
-                ExtractHighLimb(prod1), csHigh).AsByte()) & 1);
+                Sse2.UnpackHigh(prod1, prod1), csHigh).AsByte()) & 1);
             Vector128<ulong> limb3Vec = Vector128.CreateScalar((ulong)limb3);
 
             // 7. Build the 256‑bit “intermediate” result from group‑1:
@@ -1153,13 +1153,6 @@ namespace Nethermind.Int256
             {
                 // Replace the upper 128 bits of vec with upper.
                 return Avx2.InsertVector128(vec, upper, 1);
-            }
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            static Vector128<ulong> ExtractHighLimb(Vector128<ulong> vec)
-            {
-                // Reinterpret the 64-bit vector as 32-bit elements, shuffle to replicate the upper 64-bit limb,
-                // then reinterpret back as 64-bit.
-                return Sse2.Shuffle(vec.AsUInt32(), 0xEE).AsUInt64();
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
