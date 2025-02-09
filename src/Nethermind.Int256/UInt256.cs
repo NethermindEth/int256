@@ -1092,6 +1092,8 @@ namespace Nethermind.Int256
             Vector128<ulong> product4 = Avx512F.ExtractVector128(productLow, 2);
             Vector128<ulong> product5 = Avx512F.ExtractVector128(productHi, 2);
 
+            Vector128<ulong> xHigh = Vector128.Create(x.u2, x.u3);
+            Vector128<ulong> yLow = Vector128.Create(y.u1, y.u0);
             // 5. Group 1 cross‑term addition:
             // Compute crossSum = product1 + product2 (as 128‑bit numbers).
             Vector128<ulong> crossSum = Add128(product1, product2);
@@ -1118,7 +1120,6 @@ namespace Nethermind.Int256
 
             // Pack limb2 (low) and limb3 (high) to form the new upper half.
             Vector128<ulong> upperIntermediate = Sse2.UnpackLow(limb2, limb3);
-
 
             // 8. Group 2 combination:
             // Sum product3, product4, and product5.
