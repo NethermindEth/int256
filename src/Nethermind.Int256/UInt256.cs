@@ -1076,24 +1076,21 @@ namespace Nethermind.Int256
                                                      Avx512F.ShiftRightLogical(prodHL, 32)),
                                                  Avx512F.ShiftRightLogical(termT, 32));
 
+            Vector512<ulong> productLow = Avx512F.UnpackLow(lowerPartial, higherPartial);
+            Vector512<ulong> productHi = Avx512F.UnpackHigh(lowerPartial, higherPartial);
+
             // 4. Unpack the 512‑bit partial results into six 128‑bit values.
             // Group 1 (products 0 and 1):
-            Vector128<ulong> pair01Lo = Avx512F.ExtractVector128(lowerPartial, 0); // lanes 0–1: product0 (low), product1 (low)
-            Vector128<ulong> pair01Hi = Avx512F.ExtractVector128(higherPartial, 0); // lanes 0–1: product0 (high), product1 (high)
-            Vector128<ulong> product0 = Sse2.UnpackLow(pair01Lo, pair01Hi);  // product0 = { low, high }
-            Vector128<ulong> product1 = Sse2.UnpackHigh(pair01Lo, pair01Hi); // product1 = { low, high }
+            Vector128<ulong> product0 = Avx512F.ExtractVector128(productLow, 0);
+            Vector128<ulong> product1 = Avx512F.ExtractVector128(productHi, 0);
 
             // Group 2 (products 2 and 3):
-            Vector128<ulong> pair23Lo = Avx512F.ExtractVector128(lowerPartial, 1); // lanes 2–3
-            Vector128<ulong> pair23Hi = Avx512F.ExtractVector128(higherPartial, 1); // lanes 2–3
-            Vector128<ulong> product2 = Sse2.UnpackLow(pair23Lo, pair23Hi);
-            Vector128<ulong> product3 = Sse2.UnpackHigh(pair23Lo, pair23Hi);
+            Vector128<ulong> product2 = Avx512F.ExtractVector128(productLow, 1);
+            Vector128<ulong> product3 = Avx512F.ExtractVector128(productHi, 1);
 
             // Group 3 (products 4 and 5):
-            Vector128<ulong> pair45Lo = Avx512F.ExtractVector128(lowerPartial, 2); // lanes 4–5
-            Vector128<ulong> pair45Hi = Avx512F.ExtractVector128(higherPartial, 2); // lanes 4–5
-            Vector128<ulong> product4 = Sse2.UnpackLow(pair45Lo, pair45Hi);
-            Vector128<ulong> product5 = Sse2.UnpackHigh(pair45Lo, pair45Hi);
+            Vector128<ulong> product4 = Avx512F.ExtractVector128(productLow, 2);
+            Vector128<ulong> product5 = Avx512F.ExtractVector128(productHi, 2);
 
             // 5. Group 1 cross‑term addition:
             // Compute crossSum = product1 + product2 (as 128‑bit numbers).
