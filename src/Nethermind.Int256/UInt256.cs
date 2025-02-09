@@ -1012,56 +1012,61 @@ namespace Nethermind.Int256
             }
 
             // 1. Load the 256‐bit inputs into 256‐bit vector registers.
-            Vector256<ulong> aVector = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in x));
-            Vector256<ulong> bVector = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in y));
-
-            // 2. Rearrange the 64‐bit limbs into 512‐bit vectors.
-            Vector256<ulong> aPerm0 = Avx2.Permute4x64(aVector, 16);
-            Vector256<ulong> aPerm1 = Avx2.Permute4x64(aVector, 73);
-            Vector512<ulong> rearrangedA = Vector512.Create(aPerm0, aPerm1);
-
-            Vector256<ulong> bPerm0 = Avx2.Permute4x64(bVector, 132);
-            Vector256<ulong> bPerm1 = Avx2.Permute4x64(bVector, 177);
-            Vector512<ulong> rearrangedB = Vector512.Create(bPerm0, bPerm1);
-
-            // 3. Multiply the corresponding 64‐bit limbs.
+            Vector256<ulong> x0123 = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in x));
+            Vector256<ulong> y0123 = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in y));
 
             // Mask for the lower 32 bits.
             Vector512<ulong> mask32 = Vector512.Create(0xFFFFFFFFUL);
 
+            // 2. Rearrange the 64‐bit limbs into 512‐bit vectors.
+            // x0010 = [ x0, x0, x1, x0 ]
+            Vector256<ulong> x0010 = Avx2.Permute4x64(x0123, 16);
+            // x1201 = [ x1, x2, x0, x1 ]
+            Vector256<ulong> x1201 = Avx2.Permute4x64(x0123, 73);
+            // x00101201 = [ x0, x0, x1, x0, x1, x2, x0, x1 ]
+            Vector512<ulong> x00101201 = Vector512.Create(x0010, x1201);
+
+            // y0102 = [ y0, y1, y0, y2 ] 
+            Vector256<ulong> y0102 = Avx2.Permute4x64(y0123, 132);
+            // y1032 = [ y1, y0, y3, y2 ]
+            Vector256<ulong> y1032 = Avx2.Permute4x64(y0123, 177);
+            // y01021032 = [ y0, y1, y0, y2, y1, y0, y3, y2 ]
+            Vector512<ulong> y01021032 = Vector512.Create(y0102, y1032);
+
+            // 3. Multiply the corresponding 64‐bit limbs.
+
             // Split each 64-bit operand into 32-bit halves:
-            // a0 = lower 32 bits, a1 = upper 32 bits
-            Vector512<ulong> a0 = Avx512F.And(rearrangedA, mask32);
-            Vector512<ulong> a1 = Avx512F.ShiftRightLogical(rearrangedA, 32);
-            Vector512<ulong> b0 = Avx512F.And(rearrangedB, mask32);
-            Vector512<ulong> b1 = Avx512F.ShiftRightLogical(rearrangedB, 32);
+            Vector512<ulong> xLo = Avx512F.And(x00101201, mask32);
+            Vector512<ulong> xHi = Avx512F.ShiftRightLogical(x00101201, 32);
+            Vector512<ulong> yLo = Avx512F.And(y01021032, mask32);
+            Vector512<ulong> yHi = Avx512F.ShiftRightLogical(y01021032, 32);
 
             // Compute the four 32x32 partial products.
             // Each multiplication here is on 32-bit values, so the result fits in 64 bits.
-            Vector512<ulong> u0 = Avx512DQ.MultiplyLow(a0, b0); // a0 * b0
-            Vector512<ulong> u1 = Avx512DQ.MultiplyLow(a0, b1); // a0 * b1
-            Vector512<ulong> u2 = Avx512DQ.MultiplyLow(a1, b0); // a1 * b0
-            Vector512<ulong> u3 = Avx512DQ.MultiplyLow(a1, b1); // a1 * b1
+            Vector512<ulong> u0 = Avx512DQ.MultiplyLow(xLo, yLo);
+            Vector512<ulong> u1 = Avx512DQ.MultiplyLow(xLo, yHi);
+            Vector512<ulong> u2 = Avx512DQ.MultiplyLow(xHi, yLo);
+            Vector512<ulong> u3 = Avx512DQ.MultiplyLow(xHi, yHi);
 
             // Now, compute t = (u0 >> 32) + (u1 & mask32) + (u2 & mask32)
-            Vector512<ulong> u0_hi = Avx512F.ShiftRightLogical(u0, 32);
-            Vector512<ulong> u1_lo = Avx512F.And(u1, mask32);
-            Vector512<ulong> u2_lo = Avx512F.And(u2, mask32);
-            Vector512<ulong> t = Avx512F.Add(Avx512F.Add(u0_hi, u1_lo), u2_lo);
+            Vector512<ulong> u0Hi = Avx512F.ShiftRightLogical(u0, 32);
+            Vector512<ulong> u1Lo = Avx512F.And(u1, mask32);
+            Vector512<ulong> u2Lo = Avx512F.And(u2, mask32);
+            Vector512<ulong> t = Avx512F.Add(Avx512F.Add(u0Hi, u1Lo), u2Lo);
 
             // The extra carry: c = t >> 32.
-            Vector512<ulong> c = Avx512F.ShiftRightLogical(t, 32);
+            Vector512<ulong> carry = Avx512F.ShiftRightLogical(t, 32);
 
             // Now, assemble the lower 64 bits:
             // low part of u0 is u0 & mask32; low 32 bits of t are (t & mask32) shifted left 32.
-            Vector512<ulong> u0_lo = Avx512F.And(u0, mask32);
-            Vector512<ulong> t_lo = Avx512F.And(t, mask32);
-            Vector512<ulong> partialLo = Avx512F.Or(u0_lo, Avx512F.ShiftLeftLogical(t_lo, 32));
+            Vector512<ulong> u0Lo = Avx512F.And(u0, mask32);
+            Vector512<ulong> tLo = Avx512F.And(t, mask32);
+            Vector512<ulong> partialLo = Avx512F.Or(u0Lo, Avx512F.ShiftLeftLogical(tLo, 32));
 
             // The high 64 bits are: u3 + (u1 >> 32) + (u2 >> 32) + c.
-            Vector512<ulong> u1_hi = Avx512F.ShiftRightLogical(u1, 32);
-            Vector512<ulong> u2_hi = Avx512F.ShiftRightLogical(u2, 32);
-            Vector512<ulong> partialHi = Avx512F.Add(Avx512F.Add(Avx512F.Add(u3, u1_hi), u2_hi), c);
+            Vector512<ulong> u1Hi = Avx512F.ShiftRightLogical(u1, 32);
+            Vector512<ulong> u2Hi = Avx512F.ShiftRightLogical(u2, 32);
+            Vector512<ulong> partialHi = Avx512F.Add(Avx512F.Add(Avx512F.Add(u3, u1Hi), u2Hi), carry);
 
             // 4. Rearrange the six “group‑1” products (prod00, prod01, prod10, prod02, prod11, prod20)
             //    into 128‑bit quantities. (Here we use the AVX‑512 “extract 128‑bit” function to get two adjacent 64‑bit lanes.)
