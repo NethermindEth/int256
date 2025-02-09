@@ -1136,8 +1136,9 @@ namespace Nethermind.Int256
             // Now perform a horizontal add so that the two 64‑bit lanes collapse to a single 64‑bit value.
             Vector128<ulong> horizontalSum = HorizontalAdd(finalProdLow);
             // Add the horizontal sum (broadcast into the high lane) to the most–significant limb of intermediateResult.
-            Vector128<ulong> highMask = Vector128.Create(0ul, ulong.MaxValue);
-            intermediateResult = Avx2.Add(intermediateResult, Vector256.Create(default, Sse2.And(horizontalSum, highMask)));
+            // 2. Use a shuffle with a zero vector to directly form { 0, horizontalSum[0] }
+            Vector128<ulong> high = Sse2.Shuffle(Vector128<double>.Zero, horizontalSum.AsDouble(), 0).AsUInt64();
+            intermediateResult = Avx2.Add(intermediateResult, Vector256.Create(Vector128<ulong>.Zero, high));
 
             // 10. Write out the final 256‑bit result.
             Unsafe.SkipInit(out res);
