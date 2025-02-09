@@ -1128,7 +1128,6 @@ namespace Nethermind.Int256
             Vector128<ulong> newUpper = Add128(upperIntermediate, totalGroup2);
             // 7. Build the intermediate 256‑bit result.
             // Lower 128 bits come from the updated product0; upper 128 bits come from (limb2, limb3).
-            Vector256<ulong> intermediateResult = Vector256.Create(updatedProduct0, newUpper);
 
             // 9. Group 3 cross‑terms:
             // Multiply the high limbs of x (x.u2, x.u3) with the low limbs of y (y.u1, y.u0) in reversed order.
@@ -1144,7 +1143,8 @@ namespace Nethermind.Int256
             Vector128<ulong> horizontalSum = Sse2.Add(finalProdLow, swappedFinal);
             // Add the horizontal sum (broadcast into the high lane) to the most‑significant limb.
             Vector128<ulong> highCarry = Sse2.UnpackHigh(Vector128<ulong>.Zero, horizontalSum);
-            intermediateResult = Avx2.Add(intermediateResult, Vector256.Create(Vector128<ulong>.Zero, highCarry));
+            newUpper = Sse2.Add(newUpper, highCarry);
+            Vector256<ulong> intermediateResult = Vector256.Create(updatedProduct0, newUpper);
 
             // 10. Write out the final 256‑bit result.
             Unsafe.SkipInit(out res);
