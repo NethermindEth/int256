@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
@@ -116,6 +116,8 @@ namespace Nethermind.Int256.Benchmark
                     return CoreRuntime.Core70;
                 case RuntimeMoniker.Net80:
                     return CoreRuntime.Core80;
+                case RuntimeMoniker.Net90:
+                    return CoreRuntime.Core90;
                 case RuntimeMoniker.Mono:
                     return MonoRuntime.Default;
                 case RuntimeMoniker.NativeAot60:
