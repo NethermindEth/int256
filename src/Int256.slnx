@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="Nethermind.Int256.Benchmark/Nethermind.Int256.Benchmark.csproj" />
+  <Project Path="Nethermind.Int256.Test/Nethermind.Int256.Test.csproj" />
+  <Project Path="Nethermind.Int256/Nethermind.Int256.csproj" />
+</Solution>
