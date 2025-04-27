@@ -283,10 +283,10 @@ namespace Nethermind.Int256
         {
             get
             {
-                if (Avx.IsSupported)
+                if (Vector256<uint>.IsSupported)
                 {
                     var v = Unsafe.As<ulong, Vector256<ulong>>(ref Unsafe.AsRef(in u0));
-                    return Avx.TestZ(v, v);
+                    return v == default;
                 }
                 else
                 {
@@ -299,7 +299,7 @@ namespace Nethermind.Int256
         {
             get
             {
-                if (Avx.IsSupported)
+                if (Vector256<uint>.IsSupported)
                 {
                     var v = Unsafe.As<ulong, Vector256<ulong>>(ref Unsafe.AsRef(in u0));
                     return v == Vector256.CreateScalar(1UL);
@@ -1689,12 +1689,12 @@ namespace Nethermind.Int256
 
         public static void Not(in UInt256 a, out UInt256 res)
         {
-            if (Avx2.IsSupported)
+            if (Vector256<ulong>.IsSupported)
             {
                 var av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
                 // Mark res as initalized so we can use it as left said of ref assignment
                 Unsafe.SkipInit(out res);
-                Unsafe.As<UInt256, Vector256<ulong>>(ref res) = Avx2.Xor(av, Vector256<ulong>.AllBitsSet);
+                Unsafe.As<UInt256, Vector256<ulong>>(ref res) = Vector256.Xor(av, Vector256<ulong>.AllBitsSet);
             }
             else
             {
@@ -1708,13 +1708,13 @@ namespace Nethermind.Int256
 
         public static void Or(in UInt256 a, in UInt256 b, out UInt256 res)
         {
-            if (Avx2.IsSupported)
+            if (Vector256<ulong>.IsSupported)
             {
                 var av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
                 var bv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
                 // Mark res as initalized so we can use it as left said of ref assignment
                 Unsafe.SkipInit(out res);
-                Unsafe.As<UInt256, Vector256<ulong>>(ref res) = Avx2.Or(av, bv);
+                Unsafe.As<UInt256, Vector256<ulong>>(ref res) = Vector256.BitwiseOr(av, bv);
             }
             else
             {
@@ -1730,13 +1730,13 @@ namespace Nethermind.Int256
 
         public static void And(in UInt256 a, in UInt256 b, out UInt256 res)
         {
-            if (Avx2.IsSupported)
+            if (Vector256<ulong>.IsSupported)
             {
                 var av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
                 var bv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
                 // Mark res as initalized so we can use it as left said of ref assignment
                 Unsafe.SkipInit(out res);
-                Unsafe.As<UInt256, Vector256<ulong>>(ref res) = Avx2.And(av, bv);
+                Unsafe.As<UInt256, Vector256<ulong>>(ref res) = Vector256.BitwiseAnd(av, bv);
             }
             else
             {
@@ -1752,13 +1752,13 @@ namespace Nethermind.Int256
 
         public static void Xor(in UInt256 a, in UInt256 b, out UInt256 res)
         {
-            if (Avx2.IsSupported)
+            if (Vector256<long>.IsSupported)
             {
                 var av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
                 var bv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
                 // Mark res as initalized so we can use it as left said of ref assignment
                 Unsafe.SkipInit(out res);
-                Unsafe.As<UInt256, Vector256<ulong>>(ref res) = Avx2.Xor(av, bv);
+                Unsafe.As<UInt256, Vector256<ulong>>(ref res) = Vector256.Xor(av, bv);
             }
             else
             {
@@ -2018,7 +2018,7 @@ namespace Nethermind.Int256
 
         public bool Equals(uint other)
         {
-            if (Avx.IsSupported)
+            if (Vector256<uint>.IsSupported)
             {
                 var v = Unsafe.As<ulong, Vector256<uint>>(ref Unsafe.AsRef(in u0));
                 return v == Vector256.CreateScalar(other);
@@ -2033,7 +2033,7 @@ namespace Nethermind.Int256
 
         public bool Equals(ulong other)
         {
-            if (Avx.IsSupported)
+            if (Vector256<uint>.IsSupported)
             {
                 var v = Unsafe.As<ulong, Vector256<ulong>>(ref Unsafe.AsRef(in u0));
                 return v == Vector256.CreateScalar(other);
