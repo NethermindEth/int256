@@ -685,5 +685,107 @@ namespace Nethermind.Int256.Test
             var UintParsedValue = UInt256.Parse(hexValueWith66Zeroes);
             Assert.That((UInt256)bigIntWith66Zeroes, Is.EqualTo(UintParsedValue));
         }
+
+        [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
+        public void ComparisonOperators((BigInteger A, BigInteger B) test)
+        {
+            UInt256 uint256a = convert(test.A);
+            UInt256 uint256b = convert(test.B);
+
+            (uint256a < uint256b).Should().Be(test.A < test.B);
+            (uint256a <= uint256b).Should().Be(test.A <= test.B);
+            (uint256a > uint256b).Should().Be(test.A > test.B);
+            (uint256a >= uint256b).Should().Be(test.A >= test.B);
+            (uint256a == uint256b).Should().Be(test.A == test.B);
+
+            // Test overloads ulong, long, uint, int
+            if (test.A <= ulong.MaxValue)
+            {
+                ulong a = (ulong)test.A;
+
+                (a < uint256b).Should().Be(a < test.B);
+                (a <= uint256b).Should().Be(a <= test.B);
+                (a > uint256b).Should().Be(a > test.B);
+                (a >= uint256b).Should().Be(a >= test.B);
+                (a == uint256b).Should().Be(a == test.B);
+            }
+
+            if (test.A <= long.MaxValue)
+            {
+                long a = (long)test.A;
+
+                (a < uint256b).Should().Be(a < test.B);
+                (a <= uint256b).Should().Be(a <= test.B);
+                (a > uint256b).Should().Be(a > test.B);
+                (a >= uint256b).Should().Be(a >= test.B);
+                (a == uint256b).Should().Be(a == test.B);
+            }
+
+            if (test.A <= uint.MaxValue)
+            {
+                uint a = (uint)test.A;
+
+                (a < uint256b).Should().Be(a < test.B);
+                (a <= uint256b).Should().Be(a <= test.B);
+                (a > uint256b).Should().Be(a > test.B);
+                (a >= uint256b).Should().Be(a >= test.B);
+                (a == uint256b).Should().Be(a == test.B);
+            }
+
+            if (test.A <= int.MaxValue)
+            {
+                int a = (int)test.A;
+
+                (a < uint256b).Should().Be(a < test.B);
+                (a <= uint256b).Should().Be(a <= test.B);
+                (a > uint256b).Should().Be(a > test.B);
+                (a >= uint256b).Should().Be(a >= test.B);
+                (a == uint256b).Should().Be(a == test.B);
+            }
+
+            if (test.B <= ulong.MaxValue)
+            {
+                ulong b = (ulong)test.B;
+
+                (uint256a < b).Should().Be(test.A < b);
+                (uint256a <= b).Should().Be(test.A <= b);
+                (uint256a > b).Should().Be(test.A > b);
+                (uint256a >= b).Should().Be(test.A >= b);
+                (uint256a == b).Should().Be(test.A == b);
+            }
+
+            if (test.B <= long.MaxValue)
+            {
+                long b = (long)test.B;
+
+                (uint256a < b).Should().Be(test.A < b);
+                (uint256a <= b).Should().Be(test.A <= b);
+                (uint256a > b).Should().Be(test.A > b);
+                (uint256a >= b).Should().Be(test.A >= b);
+                (uint256a == b).Should().Be(test.A == b);
+            }
+
+            if (test.B <= uint.MaxValue)
+            {
+                uint b = (uint)test.B;
+
+                (uint256a < b).Should().Be(test.A < b);
+                (uint256a <= b).Should().Be(test.A <= b);
+                (uint256a > b).Should().Be(test.A > b);
+                (uint256a >= b).Should().Be(test.A >= b);
+                (uint256a == b).Should().Be(test.A == b);
+            }
+
+            if (test.B <= int.MaxValue)
+            {
+                int b = (int)test.B;
+
+                (uint256a < b).Should().Be(test.A < b);
+                (uint256a <= b).Should().Be(test.A <= b);
+                (uint256a > b).Should().Be(test.A > b);
+                (uint256a >= b).Should().Be(test.A >= b);
+                (uint256a == b).Should().Be(test.A == b);
+            }
+        }
     }
 }
