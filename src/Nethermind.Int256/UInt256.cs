@@ -15,6 +15,11 @@ namespace Nethermind.Int256
     [StructLayout(LayoutKind.Explicit)]
     public readonly struct UInt256 : IEquatable<UInt256>, IComparable, IComparable<UInt256>, IInteger<UInt256>, IConvertible
     {
+        // Ensure that hashes are different for every run of the node and every node, so if are any hash collisions on
+        // one node they will not be the same on another node or across a restart so hash collision cannot be used to degrade
+        // the performance of the network as a whole.
+        private static readonly uint s_instanceRandom = (uint)System.Security.Cryptography.RandomNumberGenerator.GetInt32(int.MinValue, int.MaxValue);
+
         public static readonly UInt256 Zero = 0ul;
         public static readonly UInt256 One = 1ul;
         public static readonly UInt256 MinValue = Zero;
@@ -2059,7 +2064,22 @@ namespace Nethermind.Int256
 
         public override bool Equals(object? obj) => obj is UInt256 other && Equals(other);
 
-        public override int GetHashCode() => HashCode.Combine(u0, u1, u2, u3);
+        [SkipLocalsInit]
+        public override int GetHashCode()
+        {
+            // Very fast hardware accelerated non-cryptographic hash function
+
+            // Start with instance random, length and first ulong as seed
+            uint hash = BitOperations.Crc32C(s_instanceRandom, u0);
+
+            // Crc32C is 3 cycle latency, 1 cycle throughput
+            // So we us same initial 3 times to not create a dependency chain
+            uint hash0 = BitOperations.Crc32C(hash, u1);
+            uint hash1 = BitOperations.Crc32C(hash, u2);
+            uint hash2 = BitOperations.Crc32C(hash, u3);
+            // Combine the 3 hashes; performing the shift on first crc to calculate
+            return (int)BitOperations.Crc32C(hash1, ((ulong)hash0 << (sizeof(uint) * 8)) | hash2);
+        }
 
         public ulong this[int index] => index switch
         {
