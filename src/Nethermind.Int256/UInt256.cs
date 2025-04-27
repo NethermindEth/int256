@@ -919,12 +919,12 @@ namespace Nethermind.Int256
                 else
                 {
                     // Invert top bits as Avx2.CompareGreaterThan is only available for longs, not unsigned
-                    Vector256<ulong> resultSigned = Avx2.Xor(result, Vector256.Create<ulong>(0x8000_0000_0000_0000));
-                    Vector256<ulong> avSigned = Avx2.Xor(av, Vector256.Create<ulong>(0x8000_0000_0000_0000));
+                    Vector256<ulong> signFlip = Vector256.Create(0x8000_0000_0000_0000UL);
+                    Vector256<ulong> resultSigned = Avx2.Xor(result, signFlip);
+                    Vector256<ulong> avSigned = Avx2.Xor(av, signFlip);
 
                     // Which vectors need to borrow from the next
-                    vBorrow = Avx2.CompareGreaterThan(Unsafe.As<Vector256<ulong>, Vector256<long>>(ref resultSigned),
-                                                          Unsafe.As<Vector256<ulong>, Vector256<long>>(ref avSigned)).AsUInt64();
+                    vBorrow = Avx2.CompareGreaterThan(resultSigned.AsInt64(), avSigned.AsInt64()).AsUInt64();
                 }
                 // Move borrow from Vector space to int
                 int borrow = Avx.MoveMask(vBorrow.AsDouble());
@@ -1957,13 +1957,53 @@ namespace Nethermind.Int256
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static bool LessThan(in UInt256 a, in UInt256 b)
         {
-            if (a.u3 != b.u3)
-                return a.u3 < b.u3;
-            if (a.u2 != b.u2)
-                return a.u2 < b.u2;
-            if (a.u1 != b.u1)
-                return a.u1 < b.u1;
-            return a.u0 < b.u0;
+            if (!Avx2.IsSupported)
+            {
+                // If AVX2 isn't supported, fall back to the straightforward scalar code.
+                if (a.u3 != b.u3)
+                    return a.u3 < b.u3;
+                if (a.u2 != b.u2)
+                    return a.u2 < b.u2;
+                if (a.u1 != b.u1)
+                    return a.u1 < b.u1;
+                return a.u0 < b.u0;
+            }
+
+            // Load the four 64-bit words into a 256-bit register.
+            Vector256<ulong> vecL = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
+            Vector256<ulong> vecR = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
+            // Build a 4-bit mask where bit i = 1 if vecL[i] == vecR[i].
+            uint equalityMask = (uint)Avx.MoveMask(Avx2.CompareEqual(vecL, vecR).AsDouble());
+
+            Vector256<ulong> lessThan;
+            if (Avx512F.VL.IsSupported)
+            {
+                // Native AVX-512 unsigned 64-bit compare
+                lessThan = Avx512F.VL.CompareLessThan(vecL, vecR);
+            }
+            else
+            {
+                // AVX2: reinterpret as signed by flipping the high bit of each lane.
+                var signFlip = Vector256.Create(0x8000_0000_0000_0000UL);
+                Vector256<long> sL = Avx2.Xor(vecL, signFlip).AsInt64();
+                Vector256<long> sR = Avx2.Xor(vecR, signFlip).AsInt64();
+
+                // CompareGreaterThan(sR, sL), reverse order yields all-ones in lane i if original vecL[i]<vecR[i].
+                lessThan = Avx2.CompareGreaterThan(sR, sL).AsUInt64();
+            }
+
+            // Build a 4-bit mask where bit i = 1 if vecL[i] < vecR[i] (unsigned).
+            uint lessThanMask = (uint)Avx.MoveMask(lessThan.AsDouble());
+            // diffMask has a 1 wherever the lanes actually differ.
+            uint diffMask = (~equalityMask) & 0xF;
+            if (diffMask == 0)
+                return false;   // all lanes equal ⇒ operands are identical
+
+            // Find the index (0=Low0 ... 3=High) of the most significant differing lane.
+            int mswIndex = BitOperations.Log2(diffMask);
+
+            // Return whether that lane indicates left < right.
+            return ((lessThanMask >> mswIndex) & 1) != 0;
         }
 
         public static bool operator ==(in UInt256 a, int b) => a.Equals(b);
