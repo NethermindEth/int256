@@ -2113,7 +2113,7 @@ namespace Nethermind.Int256
             uint hash = BitOperations.Crc32C(s_instanceRandom, u0);
 
             // Crc32C is 3 cycle latency, 1 cycle throughput
-            // So we us same initial 3 times to not create a dependency chain
+            // So we use same initial 3 times to not create a dependency chain
             uint hash0 = BitOperations.Crc32C(hash, u1);
             uint hash1 = BitOperations.Crc32C(hash, u2);
             uint hash2 = BitOperations.Crc32C(hash, u3);
