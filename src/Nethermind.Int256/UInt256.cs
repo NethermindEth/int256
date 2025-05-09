@@ -643,6 +643,23 @@ namespace Nethermind.Int256
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static int LeadingZeros(ulong x) => BitOperations.LeadingZeroCount(x);
 
+        // It avoids c#'s way of shifting a 64-bit number by 64-bit, i.e. in c# a << 64 == a, in our version a << 64 == 0.
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static ulong Lsh(ulong a, int n)
+        {
+            var n1 = n >> 1;
+            var n2 = n - n1;
+            return (a << n1) << n2;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static ulong Rsh(ulong a, int n)
+        {
+            var n1 = n >> 1;
+            var n2 = n - n1;
+            return (a >> n1) >> n2;
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static ulong NativeLsh(ulong a, int n)
         {
@@ -701,10 +718,10 @@ namespace Nethermind.Int256
             }
 
             Span<ulong> un = stackalloc ulong[uLen + 1];
-            un[uLen] = NativeRsh(Unsafe.Add(ref u, uLen - 1), 64 - shift);
+            un[uLen] = Rsh(Unsafe.Add(ref u, uLen - 1), 64 - shift);
             for (int i = uLen - 1; i > 0; i--)
             {
-                un[i] = NativeLsh(Unsafe.Add(ref u, i), shift) | NativeRsh(Unsafe.Add(ref u, i - 1), 64 - shift);
+                un[i] = NativeLsh(Unsafe.Add(ref u, i), shift) | Rsh(Unsafe.Add(ref u, i - 1), 64 - shift);
             }
 
             un[0] = NativeLsh(u, shift);
@@ -727,13 +744,13 @@ namespace Nethermind.Int256
             switch (dLen)
             {
                 case 4:
-                    dn3 = NativeLsh(d.u3, shift) | NativeRsh(d.u2, 64 - shift);
+                    dn3 = NativeLsh(d.u3, shift) | Rsh(d.u2, 64 - shift);
                     goto case 3;
                 case 3:
-                    dn2 = NativeLsh(d.u2, shift) | NativeRsh(d.u1, 64 - shift);
+                    dn2 = NativeLsh(d.u2, shift) | Rsh(d.u1, 64 - shift);
                     goto case 2;
                 case 2:
-                    dn1 = NativeLsh(d.u1, shift) | NativeRsh(d.u0, 64 - shift);
+                    dn1 = NativeLsh(d.u1, shift) | Rsh(d.u0, 64 - shift);
                     break;
             }
             Span<ulong> dnS = stackalloc ulong[4] { dn0, dn1, dn2, dn3 };
@@ -759,11 +776,11 @@ namespace Nethermind.Int256
             }
 
         r3:
-            rem2 = NativeRsh(un[2], shift) | NativeLsh(un[3], 64 - shift);
+            rem2 = NativeRsh(un[2], shift) | Lsh(un[3], 64 - shift);
         r2:
-            rem1 = NativeRsh(un[1], shift) | NativeLsh(un[2], 64 - shift);
+            rem1 = NativeRsh(un[1], shift) | Lsh(un[2], 64 - shift);
         r1:
-            rem0 = NativeRsh(un[0], shift) | NativeLsh(un[1], 64 - shift);
+            rem0 = NativeRsh(un[0], shift) | Lsh(un[1], 64 - shift);
         r0:
 
             rem = new UInt256(rem0, rem1, rem2, rem3);
@@ -1426,7 +1443,7 @@ namespace Nethermind.Int256
 
             ulong yn1 = y >> 32;
             ulong yn0 = y & mask32;
-            ulong un32 = NativeLsh(hi, s) | NativeRsh(lo, (64 - s));
+            ulong un32 = NativeLsh(hi, s) | Rsh(lo, (64 - s));
             ulong un10 = NativeLsh(lo, s);
             ulong un1 = un10 >> 32;
             ulong un0 = un10 & mask32;
