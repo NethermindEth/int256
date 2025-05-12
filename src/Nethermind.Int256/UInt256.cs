@@ -6,6 +6,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics.X86;
 using System.Runtime.Intrinsics;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 
 [assembly: InternalsVisibleTo("Nethermind.Int256.Test")]
@@ -663,12 +664,14 @@ namespace Nethermind.Int256
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static ulong NativeLsh(ulong a, int n)
         {
+            Debug.Assert(n < 64);
             return a << n;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static ulong NativeRsh(ulong a, int n)
         {
+            Debug.Assert(n < 64);
             return a >> n;
         }
 
