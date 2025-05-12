@@ -704,7 +704,7 @@ namespace Nethermind.Int256
             }
             else
             {
-                throw new DivideByZeroException();
+                ThrowDivideByZeroException("d == 0");
             }
 
             int uLen = 0;
@@ -1430,7 +1430,7 @@ namespace Nethermind.Int256
             const ulong mask32 = two32 - 1;
             if (y == 0)
             {
-                ThrowDivideByZeroException();
+                ThrowDivideByZeroException("y == 0");
             }
 
             if (y <= hi)
@@ -2223,7 +2223,7 @@ namespace Nethermind.Int256
         public ulong ToUInt64(IFormatProvider? provider) => System.Convert.ToUInt64(ToDecimal(provider), provider);
 
         [DoesNotReturn]
-        private static void ThrowDivideByZeroException() => throw new DivideByZeroException("y == 0");
+        private static void ThrowDivideByZeroException(string message) => throw new DivideByZeroException(message);
 
         [DoesNotReturn]
         private static void ThrowOverflowException(string message) => throw new OverflowException(message);
