@@ -672,8 +672,13 @@ namespace Nethermind.Int256
 
             if (Vector256.IsHardwareAccelerated)
             {
+                // Use the fact that u0, u1, u2, u3 can be loaded as a vector
                 Vector256<ulong> v = Vector256.LoadUnsafe(in d.u0);
+
+                // Check which is zero
                 var isZero = Vector256.IsZero(v);
+
+                // Use most significant bits, negation and masking with 4 bits to find the most significant set
                 dLen = 32 - BitOperations.LeadingZeroCount(~isZero.ExtractMostSignificantBits() & 0b1111);
                 shift = LeadingZeros(Unsafe.Add(ref Unsafe.AsRef(in d.u0), dLen - 1));
             }
