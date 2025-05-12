@@ -667,27 +667,38 @@ namespace Nethermind.Int256
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void Udivrem(ref ulong quot, ref ulong u, int length, in UInt256 d, out UInt256 rem)
         {
-            int dLen = 0;
-            int shift = 0;
-            if (d.u3 != 0)
+            Unsafe.SkipInit(out int dLen);
+            Unsafe.SkipInit(out int shift);
+
+            if (Vector256.IsHardwareAccelerated)
             {
-                dLen = 4;
-                shift = LeadingZeros(d.u3);
+                Vector256<ulong> v = Vector256.LoadUnsafe(in d.u0);
+                var isZero = Vector256.IsZero(v);
+                dLen = 32 - BitOperations.LeadingZeroCount(~isZero.ExtractMostSignificantBits() & 0b1111);
+                shift = LeadingZeros(Unsafe.Add(ref Unsafe.AsRef(in d.u0), dLen - 1));
             }
-            else if (d.u2 != 0)
+            else
             {
-                dLen = 3;
-                shift = LeadingZeros(d.u2);
-            }
-            else if (d.u1 != 0)
-            {
-                dLen = 2;
-                shift = LeadingZeros(d.u1);
-            }
-            else if (d.u0 != 0)
-            {
-                dLen = 1;
-                shift = LeadingZeros(d.u0);
+                if (d.u3 != 0)
+                {
+                    dLen = 4;
+                    shift = LeadingZeros(d.u3);
+                }
+                else if (d.u2 != 0)
+                {
+                    dLen = 3;
+                    shift = LeadingZeros(d.u2);
+                }
+                else if (d.u1 != 0)
+                {
+                    dLen = 2;
+                    shift = LeadingZeros(d.u1);
+                }
+                else if (d.u0 != 0)
+                {
+                    dLen = 1;
+                    shift = LeadingZeros(d.u0);
+                }
             }
 
             int uLen = 0;
