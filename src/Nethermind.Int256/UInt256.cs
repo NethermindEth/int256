@@ -675,11 +675,15 @@ namespace Nethermind.Int256
                 // Use the fact that u0, u1, u2, u3 can be loaded as a vector
                 Vector256<ulong> v = Vector256.LoadUnsafe(in d.u0);
 
-                // Check which is zero
+                // Check which ulongs are zero
                 var isZero = Vector256.IsZero(v);
 
-                // Use most significant bits, negation and masking with 4 bits to find the most significant set
-                dLen = 32 - BitOperations.LeadingZeroCount(~isZero.ExtractMostSignificantBits() & 0b1111);
+                const int ulongCount = 4;
+                const uint mask = (1 << ulongCount) - 1;
+
+                // The nth most significant bit is 1 if a nth ulong is 0. Negate and mask with 4 bits to find the most significant set.
+                var nonZeroUlongBits = ~isZero.ExtractMostSignificantBits() & mask;
+                dLen = 32 - BitOperations.LeadingZeroCount(nonZeroUlongBits);
                 shift = LeadingZeros(Unsafe.Add(ref Unsafe.AsRef(in d.u0), dLen - 1));
             }
             else
