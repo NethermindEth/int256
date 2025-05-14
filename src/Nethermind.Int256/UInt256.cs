@@ -725,7 +725,8 @@ namespace Nethermind.Int256
                     shift = LeadingZeros(d.u0);
                 }
             }
-            else
+
+            if (dLen == 0)
             {
                 ThrowDivideByZeroException();
             }
