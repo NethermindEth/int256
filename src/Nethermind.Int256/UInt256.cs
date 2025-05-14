@@ -676,7 +676,7 @@ namespace Nethermind.Int256
         }
 
         // Udivrem divides u by d and produces both quotient and remainder.
-        // It assumes d is not zero.
+        // Throws if d is zero.
         // The quotient is stored in provided quot - len(u)-len(d)+1 words.
         // It loosely follows the Knuth's division algorithm (sometimes referenced as "schoolbook" division) using 64-bit words.
         // See Knuth, Volume 2, section 4.3.1, Algorithm D.
