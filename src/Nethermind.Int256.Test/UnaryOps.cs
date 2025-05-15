@@ -1,7 +1,7 @@
 using System;
-using System.Numerics;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
 
 namespace Nethermind.Int256.Test
 {
@@ -13,11 +13,17 @@ namespace Nethermind.Int256.Test
             2,
             3,
             short.MaxValue,
+            ushort.MaxValue - 1,
             ushort.MaxValue,
+            ushort.MaxValue + 1,
             int.MaxValue,
+            uint.MaxValue - 1,
             uint.MaxValue,
+            uint.MaxValue + 1ul,
             long.MaxValue,
+            ulong.MaxValue - 1,
             ulong.MaxValue,
+            BigInteger.Parse("080000000000000008000000000000001", System.Globalization.NumberStyles.HexNumber),
             TestNumbers.TwoTo64,
             TestNumbers.TwoTo128,
             TestNumbers.TwoTo192,
