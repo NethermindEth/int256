@@ -1052,6 +1052,8 @@ namespace Nethermind.Int256
         [SkipLocalsInit]
         public static void Multiply(in UInt256 x, in UInt256 y, out UInt256 res)
         {
+            const bool Axv512Disabled = true;
+
             // If both inputs fit in 64 bits, use a simple multiplication routine.
             if ((x.u1 | x.u2 | x.u3 | y.u1 | y.u2 | y.u3) == 0)
             {
@@ -1064,7 +1066,7 @@ namespace Nethermind.Int256
                 return;
             }
             // Fallback if the required AVX‑512 intrinsics are not supported.
-            if (!Avx512F.IsSupported || !Avx512DQ.IsSupported)
+            if (Axv512Disabled || !Avx512F.IsSupported || !Avx512DQ.IsSupported)
             {
                 ref ulong rx = ref Unsafe.As<UInt256, ulong>(ref Unsafe.AsRef(in x));
                 ref ulong ry = ref Unsafe.As<UInt256, ulong>(ref Unsafe.AsRef(in y));
