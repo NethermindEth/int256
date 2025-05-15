@@ -6,6 +6,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics.X86;
 using System.Runtime.Intrinsics;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 
 [assembly: InternalsVisibleTo("Nethermind.Int256.Test")]
@@ -660,7 +661,22 @@ namespace Nethermind.Int256
             return (a >> n1) >> n2;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static ulong NativeLsh(ulong a, int n)
+        {
+            Debug.Assert(n < 64);
+            return a << n;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static ulong NativeRsh(ulong a, int n)
+        {
+            Debug.Assert(n < 64);
+            return a >> n;
+        }
+
         // Udivrem divides u by d and produces both quotient and remainder.
+        // Throws if d is zero.
         // The quotient is stored in provided quot - len(u)-len(d)+1 words.
         // It loosely follows the Knuth's division algorithm (sometimes referenced as "schoolbook" division) using 64-bit words.
         // See Knuth, Volume 2, section 4.3.1, Algorithm D.
@@ -710,6 +726,11 @@ namespace Nethermind.Int256
                 }
             }
 
+            if (dLen == 0)
+            {
+                ThrowDivideByZeroException();
+            }
+
             int uLen = 0;
             for (int i = length - 1; i >= 0; i--)
             {
@@ -724,36 +745,36 @@ namespace Nethermind.Int256
             un[uLen] = Rsh(Unsafe.Add(ref u, uLen - 1), 64 - shift);
             for (int i = uLen - 1; i > 0; i--)
             {
-                un[i] = Lsh(Unsafe.Add(ref u, i), shift) | Rsh(Unsafe.Add(ref u, i - 1), 64 - shift);
+                un[i] = NativeLsh(Unsafe.Add(ref u, i), shift) | Rsh(Unsafe.Add(ref u, i - 1), 64 - shift);
             }
 
-            un[0] = Lsh(u, shift);
+            un[0] = NativeLsh(u, shift);
 
             // TODO: Skip the highest word of numerator if not significant.
 
             if (dLen == 1)
             {
-                ulong dnn0 = Lsh(d.u0, shift);
+                ulong dnn0 = NativeLsh(d.u0, shift);
                 ulong r = UdivremBy1(ref quot, un, dnn0);
-                r = Rsh(r, shift);
+                r = NativeRsh(r, shift);
                 rem = (UInt256)r;
                 return;
             }
 
-            ulong dn0 = Lsh(d.u0, shift);
+            ulong dn0 = NativeLsh(d.u0, shift);
             ulong dn1 = 0;
             ulong dn2 = 0;
             ulong dn3 = 0;
             switch (dLen)
             {
                 case 4:
-                    dn3 = Lsh(d.u3, shift) | Rsh(d.u2, 64 - shift);
+                    dn3 = NativeLsh(d.u3, shift) | Rsh(d.u2, 64 - shift);
                     goto case 3;
                 case 3:
-                    dn2 = Lsh(d.u2, shift) | Rsh(d.u1, 64 - shift);
+                    dn2 = NativeLsh(d.u2, shift) | Rsh(d.u1, 64 - shift);
                     goto case 2;
                 case 2:
-                    dn1 = Lsh(d.u1, shift) | Rsh(d.u0, 64 - shift);
+                    dn1 = NativeLsh(d.u1, shift) | Rsh(d.u0, 64 - shift);
                     break;
             }
             Span<ulong> dnS = stackalloc ulong[4] { dn0, dn1, dn2, dn3 };
@@ -765,25 +786,25 @@ namespace Nethermind.Int256
             switch (dLen)
             {
                 case 1:
-                    rem0 = Rsh(un[dLen - 1], shift);
+                    rem0 = NativeRsh(un[dLen - 1], shift);
                     goto r0;
                 case 2:
-                    rem1 = Rsh(un[dLen - 1], shift);
+                    rem1 = NativeRsh(un[dLen - 1], shift);
                     goto r1;
                 case 3:
-                    rem2 = Rsh(un[dLen - 1], shift);
+                    rem2 = NativeRsh(un[dLen - 1], shift);
                     goto r2;
                 case 4:
-                    rem3 = Rsh(un[dLen - 1], shift);
+                    rem3 = NativeRsh(un[dLen - 1], shift);
                     goto r3;
             }
 
         r3:
-            rem2 = Rsh(un[2], shift) | Lsh(un[3], 64 - shift);
+            rem2 = NativeRsh(un[2], shift) | Lsh(un[3], 64 - shift);
         r2:
-            rem1 = Rsh(un[1], shift) | Lsh(un[2], 64 - shift);
+            rem1 = NativeRsh(un[1], shift) | Lsh(un[2], 64 - shift);
         r1:
-            rem0 = Rsh(un[0], shift) | Lsh(un[1], 64 - shift);
+            rem0 = NativeRsh(un[0], shift) | Lsh(un[1], 64 - shift);
         r0:
 
             rem = new UInt256(rem0, rem1, rem2, rem3);
@@ -1446,8 +1467,8 @@ namespace Nethermind.Int256
 
             ulong yn1 = y >> 32;
             ulong yn0 = y & mask32;
-            ulong un32 = Lsh(hi, s) | Rsh(lo, (64 - s));
-            ulong un10 = Lsh(lo, s);
+            ulong un32 = NativeLsh(hi, s) | Rsh(lo, (64 - s));
+            ulong un10 = NativeLsh(lo, s);
             ulong un1 = un10 >> 32;
             ulong un0 = un10 & mask32;
             ulong q1 = un32 / yn1;
@@ -1477,7 +1498,7 @@ namespace Nethermind.Int256
                 }
             }
 
-            return (q1 * two32 + q0, Rsh((un21 * two32 + un0 - q0 * y), s));
+            return (q1 * two32 + q0, NativeRsh((un21 * two32 + un0 - q0 * y), s));
         }
 
         public static void Lsh(in UInt256 x, int n, out UInt256 res)
@@ -1537,19 +1558,19 @@ namespace Nethermind.Int256
             }
 
             // remaining shifts
-            a = Rsh(res.u0, 64 - n);
-            z0 = Lsh(res.u0, n);
+            a = NativeRsh(res.u0, 64 - n);
+            z0 = NativeLsh(res.u0, n);
 
         sh64:
-            b = Rsh(res.u1, 64 - n);
-            z1 = Lsh(res.u1, n) | a;
+            b = NativeRsh(res.u1, 64 - n);
+            z1 = NativeLsh(res.u1, n) | a;
 
         sh128:
-            a = Rsh(res.u2, 64 - n);
-            z2 = Lsh(res.u2, n) | b;
+            a = NativeRsh(res.u2, 64 - n);
+            z2 = NativeLsh(res.u2, n) | b;
             ulong z3;
         sh192:
-            z3 = Lsh(res.u3, n) | a;
+            z3 = NativeLsh(res.u3, n) | a;
 
             res = new UInt256(z0, z1, z2, z3);
         }
@@ -1650,19 +1671,19 @@ namespace Nethermind.Int256
             }
 
             // remaining shifts
-            a = Lsh(res.u3, 64 - n);
-            z3 = Rsh(res.u3, n);
+            a = NativeLsh(res.u3, 64 - n);
+            z3 = NativeRsh(res.u3, n);
 
         sh64:
-            b = Lsh(res.u2, 64 - n);
-            z2 = Rsh(res.u2, n) | a;
+            b = NativeLsh(res.u2, 64 - n);
+            z2 = NativeRsh(res.u2, n) | a;
 
         sh128:
-            a = Lsh(res.u1, 64 - n);
-            z1 = Rsh(res.u1, n) | b;
+            a = NativeLsh(res.u1, 64 - n);
+            z1 = NativeRsh(res.u1, n) | b;
 
         sh192:
-            z0 = Rsh(res.u0, n) | a;
+            z0 = NativeRsh(res.u0, n) | a;
 
             res = new UInt256(z0, z1, z2, z3);
         }
@@ -2226,7 +2247,7 @@ namespace Nethermind.Int256
         public ulong ToUInt64(IFormatProvider? provider) => System.Convert.ToUInt64(ToDecimal(provider), provider);
 
         [DoesNotReturn]
-        private static void ThrowDivideByZeroException() => throw new DivideByZeroException("y == 0");
+        private static void ThrowDivideByZeroException() => throw new DivideByZeroException();
 
         [DoesNotReturn]
         private static void ThrowOverflowException(string message) => throw new OverflowException(message);
