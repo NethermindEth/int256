@@ -9,7 +9,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Nethermind.Int256.Test\Nethermind.Int256.Test.csproj" />
+    <ProjectReference Include="..\Nethermind.Int256.Tests\Nethermind.Int256.Tests.csproj" />
     <ProjectReference Include="..\Nethermind.Int256\Nethermind.Int256.csproj" />
   </ItemGroup>
 

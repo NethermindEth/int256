@@ -9,7 +9,7 @@ using System.Runtime.Intrinsics;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 
-[assembly: InternalsVisibleTo("Nethermind.Int256.Test")]
+[assembly: InternalsVisibleTo("Nethermind.Int256.Tests")]
 
 namespace Nethermind.Int256
 {

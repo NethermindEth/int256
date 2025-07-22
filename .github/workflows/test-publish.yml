@@ -39,7 +39,7 @@ jobs:
         run: dotnet restore
 
       - name: Test
-        working-directory: src/Nethermind.Int256.Test
+        working-directory: src/Nethermind.Int256.Tests
         run: dotnet run -c ${{ matrix.build-config }} --no-restore -p:Commit=$GITHUB_SHA
 
       - name: Publish

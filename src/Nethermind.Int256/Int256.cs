@@ -1,9 +1,9 @@
-﻿using System;
+using System;
 using System.Buffers.Binary;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 
-[assembly: InternalsVisibleTo("Nethermind.Int256.Test")]
+[assembly: InternalsVisibleTo("Nethermind.Int256.Tests")]
 
 namespace Nethermind.Int256
 {
