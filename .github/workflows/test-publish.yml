@@ -1,0 +1,54 @@
+name: Test / Publish
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish to NuGet
+        default: None
+        type: choice
+        options:
+          - 'No'
+          - Staging
+          - Production
+
+jobs:
+  test-publish:
+    name: Test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        build-config: [debug, release]
+        hardware-intrinsics: [0, 1]
+    env:
+      DOTNET_EnableHWIntrinsic: ${{ matrix.hardware-intrinsics }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+
+      - name: Install dependencies
+        working-directory: src
+        run: dotnet restore
+
+      - name: Test
+        working-directory: src/Nethermind.Int256.Test
+        run: dotnet run -c ${{ matrix.build-config }} --no-restore -p:Commit=$GITHUB_SHA
+
+      - name: Publish
+        if: matrix.build-config == 'release' && matrix.hardware-intrinsics == 1 &&
+          (github.event_name == 'workflow_dispatch' && github.event.inputs.publish != 'No' || github.event_name == 'release')
+        working-directory: src
+        run: |
+          dotnet pack ./Nethermind.Int256 -c ${{ matrix.build-config }} --no-build
+          dotnet nuget push ./artifacts/package/${{ matrix.build-config }}/*.nupkg \
+            -k ${{ github.event.inputs.publish == 'Staging' && secrets.NUGETTEST_API_KEY || secrets.NUGET_API_KEY }} \
+            -s ${{ github.event.inputs.publish == 'Staging' && 'https://apiint.nugettest.org/v3/index.json' || 'https://api.nuget.org/v3/index.json' }}
+
