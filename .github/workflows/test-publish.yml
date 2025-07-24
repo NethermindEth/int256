@@ -40,7 +40,7 @@ jobs:
 
       - name: Test
         working-directory: src/Nethermind.Int256.Tests
-        run: dotnet run -c ${{ matrix.build-config }} --no-restore -p:Commit=$GITHUB_SHA
+        run: dotnet run -c ${{ matrix.build-config }} --no-restore -p:SourceRevisionId=$GITHUB_SHA
 
       - name: Publish
         if: matrix.build-config == 'release' && matrix.hardware-intrinsics == 1 &&
