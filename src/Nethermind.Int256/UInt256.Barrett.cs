@@ -204,6 +204,7 @@ public partial struct UInt256
     /// Optimized modular multiplication using Barrett reduction.
     /// 2-3x faster than standard MultiplyMod for the common case.
     /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void MultiplyModBarrett(in UInt256 x, in UInt256 y, in UInt256 m, in UInt256 mu, out UInt256 res)
     {
         if (m.IsZero)
@@ -241,7 +242,7 @@ public partial struct UInt256
         }
     }
 
-// Helper method: AddOverflow that returns the overflow as a bool
+    // Helper method: AddOverflow that returns the overflow as a bool
     private static bool AddOverflow(in UInt256 a, in UInt256 b, out UInt256 sum, out bool overflow)
     {
         bool carry = AddOverflow(a, b, out sum);
@@ -249,7 +250,7 @@ public partial struct UInt256
         return carry;
     }
 
-// Optional: Optimized ExpMod using Barrett reduction
+    // Optional: Optimized ExpMod using Barrett reduction
     public static void ExpModBarrett(in UInt256 b, in UInt256 e, in UInt256 m, out UInt256 result)
     {
         if (m.IsOne)
@@ -276,5 +277,165 @@ public partial struct UInt256
         }
 
         result = intermediate;
+    }
+
+    /// <summary>
+    /// Optimized AddMod using Barrett reduction.
+    /// Much faster when the same modulus is reused multiple times.
+    /// </summary>
+    public static void AddModBarrett(in UInt256 x, in UInt256 y, in UInt256 m, in UInt256 mu, out UInt256 res)
+    {
+        if (m.IsZero)
+        {
+            res = Zero;
+            return;
+        }
+
+        // Perform addition
+        bool overflow = AddOverflow(x, y, out UInt256 sum);
+
+        if (overflow)
+        {
+            // sum = (x + y) - 2^256
+            // We need: ((x + y) - 2^256) mod m = (x + y) mod m
+            // Since x + y = sum + 2^256, we compute (sum + 2^256) mod m
+
+            // For 2^256 mod m, we can use: 2^256 ≡ 2^256 - m*floor(2^256/m) (mod m)
+            // But simpler: just reduce sum, then add (2^256 mod m)
+
+            // However, there's an even faster approach:
+            // If x + y overflowed, then x + y = sum + 2^256
+            // We want (sum + 2^256) mod m
+
+            // Compute 2^256 mod m efficiently:
+            // We know mu ≈ 2^512 / m, so we can derive 2^256 mod m
+            // But that's complex. Instead, use the fact that:
+            // (x + y) mod m = ((x + y - m*k) mod m) for any k
+            // If x + y >= 2^256, then x + y >= m, so we subtract m once or twice
+
+            // Actually, let's use Barrett on the overflow case properly:
+            // Create a 512-bit number: high=1, low=sum, then reduce
+            BarrettReduce512(sum, One, m, mu, out res);
+            return;
+        }
+
+        // No overflow, just reduce the sum
+        if (sum >= m)
+        {
+            // Fast path: single subtraction often enough
+            Subtract(sum, m, out res);
+            if (res >= m)
+            {
+                Subtract(res, m, out res);
+            }
+        }
+        else
+        {
+            res = sum;
+        }
+    }
+
+    /// <summary>
+    /// Optimized SubtractMod using Barrett reduction.
+    /// </summary>
+    public static void SubtractModBarrett(in UInt256 x, in UInt256 y, in UInt256 m, in UInt256 mu, out UInt256 res)
+    {
+        if (m.IsZero)
+        {
+            res = Zero;
+            return;
+        }
+
+        if (x >= y)
+        {
+            // No underflow
+            Subtract(x, y, out UInt256 diff);
+
+            // Reduce if needed (usually diff < m already)
+            if (diff >= m)
+            {
+                BarrettReduce(diff, m, mu, out res);
+            }
+            else
+            {
+                res = diff;
+            }
+        }
+        else
+        {
+            // Underflow: x - y < 0
+            // Result should be: m - ((y - x) mod m)
+            Subtract(y, x, out UInt256 diff);
+
+            if (diff >= m)
+            {
+                BarrettReduce(diff, m, mu, out diff);
+            }
+
+            if (diff.IsZero)
+            {
+                res = Zero;
+            }
+            else
+            {
+                Subtract(m, diff, out res);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Even more optimized AddMod without Barrett - avoids expensive operations.
+    /// Use this when you don't have a precomputed Barrett constant.
+    /// </summary>
+    public static void AddModOptimized(in UInt256 x, in UInt256 y, in UInt256 m, out UInt256 res)
+    {
+        if (m.IsZero)
+        {
+            res = Zero;
+            return;
+        }
+
+        // Key insight: AddMod rarely overflows 2^256 in practice
+        // Optimize for the common case: x + y < 2^256
+
+        bool overflow = AddOverflow(x, y, out UInt256 sum);
+
+        if (!overflow)
+        {
+            // Common case: no overflow
+            // Just need to reduce mod m if sum >= m
+            if (sum < m)
+            {
+                res = sum;
+                return;
+            }
+
+            // sum >= m, subtract m once
+            Subtract(sum, m, out res);
+
+            // Check if we need another subtraction (rare)
+            if (res >= m)
+            {
+                Subtract(res, m, out res);
+            }
+            return;
+        }
+
+        // Rare case: overflow occurred
+        // x + y = sum + 2^256
+        // We need (sum + 2^256) mod m
+
+        // Method: compute (2^256 mod m) and add it to sum
+        // But 2^256 mod m requires division...
+
+        // Alternative: treat as 512-bit number and use full division
+        const int length = 5;
+        Span<ulong> fullSum = [sum.u0, sum.u1, sum.u2, sum.u3, 1];
+        Span<ulong> quot = stackalloc ulong[length];
+        Udivrem(ref MemoryMarshal.GetReference(quot),
+                ref MemoryMarshal.GetReference(fullSum),
+                length,
+                m,
+                out res);
     }
 }
