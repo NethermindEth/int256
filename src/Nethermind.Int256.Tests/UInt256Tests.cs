@@ -6,20 +6,17 @@ using NUnit.Framework;
 
 namespace Nethermind.Int256.Test
 {
-    public abstract class UInt256TestsTemplate<T> where T : IInteger<T>
+    public abstract class UInt256TestsTemplate<T>(
+        Func<BigInteger, T> convert,
+        Func<int, T> convertFromInt,
+        Func<BigInteger, BigInteger> postprocess,
+        BigInteger maxValue)
+        where T : IInteger<T>
     {
-        protected readonly Func<BigInteger, T> convert;
-        protected readonly Func<int, T> convertFromInt;
-        protected readonly Func<BigInteger, BigInteger> postprocess;
-        protected readonly BigInteger maxValue;
-
-        protected UInt256TestsTemplate(Func<BigInteger, T> convert, Func<int, T> convertFromInt, Func<BigInteger, BigInteger> postprocess, BigInteger maxValue)
-        {
-            this.convert = convert;
-            this.convertFromInt = convertFromInt;
-            this.postprocess = postprocess;
-            this.maxValue = maxValue;
-        }
+        protected readonly Func<BigInteger, T> convert = convert;
+        protected readonly Func<int, T> convertFromInt = convertFromInt;
+        protected readonly Func<BigInteger, BigInteger> postprocess = postprocess;
+        protected readonly BigInteger maxValue = maxValue;
 
         [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
         public virtual void Add((BigInteger A, BigInteger B) test)

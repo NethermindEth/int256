@@ -82,14 +82,14 @@ public class Convertibles
 
     private static IEnumerable<TestCaseData> GenerateTestCases(IEnumerable<(object, string)> numbers, BigInteger? minValue = null)
     {
-        Type ExpectedException(BigInteger value, BigInteger? min, BigInteger? max) =>
+        Type? ExpectedException(BigInteger value, BigInteger? min, BigInteger? max) =>
             (!min.HasValue || !max.HasValue || (value >= min && value <= max)) && (!minValue.HasValue || value >= minValue)
                 ? null
                 : typeof(OverflowException);
 
-        string ExpectedString(Type type, BigInteger value, BigInteger? min, ref Type expectedException)
+        string? ExpectedString(Type type, BigInteger value, BigInteger? min, ref Type? expectedException)
         {
-            string expectedString = null;
+            string? expectedString = null;
             if (expectedException is not null && type == typeof(float))
             {
                 expectedString = value < min ? "-∞" : "∞";
@@ -104,8 +104,8 @@ public class Convertibles
             foreach ((Type type, BigInteger? min, BigInteger? max) in ConvertibleTypes)
             {
                 BigInteger value = BigInteger.Parse(number.ToString()!);
-                Type expectedException = ExpectedException(value, min, max);
-                string expectedString = ExpectedString(type, value, min, ref expectedException);
+                Type? expectedException = ExpectedException(value, min, max);
+                string? expectedString = ExpectedString(type, value, min, ref expectedException);
                 string testName = $"Convert({name}, {type.Name}){(expectedException is not null || expectedString?.Contains('∞') == true ? " over/under flow" : "")}";
                 yield return new TestCaseData(type, number, expectedException, expectedString) { TestName = testName };
             }

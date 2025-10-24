@@ -14,8 +14,9 @@ using System.Diagnostics.CodeAnalysis;
 namespace Nethermind.Int256
 {
     [StructLayout(LayoutKind.Explicit)]
-    public readonly struct UInt256 : IEquatable<UInt256>, IComparable, IComparable<UInt256>, IInteger<UInt256>, IConvertible
+    public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComparable<UInt256>, IInteger<UInt256>, IConvertible
     {
+        private const bool UseBarrett = true;
         // Ensure that hashes are different for every run of the node and every node, so if are any hash collisions on
         // one node they will not be the same on another node or across a restart so hash collision cannot be used to degrade
         // the performance of the network as a whole.
@@ -1066,6 +1067,7 @@ namespace Nethermind.Int256
                 return;
             }
             // Fallback if the required AVX‑512 intrinsics are not supported.
+#pragma warning disable CS0162 // Unreachable code detected
             if (Axv512Disabled || !Avx512F.IsSupported || !Avx512DQ.IsSupported)
             {
                 ref ulong rx = ref Unsafe.As<UInt256, ulong>(ref Unsafe.AsRef(in x));
@@ -1187,6 +1189,7 @@ namespace Nethermind.Int256
             Vector256<ulong> finalResult = Vector256.Create(updatedProduct0, newHalf);
             Unsafe.SkipInit(out res);
             Unsafe.As<UInt256, Vector256<ulong>>(ref res) = finalResult;
+#pragma warning restore CS0162 // Unreachable code detected
 
             /// <summary>
             /// Adds two 128-bit unsigned integers while propagating an overflow (carry) from the lower 64-bit lane to the higher lane.
@@ -1277,6 +1280,13 @@ namespace Nethermind.Int256
 
         public static void ExpMod(in UInt256 b, in UInt256 e, in UInt256 m, out UInt256 result)
         {
+            if (UseBarrett)
+            {
+                ExpModBarrett(b, e, m, out result);
+                return;
+            }
+
+#pragma warning disable CS0162 // Unreachable code detected
             if (m.IsOne)
             {
                 result = Zero;
@@ -1295,6 +1305,7 @@ namespace Nethermind.Int256
             }
 
             result = intermediate;
+#pragma warning restore CS0162 // Unreachable code detected
         }
 
         public void ExpMod(in UInt256 exp, in UInt256 m, out UInt256 res) => ExpMod(this, exp, m, out res);
@@ -1312,6 +1323,14 @@ namespace Nethermind.Int256
         // sets res to its result.
         public static void MultiplyMod(in UInt256 x, in UInt256 y, in UInt256 m, out UInt256 res)
         {
+            if (UseBarrett)
+            {
+                BarrettPrecompute(m, out UInt256 mu);
+                MultiplyModBarrett(x, y, m, mu, out res);
+                return;
+            }
+
+#pragma warning disable CS0162 // Unreachable code detected
             Umul(x, y, out UInt256 pl, out UInt256 ph);
 
             // If the multiplication is within 256 bits use Mod().
@@ -1329,6 +1348,7 @@ namespace Nethermind.Int256
             ph.ToSpan(ref pHigh);
             Span<ulong> quot = stackalloc ulong[length];
             Udivrem(ref MemoryMarshal.GetReference(quot), ref MemoryMarshal.GetReference(p), length, m, out res);
+#pragma warning restore CS0162 // Unreachable code detected
         }
 
         public void MultiplyMod(in UInt256 a, in UInt256 m, out UInt256 res) => MultiplyMod(this, a, m, out res);
