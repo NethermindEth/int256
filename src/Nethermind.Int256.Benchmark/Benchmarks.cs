@@ -170,16 +170,31 @@ namespace Nethermind.Int256.Benchmark
     [MemoryDiagnoser]
     public class AddModUnsinged : UnsignedThreeParamBenchmarkBase
     {
-        [Benchmark(Baseline = true)]
+        [Benchmark]
         public BigInteger AddMod_BigInteger()
         {
             return ((A.Item1 + B.Item1) % C.Item1);
         }
 
-        [Benchmark]
-        public UInt256 AddMod_UInt256()
+        [Benchmark(Baseline = true)]
+        public UInt256 AddMod_UInt256_Standard()
         {
-            UInt256.AddMod(A.Item2, B.Item2, C.Item2, out UInt256 res);
+            UInt256.AddModStandard(A.Item2, B.Item2, C.Item2, out UInt256 res);
+            return res;
+        }
+
+        [Benchmark]
+        public UInt256 AddMod_UInt256_Barrett()
+        {
+            UInt256.BarrettPrecompute(C.Item2, out UInt256 mu);
+            UInt256.AddModBarrett(A.Item2, B.Item2, C.Item2, mu, out UInt256 res);
+            return res;
+        }
+
+        [Benchmark]
+        public UInt256 AddMod_UInt256_Optimized()
+        {
+            UInt256.AddModOptimized(A.Item2, B.Item2, C.Item2, out UInt256 res);
             return res;
         }
     }
@@ -208,16 +223,24 @@ namespace Nethermind.Int256.Benchmark
     [MemoryDiagnoser]
     public class SubtractModUnsinged : UnsignedThreeParamBenchmarkBase
     {
-        [Benchmark(Baseline = true)]
+        [Benchmark]
         public BigInteger SubtractMod_BigInteger()
         {
             return ((A.Item1 - B.Item1) % C.Item1);
         }
 
-        [Benchmark]
-        public UInt256 SubtractMod_UInt256()
+        [Benchmark(Baseline = true)]
+        public UInt256 SubtractMod_UInt256_Standard()
         {
-            UInt256.SubtractMod(A.Item2, B.Item2, C.Item2, out UInt256 res);
+            UInt256.SubtractModStandard(A.Item2, B.Item2, C.Item2, out UInt256 res);
+            return res;
+        }
+
+        [Benchmark]
+        public UInt256 SubtractMod_UInt256_Barrett()
+        {
+            UInt256.BarrettPrecompute(C.Item2, out UInt256 mu);
+            UInt256.SubtractModBarrett(A.Item2, B.Item2, C.Item2, mu, out UInt256 res);
             return res;
         }
     }
@@ -284,16 +307,24 @@ namespace Nethermind.Int256.Benchmark
     [MemoryDiagnoser]
     public class MultiplyModUnsigned : UnsignedThreeParamBenchmarkBase
     {
-        [Benchmark(Baseline = true)]
+        [Benchmark]
         public BigInteger MultiplyMod_BigInteger()
         {
             return ((A.Item1 * B.Item1) % C.Item1);
         }
 
-        [Benchmark]
-        public UInt256 MultiplyMod_UInt256()
+        [Benchmark(Baseline = true)]
+        public UInt256 MultiplyMod_UInt256_Standard()
         {
-            UInt256.MultiplyMod(A.Item2, B.Item2, C.Item2, out UInt256 res);
+            UInt256.MultiplyModStandard(A.Item2, B.Item2, C.Item2, out UInt256 res);
+            return res;
+        }
+
+        [Benchmark]
+        public UInt256 MultiplyMod_UInt256_Barrett()
+        {
+            UInt256.BarrettPrecompute(C.Item2, out UInt256 mu);
+            UInt256.MultiplyModBarrett(A.Item2, B.Item2, C.Item2, mu, out UInt256 res);
             return res;
         }
     }
@@ -398,16 +429,23 @@ namespace Nethermind.Int256.Benchmark
     [MemoryDiagnoser]
     public class ExpModUnsigned : UnsignedThreeParamBenchmarkBase
     {
-        [Benchmark(Baseline = true)]
+        [Benchmark]
         public BigInteger ExpMod_BigInteger()
         {
             return BigInteger.ModPow(A.Item1, B.Item1, C.Item1);
         }
 
-        [Benchmark]
-        public UInt256 ExpMod_UInt256()
+        [Benchmark(Baseline = true)]
+        public UInt256 ExpMod_UInt256_Standard()
         {
-            UInt256.ExpMod(A.Item2, B.Item2, C.Item2, out UInt256 res);
+            UInt256.ExpModStandard(A.Item2, B.Item2, C.Item2, out UInt256 res);
+            return res;
+        }
+
+        [Benchmark]
+        public UInt256 ExpMod_UInt256_Barrett()
+        {
+            UInt256.ExpModBarrett(A.Item2, B.Item2, C.Item2, out UInt256 res);
             return res;
         }
     }
