@@ -4,8 +4,6 @@
     <OutputType>Exe</OutputType>
     <IsPackable>false</IsPackable>
     <EnableNUnitRunner>true</EnableNUnitRunner>
-    <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
-    <TestingPlatformShowTestsFailure>true</TestingPlatformShowTestsFailure>
   </PropertyGroup>
 
   <ItemGroup>

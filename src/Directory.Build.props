@@ -5,7 +5,7 @@
     <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <UseArtifactsOutput>true</UseArtifactsOutput>
   </PropertyGroup>
 
