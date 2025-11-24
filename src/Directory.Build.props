@@ -5,14 +5,14 @@
     <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net9.0</TargetFramework>
     <UseArtifactsOutput>true</UseArtifactsOutput>
   </PropertyGroup>
 
   <PropertyGroup Label="ProductInfo">
     <Authors>Nethermind</Authors>
     <Copyright>Demerzel Solutions Limited</Copyright>
-    <VersionPrefix>1.3.6-zkvm.1</VersionPrefix>
+    <VersionPrefix>1.3.6-zkvm.2</VersionPrefix>
     <VersionSuffix></VersionSuffix>
   </PropertyGroup>
 
