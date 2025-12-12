@@ -1101,9 +1101,8 @@ namespace Nethermind.Int256
 
             // Extract remaining parts.
             Vector128<ulong> xHigh = Avx2.ExtractVector128(vecX, 1); // [x2, x3]
-            Vector128<ulong> y01 = Avx2.ExtractVector128(vecY, 0);   // [y0, y1]
-            // swap lanes -> [y1, y0]
-            Vector128<ulong> yLow = Sse2.Shuffle(y01.AsDouble(), y01.AsDouble(), 0b_01).AsUInt64();
+            Vector128<ulong> yLow = Avx2.ExtractVector128(yPerm2, 0); // [y1, y0];
+            Vector128<ulong> finalProdLow = Avx512DQ.VL.MultiplyLow(xHigh, yLow);
 
             Vector512<ulong> z = Vector512<ulong>.Zero;
             Vector512<ulong> xRearranged = Avx512F.InsertVector256(z, xPerm1, 0);
@@ -1190,7 +1189,6 @@ namespace Nethermind.Int256
             Vector128<ulong> newHalf = Avx512F.ExtractVector128(newHalfVec, 0);
 
             // Process group 3 cross‑terms.
-            Vector128<ulong> finalProdLow = Avx512DQ.VL.MultiplyLow(xHigh, yLow);
             finalProdLow = Sse2.Add(finalProdLow, extraLow);
             Vector128<ulong> swappedFinal = Sse2.UnpackLow(finalProdLow, finalProdLow);
             Vector128<ulong> horizontalSum = Sse2.Add(finalProdLow, swappedFinal);
