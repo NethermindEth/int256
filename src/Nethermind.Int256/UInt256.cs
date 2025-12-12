@@ -1203,7 +1203,9 @@ namespace Nethermind.Int256
             // This is intentionally earlier than point-of-use - it gives OoO a longer window
             // to overlap shuffle latency with the later ALU+compare chain.
             Vector512<ulong> productLow_r2 = Avx512F.AlignRight64(productLow, productLow, 2);
-            Vector512<ulong> product1High = Avx512F.AlignRight64(productHi, productHi, 1);
+            Vector512<ulong> product1High = Avx512BW.IsSupported ?
+                Avx512BW.ShiftRightLogical128BitLane(productHi.AsByte(), 8).AsUInt64() :
+                Avx512F.AlignRight64(productHi, productHi, 1);
             Vector512<ulong> productHi_r2 = Avx512F.AlignRight64(productHi, productHi, 2);
 
             // Also hoist this extract even though its used late - it is independent work.
@@ -1215,7 +1217,9 @@ namespace Nethermind.Int256
             // - shuffle ops (valignq/vpslldq) feeding the carry path
 
             Vector512<ulong> crossAndGroup2Sum = Add128(productHi, productLow_r2);
-            Vector512<ulong> crossSumHigh = Avx512F.AlignRight64(crossAndGroup2Sum, crossAndGroup2Sum, 1);
+            Vector512<ulong> crossSumHigh =  Avx512BW.IsSupported ?
+                Avx512BW.ShiftRightLogical128BitLane(crossAndGroup2Sum.AsByte(), 8).AsUInt64() :
+                Avx512F.AlignRight64(crossAndGroup2Sum, crossAndGroup2Sum, 1);
 
             // Perform the group 1 cross-term addition (in 512-bit form, then extract only the final 128-bit lane).
             Vector512<ulong> crossAddMask = Avx512BW.IsSupported ?
@@ -1228,7 +1232,9 @@ namespace Nethermind.Int256
             Vector512<ulong> carryMaskVec = Avx512F.CompareLessThan(updatedProduct0Vec, productLow);
 
             // Convert all-ones to 0-or-1 as early as possible to keep the later chain cheap.
-            Vector512<ulong> carryMaskToHigh = Avx512F.AlignRight64(carryMaskVec, carryMaskVec, 1);
+            Vector512<ulong> carryMaskToHigh = Avx512BW.IsSupported ?
+                Avx512BW.ShiftRightLogical128BitLane(carryMaskVec.AsByte(), 8).AsUInt64() :
+                Avx512F.AlignRight64(carryMaskVec, carryMaskVec, 1);
 
             // subtract all-ones == add 1
             Vector512<ulong> limb2Vec = Avx512F.Add(crossSumHigh, Avx512F.ShiftRightLogical(carryMaskToHigh, 63));
@@ -1257,10 +1263,13 @@ namespace Nethermind.Int256
 
             // Process group 3 cross‑terms.
             finalProdLow = Sse2.Add(finalProdLow, extraLow);
-            Vector128<ulong> swappedFinal = Sse2.UnpackLow(finalProdLow, finalProdLow);
-            Vector128<ulong> horizontalSum = Sse2.Add(finalProdLow, swappedFinal);
-            Vector128<ulong> highCarry = Sse2.UnpackHigh(Vector128<ulong>.Zero, horizontalSum);
-            newHalf = Sse2.Add(newHalf, highCarry);
+            // swap qwords via pshufd imm=0x4E
+            Vector128<ulong> swapped = Sse2.Shuffle(finalProdLow.AsInt32(), 0x4E).AsUInt64();
+            // sum both lanes => [a0+a1, a1+a0]
+            Vector128<ulong> sum = Sse2.Add(finalProdLow, swapped);
+            // keep only the high-qword in the high lane: shift-left by 8 => [0, a0+a1]
+            Vector128<ulong> hiOnly = Sse2.ShiftLeftLogical128BitLane(sum.AsByte(), 8).AsUInt64();
+            newHalf = Sse2.Add(newHalf, hiOnly);
 
             // Combine the results into the final 256‑bit value.
             Vector256<ulong> finalResult = Vector256.Create(updatedProduct0, newHalf);
