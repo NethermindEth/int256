@@ -1104,17 +1104,15 @@ namespace Nethermind.Int256
             Vector512<ulong> yRearranged = Avx512F.InsertVector256(z, yPerm1, 0);
             yRearranged = Avx512F.InsertVector256(yRearranged, yPerm2, 1);
 
-            // Step 3: split each 64‑bit limb into its lower and upper 32‑bit parts.
-            Vector512<ulong> xLowerParts = Avx512F.And(xRearranged, mask32);
-            Vector512<ulong> yLowerParts = Avx512F.And(yRearranged, mask32);
+            // Step 3-4: use VPMULUDQ (Avx512F.Multiply) to do widening 32x32->64 directly.
+            //           It multiplies the even uint32 lanes, which are exactly the low-32 of each ulong lane after AsUInt32().
             Vector512<ulong> xUpperParts = Avx512F.ShiftRightLogical(xRearranged, 32);
             Vector512<ulong> yUpperParts = Avx512F.ShiftRightLogical(yRearranged, 32);
 
-            // Step 4: launch four 32×32‑bit multiplications in parallel.
-            Vector512<ulong> prodLL = Avx512DQ.MultiplyLow(xLowerParts, yLowerParts); // lower × lower
-            Vector512<ulong> prodLH = Avx512DQ.MultiplyLow(xLowerParts, yUpperParts); // lower × upper
-            Vector512<ulong> prodHL = Avx512DQ.MultiplyLow(xUpperParts, yLowerParts); // upper × lower
-            Vector512<ulong> prodHH = Avx512DQ.MultiplyLow(xUpperParts, yUpperParts); // upper × upper
+            Vector512<ulong> prodLL = Avx512F.Multiply(xRearranged.AsUInt32(), yRearranged.AsUInt32()); // low(x)  * low(y)
+            Vector512<ulong> prodHL = Avx512F.Multiply(xUpperParts.AsUInt32(), yRearranged.AsUInt32()); // high(x) * low(y)
+            Vector512<ulong> prodHH = Avx512F.Multiply(xUpperParts.AsUInt32(), yUpperParts.AsUInt32()); // high(x) * high(y)
+            Vector512<ulong> prodLH = Avx512F.Multiply(xRearranged.AsUInt32(), yUpperParts.AsUInt32()); // low(x)  * high(y)
 
             // Step 5: compute the intermediate term while the multiplications are in flight.
             Vector512<ulong> prodLL_hi = Avx512F.ShiftRightLogical(prodLL, 32);
@@ -1153,30 +1151,25 @@ namespace Nethermind.Int256
             Vector512<ulong> crossAddMask = Avx512F.UnpackLow(Vector512<ulong>.Zero, crossAndGroup2Sum);
             Vector512<ulong> updatedProduct0Vec = Avx512F.Add(productLow, crossAddMask);
 
-            // Compute the carry from adding crossSum’s low 64 bits.
-            Vector512<ulong> carryFlagVec =
-                Avx512F.ShiftRightLogical(
-                    Avx512F.CompareLessThan(updatedProduct0Vec, productLow),
-                    63);
+            // Carry mask from adding crossSum into product0 (mask lane is 0 or 0xFFFF..FFFF)
+            Vector512<ulong> carryMaskVec = Avx512F.CompareLessThan(updatedProduct0Vec, productLow);
 
             // limb2 = crossSumHigh + carryFlag
             Vector512<ulong> crossSumHigh = Avx512F.AlignRight64(crossAndGroup2Sum, crossAndGroup2Sum, 1);
-            Vector512<ulong> carryToLow = Avx512F.AlignRight64(carryFlagVec, carryFlagVec, 1);
-            Vector512<ulong> limb2Vec = Avx512F.Add(crossSumHigh, carryToLow);
+            Vector512<ulong> carryMaskToHigh = Avx512F.AlignRight64(carryMaskVec, carryMaskVec, 1);
+
+            // subtract all-ones == add 1
+            Vector512<ulong> limb2Vec = Avx512F.Subtract(crossSumHigh, carryMaskToHigh);
 
             Vector512<ulong> product1High = Avx512F.AlignRight64(productHi, productHi, 1);
-            Vector512<ulong> limb3Vec =
-                Avx512F.ShiftRightLogical(
-                    Avx512F.CompareGreaterThan(product1High, crossSumHigh),
-                    63);
 
-            // Propagate overflow from (crossSumHigh + carryFlag) into limb3.
-            Vector512<ulong> limb2Carry =
-                Avx512F.ShiftRightLogical(
-                    Avx512F.CompareLessThan(limb2Vec, crossSumHigh),
-                    63);
+            // limb3 = (product1High > crossSumHigh) ? 1 : 0
+            Vector512<ulong> limb3Mask = Avx512F.CompareGreaterThan(product1High, crossSumHigh);
+            Vector512<ulong> limb3Vec = Avx512F.Subtract(Vector512<ulong>.Zero, limb3Mask);
 
-            limb3Vec = Avx512F.Add(limb3Vec, limb2Carry);
+            // propagate overflow from (crossSumHigh + carryFlag) into limb3
+            Vector512<ulong> limb2CarryMask = Avx512F.CompareLessThan(limb2Vec, crossSumHigh);
+            limb3Vec = Avx512F.Subtract(limb3Vec, limb2CarryMask);
 
             Vector512<ulong> upperIntermediateVec = Avx512F.UnpackLow(limb2Vec, limb3Vec);
 
@@ -1217,13 +1210,13 @@ namespace Nethermind.Int256
                 Vector512<ulong> sum = Avx512F.Add(left, right);
 
                 Vector512<ulong> overflowMask = Avx512F.CompareLessThan(sum, left);
-                overflowMask = Avx512F.ShiftRightLogical(overflowMask, 63);
 
                 // Promote carry from each 128-bit chunk’s low lane into its high lane:
-                // [0, c0, 0, c2, 0, c4, 0, c6]
-                Vector512<ulong> promotedCarry = Avx512F.UnpackLow(Vector512<ulong>.Zero, overflowMask);
+                // lanes: [0, mask0, 0, mask2, 0, mask4, 0, mask6] where mask is 0 or 0xFFFF..FFFF
+                Vector512<ulong> promotedCarryAllOnes = Avx512F.UnpackLow(Vector512<ulong>.Zero, overflowMask);
 
-                return Avx512F.Add(sum, promotedCarry);
+                // Subtracting 0xFFFF..FFFF is identical to adding 1 (mod 2^64)
+                return Avx512F.Subtract(sum, promotedCarryAllOnes);
             }
         }
 
