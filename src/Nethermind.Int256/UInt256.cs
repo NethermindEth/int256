@@ -1135,51 +1135,60 @@ namespace Nethermind.Int256
             Vector512<ulong> productLow = Avx512F.UnpackLow(lowerPartial, higherPartial);
             Vector512<ulong> productHi = Avx512F.UnpackHigh(lowerPartial, higherPartial);
 
-            // Step 8: extract the 128‑bit groups.
-            Vector128<ulong> product0 = Avx512F.ExtractVector128(productLow, 0);
-            Vector128<ulong> product1 = Avx512F.ExtractVector128(productHi, 0);
-            Vector128<ulong> product2 = Avx512F.ExtractVector128(productLow, 1);
-            Vector128<ulong> product3 = Avx512F.ExtractVector128(productHi, 1);
-            Vector128<ulong> product4 = Avx512F.ExtractVector128(productLow, 2);
-            Vector128<ulong> product5 = Avx512F.ExtractVector128(productHi, 2);
+            // Step 8: keep the intermediate results in 512-bit vectors and avoid extracting 128-bit groups.
+            // Align productLow so that lane0 contains product2 and lane1 contains product4, letting us compute:
+            // crossSum = product1 + product2  (lane0)
+            // group2Sum = product3 + product4 (lane1)
+            Vector512<ulong> productLow_r2 = Avx512F.AlignRight64(productLow, productLow, 2);
+            Vector512<ulong> crossAndGroup2Sum = Add128(productHi, productLow_r2);
 
             // Step 9: issue memory request for remaining parts.
             Vector128<ulong> xHigh = Vector128.Create(x.u2, x.u3);
             Vector128<ulong> yLow = Vector128.Create(y.u1, y.u0);
 
-            // Step 10: perform the group 1 cross‑term addition.
-            Vector128<ulong> crossSum = Add128(product1, product2);
-            Vector128<ulong> crossAddMask = Sse2.UnpackLow(Vector128<ulong>.Zero, crossSum);
-            Vector128<ulong> updatedProduct0 = Sse2.Add(product0, crossAddMask);
+            // Step 10: perform the group 1 cross-term addition (in 512-bit form, then extract only the final 128-bit lane).
+            Vector512<ulong> crossAddMask = Avx512F.UnpackLow(Vector512<ulong>.Zero, crossAndGroup2Sum);
+            Vector512<ulong> updatedProduct0Vec = Avx512F.Add(productLow, crossAddMask);
 
             // Compute the carry from adding crossSum’s low 64 bits.
-            Vector128<ulong> product0HighBefore = Sse2.UnpackHigh(product0, product0);
-            Vector128<ulong> product0HighAfter = Sse2.UnpackHigh(updatedProduct0, updatedProduct0);
-            Vector128<ulong> carryFlag =
-                Sse2.ShiftRightLogical(
-                    Avx512F.VL.CompareLessThan(product0HighAfter, product0HighBefore),
+            Vector512<ulong> carryFlagVec =
+                Avx512F.ShiftRightLogical(
+                    Avx512F.CompareLessThan(updatedProduct0Vec, productLow),
                     63);
-            Vector128<ulong> crossSumHigh = Sse2.UnpackHigh(crossSum, crossSum);
-            Vector128<ulong> limb2 = Sse2.Add(crossSumHigh, carryFlag);
-            Vector128<ulong> limb3 =
-                Sse2.ShiftRightLogical(
-                    Avx512F.VL.CompareGreaterThan(Sse2.UnpackHigh(product1, product1), crossSumHigh),
+
+            // limb2 = crossSumHigh + carryFlag
+            Vector512<ulong> crossSumHigh = Avx512F.AlignRight64(crossAndGroup2Sum, crossAndGroup2Sum, 1);
+            Vector512<ulong> carryToLow = Avx512F.AlignRight64(carryFlagVec, carryFlagVec, 1);
+            Vector512<ulong> limb2Vec = Avx512F.Add(crossSumHigh, carryToLow);
+
+            Vector512<ulong> product1High = Avx512F.AlignRight64(productHi, productHi, 1);
+            Vector512<ulong> limb3Vec =
+                Avx512F.ShiftRightLogical(
+                    Avx512F.CompareGreaterThan(product1High, crossSumHigh),
                     63);
 
             // Propagate overflow from (crossSumHigh + carryFlag) into limb3.
-            Vector128<ulong> limb2Carry =
-                Sse2.ShiftRightLogical(
-                    Avx512F.VL.CompareLessThan(limb2, crossSumHigh),
+            Vector512<ulong> limb2Carry =
+                Avx512F.ShiftRightLogical(
+                    Avx512F.CompareLessThan(limb2Vec, crossSumHigh),
                     63);
 
-            limb3 = Sse2.Add(limb3, limb2Carry);
+            limb3Vec = Avx512F.Add(limb3Vec, limb2Carry);
 
-            Vector128<ulong> upperIntermediate = Sse2.UnpackLow(limb2, limb3);
+            Vector512<ulong> upperIntermediateVec = Avx512F.UnpackLow(limb2Vec, limb3Vec);
 
-            // Step 11: combine group 2 partial results.
-            Vector128<ulong> group2Sum = Add128(product3, product4);
-            Vector128<ulong> totalGroup2 = Add128(group2Sum, product5);
-            Vector128<ulong> newHalf = Add128(upperIntermediate, totalGroup2);
+            // Step 11: combine group 2 partial results (still in 512-bit form).
+            // totalGroup2 = group2Sum + product5
+            Vector512<ulong> productHi_r2 = Avx512F.AlignRight64(productHi, productHi, 2);
+            Vector512<ulong> totalGroup2Vec = Add128(crossAndGroup2Sum, productHi_r2);
+
+            // Move totalGroup2 (lane1) down into lane0, then newHalf = upperIntermediate + totalGroup2.
+            Vector512<ulong> totalGroup2ToLow = Avx512F.AlignRight64(totalGroup2Vec, totalGroup2Vec, 2);
+            Vector512<ulong> newHalfVec = Add128(upperIntermediateVec, totalGroup2ToLow);
+
+            // Extract the two 128-bit results that form the final 256-bit product.
+            Vector128<ulong> updatedProduct0 = Avx512F.ExtractVector128(updatedProduct0Vec, 0);
+            Vector128<ulong> newHalf = Avx512F.ExtractVector128(newHalfVec, 0);
 
             // Step 12: process group 3 cross‑terms.
             Vector128<ulong> finalProdLow = Avx512DQ.VL.MultiplyLow(xHigh, yLow);
@@ -1196,35 +1205,22 @@ namespace Nethermind.Int256
             Unsafe.As<UInt256, Vector256<ulong>>(ref res) = finalResult;
 
             /// <summary>
-            /// Adds two 128-bit unsigned integers while propagating an overflow (carry) from the lower 64-bit lane to the higher lane.
-            /// Each 128-bit integer is represented as a <see cref="Vector128{ulong}"/>, with element 0 holding the lower 64 bits
-            /// and element 1 holding the higher 64 bits.
+            /// Adds two 512-bit vectors that conceptually contain four independent 128-bit unsigned integers.
+            /// Within each 128-bit chunk, propagates an overflow (carry) from the lower 64-bit lane to the higher lane.
             /// </summary>
-            /// <param name="operand1">The first 128-bit unsigned integer operand.</param>
-            /// <param name="operand2">The second 128-bit unsigned integer operand.</param>
-            /// <returns>
-            /// A <see cref="Vector128{ulong}"/> representing the sum of the two operands, with any carry from the lower lane added
-            /// into the higher lane.
-            /// </returns>
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            static Vector128<ulong> Add128(Vector128<ulong> left, Vector128<ulong> right)
+            static Vector512<ulong> Add128(Vector512<ulong> left, Vector512<ulong> right)
             {
-                // Perform a lane-wise addition of the two operands.
-                Vector128<ulong> sum = Sse2.Add(left, right);
+                Vector512<ulong> sum = Avx512F.Add(left, right);
 
-                // For unsigned addition, an overflow in a lane occurs if the result is less than one of the operands.
-                // Comparing 'sum' with 'operand1' produces a mask where each 64-bit lane is all ones if an overflow occurred, or zero otherwise.
-                Vector128<ulong> overflowMask = Avx512F.VL.CompareLessThan(sum, left);
+                Vector512<ulong> overflowMask = Avx512F.CompareLessThan(sum, left);
+                overflowMask = Avx512F.ShiftRightLogical(overflowMask, 63);
 
-                // Normalize the overflow mask: shift each 64-bit lane right by 63 bits.
-                // This converts a full mask (0xFFFFFFFFFFFFFFFF) to 1, leaving lanes with no overflow as 0.
-                overflowMask = Sse2.ShiftRightLogical(overflowMask, 63);
-                // Next, clear the (now swapped) lower lane by shuffle with a zero vector.
-                // The immediate mask 0x0 indicates that lane 0 should come from the zero vector and lane 1 from overflow.
-                Vector128<ulong> promotedCarry = Sse2.UnpackLow(Vector128<ulong>.Zero, overflowMask);
+                // Promote carry from each 128-bit chunk’s low lane into its high lane:
+                // [0, c0, 0, c2, 0, c4, 0, c6]
+                Vector512<ulong> promotedCarry = Avx512F.UnpackLow(Vector512<ulong>.Zero, overflowMask);
 
-                // Add the propagated carry to the sum.
-                return Sse2.Add(sum, promotedCarry);
+                return Avx512F.Add(sum, promotedCarry);
             }
         }
 
