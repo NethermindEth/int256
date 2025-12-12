@@ -1052,8 +1052,6 @@ namespace Nethermind.Int256
         [SkipLocalsInit]
         public static void Multiply(in UInt256 x, in UInt256 y, out UInt256 res)
         {
-            const bool Axv512Disabled = true;
-
             // If both inputs fit in 64 bits, use a simple multiplication routine.
             if ((x.u1 | x.u2 | x.u3 | y.u1 | y.u2 | y.u3) == 0)
             {
@@ -1066,7 +1064,7 @@ namespace Nethermind.Int256
                 return;
             }
             // Fallback if the required AVX‑512 intrinsics are not supported.
-            if (Axv512Disabled || !Avx512F.IsSupported || !Avx512DQ.IsSupported)
+            if (!Avx512F.IsSupported || !Avx512DQ.IsSupported)
             {
                 ref ulong rx = ref Unsafe.As<UInt256, ulong>(ref Unsafe.AsRef(in x));
                 ref ulong ry = ref Unsafe.As<UInt256, ulong>(ref Unsafe.AsRef(in y));
@@ -1167,6 +1165,15 @@ namespace Nethermind.Int256
                 Sse2.ShiftRightLogical(
                     Avx512F.VL.CompareGreaterThan(Sse2.UnpackHigh(product1, product1), crossSumHigh),
                     63);
+
+            // Propagate overflow from (crossSumHigh + carryFlag) into limb3.
+            Vector128<ulong> limb2Carry =
+                Sse2.ShiftRightLogical(
+                    Avx512F.VL.CompareLessThan(limb2, crossSumHigh),
+                    63);
+
+            limb3 = Sse2.Add(limb3, limb2Carry);
+
             Vector128<ulong> upperIntermediate = Sse2.UnpackLow(limb2, limb3);
 
             // Step 11: combine group 2 partial results.
