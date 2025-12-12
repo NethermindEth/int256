@@ -1065,7 +1065,7 @@ namespace Nethermind.Int256
                 return;
             }
             // Fallback if the required AVX‑512 intrinsics are not supported.
-            if (!Avx512F.IsSupported || !Avx512DQ.IsSupported)
+            if (!Avx512F.IsSupported || !Avx512DQ.IsSupported || !Avx512DQ.VL.IsSupported)
             {
                 ref ulong rx = ref Unsafe.As<UInt256, ulong>(ref Unsafe.AsRef(in x));
                 ref ulong ry = ref Unsafe.As<UInt256, ulong>(ref Unsafe.AsRef(in y));
