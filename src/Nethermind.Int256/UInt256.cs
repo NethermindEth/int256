@@ -1118,12 +1118,8 @@ namespace Nethermind.Int256
             Vector256<ulong> vecX = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in x));
             Vector256<ulong> vecY = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in y));
 
-            Vector256<ulong> vx = Avx2.And(vecX, mask);
-            Vector256<ulong> vy = Avx2.And(vecY, mask);
-            Vector256<ulong> v = Avx2.Or(vx, vy);
-
             // If both inputs fit in 64 bits, use a simple multiplication routine.
-            if (v == default)
+            if (Avx512F.VL.TernaryLogic(vecY, mask, Avx2.And(vecX, mask), 0xea) == default)
             {
                 // Fast multiply for numbers less than 2^64 (18,446,744,073,709,551,615)
                 ulong high = Math.BigMul(vecX[0], vecY[0], out ulong low);
