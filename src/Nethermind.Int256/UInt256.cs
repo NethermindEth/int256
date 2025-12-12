@@ -1043,6 +1043,13 @@ namespace Nethermind.Int256
             borrow = (((~a) & b) | (~(a ^ b)) & res) >> 63;
         }
 
+        /// <summary>
+        /// Multiplies two 256‑bit unsigned integers (<paramref name="x"/> and <paramref name="y"/>) and
+        /// writes the 256‑bit product to <paramref name="res"/>.
+        /// </summary>
+        /// <param name="x">The first 256‑bit unsigned integer.</param>
+        /// <param name="y">The second 256‑bit unsigned integer.</param>
+        /// <param name="res">When this method returns, contains the 256‑bit product of x and y.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Multiply(in UInt256 x, in UInt256 y, out UInt256 res)
         {
@@ -1069,13 +1076,6 @@ namespace Nethermind.Int256
             }
         }
 
-        /// <summary>
-        /// Multiplies two 256‑bit unsigned integers (<paramref name="x"/> and <paramref name="y"/>) and
-        /// writes the 256‑bit product to <paramref name="res"/>.
-        /// </summary>
-        /// <param name="x">The first 256‑bit unsigned integer.</param>
-        /// <param name="y">The second 256‑bit unsigned integer.</param>
-        /// <param name="res">When this method returns, contains the 256‑bit product of x and y.</param>
         [SkipLocalsInit]
         private static void MultiplyScalar(in UInt256 x, in UInt256 y, out UInt256 res)
         {
@@ -1104,13 +1104,6 @@ namespace Nethermind.Int256
             Unsafe.Add(ref pr, 3) = r3;
         }
 
-        /// <summary>
-        /// Multiplies two 256‑bit unsigned integers (<paramref name="x"/> and <paramref name="y"/>) and
-        /// writes the 256‑bit product to <paramref name="res"/>.
-        /// </summary>
-        /// <param name="x">The first 256‑bit unsigned integer.</param>
-        /// <param name="y">The second 256‑bit unsigned integer.</param>
-        /// <param name="res">When this method returns, contains the 256‑bit product of x and y.</param>
         [SkipLocalsInit]
         private static void MultiplyAvx512F(in UInt256 x, in UInt256 y, out UInt256 res)
         {
