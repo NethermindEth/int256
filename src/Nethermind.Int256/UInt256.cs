@@ -1133,33 +1133,36 @@ namespace Nethermind.Int256
             // Load the inputs and prepare the mask constant.
             Vector512<ulong> mask32 = Vector512.Create(0xFFFFFFFFUL);
 
+            // Indices that reproduce the layout:
+            // xRearranged = [ x0, x0, x1, x0,  x1, x2, x0, x1 ]
+            // yRearranged = [ y0, y1, y0, y2,  y1, y0, y3, y2 ]
+            Vector512<ulong> idxX = Vector512.Create(0UL, 0UL, 1UL, 0UL, 1UL, 2UL, 0UL, 1UL);
+            Vector512<ulong> idxY = Vector512.Create(0UL, 1UL, 0UL, 2UL, 1UL, 0UL, 3UL, 2UL);
+
             // Lane setup - pure shuffle work.
-            // JIT will often pull these up early to keep shuffle ports busy while mul uops run.
-
-            // We permute x and y into an order that makes the 8 "needed" partial products land
-            // in fixed lanes. These permutes are independent - giving OoO plenty of freedom.
-            Vector256<ulong> xPerm1 = Avx2.Permute4x64(vecX, 16);  // [ x0, x0, x1, x0 ]
-            Vector256<ulong> yPerm1 = Avx2.Permute4x64(vecY, 132); // [ y0, y1, y0, y2 ]
-            Vector256<ulong> xPerm2 = Avx2.Permute4x64(vecX, 73);  // [ x1, x2, x0, x1 ]
-            Vector256<ulong> yPerm2 = Avx2.Permute4x64(vecY, 177); // [ y1, y0, y3, y2 ]
-
-            // "Side multiplies" - independent of the 32x32 widening multiplies.
-            // These often get scheduled inside the main multiply block
-            // so the vpmullq latency is hidden behind vpmuludq throughput.
-
-            // Low-only products we need for limb3 later: p21_lo and p30_lo.
-            Vector128<ulong> xHigh = Avx2.ExtractVector128(vecX, 1);  // [x2, x3]
-            Vector128<ulong> yLow = Avx2.ExtractVector128(yPerm2, 0); // [y1, y0]
-            Vector128<ulong> finalProdLow = Avx512DQ.VL.MultiplyLow(xHigh, yLow); // [p21_lo, p30_lo]
-
-            // Build ZMM inputs for vpmuludq.
-            // InsertVector256 is shuffle-ish - again, good to do while mul uops are in flight.
+            // Replace 4x Permute4x64 (ymm) + 4x InsertVector256 (zmm) with:
+            // 2x InsertVector256 (just put vecX/vecY in low half) + 2x PermuteVar8x64 (zmm).
 
             Vector512<ulong> z = Vector512<ulong>.Zero;
-            Vector512<ulong> xRearranged = Avx512F.InsertVector256(z, xPerm1, 0);
-            xRearranged = Avx512F.InsertVector256(xRearranged, xPerm2, 1);
-            Vector512<ulong> yRearranged = Avx512F.InsertVector256(z, yPerm1, 0);
-            yRearranged = Avx512F.InsertVector256(yRearranged, yPerm2, 1);
+
+            // Put vecX/vecY into the low 256 bits only.
+            // Upper 256 bits remain zero, which is fine because we only index 0..3.
+            Vector512<ulong> xRearranged = Avx512F.InsertVector256(z, vecX, 0);
+            Vector512<ulong> yRearranged = Avx512F.InsertVector256(z, vecY, 0);
+
+            // Depending on the exact .NET 10 intrinsic overloads, you may be able to drop the AsInt64 casts.
+            // Keeping them tends to work across the common signatures (value/control typed as Int64).
+            xRearranged = Avx512F.PermuteVar8x64(xRearranged, idxX);
+            yRearranged = Avx512F.PermuteVar8x64(yRearranged, idxY);
+
+            // "Side multiplies" - independent of the 32x32 widening multiplies.
+            // Low-only products we need for limb3 later: p21_lo and p30_lo.
+            Vector128<ulong> xHigh = Avx2.ExtractVector128(vecX, 1);  // [x2, x3]
+
+            // yRearranged elements 4..5 are [y1, y0] -> 128-bit lane index 2
+            Vector128<ulong> yLow = Avx512F.ExtractVector128(yRearranged, 2); // [y1, y0]
+
+            Vector128<ulong> finalProdLow = Avx512DQ.VL.MultiplyLow(xHigh, yLow); // [p21_lo, p30_lo]
 
             // 32x32 widening multiplies. This block is the "main event"
             // everything around it should try to overlap with it.
