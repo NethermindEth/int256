@@ -1126,7 +1126,7 @@ namespace Nethermind.Int256
             if (v == default)
             {
                 // Fast multiply for numbers less than 2^64 (18,446,744,073,709,551,615)
-                ulong high = Math.BigMul(x.u0, y.u0, out ulong low);
+                ulong high = Math.BigMul(vecX[0], vecY[0], out ulong low);
                 // Assignment to res after multiply in case is used as input for x or y (by ref aliasing)
                 res = default;
                 Unsafe.AsRef(in res.u0) = low;
