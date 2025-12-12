@@ -1098,8 +1098,11 @@ namespace Nethermind.Int256
             Vector256<ulong> xPerm2 = Avx2.Permute4x64(vecX, 73);  // [ x1, x2, x0, x1 ]
             Vector256<ulong> yPerm2 = Avx2.Permute4x64(vecY, 177); // [ y1, y0, y3, y2 ]
 
-            Vector512<ulong> xRearranged = Vector512.Create(xPerm1, xPerm2);
-            Vector512<ulong> yRearranged = Vector512.Create(yPerm1, yPerm2);
+            Vector512<ulong> z = Vector512<ulong>.Zero;
+            Vector512<ulong> xRearranged = Avx512F.InsertVector256(z, xPerm1, 0);
+            xRearranged = Avx512F.InsertVector256(xRearranged, xPerm2, 1);
+            Vector512<ulong> yRearranged = Avx512F.InsertVector256(z, yPerm1, 0);
+            yRearranged = Avx512F.InsertVector256(yRearranged, yPerm2, 1);
 
             // Step 3: split each 64‑bit limb into its lower and upper 32‑bit parts.
             Vector512<ulong> xLowerParts = Avx512F.And(xRearranged, mask32);
