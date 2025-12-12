@@ -1184,14 +1184,19 @@ namespace Nethermind.Int256
             // Unpack the 512‑bit results into two groups.
             Vector512<ulong> productLow = Avx512F.UnpackLow(lowerPartial, higherPartial);
             Vector512<ulong> productHi = Avx512F.UnpackHigh(lowerPartial, higherPartial);
+
+            Vector512<ulong> productLow_r2 = Avx512F.AlignRight64(productLow, productLow, 2);
+            Vector512<ulong> product1High = Avx512F.AlignRight64(productHi, productHi, 1);
+            Vector512<ulong> productHi_r2 = Avx512F.AlignRight64(productHi, productHi, 2);
+
             Vector128<ulong> extraLow = Avx512F.ExtractVector128(lowerPartial, 3);
 
             // Keep the intermediate results in 512-bit vectors and avoid extracting 128-bit groups.
             // Align productLow so that lane0 contains product2 and lane1 contains product4, letting us compute:
             // crossSum = product1 + product2  (lane0)
             // group2Sum = product3 + product4 (lane1)
-            Vector512<ulong> productLow_r2 = Avx512F.AlignRight64(productLow, productLow, 2);
             Vector512<ulong> crossAndGroup2Sum = Add128(productHi, productLow_r2);
+            Vector512<ulong> crossSumHigh = Avx512F.AlignRight64(crossAndGroup2Sum, crossAndGroup2Sum, 1);
 
             // Perform the group 1 cross-term addition (in 512-bit form, then extract only the final 128-bit lane).
             Vector512<ulong> crossAddMask = Avx512BW.IsSupported ?
@@ -1203,27 +1208,23 @@ namespace Nethermind.Int256
             Vector512<ulong> carryMaskVec = Avx512F.CompareLessThan(updatedProduct0Vec, productLow);
 
             // limb2 = crossSumHigh + carryFlag
-            Vector512<ulong> crossSumHigh = Avx512F.AlignRight64(crossAndGroup2Sum, crossAndGroup2Sum, 1);
             Vector512<ulong> carryMaskToHigh = Avx512F.AlignRight64(carryMaskVec, carryMaskVec, 1);
 
             // subtract all-ones == add 1
             Vector512<ulong> limb2Vec = Avx512F.Add(crossSumHigh, Avx512F.ShiftRightLogical(carryMaskToHigh, 63));
-
-            Vector512<ulong> product1High = Avx512F.AlignRight64(productHi, productHi, 1);
+            Vector512<ulong> limb2CarryMask = Avx512F.CompareLessThan(limb2Vec, crossSumHigh);
 
             // limb3 = (product1High > crossSumHigh) ? 1 : 0
             Vector512<ulong> limb3Mask = Avx512F.CompareGreaterThan(product1High, crossSumHigh);
             Vector512<ulong> limb3Vec = Avx512F.ShiftRightLogical(limb3Mask, 63);
 
             // propagate overflow from (crossSumHigh + carryFlag) into limb3
-            Vector512<ulong> limb2CarryMask = Avx512F.CompareLessThan(limb2Vec, crossSumHigh);
             limb3Vec = Avx512F.Add(limb3Vec, Avx512F.ShiftRightLogical(limb2CarryMask, 63));
 
             Vector512<ulong> upperIntermediateVec = Avx512F.UnpackLow(limb2Vec, limb3Vec);
 
             // Combine group 2 partial results (still in 512-bit form).
             // totalGroup2 = group2Sum + product5
-            Vector512<ulong> productHi_r2 = Avx512F.AlignRight64(productHi, productHi, 2);
             Vector512<ulong> totalGroup2Vec = Add128(crossAndGroup2Sum, productHi_r2);
 
             // Move totalGroup2 (lane1) down into lane0, then newHalf = upperIntermediate + totalGroup2.
