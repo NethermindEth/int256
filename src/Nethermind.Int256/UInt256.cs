@@ -1207,7 +1207,7 @@ namespace Nethermind.Int256
             Vector512<ulong> carryMaskToHigh = Avx512F.AlignRight64(carryMaskVec, carryMaskVec, 1);
 
             // subtract all-ones == add 1
-            Vector512<ulong> limb2Vec = Avx512F.Subtract(crossSumHigh, carryMaskToHigh);
+            Vector512<ulong> limb2Vec = Avx512F.Add(crossSumHigh, Avx512F.ShiftRightLogical(carryMaskToHigh, 63));
 
             Vector512<ulong> product1High = Avx512F.AlignRight64(productHi, productHi, 1);
 
@@ -1217,7 +1217,7 @@ namespace Nethermind.Int256
 
             // propagate overflow from (crossSumHigh + carryFlag) into limb3
             Vector512<ulong> limb2CarryMask = Avx512F.CompareLessThan(limb2Vec, crossSumHigh);
-            limb3Vec = Avx512F.Subtract(limb3Vec, limb2CarryMask);
+            limb3Vec = Avx512F.Add(limb3Vec, Avx512F.ShiftRightLogical(limb2CarryMask, 63));
 
             Vector512<ulong> upperIntermediateVec = Avx512F.UnpackLow(limb2Vec, limb3Vec);
 
