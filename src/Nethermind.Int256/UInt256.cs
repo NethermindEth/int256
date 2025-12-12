@@ -1042,6 +1042,7 @@ namespace Nethermind.Int256
             res = a - b - borrow;
             borrow = (((~a) & b) | (~(a ^ b)) & res) >> 63;
         }
+
         /// <summary>
         /// Multiplies two 256‑bit unsigned integers (<paramref name="x"/> and <paramref name="y"/>) and
         /// writes the 256‑bit product to <paramref name="res"/>.
@@ -1049,139 +1050,215 @@ namespace Nethermind.Int256
         /// <param name="x">The first 256‑bit unsigned integer.</param>
         /// <param name="y">The second 256‑bit unsigned integer.</param>
         /// <param name="res">When this method returns, contains the 256‑bit product of x and y.</param>
-        [SkipLocalsInit]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Multiply(in UInt256 x, in UInt256 y, out UInt256 res)
         {
-            const bool Axv512Disabled = true;
+            if (!Avx512F.IsSupported || !Avx512DQ.IsSupported || !Avx512DQ.VL.IsSupported)
+            {
+                ulong x0 = x.u0;
+                ulong y0 = y.u0;
+                // If both inputs fit in 64 bits, use a simple multiplication routine.
+                if ((x.u1 | x.u2 | x.u3 | y.u1 | y.u2 | y.u3) == 0)
+                {
+                    // Fast multiply for numbers less than 2^64 (18,446,744,073,709,551,615)
+                    ulong high = Math.BigMul(x0, y0, out ulong low);
+                    // Assignment to res after multiply in case is used as input for x or y (by ref aliasing)
+                    res = default;
+                    Unsafe.AsRef(in res.u0) = low;
+                    Unsafe.AsRef(in res.u1) = high;
+                    return;
+                }
+                MultiplyScalar(in x, in y, out res);
+            }
+            else
+            {
+                MultiplyAvx512F(in x, in y, out res);
+            }
+        }
+
+        [SkipLocalsInit]
+        private static void MultiplyScalar(in UInt256 x, in UInt256 y, out UInt256 res)
+        {
+            ref ulong rx = ref Unsafe.As<UInt256, ulong>(ref Unsafe.AsRef(in x));
+            ref ulong ry = ref Unsafe.As<UInt256, ulong>(ref Unsafe.AsRef(in y));
+
+            (ulong carry, ulong r0) = Multiply64(rx, ry);
+            UmulHop(carry, Unsafe.Add(ref rx, 1), ry, out carry, out ulong res1);
+            UmulHop(carry, Unsafe.Add(ref rx, 2), ry, out carry, out ulong res2);
+            ulong res3 = Unsafe.Add(ref rx, 3) * ry + carry;
+
+            UmulHop(res1, rx, Unsafe.Add(ref ry, 1), out carry, out ulong r1);
+            UmulStep(res2, Unsafe.Add(ref rx, 1), Unsafe.Add(ref ry, 1), carry, out carry, out res2);
+            res3 = res3 + Unsafe.Add(ref rx, 2) * Unsafe.Add(ref ry, 1) + carry;
+
+            UmulHop(res2, rx, Unsafe.Add(ref ry, 2), out carry, out ulong r2);
+            res3 = res3 + Unsafe.Add(ref rx, 1) * Unsafe.Add(ref ry, 2) + carry;
+
+            ulong r3 = res3 + rx * Unsafe.Add(ref ry, 3);
+
+            Unsafe.SkipInit(out res);
+            ref ulong pr = ref Unsafe.As<UInt256, ulong>(ref res);
+            pr = r0;
+            Unsafe.Add(ref pr, 1) = r1;
+            Unsafe.Add(ref pr, 2) = r2;
+            Unsafe.Add(ref pr, 3) = r3;
+        }
+
+        [SkipLocalsInit]
+        private static void MultiplyAvx512F(in UInt256 x, in UInt256 y, out UInt256 res)
+        {
+            Vector256<ulong> mask = Vector256.Create(0ul, ulong.MaxValue, ulong.MaxValue, ulong.MaxValue);
+            Vector256<ulong> vecX = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in x));
+            Vector256<ulong> vecY = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in y));
 
             // If both inputs fit in 64 bits, use a simple multiplication routine.
-            if ((x.u1 | x.u2 | x.u3 | y.u1 | y.u2 | y.u3) == 0)
+            if (Avx512F.VL.TernaryLogic(vecY, mask, Avx2.And(vecX, mask), 0xea) == default)
             {
                 // Fast multiply for numbers less than 2^64 (18,446,744,073,709,551,615)
-                ulong high = Math.BigMul(x.u0, y.u0, out ulong low);
+                ulong high = Math.BigMul(vecX[0], vecY[0], out ulong low);
                 // Assignment to res after multiply in case is used as input for x or y (by ref aliasing)
                 res = default;
                 Unsafe.AsRef(in res.u0) = low;
                 Unsafe.AsRef(in res.u1) = high;
                 return;
             }
-            // Fallback if the required AVX‑512 intrinsics are not supported.
-            if (Axv512Disabled || !Avx512F.IsSupported || !Avx512DQ.IsSupported)
-            {
-                ref ulong rx = ref Unsafe.As<UInt256, ulong>(ref Unsafe.AsRef(in x));
-                ref ulong ry = ref Unsafe.As<UInt256, ulong>(ref Unsafe.AsRef(in y));
 
-                (ulong carry, ulong r0) = Multiply64(rx, ry);
-                UmulHop(carry, Unsafe.Add(ref rx, 1), ry, out carry, out ulong res1);
-                UmulHop(carry, Unsafe.Add(ref rx, 2), ry, out carry, out ulong res2);
-                ulong res3 = Unsafe.Add(ref rx, 3) * ry + carry;
-
-                UmulHop(res1, rx, Unsafe.Add(ref ry, 1), out carry, out ulong r1);
-                UmulStep(res2, Unsafe.Add(ref rx, 1), Unsafe.Add(ref ry, 1), carry, out carry, out res2);
-                res3 = res3 + Unsafe.Add(ref rx, 2) * Unsafe.Add(ref ry, 1) + carry;
-
-                UmulHop(res2, rx, Unsafe.Add(ref ry, 2), out carry, out ulong r2);
-                res3 = res3 + Unsafe.Add(ref rx, 1) * Unsafe.Add(ref ry, 2) + carry;
-
-                ulong r3 = res3 + rx * Unsafe.Add(ref ry, 3);
-
-                res = new UInt256(r0, r1, r2, r3);
-                return;
-            }
-
-            // Step 1: load the inputs and prepare the mask constant.
-            Vector256<ulong> vecX = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in x));
-            Vector256<ulong> vecY = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in y));
+            // Load the inputs and prepare the mask constant.
             Vector512<ulong> mask32 = Vector512.Create(0xFFFFFFFFUL);
 
-            // Step 2: permute x and y. These operations are independent.
-            Vector256<ulong> xPerm1 = Avx2.Permute4x64(vecX, 16);  // [ x0, x0, x1, x0 ]
-            Vector256<ulong> yPerm1 = Avx2.Permute4x64(vecY, 132); // [ y0, y1, y0, y2 ]
-            Vector256<ulong> xPerm2 = Avx2.Permute4x64(vecX, 73);  // [ x1, x2, x0, x1 ]
-            Vector256<ulong> yPerm2 = Avx2.Permute4x64(vecY, 177); // [ y1, y0, y3, y2 ]
+            // Indices that reproduce the layout:
+            // xRearranged = [ x0, x0, x1, x0,  x1, x2, x0, x1 ]
+            // yRearranged = [ y0, y1, y0, y2,  y1, y0, y3, y2 ]
+            Vector512<ulong> idxX = Vector512.Create(0UL, 0UL, 1UL, 0UL, 1UL, 2UL, 0UL, 1UL);
+            Vector512<ulong> idxY = Vector512.Create(0UL, 1UL, 0UL, 2UL, 1UL, 0UL, 3UL, 2UL);
 
-            Vector512<ulong> xRearranged = Vector512.Create(xPerm1, xPerm2);
-            Vector512<ulong> yRearranged = Vector512.Create(yPerm1, yPerm2);
+            // Lane setup - pure shuffle work.
+            // Replace 4x Permute4x64 (ymm) + 4x InsertVector256 (zmm) with:
+            // 2x InsertVector256 (just put vecX/vecY in low half) + 2x PermuteVar8x64 (zmm).
 
-            // Step 3: split each 64‑bit limb into its lower and upper 32‑bit parts.
-            Vector512<ulong> xLowerParts = Avx512F.And(xRearranged, mask32);
-            Vector512<ulong> yLowerParts = Avx512F.And(yRearranged, mask32);
+            Vector512<ulong> z = Vector512<ulong>.Zero;
+
+            // Put vecX/vecY into the low 256 bits only.
+            // Upper 256 bits remain zero, which is fine because we only index 0..3.
+            Vector512<ulong> xRearranged = Avx512F.InsertVector256(z, vecX, 0);
+            Vector512<ulong> yRearranged = Avx512F.InsertVector256(z, vecY, 0);
+            xRearranged = Avx512F.PermuteVar8x64(xRearranged, idxX);
+            yRearranged = Avx512F.PermuteVar8x64(yRearranged, idxY);
+
+            // "Side multiplies" - independent of the 32x32 widening multiplies.
+            // Low-only products we need for limb3 later: p21_lo and p30_lo.
+            Vector128<ulong> xHigh = Avx2.ExtractVector128(vecX, 1);  // [x2, x3]
+
+            // yRearranged elements 4..5 are [y1, y0] -> 128-bit lane index 2
+            Vector128<ulong> yLow = Avx512F.ExtractVector128(yRearranged, 2); // [y1, y0]
+
+            Vector128<ulong> finalProdLow = Avx512DQ.VL.MultiplyLow(xHigh, yLow); // [p21_lo, p30_lo]
+
+            // 32x32 widening multiplies. This block is the "main event"
+            // everything around it should try to overlap with it.
             Vector512<ulong> xUpperParts = Avx512F.ShiftRightLogical(xRearranged, 32);
             Vector512<ulong> yUpperParts = Avx512F.ShiftRightLogical(yRearranged, 32);
 
-            // Step 4: launch four 32×32‑bit multiplications in parallel.
-            Vector512<ulong> prodLL = Avx512DQ.MultiplyLow(xLowerParts, yLowerParts); // lower × lower
-            Vector512<ulong> prodLH = Avx512DQ.MultiplyLow(xLowerParts, yUpperParts); // lower × upper
-            Vector512<ulong> prodHL = Avx512DQ.MultiplyLow(xUpperParts, yLowerParts); // upper × lower
-            Vector512<ulong> prodHH = Avx512DQ.MultiplyLow(xUpperParts, yUpperParts); // upper × upper
+            Vector512<ulong> prodLL = Avx512F.Multiply(xRearranged.AsUInt32(), yRearranged.AsUInt32()); // low(x)  * low(y)
+            Vector512<ulong> prodHL = Avx512F.Multiply(xUpperParts.AsUInt32(), yRearranged.AsUInt32()); // high(x) * low(y)
+            Vector512<ulong> prodHH = Avx512F.Multiply(xUpperParts.AsUInt32(), yUpperParts.AsUInt32()); // high(x) * high(y)
+            Vector512<ulong> prodLH = Avx512F.Multiply(xRearranged.AsUInt32(), yUpperParts.AsUInt32()); // low(x)  * high(y)
 
-            // Step 5: compute the intermediate term while the multiplications are in flight.
+            // 64x64 reconstruction.
+            // Mostly ALU ops (vpaddq/vpsrlq/vpsllq) - lower pressure than shuffles.
             Vector512<ulong> prodLL_hi = Avx512F.ShiftRightLogical(prodLL, 32);
             Vector512<ulong> prodLH_lo = Avx512F.And(prodLH, mask32);
             Vector512<ulong> prodHL_lo = Avx512F.And(prodHL, mask32);
-            Vector512<ulong> termT = Avx512F.Add(Avx512F.Add(prodLL_hi, prodLH_lo), prodHL_lo);
+            Vector512<ulong> termT = Avx512F.Add(prodLL_hi, Avx512F.Add(prodLH_lo, prodHL_lo));
 
-            // Step 6: assemble the lower and higher partial results.
-            Vector512<ulong> lowerPartial =
-                Avx512F.Or(
-                    Avx512F.And(prodLL, mask32),
-                    Avx512F.ShiftLeftLogical(Avx512F.And(termT, mask32), 32));
-            Vector512<ulong> higherPartial =
-                Avx512F.Add(
-                    Avx512F.Add(
-                        Avx512F.Add(prodHH, Avx512F.ShiftRightLogical(prodLH, 32)),
-                        Avx512F.ShiftRightLogical(prodHL, 32)),
-                    Avx512F.ShiftRightLogical(termT, 32));
+            Vector512<ulong> shiftedT = Avx512F.ShiftLeftLogical(termT, 32);
 
-            // Step 7: unpack the 512‑bit results into two groups.
+            // lowerPartial uses vpternlog - typically a throughput win over separate and/or.
+            Vector512<ulong> lowerPartial = Avx512F.TernaryLogic(prodLL, mask32, shiftedT, 0xEA);
+
+            // higherPartial is add-heavy - so we can use an add-tree
+            Vector512<ulong> hiA = Avx512F.Add(prodHH, Avx512F.ShiftRightLogical(prodLH, 32));
+            Vector512<ulong> hiB = Avx512F.Add(Avx512F.ShiftRightLogical(prodHL, 32),
+                                               Avx512F.ShiftRightLogical(termT, 32));
+            Vector512<ulong> higherPartial = Avx512F.Add(hiA, hiB);
+
+            // Interleave lo/hi into [lo,hi] pairs per product.
+            // These unpacks are shuffle-port work; JIT likes to keep them early.
+
             Vector512<ulong> productLow = Avx512F.UnpackLow(lowerPartial, higherPartial);
             Vector512<ulong> productHi = Avx512F.UnpackHigh(lowerPartial, higherPartial);
 
-            // Step 8: extract the 128‑bit groups.
-            Vector128<ulong> product0 = Avx512F.ExtractVector128(productLow, 0);
-            Vector128<ulong> product1 = Avx512F.ExtractVector128(productHi, 0);
-            Vector128<ulong> product2 = Avx512F.ExtractVector128(productLow, 1);
-            Vector128<ulong> product3 = Avx512F.ExtractVector128(productHi, 1);
-            Vector128<ulong> product4 = Avx512F.ExtractVector128(productLow, 2);
-            Vector128<ulong> product5 = Avx512F.ExtractVector128(productHi, 2);
+            // Hoist common "views" of the product vectors now.
+            // This is intentionally earlier than point-of-use - it gives OoO a longer window
+            // to overlap shuffle latency with the later ALU+compare chain.
+            Vector512<ulong> productLow_r2 = Avx512F.AlignRight64(productLow, productLow, 2);
+            Vector512<ulong> product1High = Avx512BW.IsSupported ?
+                Avx512BW.ShiftRightLogical128BitLane(productHi.AsByte(), 8).AsUInt64() :
+                Avx512F.AlignRight64(productHi, productHi, 1);
+            Vector512<ulong> productHi_r2 = Avx512F.AlignRight64(productHi, productHi, 2);
 
-            // Step 9: issue memory request for remaining parts.
-            Vector128<ulong> xHigh = Vector128.Create(x.u2, x.u3);
-            Vector128<ulong> yLow = Vector128.Create(y.u1, y.u0);
-
-            // Step 10: perform the group 1 cross‑term addition.
-            Vector128<ulong> crossSum = Add128(product1, product2);
-            Vector128<ulong> crossAddMask = Sse2.UnpackLow(Vector128<ulong>.Zero, crossSum);
-            Vector128<ulong> updatedProduct0 = Sse2.Add(product0, crossAddMask);
-
-            // Compute the carry from adding crossSum’s low 64 bits.
-            Vector128<ulong> product0HighBefore = Sse2.UnpackHigh(product0, product0);
-            Vector128<ulong> product0HighAfter = Sse2.UnpackHigh(updatedProduct0, updatedProduct0);
-            Vector128<ulong> carryFlag =
-                Sse2.ShiftRightLogical(
-                    Avx512F.VL.CompareLessThan(product0HighAfter, product0HighBefore),
-                    63);
-            Vector128<ulong> crossSumHigh = Sse2.UnpackHigh(crossSum, crossSum);
-            Vector128<ulong> limb2 = Sse2.Add(crossSumHigh, carryFlag);
-            Vector128<ulong> limb3 =
-                Sse2.ShiftRightLogical(
-                    Avx512F.VL.CompareGreaterThan(Sse2.UnpackHigh(product1, product1), crossSumHigh),
-                    63);
-            Vector128<ulong> upperIntermediate = Sse2.UnpackLow(limb2, limb3);
-
-            // Step 11: combine group 2 partial results.
-            Vector128<ulong> group2Sum = Add128(product3, product4);
-            Vector128<ulong> totalGroup2 = Add128(group2Sum, product5);
-            Vector128<ulong> newHalf = Add128(upperIntermediate, totalGroup2);
-
-            // Step 12: process group 3 cross‑terms.
-            Vector128<ulong> finalProdLow = Avx512DQ.VL.MultiplyLow(xHigh, yLow);
+            // Also hoist this extract even though its used late - it is independent work.
             Vector128<ulong> extraLow = Avx512F.ExtractVector128(lowerPartial, 3);
+
+            // Carry-emulated 128-bit adds inside each 128-bit chunk.
+            // Cost centres here are:
+            // - vpcmpltuq + vpmovm2q (mask materialisation tax)
+            // - shuffle ops (valignq/vpslldq) feeding the carry path
+
+            Vector512<ulong> crossAndGroup2Sum = Add128(productHi, productLow_r2);
+            Vector512<ulong> crossSumHigh =  Avx512BW.IsSupported ?
+                Avx512BW.ShiftRightLogical128BitLane(crossAndGroup2Sum.AsByte(), 8).AsUInt64() :
+                Avx512F.AlignRight64(crossAndGroup2Sum, crossAndGroup2Sum, 1);
+
+            // Perform the group 1 cross-term addition (in 512-bit form, then extract only the final 128-bit lane).
+            Vector512<ulong> crossAddMask = Avx512BW.IsSupported ?
+                Avx512BW.ShiftLeftLogical128BitLane(crossAndGroup2Sum.AsByte(), 8).AsUInt64() :
+                Avx512F.UnpackLow(Vector512<ulong>.Zero, crossAndGroup2Sum);
+            Vector512<ulong> updatedProduct0Vec = Avx512F.Add(productLow, crossAddMask);
+
+            // CompareLessThan returns all-ones/zero vectors, but the CPU produces k-masks.
+            // JIT must pay vpmovm2q to materialise them back into ZMM.
+            Vector512<ulong> carryMaskVec = Avx512F.CompareLessThan(updatedProduct0Vec, productLow);
+
+            // Convert all-ones to 0-or-1 as early as possible to keep the later chain cheap.
+            Vector512<ulong> carryMaskToHigh = Avx512BW.IsSupported ?
+                Avx512BW.ShiftRightLogical128BitLane(carryMaskVec.AsByte(), 8).AsUInt64() :
+                Avx512F.AlignRight64(carryMaskVec, carryMaskVec, 1);
+
+            // subtract all-ones == add 1
+            Vector512<ulong> limb2Vec = Avx512F.Add(crossSumHigh, Avx512F.ShiftRightLogical(carryMaskToHigh, 63));
+            Vector512<ulong> limb2CarryMask = Avx512F.CompareLessThan(limb2Vec, crossSumHigh);
+
+            // limb3 = (product1High > crossSumHigh) ? 1 : 0
+            Vector512<ulong> limb3Mask = Avx512F.CompareGreaterThan(product1High, crossSumHigh);
+            Vector512<ulong> limb3Vec = Avx512F.ShiftRightLogical(limb3Mask, 63);
+
+            // propagate overflow from (crossSumHigh + carryFlag) into limb3
+            limb3Vec = Avx512F.Add(limb3Vec, Avx512F.ShiftRightLogical(limb2CarryMask, 63));
+
+            Vector512<ulong> upperIntermediateVec = Avx512F.UnpackLow(limb2Vec, limb3Vec);
+
+            // Combine group 2 partial results (still in 512-bit form).
+            // totalGroup2 = group2Sum + product5
+            Vector512<ulong> totalGroup2Vec = Add128(crossAndGroup2Sum, productHi_r2);
+
+            // Move totalGroup2 (lane1) down into lane0, then newHalf = upperIntermediate + totalGroup2.
+            Vector512<ulong> totalGroup2ToLow = Avx512F.AlignRight64(totalGroup2Vec, totalGroup2Vec, 2);
+            Vector512<ulong> newHalfVec = Add128(upperIntermediateVec, totalGroup2ToLow);
+
+            // Extract the two 128-bit results that form the final 256-bit product.
+            Vector128<ulong> updatedProduct0 = Avx512F.ExtractVector128(updatedProduct0Vec, 0);
+            Vector128<ulong> newHalf = Avx512F.ExtractVector128(newHalfVec, 0);
+
+            // Process group 3 cross‑terms.
             finalProdLow = Sse2.Add(finalProdLow, extraLow);
-            Vector128<ulong> swappedFinal = Sse2.UnpackLow(finalProdLow, finalProdLow);
-            Vector128<ulong> horizontalSum = Sse2.Add(finalProdLow, swappedFinal);
-            Vector128<ulong> highCarry = Sse2.UnpackHigh(Vector128<ulong>.Zero, horizontalSum);
-            newHalf = Sse2.Add(newHalf, highCarry);
+            // swap qwords via pshufd imm=0x4E
+            Vector128<ulong> swapped = Sse2.Shuffle(finalProdLow.AsInt32(), 0x4E).AsUInt64();
+            // sum both lanes => [a0+a1, a1+a0]
+            Vector128<ulong> sum = Sse2.Add(finalProdLow, swapped);
+            // keep only the high-qword in the high lane: shift-left by 8 => [0, a0+a1]
+            Vector128<ulong> hiOnly = Sse2.ShiftLeftLogical128BitLane(sum.AsByte(), 8).AsUInt64();
+            newHalf = Sse2.Add(newHalf, hiOnly);
 
             // Combine the results into the final 256‑bit value.
             Vector256<ulong> finalResult = Vector256.Create(updatedProduct0, newHalf);
@@ -1189,35 +1266,26 @@ namespace Nethermind.Int256
             Unsafe.As<UInt256, Vector256<ulong>>(ref res) = finalResult;
 
             /// <summary>
-            /// Adds two 128-bit unsigned integers while propagating an overflow (carry) from the lower 64-bit lane to the higher lane.
-            /// Each 128-bit integer is represented as a <see cref="Vector128{ulong}"/>, with element 0 holding the lower 64 bits
-            /// and element 1 holding the higher 64 bits.
+            /// Adds two 512-bit vectors that conceptually contain four independent 128-bit unsigned integers.
+            /// Within each 128-bit chunk, propagates an overflow (carry) from the lower 64-bit lane to the higher lane.
             /// </summary>
-            /// <param name="operand1">The first 128-bit unsigned integer operand.</param>
-            /// <param name="operand2">The second 128-bit unsigned integer operand.</param>
+            /// <param name="left">The first 512-bit vector operand.</param>
+            /// <param name="right">The second 512-bit vector operand.</param>
             /// <returns>
-            /// A <see cref="Vector128{ulong}"/> representing the sum of the two operands, with any carry from the lower lane added
-            /// into the higher lane.
+            /// The sum of <paramref name="left"/> and <paramref name="right"/>, with carries propagated within each 128-bit chunk.
             /// </returns>
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            static Vector128<ulong> Add128(Vector128<ulong> left, Vector128<ulong> right)
+            static Vector512<ulong> Add128(Vector512<ulong> left, Vector512<ulong> right)
             {
-                // Perform a lane-wise addition of the two operands.
-                Vector128<ulong> sum = Sse2.Add(left, right);
-
-                // For unsigned addition, an overflow in a lane occurs if the result is less than one of the operands.
-                // Comparing 'sum' with 'operand1' produces a mask where each 64-bit lane is all ones if an overflow occurred, or zero otherwise.
-                Vector128<ulong> overflowMask = Avx512F.VL.CompareLessThan(sum, left);
-
-                // Normalize the overflow mask: shift each 64-bit lane right by 63 bits.
-                // This converts a full mask (0xFFFFFFFFFFFFFFFF) to 1, leaving lanes with no overflow as 0.
-                overflowMask = Sse2.ShiftRightLogical(overflowMask, 63);
-                // Next, clear the (now swapped) lower lane by shuffle with a zero vector.
-                // The immediate mask 0x0 indicates that lane 0 should come from the zero vector and lane 1 from overflow.
-                Vector128<ulong> promotedCarry = Sse2.UnpackLow(Vector128<ulong>.Zero, overflowMask);
-
-                // Add the propagated carry to the sum.
-                return Sse2.Add(sum, promotedCarry);
+                Vector512<ulong> sum = Avx512F.Add(left, right);
+                Vector512<ulong> overflowMask = Avx512F.CompareLessThan(sum, left);
+                // Promote carry from each 128-bit chunk’s low lane into its high lane:
+                // lanes: [0, mask0, 0, mask2, 0, mask4, 0, mask6] where mask is 0 or 0xFFFF..FFFF
+                Vector512<ulong> promotedCarryAllOnes = Avx512BW.IsSupported ?
+                    Avx512BW.ShiftLeftLogical128BitLane(overflowMask.AsByte(), 8).AsUInt64() :
+                    Avx512F.UnpackLow(Vector512<ulong>.Zero, overflowMask);
+                // Subtracting 0xFFFF..FFFF is identical to adding 1 (mod 2^64)
+                return Avx512F.Subtract(sum, promotedCarryAllOnes);
             }
         }
 
