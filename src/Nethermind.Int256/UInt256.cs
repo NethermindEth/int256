@@ -1042,6 +1042,7 @@ namespace Nethermind.Int256
             res = a - b - borrow;
             borrow = (((~a) & b) | (~(a ^ b)) & res) >> 63;
         }
+
         /// <summary>
         /// Multiplies two 256‑bit unsigned integers (<paramref name="x"/> and <paramref name="y"/>) and
         /// writes the 256‑bit product to <paramref name="res"/>.
@@ -1118,13 +1119,11 @@ namespace Nethermind.Int256
             Vector512<ulong> prodLL_hi = Avx512F.ShiftRightLogical(prodLL, 32);
             Vector512<ulong> prodLH_lo = Avx512F.And(prodLH, mask32);
             Vector512<ulong> prodHL_lo = Avx512F.And(prodHL, mask32);
-            Vector512<ulong> termT = Avx512F.Add(Avx512F.Add(prodLL_hi, prodLH_lo), prodHL_lo);
+            Vector512<ulong> termT = Avx512F.Add(prodLL_hi, Avx512F.Add(prodLH_lo, prodHL_lo));
 
             // Step 6: assemble the lower and higher partial results.
-            Vector512<ulong> lowerPartial =
-                Avx512F.Or(
-                    Avx512F.And(prodLL, mask32),
-                    Avx512F.ShiftLeftLogical(Avx512F.And(termT, mask32), 32));
+            Vector512<ulong> shiftedT = Avx512F.ShiftLeftLogical(termT, 32);
+            Vector512<ulong> lowerPartial = Avx512F.TernaryLogic(prodLL, mask32, shiftedT, 0xEA);
             Vector512<ulong> higherPartial =
                 Avx512F.Add(
                     Avx512F.Add(
@@ -1136,6 +1135,10 @@ namespace Nethermind.Int256
             Vector512<ulong> productLow = Avx512F.UnpackLow(lowerPartial, higherPartial);
             Vector512<ulong> productHi = Avx512F.UnpackHigh(lowerPartial, higherPartial);
 
+            Vector128<ulong> p6 = Avx512F.ExtractVector128(productLow, 3); // [P6.low, P6.high]
+            Vector128<ulong> p7 = Avx512F.ExtractVector128(productHi,  3); // [P7.low, P7.high]
+            Vector128<ulong> extraLow = Sse2.UnpackLow(p6, p7);            // [P6.low, P7.low]
+
             // Step 8: keep the intermediate results in 512-bit vectors and avoid extracting 128-bit groups.
             // Align productLow so that lane0 contains product2 and lane1 contains product4, letting us compute:
             // crossSum = product1 + product2  (lane0)
@@ -1143,9 +1146,11 @@ namespace Nethermind.Int256
             Vector512<ulong> productLow_r2 = Avx512F.AlignRight64(productLow, productLow, 2);
             Vector512<ulong> crossAndGroup2Sum = Add128(productHi, productLow_r2);
 
-            // Step 9: issue memory request for remaining parts.
-            Vector128<ulong> xHigh = Vector128.Create(x.u2, x.u3);
-            Vector128<ulong> yLow = Vector128.Create(y.u1, y.u0);
+            // Step 9: extract remaining parts.
+            Vector128<ulong> xHigh = Avx2.ExtractVector128(vecX, 1); // [x2, x3]
+            Vector128<ulong> y01 = Avx2.ExtractVector128(vecY, 0);   // [y0, y1]
+            // swap lanes -> [y1, y0]
+            Vector128<ulong> yLow = Sse2.Shuffle(y01.AsDouble(), y01.AsDouble(), 0b_01).AsUInt64();
 
             // Step 10: perform the group 1 cross-term addition (in 512-bit form, then extract only the final 128-bit lane).
             Vector512<ulong> crossAddMask = Avx512F.UnpackLow(Vector512<ulong>.Zero, crossAndGroup2Sum);
@@ -1188,7 +1193,6 @@ namespace Nethermind.Int256
 
             // Step 12: process group 3 cross‑terms.
             Vector128<ulong> finalProdLow = Avx512DQ.VL.MultiplyLow(xHigh, yLow);
-            Vector128<ulong> extraLow = Avx512F.ExtractVector128(lowerPartial, 3);
             finalProdLow = Sse2.Add(finalProdLow, extraLow);
             Vector128<ulong> swappedFinal = Sse2.UnpackLow(finalProdLow, finalProdLow);
             Vector128<ulong> horizontalSum = Sse2.Add(finalProdLow, swappedFinal);
