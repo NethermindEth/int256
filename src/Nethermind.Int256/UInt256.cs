@@ -1134,10 +1134,7 @@ namespace Nethermind.Int256
             // Step 7: unpack the 512‑bit results into two groups.
             Vector512<ulong> productLow = Avx512F.UnpackLow(lowerPartial, higherPartial);
             Vector512<ulong> productHi = Avx512F.UnpackHigh(lowerPartial, higherPartial);
-
-            Vector128<ulong> p6 = Avx512F.ExtractVector128(productLow, 3); // [P6.low, P6.high]
-            Vector128<ulong> p7 = Avx512F.ExtractVector128(productHi,  3); // [P7.low, P7.high]
-            Vector128<ulong> extraLow = Sse2.UnpackLow(p6, p7);            // [P6.low, P7.low]
+            Vector128<ulong> extraLow = Avx512F.ExtractVector128(lowerPartial, 3);
 
             // Step 8: keep the intermediate results in 512-bit vectors and avoid extracting 128-bit groups.
             // Align productLow so that lane0 contains product2 and lane1 contains product4, letting us compute:
