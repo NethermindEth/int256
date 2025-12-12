@@ -1194,7 +1194,9 @@ namespace Nethermind.Int256
             Vector512<ulong> crossAndGroup2Sum = Add128(productHi, productLow_r2);
 
             // Perform the group 1 cross-term addition (in 512-bit form, then extract only the final 128-bit lane).
-            Vector512<ulong> crossAddMask = Avx512F.UnpackLow(Vector512<ulong>.Zero, crossAndGroup2Sum);
+            Vector512<ulong> crossAddMask = Avx512BW.IsSupported ?
+                Avx512BW.ShiftLeftLogical128BitLane(crossAndGroup2Sum.AsByte(), 8).AsUInt64() :
+                Avx512F.UnpackLow(Vector512<ulong>.Zero, crossAndGroup2Sum);
             Vector512<ulong> updatedProduct0Vec = Avx512F.Add(productLow, crossAddMask);
 
             // Carry mask from adding crossSum into product0 (mask lane is 0 or 0xFFFF..FFFF)
@@ -1211,7 +1213,7 @@ namespace Nethermind.Int256
 
             // limb3 = (product1High > crossSumHigh) ? 1 : 0
             Vector512<ulong> limb3Mask = Avx512F.CompareGreaterThan(product1High, crossSumHigh);
-            Vector512<ulong> limb3Vec = Avx512F.Subtract(Vector512<ulong>.Zero, limb3Mask);
+            Vector512<ulong> limb3Vec = Avx512F.ShiftRightLogical(limb3Mask, 63);
 
             // propagate overflow from (crossSumHigh + carryFlag) into limb3
             Vector512<ulong> limb2CarryMask = Avx512F.CompareLessThan(limb2Vec, crossSumHigh);
@@ -1260,7 +1262,9 @@ namespace Nethermind.Int256
                 Vector512<ulong> overflowMask = Avx512F.CompareLessThan(sum, left);
                 // Promote carry from each 128-bit chunk’s low lane into its high lane:
                 // lanes: [0, mask0, 0, mask2, 0, mask4, 0, mask6] where mask is 0 or 0xFFFF..FFFF
-                Vector512<ulong> promotedCarryAllOnes = Avx512F.UnpackLow(Vector512<ulong>.Zero, overflowMask);
+                Vector512<ulong> promotedCarryAllOnes = Avx512BW.IsSupported ?
+                    Avx512BW.ShiftLeftLogical128BitLane(overflowMask.AsByte(), 8).AsUInt64() :
+                    Avx512F.UnpackLow(Vector512<ulong>.Zero, overflowMask);
                 // Subtracting 0xFFFF..FFFF is identical to adding 1 (mod 2^64)
                 return Avx512F.Subtract(sum, promotedCarryAllOnes);
             }
