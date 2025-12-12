@@ -1137,16 +1137,27 @@ namespace Nethermind.Int256
             // Load the inputs and prepare the mask constant.
             Vector512<ulong> mask32 = Vector512.Create(0xFFFFFFFFUL);
 
-            // Permute x and y. These operations are independent.
+            // Lane setup - pure shuffle work.
+            // JIT will often pull these up early to keep shuffle ports busy while mul uops run.
+
+            // We permute x and y into an order that makes the 8 "needed" partial products land
+            // in fixed lanes. These permutes are independent - giving OoO plenty of freedom.
             Vector256<ulong> xPerm1 = Avx2.Permute4x64(vecX, 16);  // [ x0, x0, x1, x0 ]
             Vector256<ulong> yPerm1 = Avx2.Permute4x64(vecY, 132); // [ y0, y1, y0, y2 ]
             Vector256<ulong> xPerm2 = Avx2.Permute4x64(vecX, 73);  // [ x1, x2, x0, x1 ]
             Vector256<ulong> yPerm2 = Avx2.Permute4x64(vecY, 177); // [ y1, y0, y3, y2 ]
 
-            // Extract remaining parts.
+            // "Side multiplies" - independent of the 32x32 widening multiplies.
+            // These often get scheduled inside the main multiply block
+            // so the vpmullq latency is hidden behind vpmuludq throughput.
+
+            // Low-only products we need for limb3 later: p21_lo and p30_lo.
             Vector128<ulong> xHigh = Avx2.ExtractVector128(vecX, 1);  // [x2, x3]
             Vector128<ulong> yLow = Avx2.ExtractVector128(yPerm2, 0); // [y1, y0]
-            Vector128<ulong> finalProdLow = Avx512DQ.VL.MultiplyLow(xHigh, yLow);
+            Vector128<ulong> finalProdLow = Avx512DQ.VL.MultiplyLow(xHigh, yLow); // [p21_lo, p30_lo]
+
+            // Build ZMM inputs for vpmuludq.
+            // InsertVector256 is shuffle-ish - again, good to do while mul uops are in flight.
 
             Vector512<ulong> z = Vector512<ulong>.Zero;
             Vector512<ulong> xRearranged = Avx512F.InsertVector256(z, xPerm1, 0);
@@ -1154,9 +1165,8 @@ namespace Nethermind.Int256
             Vector512<ulong> yRearranged = Avx512F.InsertVector256(z, yPerm1, 0);
             yRearranged = Avx512F.InsertVector256(yRearranged, yPerm2, 1);
 
-            // Use VPMULUDQ (Avx512F.Multiply) to do widening 32x32->64 directly.
-            // It multiplies the even uint32 lanes, which are exactly the low-32
-            // of each ulong lane after AsUInt32().
+            // 32x32 widening multiplies. This block is the "main event"
+            // everything around it should try to overlap with it.
             Vector512<ulong> xUpperParts = Avx512F.ShiftRightLogical(xRearranged, 32);
             Vector512<ulong> yUpperParts = Avx512F.ShiftRightLogical(yRearranged, 32);
 
@@ -1165,36 +1175,45 @@ namespace Nethermind.Int256
             Vector512<ulong> prodHH = Avx512F.Multiply(xUpperParts.AsUInt32(), yUpperParts.AsUInt32()); // high(x) * high(y)
             Vector512<ulong> prodLH = Avx512F.Multiply(xRearranged.AsUInt32(), yUpperParts.AsUInt32()); // low(x)  * high(y)
 
-            // Compute the intermediate term while the multiplications are in flight.
+            // 64x64 reconstruction.
+            // Mostly ALU ops (vpaddq/vpsrlq/vpsllq) - lower pressure than shuffles.
             Vector512<ulong> prodLL_hi = Avx512F.ShiftRightLogical(prodLL, 32);
             Vector512<ulong> prodLH_lo = Avx512F.And(prodLH, mask32);
             Vector512<ulong> prodHL_lo = Avx512F.And(prodHL, mask32);
             Vector512<ulong> termT = Avx512F.Add(prodLL_hi, Avx512F.Add(prodLH_lo, prodHL_lo));
 
-            // Assemble the lower and higher partial results.
             Vector512<ulong> shiftedT = Avx512F.ShiftLeftLogical(termT, 32);
-            Vector512<ulong> lowerPartial = Avx512F.TernaryLogic(prodLL, mask32, shiftedT, 0xEA);
-            Vector512<ulong> higherPartial =
-                Avx512F.Add(
-                    Avx512F.Add(
-                        Avx512F.Add(prodHH, Avx512F.ShiftRightLogical(prodLH, 32)),
-                        Avx512F.ShiftRightLogical(prodHL, 32)),
-                    Avx512F.ShiftRightLogical(termT, 32));
 
-            // Unpack the 512‑bit results into two groups.
+            // lowerPartial uses vpternlog - typically a throughput win over separate and/or.
+            Vector512<ulong> lowerPartial = Avx512F.TernaryLogic(prodLL, mask32, shiftedT, 0xEA);
+
+            // higherPartial is add-heavy - so we can use an add-tree
+            Vector512<ulong> hiA = Avx512F.Add(prodHH, Avx512F.ShiftRightLogical(prodLH, 32));
+            Vector512<ulong> hiB = Avx512F.Add(Avx512F.ShiftRightLogical(prodHL, 32),
+                                               Avx512F.ShiftRightLogical(termT, 32));
+            Vector512<ulong> higherPartial = Avx512F.Add(hiA, hiB);
+
+            // Interleave lo/hi into [lo,hi] pairs per product.
+            // These unpacks are shuffle-port work; JIT likes to keep them early.
+
             Vector512<ulong> productLow = Avx512F.UnpackLow(lowerPartial, higherPartial);
             Vector512<ulong> productHi = Avx512F.UnpackHigh(lowerPartial, higherPartial);
 
+            // Hoist common "views" of the product vectors now.
+            // This is intentionally earlier than point-of-use - it gives OoO a longer window
+            // to overlap shuffle latency with the later ALU+compare chain.
             Vector512<ulong> productLow_r2 = Avx512F.AlignRight64(productLow, productLow, 2);
             Vector512<ulong> product1High = Avx512F.AlignRight64(productHi, productHi, 1);
             Vector512<ulong> productHi_r2 = Avx512F.AlignRight64(productHi, productHi, 2);
 
+            // Also hoist this extract even though its used late - it is independent work.
             Vector128<ulong> extraLow = Avx512F.ExtractVector128(lowerPartial, 3);
 
-            // Keep the intermediate results in 512-bit vectors and avoid extracting 128-bit groups.
-            // Align productLow so that lane0 contains product2 and lane1 contains product4, letting us compute:
-            // crossSum = product1 + product2  (lane0)
-            // group2Sum = product3 + product4 (lane1)
+            // Carry-emulated 128-bit adds inside each 128-bit chunk.
+            // Cost centres here are:
+            // - vpcmpltuq + vpmovm2q (mask materialisation tax)
+            // - shuffle ops (valignq/vpslldq) feeding the carry path
+
             Vector512<ulong> crossAndGroup2Sum = Add128(productHi, productLow_r2);
             Vector512<ulong> crossSumHigh = Avx512F.AlignRight64(crossAndGroup2Sum, crossAndGroup2Sum, 1);
 
@@ -1204,10 +1223,11 @@ namespace Nethermind.Int256
                 Avx512F.UnpackLow(Vector512<ulong>.Zero, crossAndGroup2Sum);
             Vector512<ulong> updatedProduct0Vec = Avx512F.Add(productLow, crossAddMask);
 
-            // Carry mask from adding crossSum into product0 (mask lane is 0 or 0xFFFF..FFFF)
+            // CompareLessThan returns all-ones/zero vectors, but the CPU produces k-masks.
+            // JIT must pay vpmovm2q to materialise them back into ZMM.
             Vector512<ulong> carryMaskVec = Avx512F.CompareLessThan(updatedProduct0Vec, productLow);
 
-            // limb2 = crossSumHigh + carryFlag
+            // Convert all-ones to 0-or-1 as early as possible to keep the later chain cheap.
             Vector512<ulong> carryMaskToHigh = Avx512F.AlignRight64(carryMaskVec, carryMaskVec, 1);
 
             // subtract all-ones == add 1
