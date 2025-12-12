@@ -1149,9 +1149,6 @@ namespace Nethermind.Int256
             // Upper 256 bits remain zero, which is fine because we only index 0..3.
             Vector512<ulong> xRearranged = Avx512F.InsertVector256(z, vecX, 0);
             Vector512<ulong> yRearranged = Avx512F.InsertVector256(z, vecY, 0);
-
-            // Depending on the exact .NET 10 intrinsic overloads, you may be able to drop the AsInt64 casts.
-            // Keeping them tends to work across the common signatures (value/control typed as Int64).
             xRearranged = Avx512F.PermuteVar8x64(xRearranged, idxX);
             yRearranged = Avx512F.PermuteVar8x64(yRearranged, idxY);
 

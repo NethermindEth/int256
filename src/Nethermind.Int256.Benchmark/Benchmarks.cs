@@ -89,8 +89,8 @@ namespace Nethermind.Int256.Benchmark
         public (int, Int256) D;
     }
 
-    [SimpleJob(RuntimeMoniker.Net90, baseline: true)]
-    [NoIntrinsicsJob(RuntimeMoniker.Net90)]
+    [SimpleJob(RuntimeMoniker.Net10_0, baseline: true)]
+    [NoIntrinsicsJob(RuntimeMoniker.Net10_0)]
     [MemoryDiagnoser]
     public class AddUnsigned : UnsignedTwoParamBenchmarkBase
     {
@@ -108,8 +108,8 @@ namespace Nethermind.Int256.Benchmark
         }
     }
 
-    [SimpleJob(RuntimeMoniker.Net90, baseline: true)]
-    [NoIntrinsicsJob(RuntimeMoniker.Net90)]
+    [SimpleJob(RuntimeMoniker.Net10_0, baseline: true)]
+    [NoIntrinsicsJob(RuntimeMoniker.Net10_0)]
     [MemoryDiagnoser]
     public class AddSigned : SignedTwoParamBenchmarkBase
     {
@@ -127,8 +127,8 @@ namespace Nethermind.Int256.Benchmark
         }
     }
 
-    [SimpleJob(RuntimeMoniker.Net90, baseline: true)]
-    [NoIntrinsicsJob(RuntimeMoniker.Net90)]
+    [SimpleJob(RuntimeMoniker.Net10_0, baseline: true)]
+    [NoIntrinsicsJob(RuntimeMoniker.Net10_0)]
     [MemoryDiagnoser]
     public class SubtractUnsigned : UnsignedTwoParamBenchmarkBase
     {
@@ -146,8 +146,8 @@ namespace Nethermind.Int256.Benchmark
         }
     }
 
-    [SimpleJob(RuntimeMoniker.Net90, baseline: true)]
-    [NoIntrinsicsJob(RuntimeMoniker.Net90)]
+    [SimpleJob(RuntimeMoniker.Net10_0, baseline: true)]
+    [NoIntrinsicsJob(RuntimeMoniker.Net10_0)]
     [MemoryDiagnoser]
     public class SubtractSigned : SignedTwoParamBenchmarkBase
     {
@@ -165,8 +165,8 @@ namespace Nethermind.Int256.Benchmark
         }
     }
 
-    [SimpleJob(RuntimeMoniker.Net90, baseline: true)]
-    [NoIntrinsicsJob(RuntimeMoniker.Net90)]
+    [SimpleJob(RuntimeMoniker.Net10_0, baseline: true)]
+    [NoIntrinsicsJob(RuntimeMoniker.Net10_0)]
     [MemoryDiagnoser]
     public class AddModUnsinged : UnsignedThreeParamBenchmarkBase
     {
@@ -184,8 +184,8 @@ namespace Nethermind.Int256.Benchmark
         }
     }
 
-    [SimpleJob(RuntimeMoniker.Net90, baseline: true)]
-    [NoIntrinsicsJob(RuntimeMoniker.Net90)]
+    [SimpleJob(RuntimeMoniker.Net10_0, baseline: true)]
+    [NoIntrinsicsJob(RuntimeMoniker.Net10_0)]
     [MemoryDiagnoser]
     public class AddModSinged : SignedThreeParamBenchmarkBase
     {
@@ -203,8 +203,8 @@ namespace Nethermind.Int256.Benchmark
         }
     }
 
-    [SimpleJob(RuntimeMoniker.Net90, baseline: true)]
-    [NoIntrinsicsJob(RuntimeMoniker.Net90)]
+    [SimpleJob(RuntimeMoniker.Net10_0, baseline: true)]
+    [NoIntrinsicsJob(RuntimeMoniker.Net10_0)]
     [MemoryDiagnoser]
     public class SubtractModUnsinged : UnsignedThreeParamBenchmarkBase
     {
@@ -222,8 +222,8 @@ namespace Nethermind.Int256.Benchmark
         }
     }
 
-    [SimpleJob(RuntimeMoniker.Net90, baseline: true)]
-    [NoIntrinsicsJob(RuntimeMoniker.Net90)]
+    [SimpleJob(RuntimeMoniker.Net10_0, baseline: true)]
+    [NoIntrinsicsJob(RuntimeMoniker.Net10_0)]
     [MemoryDiagnoser]
     public class SubtractModSigned : SignedThreeParamBenchmarkBase
     {
@@ -241,8 +241,8 @@ namespace Nethermind.Int256.Benchmark
         }
     }
 
-    [SimpleJob(RuntimeMoniker.Net90, baseline: true)]
-    [NoIntrinsicsJob(RuntimeMoniker.Net90)]
+    [SimpleJob(RuntimeMoniker.Net10_0, baseline: true)]
+    [NoIntrinsicsJob(RuntimeMoniker.Net10_0)]
     [MemoryDiagnoser]
     public class MultiplyUnsigned : UnsignedTwoParamBenchmarkBase
     {
@@ -260,8 +260,8 @@ namespace Nethermind.Int256.Benchmark
         }
     }
 
-    [SimpleJob(RuntimeMoniker.Net90, baseline: true)]
-    [NoIntrinsicsJob(RuntimeMoniker.Net90)]
+    [SimpleJob(RuntimeMoniker.Net10_0, baseline: true)]
+    [NoIntrinsicsJob(RuntimeMoniker.Net10_0)]
     [MemoryDiagnoser]
     public class MultiplySigned : SignedTwoParamBenchmarkBase
     {
@@ -279,8 +279,8 @@ namespace Nethermind.Int256.Benchmark
         }
     }
 
-    [SimpleJob(RuntimeMoniker.Net90, baseline: true)]
-    [NoIntrinsicsJob(RuntimeMoniker.Net90)]
+    [SimpleJob(RuntimeMoniker.Net10_0, baseline: true)]
+    [NoIntrinsicsJob(RuntimeMoniker.Net10_0)]
     [MemoryDiagnoser]
     public class MultiplyModUnsigned : UnsignedThreeParamBenchmarkBase
     {
@@ -298,8 +298,8 @@ namespace Nethermind.Int256.Benchmark
         }
     }
 
-    [SimpleJob(RuntimeMoniker.Net90, baseline: true)]
-    [NoIntrinsicsJob(RuntimeMoniker.Net90)]
+    [SimpleJob(RuntimeMoniker.Net10_0, baseline: true)]
+    [NoIntrinsicsJob(RuntimeMoniker.Net10_0)]
     [MemoryDiagnoser]
     public class MultiplyModSigned : SignedThreeParamBenchmarkBase
     {
@@ -317,8 +317,8 @@ namespace Nethermind.Int256.Benchmark
         }
     }
 
-    [SimpleJob(RuntimeMoniker.Net90, baseline: true)]
-    [NoIntrinsicsJob(RuntimeMoniker.Net90)]
+    [SimpleJob(RuntimeMoniker.Net10_0, baseline: true)]
+    [NoIntrinsicsJob(RuntimeMoniker.Net10_0)]
     [MemoryDiagnoser]
     public class DivideUnsigned : UnsignedTwoParamBenchmarkBase
     {
@@ -336,8 +336,8 @@ namespace Nethermind.Int256.Benchmark
         }
     }
 
-    [SimpleJob(RuntimeMoniker.Net90, baseline: true)]
-    [NoIntrinsicsJob(RuntimeMoniker.Net90)]
+    [SimpleJob(RuntimeMoniker.Net10_0, baseline: true)]
+    [NoIntrinsicsJob(RuntimeMoniker.Net10_0)]
     [MemoryDiagnoser]
     public class DivideSigned : SignedTwoParamBenchmarkBase
     {
@@ -355,8 +355,8 @@ namespace Nethermind.Int256.Benchmark
         }
     }
 
-    [SimpleJob(RuntimeMoniker.Net90, baseline: true)]
-    [NoIntrinsicsJob(RuntimeMoniker.Net90)]
+    [SimpleJob(RuntimeMoniker.Net10_0, baseline: true)]
+    [NoIntrinsicsJob(RuntimeMoniker.Net10_0)]
     [MemoryDiagnoser]
     public class ExpUnsigned : UnsignedIntTwoParamBenchmarkBase
     {
@@ -374,8 +374,8 @@ namespace Nethermind.Int256.Benchmark
         }
     }
 
-    [SimpleJob(RuntimeMoniker.Net90, baseline: true)]
-    [NoIntrinsicsJob(RuntimeMoniker.Net90)]
+    [SimpleJob(RuntimeMoniker.Net10_0, baseline: true)]
+    [NoIntrinsicsJob(RuntimeMoniker.Net10_0)]
     [MemoryDiagnoser]
     public class ExpSigned : SignedIntTwoParamBenchmarkBase
     {
@@ -393,8 +393,8 @@ namespace Nethermind.Int256.Benchmark
         }
     }
 
-    [SimpleJob(RuntimeMoniker.Net90, baseline: true)]
-    [NoIntrinsicsJob(RuntimeMoniker.Net90)]
+    [SimpleJob(RuntimeMoniker.Net10_0, baseline: true)]
+    [NoIntrinsicsJob(RuntimeMoniker.Net10_0)]
     [MemoryDiagnoser]
     public class ExpModUnsigned : UnsignedThreeParamBenchmarkBase
     {
@@ -412,8 +412,8 @@ namespace Nethermind.Int256.Benchmark
         }
     }
 
-    [SimpleJob(RuntimeMoniker.Net90, baseline: true)]
-    [NoIntrinsicsJob(RuntimeMoniker.Net90)]
+    [SimpleJob(RuntimeMoniker.Net10_0, baseline: true)]
+    [NoIntrinsicsJob(RuntimeMoniker.Net10_0)]
     [MemoryDiagnoser]
     public class ExpModSigned : SignedBenchmarkBase
     {
@@ -440,8 +440,8 @@ namespace Nethermind.Int256.Benchmark
         }
     }
 
-    [SimpleJob(RuntimeMoniker.Net90, baseline: true)]
-    [NoIntrinsicsJob(RuntimeMoniker.Net90)]
+    [SimpleJob(RuntimeMoniker.Net10_0, baseline: true)]
+    [NoIntrinsicsJob(RuntimeMoniker.Net10_0)]
     [MemoryDiagnoser]
     public class LeftShiftUnsigned : UnsignedIntTwoParamBenchmarkBase
     {
@@ -459,8 +459,8 @@ namespace Nethermind.Int256.Benchmark
         }
     }
 
-    [SimpleJob(RuntimeMoniker.Net90, baseline: true)]
-    [NoIntrinsicsJob(RuntimeMoniker.Net90)]
+    [SimpleJob(RuntimeMoniker.Net10_0, baseline: true)]
+    [NoIntrinsicsJob(RuntimeMoniker.Net10_0)]
     [MemoryDiagnoser]
     public class LeftShiftSigned : SignedIntTwoParamBenchmarkBase
     {
@@ -478,8 +478,8 @@ namespace Nethermind.Int256.Benchmark
         }
     }
 
-    [SimpleJob(RuntimeMoniker.Net90, baseline: true)]
-    [NoIntrinsicsJob(RuntimeMoniker.Net90)]
+    [SimpleJob(RuntimeMoniker.Net10_0, baseline: true)]
+    [NoIntrinsicsJob(RuntimeMoniker.Net10_0)]
     [MemoryDiagnoser]
     public class RightShiftUnsigned : UnsignedIntTwoParamBenchmarkBase
     {
@@ -497,8 +497,8 @@ namespace Nethermind.Int256.Benchmark
         }
     }
 
-    [SimpleJob(RuntimeMoniker.Net90, baseline: true)]
-    [NoIntrinsicsJob(RuntimeMoniker.Net90)]
+    [SimpleJob(RuntimeMoniker.Net10_0, baseline: true)]
+    [NoIntrinsicsJob(RuntimeMoniker.Net10_0)]
     [MemoryDiagnoser]
     public class RightShiftSigned : SignedIntTwoParamBenchmarkBase
     {
@@ -516,8 +516,8 @@ namespace Nethermind.Int256.Benchmark
         }
     }
 
-    [SimpleJob(RuntimeMoniker.Net90, baseline: true)]
-    [NoIntrinsicsJob(RuntimeMoniker.Net90)]
+    [SimpleJob(RuntimeMoniker.Net10_0, baseline: true)]
+    [NoIntrinsicsJob(RuntimeMoniker.Net10_0)]
     [MemoryDiagnoser]
     public class IsZeroOne
     {

@@ -118,6 +118,8 @@ namespace Nethermind.Int256.Benchmark
                     return CoreRuntime.Core80;
                 case RuntimeMoniker.Net90:
                     return CoreRuntime.Core90;
+                case RuntimeMoniker.Net10_0:
+                    return CoreRuntime.Core10_0;
                 case RuntimeMoniker.Mono:
                     return MonoRuntime.Default;
                 case RuntimeMoniker.NativeAot60:
