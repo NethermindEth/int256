@@ -1053,11 +1053,13 @@ namespace Nethermind.Int256
         [SkipLocalsInit]
         public static void Multiply(in UInt256 x, in UInt256 y, out UInt256 res)
         {
+            ulong x0 = x.u0;
+            ulong y0 = y.u0;
             // If both inputs fit in 64 bits, use a simple multiplication routine.
             if ((x.u1 | x.u2 | x.u3 | y.u1 | y.u2 | y.u3) == 0)
             {
                 // Fast multiply for numbers less than 2^64 (18,446,744,073,709,551,615)
-                ulong high = Math.BigMul(x.u0, y.u0, out ulong low);
+                ulong high = Math.BigMul(x0, y0, out ulong low);
                 // Assignment to res after multiply in case is used as input for x or y (by ref aliasing)
                 res = default;
                 Unsafe.AsRef(in res.u0) = low;
@@ -1100,8 +1102,8 @@ namespace Nethermind.Int256
             Vector256<ulong> yPerm2 = Avx2.Permute4x64(vecY, 177); // [ y1, y0, y3, y2 ]
 
             // Extract remaining parts.
-            Vector128<ulong> xHigh = Avx2.ExtractVector128(vecX, 1); // [x2, x3]
-            Vector128<ulong> yLow = Avx2.ExtractVector128(yPerm2, 0); // [y1, y0];
+            Vector128<ulong> xHigh = Avx2.ExtractVector128(vecX, 1);  // [x2, x3]
+            Vector128<ulong> yLow = Avx2.ExtractVector128(yPerm2, 0); // [y1, y0]
             Vector128<ulong> finalProdLow = Avx512DQ.VL.MultiplyLow(xHigh, yLow);
 
             Vector512<ulong> z = Vector512<ulong>.Zero;
