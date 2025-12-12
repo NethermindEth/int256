@@ -1043,6 +1043,32 @@ namespace Nethermind.Int256
             borrow = (((~a) & b) | (~(a ^ b)) & res) >> 63;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Multiply(in UInt256 x, in UInt256 y, out UInt256 res)
+        {
+            if (!Avx512F.IsSupported || !Avx512DQ.IsSupported || !Avx512DQ.VL.IsSupported)
+            {
+                ulong x0 = x.u0;
+                ulong y0 = y.u0;
+                // If both inputs fit in 64 bits, use a simple multiplication routine.
+                if ((x.u1 | x.u2 | x.u3 | y.u1 | y.u2 | y.u3) == 0)
+                {
+                    // Fast multiply for numbers less than 2^64 (18,446,744,073,709,551,615)
+                    ulong high = Math.BigMul(x0, y0, out ulong low);
+                    // Assignment to res after multiply in case is used as input for x or y (by ref aliasing)
+                    res = default;
+                    Unsafe.AsRef(in res.u0) = low;
+                    Unsafe.AsRef(in res.u1) = high;
+                    return;
+                }
+                MultiplyScalar(in x, in y, out res);
+            }
+            else
+            {
+                MultiplyAvx512F(in x, in y, out res);
+            }
+        }
+
         /// <summary>
         /// Multiplies two 256‑bit unsigned integers (<paramref name="x"/> and <paramref name="y"/>) and
         /// writes the 256‑bit product to <paramref name="res"/>.
@@ -1051,48 +1077,64 @@ namespace Nethermind.Int256
         /// <param name="y">The second 256‑bit unsigned integer.</param>
         /// <param name="res">When this method returns, contains the 256‑bit product of x and y.</param>
         [SkipLocalsInit]
-        public static void Multiply(in UInt256 x, in UInt256 y, out UInt256 res)
+        private static void MultiplyScalar(in UInt256 x, in UInt256 y, out UInt256 res)
         {
-            ulong x0 = x.u0;
-            ulong y0 = y.u0;
+            ref ulong rx = ref Unsafe.As<UInt256, ulong>(ref Unsafe.AsRef(in x));
+            ref ulong ry = ref Unsafe.As<UInt256, ulong>(ref Unsafe.AsRef(in y));
+
+            (ulong carry, ulong r0) = Multiply64(rx, ry);
+            UmulHop(carry, Unsafe.Add(ref rx, 1), ry, out carry, out ulong res1);
+            UmulHop(carry, Unsafe.Add(ref rx, 2), ry, out carry, out ulong res2);
+            ulong res3 = Unsafe.Add(ref rx, 3) * ry + carry;
+
+            UmulHop(res1, rx, Unsafe.Add(ref ry, 1), out carry, out ulong r1);
+            UmulStep(res2, Unsafe.Add(ref rx, 1), Unsafe.Add(ref ry, 1), carry, out carry, out res2);
+            res3 = res3 + Unsafe.Add(ref rx, 2) * Unsafe.Add(ref ry, 1) + carry;
+
+            UmulHop(res2, rx, Unsafe.Add(ref ry, 2), out carry, out ulong r2);
+            res3 = res3 + Unsafe.Add(ref rx, 1) * Unsafe.Add(ref ry, 2) + carry;
+
+            ulong r3 = res3 + rx * Unsafe.Add(ref ry, 3);
+
+            Unsafe.SkipInit(out res);
+            ref ulong pr = ref Unsafe.As<UInt256, ulong>(ref res);
+            pr = r0;
+            Unsafe.Add(ref pr, 1) = r1;
+            Unsafe.Add(ref pr, 2) = r2;
+            Unsafe.Add(ref pr, 3) = r3;
+        }
+
+        /// <summary>
+        /// Multiplies two 256‑bit unsigned integers (<paramref name="x"/> and <paramref name="y"/>) and
+        /// writes the 256‑bit product to <paramref name="res"/>.
+        /// </summary>
+        /// <param name="x">The first 256‑bit unsigned integer.</param>
+        /// <param name="y">The second 256‑bit unsigned integer.</param>
+        /// <param name="res">When this method returns, contains the 256‑bit product of x and y.</param>
+        [SkipLocalsInit]
+        private static void MultiplyAvx512F(in UInt256 x, in UInt256 y, out UInt256 res)
+        {
+            Vector256<ulong> mask = Vector256.Create(0ul, ulong.MaxValue, ulong.MaxValue, ulong.MaxValue);
+            Vector256<ulong> vecX = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in x));
+            Vector256<ulong> vecY = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in y));
+
+            Vector256<ulong> vx = Avx2.And(vecX, mask);
+            Vector256<ulong> vy = Avx2.And(vecY, mask);
+            Vector256<ulong> v = Avx2.Or(vx, vy);
+
             // If both inputs fit in 64 bits, use a simple multiplication routine.
-            if ((x.u1 | x.u2 | x.u3 | y.u1 | y.u2 | y.u3) == 0)
+            if (v == default)
             {
                 // Fast multiply for numbers less than 2^64 (18,446,744,073,709,551,615)
-                ulong high = Math.BigMul(x0, y0, out ulong low);
+                ulong high = Math.BigMul(x.u0, y.u0, out ulong low);
                 // Assignment to res after multiply in case is used as input for x or y (by ref aliasing)
                 res = default;
                 Unsafe.AsRef(in res.u0) = low;
                 Unsafe.AsRef(in res.u1) = high;
                 return;
             }
-            // Fallback if the required AVX‑512 intrinsics are not supported.
-            if (!Avx512F.IsSupported || !Avx512DQ.IsSupported || !Avx512DQ.VL.IsSupported)
-            {
-                ref ulong rx = ref Unsafe.As<UInt256, ulong>(ref Unsafe.AsRef(in x));
-                ref ulong ry = ref Unsafe.As<UInt256, ulong>(ref Unsafe.AsRef(in y));
-
-                (ulong carry, ulong r0) = Multiply64(rx, ry);
-                UmulHop(carry, Unsafe.Add(ref rx, 1), ry, out carry, out ulong res1);
-                UmulHop(carry, Unsafe.Add(ref rx, 2), ry, out carry, out ulong res2);
-                ulong res3 = Unsafe.Add(ref rx, 3) * ry + carry;
-
-                UmulHop(res1, rx, Unsafe.Add(ref ry, 1), out carry, out ulong r1);
-                UmulStep(res2, Unsafe.Add(ref rx, 1), Unsafe.Add(ref ry, 1), carry, out carry, out res2);
-                res3 = res3 + Unsafe.Add(ref rx, 2) * Unsafe.Add(ref ry, 1) + carry;
-
-                UmulHop(res2, rx, Unsafe.Add(ref ry, 2), out carry, out ulong r2);
-                res3 = res3 + Unsafe.Add(ref rx, 1) * Unsafe.Add(ref ry, 2) + carry;
-
-                ulong r3 = res3 + rx * Unsafe.Add(ref ry, 3);
-
-                res = new UInt256(r0, r1, r2, r3);
-                return;
-            }
 
             // Load the inputs and prepare the mask constant.
-            Vector256<ulong> vecX = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in x));
-            Vector256<ulong> vecY = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in y));
             Vector512<ulong> mask32 = Vector512.Create(0xFFFFFFFFUL);
 
             // Permute x and y. These operations are independent.
@@ -1206,17 +1248,19 @@ namespace Nethermind.Int256
             /// Adds two 512-bit vectors that conceptually contain four independent 128-bit unsigned integers.
             /// Within each 128-bit chunk, propagates an overflow (carry) from the lower 64-bit lane to the higher lane.
             /// </summary>
+            /// <param name="left">The first 512-bit vector operand.</param>
+            /// <param name="right">The second 512-bit vector operand.</param>
+            /// <returns>
+            /// The sum of <paramref name="left"/> and <paramref name="right"/>, with carries propagated within each 128-bit chunk.
+            /// </returns>
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             static Vector512<ulong> Add128(Vector512<ulong> left, Vector512<ulong> right)
             {
                 Vector512<ulong> sum = Avx512F.Add(left, right);
-
                 Vector512<ulong> overflowMask = Avx512F.CompareLessThan(sum, left);
-
                 // Promote carry from each 128-bit chunk’s low lane into its high lane:
                 // lanes: [0, mask0, 0, mask2, 0, mask4, 0, mask6] where mask is 0 or 0xFFFF..FFFF
                 Vector512<ulong> promotedCarryAllOnes = Avx512F.UnpackLow(Vector512<ulong>.Zero, overflowMask);
-
                 // Subtracting 0xFFFF..FFFF is identical to adding 1 (mod 2^64)
                 return Avx512F.Subtract(sum, promotedCarryAllOnes);
             }
