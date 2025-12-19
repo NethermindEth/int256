@@ -484,6 +484,9 @@ namespace Nethermind.Int256
 
                 return carry != 0;
             }
+            // #if DEBUG
+            //             Debug.Assert((BigInteger)res == ((BigInteger)a + (BigInteger)b) % ((BigInteger)1 << 256));
+            // #endif
         }
         public void Add(in UInt256 a, out UInt256 res) => Add(this, a, out res);
 
