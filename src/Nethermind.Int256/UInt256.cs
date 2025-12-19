@@ -484,9 +484,6 @@ namespace Nethermind.Int256
 
                 return carry != 0;
             }
-            // #if DEBUG
-            //             Debug.Assert((BigInteger)res == ((BigInteger)a + (BigInteger)b) % ((BigInteger)1 << 256));
-            // #endif
         }
         public void Add(in UInt256 a, out UInt256 res) => Add(this, a, out res);
 
@@ -2097,20 +2094,11 @@ namespace Nethermind.Int256
             {
                 // Equality mask - AVX2 compare -> movmskpd
                 eqMask = (uint)Avx.MoveMask(Avx2.CompareEqual(vecL, vecR).AsDouble());
-
-                if (Avx512F.VL.IsSupported)
-                {
-                    // AVX-512 without DQ MoveMask: materialise+movmsk
-                    ltMask = (uint)Avx.MoveMask(Avx512F.VL.CompareLessThan(vecL, vecR).AsDouble());
-                }
-                else
-                {
-                    // AVX2 unsigned-compare trick (flip sign bit, signed compare)
-                    var signFlip = Vector256.Create(0x8000_0000_0000_0000UL);
-                    Vector256<long> sL = Avx2.Xor(vecL, signFlip).AsInt64();
-                    Vector256<long> sR = Avx2.Xor(vecR, signFlip).AsInt64();
-                    ltMask = (uint)Avx.MoveMask(Avx2.CompareGreaterThan(sR, sL).AsDouble());
-                }
+                // AVX2 unsigned-compare trick (flip sign bit, signed compare)
+                var signFlip = Vector256.Create(0x8000_0000_0000_0000UL);
+                Vector256<long> sL = Avx2.Xor(vecL, signFlip).AsInt64();
+                Vector256<long> sR = Avx2.Xor(vecR, signFlip).AsInt64();
+                ltMask = (uint)Avx.MoveMask(Avx2.CompareGreaterThan(sR, sL).AsDouble());
             }
 
             uint diff = eqMask ^ 0xFu;
