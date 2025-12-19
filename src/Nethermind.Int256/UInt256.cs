@@ -2108,7 +2108,7 @@ namespace Nethermind.Int256
             if (diff == 0) return false;
 
             // Slightly nicer than BitOperations.Log2 here:
-            // diff != 0 => LZCNT in [0..31] => (31 - lzcnt) == (31 ^ lzcnt)
+            // diff != 0 and diff <= 0xF => LZCNT in [28..31] => (31 - lzcnt) == (31 ^ lzcnt)
             int idx = BitOperations.LeadingZeroCount(diff) ^ 31;
             return ((ltMask >> idx) & 1u) != 0;
         }
