@@ -2117,9 +2117,9 @@ namespace Nethermind.Int256
             if (diff == 0) return false;
 
             // Slightly nicer than BitOperations.Log2 here:
-            // avoids the JIT's "or eax,1" sequence used to make Log2(0) well-defined.
-            int idx = 31 - BitOperations.LeadingZeroCount(diff);
-            return (ltMask & (1u << idx)) != 0;
+            // diff != 0 => LZCNT in [0..31] => (31 - lzcnt) == (31 ^ lzcnt)
+            int idx = BitOperations.LeadingZeroCount(diff) ^ 31;
+            return ((ltMask >> idx) & 1u) != 0;
         }
 
         public static bool operator ==(in UInt256 a, int b) => a.Equals(b);
