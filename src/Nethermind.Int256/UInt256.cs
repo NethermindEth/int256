@@ -2083,38 +2083,34 @@ namespace Nethermind.Int256
             // Load the four 64-bit words into a 256-bit register.
             Vector256<ulong> vecL = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
             Vector256<ulong> vecR = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
-            // Build a 4-bit mask where bit i = 1 if vecL[i] == vecR[i].
-            uint equalityMask = (uint)Avx.MoveMask(Avx2.CompareEqual(vecL, vecR).AsDouble());
 
-            Vector256<ulong> lessThan;
-            if (Avx512F.VL.IsSupported)
+            uint eqMask;
+            uint ltMask;
+            if (Avx512F.VL.IsSupported && Avx512DQ.IsSupported)
             {
-                // Native AVX-512 unsigned 64-bit compare
-                lessThan = Avx512F.VL.CompareLessThan(vecL, vecR);
+                // Best case: AVX-512 compare produces k-mask; MoveMask uses KMOVB.
+                // Avx512DQ.MoveMask is documented as KMOVB r32,k1. 
+                eqMask = (uint)Avx512DQ.MoveMask(Avx512F.VL.CompareEqual(vecL, vecR));     // VPCMPUQ + KMOVB 
+                ltMask = (uint)Avx512DQ.MoveMask(Avx512F.VL.CompareLessThan(vecL, vecR));  // VPCMPUQ + KMOVB 
             }
             else
             {
-                // AVX2: reinterpret as signed by flipping the high bit of each lane.
+                // Equality mask - AVX2 compare -> movmskpd
+                eqMask = (uint)Avx.MoveMask(Avx2.CompareEqual(vecL, vecR).AsDouble());
+                // AVX2 unsigned-compare trick (flip sign bit, signed compare)
                 var signFlip = Vector256.Create(0x8000_0000_0000_0000UL);
                 Vector256<long> sL = Avx2.Xor(vecL, signFlip).AsInt64();
                 Vector256<long> sR = Avx2.Xor(vecR, signFlip).AsInt64();
-
-                // CompareGreaterThan(sR, sL), reverse order yields all-ones in lane i if original vecL[i]<vecR[i].
-                lessThan = Avx2.CompareGreaterThan(sR, sL).AsUInt64();
+                ltMask = (uint)Avx.MoveMask(Avx2.CompareGreaterThan(sR, sL).AsDouble());
             }
 
-            // Build a 4-bit mask where bit i = 1 if vecL[i] < vecR[i] (unsigned).
-            uint lessThanMask = (uint)Avx.MoveMask(lessThan.AsDouble());
-            // diffMask has a 1 wherever the lanes actually differ.
-            uint diffMask = (~equalityMask) & 0xF;
-            if (diffMask == 0)
-                return false;   // all lanes equal ⇒ operands are identical
+            uint diff = eqMask ^ 0xFu;
+            if (diff == 0) return false;
 
-            // Find the index (0=Low0 ... 3=High) of the most significant differing lane.
-            int mswIndex = BitOperations.Log2(diffMask);
-
-            // Return whether that lane indicates left < right.
-            return ((lessThanMask >> mswIndex) & 1) != 0;
+            // Slightly nicer than BitOperations.Log2 here:
+            // diff != 0 and diff <= 0xF => LZCNT in [28..31] => (31 - lzcnt) == (31 ^ lzcnt)
+            int idx = BitOperations.LeadingZeroCount(diff) ^ 31;
+            return ((ltMask >> idx) & 1u) != 0;
         }
 
         public static bool operator ==(in UInt256 a, int b) => a.Equals(b);
