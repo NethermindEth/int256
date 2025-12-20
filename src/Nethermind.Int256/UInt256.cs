@@ -2466,6 +2466,12 @@ namespace Nethermind.Int256
 
         private static bool TryParseCore(ReadOnlySpan<char> value, NumberStyles style, IFormatProvider? provider, out UInt256 result)
         {
+            if (value.IsEmpty)
+            {
+                result = Zero;
+                return false;
+            }
+
             BigInteger a;
             bool bigParsedProperly;
             if ((style & NumberStyles.HexNumber) == NumberStyles.HexNumber && value[0] != 0)
@@ -2877,7 +2883,93 @@ namespace Nethermind.Int256
         }
 
         private static bool TryConvertFromTruncating<TOther>(TOther value, out UInt256 result) where TOther : INumberBase<TOther>
-            => TryConvertFromSaturating(value, out result);
+        {
+            if (typeof(TOther) == typeof(byte))
+            {
+                result = (byte)(object)value;
+                return true;
+            }
+            if (typeof(TOther) == typeof(ushort))
+            {
+                result = (ushort)(object)value;
+                return true;
+            }
+            if (typeof(TOther) == typeof(uint))
+            {
+                result = (uint)(object)value;
+                return true;
+            }
+            if (typeof(TOther) == typeof(ulong))
+            {
+                result = (ulong)(object)value;
+                return true;
+            }
+            if (typeof(TOther) == typeof(UInt128))
+            {
+                var v = (UInt128)(object)value;
+                result = new UInt256((ulong)v, (ulong)(v >> 64), 0, 0);
+                return true;
+            }
+            if (typeof(TOther) == typeof(nuint))
+            {
+                result = (nuint)(object)value;
+                return true;
+            }
+            if (typeof(TOther) == typeof(sbyte))
+            {
+                var v = (sbyte)(object)value;
+                result = v < 0 ? new UInt256(unchecked((ulong)v), ulong.MaxValue, ulong.MaxValue, ulong.MaxValue) : (ulong)v;
+                return true;
+            }
+            if (typeof(TOther) == typeof(short))
+            {
+                var v = (short)(object)value;
+                result = v < 0 ? new UInt256(unchecked((ulong)v), ulong.MaxValue, ulong.MaxValue, ulong.MaxValue) : (ulong)v;
+                return true;
+            }
+            if (typeof(TOther) == typeof(int))
+            {
+                var v = (int)(object)value;
+                result = v < 0 ? new UInt256(unchecked((ulong)v), ulong.MaxValue, ulong.MaxValue, ulong.MaxValue) : (ulong)v;
+                return true;
+            }
+            if (typeof(TOther) == typeof(long))
+            {
+                var v = (long)(object)value;
+                result = v < 0 ? new UInt256(unchecked((ulong)v), ulong.MaxValue, ulong.MaxValue, ulong.MaxValue) : (ulong)v;
+                return true;
+            }
+            if (typeof(TOther) == typeof(Int128))
+            {
+                var v = (Int128)(object)value;
+                var unsigned = unchecked((UInt128)v);
+                result = v < 0
+                    ? new UInt256((ulong)unsigned, (ulong)(unsigned >> 64), ulong.MaxValue, ulong.MaxValue)
+                    : new UInt256((ulong)unsigned, (ulong)(unsigned >> 64), 0, 0);
+                return true;
+            }
+            if (typeof(TOther) == typeof(nint))
+            {
+                var v = (nint)(object)value;
+                result = v < 0 ? new UInt256(unchecked((ulong)v), ulong.MaxValue, ulong.MaxValue, ulong.MaxValue) : (ulong)v;
+                return true;
+            }
+            if (typeof(TOther) == typeof(BigInteger))
+            {
+                var v = (BigInteger)(object)value;
+                Span<byte> bytes = stackalloc byte[32];
+                if (!v.TryWriteBytes(bytes, out _, isUnsigned: false, isBigEndian: false))
+                {
+                    bytes.Fill((byte)(v.Sign < 0 ? 0xFF : 0));
+                    v.TryWriteBytes(bytes[..Math.Min(v.GetByteCount(isUnsigned: false), 32)], out _, isUnsigned: false, isBigEndian: false);
+                }
+                result = new UInt256(bytes, isBigEndian: false);
+                return true;
+            }
+
+            result = default;
+            return false;
+        }
 
         private static bool TryConvertToChecked<TOther>(UInt256 value, [MaybeNullWhen(false)] out TOther result) where TOther : INumberBase<TOther>
         {

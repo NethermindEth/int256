@@ -1098,7 +1098,51 @@ namespace Nethermind.Int256
             => TryConvertToChecked(value, out result);
 
         private static bool TryConvertToTruncating<TOther>(Int256 value, [MaybeNullWhen(false)] out TOther result) where TOther : INumberBase<TOther>
-            => TryConvertToChecked(value, out result);
+        {
+            if (typeof(TOther) == typeof(BigInteger))
+            {
+                result = (TOther)(object)(BigInteger)value;
+                return true;
+            }
+            if (typeof(TOther) == typeof(long))
+            {
+                result = (TOther)(object)(long)value._value.u0;
+                return true;
+            }
+            if (typeof(TOther) == typeof(int))
+            {
+                result = (TOther)(object)(int)value._value.u0;
+                return true;
+            }
+            if (typeof(TOther) == typeof(short))
+            {
+                result = (TOther)(object)(short)value._value.u0;
+                return true;
+            }
+            if (typeof(TOther) == typeof(sbyte))
+            {
+                result = (TOther)(object)(sbyte)value._value.u0;
+                return true;
+            }
+            if (typeof(TOther) == typeof(double))
+            {
+                result = (TOther)(object)value.ToDouble(null);
+                return true;
+            }
+            if (typeof(TOther) == typeof(float))
+            {
+                result = (TOther)(object)value.ToSingle(null);
+                return true;
+            }
+            if (typeof(TOther) == typeof(decimal))
+            {
+                result = (TOther)(object)value.ToDecimal(null);
+                return true;
+            }
+
+            result = default;
+            return false;
+        }
 
         #endregion
 
