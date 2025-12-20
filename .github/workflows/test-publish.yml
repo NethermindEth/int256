@@ -20,7 +20,7 @@ on:
 jobs:
   test-publish:
     name: Test
-    runs-on: ubuntu-latest
+    runs-on: [ubuntu-latest, windows-latest, macos-latest]
     strategy:
       matrix:
         build-config: [debug, release]
