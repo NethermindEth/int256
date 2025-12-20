@@ -1313,15 +1313,29 @@ namespace Nethermind.Int256
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             static Vector512<ulong> Add128(Vector512<ulong> left, Vector512<ulong> right)
             {
+                // Add
                 Vector512<ulong> sum = Avx512F.Add(left, right);
-                Vector512<ulong> overflowMask = Avx512F.CompareLessThan(sum, left);
-                // Promote carry from each 128-bit chunk’s low lane into its high lane:
-                // lanes: [0, mask0, 0, mask2, 0, mask4, 0, mask6] where mask is 0 or 0xFFFF..FFFF
-                Vector512<ulong> promotedCarryAllOnes = Avx512BW.IsSupported ?
-                    Avx512BW.ShiftLeftLogical128BitLane(overflowMask.AsByte(), 8).AsUInt64() :
-                    Avx512F.UnpackLow(Vector512<ulong>.Zero, overflowMask);
-                // Subtracting 0xFFFF..FFFF is identical to adding 1 (mod 2^64)
-                return Avx512F.Subtract(sum, promotedCarryAllOnes);
+
+                if (Avx512BW.IsSupported)
+                {
+                    // carryBits = (a&b) | (~sum & (a|b))  (imm8 = 0x8E)
+                    Vector512<ulong> carryBits = Avx512F.TernaryLogic(sum, left, right, 0x8E);
+                    // carryOut (0 or 1 in each 64-bit lane)
+                    Vector512<ulong> carry01 = Avx512F.ShiftRightLogical(carryBits, 63);
+                    // Promote carry from lane0->lane1, lane2->lane3, ... within each 128-bit chunk
+                    Vector512<ulong> promoted = Avx512BW.ShiftLeftLogical128BitLane(carry01.AsByte(), 8).AsUInt64();
+                    // Finalise
+                    return Avx512F.Add(sum, promoted);
+                }
+                else
+                {
+                    Vector512<ulong> overflowMask = Avx512F.CompareLessThan(sum, left);
+                    // Promote carry from each 128-bit chunk’s low lane into its high lane:
+                    // lanes: [0, mask0, 0, mask2, 0, mask4, 0, mask6] where mask is 0 or 0xFFFF..FFFF
+                    Vector512<ulong> promotedCarryAllOnes = Avx512F.UnpackLow(Vector512<ulong>.Zero, overflowMask);
+                    // Subtracting 0xFFFF..FFFF is identical to adding 1 (mod 2^64)
+                    return Avx512F.Subtract(sum, promotedCarryAllOnes);
+                }
             }
         }
 
