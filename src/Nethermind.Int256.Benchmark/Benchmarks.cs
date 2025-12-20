@@ -92,6 +92,24 @@ namespace Nethermind.Int256.Benchmark
     [SimpleJob(RuntimeMoniker.Net10_0, baseline: true)]
     [NoIntrinsicsJob(RuntimeMoniker.Net10_0)]
     [MemoryDiagnoser]
+    public class LessThanUnsigned : UnsignedTwoParamBenchmarkBase
+    {
+        [Benchmark(Baseline = true)]
+        public bool LessThan_BigInteger()
+        {
+            return A.Item1 < B.Item1;
+        }
+
+        [Benchmark]
+        public bool LessThan_UInt256()
+        {
+            return A.Item2 < B.Item2;
+        }
+    }
+
+    [SimpleJob(RuntimeMoniker.Net10_0, baseline: true)]
+    [NoIntrinsicsJob(RuntimeMoniker.Net10_0)]
+    [MemoryDiagnoser]
     public class AddUnsigned : UnsignedTwoParamBenchmarkBase
     {
         [Benchmark(Baseline = true)]
