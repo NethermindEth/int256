@@ -1315,7 +1315,8 @@ namespace Nethermind.Int256
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             static Vector512<ulong> Add128(Vector512<ulong> left, Vector512<ulong> right)
             {
-                // Add
+                // Compute the raw lane-wise sum; carries between 64-bit lanes within a 128-bit chunk
+                // are not yet propagated and will be handled by the carry logic below.
                 Vector512<ulong> sum = Avx512F.Add(left, right);
 
                 if (Avx512BW.IsSupported)
