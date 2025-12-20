@@ -1,5 +1,10 @@
+// SPDX-FileCopyrightText: 2023 Demerzel Solutions Limited
+// SPDX-License-Identifier: LGPL-3.0-only
+
 using System;
 using System.Buffers.Binary;
+using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 
@@ -7,12 +12,23 @@ using System.Runtime.CompilerServices;
 
 namespace Nethermind.Int256
 {
-    public readonly struct Int256 : IEquatable<Int256>, IComparable, IComparable<Int256>, IInteger<Int256>, IConvertible
+    public readonly struct Int256 :
+        IEquatable<Int256>,
+        IComparable,
+        IComparable<Int256>,
+        IConvertible,
+        ISpanFormattable,
+        ISpanParsable<Int256>,
+        IBinaryInteger<Int256>,
+        ISignedNumber<Int256>,
+        IMinMaxValue<Int256>,
+        IInteger<Int256>
     {
         public static readonly Int256 Zero = (Int256)0UL;
         public static readonly Int256 One = (Int256)1UL;
         public static readonly Int256 MinusOne = -1L;
         public static readonly Int256 Max = new Int256(((BigInteger.One << 255) - 1));
+        public static readonly Int256 Min = new Int256(-(BigInteger.One << 255));
 
         internal readonly UInt256 _value;
 
@@ -55,14 +71,16 @@ namespace Nethermind.Int256
 
         public static explicit operator Int256(int n) => new Int256(n);
 
-        public Int256 OneValue => One;
-
-        public Int256 ZeroValue => Zero;
-
         public int Sign => _value.IsZero ? 0 : _value.u3 < 0x8000000000000000ul ? 1 : -1;
         public bool IsNegative => Sign < 0;
 
         public static Int256 operator +(in Int256 a, in Int256 b)
+        {
+            Add(in a, in b, out Int256 res);
+            return res;
+        }
+
+        public static Int256 operator +(Int256 a, Int256 b)
         {
             Add(in a, in b, out Int256 res);
             return res;
@@ -547,6 +565,10 @@ namespace Nethermind.Int256
 
         public bool IsOne => this == One;
 
+        public Int256 ZeroValue => Zero;
+
+        public Int256 OneValue => One;
+
         public Int256 MaximalValue => Max;
 
         public int CompareTo(object? obj) => obj is not Int256 int256 ? throw new InvalidOperationException() : CompareTo(int256);
@@ -644,5 +666,614 @@ namespace Nethermind.Int256
             UInt256.Not(in a._value, out var o);
             res = new Int256(o);
         }
+
+        #region Additional Operators for Interface Compliance
+
+        public static bool operator ==(Int256 a, Int256 b) => a.Equals(b);
+        public static bool operator !=(Int256 a, Int256 b) => !a.Equals(b);
+        public static bool operator <(Int256 a, Int256 b)
+        {
+            int aSign = a.Sign;
+            int bSign = b.Sign;
+
+            if (aSign >= 0)
+            {
+                if (bSign < 0)
+                    return false;
+            }
+            else if (bSign >= 0)
+            {
+                return true;
+            }
+
+            return a._value < b._value;
+        }
+        public static bool operator >(Int256 a, Int256 b) => b < a;
+        public static bool operator <=(in Int256 a, in Int256 b) => !(b < a);
+        public static bool operator <=(Int256 a, Int256 b) => !(b < a);
+        public static bool operator >=(in Int256 a, in Int256 b) => !(a < b);
+        public static bool operator >=(Int256 a, Int256 b) => !(a < b);
+
+        public static Int256 operator -(in Int256 a, in Int256 b)
+        {
+            Subtract(in a, in b, out Int256 res);
+            return res;
+        }
+
+        public static Int256 operator -(Int256 a, Int256 b)
+        {
+            Subtract(in a, in b, out Int256 res);
+            return res;
+        }
+
+        public static Int256 operator *(in Int256 a, in Int256 b)
+        {
+            Multiply(in a, in b, out Int256 res);
+            return res;
+        }
+
+        public static Int256 operator *(Int256 a, Int256 b)
+        {
+            Multiply(in a, in b, out Int256 res);
+            return res;
+        }
+
+        public static Int256 operator /(in Int256 a, in Int256 b)
+        {
+            Divide(in a, in b, out Int256 res);
+            return res;
+        }
+
+        public static Int256 operator /(Int256 a, Int256 b)
+        {
+            Divide(in a, in b, out Int256 res);
+            return res;
+        }
+
+        public static Int256 operator %(in Int256 a, in Int256 b)
+        {
+            Mod(in a, in b, out Int256 res);
+            return res;
+        }
+
+        public static Int256 operator %(Int256 a, Int256 b)
+        {
+            Mod(in a, in b, out Int256 res);
+            return res;
+        }
+
+        public static Int256 operator ++(in Int256 a)
+        {
+            Add(in a, One, out Int256 res);
+            return res;
+        }
+
+        public static Int256 operator ++(Int256 a)
+        {
+            Add(in a, One, out Int256 res);
+            return res;
+        }
+
+        public static Int256 operator --(in Int256 a)
+        {
+            Subtract(in a, One, out Int256 res);
+            return res;
+        }
+
+        public static Int256 operator --(Int256 a)
+        {
+            Subtract(in a, One, out Int256 res);
+            return res;
+        }
+
+        public static Int256 operator +(Int256 value) => value;
+
+        public static Int256 operator -(Int256 value)
+        {
+            Neg(in value, out Int256 res);
+            return res;
+        }
+
+        public static Int256 operator &(in Int256 a, in Int256 b)
+        {
+            And(in a, in b, out Int256 res);
+            return res;
+        }
+
+        public static Int256 operator &(Int256 a, Int256 b)
+        {
+            And(in a, in b, out Int256 res);
+            return res;
+        }
+
+        public static Int256 operator |(in Int256 a, in Int256 b)
+        {
+            Or(in a, in b, out Int256 res);
+            return res;
+        }
+
+        public static Int256 operator |(Int256 a, Int256 b)
+        {
+            Or(in a, in b, out Int256 res);
+            return res;
+        }
+
+        public static Int256 operator ^(in Int256 a, in Int256 b)
+        {
+            Xor(in a, in b, out Int256 res);
+            return res;
+        }
+
+        public static Int256 operator ^(Int256 a, Int256 b)
+        {
+            Xor(in a, in b, out Int256 res);
+            return res;
+        }
+
+        public static Int256 operator ~(in Int256 a)
+        {
+            Not(in a, out Int256 res);
+            return res;
+        }
+
+        public static Int256 operator ~(Int256 a)
+        {
+            Not(in a, out Int256 res);
+            return res;
+        }
+
+        public static Int256 operator <<(in Int256 a, int n)
+        {
+            LeftShift(in a, n, out Int256 res);
+            return res;
+        }
+
+        public static Int256 operator <<(Int256 a, int n)
+        {
+            LeftShift(in a, n, out Int256 res);
+            return res;
+        }
+
+        public static Int256 operator >>(in Int256 a, int n)
+        {
+            RightShift(in a, n, out Int256 res);
+            return res;
+        }
+
+        public static Int256 operator >>(Int256 a, int n)
+        {
+            RightShift(in a, n, out Int256 res);
+            return res;
+        }
+
+        public static Int256 operator >>>(Int256 value, int shiftAmount)
+        {
+            UInt256.Rsh(in value._value, shiftAmount, out UInt256 result);
+            return new Int256(result);
+        }
+
+        #endregion
+
+        #region INumberBase<Int256> Implementation
+
+        static Int256 INumberBase<Int256>.One => One;
+        static int INumberBase<Int256>.Radix => 2;
+        static Int256 INumberBase<Int256>.Zero => Zero;
+        static Int256 IAdditiveIdentity<Int256, Int256>.AdditiveIdentity => Zero;
+        static Int256 IMultiplicativeIdentity<Int256, Int256>.MultiplicativeIdentity => One;
+
+        public static Int256 Abs(Int256 value)
+        {
+            if (value.Sign >= 0)
+                return value;
+            Neg(in value, out Int256 result);
+            return result;
+        }
+
+        static bool INumberBase<Int256>.IsCanonical(Int256 value) => true;
+        static bool INumberBase<Int256>.IsComplexNumber(Int256 value) => false;
+        public static bool IsEvenInteger(Int256 value) => (value._value.u0 & 1) == 0;
+        static bool INumberBase<Int256>.IsFinite(Int256 value) => true;
+        static bool INumberBase<Int256>.IsImaginaryNumber(Int256 value) => false;
+        static bool INumberBase<Int256>.IsInfinity(Int256 value) => false;
+        static bool INumberBase<Int256>.IsInteger(Int256 value) => true;
+        static bool INumberBase<Int256>.IsNaN(Int256 value) => false;
+        static bool INumberBase<Int256>.IsNegative(Int256 value) => value.Sign < 0;
+        static bool INumberBase<Int256>.IsNegativeInfinity(Int256 value) => false;
+        static bool INumberBase<Int256>.IsNormal(Int256 value) => !value.IsZero;
+        public static bool IsOddInteger(Int256 value) => (value._value.u0 & 1) != 0;
+        static bool INumberBase<Int256>.IsPositive(Int256 value) => value.Sign >= 0;
+        static bool INumberBase<Int256>.IsPositiveInfinity(Int256 value) => false;
+        static bool INumberBase<Int256>.IsRealNumber(Int256 value) => true;
+        static bool INumberBase<Int256>.IsSubnormal(Int256 value) => false;
+        static bool INumberBase<Int256>.IsZero(Int256 value) => value.IsZero;
+
+        public static Int256 MaxMagnitude(Int256 x, Int256 y)
+        {
+            var absX = Abs(x);
+            var absY = Abs(y);
+            return absX > absY ? x : y;
+        }
+
+        public static Int256 MaxMagnitudeNumber(Int256 x, Int256 y) => MaxMagnitude(x, y);
+
+        public static Int256 MinMagnitude(Int256 x, Int256 y)
+        {
+            var absX = Abs(x);
+            var absY = Abs(y);
+            return absX < absY ? x : y;
+        }
+
+        public static Int256 MinMagnitudeNumber(Int256 x, Int256 y) => MinMagnitude(x, y);
+
+        public static Int256 Parse(string s, NumberStyles style, IFormatProvider? provider)
+            => TryParse(s.AsSpan(), style, provider ?? CultureInfo.InvariantCulture, out Int256 result)
+                ? result
+                : throw new FormatException();
+
+        public static Int256 Parse(ReadOnlySpan<char> s, NumberStyles style, IFormatProvider? provider)
+            => TryParse(s, style, provider ?? CultureInfo.InvariantCulture, out Int256 result)
+                ? result
+                : throw new FormatException();
+
+        static Int256 ISpanParsable<Int256>.Parse(ReadOnlySpan<char> s, IFormatProvider? provider)
+            => TryParse(s, out Int256 result)
+                ? result
+                : throw new FormatException();
+
+        static Int256 IParsable<Int256>.Parse(string s, IFormatProvider? provider)
+            => TryParse(s, out Int256 result)
+                ? result
+                : throw new FormatException();
+
+        public static bool TryParse([NotNullWhen(true)] string? s, NumberStyles style, IFormatProvider? provider, out Int256 result)
+        {
+            if (s is null)
+            {
+                result = Zero;
+                return false;
+            }
+            return TryParse(s.AsSpan(), style, provider, out result);
+        }
+
+        public static bool TryParse(ReadOnlySpan<char> s, NumberStyles style, IFormatProvider? provider, out Int256 result)
+        {
+            if (BigInteger.TryParse(s, style, provider, out BigInteger big))
+            {
+                result = new Int256(big);
+                return true;
+            }
+            result = Zero;
+            return false;
+        }
+
+        public static bool TryParse([NotNullWhen(true)] string? s, out Int256 result)
+        {
+            if (s is null)
+            {
+                result = Zero;
+                return false;
+            }
+            return TryParse(s.AsSpan(), out result);
+        }
+
+        public static bool TryParse(ReadOnlySpan<char> s, out Int256 result)
+        {
+            bool isHex = s.StartsWith("0x", StringComparison.OrdinalIgnoreCase);
+            var style = isHex ? NumberStyles.HexNumber : NumberStyles.Integer;
+            var span = isHex ? s[2..] : s;
+            return TryParse(span, style, CultureInfo.InvariantCulture, out result);
+        }
+
+        static bool ISpanParsable<Int256>.TryParse(ReadOnlySpan<char> s, IFormatProvider? provider, out Int256 result)
+            => TryParse(s, out result);
+
+        static bool IParsable<Int256>.TryParse([NotNullWhen(true)] string? s, IFormatProvider? provider, out Int256 result)
+            => TryParse(s, out result);
+
+        static bool INumberBase<Int256>.TryConvertFromChecked<TOther>(TOther value, out Int256 result)
+            => TryConvertFromChecked(value, out result);
+
+        static bool INumberBase<Int256>.TryConvertFromSaturating<TOther>(TOther value, out Int256 result)
+            => TryConvertFromSaturating(value, out result);
+
+        static bool INumberBase<Int256>.TryConvertFromTruncating<TOther>(TOther value, out Int256 result)
+            => TryConvertFromTruncating(value, out result);
+
+        static bool INumberBase<Int256>.TryConvertToChecked<TOther>(Int256 value, [MaybeNullWhen(false)] out TOther result)
+            => TryConvertToChecked(value, out result);
+
+        static bool INumberBase<Int256>.TryConvertToSaturating<TOther>(Int256 value, [MaybeNullWhen(false)] out TOther result)
+            => TryConvertToSaturating(value, out result);
+
+        static bool INumberBase<Int256>.TryConvertToTruncating<TOther>(Int256 value, [MaybeNullWhen(false)] out TOther result)
+            => TryConvertToTruncating(value, out result);
+
+        private static bool TryConvertFromChecked<TOther>(TOther value, out Int256 result) where TOther : INumberBase<TOther>
+        {
+            if (typeof(TOther) == typeof(BigInteger))
+            {
+                result = new Int256((BigInteger)(object)value);
+                return true;
+            }
+            if (typeof(TOther) == typeof(long))
+            {
+                result = (long)(object)value;
+                return true;
+            }
+            if (typeof(TOther) == typeof(int))
+            {
+                result = (Int256)(int)(object)value;
+                return true;
+            }
+            if (typeof(TOther) == typeof(short))
+            {
+                result = (Int256)(int)(short)(object)value;
+                return true;
+            }
+            if (typeof(TOther) == typeof(sbyte))
+            {
+                result = (Int256)(int)(sbyte)(object)value;
+                return true;
+            }
+            if (typeof(TOther) == typeof(ulong))
+            {
+                result = (Int256)(ulong)(object)value;
+                return true;
+            }
+            if (typeof(TOther) == typeof(uint))
+            {
+                result = (Int256)(ulong)(uint)(object)value;
+                return true;
+            }
+            if (typeof(TOther) == typeof(ushort))
+            {
+                result = (Int256)(ulong)(ushort)(object)value;
+                return true;
+            }
+            if (typeof(TOther) == typeof(byte))
+            {
+                result = (Int256)(ulong)(byte)(object)value;
+                return true;
+            }
+
+            result = default;
+            return false;
+        }
+
+        private static bool TryConvertFromSaturating<TOther>(TOther value, out Int256 result) where TOther : INumberBase<TOther>
+            => TryConvertFromChecked(value, out result);
+
+        private static bool TryConvertFromTruncating<TOther>(TOther value, out Int256 result) where TOther : INumberBase<TOther>
+            => TryConvertFromChecked(value, out result);
+
+        private static bool TryConvertToChecked<TOther>(Int256 value, [MaybeNullWhen(false)] out TOther result) where TOther : INumberBase<TOther>
+        {
+            if (typeof(TOther) == typeof(BigInteger))
+            {
+                result = (TOther)(object)(BigInteger)value;
+                return true;
+            }
+            if (typeof(TOther) == typeof(long))
+            {
+                result = (TOther)(object)value.ToInt64(null);
+                return true;
+            }
+            if (typeof(TOther) == typeof(int))
+            {
+                result = (TOther)(object)value.ToInt32(null);
+                return true;
+            }
+            if (typeof(TOther) == typeof(short))
+            {
+                result = (TOther)(object)value.ToInt16(null);
+                return true;
+            }
+            if (typeof(TOther) == typeof(sbyte))
+            {
+                result = (TOther)(object)value.ToSByte(null);
+                return true;
+            }
+            if (typeof(TOther) == typeof(double))
+            {
+                result = (TOther)(object)value.ToDouble(null);
+                return true;
+            }
+            if (typeof(TOther) == typeof(float))
+            {
+                result = (TOther)(object)value.ToSingle(null);
+                return true;
+            }
+            if (typeof(TOther) == typeof(decimal))
+            {
+                result = (TOther)(object)value.ToDecimal(null);
+                return true;
+            }
+
+            result = default;
+            return false;
+        }
+
+        private static bool TryConvertToSaturating<TOther>(Int256 value, [MaybeNullWhen(false)] out TOther result) where TOther : INumberBase<TOther>
+            => TryConvertToChecked(value, out result);
+
+        private static bool TryConvertToTruncating<TOther>(Int256 value, [MaybeNullWhen(false)] out TOther result) where TOther : INumberBase<TOther>
+            => TryConvertToChecked(value, out result);
+
+        #endregion
+
+        #region INumber<Int256> Implementation
+
+        public static Int256 Clamp(Int256 value, Int256 min, Int256 max)
+        {
+            if (min > max)
+                throw new ArgumentException($"'{min}' cannot be greater than '{max}'.");
+            if (value < min)
+                return min;
+            if (value > max)
+                return max;
+            return value;
+        }
+
+        public static Int256 CopySign(Int256 value, Int256 sign)
+        {
+            var absValue = Abs(value);
+            return sign.Sign < 0 ? -absValue : absValue;
+        }
+
+        static int INumber<Int256>.Sign(Int256 value) => value.Sign;
+
+        #endregion
+
+        #region IBinaryInteger<Int256> Implementation
+
+        public static (Int256 Quotient, Int256 Remainder) DivRem(Int256 left, Int256 right)
+        {
+            Divide(in left, in right, out Int256 quotient);
+            Mod(in left, in right, out Int256 remainder);
+            return (quotient, remainder);
+        }
+
+        public static Int256 LeadingZeroCount(Int256 value)
+        {
+            if (value.Sign < 0)
+                return Zero;
+            return (Int256)(ulong)UInt256.LeadingZeroCount(value._value);
+        }
+
+        public static Int256 PopCount(Int256 value)
+            => (Int256)(ulong)UInt256.PopCount(value._value);
+
+        public static Int256 TrailingZeroCount(Int256 value)
+            => (Int256)(ulong)UInt256.TrailingZeroCount(value._value);
+
+        public static bool TryReadBigEndian(ReadOnlySpan<byte> source, bool isUnsigned, out Int256 value)
+        {
+            if (source.Length < 32)
+            {
+                value = default;
+                return false;
+            }
+
+            value = new Int256(source[..32], isBigEndian: true);
+            return true;
+        }
+
+        public static bool TryReadLittleEndian(ReadOnlySpan<byte> source, bool isUnsigned, out Int256 value)
+        {
+            if (source.Length < 32)
+            {
+                value = default;
+                return false;
+            }
+
+            value = new Int256(source[..32], isBigEndian: false);
+            return true;
+        }
+
+        public int GetByteCount() => 32;
+
+        public int GetShortestBitLength()
+        {
+            if (Sign >= 0)
+                return _value.BitLen;
+
+            Neg(out Int256 abs);
+            return abs._value.BitLen + 1;
+        }
+
+        public bool TryWriteBigEndian(Span<byte> destination, out int bytesWritten)
+        {
+            if (destination.Length < 32)
+            {
+                bytesWritten = 0;
+                return false;
+            }
+
+            _value.ToBigEndian(destination[..32]);
+            bytesWritten = 32;
+            return true;
+        }
+
+        public bool TryWriteLittleEndian(Span<byte> destination, out int bytesWritten)
+        {
+            if (destination.Length < 32)
+            {
+                bytesWritten = 0;
+                return false;
+            }
+
+            _value.ToLittleEndian(destination[..32]);
+            bytesWritten = 32;
+            return true;
+        }
+
+        static Int256 IBinaryInteger<Int256>.RotateLeft(Int256 value, int rotateAmount)
+        {
+            rotateAmount &= 255;
+            if (rotateAmount == 0) return value;
+            LeftShift(in value, rotateAmount, out Int256 left);
+            RightShift(in value, 256 - rotateAmount, out Int256 right);
+            return left | right;
+        }
+
+        static Int256 IBinaryInteger<Int256>.RotateRight(Int256 value, int rotateAmount)
+        {
+            rotateAmount &= 255;
+            if (rotateAmount == 0) return value;
+            RightShift(in value, rotateAmount, out Int256 right);
+            LeftShift(in value, 256 - rotateAmount, out Int256 left);
+            return right | left;
+        }
+
+        #endregion
+
+        #region IBinaryNumber<Int256> Implementation
+
+        static bool IBinaryNumber<Int256>.IsPow2(Int256 value)
+        {
+            if (value.Sign <= 0)
+                return false;
+            int popCount = BitOperations.PopCount(value._value.u0) +
+                          BitOperations.PopCount(value._value.u1) +
+                          BitOperations.PopCount(value._value.u2) +
+                          BitOperations.PopCount(value._value.u3);
+            return popCount == 1;
+        }
+
+        static Int256 IBinaryNumber<Int256>.Log2(Int256 value)
+        {
+            if (value.Sign <= 0)
+                throw new ArgumentException("Cannot compute Log2 of zero or negative number");
+            return (Int256)(ulong)(255 - (int)(ulong)UInt256.LeadingZeroCount(value._value));
+        }
+
+        #endregion
+
+        #region ISignedNumber<Int256> Implementation
+
+        static Int256 ISignedNumber<Int256>.NegativeOne => MinusOne;
+
+        #endregion
+
+        #region IMinMaxValue<Int256> Implementation
+
+        static Int256 IMinMaxValue<Int256>.MinValue => Min;
+        static Int256 IMinMaxValue<Int256>.MaxValue => Max;
+
+        #endregion
+
+        #region ISpanFormattable Implementation
+
+        public bool TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
+        {
+            var bigInt = (BigInteger)this;
+            return bigInt.TryFormat(destination, out charsWritten, format, provider);
+        }
+
+        public string ToString(string? format, IFormatProvider? formatProvider)
+            => ((BigInteger)this).ToString(format, formatProvider);
+
+        #endregion
     }
 }
