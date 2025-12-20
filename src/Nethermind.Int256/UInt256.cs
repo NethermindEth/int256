@@ -2110,8 +2110,8 @@ namespace Nethermind.Int256
             }
 
             return Avx2.IsSupported ?
-                LessThanAxv2(in a, in b) :
-                LessThanVector256(in a, in b) ;
+                LessThanAvx2(in a, in b) :
+                LessThanVector256(in a, in b);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -2127,7 +2127,7 @@ namespace Nethermind.Int256
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static bool LessThanAxv2(in UInt256 a, in UInt256 b)
+        private static bool LessThanAvx2(in UInt256 a, in UInt256 b)
         {
             // Load the four 64-bit words into a 256-bit register.
             Vector256<ulong> vecL = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
@@ -2169,8 +2169,8 @@ namespace Nethermind.Int256
             Vector256<ulong> vecL = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
             Vector256<ulong> vecR = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
 
-            uint eqMask = Vector256.ExtractMostSignificantBits(Vector256.Equals(vecL, vecR)); 
-            uint ltMask = Vector256.ExtractMostSignificantBits(Vector256.LessThan(vecL, vecR)); 
+            uint eqMask = Vector256.ExtractMostSignificantBits(Vector256.Equals(vecL, vecR));
+            uint ltMask = Vector256.ExtractMostSignificantBits(Vector256.LessThan(vecL, vecR));
 
             uint diff = eqMask ^ 0xFu;
             if (diff == 0) return false;
