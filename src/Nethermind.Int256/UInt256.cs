@@ -2104,18 +2104,31 @@ namespace Nethermind.Int256
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static bool LessThan(in UInt256 a, in UInt256 b)
         {
-            if (!Avx2.IsSupported)
+            if (!Avx2.IsSupported && !Vector256<ulong>.IsSupported)
             {
-                // If AVX2 isn't supported, fall back to the straightforward scalar code.
-                if (a.u3 != b.u3)
-                    return a.u3 < b.u3;
-                if (a.u2 != b.u2)
-                    return a.u2 < b.u2;
-                if (a.u1 != b.u1)
-                    return a.u1 < b.u1;
-                return a.u0 < b.u0;
+                return LessThanScalar(in a, in b);
             }
 
+            return Avx2.IsSupported ?
+                LessThanAvx2(in a, in b) :
+                LessThanVector256(in a, in b);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool LessThanScalar(in UInt256 a, in UInt256 b)
+        {
+            if (a.u3 != b.u3)
+                return a.u3 < b.u3;
+            if (a.u2 != b.u2)
+                return a.u2 < b.u2;
+            if (a.u1 != b.u1)
+                return a.u1 < b.u1;
+            return a.u0 < b.u0;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool LessThanAvx2(in UInt256 a, in UInt256 b)
+        {
             // Load the four 64-bit words into a 256-bit register.
             Vector256<ulong> vecL = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
             Vector256<ulong> vecR = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
@@ -2139,6 +2152,25 @@ namespace Nethermind.Int256
                 Vector256<long> sR = Avx2.Xor(vecR, signFlip).AsInt64();
                 ltMask = (uint)Avx.MoveMask(Avx2.CompareGreaterThan(sR, sL).AsDouble());
             }
+
+            uint diff = eqMask ^ 0xFu;
+            if (diff == 0) return false;
+
+            // Slightly nicer than BitOperations.Log2 here:
+            // diff != 0 and diff <= 0xF => LZCNT in [28..31] => (31 - lzcnt) == (31 ^ lzcnt)
+            int idx = BitOperations.LeadingZeroCount(diff) ^ 31;
+            return ((ltMask >> idx) & 1u) != 0;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool LessThanVector256(in UInt256 a, in UInt256 b)
+        {
+            // Load the four 64-bit words into a 256-bit register.
+            Vector256<ulong> vecL = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
+            Vector256<ulong> vecR = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
+
+            uint eqMask = Vector256.ExtractMostSignificantBits(Vector256.Equals(vecL, vecR));
+            uint ltMask = Vector256.ExtractMostSignificantBits(Vector256.LessThan(vecL, vecR));
 
             uint diff = eqMask ^ 0xFu;
             if (diff == 0) return false;
