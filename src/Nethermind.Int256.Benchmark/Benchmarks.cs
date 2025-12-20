@@ -9,7 +9,7 @@ namespace Nethermind.Int256.Benchmark
 {
     public class UnsingedBenchmarkBase
     {
-        public IEnumerable<BigInteger> Values => Enumerable.Concat(new[] { Numbers.UInt256Max }, UnaryOps.RandomUnsigned(1));
+        public IEnumerable<BigInteger> Values => new[] { Numbers.UInt256Max, BigInteger.One };
 
         public IEnumerable<UInt256> ValuesUint256 => Values.Select(x => (UInt256)x);
 

@@ -106,7 +106,7 @@ public class Convertibles
                 BigInteger value = BigInteger.Parse(number.ToString()!);
                 Type expectedException = ExpectedException(value, min, max);
                 string expectedString = ExpectedString(type, value, min, ref expectedException);
-                string testName = $"Convert({name}, {type.Name}){(expectedException is not null || expectedString?.Contains('∞') == true ? " over/under flow" : "")}";
+                string testName = $"Convert({name}, {type.Name}{(expectedException is not null || expectedString?.Contains('∞') == true ? ", over/under flow" : "")})";
                 yield return new TestCaseData(type, number, expectedException, expectedString) { TestName = testName };
             }
         }

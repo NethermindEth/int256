@@ -402,19 +402,47 @@ namespace Nethermind.Int256
             0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         };
 
-        // Add sets res to the sum a+b
+        /// <summary>
+        /// Sets <paramref name="res" /> to the sum of <paramref name="a" /> and <paramref name="b" />.
+        /// </summary>
+        /// <param name="a">The first value to add.</param>
+        /// <param name="b">The second value to add.</param>
+        /// <param name="res">When this method returns, contains the sum of <paramref name="a" /> and <paramref name="b" />.</param>
+        /// <remarks>
+        /// This method does not report whether the addition overflows the range of <see cref="UInt256"/>.
+        /// Use <see cref="AddOverflow(in UInt256, in UInt256, out UInt256)"/> if you need to detect overflow.
+        /// </remarks>
         public static void Add(in UInt256 a, in UInt256 b, out UInt256 res)
+            => AddOverflow(in a, in b, out res);
+
+        /// <summary>
+        /// AddOverflow sets res to the sum a+b, and returns whether overflow occurred
+        /// </summary>
+        /// <param name="a">The first value to add.</param>
+        /// <param name="b">The second value to add.</param>
+        /// <param name="res">When this method returns, contains the sum of <paramref name="a" /> and <paramref name="b" />.</param>
+        /// <returns><see langword="true"/> if the addition overflows the range of <see cref="UInt256"/>; otherwise, <see langword="false"/>.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool AddOverflow(in UInt256 a, in UInt256 b, out UInt256 res)
         {
-            AddImpl(in a, in b, out res);
+            if (!Avx2.IsSupported && !Vector256<ulong>.IsSupported)
+            {
+                return AddScalar(in a, in b, out res);
+            }
+
+            return Avx2.IsSupported ?
+                AddAvx2(in a, in b, out res) :
+                AddVector256(in a, in b, out res);
         }
 
-        public static bool AddImpl(in UInt256 a, in UInt256 b, out UInt256 res)
+        private static bool AddScalar(in UInt256 a, in UInt256 b, out UInt256 res)
         {
+            ulong a0 = a.u0;
+            ulong b0 = b.u0;
             if ((a.u1 | a.u2 | a.u3 | b.u1 | b.u2 | b.u3) == 0)
             {
                 // Fast add for numbers less than 2^64 (18,446,744,073,709,551,615)
-                ulong a0 = a.u0; // copy to local as we need to check after result clear
-                ulong u0 = a0 + b.u0;
+                ulong u0 = a0 + b0;
                 // Assignment to res after in case is used as input for a or b (by ref aliasing)
                 res = default;
                 Unsafe.AsRef(in res.u0) = u0;
@@ -426,81 +454,102 @@ namespace Nethermind.Int256
                 return false;
             }
 
-            if (Avx2.IsSupported)
+            ulong c = 0;
+            AddWithCarry(a0, b0, ref c, out ulong r0);
+            AddWithCarry(a.u1, b.u1, ref c, out ulong r1);
+            AddWithCarry(a.u2, b.u2, ref c, out ulong r2);
+            AddWithCarry(a.u3, b.u3, ref c, out ulong r3);
+            res = new UInt256(r0, r1, r2, r3);
+            return c != 0;
+        }
+
+        private static bool AddAvx2(in UInt256 a, in UInt256 b, out UInt256 res)
+        {
+            Vector256<ulong> av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
+            Vector256<ulong> bv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
+
+            Vector256<ulong> result = Avx2.Add(av, bv);
+            Vector256<ulong> vCarry;
+            if (Avx512F.VL.IsSupported)
             {
-                Vector256<ulong> av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
-                Vector256<ulong> bv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
-
-                Vector256<ulong> result = Avx2.Add(av, bv);
-                Vector256<ulong> vCarry;
-                if (Avx512F.VL.IsSupported)
-                {
-                    vCarry = Avx512F.VL.CompareLessThan(result, av);
-                }
-                else
-                {
-                    // Work around for missing Vector256.CompareLessThan
-                    Vector256<ulong> carryFromBothHighBits = Avx2.And(av, bv);
-                    Vector256<ulong> eitherHighBit = Avx2.Or(av, bv);
-                    Vector256<ulong> highBitNotInResult = Avx2.AndNot(result, eitherHighBit);
-
-                    // Set high bits where carry occurs
-                    vCarry = Avx2.Or(carryFromBothHighBits, highBitNotInResult);
-                }
-                // Move carry from Vector space to int
-                int carry = Avx.MoveMask(vCarry.AsDouble());
-
-                // All bits set will cascade another carry when carry is added to it
-                Vector256<ulong> vCascade = Avx2.CompareEqual(result, Vector256<ulong>.AllBitsSet);
-                // Move cascade from Vector space to int
-                int cascade = Avx.MoveMask(Unsafe.As<Vector256<ulong>, Vector256<double>>(ref vCascade));
-
-                // Use ints to work out the Vector cross lane cascades
-                // Move carry to next bit and add cascade
-                carry = cascade + 2 * carry; // lea
-                // Remove cascades not effected by carry
-                cascade ^= carry;
-                // Choice of 16 vectors
-                cascade &= 0x0f;
-
-                // Lookup the carries to broadcast to the Vectors
-                Vector256<ulong> cascadedCarries = Unsafe.Add(ref Unsafe.As<byte, Vector256<ulong>>(ref MemoryMarshal.GetReference(s_broadcastLookup)), cascade);
-
-                // Mark res as initialized so we can use it as left said of ref assignment
-                Unsafe.SkipInit(out res);
-                // Add the cascadedCarries to the result
-                Unsafe.As<UInt256, Vector256<ulong>>(ref res) = Avx2.Add(result, cascadedCarries);
-
-                return (carry & 0b1_0000) != 0;
+                vCarry = Avx512F.VL.CompareLessThan(result, av);
             }
             else
             {
-                ulong carry = 0ul;
-                AddWithCarry(a.u0, b.u0, ref carry, out ulong res1);
-                AddWithCarry(a.u1, b.u1, ref carry, out ulong res2);
-                AddWithCarry(a.u2, b.u2, ref carry, out ulong res3);
-                AddWithCarry(a.u3, b.u3, ref carry, out ulong res4);
-                res = new UInt256(res1, res2, res3, res4);
+                // Work around for missing Vector256.CompareLessThan
+                Vector256<ulong> carryFromBothHighBits = Avx2.And(av, bv);
+                Vector256<ulong> eitherHighBit = Avx2.Or(av, bv);
+                Vector256<ulong> highBitNotInResult = Avx2.AndNot(result, eitherHighBit);
 
-                return carry != 0;
+                // Set high bits where carry occurs
+                vCarry = Avx2.Or(carryFromBothHighBits, highBitNotInResult);
             }
-            // #if DEBUG
-            //             Debug.Assert((BigInteger)res == ((BigInteger)a + (BigInteger)b) % ((BigInteger)1 << 256));
-            // #endif
-        }
-        public void Add(in UInt256 a, out UInt256 res) => Add(this, a, out res);
+            // Move carry from Vector space to uint
+            uint carry = (uint)(Avx512DQ.IsSupported ?
+                Avx512DQ.MoveMask(vCarry) :
+                Avx.MoveMask(vCarry.AsDouble()));
 
-        /// <summary>
-        /// AddOverflow sets res to the sum a+b, and returns whether overflow occurred
-        /// </summary>
-        /// <param name="a"></param>
-        /// <param name="b"></param>
-        /// <param name="res"></param>
-        /// <returns></returns>
-        public static bool AddOverflow(in UInt256 a, in UInt256 b, out UInt256 res)
-        {
-            return AddImpl(in a, in b, out res);
+            // All bits set will cascade another carry when carry is added to it
+            Vector256<ulong> vCascade = Avx2.CompareEqual(result, Vector256<ulong>.AllBitsSet);
+            // Move cascade from Vector space to uint
+            uint cascade = (uint)(Avx512DQ.IsSupported ?
+                Avx512DQ.MoveMask(vCascade) :
+                Avx.MoveMask(Unsafe.As<Vector256<ulong>, Vector256<double>>(ref vCascade)));
+
+            // Use ints to work out the Vector cross lane cascades
+            // Move carry to next bit and add cascade
+            carry = cascade + 2 * carry; // lea
+            // Remove cascades not affected by carry
+            cascade ^= carry;
+            // Choice of 16 vectors
+            cascade &= 0x0f;
+
+            // Lookup the carries to broadcast to the Vectors
+            Vector256<ulong> cascadedCarries = Unsafe.Add(ref Unsafe.As<byte, Vector256<ulong>>(ref MemoryMarshal.GetReference(s_broadcastLookup)), cascade);
+
+            // Mark res as initialized so we can use it as left side of ref assignment
+            Unsafe.SkipInit(out res);
+            // Add the cascadedCarries to the result
+            Unsafe.As<UInt256, Vector256<ulong>>(ref res) = Avx2.Add(result, cascadedCarries);
+
+            return (carry & 0b1_0000) != 0;
         }
+
+        private static bool AddVector256(in UInt256 a, in UInt256 b, out UInt256 res)
+        {
+            Vector256<ulong> av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
+            Vector256<ulong> bv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
+
+            Vector256<ulong> result = Vector256.Add(av, bv);
+            Vector256<ulong> vCarry = Vector256.LessThan(result, av);
+
+            uint carry = Vector256.ExtractMostSignificantBits(vCarry);
+
+            // All bits set will cascade another carry when carry is added to it
+            Vector256<ulong> vCascade = Vector256.Equals(result, Vector256<ulong>.AllBitsSet);
+            // Move cascade from Vector space to uint
+            uint cascade = Vector256.ExtractMostSignificantBits(vCascade);
+
+            // Use ints to work out the Vector cross lane cascades
+            // Move carry to next bit and add cascade
+            carry = cascade + 2 * carry; // lea
+            // Remove cascades not affected by carry
+            cascade ^= carry;
+            // Choice of 16 vectors
+            cascade &= 0x0f;
+
+            // Lookup the carries to broadcast to the Vectors
+            Vector256<ulong> cascadedCarries = Unsafe.Add(ref Unsafe.As<byte, Vector256<ulong>>(ref MemoryMarshal.GetReference(s_broadcastLookup)), cascade);
+
+            // Mark res as initialized so we can use it as left side of ref assignment
+            Unsafe.SkipInit(out res);
+            // Add the cascadedCarries to the result
+            Unsafe.As<UInt256, Vector256<ulong>>(ref res) = Vector256.Add(result, cascadedCarries);
+
+            return (carry & 0b1_0000) != 0;
+        }
+
+        public void Add(in UInt256 a, out UInt256 res) => AddOverflow(this, a, out res);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void AddWithCarry(ulong x, ulong y, ref ulong carry, out ulong sum)
@@ -1055,19 +1104,6 @@ namespace Nethermind.Int256
         {
             if (!Avx512F.IsSupported || !Avx512DQ.IsSupported || !Avx512DQ.VL.IsSupported)
             {
-                ulong x0 = x.u0;
-                ulong y0 = y.u0;
-                // If both inputs fit in 64 bits, use a simple multiplication routine.
-                if ((x.u1 | x.u2 | x.u3 | y.u1 | y.u2 | y.u3) == 0)
-                {
-                    // Fast multiply for numbers less than 2^64 (18,446,744,073,709,551,615)
-                    ulong high = Math.BigMul(x0, y0, out ulong low);
-                    // Assignment to res after multiply in case is used as input for x or y (by ref aliasing)
-                    res = default;
-                    Unsafe.AsRef(in res.u0) = low;
-                    Unsafe.AsRef(in res.u1) = high;
-                    return;
-                }
                 MultiplyScalar(in x, in y, out res);
             }
             else
@@ -1079,6 +1115,19 @@ namespace Nethermind.Int256
         [SkipLocalsInit]
         private static void MultiplyScalar(in UInt256 x, in UInt256 y, out UInt256 res)
         {
+            ulong x0 = x.u0;
+            ulong y0 = y.u0;
+            // If both inputs fit in 64 bits, use a simple multiplication routine.
+            if ((x.u1 | x.u2 | x.u3 | y.u1 | y.u2 | y.u3) == 0)
+            {
+                // Fast multiply for numbers less than 2^64 (18,446,744,073,709,551,615)
+                ulong high = Math.BigMul(x0, y0, out ulong low);
+                // Assignment to res after multiply in case is used as input for x or y (by ref aliasing)
+                res = default;
+                Unsafe.AsRef(in res.u0) = low;
+                Unsafe.AsRef(in res.u1) = high;
+                return;
+            }
             ref ulong rx = ref Unsafe.As<UInt256, ulong>(ref Unsafe.AsRef(in x));
             ref ulong ry = ref Unsafe.As<UInt256, ulong>(ref Unsafe.AsRef(in y));
 
@@ -1107,21 +1156,8 @@ namespace Nethermind.Int256
         [SkipLocalsInit]
         private static void MultiplyAvx512F(in UInt256 x, in UInt256 y, out UInt256 res)
         {
-            Vector256<ulong> mask = Vector256.Create(0ul, ulong.MaxValue, ulong.MaxValue, ulong.MaxValue);
             Vector256<ulong> vecX = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in x));
             Vector256<ulong> vecY = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in y));
-
-            // If both inputs fit in 64 bits, use a simple multiplication routine.
-            if (Avx512F.VL.TernaryLogic(vecY, mask, Avx2.And(vecX, mask), 0xea) == default)
-            {
-                // Fast multiply for numbers less than 2^64 (18,446,744,073,709,551,615)
-                ulong high = Math.BigMul(vecX[0], vecY[0], out ulong low);
-                // Assignment to res after multiply in case is used as input for x or y (by ref aliasing)
-                res = default;
-                Unsafe.AsRef(in res.u0) = low;
-                Unsafe.AsRef(in res.u1) = high;
-                return;
-            }
 
             // Load the inputs and prepare the mask constant.
             Vector512<ulong> mask32 = Vector512.Create(0xFFFFFFFFUL);
@@ -1206,7 +1242,7 @@ namespace Nethermind.Int256
             // - shuffle ops (valignq/vpslldq) feeding the carry path
 
             Vector512<ulong> crossAndGroup2Sum = Add128(productHi, productLow_r2);
-            Vector512<ulong> crossSumHigh =  Avx512BW.IsSupported ?
+            Vector512<ulong> crossSumHigh = Avx512BW.IsSupported ?
                 Avx512BW.ShiftRightLogical128BitLane(crossAndGroup2Sum.AsByte(), 8).AsUInt64() :
                 Avx512F.AlignRight64(crossAndGroup2Sum, crossAndGroup2Sum, 1);
 
@@ -1891,13 +1927,13 @@ namespace Nethermind.Int256
 
         public static UInt256 operator +(in UInt256 a, in UInt256 b)
         {
-            Add(in a, in b, out UInt256 res);
+            AddOverflow(in a, in b, out UInt256 res);
             return res;
         }
 
         public static UInt256 operator ++(in UInt256 a)
         {
-            Add(in a, 1, out UInt256 res);
+            AddOverflow(in a, 1, out UInt256 res);
             return res;
         }
 
