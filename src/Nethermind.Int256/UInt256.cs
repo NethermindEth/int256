@@ -455,48 +455,54 @@ namespace Nethermind.Int256
 
         public static bool AddAvx2(in UInt256 a, in UInt256 b, out UInt256 res)
         {
-            Vector256<ulong> CarryLaneMask = Vector256.Create(0UL, 1UL, 1UL, 1UL);
-            Vector256<ulong> Lane3Mask     = Vector256.Create(0UL, 0UL, 0UL, ulong.MaxValue);
-            Vector256<ulong> SignBit       = Vector256.Create(0x8000_0000_0000_0000UL);
-
-            // Force separate loads so the core can overlap them.
             Vector256<ulong> av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
             Vector256<ulong> bv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
 
-            Vector256<ulong> sum = Avx2.Add(av, bv);
+            Vector256<ulong> result = Avx2.Add(av, bv);
+            Vector256<ulong> vCarry;
+            if (Avx512F.VL.IsSupported)
+            {
+                vCarry = Avx512F.VL.CompareLessThan(result, av);
+            }
+            else
+            {
+                // Work around for missing Vector256.CompareLessThan
+                Vector256<ulong> carryFromBothHighBits = Avx2.And(av, bv);
+                Vector256<ulong> eitherHighBit = Avx2.Or(av, bv);
+                Vector256<ulong> highBitNotInResult = Avx2.AndNot(result, eitherHighBit);
 
-            // g = (sum < av) unsigned, but without opmask.
-            // carry happens when av > sum (unsigned)
-            Vector256<long> avS  = Avx2.Xor(av, SignBit).AsInt64();
-            Vector256<long> sumS = Avx2.Xor(sum, SignBit).AsInt64();
-            Vector256<ulong> g   = Avx2.CompareGreaterThan(avS, sumS).AsUInt64(); // 0 or all-ones
+                // Set high bits where carry occurs
+                vCarry = Avx2.Or(carryFromBothHighBits, highBitNotInResult);
+            }
+            // Move carry from Vector space to int
+            uint carry = (uint)(Avx512DQ.IsSupported ?
+                Avx512DQ.MoveMask(vCarry) :
+                Avx.MoveMask(vCarry.AsDouble()));
 
-            // p = (sum == -1)
-            Vector256<long> ones = Avx2.CompareEqual(sum.AsInt64(), sum.AsInt64()); // all-ones
-            Vector256<ulong> p   = Avx2.CompareEqual(sum.AsInt64(), ones).AsUInt64();
+            // All bits set will cascade another carry when carry is added to it
+            Vector256<ulong> vCascade = Avx2.CompareEqual(result, Vector256<ulong>.AllBitsSet);
+            // Move cascade from Vector space to uint
+            uint cascade = (uint)(Avx512DQ.IsSupported ?
+                Avx512DQ.MoveMask(vCascade) :
+                Avx.MoveMask(Unsafe.As<Vector256<ulong>, Vector256<double>>(ref vCascade)));
 
-            // Step1 (distance 1)
-            Vector256<ulong> gSh1 = Avx2.Permute4x64(g.AsInt64(), 0x90).AsUInt64(); // [g0,g0,g1,g2]
-            Vector256<ulong> pSh1 = Avx2.Permute4x64(p.AsInt64(), 0x90).AsUInt64(); // [p0,p0,p1,p2]
-            Vector256<ulong> g1   = Avx2.Or(g, Avx2.And(p, gSh1));
-            Vector256<ulong> p1   = Avx2.And(p, pSh1);
+            // Use ints to work out the Vector cross lane cascades
+            // Move carry to next bit and add cascade
+            carry = cascade + 2 * carry; // lea
+            // Remove cascades not effected by carry
+            cascade ^= carry;
+            // Choice of 16 vectors
+            cascade &= 0x0f;
 
-            // Step2 (distance 2)
-            Vector256<ulong> gSh2 = Avx2.Permute4x64(g1.AsInt64(), 0x44).AsUInt64(); // [g1_0,g1_1,g1_0,g1_1]
-            Vector256<ulong> g2   = Avx2.Or(g1, Avx2.And(p1, gSh2));
+            // Lookup the carries to broadcast to the Vectors
+            Vector256<ulong> cascadedCarries = Unsafe.Add(ref Unsafe.As<byte, Vector256<ulong>>(ref MemoryMarshal.GetReference(s_broadcastLookup)), cascade);
 
-            // carry-in per lane = shift1(g2) as 0/1, with lane0 forced 0.
-            Vector256<ulong> cSh1 = Avx2.Permute4x64(g2.AsInt64(), 0x90).AsUInt64(); // [g2_0,g2_0,g2_1,g2_2]
-            Vector256<ulong> cin  = Avx2.And(cSh1, CarryLaneMask);                   // [0,g2_0&1,g2_1&1,g2_2&1]
-
-            Vector256<ulong> final = Avx2.Add(sum, cin);
-
+            // Mark res as initialized so we can use it as left said of ref assignment
             Unsafe.SkipInit(out res);
-            Unsafe.As<UInt256, Vector256<ulong>>(ref res) = final;
+            // Add the cascadedCarries to the result
+            Unsafe.As<UInt256, Vector256<ulong>>(ref res) = Avx2.Add(result, cascadedCarries);
 
-            // overflow if top carry-out is set - lane3 of g2 is all-ones when overflow.
-            Vector256<ulong> top = Avx2.And(g2, Lane3Mask);
-            return !Avx.TestZ(top.AsDouble(), top.AsDouble());
+            return (carry & 0b1_0000) != 0;
         }
 
         public void Add(in UInt256 a, out UInt256 res) => AddOverflow(this, a, out res);
