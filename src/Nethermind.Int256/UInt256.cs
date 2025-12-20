@@ -455,65 +455,48 @@ namespace Nethermind.Int256
 
         public static bool AddAvx2(in UInt256 a, in UInt256 b, out UInt256 res)
         {
+            Vector256<ulong> CarryLaneMask = Vector256.Create(0UL, 1UL, 1UL, 1UL);
+            Vector256<ulong> Lane3Mask     = Vector256.Create(0UL, 0UL, 0UL, ulong.MaxValue);
+            Vector256<ulong> SignBit       = Vector256.Create(0x8000_0000_0000_0000UL);
+
+            // Force separate loads so the core can overlap them.
             Vector256<ulong> av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
             Vector256<ulong> bv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
-            Vector256<ulong> MaskShift1 = Vector256.Create(0UL, ulong.MaxValue, ulong.MaxValue, ulong.MaxValue);
-
-            const byte PermShift1 = 0x90; // [0,0,1,2]
-            const byte PermShift2 = 0x44; // [0,1,0,1]
-
-            Vector256<ulong> MaskShift2 = Vector256.Create(0UL, 0UL, ulong.MaxValue, ulong.MaxValue);
-            Vector256<ulong> One = Vector256.Create(1UL);
-            Vector256<ulong> Lane3Mask = Vector256.Create(0UL, 0UL, 0UL, ulong.MaxValue);
 
             Vector256<ulong> sum = Avx2.Add(av, bv);
 
-            // g = carry generate from each 64-bit lane (mask lanes are 0 or all-ones)
-            Vector256<ulong> g;
-            if (Avx512F.VL.IsSupported)
-            {
-                g = Avx512F.VL.CompareLessThan(sum, av);
-            }
-            else
-            {
-                // Work around for missing Vector256.CompareLessThan
-                Vector256<ulong> carryFromBothHighBits = Avx2.And(av, bv);
-                Vector256<ulong> eitherHighBit = Avx2.Or(av, bv);
-                Vector256<ulong> highBitNotInResult = Avx2.AndNot(sum, eitherHighBit);
-                // Set high bits where carry occurs
-                g = Avx2.Or(carryFromBothHighBits, highBitNotInResult);
-            }
+            // g = (sum < av) unsigned, but without opmask.
+            // carry happens when av > sum (unsigned)
+            Vector256<long> avS  = Avx2.Xor(av, SignBit).AsInt64();
+            Vector256<long> sumS = Avx2.Xor(sum, SignBit).AsInt64();
+            Vector256<ulong> g   = Avx2.CompareGreaterThan(avS, sumS).AsUInt64(); // 0 or all-ones
 
-            // p = propagate mask: lane is all-ones iff sum == -1
-            Vector256<ulong> ones = Avx2.CompareEqual(Vector256<ulong>.Zero, Vector256<ulong>.Zero); // ones idiom (Zen5 supports it) :contentReference[oaicite:4]{index=4}
-            Vector256<ulong> p = Avx2.CompareEqual(sum, ones);
+            // p = (sum == -1)
+            Vector256<long> ones = Avx2.CompareEqual(sum.AsInt64(), sum.AsInt64()); // all-ones
+            Vector256<ulong> p   = Avx2.CompareEqual(sum.AsInt64(), ones).AsUInt64();
 
-            // Prefix carry network (Kogge-Stone for 4 lanes):
-            // g1 = g | (p & (g <<1))
-            // p1 = p & (p <<1)
-            // g2 = g1 | (p1 & (g1<<2))
-            //
-            Vector256<ulong> gPrev1 = Avx2.And(Avx2.Permute4x64(g, PermShift1), MaskShift1);
-            Vector256<ulong> pPrev1 = Avx2.And(Avx2.Permute4x64(p, PermShift1), MaskShift1);
+            // Step1 (distance 1)
+            Vector256<ulong> gSh1 = Avx2.Permute4x64(g.AsInt64(), 0x90).AsUInt64(); // [g0,g0,g1,g2]
+            Vector256<ulong> pSh1 = Avx2.Permute4x64(p.AsInt64(), 0x90).AsUInt64(); // [p0,p0,p1,p2]
+            Vector256<ulong> g1   = Avx2.Or(g, Avx2.And(p, gSh1));
+            Vector256<ulong> p1   = Avx2.And(p, pSh1);
 
-            Vector256<ulong> g1 = Avx2.Or(g, Avx2.And(p, gPrev1));
-            Vector256<ulong> p1 = Avx2.And(p, pPrev1);
+            // Step2 (distance 2)
+            Vector256<ulong> gSh2 = Avx2.Permute4x64(g1.AsInt64(), 0x44).AsUInt64(); // [g1_0,g1_1,g1_0,g1_1]
+            Vector256<ulong> g2   = Avx2.Or(g1, Avx2.And(p1, gSh2));
 
-            Vector256<ulong> gPrev2 = Avx2.And(Avx2.Permute4x64(g1, PermShift2), MaskShift2);
-            Vector256<ulong> g2 = Avx2.Or(g1, Avx2.And(p1, gPrev2));
+            // carry-in per lane = shift1(g2) as 0/1, with lane0 forced 0.
+            Vector256<ulong> cSh1 = Avx2.Permute4x64(g2.AsInt64(), 0x90).AsUInt64(); // [g2_0,g2_0,g2_1,g2_2]
+            Vector256<ulong> cin  = Avx2.And(cSh1, CarryLaneMask);                   // [0,g2_0&1,g2_1&1,g2_2&1]
 
-            // carry-in vector is (g2 <<1) masked to lanes 1..3, then convert -1/0 to 1/0
-            Vector256<ulong> carryInMask = Avx2.And(Avx2.Permute4x64(g2, PermShift1), MaskShift1);
-            Vector256<ulong> carryIn = Avx2.And(carryInMask, One);
-
-            Vector256<ulong> final = Avx2.Add(sum, carryIn);
+            Vector256<ulong> final = Avx2.Add(sum, cin);
 
             Unsafe.SkipInit(out res);
             Unsafe.As<UInt256, Vector256<ulong>>(ref res) = final;
 
-            // overflow is g2 lane3 != 0 - avoid vmovmskpd by using vtestpd on lane3 only
-            Vector256<ulong> ov = Avx2.And(g2, Lane3Mask);
-            return !Avx.TestZ(ov.AsDouble(), ov.AsDouble());
+            // overflow if top carry-out is set - lane3 of g2 is all-ones when overflow.
+            Vector256<ulong> top = Avx2.And(g2, Lane3Mask);
+            return !Avx.TestZ(top.AsDouble(), top.AsDouble());
         }
 
         public void Add(in UInt256 a, out UInt256 res) => AddOverflow(this, a, out res);
