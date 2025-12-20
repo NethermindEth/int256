@@ -409,10 +409,10 @@ namespace Nethermind.Int256
         /// <summary>
         /// AddOverflow sets res to the sum a+b, and returns whether overflow occurred
         /// </summary>
-        /// <param name="a"></param>
-        /// <param name="b"></param>
-        /// <param name="res"></param>
-        /// <returns></returns>
+        /// <param name="a">The first value to add.</param>
+        /// <param name="b">The second value to add.</param>
+        /// <param name="res">When this method returns, contains the sum of <paramref name="a" /> and <paramref name="b" />.</param>
+        /// <returns><see langword="true"/> if the addition overflows the range of <see cref="UInt256"/>; otherwise, <see langword="false"/>.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool AddOverflow(in UInt256 a, in UInt256 b, out UInt256 res)
         {
@@ -490,7 +490,7 @@ namespace Nethermind.Int256
             // Use ints to work out the Vector cross lane cascades
             // Move carry to next bit and add cascade
             carry = cascade + 2 * carry; // lea
-            // Remove cascades not effected by carry
+            // Remove cascades not affected by carry
             cascade ^= carry;
             // Choice of 16 vectors
             cascade &= 0x0f;
@@ -524,7 +524,7 @@ namespace Nethermind.Int256
             // Use ints to work out the Vector cross lane cascades
             // Move carry to next bit and add cascade
             carry = cascade + 2 * carry; // lea
-            // Remove cascades not effected by carry
+            // Remove cascades not affected by carry
             cascade ^= carry;
             // Choice of 16 vectors
             cascade &= 0x0f;
