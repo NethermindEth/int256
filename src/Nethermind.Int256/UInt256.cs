@@ -402,7 +402,16 @@ namespace Nethermind.Int256
             0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         };
 
-        // Add sets res to the sum a+b
+        /// <summary>
+        /// Sets <paramref name="res" /> to the sum of <paramref name="a" /> and <paramref name="b" />.
+        /// </summary>
+        /// <param name="a">The first value to add.</param>
+        /// <param name="b">The second value to add.</param>
+        /// <param name="res">When this method returns, contains the sum of <paramref name="a" /> and <paramref name="b" />.</param>
+        /// <remarks>
+        /// This method does not report whether the addition overflows the range of <see cref="UInt256"/>.
+        /// Use <see cref="AddOverflow(in UInt256, in UInt256, out UInt256)"/> if you need to detect overflow.
+        /// </remarks>
         public static void Add(in UInt256 a, in UInt256 b, out UInt256 res)
             => AddOverflow(in a, in b, out res);
 
