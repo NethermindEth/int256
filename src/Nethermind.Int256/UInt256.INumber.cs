@@ -882,7 +882,11 @@ public readonly partial struct UInt256
     public static UInt256 operator +(UInt256 value) => value;
 
     /// <inheritdoc />
-    public static UInt256 operator -(UInt256 value) => Negate(in value);
+    public static UInt256 operator -(UInt256 value)
+    {
+        // For unsigned 256-bit values, unary minus is defined as two's complement: ~value + 1
+        return ~value + One;
+    }
 
     /// <inheritdoc />
     public static (UInt256 Quotient, UInt256 Remainder) DivRem(UInt256 left, UInt256 right)
