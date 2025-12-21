@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Demerzel Solutions Limited
+// SPDX-FileCopyrightText: 2025 Demerzel Solutions Limited
 // SPDX-License-Identifier: MIT
 
 using System;
@@ -10,8 +10,6 @@ namespace Nethermind.Int256;
 
 public readonly partial struct UInt256
 {
-    #region INumberBase<UInt256> Implementation
-
     /// <inheritdoc />
     static UInt256 INumberBase<UInt256>.One => One;
 
@@ -27,8 +25,10 @@ public readonly partial struct UInt256
     /// <inheritdoc />
     static UInt256 IMultiplicativeIdentity<UInt256, UInt256>.MultiplicativeIdentity => One;
 
+    [OverloadResolutionPriority(1)]
+    public static UInt256 Abs(in UInt256 value) => value;
     /// <inheritdoc />
-    public static UInt256 Abs(UInt256 value) => value;
+    public static UInt256 Abs(UInt256 value) => Abs(in value);
 
     /// <inheritdoc />
     static bool INumberBase<UInt256>.IsCanonical(UInt256 value) => true;
@@ -147,7 +147,7 @@ public readonly partial struct UInt256
         if (typeof(TOther) == typeof(sbyte))
         {
             var v = (sbyte)(object)value;
-            if (v < 0) throw new OverflowException();
+            if (v < 0) ThrowOverflowException();
             result = (ulong)v;
             return true;
         }
@@ -159,7 +159,7 @@ public readonly partial struct UInt256
         if (typeof(TOther) == typeof(short))
         {
             var v = (short)(object)value;
-            if (v < 0) throw new OverflowException();
+            if (v < 0) ThrowOverflowException();
             result = (ulong)v;
             return true;
         }
@@ -171,7 +171,7 @@ public readonly partial struct UInt256
         if (typeof(TOther) == typeof(int))
         {
             var v = (int)(object)value;
-            if (v < 0) throw new OverflowException();
+            if (v < 0) ThrowOverflowException();
             result = (ulong)v;
             return true;
         }
@@ -183,7 +183,7 @@ public readonly partial struct UInt256
         if (typeof(TOther) == typeof(long))
         {
             var v = (long)(object)value;
-            if (v < 0) throw new OverflowException();
+            if (v < 0) ThrowOverflowException();
             result = (ulong)v;
             return true;
         }
@@ -196,7 +196,7 @@ public readonly partial struct UInt256
         if (typeof(TOther) == typeof(Int128))
         {
             var v = (Int128)(object)value;
-            if (v < 0) throw new OverflowException();
+            if (v < 0) ThrowOverflowException();
             result = new UInt256((ulong)v, (ulong)(v >> 64), 0, 0);
             return true;
         }
@@ -208,7 +208,7 @@ public readonly partial struct UInt256
         if (typeof(TOther) == typeof(nint))
         {
             var v = (nint)(object)value;
-            if (v < 0) throw new OverflowException();
+            if (v < 0) ThrowOverflowException();
             result = (ulong)v;
             return true;
         }
@@ -216,7 +216,7 @@ public readonly partial struct UInt256
         {
             var v = (Half)(object)value;
             double dv = (double)v;
-            if (dv < 0 || double.IsNaN(dv) || double.IsInfinity(dv)) throw new OverflowException();
+            if (dv < 0 || double.IsNaN(dv) || double.IsInfinity(dv)) ThrowOverflowException();
             result = (UInt256)dv;
             return true;
         }
@@ -224,28 +224,28 @@ public readonly partial struct UInt256
         {
             var v = (float)(object)value;
             double dv = v;
-            if (dv < 0 || double.IsNaN(dv) || double.IsInfinity(dv)) throw new OverflowException();
+            if (dv < 0 || double.IsNaN(dv) || double.IsInfinity(dv)) ThrowOverflowException();
             result = (UInt256)dv;
             return true;
         }
         if (typeof(TOther) == typeof(double))
         {
             var v = (double)(object)value;
-            if (v < 0 || double.IsNaN(v) || double.IsInfinity(v)) throw new OverflowException();
+            if (v < 0 || double.IsNaN(v) || double.IsInfinity(v)) ThrowOverflowException();
             result = (UInt256)v;
             return true;
         }
         if (typeof(TOther) == typeof(decimal))
         {
             var v = (decimal)(object)value;
-            if (v < 0) throw new OverflowException();
+            if (v < 0) ThrowOverflowException();
             result = (UInt256)new BigInteger(v);
             return true;
         }
         if (typeof(TOther) == typeof(BigInteger))
         {
             var v = (BigInteger)(object)value;
-            if (v < 0 || v > (BigInteger)MaxValue) throw new OverflowException();
+            if (v < 0 || v > (BigInteger)MaxValue) ThrowOverflowException();
             result = (UInt256)v;
             return true;
         }
@@ -257,7 +257,7 @@ public readonly partial struct UInt256
         if (typeof(TOther) == typeof(Int256))
         {
             var v = (Int256)(object)value;
-            if (v.Sign < 0) throw new OverflowException();
+            if (v.Sign < 0) ThrowOverflowException();
             result = (UInt256)v;
             return true;
         }
@@ -559,83 +559,83 @@ public readonly partial struct UInt256
         if (typeof(TOther) == typeof(byte))
         {
             if (value.u1 != 0 || value.u2 != 0 || value.u3 != 0 || value.u0 > byte.MaxValue)
-                throw new OverflowException();
+                ThrowOverflowException();
             result = (TOther)(object)(byte)value.u0;
             return true;
         }
         if (typeof(TOther) == typeof(sbyte))
         {
             if (value.u1 != 0 || value.u2 != 0 || value.u3 != 0 || value.u0 > (ulong)sbyte.MaxValue)
-                throw new OverflowException();
+                ThrowOverflowException();
             result = (TOther)(object)(sbyte)value.u0;
             return true;
         }
         if (typeof(TOther) == typeof(ushort))
         {
             if (value.u1 != 0 || value.u2 != 0 || value.u3 != 0 || value.u0 > ushort.MaxValue)
-                throw new OverflowException();
+                ThrowOverflowException();
             result = (TOther)(object)(ushort)value.u0;
             return true;
         }
         if (typeof(TOther) == typeof(short))
         {
             if (value.u1 != 0 || value.u2 != 0 || value.u3 != 0 || value.u0 > (ulong)short.MaxValue)
-                throw new OverflowException();
+                ThrowOverflowException();
             result = (TOther)(object)(short)value.u0;
             return true;
         }
         if (typeof(TOther) == typeof(uint))
         {
             if (value.u1 != 0 || value.u2 != 0 || value.u3 != 0 || value.u0 > uint.MaxValue)
-                throw new OverflowException();
+                ThrowOverflowException();
             result = (TOther)(object)(uint)value.u0;
             return true;
         }
         if (typeof(TOther) == typeof(int))
         {
             if (value.u1 != 0 || value.u2 != 0 || value.u3 != 0 || value.u0 > (ulong)int.MaxValue)
-                throw new OverflowException();
+                ThrowOverflowException();
             result = (TOther)(object)(int)value.u0;
             return true;
         }
         if (typeof(TOther) == typeof(ulong))
         {
             if (value.u1 != 0 || value.u2 != 0 || value.u3 != 0)
-                throw new OverflowException();
+                ThrowOverflowException();
             result = (TOther)(object)value.u0;
             return true;
         }
         if (typeof(TOther) == typeof(long))
         {
             if (value.u1 != 0 || value.u2 != 0 || value.u3 != 0 || value.u0 > (ulong)long.MaxValue)
-                throw new OverflowException();
+                ThrowOverflowException();
             result = (TOther)(object)(long)value.u0;
             return true;
         }
         if (typeof(TOther) == typeof(UInt128))
         {
             if (value.u2 != 0 || value.u3 != 0)
-                throw new OverflowException();
+                ThrowOverflowException();
             result = (TOther)(object)(new UInt128(value.u1, value.u0));
             return true;
         }
         if (typeof(TOther) == typeof(Int128))
         {
             if (value.u2 != 0 || value.u3 != 0 || value.u1 > (ulong)long.MaxValue)
-                throw new OverflowException();
+                ThrowOverflowException();
             result = (TOther)(object)(new Int128(value.u1, value.u0));
             return true;
         }
         if (typeof(TOther) == typeof(nuint))
         {
             if (value.u1 != 0 || value.u2 != 0 || value.u3 != 0 || value.u0 > (ulong)nuint.MaxValue)
-                throw new OverflowException();
+                ThrowOverflowException();
             result = (TOther)(object)(nuint)value.u0;
             return true;
         }
         if (typeof(TOther) == typeof(nint))
         {
-            if (value.u1 != 0 || value.u2 != 0 || value.u3 != 0) throw new OverflowException();
+            if (value.u1 != 0 || value.u2 != 0 || value.u3 != 0) ThrowOverflowException();
             result = (TOther)(object)checked((nint)value.u0);
             return true;
         }
@@ -856,12 +856,8 @@ public readonly partial struct UInt256
         return false;
     }
 
-    #endregion
-
-    #region INumber<UInt256> Implementation
-
-    /// <inheritdoc />
-    public static UInt256 Clamp(UInt256 value, UInt256 min, UInt256 max)
+    [OverloadResolutionPriority(1)]
+    public static UInt256 Clamp(in UInt256 value, in UInt256 min, in UInt256 max)
     {
         if (min > max)
             ThrowMinMaxException(min, max);
@@ -871,6 +867,10 @@ public readonly partial struct UInt256
             return max;
         return value;
     }
+
+    /// <inheritdoc />
+    public static UInt256 Clamp(UInt256 value, UInt256 min, UInt256 max)
+        => Clamp(in value, in min, in max);
 
     [DoesNotReturn]
     private static void ThrowMinMaxException(UInt256 min, UInt256 max)
@@ -882,17 +882,8 @@ public readonly partial struct UInt256
     /// <inheritdoc />
     public static int Sign(UInt256 value) => value.IsZero ? 0 : 1;
 
-    #endregion
-
-    #region IComparisonOperators<UInt256, UInt256, bool> Implementation
-
-    // Already implemented via existing operators
-
-    #endregion
-
-    #region IModulusOperators<UInt256, UInt256, UInt256> Implementation
-
     /// <inheritdoc />
+    [OverloadResolutionPriority(1)]
     public static UInt256 operator %(in UInt256 left, in UInt256 right)
     {
         Mod(in left, in right, out UInt256 result);
@@ -900,15 +891,7 @@ public readonly partial struct UInt256
     }
 
     /// <inheritdoc />
-    public static UInt256 operator %(UInt256 left, UInt256 right)
-    {
-        Mod(in left, in right, out UInt256 result);
-        return result;
-    }
-
-    #endregion
-
-    #region IDecrementOperators<UInt256> Implementation
+    public static UInt256 operator %(UInt256 left, UInt256 right) => left % right;
 
     /// <inheritdoc />
     [OverloadResolutionPriority(1)]
@@ -919,29 +902,13 @@ public readonly partial struct UInt256
     }
 
     /// <inheritdoc />
-    public static UInt256 operator --(UInt256 value)
-    {
-        Subtract(in value, One, out UInt256 result);
-        return result;
-    }
-
-    #endregion
-
-    #region IUnaryPlusOperators<UInt256, UInt256> Implementation
+    public static UInt256 operator --(UInt256 value) => value--;
 
     /// <inheritdoc />
     public static UInt256 operator +(UInt256 value) => value;
 
-    #endregion
-
-    #region IUnaryNegationOperators<UInt256, UInt256> Implementation
-
     /// <inheritdoc />
     public static UInt256 operator -(UInt256 value) => Negate(in value);
-
-    #endregion
-
-    #region IBinaryInteger<UInt256> Implementation
 
     /// <inheritdoc />
     public static (UInt256 Quotient, UInt256 Remainder) DivRem(UInt256 left, UInt256 right)
@@ -951,14 +918,13 @@ public readonly partial struct UInt256
         return (quotient, remainder);
     }
 
+    [OverloadResolutionPriority(1)]
+    public static uint LeadingZeroCount(in UInt256 value)
+        => value.LeadingZeroCount();
+
     /// <inheritdoc />
     public static UInt256 LeadingZeroCount(UInt256 value)
-    {
-        if (value.u3 != 0) return (ulong)BitOperations.LeadingZeroCount(value.u3);
-        if (value.u2 != 0) return (ulong)(64 + BitOperations.LeadingZeroCount(value.u2));
-        if (value.u1 != 0) return (ulong)(128 + BitOperations.LeadingZeroCount(value.u1));
-        return (ulong)(192 + BitOperations.LeadingZeroCount(value.u0));
-    }
+        => value.LeadingZeroCount();
 
     /// <inheritdoc />
     public static UInt256 PopCount(UInt256 value) =>
@@ -1069,10 +1035,6 @@ public readonly partial struct UInt256
         return right | left;
     }
 
-    #endregion
-
-    #region IBinaryNumber<UInt256> Implementation
-
     /// <inheritdoc />
     static bool IBinaryNumber<UInt256>.IsPow2(UInt256 value)
     {
@@ -1090,26 +1052,12 @@ public readonly partial struct UInt256
         return (ulong)(255 - (int)(ulong)LeadingZeroCount(value));
     }
 
-    #endregion
-
-    #region IBitwiseOperators<UInt256, UInt256, UInt256> Implementation
-
-    // Already implemented via existing operators (|, &, ^, ~)
-
-    #endregion
-
-    #region IShiftOperators<UInt256, int, UInt256> Implementation
-
     /// <inheritdoc />
     public static UInt256 operator >>>(UInt256 value, int shiftAmount)
     {
         Rsh(in value, shiftAmount, out UInt256 result);
         return result;
     }
-
-    #endregion
-
-    #region ISpanFormattable Implementation
 
     /// <inheritdoc />
     public bool TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
@@ -1122,15 +1070,9 @@ public readonly partial struct UInt256
     public string ToString(string? format, IFormatProvider? formatProvider)
         => ((BigInteger)this).ToString(format, formatProvider);
 
-    #endregion
-
-    #region IMinMaxValue<UInt256> Implementation
-
     /// <inheritdoc />
     static UInt256 IMinMaxValue<UInt256>.MinValue => MinValue;
 
     /// <inheritdoc />
     static UInt256 IMinMaxValue<UInt256>.MaxValue => MaxValue;
-
-    #endregion
 }

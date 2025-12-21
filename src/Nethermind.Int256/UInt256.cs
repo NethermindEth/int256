@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Demerzel Solutions Limited
+// SPDX-FileCopyrightText: 2025 Demerzel Solutions Limited
 // SPDX-License-Identifier: MIT
 
 using System;
@@ -1363,14 +1363,15 @@ namespace Nethermind.Int256
             return !high.IsZero;
         }
 
-        public int BitLen =>
-            u3 != 0
-                ? 192 + Len64(u3)
-                : u2 != 0
-                    ? 128 + Len64(u2)
-                    : u1 != 0
-                        ? 64 + Len64(u1)
-                        : Len64(u0);
+        public uint LeadingZeroCount()
+        {
+            if (u3 != 0) return (uint)BitOperations.LeadingZeroCount(u3);
+            if (u2 != 0) return (uint)(64 + BitOperations.LeadingZeroCount(u2));
+            if (u1 != 0) return (uint)(128 + BitOperations.LeadingZeroCount(u1));
+            return (uint)(192 + BitOperations.LeadingZeroCount(u0));
+        }
+
+        public int BitLen => (int)(256 - LeadingZeroCount());
 
         [SkipLocalsInit]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -2543,6 +2544,9 @@ namespace Nethermind.Int256
 
         [DoesNotReturn]
         private static void ThrowOverflowException(string message) => throw new OverflowException(message);
+
+        [DoesNotReturn]
+        private static void ThrowOverflowException() => throw new OverflowException();
 
         [DoesNotReturn]
         private static void ThrowNotSupportedException() => throw new NotSupportedException();

@@ -258,19 +258,19 @@ namespace Nethermind.Int256.Test
         [Test]
         public void UInt256_LeadingZeroCount_Zero_Returns256()
         {
-            UInt256.LeadingZeroCount(UInt256.Zero).Should().Be((UInt256)256);
+            UInt256.LeadingZeroCount(UInt256.Zero).Should().Be(256);
         }
 
         [Test]
         public void UInt256_LeadingZeroCount_One_Returns255()
         {
-            UInt256.LeadingZeroCount((UInt256)1).Should().Be((UInt256)255);
+            UInt256.LeadingZeroCount((UInt256)1).Should().Be(255);
         }
 
         [Test]
         public void UInt256_LeadingZeroCount_MaxValue_ReturnsZero()
         {
-            UInt256.LeadingZeroCount(UInt256.MaxValue).Should().Be((UInt256)0);
+            UInt256.LeadingZeroCount(UInt256.MaxValue).Should().Be(0);
         }
 
         #endregion
