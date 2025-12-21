@@ -1716,6 +1716,7 @@ namespace Nethermind.Int256
             Lsh(this, n, out res);
         }
 
+        [OverloadResolutionPriority(1)]
         public static UInt256 operator <<(in UInt256 a, int n)
         {
             a.LeftShift(n, out UInt256 res);
@@ -1832,6 +1833,7 @@ namespace Nethermind.Int256
 
         public void RightShift(int n, out UInt256 res) => Rsh(this, n, out res);
 
+        [OverloadResolutionPriority(1)]
         public static UInt256 operator >>(in UInt256 a, int n)
         {
             a.RightShift(n, out UInt256 res);
@@ -1911,6 +1913,7 @@ namespace Nethermind.Int256
             }
         }
 
+        [OverloadResolutionPriority(1)]
         public static UInt256 operator |(in UInt256 a, in UInt256 b)
         {
             Or(a, b, out UInt256 res);
@@ -1939,6 +1942,7 @@ namespace Nethermind.Int256
             }
         }
 
+        [OverloadResolutionPriority(1)]
         public static UInt256 operator &(in UInt256 a, in UInt256 b)
         {
             And(a, b, out UInt256 res);
@@ -1967,6 +1971,7 @@ namespace Nethermind.Int256
             }
         }
 
+        [OverloadResolutionPriority(1)]
         public static UInt256 operator ^(in UInt256 a, in UInt256 b)
         {
             Xor(a, b, out UInt256 res);
@@ -1979,6 +1984,7 @@ namespace Nethermind.Int256
             return res;
         }
 
+        [OverloadResolutionPriority(1)]
         public static UInt256 operator ~(in UInt256 a)
         {
             Not(in a, out UInt256 res);
@@ -1991,6 +1997,7 @@ namespace Nethermind.Int256
             return res;
         }
 
+        [OverloadResolutionPriority(1)]
         public static UInt256 operator +(in UInt256 a, in UInt256 b)
         {
             AddOverflow(in a, in b, out UInt256 res);
@@ -2003,6 +2010,7 @@ namespace Nethermind.Int256
             return res;
         }
 
+        [OverloadResolutionPriority(1)]
         public static UInt256 operator ++(in UInt256 a)
         {
             AddOverflow(in a, 1, out UInt256 res);
@@ -2015,6 +2023,7 @@ namespace Nethermind.Int256
             return res;
         }
 
+        [OverloadResolutionPriority(1)]
         public static UInt256 operator -(in UInt256 a, in UInt256 b)
         {
             if (SubtractUnderflow(in a, in b, out UInt256 c))
@@ -2035,10 +2044,12 @@ namespace Nethermind.Int256
             return c;
         }
 
+        [OverloadResolutionPriority(1)]
         public static bool operator ==(in UInt256 a, in UInt256 b) => a.Equals(b);
 
         public static bool operator ==(UInt256 a, UInt256 b) => a.Equals(b);
 
+        [OverloadResolutionPriority(1)]
         public static bool operator !=(in UInt256 a, in UInt256 b) => !(a == b);
 
         public static bool operator !=(UInt256 a, UInt256 b) => !(a == b);
@@ -2125,6 +2136,7 @@ namespace Nethermind.Int256
             return c;
         }
 
+        [OverloadResolutionPriority(1)]
         public static UInt256 operator *(in UInt256 a, in UInt256 b)
         {
             Multiply(in a, in b, out UInt256 c);
@@ -2144,6 +2156,7 @@ namespace Nethermind.Int256
             return c;
         }
 
+        [OverloadResolutionPriority(1)]
         public static UInt256 operator /(in UInt256 a, in UInt256 b)
         {
             Divide(in a, in b, out UInt256 c);
@@ -2156,6 +2169,7 @@ namespace Nethermind.Int256
             return c;
         }
 
+        [OverloadResolutionPriority(1)]
         public static bool operator <(in UInt256 a, in UInt256 b) => LessThan(in a, in b);
         public static bool operator <(UInt256 a, UInt256 b) => LessThan(in a, in b);
         public static bool operator <(in UInt256 a, int b) => LessThan(in a, b);
@@ -2166,6 +2180,7 @@ namespace Nethermind.Int256
         public static bool operator <(long a, in UInt256 b) => LessThan(a, in b);
         public static bool operator <(in UInt256 a, ulong b) => LessThan(in a, b);
         public static bool operator <(ulong a, in UInt256 b) => LessThan(a, in b);
+        [OverloadResolutionPriority(1)]
         public static bool operator <=(in UInt256 a, in UInt256 b) => !LessThan(in b, in a);
         public static bool operator <=(UInt256 a, UInt256 b) => !LessThan(in b, in a);
         public static bool operator <=(in UInt256 a, int b) => !LessThan(b, in a);
@@ -2176,6 +2191,7 @@ namespace Nethermind.Int256
         public static bool operator <=(long a, in UInt256 b) => !LessThan(in b, a);
         public static bool operator <=(in UInt256 a, ulong b) => !LessThan(b, in a);
         public static bool operator <=(ulong a, UInt256 b) => !LessThan(in b, a);
+        [OverloadResolutionPriority(1)]
         public static bool operator >(in UInt256 a, in UInt256 b) => LessThan(in b, in a);
         public static bool operator >(UInt256 a, UInt256 b) => LessThan(in b, in a);
         public static bool operator >(in UInt256 a, int b) => LessThan(b, in a);
@@ -2186,6 +2202,7 @@ namespace Nethermind.Int256
         public static bool operator >(long a, in UInt256 b) => LessThan(in b, a);
         public static bool operator >(in UInt256 a, ulong b) => LessThan(b, in a);
         public static bool operator >(ulong a, in UInt256 b) => LessThan(in b, a);
+        [OverloadResolutionPriority(1)]
         public static bool operator >=(in UInt256 a, in UInt256 b) => !LessThan(in a, in b);
         public static bool operator >=(UInt256 a, UInt256 b) => !LessThan(in a, in b);
         public static bool operator >=(in UInt256 a, int b) => !LessThan(in a, b);

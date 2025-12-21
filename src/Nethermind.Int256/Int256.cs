@@ -74,6 +74,7 @@ namespace Nethermind.Int256
         public int Sign => _value.IsZero ? 0 : _value.u3 < 0x8000000000000000ul ? 1 : -1;
         public bool IsNegative => Sign < 0;
 
+        [OverloadResolutionPriority(1)]
         public static Int256 operator +(in Int256 a, in Int256 b)
         {
             Add(in a, in b, out Int256 res);
@@ -557,8 +558,10 @@ namespace Nethermind.Int256
 
         public override int GetHashCode() => _value.GetHashCode();
 
+        [OverloadResolutionPriority(1)]
         public static bool operator ==(in Int256 a, in Int256 b) => a.Equals(b);
 
+        [OverloadResolutionPriority(1)]
         public static bool operator !=(in Int256 a, in Int256 b) => !(a == b);
 
         public bool IsZero => this == Zero;
@@ -577,6 +580,7 @@ namespace Nethermind.Int256
 
         public static explicit operator UInt256(Int256 z) => z._value;
 
+        [OverloadResolutionPriority(1)]
         public static bool operator <(in Int256 z, in Int256 x)
         {
             int zSign = z.Sign;
@@ -596,6 +600,7 @@ namespace Nethermind.Int256
 
             return z._value < x._value;
         }
+        [OverloadResolutionPriority(1)]
         public static bool operator >(in Int256 z, in Int256 x) => x < z;
 
         public static explicit operator Int256(ulong value) => new((UInt256)value);
@@ -689,11 +694,14 @@ namespace Nethermind.Int256
             return a._value < b._value;
         }
         public static bool operator >(Int256 a, Int256 b) => b < a;
+        [OverloadResolutionPriority(1)]
         public static bool operator <=(in Int256 a, in Int256 b) => !(b < a);
         public static bool operator <=(Int256 a, Int256 b) => !(b < a);
+        [OverloadResolutionPriority(1)]
         public static bool operator >=(in Int256 a, in Int256 b) => !(a < b);
         public static bool operator >=(Int256 a, Int256 b) => !(a < b);
 
+        [OverloadResolutionPriority(1)]
         public static Int256 operator -(in Int256 a, in Int256 b)
         {
             Subtract(in a, in b, out Int256 res);
@@ -706,6 +714,7 @@ namespace Nethermind.Int256
             return res;
         }
 
+        [OverloadResolutionPriority(1)]
         public static Int256 operator *(in Int256 a, in Int256 b)
         {
             Multiply(in a, in b, out Int256 res);
@@ -718,6 +727,7 @@ namespace Nethermind.Int256
             return res;
         }
 
+        [OverloadResolutionPriority(1)]
         public static Int256 operator /(in Int256 a, in Int256 b)
         {
             Divide(in a, in b, out Int256 res);
@@ -730,6 +740,7 @@ namespace Nethermind.Int256
             return res;
         }
 
+        [OverloadResolutionPriority(1)]
         public static Int256 operator %(in Int256 a, in Int256 b)
         {
             Mod(in a, in b, out Int256 res);
@@ -742,6 +753,7 @@ namespace Nethermind.Int256
             return res;
         }
 
+        [OverloadResolutionPriority(1)]
         public static Int256 operator ++(in Int256 a)
         {
             Add(in a, One, out Int256 res);
@@ -754,6 +766,7 @@ namespace Nethermind.Int256
             return res;
         }
 
+        [OverloadResolutionPriority(1)]
         public static Int256 operator --(in Int256 a)
         {
             Subtract(in a, One, out Int256 res);
@@ -774,6 +787,7 @@ namespace Nethermind.Int256
             return res;
         }
 
+        [OverloadResolutionPriority(1)]
         public static Int256 operator &(in Int256 a, in Int256 b)
         {
             And(in a, in b, out Int256 res);
@@ -786,6 +800,7 @@ namespace Nethermind.Int256
             return res;
         }
 
+        [OverloadResolutionPriority(1)]
         public static Int256 operator |(in Int256 a, in Int256 b)
         {
             Or(in a, in b, out Int256 res);
@@ -798,6 +813,7 @@ namespace Nethermind.Int256
             return res;
         }
 
+        [OverloadResolutionPriority(1)]
         public static Int256 operator ^(in Int256 a, in Int256 b)
         {
             Xor(in a, in b, out Int256 res);
@@ -810,6 +826,7 @@ namespace Nethermind.Int256
             return res;
         }
 
+        [OverloadResolutionPriority(1)]
         public static Int256 operator ~(in Int256 a)
         {
             Not(in a, out Int256 res);
@@ -822,6 +839,7 @@ namespace Nethermind.Int256
             return res;
         }
 
+        [OverloadResolutionPriority(1)]
         public static Int256 operator <<(in Int256 a, int n)
         {
             LeftShift(in a, n, out Int256 res);
@@ -834,6 +852,7 @@ namespace Nethermind.Int256
             return res;
         }
 
+        [OverloadResolutionPriority(1)]
         public static Int256 operator >>(in Int256 a, int n)
         {
             RightShift(in a, n, out Int256 res);
