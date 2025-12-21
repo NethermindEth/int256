@@ -886,7 +886,7 @@ public readonly partial struct Int256
         if (Sign >= 0)
             return _value.BitLen;
 
-        Neg(out Int256 abs);
+        this.Neg(out Int256 abs);
         return abs._value.BitLen + 1;
     }
 
