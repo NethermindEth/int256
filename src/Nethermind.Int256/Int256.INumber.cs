@@ -298,6 +298,15 @@ public readonly partial struct Int256
     {
         if (BigInteger.TryParse(s, style, provider, out BigInteger big))
         {
+            BigInteger minValue = (BigInteger)MinValue;
+            BigInteger maxValue = (BigInteger)MaxValue;
+
+            if (big < minValue || big > maxValue)
+            {
+                result = Zero;
+                return false;
+            }
+
             result = new Int256(big);
             return true;
         }
