@@ -59,8 +59,8 @@ namespace Nethermind.Int256.Test
         [Test]
         public void Int256_MinMaxValue_IsCorrect()
         {
-            ((BigInteger)Int256.Min).Should().Be(-(BigInteger.One << 255));
-            ((BigInteger)Int256.Max).Should().Be((BigInteger.One << 255) - 1);
+            ((BigInteger)Int256.MinValue).Should().Be(-(BigInteger.One << 255));
+            ((BigInteger)Int256.MaxValue).Should().Be((BigInteger.One << 255) - 1);
         }
 
         #endregion

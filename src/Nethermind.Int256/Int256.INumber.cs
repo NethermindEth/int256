@@ -483,12 +483,12 @@ public readonly partial struct Int256
             var v = (double)(object)value;
             if (double.IsNaN(v) || double.IsNegativeInfinity(v))
             {
-                result = Min;
+                result = MinValue;
                 return true;
             }
             if (double.IsPositiveInfinity(v))
             {
-                result = Max;
+                result = MaxValue;
                 return true;
             }
         }
@@ -497,12 +497,12 @@ public readonly partial struct Int256
             var v = (float)(object)value;
             if (float.IsNaN(v) || float.IsNegativeInfinity(v))
             {
-                result = Min;
+                result = MinValue;
                 return true;
             }
             if (float.IsPositiveInfinity(v))
             {
-                result = Max;
+                result = MaxValue;
                 return true;
             }
         }
@@ -511,12 +511,12 @@ public readonly partial struct Int256
             var v = (Half)(object)value;
             if (Half.IsNaN(v) || Half.IsNegativeInfinity(v))
             {
-                result = Min;
+                result = MinValue;
                 return true;
             }
             if (Half.IsPositiveInfinity(v))
             {
-                result = Max;
+                result = MaxValue;
                 return true;
             }
         }
@@ -972,8 +972,8 @@ public readonly partial struct Int256
 
     #region IMinMaxValue<Int256> Implementation
 
-    static Int256 IMinMaxValue<Int256>.MinValue => Min;
-    static Int256 IMinMaxValue<Int256>.MaxValue => Max;
+    static Int256 IMinMaxValue<Int256>.MinValue => MinValue;
+    static Int256 IMinMaxValue<Int256>.MaxValue => MaxValue;
 
     #endregion
 

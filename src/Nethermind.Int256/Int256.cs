@@ -25,8 +25,8 @@ namespace Nethermind.Int256
         public static readonly Int256 Zero = (Int256)0UL;
         public static readonly Int256 One = (Int256)1UL;
         public static readonly Int256 MinusOne = -1L;
-        public static readonly Int256 Max = new Int256(((BigInteger.One << 255) - 1));
-        public static readonly Int256 Min = new Int256(-(BigInteger.One << 255));
+        public static readonly Int256 MaxValue = new Int256(((BigInteger.One << 255) - 1));
+        public static readonly Int256 MinValue = new Int256(-(BigInteger.One << 255));
 
         internal readonly UInt256 _value;
 
@@ -570,7 +570,7 @@ namespace Nethermind.Int256
 
         public Int256 OneValue => One;
 
-        public Int256 MaximalValue => Max;
+        public Int256 MaximalValue => MaxValue;
 
         public int CompareTo(object? obj) => obj is not Int256 int256 ? throw new InvalidOperationException() : CompareTo(int256);
 
