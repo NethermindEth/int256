@@ -321,10 +321,7 @@ public readonly partial struct UInt256
         if (typeof(TOther) == typeof(Int128))
         {
             var v = (Int128)(object)value;
-            if (v < 0)
-                result = Zero;
-            else
-                result = new UInt256((ulong)v, (ulong)(v >> 64), 0, 0);
+            result = v < 0 ? Zero : new UInt256((ulong)v, (ulong)(v >> 64), 0, 0);
             return true;
         }
         if (typeof(TOther) == typeof(nuint))
@@ -343,10 +340,7 @@ public readonly partial struct UInt256
             var v = (double)(Half)(object)value;
             if (v < 0 || double.IsNaN(v) || double.IsNegativeInfinity(v))
                 result = Zero;
-            else if (double.IsPositiveInfinity(v))
-                result = MaxValue;
-            else
-                result = (UInt256)v;
+            else result = double.IsPositiveInfinity(v) ? MaxValue : (UInt256)v;
             return true;
         }
         if (typeof(TOther) == typeof(float))
@@ -354,10 +348,7 @@ public readonly partial struct UInt256
             var v = (float)(object)value;
             if (v < 0 || float.IsNaN(v) || float.IsNegativeInfinity(v))
                 result = Zero;
-            else if (float.IsPositiveInfinity(v))
-                result = MaxValue;
-            else
-                result = (UInt256)(double)v;
+            else result = float.IsPositiveInfinity(v) ? MaxValue : (UInt256)(double)v;
             return true;
         }
         if (typeof(TOther) == typeof(double))
@@ -365,19 +356,13 @@ public readonly partial struct UInt256
             var v = (double)(object)value;
             if (v < 0 || double.IsNaN(v) || double.IsNegativeInfinity(v))
                 result = Zero;
-            else if (double.IsPositiveInfinity(v))
-                result = MaxValue;
-            else
-                result = (UInt256)v;
+            else result = double.IsPositiveInfinity(v) ? MaxValue : (UInt256)v;
             return true;
         }
         if (typeof(TOther) == typeof(decimal))
         {
             var v = (decimal)(object)value;
-            if (v < 0)
-                result = Zero;
-            else
-                result = (UInt256)new BigInteger(v);
+            result = v < 0 ? Zero : (UInt256)new BigInteger(v);
             return true;
         }
         if (typeof(TOther) == typeof(BigInteger))
@@ -385,10 +370,7 @@ public readonly partial struct UInt256
             var v = (BigInteger)(object)value;
             if (v < 0)
                 result = Zero;
-            else if (v > (BigInteger)MaxValue)
-                result = MaxValue;
-            else
-                result = (UInt256)v;
+            else result = v > (BigInteger)MaxValue ? MaxValue : (UInt256)v;
             return true;
         }
         if (typeof(TOther) == typeof(UInt256))
@@ -399,10 +381,7 @@ public readonly partial struct UInt256
         if (typeof(TOther) == typeof(Int256))
         {
             var v = (Int256)(object)value;
-            if (v.Sign < 0)
-                result = Zero;
-            else
-                result = (UInt256)v;
+            result = v.Sign < 0 ? Zero : (UInt256)v;
             return true;
         }
 
@@ -484,10 +463,7 @@ public readonly partial struct UInt256
             var v = (double)(Half)(object)value;
             if (v < 0 || double.IsNaN(v) || double.IsNegativeInfinity(v))
                 result = Zero;
-            else if (double.IsPositiveInfinity(v))
-                result = MaxValue;
-            else
-                result = (UInt256)v;
+            else result = double.IsPositiveInfinity(v) ? MaxValue : (UInt256)v;
             return true;
         }
         if (typeof(TOther) == typeof(float))
@@ -495,10 +471,7 @@ public readonly partial struct UInt256
             var v = (float)(object)value;
             if (v < 0 || float.IsNaN(v) || float.IsNegativeInfinity(v))
                 result = Zero;
-            else if (float.IsPositiveInfinity(v))
-                result = MaxValue;
-            else
-                result = (UInt256)(double)v;
+            else result = float.IsPositiveInfinity(v) ? MaxValue : (UInt256)(double)v;
             return true;
         }
         if (typeof(TOther) == typeof(double))
@@ -506,19 +479,13 @@ public readonly partial struct UInt256
             var v = (double)(object)value;
             if (v < 0 || double.IsNaN(v) || double.IsNegativeInfinity(v))
                 result = Zero;
-            else if (double.IsPositiveInfinity(v))
-                result = MaxValue;
-            else
-                result = (UInt256)v;
+            else result = double.IsPositiveInfinity(v) ? MaxValue : (UInt256)v;
             return true;
         }
         if (typeof(TOther) == typeof(decimal))
         {
             var v = (decimal)(object)value;
-            if (v < 0)
-                result = Zero;
-            else
-                result = (UInt256)new BigInteger(v);
+            result = v < 0 ? Zero : (UInt256)new BigInteger(v);
             return true;
         }
         if (typeof(TOther) == typeof(BigInteger))
@@ -718,10 +685,9 @@ public readonly partial struct UInt256
         }
         if (typeof(TOther) == typeof(Int128))
         {
-            if ((value.u2 | value.u3) != 0 || value.u1 > (ulong)long.MaxValue)
-                result = (TOther)(object)Int128.MaxValue;
-            else
-                result = (TOther)(object)(new Int128(value.u1, value.u0));
+            result = (value.u2 | value.u3) != 0 || value.u1 > (ulong)long.MaxValue
+                ? (TOther)(object)Int128.MaxValue
+                : (TOther)(object)(new Int128(value.u1, value.u0));
             return true;
         }
         if (typeof(TOther) == typeof(nuint))
@@ -891,7 +857,11 @@ public readonly partial struct UInt256
     }
 
     /// <inheritdoc />
-    public static UInt256 operator %(UInt256 left, UInt256 right) => left % right;
+    public static UInt256 operator %(UInt256 left, UInt256 right)
+    {
+        Mod(in left, in right, out UInt256 result);
+        return result;
+    }
 
     /// <inheritdoc />
     [OverloadResolutionPriority(1)]
@@ -902,7 +872,11 @@ public readonly partial struct UInt256
     }
 
     /// <inheritdoc />
-    public static UInt256 operator --(UInt256 value) => value--;
+    public static UInt256 operator --(UInt256 value)
+    {
+        Subtract(in value, One, out UInt256 result);
+        return result;
+    }
 
     /// <inheritdoc />
     public static UInt256 operator +(UInt256 value) => value;
@@ -924,7 +898,7 @@ public readonly partial struct UInt256
 
     /// <inheritdoc />
     public static UInt256 LeadingZeroCount(UInt256 value)
-        => value.LeadingZeroCount();
+        => (UInt256)value.LeadingZeroCount();
 
     /// <inheritdoc />
     public static UInt256 PopCount(UInt256 value) =>
