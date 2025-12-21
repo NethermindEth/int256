@@ -252,11 +252,6 @@ namespace Nethermind.Int256
             return c;
         }
 
-        private uint r0 => (uint)u0;
-        private uint r1 => (uint)(u0 >> 32);
-        private uint r2 => (uint)u1;
-        private uint r3 => (uint)(u1 >> 32);
-
         public static explicit operator decimal(in UInt256 a) => (decimal)(BigInteger)a;
 
         public static explicit operator UInt256(decimal a)
