@@ -368,9 +368,7 @@ public readonly partial struct UInt256
         if (typeof(TOther) == typeof(BigInteger))
         {
             var v = (BigInteger)(object)value;
-            if (v < 0)
-                result = Zero;
-            else result = v > (BigInteger)MaxValue ? MaxValue : (UInt256)v;
+            result = v < 0 ? Zero : v > (BigInteger)MaxValue ? MaxValue : (UInt256)v;
             return true;
         }
         if (typeof(TOther) == typeof(UInt256))
