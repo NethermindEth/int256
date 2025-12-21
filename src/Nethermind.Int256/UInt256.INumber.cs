@@ -338,25 +338,25 @@ public readonly partial struct UInt256
         if (typeof(TOther) == typeof(Half))
         {
             var v = (double)(Half)(object)value;
-            if (v < 0 || double.IsNaN(v) || double.IsNegativeInfinity(v))
-                result = Zero;
-            else result = double.IsPositiveInfinity(v) ? MaxValue : (UInt256)v;
+            result = (v < 0 || double.IsNaN(v) || double.IsNegativeInfinity(v))
+                ? Zero
+                : double.IsPositiveInfinity(v) ? MaxValue : (UInt256)v;
             return true;
         }
         if (typeof(TOther) == typeof(float))
         {
             var v = (float)(object)value;
-            if (v < 0 || float.IsNaN(v) || float.IsNegativeInfinity(v))
-                result = Zero;
-            else result = float.IsPositiveInfinity(v) ? MaxValue : (UInt256)(double)v;
+            result = (v < 0 || float.IsNaN(v) || float.IsNegativeInfinity(v))
+                ? Zero
+                : float.IsPositiveInfinity(v) ? MaxValue : (UInt256)(double)v;
             return true;
         }
         if (typeof(TOther) == typeof(double))
         {
             var v = (double)(object)value;
-            if (v < 0 || double.IsNaN(v) || double.IsNegativeInfinity(v))
-                result = Zero;
-            else result = double.IsPositiveInfinity(v) ? MaxValue : (UInt256)v;
+            result = (v < 0 || double.IsNaN(v) || double.IsNegativeInfinity(v))
+                ? Zero
+                : double.IsPositiveInfinity(v) ? MaxValue : (UInt256)v;
             return true;
         }
         if (typeof(TOther) == typeof(decimal))
