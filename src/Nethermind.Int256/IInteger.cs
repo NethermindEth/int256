@@ -28,17 +28,18 @@ namespace Nethermind.Int256
         void LeftShift(int n, out T res);
         void RightShift(int n, out T res);
 
-        static abstract bool AddOverflow(in T a, in T b, out T res);
-        static abstract void And(in T a, in T b, out T res);
-        static abstract void Or(in T a, in T b, out T res);
-        static abstract void Xor(in T a, in T b, out T res);
-        static abstract void Not(in T a, out T res);
+        abstract static bool AddOverflow(in T a, in T b, out T res);
+        abstract static void And(in T a, in T b, out T res);
+        abstract static void Or(in T a, in T b, out T res);
+        abstract static void Xor(in T a, in T b, out T res);
+        abstract static void Not(in T a, out T res);
 
         void Convert(out BigInteger big);
 
         T OneValue { get; }
 
         T ZeroValue { get; }
+
         bool IsZero { get; }
 
         bool IsOne { get; }
