@@ -1016,6 +1016,23 @@ namespace Nethermind.Int256
                 result = (Int256)(int)(sbyte)(object)value;
                 return true;
             }
+            if (typeof(TOther) == typeof(nint))
+            {
+                result = new Int256((nint)(object)value);
+                return true;
+            }
+            if (typeof(TOther) == typeof(Int128))
+            {
+                var v = (Int128)(object)value;
+                Span<byte> bytes = stackalloc byte[16];
+                System.Buffers.Binary.BinaryPrimitives.WriteInt128LittleEndian(bytes, v);
+                Span<byte> fullBytes = stackalloc byte[32];
+                bytes.CopyTo(fullBytes);
+                if (v < 0)
+                    fullBytes[16..].Fill(0xFF);
+                result = new Int256(fullBytes, isBigEndian: false);
+                return true;
+            }
             if (typeof(TOther) == typeof(ulong))
             {
                 result = (Int256)(ulong)(object)value;
@@ -1036,13 +1053,92 @@ namespace Nethermind.Int256
                 result = (Int256)(ulong)(byte)(object)value;
                 return true;
             }
+            if (typeof(TOther) == typeof(nuint))
+            {
+                result = (Int256)(ulong)(nuint)(object)value;
+                return true;
+            }
+            if (typeof(TOther) == typeof(UInt128))
+            {
+                var v = (UInt128)(object)value;
+                result = new Int256(new UInt256((ulong)v, (ulong)(v >> 64), 0, 0));
+                return true;
+            }
+            if (typeof(TOther) == typeof(Half))
+            {
+                var v = (double)(Half)(object)value;
+                result = new Int256(new BigInteger(v));
+                return true;
+            }
+            if (typeof(TOther) == typeof(float))
+            {
+                var v = (float)(object)value;
+                result = new Int256(new BigInteger(v));
+                return true;
+            }
+            if (typeof(TOther) == typeof(double))
+            {
+                var v = (double)(object)value;
+                result = new Int256(new BigInteger(v));
+                return true;
+            }
+            if (typeof(TOther) == typeof(decimal))
+            {
+                var v = (decimal)(object)value;
+                result = new Int256(new BigInteger(v));
+                return true;
+            }
 
             result = default;
             return false;
         }
 
         private static bool TryConvertFromSaturating<TOther>(TOther value, out Int256 result) where TOther : INumberBase<TOther>
-            => TryConvertFromChecked(value, out result);
+        {
+            if (typeof(TOther) == typeof(double))
+            {
+                var v = (double)(object)value;
+                if (double.IsNaN(v) || double.IsNegativeInfinity(v))
+                {
+                    result = Min;
+                    return true;
+                }
+                if (double.IsPositiveInfinity(v))
+                {
+                    result = Max;
+                    return true;
+                }
+            }
+            if (typeof(TOther) == typeof(float))
+            {
+                var v = (float)(object)value;
+                if (float.IsNaN(v) || float.IsNegativeInfinity(v))
+                {
+                    result = Min;
+                    return true;
+                }
+                if (float.IsPositiveInfinity(v))
+                {
+                    result = Max;
+                    return true;
+                }
+            }
+            if (typeof(TOther) == typeof(Half))
+            {
+                var v = (Half)(object)value;
+                if (Half.IsNaN(v) || Half.IsNegativeInfinity(v))
+                {
+                    result = Min;
+                    return true;
+                }
+                if (Half.IsPositiveInfinity(v))
+                {
+                    result = Max;
+                    return true;
+                }
+            }
+            return TryConvertFromChecked(value, out result);
+        }
 
         private static bool TryConvertFromTruncating<TOther>(TOther value, out Int256 result) where TOther : INumberBase<TOther>
             => TryConvertFromChecked(value, out result);
@@ -1074,6 +1170,58 @@ namespace Nethermind.Int256
                 result = (TOther)(object)value.ToSByte(null);
                 return true;
             }
+            if (typeof(TOther) == typeof(nint))
+            {
+                var big = (BigInteger)value;
+                if (big < nint.MinValue || big > nint.MaxValue)
+                    throw new OverflowException();
+                result = (TOther)(object)(nint)big;
+                return true;
+            }
+            if (typeof(TOther) == typeof(Int128))
+            {
+                var big = (BigInteger)value;
+                if (big < (BigInteger)Int128.MinValue || big > (BigInteger)Int128.MaxValue)
+                    throw new OverflowException();
+                result = (TOther)(object)(Int128)big;
+                return true;
+            }
+            if (typeof(TOther) == typeof(ulong))
+            {
+                result = (TOther)(object)value.ToUInt64(null);
+                return true;
+            }
+            if (typeof(TOther) == typeof(uint))
+            {
+                result = (TOther)(object)value.ToUInt32(null);
+                return true;
+            }
+            if (typeof(TOther) == typeof(ushort))
+            {
+                result = (TOther)(object)value.ToUInt16(null);
+                return true;
+            }
+            if (typeof(TOther) == typeof(byte))
+            {
+                result = (TOther)(object)value.ToByte(null);
+                return true;
+            }
+            if (typeof(TOther) == typeof(nuint))
+            {
+                var big = (BigInteger)value;
+                if (big < 0 || big > nuint.MaxValue)
+                    throw new OverflowException();
+                result = (TOther)(object)(nuint)(ulong)big;
+                return true;
+            }
+            if (typeof(TOther) == typeof(UInt128))
+            {
+                var big = (BigInteger)value;
+                if (big < 0 || big > (BigInteger)UInt128.MaxValue)
+                    throw new OverflowException();
+                result = (TOther)(object)(UInt128)big;
+                return true;
+            }
             if (typeof(TOther) == typeof(double))
             {
                 result = (TOther)(object)value.ToDouble(null);
@@ -1082,6 +1230,11 @@ namespace Nethermind.Int256
             if (typeof(TOther) == typeof(float))
             {
                 result = (TOther)(object)value.ToSingle(null);
+                return true;
+            }
+            if (typeof(TOther) == typeof(Half))
+            {
+                result = (TOther)(object)(Half)value.ToDouble(null);
                 return true;
             }
             if (typeof(TOther) == typeof(decimal))
@@ -1095,7 +1248,90 @@ namespace Nethermind.Int256
         }
 
         private static bool TryConvertToSaturating<TOther>(Int256 value, [MaybeNullWhen(false)] out TOther result) where TOther : INumberBase<TOther>
-            => TryConvertToChecked(value, out result);
+        {
+            if (typeof(TOther) == typeof(byte))
+            {
+                var big = (BigInteger)value;
+                result = (TOther)(object)(big < 0 ? (byte)0 : big > byte.MaxValue ? byte.MaxValue : (byte)big);
+                return true;
+            }
+            if (typeof(TOther) == typeof(ushort))
+            {
+                var big = (BigInteger)value;
+                result = (TOther)(object)(big < 0 ? (ushort)0 : big > ushort.MaxValue ? ushort.MaxValue : (ushort)big);
+                return true;
+            }
+            if (typeof(TOther) == typeof(uint))
+            {
+                var big = (BigInteger)value;
+                result = (TOther)(object)(big < 0 ? 0u : big > uint.MaxValue ? uint.MaxValue : (uint)big);
+                return true;
+            }
+            if (typeof(TOther) == typeof(ulong))
+            {
+                var big = (BigInteger)value;
+                result = (TOther)(object)(big < 0 ? 0ul : big > ulong.MaxValue ? ulong.MaxValue : (ulong)big);
+                return true;
+            }
+            if (typeof(TOther) == typeof(nuint))
+            {
+                var big = (BigInteger)value;
+                result = (TOther)(object)(big < 0 ? (nuint)0 : big > nuint.MaxValue ? nuint.MaxValue : (nuint)(ulong)big);
+                return true;
+            }
+            if (typeof(TOther) == typeof(UInt128))
+            {
+                if (value.Sign < 0)
+                {
+                    result = (TOther)(object)UInt128.Zero;
+                    return true;
+                }
+                if ((value._value.u2 | value._value.u3) != 0)
+                {
+                    result = (TOther)(object)UInt128.MaxValue;
+                    return true;
+                }
+                result = (TOther)(object)new UInt128(value._value.u1, value._value.u0);
+                return true;
+            }
+            if (typeof(TOther) == typeof(sbyte))
+            {
+                var big = (BigInteger)value;
+                result = (TOther)(object)(big < sbyte.MinValue ? sbyte.MinValue : big > sbyte.MaxValue ? sbyte.MaxValue : (sbyte)big);
+                return true;
+            }
+            if (typeof(TOther) == typeof(short))
+            {
+                var big = (BigInteger)value;
+                result = (TOther)(object)(big < short.MinValue ? short.MinValue : big > short.MaxValue ? short.MaxValue : (short)big);
+                return true;
+            }
+            if (typeof(TOther) == typeof(int))
+            {
+                var big = (BigInteger)value;
+                result = (TOther)(object)(big < int.MinValue ? int.MinValue : big > int.MaxValue ? int.MaxValue : (int)big);
+                return true;
+            }
+            if (typeof(TOther) == typeof(long))
+            {
+                var big = (BigInteger)value;
+                result = (TOther)(object)(big < long.MinValue ? long.MinValue : big > long.MaxValue ? long.MaxValue : (long)big);
+                return true;
+            }
+            if (typeof(TOther) == typeof(nint))
+            {
+                var big = (BigInteger)value;
+                result = (TOther)(object)(big < nint.MinValue ? nint.MinValue : big > nint.MaxValue ? nint.MaxValue : (nint)big);
+                return true;
+            }
+            if (typeof(TOther) == typeof(Int128))
+            {
+                var big = (BigInteger)value;
+                result = (TOther)(object)(big < (BigInteger)Int128.MinValue ? Int128.MinValue : big > (BigInteger)Int128.MaxValue ? Int128.MaxValue : (Int128)big);
+                return true;
+            }
+            return TryConvertToChecked(value, out result);
+        }
 
         private static bool TryConvertToTruncating<TOther>(Int256 value, [MaybeNullWhen(false)] out TOther result) where TOther : INumberBase<TOther>
         {
@@ -1124,6 +1360,46 @@ namespace Nethermind.Int256
                 result = (TOther)(object)(sbyte)value._value.u0;
                 return true;
             }
+            if (typeof(TOther) == typeof(nint))
+            {
+                result = (TOther)(object)(nint)value._value.u0;
+                return true;
+            }
+            if (typeof(TOther) == typeof(Int128))
+            {
+                result = (TOther)(object)new Int128(value._value.u1, value._value.u0);
+                return true;
+            }
+            if (typeof(TOther) == typeof(ulong))
+            {
+                result = (TOther)(object)value._value.u0;
+                return true;
+            }
+            if (typeof(TOther) == typeof(uint))
+            {
+                result = (TOther)(object)(uint)value._value.u0;
+                return true;
+            }
+            if (typeof(TOther) == typeof(ushort))
+            {
+                result = (TOther)(object)(ushort)value._value.u0;
+                return true;
+            }
+            if (typeof(TOther) == typeof(byte))
+            {
+                result = (TOther)(object)(byte)value._value.u0;
+                return true;
+            }
+            if (typeof(TOther) == typeof(nuint))
+            {
+                result = (TOther)(object)(nuint)value._value.u0;
+                return true;
+            }
+            if (typeof(TOther) == typeof(UInt128))
+            {
+                result = (TOther)(object)new UInt128(value._value.u1, value._value.u0);
+                return true;
+            }
             if (typeof(TOther) == typeof(double))
             {
                 result = (TOther)(object)value.ToDouble(null);
@@ -1132,6 +1408,11 @@ namespace Nethermind.Int256
             if (typeof(TOther) == typeof(float))
             {
                 result = (TOther)(object)value.ToSingle(null);
+                return true;
+            }
+            if (typeof(TOther) == typeof(Half))
+            {
+                result = (TOther)(object)(Half)value.ToDouble(null);
                 return true;
             }
             if (typeof(TOther) == typeof(decimal))
