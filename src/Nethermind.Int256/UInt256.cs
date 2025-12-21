@@ -1407,7 +1407,7 @@ namespace Nethermind.Int256
             }
         }
 
-        public void Exp(in UInt256 exp, out UInt256 res) => Exp(this, exp, out res);
+        public void Exp(in UInt256 e, out UInt256 res) => Exp(this, e, out res);
 
         public static void ExpMod(in UInt256 b, in UInt256 e, in UInt256 m, out UInt256 result)
         {
@@ -2474,7 +2474,7 @@ namespace Nethermind.Int256
 
             BigInteger a;
             bool bigParsedProperly;
-            if ((style & NumberStyles.HexNumber) == NumberStyles.HexNumber && value[0] != 0)
+            if ((style & NumberStyles.HexNumber) == NumberStyles.HexNumber && value[0] != '0')
             {
                 Span<char> fixedHexValue = stackalloc char[value.Length + 1];
                 fixedHexValue[0] = '0';
@@ -2738,24 +2738,29 @@ namespace Nethermind.Int256
             if (typeof(TOther) == typeof(Half))
             {
                 var v = (Half)(object)value;
-                result = (UInt256)(double)v;
+                double dv = (double)v;
+                if (dv < 0 || double.IsNaN(dv) || double.IsInfinity(dv)) throw new OverflowException();
+                result = (UInt256)dv;
                 return true;
             }
             if (typeof(TOther) == typeof(float))
             {
                 var v = (float)(object)value;
+                if (v < 0 || float.IsNaN(v) || float.IsInfinity(v)) throw new OverflowException();
                 result = (UInt256)(double)v;
                 return true;
             }
             if (typeof(TOther) == typeof(double))
             {
                 var v = (double)(object)value;
+                if (v < 0 || double.IsNaN(v) || double.IsInfinity(v)) throw new OverflowException();
                 result = (UInt256)v;
                 return true;
             }
             if (typeof(TOther) == typeof(decimal))
             {
                 var v = (decimal)(object)value;
+                if (v < 0) throw new OverflowException();
                 result = (UInt256)v;
                 return true;
             }
@@ -3001,7 +3006,11 @@ namespace Nethermind.Int256
             }
             if (typeof(TOther) == typeof(nuint))
             {
-                result = (TOther)(object)checked((nuint)value.u0);
+                if (value.u1 != 0 || value.u2 != 0 || value.u3 != 0 || value.u0 > (ulong)nuint.MaxValue)
+                {
+                    throw new OverflowException();
+                }
+                result = (TOther)(object)(nuint)value.u0;
                 return true;
             }
             if (typeof(TOther) == typeof(sbyte))
@@ -3032,6 +3041,7 @@ namespace Nethermind.Int256
             }
             if (typeof(TOther) == typeof(nint))
             {
+                if (value.u1 != 0 || value.u2 != 0 || value.u3 != 0) throw new OverflowException();
                 result = (TOther)(object)checked((nint)value.u0);
                 return true;
             }
@@ -3094,27 +3104,27 @@ namespace Nethermind.Int256
             }
             if (typeof(TOther) == typeof(nuint))
             {
-                result = (TOther)(object)(value > nuint.MaxValue ? nuint.MaxValue : (nuint)value.u0);
+                result = (TOther)(object)(((value.u1 | value.u2 | value.u3) != 0 || value.u0 > (ulong)nuint.MaxValue) ? nuint.MaxValue : (nuint)value.u0);
                 return true;
             }
             if (typeof(TOther) == typeof(sbyte))
             {
-                result = (TOther)(object)(value > (ulong)sbyte.MaxValue ? sbyte.MaxValue : (sbyte)value.u0);
+                result = (TOther)(object)(((value.u1 | value.u2 | value.u3) != 0 || value.u0 > (ulong)sbyte.MaxValue) ? sbyte.MaxValue : (sbyte)value.u0);
                 return true;
             }
             if (typeof(TOther) == typeof(short))
             {
-                result = (TOther)(object)(value > (ulong)short.MaxValue ? short.MaxValue : (short)value.u0);
+                result = (TOther)(object)(((value.u1 | value.u2 | value.u3) != 0 || value.u0 > (ulong)short.MaxValue) ? short.MaxValue : (short)value.u0);
                 return true;
             }
             if (typeof(TOther) == typeof(int))
             {
-                result = (TOther)(object)(value > int.MaxValue ? int.MaxValue : (int)value.u0);
+                result = (TOther)(object)(((value.u1 | value.u2 | value.u3) != 0 || value.u0 > int.MaxValue) ? int.MaxValue : (int)value.u0);
                 return true;
             }
             if (typeof(TOther) == typeof(long))
             {
-                result = (TOther)(object)(value > long.MaxValue ? long.MaxValue : (long)value.u0);
+                result = (TOther)(object)(((value.u1 | value.u2 | value.u3) != 0 || value.u0 > long.MaxValue) ? long.MaxValue : (long)value.u0);
                 return true;
             }
             if (typeof(TOther) == typeof(Int128))
@@ -3124,7 +3134,7 @@ namespace Nethermind.Int256
             }
             if (typeof(TOther) == typeof(nint))
             {
-                result = (TOther)(object)(value > (ulong)nint.MaxValue ? nint.MaxValue : (nint)value.u0);
+                result = (TOther)(object)(((value.u1 | value.u2 | value.u3) != 0 || value.u0 > (ulong)nint.MaxValue) ? nint.MaxValue : (nint)value.u0);
                 return true;
             }
             if (typeof(TOther) == typeof(Half))

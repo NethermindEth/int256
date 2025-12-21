@@ -18,8 +18,8 @@ namespace Nethermind.Int256
         void Multiply(in T a, out T res);
         void MultiplyMod(in T a, in T m, out T res);
         void Divide(in T a, out T res);
-        void Exp(in T exp, out T res);
-        void ExpMod(in T exp, in T m, out T res);
+        void Exp(in T e, out T res);
+        void ExpMod(in T e, in T m, out T res);
         void LeftShift(int n, out T res);
         void RightShift(int n, out T res);
         void Convert(out BigInteger big);

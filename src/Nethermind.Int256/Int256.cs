@@ -315,7 +315,7 @@ namespace Nethermind.Int256
             }
         }
 
-        public void Exp(in Int256 exp, out Int256 res) => Exp(this, exp, out res);
+        public void Exp(in Int256 e, out Int256 res) => Exp(this, e, out res);
 
         public static void ExpMod(in Int256 bs, in Int256 exp, in Int256 m, out Int256 res)
         {
@@ -1061,24 +1061,40 @@ namespace Nethermind.Int256
             if (typeof(TOther) == typeof(UInt128))
             {
                 var v = (UInt128)(object)value;
+                if (v > (UInt128)((BigInteger.One << 255) - 1))
+                {
+                    throw new OverflowException();
+                }
                 result = new Int256(new UInt256((ulong)v, (ulong)(v >> 64), 0, 0));
                 return true;
             }
             if (typeof(TOther) == typeof(Half))
             {
                 var v = (double)(Half)(object)value;
+                if (double.IsNaN(v) || double.IsInfinity(v))
+                {
+                    throw new OverflowException();
+                }
                 result = new Int256(new BigInteger(v));
                 return true;
             }
             if (typeof(TOther) == typeof(float))
             {
                 var v = (float)(object)value;
+                if (float.IsNaN(v) || float.IsInfinity(v))
+                {
+                    throw new OverflowException();
+                }
                 result = new Int256(new BigInteger(v));
                 return true;
             }
             if (typeof(TOther) == typeof(double))
             {
                 var v = (double)(object)value;
+                if (double.IsNaN(v) || double.IsInfinity(v))
+                {
+                    throw new OverflowException();
+                }
                 result = new Int256(new BigInteger(v));
                 return true;
             }
@@ -1536,19 +1552,25 @@ namespace Nethermind.Int256
         static Int256 IBinaryInteger<Int256>.RotateLeft(Int256 value, int rotateAmount)
         {
             rotateAmount &= 255;
-            if (rotateAmount == 0) return value;
-            LeftShift(in value, rotateAmount, out Int256 left);
-            RightShift(in value, 256 - rotateAmount, out Int256 right);
-            return left | right;
+            if (rotateAmount == 0)
+                return value;
+
+            UInt256.Lsh(in value._value, rotateAmount, out UInt256 left);
+            UInt256.Rsh(in value._value, 256 - rotateAmount, out UInt256 right);
+            UInt256 result = left | right;
+            return new Int256(result);
         }
 
         static Int256 IBinaryInteger<Int256>.RotateRight(Int256 value, int rotateAmount)
         {
             rotateAmount &= 255;
-            if (rotateAmount == 0) return value;
-            RightShift(in value, rotateAmount, out Int256 right);
-            LeftShift(in value, 256 - rotateAmount, out Int256 left);
-            return right | left;
+            if (rotateAmount == 0)
+                return value;
+
+            UInt256.Rsh(in value._value, rotateAmount, out UInt256 right);
+            UInt256.Lsh(in value._value, 256 - rotateAmount, out UInt256 left);
+            UInt256 result = right | left;
+            return new Int256(result);
         }
 
         #endregion

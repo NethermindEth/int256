@@ -985,5 +985,225 @@ namespace Nethermind.Int256.Test
         }
 
         #endregion
+
+        #region Checked Conversion Overflow Tests
+
+        [Test]
+        public void UInt256_TryConvertFromChecked_NegativeDouble_ThrowsOverflow()
+        {
+            Action act = () => CreateChecked<double, UInt256>(-1.0);
+            act.Should().Throw<OverflowException>();
+        }
+
+        [Test]
+        public void UInt256_TryConvertFromChecked_NaN_ThrowsOverflow()
+        {
+            Action act = () => CreateChecked<double, UInt256>(double.NaN);
+            act.Should().Throw<OverflowException>();
+        }
+
+        [Test]
+        public void UInt256_TryConvertFromChecked_PositiveInfinity_ThrowsOverflow()
+        {
+            Action act = () => CreateChecked<double, UInt256>(double.PositiveInfinity);
+            act.Should().Throw<OverflowException>();
+        }
+
+        [Test]
+        public void UInt256_TryConvertFromChecked_NegativeDecimal_ThrowsOverflow()
+        {
+            Action act = () => CreateChecked<decimal, UInt256>(-1.0m);
+            act.Should().Throw<OverflowException>();
+        }
+
+        [Test]
+        public void UInt256_TryConvertToChecked_LargeValue_ToNuint_ThrowsOverflow()
+        {
+            UInt256 largeValue = UInt256.MaxValue;
+            Action act = () => CreateChecked<UInt256, nuint>(largeValue);
+            act.Should().Throw<OverflowException>();
+        }
+
+        [Test]
+        public void UInt256_TryConvertToChecked_LargeValue_ToNint_ThrowsOverflow()
+        {
+            UInt256 largeValue = UInt256.MaxValue;
+            Action act = () => CreateChecked<UInt256, nint>(largeValue);
+            act.Should().Throw<OverflowException>();
+        }
+
+        [Test]
+        public void Int256_TryConvertFromChecked_NaN_ThrowsOverflow()
+        {
+            Action act = () => CreateChecked<double, Int256>(double.NaN);
+            act.Should().Throw<OverflowException>();
+        }
+
+        [Test]
+        public void Int256_TryConvertFromChecked_Infinity_ThrowsOverflow()
+        {
+            Action act = () => CreateChecked<double, Int256>(double.PositiveInfinity);
+            act.Should().Throw<OverflowException>();
+        }
+
+        private static TResult CreateChecked<TSource, TResult>(TSource value)
+            where TSource : INumberBase<TSource>
+            where TResult : INumberBase<TResult>
+        {
+            return TResult.CreateChecked(value);
+        }
+
+        private static TResult CreateSaturating<TSource, TResult>(TSource value)
+            where TSource : INumberBase<TSource>
+            where TResult : INumberBase<TResult>
+        {
+            return TResult.CreateSaturating(value);
+        }
+
+        #endregion
+
+        #region Rotation Tests
+
+        [Test]
+        public void UInt256_RotateLeft_Zero()
+        {
+            var value = (UInt256)0x12345678;
+            var result = RotateLeft(value, 0);
+            result.Should().Be(value);
+        }
+
+        [Test]
+        public void UInt256_RotateLeft_ByOne()
+        {
+            var value = (UInt256)1;
+            var result = RotateLeft(value, 1);
+            result.Should().Be((UInt256)2);
+        }
+
+        [Test]
+        public void UInt256_RotateLeft_Wraps()
+        {
+            // Rotate left by 256 should be same as original
+            var value = (UInt256)0x12345678;
+            var result = RotateLeft(value, 256);
+            result.Should().Be(value);
+        }
+
+        [Test]
+        public void UInt256_RotateRight_ByOne()
+        {
+            var value = (UInt256)2;
+            var result = RotateRight(value, 1);
+            result.Should().Be((UInt256)1);
+        }
+
+        [Test]
+        public void Int256_RotateLeft_Zero()
+        {
+            var value = (Int256)0x12345678;
+            var result = RotateLeft(value, 0);
+            result.Should().Be(value);
+        }
+
+        [Test]
+        public void Int256_RotateLeft_ByOne()
+        {
+            var value = (Int256)1;
+            var result = RotateLeft(value, 1);
+            ((BigInteger)result).Should().Be(2);
+        }
+
+        [Test]
+        public void Int256_RotateRight_ByOne()
+        {
+            var value = (Int256)2;
+            var result = RotateRight(value, 1);
+            ((BigInteger)result).Should().Be(1);
+        }
+
+        [Test]
+        public void Int256_RotateLeft_NegativeValue_UsesLogicalShift()
+        {
+            // When rotating a negative Int256, the bits should rotate without sign extension
+            var value = new Int256(-1); // All bits set
+            var rotated = RotateLeft(value, 1);
+            // After rotation, all bits should still be set
+            ((BigInteger)rotated).Should().Be(-1);
+        }
+
+        private static T RotateLeft<T>(T value, int rotateAmount) where T : IBinaryInteger<T>
+        {
+            return T.RotateLeft(value, rotateAmount);
+        }
+
+        private static T RotateRight<T>(T value, int rotateAmount) where T : IBinaryInteger<T>
+        {
+            return T.RotateRight(value, rotateAmount);
+        }
+
+        #endregion
+
+        #region Saturating Conversion Tests
+
+        [Test]
+        public void UInt256_TryConvertToSaturating_LargeValue_ToNuint_Saturates()
+        {
+            UInt256 largeValue = UInt256.MaxValue;
+            var result = CreateSaturating<UInt256, nuint>(largeValue);
+            result.Should().Be(nuint.MaxValue);
+        }
+
+        [Test]
+        public void UInt256_TryConvertToSaturating_LargeValue_ToSByte_Saturates()
+        {
+            UInt256 largeValue = UInt256.MaxValue;
+            var result = CreateSaturating<UInt256, sbyte>(largeValue);
+            result.Should().Be(sbyte.MaxValue);
+        }
+
+        [Test]
+        public void UInt256_TryConvertToSaturating_LargeValue_ToInt_Saturates()
+        {
+            UInt256 largeValue = UInt256.MaxValue;
+            var result = CreateSaturating<UInt256, int>(largeValue);
+            result.Should().Be(int.MaxValue);
+        }
+
+        [Test]
+        public void UInt256_TryConvertToSaturating_LargeValue_ToLong_Saturates()
+        {
+            UInt256 largeValue = UInt256.MaxValue;
+            var result = CreateSaturating<UInt256, long>(largeValue);
+            result.Should().Be(long.MaxValue);
+        }
+
+        #endregion
+
+        #region Hex Parsing Tests
+
+        [Test]
+        public void UInt256_Parse_HexWithLeadingZero()
+        {
+            var result = UInt256.Parse("0FF", System.Globalization.NumberStyles.HexNumber, null);
+            result.Should().Be((UInt256)255);
+        }
+
+        [Test]
+        public void UInt256_Parse_HexWithoutLeadingZero()
+        {
+            // FF should parse correctly with the leading zero fix
+            var result = UInt256.Parse("FF", System.Globalization.NumberStyles.HexNumber, null);
+            result.Should().Be((UInt256)255);
+        }
+
+        [Test]
+        public void UInt256_Parse_LargeHexValue()
+        {
+            // Test that large hex values parse correctly
+            var result = UInt256.Parse("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", System.Globalization.NumberStyles.HexNumber, null);
+            result.Should().Be(UInt256.MaxValue);
+        }
+
+        #endregion
     }
 }
