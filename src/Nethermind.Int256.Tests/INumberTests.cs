@@ -1205,5 +1205,708 @@ namespace Nethermind.Int256.Test
         }
 
         #endregion
+
+        #region TryConvertFromSaturating Additional Tests
+
+        [Test]
+        public void UInt256_CreateSaturating_FromNegativeBigInteger_ReturnsZero()
+        {
+            BigInteger negative = -12345;
+            var result = CreateSaturating<BigInteger, UInt256>(negative);
+            result.Should().Be(UInt256.Zero);
+        }
+
+        [Test]
+        public void UInt256_CreateSaturating_FromLargeBigInteger_ReturnsMax()
+        {
+            BigInteger tooLarge = TestNumbers.UInt256Max + 1;
+            var result = CreateSaturating<BigInteger, UInt256>(tooLarge);
+            result.Should().Be(UInt256.MaxValue);
+        }
+
+        [Test]
+        public void UInt256_CreateSaturating_FromNegativeFloat_ReturnsZero()
+        {
+            var result = CreateSaturating<float, UInt256>(-1.0f);
+            result.Should().Be(UInt256.Zero);
+        }
+
+        [Test]
+        public void UInt256_CreateSaturating_FromNaN_ReturnsZero()
+        {
+            var result = CreateSaturating<double, UInt256>(double.NaN);
+            result.Should().Be(UInt256.Zero);
+        }
+
+        [Test]
+        public void UInt256_CreateSaturating_FromPositiveInfinity_ReturnsMax()
+        {
+            var result = CreateSaturating<double, UInt256>(double.PositiveInfinity);
+            result.Should().Be(UInt256.MaxValue);
+        }
+
+        [Test]
+        public void Int256_CreateSaturating_FromNaN_ReturnsMinValue()
+        {
+            var result = CreateSaturating<double, Int256>(double.NaN);
+            result.Should().Be(Int256.MinValue);
+        }
+
+        [Test]
+        public void Int256_CreateSaturating_FromPositiveInfinity_ReturnsMaxValue()
+        {
+            var result = CreateSaturating<double, Int256>(double.PositiveInfinity);
+            result.Should().Be(Int256.MaxValue);
+        }
+
+        [Test]
+        public void Int256_CreateSaturating_FromNegativeInfinity_ReturnsMinValue()
+        {
+            var result = CreateSaturating<double, Int256>(double.NegativeInfinity);
+            result.Should().Be(Int256.MinValue);
+        }
+
+        #endregion
+
+        #region TryConvertFromTruncating Tests
+
+        [Test]
+        public void UInt256_CreateTruncating_FromNegativeByte_Truncates()
+        {
+            sbyte value = -1; // 0xFF when interpreted as unsigned
+            var result = CreateTruncating<sbyte, UInt256>(value);
+            result.Should().Be((UInt256)255); // unchecked((byte)(-1)) = 255
+        }
+
+        private static TResult CreateTruncating<TSource, TResult>(TSource value)
+            where TSource : INumberBase<TSource>
+            where TResult : INumberBase<TResult>
+        {
+            return TResult.CreateTruncating(value);
+        }
+
+        #endregion
+
+        #region Int256 Additional Type Conversion Tests
+
+        [Test]
+        public void Int256_CreateChecked_FromInt128()
+        {
+            Int128 value = Int128.MaxValue;
+            var result = CreateChecked<Int128, Int256>(value);
+            ((BigInteger)result).Should().Be((BigInteger)value);
+        }
+
+        [Test]
+        public void Int256_CreateChecked_FromNegativeInt128()
+        {
+            Int128 value = Int128.MinValue;
+            var result = CreateChecked<Int128, Int256>(value);
+            ((BigInteger)result).Should().Be((BigInteger)value);
+        }
+
+        [Test]
+        public void Int256_CreateChecked_ToInt128_SmallValue()
+        {
+            var value = (Int256)12345;
+            var result = CreateChecked<Int256, Int128>(value);
+            result.Should().Be((Int128)12345);
+        }
+
+        [Test]
+        public void Int256_CreateChecked_ToInt128_Overflow_Throws()
+        {
+            var value = Int256.MaxValue;
+            Action act = () => CreateChecked<Int256, Int128>(value);
+            act.Should().Throw<OverflowException>();
+        }
+
+        [Test]
+        public void UInt256_CreateChecked_FromUInt128()
+        {
+            UInt128 value = UInt128.MaxValue;
+            var result = CreateChecked<UInt128, UInt256>(value);
+            ((BigInteger)result).Should().Be((BigInteger)value);
+        }
+
+        [Test]
+        public void UInt256_CreateChecked_ToUInt128_SmallValue()
+        {
+            var value = (UInt256)12345;
+            var result = CreateChecked<UInt256, UInt128>(value);
+            result.Should().Be((UInt128)12345);
+        }
+
+        [Test]
+        public void UInt256_CreateChecked_ToUInt128_Overflow_Throws()
+        {
+            var value = UInt256.MaxValue;
+            Action act = () => CreateChecked<UInt256, UInt128>(value);
+            act.Should().Throw<OverflowException>();
+        }
+
+        #endregion
+
+        #region Int256 Negative Value Operations
+
+        [Test]
+        public void Int256_Increment_NegativeValueCrossingZero()
+        {
+            Int256 value = new Int256(-1);
+            value++;
+            value.Should().Be(Int256.Zero);
+        }
+
+        [Test]
+        public void Int256_Decrement_ZeroCrossingToNegative()
+        {
+            Int256 value = Int256.Zero;
+            value--;
+            ((BigInteger)value).Should().Be(-1);
+        }
+
+        [Test]
+        public void Int256_Subtraction_ResultingInNegative()
+        {
+            Int256 a = (Int256)10;
+            Int256 b = (Int256)20;
+            Int256 result = a - b;
+            ((BigInteger)result).Should().Be(-10);
+        }
+
+        [Test]
+        public void Int256_Multiplication_NegativeByPositive()
+        {
+            Int256 a = new Int256(-5);
+            Int256 b = (Int256)10;
+            Int256 result = a * b;
+            ((BigInteger)result).Should().Be(-50);
+        }
+
+        [Test]
+        public void Int256_Multiplication_NegativeByNegative()
+        {
+            Int256 a = new Int256(-5);
+            Int256 b = new Int256(-10);
+            Int256 result = a * b;
+            ((BigInteger)result).Should().Be(50);
+        }
+
+        [Test]
+        public void Int256_Division_NegativeByPositive()
+        {
+            Int256 a = new Int256(-50);
+            Int256 b = (Int256)10;
+            Int256 result = a / b;
+            ((BigInteger)result).Should().Be(-5);
+        }
+
+        [Test]
+        public void Int256_Modulus_NegativeValue()
+        {
+            Int256 a = new Int256(-17);
+            Int256 b = (Int256)5;
+            var (quotient, remainder) = Int256.DivRem(a, b);
+            ((BigInteger)quotient).Should().Be(-3);
+            ((BigInteger)remainder).Should().Be(-2);
+        }
+
+        [Test]
+        public void Int256_UnaryNegation()
+        {
+            Int256 value = (Int256)100;
+            Int256 result = -value;
+            ((BigInteger)result).Should().Be(-100);
+        }
+
+        [Test]
+        public void Int256_UnaryNegation_NegativeValue()
+        {
+            Int256 value = new Int256(-100);
+            Int256 result = -value;
+            ((BigInteger)result).Should().Be(100);
+        }
+
+        #endregion
+
+        #region IsPow2 Tests
+
+        [Test]
+        public void UInt256_IsPow2_One_ReturnsTrue()
+        {
+            IsPow2<UInt256>(UInt256.One).Should().BeTrue();
+        }
+
+        [Test]
+        public void UInt256_IsPow2_Two_ReturnsTrue()
+        {
+            IsPow2<UInt256>((UInt256)2).Should().BeTrue();
+        }
+
+        [Test]
+        public void UInt256_IsPow2_Three_ReturnsFalse()
+        {
+            IsPow2<UInt256>((UInt256)3).Should().BeFalse();
+        }
+
+        [Test]
+        public void UInt256_IsPow2_Zero_ReturnsFalse()
+        {
+            IsPow2<UInt256>(UInt256.Zero).Should().BeFalse();
+        }
+
+        [Test]
+        public void UInt256_IsPow2_LargePowerOfTwo()
+        {
+            // 2^128
+            UInt256 value = (UInt256)(BigInteger.One << 128);
+            IsPow2<UInt256>(value).Should().BeTrue();
+        }
+
+        [Test]
+        public void Int256_IsPow2_Positive_ReturnsTrue()
+        {
+            IsPow2<Int256>((Int256)4).Should().BeTrue();
+        }
+
+        [Test]
+        public void Int256_IsPow2_Negative_ReturnsFalse()
+        {
+            IsPow2<Int256>(new Int256(-4)).Should().BeFalse();
+        }
+
+        private static bool IsPow2<T>(T value) where T : IBinaryNumber<T>
+        {
+            return T.IsPow2(value);
+        }
+
+        #endregion
+
+        #region Log2 Tests
+
+        [Test]
+        public void UInt256_Log2_One_ReturnsZero()
+        {
+            Log2<UInt256>(UInt256.One).Should().Be((UInt256)0);
+        }
+
+        [Test]
+        public void UInt256_Log2_Two_ReturnsOne()
+        {
+            Log2<UInt256>((UInt256)2).Should().Be((UInt256)1);
+        }
+
+        [Test]
+        public void UInt256_Log2_256_Returns8()
+        {
+            Log2<UInt256>((UInt256)256).Should().Be((UInt256)8);
+        }
+
+        [Test]
+        public void UInt256_Log2_MaxValue_Returns255()
+        {
+            Log2<UInt256>(UInt256.MaxValue).Should().Be((UInt256)255);
+        }
+
+        private static T Log2<T>(T value) where T : IBinaryNumber<T>
+        {
+            return T.Log2(value);
+        }
+
+        #endregion
+
+        #region TryReadBigEndian/TryReadLittleEndian Additional Tests
+
+        [Test]
+        public void UInt256_TryReadBigEndian_ShortBuffer_ReturnsFalse()
+        {
+            Span<byte> buffer = stackalloc byte[16];
+            bool success = UInt256.TryReadBigEndian(buffer, true, out _);
+            success.Should().BeFalse();
+        }
+
+        [Test]
+        public void UInt256_TryReadLittleEndian_ShortBuffer_ReturnsFalse()
+        {
+            Span<byte> buffer = stackalloc byte[16];
+            bool success = UInt256.TryReadLittleEndian(buffer, true, out _);
+            success.Should().BeFalse();
+        }
+
+        [Test]
+        public void Int256_TryReadBigEndian_ShortBuffer_ReturnsFalse()
+        {
+            Span<byte> buffer = stackalloc byte[16];
+            bool success = Int256.TryReadBigEndian(buffer, false, out _);
+            success.Should().BeFalse();
+        }
+
+        [Test]
+        public void Int256_TryReadLittleEndian_ShortBuffer_ReturnsFalse()
+        {
+            Span<byte> buffer = stackalloc byte[16];
+            bool success = Int256.TryReadLittleEndian(buffer, false, out _);
+            success.Should().BeFalse();
+        }
+
+        [Test]
+        public void Int256_TryWriteBigEndian_ShortBuffer_ReturnsFalse()
+        {
+            var value = (Int256)12345;
+            Span<byte> buffer = stackalloc byte[16];
+            bool success = value.TryWriteBigEndian(buffer, out int bytesWritten);
+            success.Should().BeFalse();
+            bytesWritten.Should().Be(0);
+        }
+
+        [Test]
+        public void Int256_TryWriteLittleEndian_ShortBuffer_ReturnsFalse()
+        {
+            var value = (Int256)12345;
+            Span<byte> buffer = stackalloc byte[16];
+            bool success = value.TryWriteLittleEndian(buffer, out int bytesWritten);
+            success.Should().BeFalse();
+            bytesWritten.Should().Be(0);
+        }
+
+        [Test]
+        public void Int256_TryWriteBigEndian_Success()
+        {
+            var value = new Int256(-12345);
+            Span<byte> buffer = stackalloc byte[32];
+            bool success = value.TryWriteBigEndian(buffer, out int bytesWritten);
+            success.Should().BeTrue();
+            bytesWritten.Should().Be(32);
+        }
+
+        [Test]
+        public void Int256_TryWriteLittleEndian_Success()
+        {
+            var value = new Int256(-12345);
+            Span<byte> buffer = stackalloc byte[32];
+            bool success = value.TryWriteLittleEndian(buffer, out int bytesWritten);
+            success.Should().BeTrue();
+            bytesWritten.Should().Be(32);
+        }
+
+        #endregion
+
+        #region GetShortestBitLength Additional Tests
+
+        [Test]
+        public void Int256_GetShortestBitLength_PositiveSmallValue()
+        {
+            var value = (Int256)255; // 8 bits
+            value.GetShortestBitLength().Should().Be(8);
+        }
+
+        [Test]
+        public void Int256_GetShortestBitLength_NegativeValue()
+        {
+            var value = new Int256(-1);
+            // For -1, abs is 1 (1 bit) + 1 for sign bit = 2
+            value.GetShortestBitLength().Should().Be(2);
+        }
+
+        [Test]
+        public void Int256_GetShortestBitLength_Zero()
+        {
+            Int256.Zero.GetShortestBitLength().Should().Be(0);
+        }
+
+        [Test]
+        public void Int256_GetByteCount()
+        {
+            ((Int256)12345).GetByteCount().Should().Be(32);
+        }
+
+        #endregion
+
+        #region Additional Bitwise Operations
+
+        [Test]
+        public void UInt256_BitwiseComplement()
+        {
+            var value = (UInt256)0;
+            (~value).Should().Be(UInt256.MaxValue);
+        }
+
+        [Test]
+        public void Int256_BitwiseComplement()
+        {
+            var value = Int256.Zero;
+            var result = ~value;
+            ((BigInteger)result).Should().Be(-1); // ~0 = -1 in two's complement
+        }
+
+        [Test]
+        public void Int256_BitwiseAnd()
+        {
+            var a = (Int256)0xFF00;
+            var b = (Int256)0x0FF0;
+            var result = a & b;
+            ((BigInteger)result).Should().Be(0x0F00);
+        }
+
+        [Test]
+        public void Int256_BitwiseOr()
+        {
+            var a = (Int256)0xFF00;
+            var b = (Int256)0x0FF0;
+            var result = a | b;
+            ((BigInteger)result).Should().Be(0xFFF0);
+        }
+
+        [Test]
+        public void Int256_BitwiseXor()
+        {
+            var a = (Int256)0xFF00;
+            var b = (Int256)0x0FF0;
+            var result = a ^ b;
+            ((BigInteger)result).Should().Be(0xF0F0);
+        }
+
+        [Test]
+        public void Int256_LeftShift()
+        {
+            var value = (Int256)1;
+            var result = value << 64;
+            var expected = BigInteger.One << 64;
+            ((BigInteger)result).Should().Be(expected);
+        }
+
+        [Test]
+        public void Int256_RightShift_Positive()
+        {
+            var value = (Int256)256;
+            var result = value >> 4;
+            ((BigInteger)result).Should().Be(16);
+        }
+
+        [Test]
+        public void Int256_UnsignedRightShift()
+        {
+            var value = new Int256(-1);
+            var result = value >>> 1; // unsigned right shift
+            // After unsigned right shift, MSB should be 0
+            result.Sign.Should().Be(1); // Should be positive
+        }
+
+        #endregion
+
+        #region Radix and Identity Tests
+
+        [Test]
+        public void UInt256_Radix_IsTwo()
+        {
+            GetRadix<UInt256>().Should().Be(2);
+        }
+
+        [Test]
+        public void Int256_Radix_IsTwo()
+        {
+            GetRadix<Int256>().Should().Be(2);
+        }
+
+        [Test]
+        public void UInt256_AdditiveIdentity_IsZero()
+        {
+            GetAdditiveIdentity<UInt256>().Should().Be(UInt256.Zero);
+        }
+
+        [Test]
+        public void UInt256_MultiplicativeIdentity_IsOne()
+        {
+            GetMultiplicativeIdentity<UInt256>().Should().Be(UInt256.One);
+        }
+
+        [Test]
+        public void Int256_AdditiveIdentity_IsZero()
+        {
+            GetAdditiveIdentity<Int256>().Should().Be(Int256.Zero);
+        }
+
+        [Test]
+        public void Int256_MultiplicativeIdentity_IsOne()
+        {
+            GetMultiplicativeIdentity<Int256>().Should().Be(Int256.One);
+        }
+
+        private static int GetRadix<T>() where T : INumberBase<T>
+        {
+            return T.Radix;
+        }
+
+        private static T GetAdditiveIdentity<T>() where T : IAdditiveIdentity<T, T>
+        {
+            return T.AdditiveIdentity;
+        }
+
+        private static T GetMultiplicativeIdentity<T>() where T : IMultiplicativeIdentity<T, T>
+        {
+            return T.MultiplicativeIdentity;
+        }
+
+        #endregion
+
+        #region IsNegative/IsPositive Tests
+
+        [Test]
+        public void UInt256_IsNegative_AlwaysFalse()
+        {
+            IsNegative<UInt256>(UInt256.Zero).Should().BeFalse();
+            IsNegative<UInt256>(UInt256.MaxValue).Should().BeFalse();
+        }
+
+        [Test]
+        public void UInt256_IsPositive_AlwaysTrue()
+        {
+            IsPositive<UInt256>(UInt256.Zero).Should().BeTrue();
+            IsPositive<UInt256>(UInt256.MaxValue).Should().BeTrue();
+        }
+
+        [Test]
+        public void Int256_IsNegative_NegativeValue_ReturnsTrue()
+        {
+            IsNegative<Int256>(new Int256(-1)).Should().BeTrue();
+            IsNegative<Int256>(Int256.MinValue).Should().BeTrue();
+        }
+
+        [Test]
+        public void Int256_IsNegative_PositiveValue_ReturnsFalse()
+        {
+            IsNegative<Int256>(Int256.One).Should().BeFalse();
+            IsNegative<Int256>(Int256.Zero).Should().BeFalse();
+        }
+
+        [Test]
+        public void Int256_IsPositive_PositiveValue_ReturnsTrue()
+        {
+            IsPositive<Int256>(Int256.One).Should().BeTrue();
+            IsPositive<Int256>(Int256.Zero).Should().BeTrue();
+        }
+
+        [Test]
+        public void Int256_IsPositive_NegativeValue_ReturnsFalse()
+        {
+            IsPositive<Int256>(new Int256(-1)).Should().BeFalse();
+        }
+
+        private static bool IsNegative<T>(T value) where T : INumberBase<T>
+        {
+            return T.IsNegative(value);
+        }
+
+        private static bool IsPositive<T>(T value) where T : INumberBase<T>
+        {
+            return T.IsPositive(value);
+        }
+
+        #endregion
+
+        #region IsZero Tests
+
+        [Test]
+        public void UInt256_IsZero_Zero_ReturnsTrue()
+        {
+            IsZero<UInt256>(UInt256.Zero).Should().BeTrue();
+        }
+
+        [Test]
+        public void UInt256_IsZero_NonZero_ReturnsFalse()
+        {
+            IsZero<UInt256>(UInt256.One).Should().BeFalse();
+        }
+
+        [Test]
+        public void Int256_IsZero_Zero_ReturnsTrue()
+        {
+            IsZero<Int256>(Int256.Zero).Should().BeTrue();
+        }
+
+        [Test]
+        public void Int256_IsZero_NonZero_ReturnsFalse()
+        {
+            IsZero<Int256>(Int256.One).Should().BeFalse();
+            IsZero<Int256>(new Int256(-1)).Should().BeFalse();
+        }
+
+        private static bool IsZero<T>(T value) where T : INumberBase<T>
+        {
+            return T.IsZero(value);
+        }
+
+        #endregion
+
+        #region UnaryPlus Tests
+
+        [Test]
+        public void UInt256_UnaryPlus_ReturnsValue()
+        {
+            var value = (UInt256)12345;
+            (+value).Should().Be(value);
+        }
+
+        [Test]
+        public void Int256_UnaryPlus_PositiveValue_ReturnsValue()
+        {
+            var value = (Int256)12345;
+            (+value).Should().Be(value);
+        }
+
+        [Test]
+        public void Int256_UnaryPlus_NegativeValue_ReturnsValue()
+        {
+            var value = new Int256(-12345);
+            (+value).Should().Be(value);
+        }
+
+        #endregion
+
+        #region Int256 TryParse With Range Validation Tests
+
+        [Test]
+        public void Int256_TryParse_ValueExceedingMaxValue_ReturnsFalse()
+        {
+            // A value larger than Int256.MaxValue
+            BigInteger tooLarge = (BigInteger.One << 255);
+            string tooLargeStr = tooLarge.ToString();
+            bool success = Int256.TryParse(tooLargeStr, out Int256 result);
+            success.Should().BeFalse();
+            result.Should().Be(Int256.Zero);
+        }
+
+        [Test]
+        public void Int256_TryParse_ValueBelowMinValue_ReturnsFalse()
+        {
+            // A value smaller than Int256.MinValue
+            BigInteger tooSmall = -(BigInteger.One << 256);
+            string tooSmallStr = tooSmall.ToString();
+            bool success = Int256.TryParse(tooSmallStr, out Int256 result);
+            success.Should().BeFalse();
+            result.Should().Be(Int256.Zero);
+        }
+
+        [Test]
+        public void Int256_TryParse_ValidMaxValue_ReturnsTrue()
+        {
+            BigInteger maxValue = (BigInteger.One << 255) - 1;
+            string maxValueStr = maxValue.ToString();
+            bool success = Int256.TryParse(maxValueStr, out Int256 result);
+            success.Should().BeTrue();
+            result.Should().Be(Int256.MaxValue);
+        }
+
+        [Test]
+        public void Int256_TryParse_ValidMinValue_ReturnsTrue()
+        {
+            BigInteger minValue = -(BigInteger.One << 255);
+            string minValueStr = minValue.ToString();
+            bool success = Int256.TryParse(minValueStr, out Int256 result);
+            success.Should().BeTrue();
+            result.Should().Be(Int256.MinValue);
+        }
+
+        #endregion
     }
 }
