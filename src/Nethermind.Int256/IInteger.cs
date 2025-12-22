@@ -15,6 +15,7 @@ namespace Nethermind.Int256
         void MultiplyMod(in T a, in T m, out T res);
 
         void Divide(in T a, out T res);
+        void Mod(in T a, out T res);
 
         void Exp(in T e, out T res);
         void ExpMod(in T e, in T m, out T res);
