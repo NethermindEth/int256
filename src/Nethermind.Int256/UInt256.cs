@@ -39,7 +39,7 @@ namespace Nethermind.Int256
 
         public UInt256(uint r0, uint r1, uint r2, uint r3, uint r4, uint r5, uint r6, uint r7)
         {
-            if (Vector256<uint>.IsSupported)
+            if (Vector256.IsHardwareAccelerated)
             {
                 Unsafe.SkipInit(out this.u0);
                 Unsafe.SkipInit(out this.u1);
@@ -58,7 +58,7 @@ namespace Nethermind.Int256
 
         public UInt256(ulong u0 = 0, ulong u1 = 0, ulong u2 = 0, ulong u3 = 0)
         {
-            if (Vector256<ulong>.IsSupported)
+            if (Vector256.IsHardwareAccelerated)
             {
                 Unsafe.SkipInit(out this.u0);
                 Unsafe.SkipInit(out this.u1);
@@ -88,7 +88,7 @@ namespace Nethermind.Int256
                 }
                 else
                 {
-                    if (Vector256<byte>.IsSupported)
+                    if (Vector256.IsHardwareAccelerated)
                     {
                         Unsafe.SkipInit(out this.u0);
                         Unsafe.SkipInit(out this.u1);
@@ -193,7 +193,7 @@ namespace Nethermind.Int256
             }
             else
             {
-                if (Vector256<ulong>.IsSupported)
+                if (Vector256.IsHardwareAccelerated)
                 {
                     Unsafe.SkipInit(out this.u0);
                     Unsafe.SkipInit(out this.u1);
@@ -279,7 +279,7 @@ namespace Nethermind.Int256
         {
             get
             {
-                if (Vector256<uint>.IsSupported)
+                if (Vector256.IsHardwareAccelerated)
                 {
                     var v = Unsafe.As<ulong, Vector256<ulong>>(ref Unsafe.AsRef(in u0));
                     return v == default;
@@ -295,7 +295,7 @@ namespace Nethermind.Int256
         {
             get
             {
-                if (Vector256<uint>.IsSupported)
+                if (Vector256.IsHardwareAccelerated)
                 {
                     var v = Unsafe.As<ulong, Vector256<ulong>>(ref Unsafe.AsRef(in u0));
                     return v == Vector256.CreateScalar(1UL);
@@ -420,7 +420,7 @@ namespace Nethermind.Int256
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool AddOverflow(in UInt256 a, in UInt256 b, out UInt256 res)
         {
-            if (!Avx2.IsSupported && !Vector256<ulong>.IsSupported)
+            if (!Avx2.IsSupported && !Vector256.IsHardwareAccelerated)
             {
                 return AddScalar(in a, in b, out res);
             }
@@ -1848,7 +1848,7 @@ namespace Nethermind.Int256
 
         public static void Not(in UInt256 a, out UInt256 res)
         {
-            if (Vector256<ulong>.IsSupported)
+            if (Vector256.IsHardwareAccelerated)
             {
                 var av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
                 // Mark res as initalized so we can use it as left said of ref assignment
@@ -1867,7 +1867,7 @@ namespace Nethermind.Int256
 
         public static void Or(in UInt256 a, in UInt256 b, out UInt256 res)
         {
-            if (Vector256<ulong>.IsSupported)
+            if (Vector256.IsHardwareAccelerated)
             {
                 var av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
                 var bv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
@@ -1889,7 +1889,7 @@ namespace Nethermind.Int256
 
         public static void And(in UInt256 a, in UInt256 b, out UInt256 res)
         {
-            if (Vector256<ulong>.IsSupported)
+            if (Vector256.IsHardwareAccelerated)
             {
                 var av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
                 var bv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
@@ -1911,7 +1911,7 @@ namespace Nethermind.Int256
 
         public static void Xor(in UInt256 a, in UInt256 b, out UInt256 res)
         {
-            if (Vector256<long>.IsSupported)
+            if (Vector256.IsHardwareAccelerated)
             {
                 var av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
                 var bv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
@@ -2116,7 +2116,7 @@ namespace Nethermind.Int256
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static bool LessThan(in UInt256 a, in UInt256 b)
         {
-            if (!Avx2.IsSupported && !Vector256<ulong>.IsSupported)
+            if (!Avx2.IsSupported && !Vector256.IsHardwareAccelerated)
             {
                 return LessThanScalar(in a, in b);
             }
@@ -2245,7 +2245,7 @@ namespace Nethermind.Int256
 
         public bool Equals(uint other)
         {
-            if (Vector256<uint>.IsSupported)
+            if (Vector256.IsHardwareAccelerated)
             {
                 var v = Unsafe.As<ulong, Vector256<uint>>(ref Unsafe.AsRef(in u0));
                 return v == Vector256.CreateScalar(other);
@@ -2260,7 +2260,7 @@ namespace Nethermind.Int256
 
         public bool Equals(ulong other)
         {
-            if (Vector256<uint>.IsSupported)
+            if (Vector256.IsHardwareAccelerated)
             {
                 var v = Unsafe.As<ulong, Vector256<ulong>>(ref Unsafe.AsRef(in u0));
                 return v == Vector256.CreateScalar(other);
