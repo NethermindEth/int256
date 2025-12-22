@@ -825,7 +825,7 @@ namespace Nethermind.Int256
         {
             if (x.IsZero || y.IsZeroOrOne)
             {
-                res = Zero;
+                res = default;
                 return;
             }
 
@@ -835,7 +835,7 @@ namespace Nethermind.Int256
                     res = x;
                     return;
                 case 0:
-                    res = Zero;
+                    res = default;
                     return;
             }
             // At this point:
@@ -851,9 +851,6 @@ namespace Nethermind.Int256
             }
 
             DivideImpl(x, y, out _, out res);
-            //const int length = 4;
-            //Span<ulong> quot = stackalloc ulong[length];
-            //Udivrem(ref MemoryMarshal.GetReference(quot), ref Unsafe.As<UInt256, ulong>(ref Unsafe.AsRef(in x)), length, y, out res);
         }
 
         public void Mod(in UInt256 m, out UInt256 res) => Mod(this, m, out res);
@@ -1786,7 +1783,7 @@ namespace Nethermind.Int256
         {
             if (y.IsZero || y > x)
             {
-                res = Zero;
+                res = default;
                 return;
             }
 
@@ -2596,9 +2593,7 @@ namespace Nethermind.Int256
         [DoesNotReturn]
         private static ulong ThrowIndexOutOfRangeException() => throw new IndexOutOfRangeException();
 
-
-
-        // Preconditions (enforced by your public Divide wrapper):
+        // Preconditions (enforced by public Divide wrapper):
         // - y != 0
         // - x > y
         // - x != y
@@ -2607,52 +2602,30 @@ namespace Nethermind.Int256
         // This implementation returns quotient only (fastest for Divide()).
         // If you need remainder too, keep the same core but unnormalise the final u-limbs.
         [SkipLocalsInit]
-        private static void DivideImpl(in UInt256 x, in UInt256 y, out UInt256 q, out UInt256 remainder)
+        private static void DivideImpl(in UInt256 x, in UInt256 y, out UInt256 quotient, out UInt256 remainder)
         {
-            // Fast path: y == 1
             if (y.IsOne)
             {
-                q = x;
-                remainder = Zero;
-                return;
+                // Fast path: y == 1
+                quotient = x;
+                remainder = default;
             }
-
-            // Fast path: power-of-two divisor
-            if (TryGetPow2Shift(in y, out int k))
+            else if (y.u3 != 0)
             {
-                DivideByPowerOf2(in x, k, out q, out remainder);
-                return;
-            }
-
-            if (y.u3 != 0)
-            {
-                DivideBy256Bits(in x, in y, out q, out remainder);
-                return;
+                DivideBy256Bits(in x, in y, out quotient, out remainder);
             }
             else if (y.u2 != 0)
             {
-                DivideBy192Bits(in x, in y, out q, out remainder);
-                return;
+                DivideBy192Bits(in x, in y, out quotient, out remainder);
             }
             else if (y.u1 != 0)
             {
-                DivideBy128Bits(in x, in y, out q, out remainder);
-                return;
+                DivideBy128Bits(in x, in y, out quotient, out remainder);
             }
             else
             {
-                DivideBy64Bits(in x, y.u0, out q, out remainder);
-                return;
+                DivideBy64Bits(in x, y.u0, out quotient, out remainder);
             }
-        }
-
-        [SkipLocalsInit]
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void DivideByPowerOf2(in UInt256 x, int k, out UInt256 q, out UInt256 remainder)
-        {
-            q = ShiftRight(in x, k);
-            remainder = MaskLowBits(in x, k);
-            return;
         }
 
         [SkipLocalsInit]
@@ -2856,7 +2829,11 @@ namespace Nethermind.Int256
         {
             if (s == 0) return v;
 
-            ulong a0 = v.u0, a1 = v.u1, a2 = v.u2, a3 = v.u3;
+            ulong a0 = v.u0;
+            ulong a1 = v.u1;
+            ulong a2 = v.u2;
+            ulong a3 = v.u3;
+
             int rs = 64 - s;
             
             Unsafe.SkipInit(out UInt256 result);
@@ -2864,51 +2841,6 @@ namespace Nethermind.Int256
             Unsafe.AsRef(in result.u1) = (a1 >> s) | (a2 << rs);
             Unsafe.AsRef(in result.u2) = (a2 >> s) | (a3 << rs);
             Unsafe.AsRef(in result.u3) = (a3 >> s);
-
-            return result;
-        }
-
-        // Mask low k bits (k in 0..255)
-        [SkipLocalsInit]
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static UInt256 MaskLowBits(in UInt256 x, int k)
-        {
-            // Keep the same fast exits, but avoid touching any statics like Zero.
-            if (k <= 0)
-                return default;
-
-            if (k >= 256)
-                return x;
-
-            uint w = (uint)k >> 6;   // 0..3
-            int s = k & 63;          // 0..63
-
-            ulong x0 = x.u0;
-            ulong x1 = x.u1;
-            ulong x2 = x.u2;
-            ulong x3 = x.u3;
-
-            Unsafe.SkipInit(out UInt256 result);
-            if (s == 0)
-            {
-                // k is a multiple of 64, and k > 0, so w is 1..3 here.
-                // Keep whole limbs below w, clear above.
-                Unsafe.AsRef(in result.u0) = x0;
-                Unsafe.AsRef(in result.u1) = (w >= 2) ? x1 : 0UL;
-                Unsafe.AsRef(in result.u2) = (w >= 3) ? x2 : 0UL;
-                Unsafe.AsRef(in result.u3) = 0UL;
-                return result;
-            }
-
-            // s is 1..63 here, so this is safe.
-            ulong mask = (1UL << s) - 1UL;
-
-            // Keep full limbs below w, mask the limb at w, clear above.
-            // Written to encourage cmov chains rather than jump tables.
-            Unsafe.AsRef(in result.u0) = (w == 0) ? (x0 & mask) : x0;
-            Unsafe.AsRef(in result.u1) = (w == 0) ? 0UL : (w == 1) ? (x1 & mask) : x1;
-            Unsafe.AsRef(in result.u2) = (w <= 1) ? 0UL : (w == 2) ? (x2 & mask) : x2;
-            Unsafe.AsRef(in result.u3) = (w <= 2) ? 0UL : (x3 & mask);
 
             return result;
         }
@@ -3197,86 +3129,39 @@ namespace Nethermind.Int256
         // Bit fiddly fast-path helpers
         // ------------------------------------------------------------
 
+        [SkipLocalsInit]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static bool TryGetPow2Shift(in UInt256 y, out int shift)
         {
-            if (y.u3 != 0)
+            ulong u0 = y.u0;
+            ulong u1 = y.u1;
+            ulong u2 = y.u2;
+            ulong u3 = y.u3;
+
+            uint mask =
+                (uint)(u0 != 0 ? 1u : 0u) |
+                ((uint)(u1 != 0 ? 1u : 0u) << 1) |
+                ((uint)(u2 != 0 ? 1u : 0u) << 2) |
+                ((uint)(u3 != 0 ? 1u : 0u) << 3);
+
+            // mask must be 1,2,4,8
+            if (mask == 0 || (mask & (mask - 1)) != 0)
             {
-                if ((y.u0 | y.u1 | y.u2) == 0 && ((y.u3 & (y.u3 - 1)) == 0))
-                {
-                    shift = 192 + BitOperations.TrailingZeroCount(y.u3);
-                    return true;
-                }
-            }
-            else if (y.u2 != 0)
-            {
-                if ((y.u0 | y.u1) == 0 && ((y.u2 & (y.u2 - 1)) == 0))
-                {
-                    shift = 128 + BitOperations.TrailingZeroCount(y.u2);
-                    return true;
-                }
-            }
-            else if (y.u1 != 0)
-            {
-                if (y.u0 == 0 && ((y.u1 & (y.u1 - 1)) == 0))
-                {
-                    shift = 64 + BitOperations.TrailingZeroCount(y.u1);
-                    return true;
-                }
-            }
-            else
-            {
-                if (((y.u0 & (y.u0 - 1)) == 0))
-                {
-                    shift = BitOperations.TrailingZeroCount(y.u0);
-                    return true;
-                }
+                shift = 0;
+                return false;
             }
 
-            shift = 0;
-            return false;
-        }
+            ulong v = (u0 | u1) | (u2 | u3);
 
-        [SkipLocalsInit]
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static UInt256 ShiftRight(in UInt256 x, int k)
-        {
-            if ((uint)k >= 256u)
-                return default;
-
-            uint w = (uint)k >> 6;
-            int s = k & 63;
-
-            ulong x0 = x.u0;
-            ulong x1 = x.u1;
-            ulong x2 = x.u2;
-            ulong x3 = x.u3;
-
-            // Word shift (cmov-friendly shape)
-            ulong y0 = w == 0 ? x0 : w == 1 ? x1 : w == 2 ? x2 : x3;
-            ulong y1 = w == 0 ? x1 : w == 1 ? x2 : w == 2 ? x3 : 0UL;
-            ulong y2 = w == 0 ? x2 : w == 1 ? x3 : 0UL;
-            ulong y3 = w == 0 ? x3 : 0UL;
-
-            Unsafe.SkipInit(out UInt256 result);
-
-            if (s == 0)
+            // v must be a 64-bit power of two
+            if (v == 0 || (v & (v - 1)) != 0)
             {
-                Unsafe.AsRef(in result.u0) = y0;
-                Unsafe.AsRef(in result.u1) = y1;
-                Unsafe.AsRef(in result.u2) = y2;
-                Unsafe.AsRef(in result.u3) = y3;
-                return result;
+                shift = 0;
+                return false;
             }
 
-            int rs = 64 - s;
-            // Compute + store each limb immediately - shrinks live ranges
-            Unsafe.AsRef(in result.u0) = (y0 >> s) | (y1 << rs);
-            Unsafe.AsRef(in result.u1) = (y1 >> s) | (y2 << rs);
-            Unsafe.AsRef(in result.u2) = (y2 >> s) | (y3 << rs);
-            Unsafe.AsRef(in result.u3) = (y3 >> s);
-
-            return result;
+            shift = (BitOperations.TrailingZeroCount(mask) << 6) + BitOperations.TrailingZeroCount(v);
+            return true;
         }
 
         // ------------------------------------------------------------
