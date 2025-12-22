@@ -7,8 +7,8 @@ using Nethermind.Int256.Test;
 
 namespace Nethermind.Int256.Benchmark;
 
-[SimpleJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 1, iterationCount: 3)]
-[NoIntrinsicsJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 1, iterationCount: 3)]
+[SimpleJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 3)]
+[NoIntrinsicsJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 3)]
 public class UnsignedBenchmarkBase
 {
     public IEnumerable<BigInteger> Values => new[] { Numbers.UInt256Max - 1, Numbers.UInt192Max - 1, Numbers.UInt128Max - 1, Numbers.TwoTo64 - 1, BigInteger.One };
