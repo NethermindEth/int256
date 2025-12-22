@@ -559,28 +559,20 @@ namespace Nethermind.Int256
         // If m == 0, z is set to 0 (OBS: differs from the big.Int)
         public static void AddMod(in UInt256 x, in UInt256 y, in UInt256 m, out UInt256 res)
         {
+            res = default;
             if (m.IsZero || m.IsOne)
             {
-                res = Zero;
                 return;
             }
 
-            // sumLow = (x+y) mod 2^256, carry = 0/1
-            //bool carry = AddOverflow(in x, in y, out UInt256 sumLow);
-
             // 1) Compute 257-bit sum S = x + y as 5 limbs (s0..s3, s4=carry)
-            ulong c = 0;
-            AddWithCarry(x.u0, y.u0, ref c, out ulong s0);
-            AddWithCarry(x.u1, y.u1, ref c, out ulong s1);
-            AddWithCarry(x.u2, y.u2, ref c, out ulong s2);
-            AddWithCarry(x.u3, y.u3, ref c, out ulong s3);
-            ulong s4 = c; // 0 or 1
+            ulong s4 = !AddOverflow(in x, in y, out UInt256 sum) ? 0UL : 1UL;
 
             // 2) If modulus fits in 64 bits, do direct remainder of the 5-limb value.
             if (m.IsUint64)
             {
-                ulong r0 = Rem5ByU64(s0, s1, s2, s3, s4, m.u0);
-                res = Create(r0, 0, 0, 0);
+                ulong r0 = Rem5ByU64(in sum, s4, m.u0);
+                Unsafe.AsRef(in res.u0) = r0;
                 return;
             }
 
@@ -588,176 +580,177 @@ namespace Nethermind.Int256
             // (Branchy compare is fine - the fallback is much more expensive anyway.)
             if (LessThan(in x, in m) && LessThan(in y, in m))
             {
-                res = ReduceSumAssumingLT2m(s0, s1, s2, s3, s4, in m);
+                res = ReduceSumAssumingLT2m(in sum, s4, in m);
                 return;
             }
 
             // 4) General fallback: reduce the 257-bit sum directly: res = S % m
-            res = RemSum257ByMod(s0, s1, s2, s3, s4, in m);
+            res = RemSum257ByMod(in sum, s4, in m);
         }
-        
 
-    // ----------------------------
-    // Fast reduction when S < 2m (eg x<m,y<m).
-    // Uses carry-aware single subtract.
-    // ----------------------------
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static UInt256 ReduceSumAssumingLT2m(ulong s0, ulong s1, ulong s2, ulong s3, ulong carry, in UInt256 m)
-    {
-        // diff = sum - m
-        ulong b = 0;
-        ulong d0 = SubBorrow(s0, m.u0, ref b);
-        ulong d1 = SubBorrow(s1, m.u1, ref b);
-        ulong d2 = SubBorrow(s2, m.u2, ref b);
-        ulong d3 = SubBorrow(s3, m.u3, ref b);
-        ulong borrow = b; // 0 if sum>=m else 1
 
-        // Need subtract if (carry==1) || (sum>=m)
-        // sum>=m <=> borrow==0
-        ulong needSub = carry | (borrow ^ 1UL);
-        ulong mask = 0UL - needSub;
-
-        return Create(
-            (d0 & mask) | (s0 & ~mask),
-            (d1 & mask) | (s1 & ~mask),
-            (d2 & mask) | (s2 & ~mask),
-            (d3 & mask) | (s3 & ~mask)
-        );
-    }
-
-    // ----------------------------
-    // Remainder of 5-limb value by 64-bit modulus (fast, fixes your test).
-    // Computes ((a4..a0 base 2^64) % d).
-    // ----------------------------
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static ulong Rem5ByU64(ulong a0, ulong a1, ulong a2, ulong a3, ulong a4, ulong d)
-    {
-        // d != 0 assumed by caller
-        int s = BitOperations.LeadingZeroCount(d);
-        ulong dn = (s != 0) ? (d << s) : d;       // normalised (msb set) if s>0
-        ulong recip = Reciprocal2By1(dn);
-
-        // Normalise dividend (we treat it as 6 limbs with top limb 0)
-        ulong u0, u1, u2, u3, u4, u5;
-        if (s == 0)
+        // ----------------------------
+        // Fast reduction when S < 2m (eg x<m,y<m).
+        // Uses carry-aware single subtract.
+        // ----------------------------
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static UInt256 ReduceSumAssumingLT2m(in UInt256 sum, ulong carry, in UInt256 m)
         {
-            u0 = a0; u1 = a1; u2 = a2; u3 = a3; u4 = a4; u5 = 0;
+            // diff = sum - m
+            ulong borrow = !SubtractUnderflow(in sum, in m, out UInt256 d) ? 0UL : 1UL;
+
+            // Need subtract if (carry==1) || (sum>=m)
+            // sum>=m <=> borrow==0
+            ulong needSub = carry | (borrow ^ 1UL);
+            ulong mask = 0UL - needSub;
+
+            if (mask == 0)
+            {
+                return sum;
+            }
+            else if (mask == ulong.MaxValue)
+            {
+                return d;
+            }
+            else
+            {
+                var mask256 = new UInt256(mask, mask, mask, mask);
+                return (d & mask256) | (sum & ~mask256);
+            }
         }
-        else
+
+        // ----------------------------
+        // Remainder of 5-limb value by 64-bit modulus (fast, fixes your test).
+        // Computes ((a4..a0 base 2^64) % d).
+        // ----------------------------
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static ulong Rem5ByU64(in UInt256 a, ulong a4, ulong d)
         {
-            int rs = 64 - s;
-            u0 = a0 << s;
-            u1 = (a1 << s) | (a0 >> rs);
-            u2 = (a2 << s) | (a1 >> rs);
-            u3 = (a3 << s) | (a2 >> rs);
-            u4 = (a4 << s) | (a3 >> rs);
-            u5 = (a4 >> rs); // top limb (a5=0)
+            // d != 0 assumed by caller
+            int s = BitOperations.LeadingZeroCount(d);
+            ulong dn = (s != 0) ? (d << s) : d;       // normalised (msb set) if s>0
+            ulong recip = Reciprocal2By1(dn);
+
+            // Normalise dividend (we treat it as 6 limbs with top limb 0)
+            ulong u0, u1, u2, u3, u4, u5;
+            if (s == 0)
+            {
+                u0 = a.u0;
+                u1 = a.u1;
+                u2 = a.u2;
+                u3 = a.u3;
+                u4 = a4;
+                u5 = 0;
+            }
+            else
+            {
+                int rs = 64 - s;
+                u0 = a.u0 << s;
+                u1 = (a.u1 << s) | (a.u0 >> rs);
+                u2 = (a.u2 << s) | (a.u1 >> rs);
+                u3 = (a.u3 << s) | (a.u2 >> rs);
+                u4 = (a4 << s) | (a.u3 >> rs);
+                u5 = (a4 >> rs); // top limb (a5=0)
+            }
+
+            // Horner-like remainder using exact 2-by-1 divisions:
+            // r = (((((u5*b + u4)*b + u3)*b + u2)*b + u1)*b + u0) % dn
+            ulong r = 0;
+            _ = UDivRem2By1(r, u5, dn, recip, out r);
+            _ = UDivRem2By1(r, u4, dn, recip, out r);
+            _ = UDivRem2By1(r, u3, dn, recip, out r);
+            _ = UDivRem2By1(r, u2, dn, recip, out r);
+            _ = UDivRem2By1(r, u1, dn, recip, out r);
+            _ = UDivRem2By1(r, u0, dn, recip, out r);
+
+            return (s == 0) ? r : (r >> s);
         }
 
-        // Horner-like remainder using exact 2-by-1 divisions:
-        // r = (((((u5*b + u4)*b + u3)*b + u2)*b + u1)*b + u0) % dn
-        ulong r = 0;
-        _ = UDivRem2By1(r, u5, dn, recip, out r);
-        _ = UDivRem2By1(r, u4, dn, recip, out r);
-        _ = UDivRem2By1(r, u3, dn, recip, out r);
-        _ = UDivRem2By1(r, u2, dn, recip, out r);
-        _ = UDivRem2By1(r, u1, dn, recip, out r);
-        _ = UDivRem2By1(r, u0, dn, recip, out r);
-
-        return (s == 0) ? r : (r >> s);
-    }
-
-    // ----------------------------
-    // General remainder: (257-bit sum) % m, where sum is 5 limbs and m is up to 4 limbs.
-    // Uses Knuth D specialised, operating on a 6-limb u (top limb is 0).
-    // ----------------------------
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static UInt256 RemSum257ByMod(ulong a0, ulong a1, ulong a2, ulong a3, ulong a4, in UInt256 m)
-    {
-        // divisor limb count n in 2..4 (caller ensured m doesn't fit in 64 bits)
-        int n = (m.u3 != 0) ? 4 : (m.u2 != 0) ? 3 : 2;
-
-        // Normalise divisor
-        ulong v0, v1, v2, v3;
-        ulong vHi = (n == 4) ? m.u3 : (n == 3) ? m.u2 : m.u1;
-        int sh = BitOperations.LeadingZeroCount(vHi);
-
-        if (sh == 0)
+        // ----------------------------
+        // General remainder: (257-bit sum) % m, where sum is 5 limbs and m is up to 4 limbs.
+        // Uses Knuth D specialised, operating on a 6-limb u (top limb is 0).
+        // ----------------------------
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static UInt256 RemSum257ByMod(in UInt256 a, ulong a4, in UInt256 m)
         {
-            v0 = m.u0; v1 = m.u1; v2 = m.u2; v3 = m.u3;
-        }
-        else
-        {
-            int rs = 64 - sh;
-            v0 = m.u0 << sh;
-            v1 = (m.u1 << sh) | (m.u0 >> rs);
-            v2 = (m.u2 << sh) | (m.u1 >> rs);
-            v3 = (m.u3 << sh) | (m.u2 >> rs);
-        }
+            // divisor limb count n in 2..4 (caller ensured m doesn't fit in 64 bits)
+            int n = (m.u3 != 0) ? 4 : (m.u2 != 0) ? 3 : 2;
 
-        ulong vnHi = (n == 4) ? v3 : (n == 3) ? v2 : v1;
-        ulong recip = Reciprocal2By1(vnHi);
+            // Normalise divisor
+            ulong v0, v1, v2, v3;
+            ulong vHi = (n == 4) ? m.u3 : (n == 3) ? m.u2 : m.u1;
+            int sh = BitOperations.LeadingZeroCount(vHi);
 
-        // Normalise dividend: u is 6 limbs (a0..a4 plus a5=0), shifted left by sh.
-        ulong u0, u1, u2, u3, u4, u5;
-        if (sh == 0)
-        {
-            u0 = a0; u1 = a1; u2 = a2; u3 = a3; u4 = a4; u5 = 0;
+            if (sh == 0)
+            {
+                v0 = m.u0; v1 = m.u1; v2 = m.u2; v3 = m.u3;
+            }
+            else
+            {
+                int rs = 64 - sh;
+                v0 = m.u0 << sh;
+                v1 = (m.u1 << sh) | (m.u0 >> rs);
+                v2 = (m.u2 << sh) | (m.u1 >> rs);
+                v3 = (m.u3 << sh) | (m.u2 >> rs);
+            }
+
+            ulong vnHi = (n == 4) ? v3 : (n == 3) ? v2 : v1;
+            ulong recip = Reciprocal2By1(vnHi);
+
+            // Normalise dividend: u is 6 limbs (a0..a4 plus a5=0), shifted left by sh.
+            ulong u0, u1, u2, u3, u4, u5;
+            if (sh == 0)
+            {
+                u0 = a.u0;
+                u1 = a.u1;
+                u2 = a.u2;
+                u3 = a.u3;
+                u4 = a4;
+                u5 = 0;
+            }
+            else
+            {
+                int rs = 64 - sh;
+                u0 = a.u0 << sh;
+                u1 = (a.u1 << sh) | (a.u0 >> rs);
+                u2 = (a.u2 << sh) | (a.u1 >> rs);
+                u3 = (a.u3 << sh) | (a.u2 >> rs);
+                u4 = (a4 << sh) | (a.u3 >> rs);
+                u5 = (a4 >> rs); // a5=0
+            }
+
+            // Run Knuth steps for dividendLen=5 (plus leading u5) and divisorLen=n.
+            if (n == 2)
+            {
+                // m = 5-n = 3, j = 3..0
+                _ = DivStep2(ref u3, ref u4, ref u5, v0, v1, recip);
+                _ = DivStep2(ref u2, ref u3, ref u4, v0, v1, recip);
+                _ = DivStep2(ref u1, ref u2, ref u3, v0, v1, recip);
+                _ = DivStep2(ref u0, ref u1, ref u2, v0, v1, recip);
+
+                UInt256 remN = Create(u0, u1, 0, 0);
+                return (sh == 0) ? remN : ShiftRightSmall(remN, sh);
+            }
+            else if (n == 3)
+            {
+                // m = 2, j = 2..0
+                _ = DivStep3(ref u2, ref u3, ref u4, ref u5, v0, v1, v2, recip);
+                _ = DivStep3(ref u1, ref u2, ref u3, ref u4, v0, v1, v2, recip);
+                _ = DivStep3(ref u0, ref u1, ref u2, ref u3, v0, v1, v2, recip);
+
+                UInt256 remN = Create(u0, u1, u2, 0);
+                return (sh == 0) ? remN : ShiftRightSmall(remN, sh);
+            }
+            else
+            {
+                // n == 4, m = 1, j = 1..0
+                _ = DivStep4(ref u1, ref u2, ref u3, ref u4, ref u5, v0, v1, v2, v3, recip);
+                _ = DivStep4(ref u0, ref u1, ref u2, ref u3, ref u4, v0, v1, v2, v3, recip);
+
+                UInt256 remN = Create(u0, u1, u2, u3);
+                return (sh == 0) ? remN : ShiftRightSmall(remN, sh);
+            }
         }
-        else
-        {
-            int rs = 64 - sh;
-            u0 = a0 << sh;
-            u1 = (a1 << sh) | (a0 >> rs);
-            u2 = (a2 << sh) | (a1 >> rs);
-            u3 = (a3 << sh) | (a2 >> rs);
-            u4 = (a4 << sh) | (a3 >> rs);
-            u5 = (a4 >> rs); // a5=0
-        }
-
-        // Run Knuth steps for dividendLen=5 (plus leading u5) and divisorLen=n.
-        if (n == 2)
-        {
-            // m = 5-n = 3, j = 3..0
-            _ = DivStep2(ref u3, ref u4, ref u5, v0, v1, recip);
-            _ = DivStep2(ref u2, ref u3, ref u4, v0, v1, recip);
-            _ = DivStep2(ref u1, ref u2, ref u3, v0, v1, recip);
-            _ = DivStep2(ref u0, ref u1, ref u2, v0, v1, recip);
-
-            UInt256 remN = Create(u0, u1, 0, 0);
-            return (sh == 0) ? remN : ShiftRightSmall(remN, sh);
-        }
-        else if (n == 3)
-        {
-            // m = 2, j = 2..0
-            _ = DivStep3(ref u2, ref u3, ref u4, ref u5, v0, v1, v2, recip);
-            _ = DivStep3(ref u1, ref u2, ref u3, ref u4, v0, v1, v2, recip);
-            _ = DivStep3(ref u0, ref u1, ref u2, ref u3, v0, v1, v2, recip);
-
-            UInt256 remN = Create(u0, u1, u2, 0);
-            return (sh == 0) ? remN : ShiftRightSmall(remN, sh);
-        }
-        else
-        {
-            // n == 4, m = 1, j = 1..0
-            _ = DivStep4(ref u1, ref u2, ref u3, ref u4, ref u5, v0, v1, v2, v3, recip);
-            _ = DivStep4(ref u0, ref u1, ref u2, ref u3, ref u4, v0, v1, v2, v3, recip);
-
-            UInt256 remN = Create(u0, u1, u2, u3);
-            return (sh == 0) ? remN : ShiftRightSmall(remN, sh);
-        }
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static ulong SubBorrow(ulong x, ulong y, ref ulong b)
-    {
-        ulong d = x - y;
-        ulong b1 = (x < y) ? 1UL : 0UL;
-        ulong r = d - b;
-        ulong b2 = (d < b) ? 1UL : 0UL;
-        b = b1 | b2;
-        return r;
-    }
 
         public void AddMod(in UInt256 a, in UInt256 m, out UInt256 res) => AddMod(this, a, m, out res);
 
@@ -856,7 +849,7 @@ namespace Nethermind.Int256
                 res = x.u0 % y.u0;
                 return;
             }
-            
+
             DivideImpl(x, y, out _, out res);
             //const int length = 4;
             //Span<ulong> quot = stackalloc ulong[length];
@@ -2620,208 +2613,298 @@ namespace Nethermind.Int256
         [SkipLocalsInit]
         private static void DivideImpl(in UInt256 x, in UInt256 y, out UInt256 q, out UInt256 remainder)
         {
-            unchecked
+            // Fast path: y == 1
+            if (y.IsOne)
             {
-                ulong x0 = x.u0, x1 = x.u1, x2 = x.u2, x3 = x.u3;
-                ulong y0 = y.u0, y1 = y.u1, y2 = y.u2, y3 = y.u3;
-
-                // Fast path: y == 1
-                if (y0 == 1 && (y1 | y2 | y3) == 0)
-                {
-                    q = x;
-                    remainder = Zero;
-                    return;
-                }
-
-                // Fast path: power-of-two divisor
-                if (TryGetPow2Shift(y0, y1, y2, y3, out int k))
-                {
-                    q = ShiftRight(x0, x1, x2, x3, k);
-                    remainder = MaskLowBits(x0, x1, x2, x3, k);
-                    return;
-                }
-
-                int n = (y3 != 0) ? 4 : (y2 != 0) ? 3 : (y1 != 0) ? 2 : 1;
-
-                // ------------------------------------------------------------
-                // n == 1: 256 / 64
-                // ------------------------------------------------------------
-                if (n == 1)
-                {
-                    ulong d = y0;
-
-                    int s = BitOperations.LeadingZeroCount(d);
-                    ulong dn = (s != 0) ? (d << s) : d; // normalised divisor (msb set if s>0)
-
-                    ulong recip = Reciprocal2By1(dn);
-
-                    // Normalise dividend into 5 limbs
-                    ulong u0n, u1n, u2n, u3n, u4;
-                    if (s == 0)
-                    {
-                        u0n = x0; u1n = x1; u2n = x2; u3n = x3; u4 = 0;
-                    }
-                    else
-                    {
-                        int rs = 64 - s;
-                        u0n = x0 << s;
-                        u1n = (x1 << s) | (x0 >> rs);
-                        u2n = (x2 << s) | (x1 >> rs);
-                        u3n = (x3 << s) | (x2 >> rs);
-                        u4 = (x3 >> rs);
-                    }
-
-                    ulong rem = u4;
-
-                    ulong q3 = UDivRem2By1(rem, u3n, dn, recip, out rem);
-                    ulong q2 = UDivRem2By1(rem, u2n, dn, recip, out rem);
-                    ulong q1 = UDivRem2By1(rem, u1n, dn, recip, out rem);
-                    ulong q0 = UDivRem2By1(rem, u0n, dn, recip, out rem);
-
-                    q = Create(q0, q1, q2, q3);
-
-                    // Unnormalise remainder (single limb)
-                    ulong r0 = (s == 0) ? rem : (rem >> s);
-                    remainder = Create(r0, 0, 0, 0);
-                    return;
-                }
-
-                // ------------------------------------------------------------
-                // n >= 2: Knuth D (specialised) with reciprocal qhat
-                // ------------------------------------------------------------
-
-                int shift = (n == 2)
-                    ? BitOperations.LeadingZeroCount(y1)
-                    : (n == 3)
-                        ? BitOperations.LeadingZeroCount(y2)
-                        : BitOperations.LeadingZeroCount(y3);
-
-                // Normalise divisor v = y << shift
-                ulong v0, v1n, v2n, v3n;
-                if (shift == 0)
-                {
-                    v0 = y0; v1n = y1; v2n = y2; v3n = y3;
-                }
-                else
-                {
-                    int rs = 64 - shift;
-                    v0 = y0 << shift;
-                    v1n = (y1 << shift) | (y0 >> rs);
-                    v2n = (y2 << shift) | (y1 >> rs);
-                    v3n = (y3 << shift) | (y2 >> rs);
-                }
-
-                // Normalise dividend u = x << shift into 5 limbs
-                ulong u0n2, u1d, u2d, u3d, u4d;
-                if (shift == 0)
-                {
-                    u0n2 = x0; u1d = x1; u2d = x2; u3d = x3; u4d = 0;
-                }
-                else
-                {
-                    int rs = 64 - shift;
-                    u0n2 = x0 << shift;
-                    u1d = (x1 << shift) | (x0 >> rs);
-                    u2d = (x2 << shift) | (x1 >> rs);
-                    u3d = (x3 << shift) | (x2 >> rs);
-                    u4d = (x3 >> rs);
-                }
-
-                ulong vHi = (n == 2) ? v1n : (n == 3) ? v2n : v3n;
-                ulong vRecip = Reciprocal2By1(vHi);
-
-                if (n == 2)
-                {
-                    ulong q2 = DivStep2(ref u2d, ref u3d, ref u4d, v0, v1n, vRecip);
-                    ulong q1 = DivStep2(ref u1d, ref u2d, ref u3d, v0, v1n, vRecip);
-                    ulong q0 = DivStep2(ref u0n2, ref u1d, ref u2d, v0, v1n, vRecip);
-
-                    q = Create(q0, q1, q2, 0);
-
-                    // Remainder is u0..u1 (normalised) then unnormalise
-                    UInt256 remN = Create(u0n2, u1d, 0, 0);
-                    remainder = (shift == 0) ? remN : ShiftRightSmall(remN, shift);
-                    return;
-                }
-
-                if (n == 3)
-                {
-                    ulong q1 = DivStep3(ref u1d, ref u2d, ref u3d, ref u4d, v0, v1n, v2n, vRecip);
-                    ulong q0 = DivStep3(ref u0n2, ref u1d, ref u2d, ref u3d, v0, v1n, v2n, vRecip);
-
-                    q = Create(q0, q1, 0, 0);
-
-                    // Remainder is u0..u2
-                    UInt256 remN = Create(u0n2, u1d, u2d, 0);
-                    remainder = (shift == 0) ? remN : ShiftRightSmall(remN, shift);
-                    return;
-                }
-
-                // n == 4
-                {
-                    ulong q0 = DivStep4(ref u0n2, ref u1d, ref u2d, ref u3d, ref u4d, v0, v1n, v2n, v3n, vRecip);
-
-                    q = Create(q0, 0, 0, 0);
-
-                    // Remainder is u0..u3
-                    UInt256 remN = Create(u0n2, u1d, u2d, u3d);
-                    remainder = (shift == 0) ? remN : ShiftRightSmall(remN, shift);
-                    return;
-                }
+                q = x;
+                remainder = Zero;
+                return;
             }
+
+            // Fast path: power-of-two divisor
+            if (TryGetPow2Shift(in y, out int k))
+            {
+                DivideByPowerOf2(in x, k, out q, out remainder);
+                return;
+            }
+
+            if (y.u3 != 0)
+            {
+                DivideBy256Bits(in x, in y, out q, out remainder);
+                return;
+            }
+            else if (y.u2 != 0)
+            {
+                DivideBy192Bits(in x, in y, out q, out remainder);
+                return;
+            }
+            else if (y.u1 != 0)
+            {
+                DivideBy128Bits(in x, in y, out q, out remainder);
+                return;
+            }
+            else
+            {
+                DivideBy64Bits(in x, in y, out q, out remainder);
+                return;
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void DivideByPowerOf2(in UInt256 x, int k, out UInt256 q, out UInt256 remainder)
+        {
+            q = ShiftRight(in x, k);
+            remainder = MaskLowBits(in x, k);
+            return;
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void DivideBy64Bits(in UInt256 x, in UInt256 y, out UInt256 q, out UInt256 remainder)
+        {
+            ulong d = y.u0;
+
+            int s = BitOperations.LeadingZeroCount(d);
+            ulong dn = (s != 0) ? (d << s) : d; // normalised divisor (msb set if s>0)
+
+            ulong recip = Reciprocal2By1(dn);
+
+            // Normalise dividend into 5 limbs
+            ulong u0n, u1n, u2n, u3n, u4;
+            if (s == 0)
+            {
+                u0n = x.u0; u1n = x.u1; u2n = x.u2; u3n = x.u3; u4 = 0;
+            }
+            else
+            {
+                int rs = 64 - s;
+                u0n = x.u0 << s;
+                u1n = (x.u1 << s) | (x.u0 >> rs);
+                u2n = (x.u2 << s) | (x.u1 >> rs);
+                u3n = (x.u3 << s) | (x.u2 >> rs);
+                u4 = (x.u3 >> rs);
+            }
+
+            ulong rem = u4;
+
+            ulong q3 = UDivRem2By1(rem, u3n, dn, recip, out rem);
+            ulong q2 = UDivRem2By1(rem, u2n, dn, recip, out rem);
+            ulong q1 = UDivRem2By1(rem, u1n, dn, recip, out rem);
+            ulong q0 = UDivRem2By1(rem, u0n, dn, recip, out rem);
+
+            q = Create(q0, q1, q2, q3);
+
+            // Unnormalise remainder (single limb)
+            ulong r0 = (s == 0) ? rem : (rem >> s);
+            remainder = Create(r0, 0, 0, 0);
+            return;
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void DivideBy128Bits(in UInt256 x, in UInt256 y, out UInt256 q, out UInt256 remainder)
+        {
+            const int n = 2;
+            // ------------------------------------------------------------
+            // n >= 2: Knuth D (specialised) with reciprocal qhat
+            // ------------------------------------------------------------
+
+            int shift = BitOperations.LeadingZeroCount(y.u1);
+
+            // Normalise divisor v = y << shift
+            ulong v0, v1n, v2n, v3n;
+            if (shift == 0)
+            {
+                v0 = y.u0; v1n = y.u1; v2n = y.u2; v3n = y.u3;
+            }
+            else
+            {
+                int rs = 64 - shift;
+                v0 = y.u0 << shift;
+                v1n = (y.u1 << shift) | (y.u0 >> rs);
+                v2n = (y.u2 << shift) | (y.u1 >> rs);
+                v3n = (y.u3 << shift) | (y.u2 >> rs);
+            }
+
+            // Normalise dividend u = x << shift into 5 limbs
+            ulong u0n2, u1d, u2d, u3d, u4d;
+            if (shift == 0)
+            {
+                u0n2 = x.u0; u1d = x.u1; u2d = x.u2; u3d = x.u3; u4d = 0;
+            }
+            else
+            {
+                int rs = 64 - shift;
+                u0n2 = x.u0 << shift;
+                u1d = (x.u1 << shift) | (x.u0 >> rs);
+                u2d = (x.u2 << shift) | (x.u1 >> rs);
+                u3d = (x.u3 << shift) | (x.u2 >> rs);
+                u4d = (x.u3 >> rs);
+            }
+
+            ulong vHi = (n == 2) ? v1n : (n == 3) ? v2n : v3n;
+            ulong vRecip = Reciprocal2By1(vHi);
+            ulong q2 = DivStep2(ref u2d, ref u3d, ref u4d, v0, v1n, vRecip);
+            ulong q1 = DivStep2(ref u1d, ref u2d, ref u3d, v0, v1n, vRecip);
+            ulong q0 = DivStep2(ref u0n2, ref u1d, ref u2d, v0, v1n, vRecip);
+
+            q = Create(q0, q1, q2, 0);
+
+            // Remainder is u0..u1 (normalised) then unnormalise
+            UInt256 remN = Create(u0n2, u1d, 0, 0);
+            remainder = (shift == 0) ? remN : ShiftRightSmall(remN, shift);
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void DivideBy192Bits(in UInt256 x, in UInt256 y, out UInt256 q, out UInt256 remainder)
+        {
+            const int n = 3;
+            // ------------------------------------------------------------
+            // n >= 2: Knuth D (specialised) with reciprocal qhat
+            // ------------------------------------------------------------
+
+            int shift = BitOperations.LeadingZeroCount(y.u2);
+
+            // Normalise divisor v = y << shift
+            ulong v0, v1n, v2n, v3n;
+            if (shift == 0)
+            {
+                v0 = y.u0; v1n = y.u1; v2n = y.u2; v3n = y.u3;
+            }
+            else
+            {
+                int rs = 64 - shift;
+                v0 = y.u0 << shift;
+                v1n = (y.u1 << shift) | (y.u0 >> rs);
+                v2n = (y.u2 << shift) | (y.u1 >> rs);
+                v3n = (y.u3 << shift) | (y.u2 >> rs);
+            }
+
+            // Normalise dividend u = x << shift into 5 limbs
+            ulong u0n2, u1d, u2d, u3d, u4d;
+            if (shift == 0)
+            {
+                u0n2 = x.u0; u1d = x.u1; u2d = x.u2; u3d = x.u3; u4d = 0;
+            }
+            else
+            {
+                int rs = 64 - shift;
+                u0n2 = x.u0 << shift;
+                u1d = (x.u1 << shift) | (x.u0 >> rs);
+                u2d = (x.u2 << shift) | (x.u1 >> rs);
+                u3d = (x.u3 << shift) | (x.u2 >> rs);
+                u4d = (x.u3 >> rs);
+            }
+
+            ulong vHi = (n == 2) ? v1n : (n == 3) ? v2n : v3n;
+            ulong vRecip = Reciprocal2By1(vHi);
+            ulong q1 = DivStep3(ref u1d, ref u2d, ref u3d, ref u4d, v0, v1n, v2n, vRecip);
+            ulong q0 = DivStep3(ref u0n2, ref u1d, ref u2d, ref u3d, v0, v1n, v2n, vRecip);
+
+            q = Create(q0, q1, 0, 0);
+
+            // Remainder is u0..u2
+            UInt256 remN = Create(u0n2, u1d, u2d, 0);
+            remainder = (shift == 0) ? remN : ShiftRightSmall(remN, shift);
+            return;
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void DivideBy256Bits(in UInt256 x, in UInt256 y, out UInt256 q, out UInt256 remainder)
+        {
+            const int n = 4;
+            // ------------------------------------------------------------
+            // n >= 2: Knuth D (specialised) with reciprocal qhat
+            // ------------------------------------------------------------
+
+            int shift = BitOperations.LeadingZeroCount(y.u3);
+
+            // Normalise divisor v = y << shift
+            ulong v0, v1n, v2n, v3n;
+            if (shift == 0)
+            {
+                v0 = y.u0; v1n = y.u1; v2n = y.u2; v3n = y.u3;
+            }
+            else
+            {
+                int rs = 64 - shift;
+                v0 = y.u0 << shift;
+                v1n = (y.u1 << shift) | (y.u0 >> rs);
+                v2n = (y.u2 << shift) | (y.u1 >> rs);
+                v3n = (y.u3 << shift) | (y.u2 >> rs);
+            }
+
+            // Normalise dividend u = x << shift into 5 limbs
+            ulong u0n2, u1d, u2d, u3d, u4d;
+            if (shift == 0)
+            {
+                u0n2 = x.u0; u1d = x.u1; u2d = x.u2; u3d = x.u3; u4d = 0;
+            }
+            else
+            {
+                int rs = 64 - shift;
+                u0n2 = x.u0 << shift;
+                u1d = (x.u1 << shift) | (x.u0 >> rs);
+                u2d = (x.u2 << shift) | (x.u1 >> rs);
+                u3d = (x.u3 << shift) | (x.u2 >> rs);
+                u4d = (x.u3 >> rs);
+            }
+
+            ulong vHi = (n == 2) ? v1n : (n == 3) ? v2n : v3n;
+            ulong vRecip = Reciprocal2By1(vHi);
+            ulong q0 = DivStep4(ref u0n2, ref u1d, ref u2d, ref u3d, ref u4d, v0, v1n, v2n, v3n, vRecip);
+
+            q = Create(q0, 0, 0, 0);
+
+            // Remainder is u0..u3
+            UInt256 remN = Create(u0n2, u1d, u2d, u3d);
+            remainder = (shift == 0) ? remN : ShiftRightSmall(remN, shift);
+            return;
         }
 
         // Shift-right by 0..63 (used to unnormalise remainder)
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static UInt256 ShiftRightSmall(UInt256 v, int s)
+        private static UInt256 ShiftRightSmall(in UInt256 v, int s)
         {
-            unchecked
-            {
-                if (s == 0) return v;
+            if (s == 0) return v;
 
-                ulong a0 = v.u0, a1 = v.u1, a2 = v.u2, a3 = v.u3;
-                int rs = 64 - s;
+            ulong a0 = v.u0, a1 = v.u1, a2 = v.u2, a3 = v.u3;
+            int rs = 64 - s;
 
-                return Create(
-                    (a0 >> s) | (a1 << rs),
-                    (a1 >> s) | (a2 << rs),
-                    (a2 >> s) | (a3 << rs),
-                    (a3 >> s));
-            }
+            return Create(
+                (a0 >> s) | (a1 << rs),
+                (a1 >> s) | (a2 << rs),
+                (a2 >> s) | (a3 << rs),
+                (a3 >> s));
         }
         // Mask low k bits (k in 0..255)
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static UInt256 MaskLowBits(ulong x0, ulong x1, ulong x2, ulong x3, int k)
+        private static UInt256 MaskLowBits(in UInt256 x, int k)
         {
-            unchecked
+            if (k <= 0) return Zero;
+            if (k >= 256) return x;
+
+            int w = k >> 6;
+            int s = k & 63;
+
+            if (s == 0)
             {
-                if (k <= 0) return Zero;
-                if (k >= 256) return Create(x0, x1, x2, x3);
-
-                int w = k >> 6;
-                int s = k & 63;
-
-                if (s == 0)
-                {
-                    return w switch
-                    {
-                        0 => Zero,
-                        1 => Create(x0, 0, 0, 0),
-                        2 => Create(x0, x1, 0, 0),
-                        _ => Create(x0, x1, x2, 0),
-                    };
-                }
-
-                ulong mask = (1UL << s) - 1UL;
-
                 return w switch
                 {
-                    0 => Create(x0 & mask, 0, 0, 0),
-                    1 => Create(x0, x1 & mask, 0, 0),
-                    2 => Create(x0, x1, x2 & mask, 0),
-                    _ => Create(x0, x1, x2, x3 & mask),
+                    0 => Zero,
+                    1 => Create(x.u0, 0, 0, 0),
+                    2 => Create(x.u0, x.u1, 0, 0),
+                    _ => Create(x.u0, x.u1, x.u2, 0),
                 };
             }
+
+            ulong mask = (1UL << s) - 1UL;
+
+            return w switch
+            {
+                0 => Create(x.u0 & mask, 0, 0, 0),
+                1 => Create(x.u0, x.u1 & mask, 0, 0),
+                2 => Create(x.u0, x.u1, x.u2 & mask, 0),
+                _ => Create(x.u0, x.u1, x.u2, x.u3 & mask),
+            };
         }
         // ------------------------------------------------------------
         // Knuth steps (unrolled)
@@ -2830,107 +2913,98 @@ namespace Nethermind.Int256
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static ulong DivStep2(ref ulong u0, ref ulong u1, ref ulong u2, ulong v0, ulong v1, ulong recip)
         {
-            unchecked
+            // qhat from (u2:u1) / v1
+            ulong qhat, rhat, rcarry;
+            if (u2 == v1)
             {
-                // qhat from (u2:u1) / v1
-                ulong qhat, rhat, rcarry;
-                if (u2 == v1)
-                {
-                    qhat = ulong.MaxValue;
-                    ulong sum = u1 + v1;
-                    rcarry = (sum < u1) ? 1UL : 0UL;
-                    rhat = sum;
-                }
-                else
-                {
-                    qhat = UDivRem2By1(u2, u1, v1, recip, out rhat);
-                    rcarry = 0;
-                }
-
-                // Correct at most twice, but only do 2nd check if we actually decremented once.
-                if (CorrectQHatOnce(ref qhat, ref rhat, ref rcarry, v1, v0, u0))
-                    CorrectQHatOnce(ref qhat, ref rhat, ref rcarry, v1, v0, u0);
-
-                // u -= qhat * v ; u is 3 limbs here
-                ulong borrow = SubMul2(ref u0, ref u1, ref u2, v0, v1, qhat);
-
-                // FAST add-back: very rarely taken, cheaper than mask-addback on average
-                if (borrow != 0)
-                {
-                    AddBack2(ref u0, ref u1, ref u2, v0, v1);
-                    qhat--;
-                }
-
-                return qhat;
+                qhat = ulong.MaxValue;
+                ulong sum = u1 + v1;
+                rcarry = (sum < u1) ? 1UL : 0UL;
+                rhat = sum;
             }
+            else
+            {
+                qhat = UDivRem2By1(u2, u1, v1, recip, out rhat);
+                rcarry = 0;
+            }
+
+            // Correct at most twice, but only do 2nd check if we actually decremented once.
+            if (CorrectQHatOnce(ref qhat, ref rhat, ref rcarry, v1, v0, u0))
+                CorrectQHatOnce(ref qhat, ref rhat, ref rcarry, v1, v0, u0);
+
+            // u -= qhat * v ; u is 3 limbs here
+            ulong borrow = SubMul2(ref u0, ref u1, ref u2, v0, v1, qhat);
+
+            // FAST add-back: very rarely taken, cheaper than mask-addback on average
+            if (borrow != 0)
+            {
+                AddBack2(ref u0, ref u1, ref u2, v0, v1);
+                qhat--;
+            }
+
+            return qhat;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static ulong DivStep3(ref ulong u0, ref ulong u1, ref ulong u2, ref ulong u3, ulong v0, ulong v1, ulong v2, ulong recip)
         {
-            unchecked
+            ulong qhat, rhat, rcarry;
+            if (u3 == v2)
             {
-                ulong qhat, rhat, rcarry;
-                if (u3 == v2)
-                {
-                    qhat = ulong.MaxValue;
-                    ulong sum = u2 + v2;
-                    rcarry = (sum < u2) ? 1UL : 0UL;
-                    rhat = sum;
-                }
-                else
-                {
-                    qhat = UDivRem2By1(u3, u2, v2, recip, out rhat);
-                    rcarry = 0;
-                }
-
-                if (CorrectQHatOnce(ref qhat, ref rhat, ref rcarry, v2, v1, u1))
-                    CorrectQHatOnce(ref qhat, ref rhat, ref rcarry, v2, v1, u1);
-
-                ulong borrow = SubMul3(ref u0, ref u1, ref u2, ref u3, v0, v1, v2, qhat);
-
-                if (borrow != 0)
-                {
-                    AddBack3(ref u0, ref u1, ref u2, ref u3, v0, v1, v2);
-                    qhat--;
-                }
-
-                return qhat;
+                qhat = ulong.MaxValue;
+                ulong sum = u2 + v2;
+                rcarry = (sum < u2) ? 1UL : 0UL;
+                rhat = sum;
             }
+            else
+            {
+                qhat = UDivRem2By1(u3, u2, v2, recip, out rhat);
+                rcarry = 0;
+            }
+
+            if (CorrectQHatOnce(ref qhat, ref rhat, ref rcarry, v2, v1, u1))
+                CorrectQHatOnce(ref qhat, ref rhat, ref rcarry, v2, v1, u1);
+
+            ulong borrow = SubMul3(ref u0, ref u1, ref u2, ref u3, v0, v1, v2, qhat);
+
+            if (borrow != 0)
+            {
+                AddBack3(ref u0, ref u1, ref u2, ref u3, v0, v1, v2);
+                qhat--;
+            }
+
+            return qhat;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static ulong DivStep4(ref ulong u0, ref ulong u1, ref ulong u2, ref ulong u3, ref ulong u4, ulong v0, ulong v1, ulong v2, ulong v3, ulong recip)
         {
-            unchecked
+            ulong qhat, rhat, rcarry;
+            if (u4 == v3)
             {
-                ulong qhat, rhat, rcarry;
-                if (u4 == v3)
-                {
-                    qhat = ulong.MaxValue;
-                    ulong sum = u3 + v3;
-                    rcarry = (sum < u3) ? 1UL : 0UL;
-                    rhat = sum;
-                }
-                else
-                {
-                    qhat = UDivRem2By1(u4, u3, v3, recip, out rhat);
-                    rcarry = 0;
-                }
-
-                if (CorrectQHatOnce(ref qhat, ref rhat, ref rcarry, v3, v2, u2))
-                    CorrectQHatOnce(ref qhat, ref rhat, ref rcarry, v3, v2, u2);
-
-                ulong borrow = SubMul4(ref u0, ref u1, ref u2, ref u3, ref u4, v0, v1, v2, v3, qhat);
-
-                if (borrow != 0)
-                {
-                    AddBack4(ref u0, ref u1, ref u2, ref u3, ref u4, v0, v1, v2, v3);
-                    qhat--;
-                }
-
-                return qhat;
+                qhat = ulong.MaxValue;
+                ulong sum = u3 + v3;
+                rcarry = (sum < u3) ? 1UL : 0UL;
+                rhat = sum;
             }
+            else
+            {
+                qhat = UDivRem2By1(u4, u3, v3, recip, out rhat);
+                rcarry = 0;
+            }
+
+            if (CorrectQHatOnce(ref qhat, ref rhat, ref rcarry, v3, v2, u2))
+                CorrectQHatOnce(ref qhat, ref rhat, ref rcarry, v3, v2, u2);
+
+            ulong borrow = SubMul4(ref u0, ref u1, ref u2, ref u3, ref u4, v0, v1, v2, v3, qhat);
+
+            if (borrow != 0)
+            {
+                AddBack4(ref u0, ref u1, ref u2, ref u3, ref u4, v0, v1, v2, v3);
+                qhat--;
+            }
+
+            return qhat;
         }
 
         // ------------------------------------------------------------
@@ -2940,28 +3014,25 @@ namespace Nethermind.Int256
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static bool CorrectQHatOnce(ref ulong qhat, ref ulong rhat, ref ulong rcarry, ulong vHi, ulong vNext, ulong uCorr)
         {
-            unchecked
-            {
-                if (rcarry != 0)
-                    return false;
-
-                Mul128(qhat, vNext, out ulong pLo, out ulong pHi);
-
-                // if qhat*vNext > rhat*b + uCorr then decrement
-                if (pHi > rhat || (pHi == rhat && pLo > uCorr))
-                {
-                    qhat--;
-
-                    ulong sum = rhat + vHi;
-                    if (sum < rhat)
-                        rcarry = 1;
-
-                    rhat = sum;
-                    return true;
-                }
-
+            if (rcarry != 0)
                 return false;
+
+            Mul128(qhat, vNext, out ulong pLo, out ulong pHi);
+
+            // if qhat*vNext > rhat*b + uCorr then decrement
+            if (pHi > rhat || (pHi == rhat && pLo > uCorr))
+            {
+                qhat--;
+
+                ulong sum = rhat + vHi;
+                if (sum < rhat)
+                    rcarry = 1;
+
+                rhat = sum;
+                return true;
             }
+
+            return false;
         }
 
         // ------------------------------------------------------------
@@ -2971,97 +3042,88 @@ namespace Nethermind.Int256
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static ulong SubMul2(ref ulong u0, ref ulong u1, ref ulong u2, ulong v0, ulong v1, ulong q)
         {
-            unchecked
-            {
-                ulong borrow = 0;
-                ulong carry = 0;
+            ulong borrow = 0;
+            ulong carry = 0;
 
-                Mul128(q, v0, out ulong pLo, out ulong pHi);
-                ulong sum = pLo + carry;
-                ulong c2 = (sum < pLo) ? 1UL : 0UL;
-                carry = pHi + c2;
-                SubInPlace(ref u0, sum, ref borrow);
+            Mul128(q, v0, out ulong pLo, out ulong pHi);
+            ulong sum = pLo + carry;
+            ulong c2 = (sum < pLo) ? 1UL : 0UL;
+            carry = pHi + c2;
+            SubInPlace(ref u0, sum, ref borrow);
 
-                Mul128(q, v1, out pLo, out pHi);
-                sum = pLo + carry;
-                c2 = (sum < pLo) ? 1UL : 0UL;
-                carry = pHi + c2;
-                SubInPlace(ref u1, sum, ref borrow);
+            Mul128(q, v1, out pLo, out pHi);
+            sum = pLo + carry;
+            c2 = (sum < pLo) ? 1UL : 0UL;
+            carry = pHi + c2;
+            SubInPlace(ref u1, sum, ref borrow);
 
-                SubInPlace(ref u2, carry, ref borrow);
+            SubInPlace(ref u2, carry, ref borrow);
 
-                return borrow;
-            }
+            return borrow;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static ulong SubMul3(ref ulong u0, ref ulong u1, ref ulong u2, ref ulong u3, ulong v0, ulong v1, ulong v2, ulong q)
         {
-            unchecked
-            {
-                ulong borrow = 0;
-                ulong carry = 0;
+            ulong borrow = 0;
+            ulong carry = 0;
 
-                Mul128(q, v0, out ulong pLo, out ulong pHi);
-                ulong sum = pLo + carry;
-                ulong c2 = (sum < pLo) ? 1UL : 0UL;
-                carry = pHi + c2;
-                SubInPlace(ref u0, sum, ref borrow);
+            Mul128(q, v0, out ulong pLo, out ulong pHi);
+            ulong sum = pLo + carry;
+            ulong c2 = (sum < pLo) ? 1UL : 0UL;
+            carry = pHi + c2;
+            SubInPlace(ref u0, sum, ref borrow);
 
-                Mul128(q, v1, out pLo, out pHi);
-                sum = pLo + carry;
-                c2 = (sum < pLo) ? 1UL : 0UL;
-                carry = pHi + c2;
-                SubInPlace(ref u1, sum, ref borrow);
+            Mul128(q, v1, out pLo, out pHi);
+            sum = pLo + carry;
+            c2 = (sum < pLo) ? 1UL : 0UL;
+            carry = pHi + c2;
+            SubInPlace(ref u1, sum, ref borrow);
 
-                Mul128(q, v2, out pLo, out pHi);
-                sum = pLo + carry;
-                c2 = (sum < pLo) ? 1UL : 0UL;
-                carry = pHi + c2;
-                SubInPlace(ref u2, sum, ref borrow);
+            Mul128(q, v2, out pLo, out pHi);
+            sum = pLo + carry;
+            c2 = (sum < pLo) ? 1UL : 0UL;
+            carry = pHi + c2;
+            SubInPlace(ref u2, sum, ref borrow);
 
-                SubInPlace(ref u3, carry, ref borrow);
+            SubInPlace(ref u3, carry, ref borrow);
 
-                return borrow;
-            }
+            return borrow;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static ulong SubMul4(ref ulong u0, ref ulong u1, ref ulong u2, ref ulong u3, ref ulong u4, ulong v0, ulong v1, ulong v2, ulong v3, ulong q)
         {
-            unchecked
-            {
-                ulong borrow = 0;
-                ulong carry = 0;
+            ulong borrow = 0;
+            ulong carry = 0;
 
-                Mul128(q, v0, out ulong pLo, out ulong pHi);
-                ulong sum = pLo + carry;
-                ulong c2 = (sum < pLo) ? 1UL : 0UL;
-                carry = pHi + c2;
-                SubInPlace(ref u0, sum, ref borrow);
+            Mul128(q, v0, out ulong pLo, out ulong pHi);
+            ulong sum = pLo + carry;
+            ulong c2 = (sum < pLo) ? 1UL : 0UL;
+            carry = pHi + c2;
+            SubInPlace(ref u0, sum, ref borrow);
 
-                Mul128(q, v1, out pLo, out pHi);
-                sum = pLo + carry;
-                c2 = (sum < pLo) ? 1UL : 0UL;
-                carry = pHi + c2;
-                SubInPlace(ref u1, sum, ref borrow);
+            Mul128(q, v1, out pLo, out pHi);
+            sum = pLo + carry;
+            c2 = (sum < pLo) ? 1UL : 0UL;
+            carry = pHi + c2;
+            SubInPlace(ref u1, sum, ref borrow);
 
-                Mul128(q, v2, out pLo, out pHi);
-                sum = pLo + carry;
-                c2 = (sum < pLo) ? 1UL : 0UL;
-                carry = pHi + c2;
-                SubInPlace(ref u2, sum, ref borrow);
+            Mul128(q, v2, out pLo, out pHi);
+            sum = pLo + carry;
+            c2 = (sum < pLo) ? 1UL : 0UL;
+            carry = pHi + c2;
+            SubInPlace(ref u2, sum, ref borrow);
 
-                Mul128(q, v3, out pLo, out pHi);
-                sum = pLo + carry;
-                c2 = (sum < pLo) ? 1UL : 0UL;
-                carry = pHi + c2;
-                SubInPlace(ref u3, sum, ref borrow);
+            Mul128(q, v3, out pLo, out pHi);
+            sum = pLo + carry;
+            c2 = (sum < pLo) ? 1UL : 0UL;
+            carry = pHi + c2;
+            SubInPlace(ref u3, sum, ref borrow);
 
-                SubInPlace(ref u4, carry, ref borrow);
+            SubInPlace(ref u4, carry, ref borrow);
 
-                return borrow;
-            }
+            return borrow;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -3086,15 +3148,12 @@ namespace Nethermind.Int256
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void AddBack4(ref ulong u0, ref ulong u1, ref ulong u2, ref ulong u3, ref ulong u4, ulong v0, ulong v1, ulong v2, ulong v3)
         {
-            unchecked
-            {
-                ulong c = 0;
-                AddWithCarry(u0, v0, ref c, out u0);
-                AddWithCarry(u1, v1, ref c, out u1);
-                AddWithCarry(u2, v2, ref c, out u2);
-                AddWithCarry(u3, v3, ref c, out u3);
-                u4 += c;
-            }
+            ulong c = 0;
+            AddWithCarry(u0, v0, ref c, out u0);
+            AddWithCarry(u1, v1, ref c, out u1);
+            AddWithCarry(u2, v2, ref c, out u2);
+            AddWithCarry(u3, v3, ref c, out u3);
+            u4 += c;
         }
 
         // Preconditions:
@@ -3103,31 +3162,28 @@ namespace Nethermind.Int256
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static ulong UDivRem2By1(ulong u1, ulong u0, ulong d, ulong recip, out ulong r)
         {
-            unchecked
+            Mul128(recip, u1, out ulong pLo, out ulong pHi);
+
+            ulong qLo = pLo + u0;
+            ulong carry = (qLo < pLo) ? 1UL : 0UL;
+            ulong q = pHi + u1 + carry + 1;
+
+            ulong rem = u0 - (q * d);
+
+            // Corrections are rare - branchy is typically fastest.
+            if (rem > qLo)
             {
-                Mul128(recip, u1, out ulong pLo, out ulong pHi);
-
-                ulong qLo = pLo + u0;
-                ulong carry = (qLo < pLo) ? 1UL : 0UL;
-                ulong q = pHi + u1 + carry + 1;
-
-                ulong rem = u0 - unchecked(q * d);
-
-                // Corrections are rare - branchy is typically fastest.
-                if (rem > qLo)
-                {
-                    q--;
-                    rem += d;
-                }
-                if (rem >= d)
-                {
-                    q++;
-                    rem -= d;
-                }
-
-                r = rem;
-                return q;
+                q--;
+                rem += d;
             }
+            if (rem >= d)
+            {
+                q++;
+                rem -= d;
+            }
+
+            r = rem;
+            return q;
         }
 
         // ------------------------------------------------------------
@@ -3135,37 +3191,37 @@ namespace Nethermind.Int256
         // ------------------------------------------------------------
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static bool TryGetPow2Shift(ulong y0, ulong y1, ulong y2, ulong y3, out int shift)
+        private static bool TryGetPow2Shift(in UInt256 y, out int shift)
         {
-            if (y3 != 0)
+            if (y.u3 != 0)
             {
-                if ((y0 | y1 | y2) == 0 && ((y3 & (y3 - 1)) == 0))
+                if ((y.u0 | y.u1 | y.u2) == 0 && ((y.u3 & (y.u3 - 1)) == 0))
                 {
-                    shift = 192 + BitOperations.TrailingZeroCount(y3);
+                    shift = 192 + BitOperations.TrailingZeroCount(y.u3);
                     return true;
                 }
             }
-            else if (y2 != 0)
+            else if (y.u2 != 0)
             {
-                if ((y0 | y1) == 0 && ((y2 & (y2 - 1)) == 0))
+                if ((y.u0 | y.u1) == 0 && ((y.u2 & (y.u2 - 1)) == 0))
                 {
-                    shift = 128 + BitOperations.TrailingZeroCount(y2);
+                    shift = 128 + BitOperations.TrailingZeroCount(y.u2);
                     return true;
                 }
             }
-            else if (y1 != 0)
+            else if (y.u1 != 0)
             {
-                if (y0 == 0 && ((y1 & (y1 - 1)) == 0))
+                if (y.u0 == 0 && ((y.u1 & (y.u1 - 1)) == 0))
                 {
-                    shift = 64 + BitOperations.TrailingZeroCount(y1);
+                    shift = 64 + BitOperations.TrailingZeroCount(y.u1);
                     return true;
                 }
             }
             else
             {
-                if (((y0 & (y0 - 1)) == 0))
+                if (((y.u0 & (y.u0 - 1)) == 0))
                 {
-                    shift = BitOperations.TrailingZeroCount(y0);
+                    shift = BitOperations.TrailingZeroCount(y.u0);
                     return true;
                 }
             }
@@ -3175,53 +3231,50 @@ namespace Nethermind.Int256
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static UInt256 ShiftRight(ulong x0, ulong x1, ulong x2, ulong x3, int k)
+        private static UInt256 ShiftRight(in UInt256 x, int k)
         {
-            unchecked
+            if ((uint)k >= 256u)
+                return Zero;
+
+            int w = k >> 6;
+            int s = k & 63;
+
+            if (s == 0)
             {
-                if ((uint)k >= 256u)
-                    return Zero;
-
-                int w = k >> 6;
-                int s = k & 63;
-
-                if (s == 0)
-                {
-                    return w switch
-                    {
-                        0 => Create(x0, x1, x2, x3),
-                        1 => Create(x1, x2, x3, 0),
-                        2 => Create(x2, x3, 0, 0),
-                        _ => Create(x3, 0, 0, 0),
-                    };
-                }
-
-                int rs = 64 - s;
-
                 return w switch
                 {
-                    0 => Create(
-                        (x0 >> s) | (x1 << rs),
-                        (x1 >> s) | (x2 << rs),
-                        (x2 >> s) | (x3 << rs),
-                        (x3 >> s)),
-                    1 => Create(
-                        (x1 >> s) | (x2 << rs),
-                        (x2 >> s) | (x3 << rs),
-                        (x3 >> s),
-                        0),
-                    2 => Create(
-                        (x2 >> s) | (x3 << rs),
-                        (x3 >> s),
-                        0,
-                        0),
-                    _ => Create(
-                        (x3 >> s),
-                        0,
-                        0,
-                        0),
+                    0 => Create(x.u0, x.u1, x.u2, x.u3),
+                    1 => Create(x.u1, x.u2, x.u3, 0),
+                    2 => Create(x.u2, x.u3, 0, 0),
+                    _ => Create(x.u3, 0, 0, 0),
                 };
             }
+
+            int rs = 64 - s;
+
+            return w switch
+            {
+                0 => Create(
+                    (x.u0 >> s) | (x.u1 << rs),
+                    (x.u1 >> s) | (x.u2 << rs),
+                    (x.u2 >> s) | (x.u3 << rs),
+                    (x.u3 >> s)),
+                1 => Create(
+                    (x.u1 >> s) | (x.u2 << rs),
+                    (x.u2 >> s) | (x.u3 << rs),
+                    (x.u3 >> s),
+                    0),
+                2 => Create(
+                    (x.u2 >> s) | (x.u3 << rs),
+                    (x.u3 >> s),
+                    0,
+                    0),
+                _ => Create(
+                    (x.u3 >> s),
+                    0,
+                    0,
+                    0),
+            };
         }
 
         // ------------------------------------------------------------
@@ -3229,7 +3282,7 @@ namespace Nethermind.Int256
         // ------------------------------------------------------------
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static unsafe void Mul128(ulong a, ulong b, out ulong lo, out ulong hi)
+        private static void Mul128(ulong a, ulong b, out ulong lo, out ulong hi)
         {
             // mulx: returns high, writes low (managed signature is swapped vs the C intrinsic)
             hi = Math.BigMul(a, b, out ulong loLocal);
@@ -3239,15 +3292,12 @@ namespace Nethermind.Int256
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void SubInPlace(ref ulong x, ulong y, ref ulong borrow)
         {
-            unchecked
-            {
-                ulong t = x - y;
-                ulong b1 = (x < y) ? 1UL : 0UL;
-                ulong t2 = t - borrow;
-                ulong b2 = (t < borrow) ? 1UL : 0UL;
-                x = t2;
-                borrow = b1 | b2;
-            }
+            ulong t = x - y;
+            ulong b1 = (x < y) ? 1UL : 0UL;
+            ulong t2 = t - borrow;
+            ulong b2 = (t < borrow) ? 1UL : 0UL;
+            x = t2;
+            borrow = b1 | b2;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
