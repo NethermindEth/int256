@@ -656,12 +656,12 @@ namespace Nethermind.Int256
             // Horner-like remainder using exact 2-by-1 divisions:
             // r = (((((u5*b + u4)*b + u3)*b + u2)*b + u1)*b + u0) % dn
             ulong r = 0;
-            _ = UDivRem2By1(r, u5, dn, recip, out r);
-            _ = UDivRem2By1(r, u4, dn, recip, out r);
-            _ = UDivRem2By1(r, u3, dn, recip, out r);
-            _ = UDivRem2By1(r, u2, dn, recip, out r);
-            _ = UDivRem2By1(r, u1, dn, recip, out r);
-            _ = UDivRem2By1(r, u0, dn, recip, out r);
+            _ = UDivRem2By1(r, recip, dn, u5, out r);
+            _ = UDivRem2By1(r, recip, dn, u4, out r);
+            _ = UDivRem2By1(r, recip, dn, u3, out r);
+            _ = UDivRem2By1(r, recip, dn, u2, out r);
+            _ = UDivRem2By1(r, recip, dn, u1, out r);
+            _ = UDivRem2By1(r, recip, dn, u0, out r);
 
             return (s == 0) ? r : (r >> s);
         }
@@ -1121,7 +1121,7 @@ namespace Nethermind.Int256
         }
 
         [SkipLocalsInit]
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.NoInlining)]
         private static ulong Reciprocal2By1(ulong d)
         {
             // Precondition: d is normalised (bit 63 set).
@@ -1807,10 +1807,6 @@ namespace Nethermind.Int256
             // x/y ; x > y > 0
 
             DivideImpl(x, y, out res, out _);
-            //UInt256 intermediate = default; // initialize with zeros
-            //const int length = 4;
-            //Udivrem(ref Unsafe.As<UInt256, ulong>(ref intermediate), ref Unsafe.As<UInt256, ulong>(ref Unsafe.AsRef(in x)), length, y, out UInt256 _);
-            //res = intermediate;
         }
 
         public void Divide(in UInt256 a, out UInt256 res) => Divide(this, a, out res);
@@ -2645,11 +2641,12 @@ namespace Nethermind.Int256
             }
             else
             {
-                DivideBy64Bits(in x, in y, out q, out remainder);
+                DivideBy64Bits(in x, y.u0, out q, out remainder);
                 return;
             }
         }
 
+        [SkipLocalsInit]
         [MethodImpl(MethodImplOptions.NoInlining)]
         private static void DivideByPowerOf2(in UInt256 x, int k, out UInt256 q, out UInt256 remainder)
         {
@@ -2658,13 +2655,12 @@ namespace Nethermind.Int256
             return;
         }
 
+        [SkipLocalsInit]
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void DivideBy64Bits(in UInt256 x, in UInt256 y, out UInt256 q, out UInt256 remainder)
+        private static void DivideBy64Bits(in UInt256 x, ulong d, out UInt256 q, out UInt256 remainder)
         {
-            ulong d = y.u0;
-
             int s = BitOperations.LeadingZeroCount(d);
-            ulong dn = (s != 0) ? (d << s) : d; // normalised divisor (msb set if s>0)
+            ulong dn = d << s; // normalised divisor (msb set if s>0)
 
             ulong recip = Reciprocal2By1(dn);
 
@@ -2686,23 +2682,23 @@ namespace Nethermind.Int256
 
             ulong rem = u4;
 
-            ulong q3 = UDivRem2By1(rem, u3n, dn, recip, out rem);
-            ulong q2 = UDivRem2By1(rem, u2n, dn, recip, out rem);
-            ulong q1 = UDivRem2By1(rem, u1n, dn, recip, out rem);
-            ulong q0 = UDivRem2By1(rem, u0n, dn, recip, out rem);
+            ulong q3 = UDivRem2By1(rem, recip, dn, u3n, out rem);
+            ulong q2 = UDivRem2By1(rem, recip, dn, u2n, out rem);
+            ulong q1 = UDivRem2By1(rem, recip, dn, u1n, out rem);
+            ulong q0 = UDivRem2By1(rem, recip, dn, u0n, out rem);
 
             q = Create(q0, q1, q2, q3);
 
             // Unnormalise remainder (single limb)
-            ulong r0 = (s == 0) ? rem : (rem >> s);
+            ulong r0 = rem >> s;
             remainder = Create(r0, 0, 0, 0);
             return;
         }
 
+        [SkipLocalsInit]
         [MethodImpl(MethodImplOptions.NoInlining)]
         private static void DivideBy128Bits(in UInt256 x, in UInt256 y, out UInt256 q, out UInt256 remainder)
         {
-            const int n = 2;
             // ------------------------------------------------------------
             // n >= 2: Knuth D (specialised) with reciprocal qhat
             // ------------------------------------------------------------
@@ -2710,18 +2706,16 @@ namespace Nethermind.Int256
             int shift = BitOperations.LeadingZeroCount(y.u1);
 
             // Normalise divisor v = y << shift
-            ulong v0, v1n, v2n, v3n;
+            ulong v0, v1n;
             if (shift == 0)
             {
-                v0 = y.u0; v1n = y.u1; v2n = y.u2; v3n = y.u3;
+                v0 = y.u0; v1n = y.u1;
             }
             else
             {
                 int rs = 64 - shift;
                 v0 = y.u0 << shift;
                 v1n = (y.u1 << shift) | (y.u0 >> rs);
-                v2n = (y.u2 << shift) | (y.u1 >> rs);
-                v3n = (y.u3 << shift) | (y.u2 >> rs);
             }
 
             // Normalise dividend u = x << shift into 5 limbs
@@ -2740,8 +2734,7 @@ namespace Nethermind.Int256
                 u4d = (x.u3 >> rs);
             }
 
-            ulong vHi = (n == 2) ? v1n : (n == 3) ? v2n : v3n;
-            ulong vRecip = Reciprocal2By1(vHi);
+            ulong vRecip = Reciprocal2By1(v1n);
             ulong q2 = DivStep2(ref u2d, ref u3d, ref u4d, v0, v1n, vRecip);
             ulong q1 = DivStep2(ref u1d, ref u2d, ref u3d, v0, v1n, vRecip);
             ulong q0 = DivStep2(ref u0n2, ref u1d, ref u2d, v0, v1n, vRecip);
@@ -2753,10 +2746,10 @@ namespace Nethermind.Int256
             remainder = (shift == 0) ? remN : ShiftRightSmall(remN, shift);
         }
 
+        [SkipLocalsInit]
         [MethodImpl(MethodImplOptions.NoInlining)]
         private static void DivideBy192Bits(in UInt256 x, in UInt256 y, out UInt256 q, out UInt256 remainder)
         {
-            const int n = 3;
             // ------------------------------------------------------------
             // n >= 2: Knuth D (specialised) with reciprocal qhat
             // ------------------------------------------------------------
@@ -2764,10 +2757,10 @@ namespace Nethermind.Int256
             int shift = BitOperations.LeadingZeroCount(y.u2);
 
             // Normalise divisor v = y << shift
-            ulong v0, v1n, v2n, v3n;
+            ulong v0, v1n, v2n;
             if (shift == 0)
             {
-                v0 = y.u0; v1n = y.u1; v2n = y.u2; v3n = y.u3;
+                v0 = y.u0; v1n = y.u1; v2n = y.u2;
             }
             else
             {
@@ -2775,7 +2768,6 @@ namespace Nethermind.Int256
                 v0 = y.u0 << shift;
                 v1n = (y.u1 << shift) | (y.u0 >> rs);
                 v2n = (y.u2 << shift) | (y.u1 >> rs);
-                v3n = (y.u3 << shift) | (y.u2 >> rs);
             }
 
             // Normalise dividend u = x << shift into 5 limbs
@@ -2794,8 +2786,7 @@ namespace Nethermind.Int256
                 u4d = (x.u3 >> rs);
             }
 
-            ulong vHi = (n == 2) ? v1n : (n == 3) ? v2n : v3n;
-            ulong vRecip = Reciprocal2By1(vHi);
+            ulong vRecip = Reciprocal2By1(v2n);
             ulong q1 = DivStep3(ref u1d, ref u2d, ref u3d, ref u4d, v0, v1n, v2n, vRecip);
             ulong q0 = DivStep3(ref u0n2, ref u1d, ref u2d, ref u3d, v0, v1n, v2n, vRecip);
 
@@ -2807,10 +2798,10 @@ namespace Nethermind.Int256
             return;
         }
 
+        [SkipLocalsInit]
         [MethodImpl(MethodImplOptions.NoInlining)]
         private static void DivideBy256Bits(in UInt256 x, in UInt256 y, out UInt256 q, out UInt256 remainder)
         {
-            const int n = 4;
             // ------------------------------------------------------------
             // n >= 2: Knuth D (specialised) with reciprocal qhat
             // ------------------------------------------------------------
@@ -2848,8 +2839,7 @@ namespace Nethermind.Int256
                 u4d = (x.u3 >> rs);
             }
 
-            ulong vHi = (n == 2) ? v1n : (n == 3) ? v2n : v3n;
-            ulong vRecip = Reciprocal2By1(vHi);
+            ulong vRecip = Reciprocal2By1(v3n);
             ulong q0 = DivStep4(ref u0n2, ref u1d, ref u2d, ref u3d, ref u4d, v0, v1n, v2n, v3n, vRecip);
 
             q = Create(q0, 0, 0, 0);
@@ -2868,43 +2858,59 @@ namespace Nethermind.Int256
 
             ulong a0 = v.u0, a1 = v.u1, a2 = v.u2, a3 = v.u3;
             int rs = 64 - s;
+            
+            Unsafe.SkipInit(out UInt256 result);
+            Unsafe.AsRef(in result.u0) = (a0 >> s) | (a1 << rs);
+            Unsafe.AsRef(in result.u1) = (a1 >> s) | (a2 << rs);
+            Unsafe.AsRef(in result.u2) = (a2 >> s) | (a3 << rs);
+            Unsafe.AsRef(in result.u3) = (a3 >> s);
 
-            return Create(
-                (a0 >> s) | (a1 << rs),
-                (a1 >> s) | (a2 << rs),
-                (a2 >> s) | (a3 << rs),
-                (a3 >> s));
+            return result;
         }
+
         // Mask low k bits (k in 0..255)
+        [SkipLocalsInit]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static UInt256 MaskLowBits(in UInt256 x, int k)
         {
-            if (k <= 0) return Zero;
-            if (k >= 256) return x;
+            // Keep the same fast exits, but avoid touching any statics like Zero.
+            if (k <= 0)
+                return default;
 
-            int w = k >> 6;
-            int s = k & 63;
+            if (k >= 256)
+                return x;
 
+            uint w = (uint)k >> 6;   // 0..3
+            int s = k & 63;          // 0..63
+
+            ulong x0 = x.u0;
+            ulong x1 = x.u1;
+            ulong x2 = x.u2;
+            ulong x3 = x.u3;
+
+            Unsafe.SkipInit(out UInt256 result);
             if (s == 0)
             {
-                return w switch
-                {
-                    0 => Zero,
-                    1 => Create(x.u0, 0, 0, 0),
-                    2 => Create(x.u0, x.u1, 0, 0),
-                    _ => Create(x.u0, x.u1, x.u2, 0),
-                };
+                // k is a multiple of 64, and k > 0, so w is 1..3 here.
+                // Keep whole limbs below w, clear above.
+                Unsafe.AsRef(in result.u0) = x0;
+                Unsafe.AsRef(in result.u1) = (w >= 2) ? x1 : 0UL;
+                Unsafe.AsRef(in result.u2) = (w >= 3) ? x2 : 0UL;
+                Unsafe.AsRef(in result.u3) = 0UL;
+                return result;
             }
 
+            // s is 1..63 here, so this is safe.
             ulong mask = (1UL << s) - 1UL;
 
-            return w switch
-            {
-                0 => Create(x.u0 & mask, 0, 0, 0),
-                1 => Create(x.u0, x.u1 & mask, 0, 0),
-                2 => Create(x.u0, x.u1, x.u2 & mask, 0),
-                _ => Create(x.u0, x.u1, x.u2, x.u3 & mask),
-            };
+            // Keep full limbs below w, mask the limb at w, clear above.
+            // Written to encourage cmov chains rather than jump tables.
+            Unsafe.AsRef(in result.u0) = (w == 0) ? (x0 & mask) : x0;
+            Unsafe.AsRef(in result.u1) = (w == 0) ? 0UL : (w == 1) ? (x1 & mask) : x1;
+            Unsafe.AsRef(in result.u2) = (w <= 1) ? 0UL : (w == 2) ? (x2 & mask) : x2;
+            Unsafe.AsRef(in result.u3) = (w <= 2) ? 0UL : (x3 & mask);
+
+            return result;
         }
         // ------------------------------------------------------------
         // Knuth steps (unrolled)
@@ -2924,7 +2930,7 @@ namespace Nethermind.Int256
             }
             else
             {
-                qhat = UDivRem2By1(u2, u1, v1, recip, out rhat);
+                qhat = UDivRem2By1(u2, recip, v1, u1, out rhat);
                 rcarry = 0;
             }
 
@@ -2958,7 +2964,7 @@ namespace Nethermind.Int256
             }
             else
             {
-                qhat = UDivRem2By1(u3, u2, v2, recip, out rhat);
+                qhat = UDivRem2By1(u3, recip, v2, u2, out rhat);
                 rcarry = 0;
             }
 
@@ -2989,7 +2995,7 @@ namespace Nethermind.Int256
             }
             else
             {
-                qhat = UDivRem2By1(u4, u3, v3, recip, out rhat);
+                qhat = UDivRem2By1(u4, recip, v3, u3, out rhat);
                 rcarry = 0;
             }
 
@@ -3159,28 +3165,29 @@ namespace Nethermind.Int256
         // Preconditions:
         // - d normalised (msb set)
         // - u1 < d
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static ulong UDivRem2By1(ulong u1, ulong u0, ulong d, ulong recip, out ulong r)
+        [SkipLocalsInit]
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static ulong UDivRem2By1(ulong u1, ulong recip, ulong d, ulong u0, out ulong r)
         {
             Mul128(recip, u1, out ulong pLo, out ulong pHi);
 
-            ulong qLo = pLo + u0;
-            ulong carry = (qLo < pLo) ? 1UL : 0UL;
-            ulong q = pHi + u1 + carry + 1;
+            ulong qLoNew = u0 + pLo;
+            ulong q = pHi + u1 + 1UL;
+
+            // carry from u0 + pLo, but compare against u0 so pLo does not need to live
+            q += (qLoNew < u0) ? 1UL : 0UL;
 
             ulong rem = u0 - (q * d);
 
-            // Corrections are rare - branchy is typically fastest.
-            if (rem > qLo)
-            {
-                q--;
-                rem += d;
-            }
-            if (rem >= d)
-            {
-                q++;
-                rem -= d;
-            }
+            // correction 1: if (rem > qLoNew) { q--; rem += d; }
+            ulong m = (ulong)-(rem > qLoNew ? 1 : 0);
+            q -= (m & 1UL);
+            rem += (m & d);
+
+            // correction 2: if (rem >= d) { q++; rem -= d; }
+            m = (ulong)-(rem >= d ? 1 : 0);
+            q += (m & 1UL);
+            rem -= (m & d);
 
             r = rem;
             return q;
@@ -3230,63 +3237,57 @@ namespace Nethermind.Int256
             return false;
         }
 
+        [SkipLocalsInit]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static UInt256 ShiftRight(in UInt256 x, int k)
         {
             if ((uint)k >= 256u)
-                return Zero;
+                return default;
 
-            int w = k >> 6;
+            uint w = (uint)k >> 6;
             int s = k & 63;
+
+            ulong x0 = x.u0;
+            ulong x1 = x.u1;
+            ulong x2 = x.u2;
+            ulong x3 = x.u3;
+
+            // Word shift (cmov-friendly shape)
+            ulong y0 = w == 0 ? x0 : w == 1 ? x1 : w == 2 ? x2 : x3;
+            ulong y1 = w == 0 ? x1 : w == 1 ? x2 : w == 2 ? x3 : 0UL;
+            ulong y2 = w == 0 ? x2 : w == 1 ? x3 : 0UL;
+            ulong y3 = w == 0 ? x3 : 0UL;
+
+            Unsafe.SkipInit(out UInt256 result);
 
             if (s == 0)
             {
-                return w switch
-                {
-                    0 => Create(x.u0, x.u1, x.u2, x.u3),
-                    1 => Create(x.u1, x.u2, x.u3, 0),
-                    2 => Create(x.u2, x.u3, 0, 0),
-                    _ => Create(x.u3, 0, 0, 0),
-                };
+                Unsafe.AsRef(in result.u0) = y0;
+                Unsafe.AsRef(in result.u1) = y1;
+                Unsafe.AsRef(in result.u2) = y2;
+                Unsafe.AsRef(in result.u3) = y3;
+                return result;
             }
 
             int rs = 64 - s;
+            // Compute + store each limb immediately - shrinks live ranges
+            Unsafe.AsRef(in result.u0) = (y0 >> s) | (y1 << rs);
+            Unsafe.AsRef(in result.u1) = (y1 >> s) | (y2 << rs);
+            Unsafe.AsRef(in result.u2) = (y2 >> s) | (y3 << rs);
+            Unsafe.AsRef(in result.u3) = (y3 >> s);
 
-            return w switch
-            {
-                0 => Create(
-                    (x.u0 >> s) | (x.u1 << rs),
-                    (x.u1 >> s) | (x.u2 << rs),
-                    (x.u2 >> s) | (x.u3 << rs),
-                    (x.u3 >> s)),
-                1 => Create(
-                    (x.u1 >> s) | (x.u2 << rs),
-                    (x.u2 >> s) | (x.u3 << rs),
-                    (x.u3 >> s),
-                    0),
-                2 => Create(
-                    (x.u2 >> s) | (x.u3 << rs),
-                    (x.u3 >> s),
-                    0,
-                    0),
-                _ => Create(
-                    (x.u3 >> s),
-                    0,
-                    0,
-                    0),
-            };
+            return result;
         }
 
         // ------------------------------------------------------------
         // Low-level arithmetic primitives
         // ------------------------------------------------------------
 
+        [SkipLocalsInit]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void Mul128(ulong a, ulong b, out ulong lo, out ulong hi)
         {
-            // mulx: returns high, writes low (managed signature is swapped vs the C intrinsic)
-            hi = Math.BigMul(a, b, out ulong loLocal);
-            lo = loLocal;
+            hi = Math.BigMul(a, b, out lo);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
