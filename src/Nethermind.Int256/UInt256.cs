@@ -2332,9 +2332,9 @@ namespace Nethermind.Int256
             if (Avx512F.VL.IsSupported && Avx512DQ.IsSupported)
             {
                 // Best case: AVX-512 compare produces k-mask; MoveMask uses KMOVB.
-                // Avx512DQ.MoveMask is documented as KMOVB r32,k1. 
-                eqMask = (uint)Avx512DQ.MoveMask(Avx512F.VL.CompareEqual(vecL, vecR));     // VPCMPUQ + KMOVB 
-                ltMask = (uint)Avx512DQ.MoveMask(Avx512F.VL.CompareLessThan(vecL, vecR));  // VPCMPUQ + KMOVB 
+                // Avx512DQ.MoveMask is documented as KMOVB r32,k1.
+                eqMask = (uint)Avx512DQ.MoveMask(Avx512F.VL.CompareEqual(vecL, vecR));     // VPCMPUQ + KMOVB
+                ltMask = (uint)Avx512DQ.MoveMask(Avx512F.VL.CompareLessThan(vecL, vecR));  // VPCMPUQ + KMOVB
             }
             else
             {
@@ -3040,43 +3040,134 @@ namespace Nethermind.Int256
                 return r;
             }
         }
+
+        // Preconditions:
+        // - d normalised (msb set)
+        // - u1 < d
+        [SkipLocalsInit]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static ulong UDivRem2By1(ulong u1, ulong recip, ulong d, ulong u0, out ulong r)
+        {
+            ulong pHi = Math.BigMul(recip, u1, out r);   // r = pLo
+
+            ulong qLoNew = u0 + r;
+            ulong q = pHi + u1 + 1UL;
+            q += (qLoNew < u0) ? 1UL : 0;
+
+            ulong rem = u0 - (q * d);
+
+            ulong m = (rem > qLoNew ? ulong.MaxValue : 0);
+            q -= (m & 1UL);
+            rem += (m & d);
+
+            m = (rem >= d ? ulong.MaxValue : 0);
+            q += (m & 1UL);
+            rem -= (m & d);
+
+            r = rem;
+            return q;
+        }
         // ------------------------------------------------------------
         // Knuth steps (unrolled)
         // ------------------------------------------------------------
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static ulong DivStep2(ref ulong u0, ref ulong u1, ref ulong u2, ulong v0, ulong v1, ulong recip)
+        [SkipLocalsInit]
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static ulong DivStep2(ref ulong u0r, ref ulong u1r, ref ulong u2r, ulong v0, ulong v1, ulong recip)
         {
-            // qhat from (u2:u1) / v1
-            ulong qhat, rhat, rcarry;
+            // Variant B style: load u1/u2 once. Delay u0 until after quotient estimate.
+            ulong u1 = u1r;
+            ulong u2 = u2r;
+
+            ulong qhat;
+            ulong rhat;
+            bool rcarry;
+
+            // Single shared out-home for everything.
+            ulong lo;
+
             if (u2 == v1)
             {
                 qhat = ulong.MaxValue;
-                ulong sum = u1 + v1;
-                rcarry = (sum < u1) ? 1UL : 0UL;
-                rhat = sum;
+                rhat = u1 + v1;
+                rcarry = rhat < u1;
             }
             else
             {
-                qhat = UDivRem2By1(u2, recip, v1, u1, out rhat);
-                rcarry = 0;
+                qhat = UDivRem2By1(u2, recip, v1, u1, out lo);
+                rhat = lo;
+                rcarry = false;
             }
 
-            // Correct at most twice, but only do 2nd check if we actually decremented once.
-            if (CorrectQHatOnce(ref qhat, ref rhat, ref rcarry, v1, v0, u0))
-                CorrectQHatOnce(ref qhat, ref rhat, ref rcarry, v1, v0, u0);
+            ulong u0 = u0r;
 
-            // u -= qhat * v ; u is 3 limbs here
-            ulong borrow = SubMul2(ref u0, ref u1, ref u2, v0, v1, qhat);
+            // qhat*v0 once - reused for correction + subtraction
+            ulong hi = Math.BigMul(qhat, v0, out lo); // hi:lo = qhat*v0
 
-            // FAST add-back: very rarely taken, cheaper than mask-addback on average
-            if (borrow != 0)
+            // Correct at most twice
+            if (!rcarry && (hi > rhat || (hi == rhat && lo > u0)))
             {
-                AddBack2(ref u0, ref u1, ref u2, v0, v1);
                 qhat--;
+
+                // (hi:lo) -= v0
+                hi -= (lo < v0) ? 1UL : 0UL;
+                lo -= v0;
+
+                ulong sum = rhat + v1;
+                rcarry = sum < rhat;
+                rhat = sum;
+
+                if (!rcarry && (hi > rhat || (hi == rhat && lo > u0)))
+                {
+                    qhat--;
+
+                    hi -= (lo < v0) ? 1UL : 0UL;
+                    lo -= v0;
+                }
             }
 
-            return qhat;
+            // Subtract qhat*v from u (3 limbs)
+            ulong borrow = (u0 < lo) ? 1UL : 0UL;
+            u0 -= lo;
+
+            ulong hi1 = Math.BigMul(qhat, v1, out lo);
+            ulong sum1 = lo + hi;
+            hi = hi1 + ((sum1 < lo) ? 1UL : 0UL);
+
+            ulong t = u1 - sum1;
+            ulong b = (u1 < sum1) ? 1UL : 0UL;
+            u1 = t - borrow;
+            borrow = b | ((t < borrow) ? 1UL : 0UL);
+
+            t = u2 - hi;
+            b = (u2 < hi) ? 1UL : 0UL;
+            u2 = t - borrow;
+            borrow = b | ((t < borrow) ? 1UL : 0UL);
+
+            // Store raw subtraction results first (preserves aliasing behaviour)
+            u0r = u0;
+            u1r = u1;
+            u2r = u2;
+
+            if (borrow == 0)
+                return qhat;
+
+            // Cold path: add-back and decrement qhat
+
+            ulong s0 = u0 + v0;
+            ulong c0 = (s0 < u0) ? 1UL : 0UL;
+
+            ulong s1 = u1 + v1;
+            ulong c1 = (s1 < u1) ? 1UL : 0UL;
+
+            ulong s1c = s1 + c0;
+            ulong c2 = (s1c < s1) ? 1UL : 0UL;
+
+            // Write order matters for ref-aliasing semantics - match original: u0r, then u1r, then u2r += carry
+            u0r = s0;
+            u1r = s1c;
+            u2r += (c1 | c2);
+
+            return qhat - 1;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -3096,10 +3187,72 @@ namespace Nethermind.Int256
                 rcarry = 0;
             }
 
-            if (CorrectQHatOnce(ref qhat, ref rhat, ref rcarry, v2, v1, u1))
-                CorrectQHatOnce(ref qhat, ref rhat, ref rcarry, v2, v1, u1);
+            bool ret;
+            if (rcarry != 0)
+                ret = false;
+            else
+            {
+                Mul128(qhat, v1, out ulong pLo, out ulong pHi);
 
-            ulong borrow = SubMul3(ref u0, ref u1, ref u2, ref u3, v0, v1, v2, qhat);
+                // if qhat*vNext > rhat*b + uCorr then decrement
+                if (pHi > rhat || (pHi == rhat && pLo > u1))
+                {
+                    qhat--;
+
+                    ulong sum1 = rhat + v2;
+                    if (sum1 < rhat)
+                        rcarry = 1;
+
+                    rhat = sum1;
+                    ret = true;
+                }
+                else
+                {
+                    ret = false;
+                }
+            }
+
+            if (ret && rcarry == 0)
+
+            {
+                ulong pHi = Math.BigMul(qhat, v1, out ulong pLo);
+
+                // if qhat*vNext > rhat*b + uCorr then decrement
+                if (pHi > rhat || (pHi == rhat && pLo > u1))
+                {
+                    qhat--;
+
+                    ulong sum = rhat + v2;
+                    if (sum < rhat)
+                        rcarry = 1;
+
+                    rhat = sum;
+                }
+            }
+
+            ulong borrow1 = 0;
+            ulong carry = 0;
+
+            ulong pHi1 = Math.BigMul(qhat, v0, out ulong pLo1);
+            ulong sum2 = pLo1 + carry;
+            ulong c2 = (sum2 < pLo1) ? 1UL : 0UL;
+            carry = pHi1 + c2;
+            SubInPlace(ref u0, sum2, ref borrow1);
+
+            pHi1 = Math.BigMul(qhat, v1, out pLo1);
+            sum2 = pLo1 + carry;
+            c2 = (sum2 < pLo1) ? 1UL : 0UL;
+            carry = pHi1 + c2;
+            SubInPlace(ref u1, sum2, ref borrow1);
+
+            pHi1 = Math.BigMul(qhat, v2, out pLo1);
+            sum2 = pLo1 + carry;
+            c2 = (sum2 < pLo1) ? 1UL : 0UL;
+            carry = pHi1 + c2;
+            SubInPlace(ref u2, sum2, ref borrow1);
+
+            SubInPlace(ref u3, carry, ref borrow1);
+            ulong borrow = borrow1;
 
             if (borrow != 0)
             {
@@ -3109,7 +3262,7 @@ namespace Nethermind.Int256
 
             return qhat;
         }
-        
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static ulong DivStep4(in UInt256 u, ref ulong u4, in UInt256 v, ulong recip, out UInt256 rem)
         {
@@ -3134,7 +3287,10 @@ namespace Nethermind.Int256
 
             if (borrow != 0)
             {
-                AddBack4(in rem, ref u4, in v, out rem);
+                if (!AddOverflow(in rem, in v, out rem))
+                {
+                    u4 += 1;
+                }
                 qhat--;
             }
 
@@ -3174,7 +3330,6 @@ namespace Nethermind.Int256
         // ------------------------------------------------------------
         // qhat correction (at most twice in Knuth D)
         // ------------------------------------------------------------
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static bool CorrectQHatOnce(ref ulong qhat, ref ulong rhat, ref ulong rcarry, ulong vHi, ulong vNext, ulong uCorr)
         {
@@ -3204,29 +3359,6 @@ namespace Nethermind.Int256
         // ------------------------------------------------------------
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static ulong SubMul2(ref ulong u0, ref ulong u1, ref ulong u2, ulong v0, ulong v1, ulong q)
-        {
-            ulong borrow = 0;
-            ulong carry = 0;
-
-            Mul128(q, v0, out ulong pLo, out ulong pHi);
-            ulong sum = pLo + carry;
-            ulong c2 = (sum < pLo) ? 1UL : 0UL;
-            carry = pHi + c2;
-            SubInPlace(ref u0, sum, ref borrow);
-
-            Mul128(q, v1, out pLo, out pHi);
-            sum = pLo + carry;
-            c2 = (sum < pLo) ? 1UL : 0UL;
-            carry = pHi + c2;
-            SubInPlace(ref u1, sum, ref borrow);
-
-            SubInPlace(ref u2, carry, ref borrow);
-
-            return borrow;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static ulong SubMul3(ref ulong u0, ref ulong u1, ref ulong u2, ref ulong u3, ulong v0, ulong v1, ulong v2, ulong q)
         {
             ulong borrow = 0;
@@ -3254,7 +3386,7 @@ namespace Nethermind.Int256
 
             return borrow;
         }
-        
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static ulong SubMul4(in UInt256 u, ref ulong u4, in UInt256 v, ulong q, out UInt256 rem)
         {
@@ -3325,15 +3457,6 @@ namespace Nethermind.Int256
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static void AddBack2(ref ulong u0, ref ulong u1, ref ulong u2, ulong v0, ulong v1)
-        {
-            ulong c = 0;
-            AddWithCarry(u0, v0, ref c, out u0);
-            AddWithCarry(u1, v1, ref c, out u1);
-            u2 += c;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void AddBack3(ref ulong u0, ref ulong u1, ref ulong u2, ref ulong u3, ulong v0, ulong v1, ulong v2)
         {
             ulong c = 0;
@@ -3341,15 +3464,6 @@ namespace Nethermind.Int256
             AddWithCarry(u1, v1, ref c, out u1);
             AddWithCarry(u2, v2, ref c, out u2);
             u3 += c;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static void AddBack4(in UInt256 u, ref ulong u4, in UInt256 v, out UInt256 rem)
-        {
-            if (!AddOverflow(u, v, out rem))
-            {
-                u4 += 1;
-            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -3363,36 +3477,6 @@ namespace Nethermind.Int256
             u4 += c;
         }
 
-        // Preconditions:
-        // - d normalised (msb set)
-        // - u1 < d
-        [SkipLocalsInit]
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static ulong UDivRem2By1(ulong u1, ulong recip, ulong d, ulong u0, out ulong r)
-        {
-            Mul128(recip, u1, out ulong pLo, out ulong pHi);
-
-            ulong qLoNew = u0 + pLo;
-            ulong q = pHi + u1 + 1UL;
-
-            // carry from u0 + pLo, but compare against u0 so pLo does not need to live
-            q += (qLoNew < u0) ? 1UL : 0UL;
-
-            ulong rem = u0 - (q * d);
-
-            // correction 1: if (rem > qLoNew) { q--; rem += d; }
-            ulong m = (ulong)-(rem > qLoNew ? 1 : 0);
-            q -= (m & 1UL);
-            rem += (m & d);
-
-            // correction 2: if (rem >= d) { q++; rem -= d; }
-            m = (ulong)-(rem >= d ? 1 : 0);
-            q += (m & 1UL);
-            rem -= (m & d);
-
-            r = rem;
-            return q;
-        }
 
         // ------------------------------------------------------------
         // Low-level arithmetic primitives
@@ -3405,6 +3489,15 @@ namespace Nethermind.Int256
             hi = Math.BigMul(a, b, out lo);
         }
 
+        private static ulong Sub(ulong x, ulong y, ref ulong borrow)
+        {
+            ulong t = x - y;
+            ulong b1 = (x < y) ? 1UL : 0UL;
+            ulong t2 = t - borrow;
+            ulong b2 = (t < borrow) ? 1UL : 0UL;
+            borrow = b1 | b2;
+            return t2;
+        }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void SubInPlace(ref ulong x, ulong y, ref ulong borrow)
         {
@@ -3414,18 +3507,6 @@ namespace Nethermind.Int256
             ulong b2 = (t < borrow) ? 1UL : 0UL;
             x = t2;
             borrow = b1 | b2;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static ulong Sub(ulong x, ulong y, ref ulong borrow)
-        {
-            ulong t = x - y;
-            ulong b1 = (x < y) ? 1UL : 0UL;
-            ulong t2 = t - borrow;
-            ulong b2 = (t < borrow) ? 1UL : 0UL;
-            x = t2;
-            borrow = b1 | b2;
-            return x;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
