@@ -2397,20 +2397,27 @@ namespace Nethermind.Int256
             Vector256<ulong> vy = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in y));
             Vector256<ulong> vm = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in m));
 
-            // lower 256 = x, upper 256 = y
             Vector512<ulong> vxy = Vector512.Create(vx, vy);
-            Vector512<ulong> vmm = Vector512.Create(vm, vm);
+            Vector512<ulong> vmm = Vector512.Create(vm, vm); // can be improved to vbroadcasti64x4 - see below
 
-            uint eq = (uint)Avx512DQ.MoveMask(Avx512F.CompareEqual(vxy, vmm));
-            uint lt = (uint)Avx512DQ.MoveMask(Avx512F.CompareLessThan(vxy, vmm));
+            uint eq8 = (uint)Avx512DQ.MoveMask(Avx512F.CompareEqual(vxy, vmm)) & 0xFFu;
+            uint lt8 = (uint)Avx512DQ.MoveMask(Avx512F.CompareLessThan(vxy, vmm)) & 0xFFu;
 
-            uint eqX = eq & 0x0Fu;
-            uint eqY = eq >> 4;
+            // d has 1s where lanes differ, in both nibbles
+            uint d = (eq8 ^ 0xFFu);
 
-            uint ltX = lt & 0x0Fu;
-            uint ltY = lt >> 4;
+            // saturate within each nibble (no cross-nibble bleed)
+            d |= (d >> 1) & 0x77u;
+            d |= (d >> 2) & 0x33u;
 
-            return LessThanFromMasks(eqX, ltX) & LessThanFromMasks(eqY, ltY);
+            // isolate the top mismatch bit in each nibble
+            uint msb = d & ~((d >> 1) & 0x77u);
+
+            // pick lt at that mismatch bit (still per nibble)
+            uint chosen = lt8 & msb;
+
+            // low nibble -> x, high nibble -> y
+            return ((chosen & 0x0Fu) != 0) & ((chosen & 0xF0u) != 0);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -2447,6 +2454,26 @@ namespace Nethermind.Int256
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool LessThanBothFromEqLt8(uint eq8, uint lt8)
+        {
+            // eq8/lt8 are 0..255 (low 8 bits used)
+            uint d = (eq8 ^ 0xFFu);           // mismatch bits (1 where not equal), per nibble
+
+            // saturate within each nibble (prevent bit4 spilling into bit3 etc)
+            d |= (d >> 1) & 0x77u;
+            d |= (d >> 2) & 0x33u;
+
+            // isolate most-significant mismatch bit in each nibble
+            uint msb = d & ~((d >> 1) & 0x77u);
+
+            // pick lt bit at that msb position for each nibble
+            uint chosen = lt8 & msb;
+
+            // low nibble -> x decision, high nibble -> y decision
+            return ((chosen & 0x0Fu) != 0) & ((chosen & 0xF0u) != 0);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static bool LessThanFromPackedMask8(uint mask8)
         {
             // even bits are eq, odd bits are lt
@@ -2458,16 +2485,6 @@ namespace Nethermind.Int256
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static bool LessThanFromMasks(uint eqMask, uint ltMask)
-        {
-            uint diff = eqMask ^ 0xFu;
-            if (diff == 0) return false;
-
-            int idx = BitOperations.LeadingZeroCount(diff) ^ 31;
-            return ((ltMask >> idx) & 1u) != 0;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static bool LessThanBothVector256(in UInt256 x, in UInt256 y, in UInt256 m)
         {
             Vector256<ulong> vecM = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in m));
@@ -2476,14 +2493,14 @@ namespace Nethermind.Int256
             Vector256<ulong> vecX = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in x));
             uint eqMaskX = Vector256.ExtractMostSignificantBits(Vector256.Equals(vecX, vecM));
             uint ltMaskX = Vector256.ExtractMostSignificantBits(Vector256.LessThan(vecX, vecM));
-            if (!LessThanFromMasks(eqMaskX, ltMaskX))
+            if (!LessThanBothFromEqLt8(eqMaskX, ltMaskX))
                 return false;
 
             // y < m
             Vector256<ulong> vecY = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in y));
             uint eqMaskY = Vector256.ExtractMostSignificantBits(Vector256.Equals(vecY, vecM));
             uint ltMaskY = Vector256.ExtractMostSignificantBits(Vector256.LessThan(vecY, vecM));
-            return LessThanFromMasks(eqMaskY, ltMaskY);
+            return LessThanBothFromEqLt8(eqMaskY, ltMaskY);
         }
 
         public static bool operator ==(in UInt256 a, int b) => a.Equals(b);
@@ -2886,32 +2903,27 @@ namespace Nethermind.Int256
             int shift = BitOperations.LeadingZeroCount(y.u3);
 
             // Normalise divisor v = y << shift
+            UInt256 u = ShiftLeftSmall(in x, shift);
             UInt256 v = ShiftLeftSmall(in y, shift);
-
             // Normalise dividend u = x << shift into 5 limbs
-            ulong u0n2, u1d, u2d, u3d, u4d;
+            ulong u4d;
             if (shift == 0)
             {
-                u0n2 = x.u0; u1d = x.u1; u2d = x.u2; u3d = x.u3; u4d = 0;
+                u4d = 0;
             }
             else
             {
                 int rs = 64 - shift;
-                u0n2 = x.u0 << shift;
-                u1d = (x.u1 << shift) | (x.u0 >> rs);
-                u2d = (x.u2 << shift) | (x.u1 >> rs);
-                u3d = (x.u3 << shift) | (x.u2 >> rs);
                 u4d = (x.u3 >> rs);
             }
 
             ulong vRecip = Reciprocal2By1(v.u3);
-            ulong q0 = DivStep4(ref u0n2, ref u1d, ref u2d, ref u3d, ref u4d, in v, vRecip);
+            ulong q0 = DivStep4(in u, ref u4d, in v, vRecip, out UInt256 rem);
 
             q = Create(q0, 0, 0, 0);
 
             // Remainder is u0..u3
-            UInt256 remN = Create(u0n2, u1d, u2d, u3d);
-            remainder = (shift == 0) ? remN : ShiftRightSmall(remN, shift);
+            remainder = (shift == 0) ? rem : ShiftRightSmall(rem, shift);
             return;
         }
 
@@ -3017,11 +3029,9 @@ namespace Nethermind.Int256
                 else
                 {
                     Vector256<ulong> left = Avx2.ShiftLeftLogical(x, cL);
-
                     // carry lanes: [a1<<rs, a2<<rs, a3<<rs, a0<<rs] then zero the last lane
                     Vector256<ulong> carry = Avx2.Permute4x64(left, 0x39);
                     carry = Avx2.And(carry, Vector256.Create(ulong.MaxValue, ulong.MaxValue, ulong.MaxValue, 0UL));
-
                     y = Avx2.Or(right, carry);
                 }
 
@@ -3099,7 +3109,37 @@ namespace Nethermind.Int256
 
             return qhat;
         }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static ulong DivStep4(in UInt256 u, ref ulong u4, in UInt256 v, ulong recip, out UInt256 rem)
+        {
+            ulong qhat, rhat, rcarry;
+            if (u4 == v.u3)
+            {
+                qhat = ulong.MaxValue;
+                ulong sum = u.u3 + v.u3;
+                rcarry = (sum < u.u3) ? 1UL : 0UL;
+                rhat = sum;
+            }
+            else
+            {
+                qhat = UDivRem2By1(u4, recip, v.u3, u.u3, out rhat);
+                rcarry = 0;
+            }
 
+            if (CorrectQHatOnce(ref qhat, ref rhat, ref rcarry, v.u3, v.u2, u.u2))
+                CorrectQHatOnce(ref qhat, ref rhat, ref rcarry, v.u3, v.u2, u.u2);
+
+            ulong borrow = SubMul4(in u, ref u4, in v, qhat, out rem);
+
+            if (borrow != 0)
+            {
+                AddBack4(in rem, ref u4, in v, out rem);
+                qhat--;
+            }
+
+            return qhat;
+        }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static ulong DivStep4(ref ulong u0, ref ulong u1, ref ulong u2, ref ulong u3, ref ulong u4, in UInt256 v, ulong recip)
         {
@@ -3214,7 +3254,41 @@ namespace Nethermind.Int256
 
             return borrow;
         }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static ulong SubMul4(in UInt256 u, ref ulong u4, in UInt256 v, ulong q, out UInt256 rem)
+        {
+            ulong borrow = 0;
+            ulong carry = 0;
 
+            Mul128(q, v.u0, out ulong pLo, out ulong pHi);
+            ulong sum = pLo + carry;
+            ulong c2 = (sum < pLo) ? 1UL : 0UL;
+            carry = pHi + c2;
+            var r0 = Sub(u.u0, sum, ref borrow);
+
+            Mul128(q, v.u1, out pLo, out pHi);
+            sum = pLo + carry;
+            c2 = (sum < pLo) ? 1UL : 0UL;
+            carry = pHi + c2;
+            var r1 = Sub(u.u1, sum, ref borrow);
+
+            Mul128(q, v.u2, out pLo, out pHi);
+            sum = pLo + carry;
+            c2 = (sum < pLo) ? 1UL : 0UL;
+            carry = pHi + c2;
+            var r2 = Sub(u.u2, sum, ref borrow);
+            Mul128(q, v.u3, out pLo, out pHi);
+            sum = pLo + carry;
+            c2 = (sum < pLo) ? 1UL : 0UL;
+            carry = pHi + c2;
+            var r3 = Sub(u.u3, sum, ref borrow);
+
+            SubInPlace(ref u4, carry, ref borrow);
+
+            rem = Create(r0, r1, r2, r3);
+            return borrow;
+        }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static ulong SubMul4(ref ulong u0, ref ulong u1, ref ulong u2, ref ulong u3, ref ulong u4, ulong v0, ulong v1, ulong v2, ulong v3, ulong q)
         {
@@ -3270,6 +3344,15 @@ namespace Nethermind.Int256
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void AddBack4(in UInt256 u, ref ulong u4, in UInt256 v, out UInt256 rem)
+        {
+            if (!AddOverflow(u, v, out rem))
+            {
+                u4 += 1;
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void AddBack4(ref ulong u0, ref ulong u1, ref ulong u2, ref ulong u3, ref ulong u4, ulong v0, ulong v1, ulong v2, ulong v3)
         {
             ulong c = 0;
@@ -3312,45 +3395,6 @@ namespace Nethermind.Int256
         }
 
         // ------------------------------------------------------------
-        // Bit fiddly fast-path helpers
-        // ------------------------------------------------------------
-
-        [SkipLocalsInit]
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static bool TryGetPow2Shift(in UInt256 y, out int shift)
-        {
-            ulong u0 = y.u0;
-            ulong u1 = y.u1;
-            ulong u2 = y.u2;
-            ulong u3 = y.u3;
-
-            uint mask =
-                (uint)(u0 != 0 ? 1u : 0u) |
-                ((uint)(u1 != 0 ? 1u : 0u) << 1) |
-                ((uint)(u2 != 0 ? 1u : 0u) << 2) |
-                ((uint)(u3 != 0 ? 1u : 0u) << 3);
-
-            // mask must be 1,2,4,8
-            if (mask == 0 || (mask & (mask - 1)) != 0)
-            {
-                shift = 0;
-                return false;
-            }
-
-            ulong v = (u0 | u1) | (u2 | u3);
-
-            // v must be a 64-bit power of two
-            if (v == 0 || (v & (v - 1)) != 0)
-            {
-                shift = 0;
-                return false;
-            }
-
-            shift = (BitOperations.TrailingZeroCount(mask) << 6) + BitOperations.TrailingZeroCount(v);
-            return true;
-        }
-
-        // ------------------------------------------------------------
         // Low-level arithmetic primitives
         // ------------------------------------------------------------
 
@@ -3370,6 +3414,18 @@ namespace Nethermind.Int256
             ulong b2 = (t < borrow) ? 1UL : 0UL;
             x = t2;
             borrow = b1 | b2;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static ulong Sub(ulong x, ulong y, ref ulong borrow)
+        {
+            ulong t = x - y;
+            ulong b1 = (x < y) ? 1UL : 0UL;
+            ulong t2 = t - borrow;
+            ulong b2 = (t < borrow) ? 1UL : 0UL;
+            x = t2;
+            borrow = b1 | b2;
+            return x;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
