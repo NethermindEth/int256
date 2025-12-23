@@ -559,19 +559,21 @@ namespace Nethermind.Int256
         // If m == 0, z is set to 0 (OBS: differs from the big.Int)
         public static void AddMod(in UInt256 x, in UInt256 y, in UInt256 m, out UInt256 res)
         {
-            res = default;
             if (m.IsZero || m.IsOne)
             {
+                res = default;
                 return;
             }
 
             // 1) Compute 257-bit sum S = x + y as 5 limbs (s0..s3, s4=carry)
-            ulong s4 = !AddOverflow(in x, in y, out UInt256 sum) ? 0UL : 1UL;
+            bool overflow = AddOverflow(in x, in y, out UInt256 sum);
+            ulong s4 = !overflow ? 0UL : 1UL;
 
             // 2) If modulus fits in 64 bits, do direct remainder of the 5-limb value.
             if (m.IsUint64)
             {
                 ulong r0 = Rem5ByU64(in sum, s4, m.u0);
+                res = default;
                 Unsafe.AsRef(in res.u0) = r0;
                 return;
             }
@@ -584,6 +586,12 @@ namespace Nethermind.Int256
                 return;
             }
 
+            // No overflow - sum is the exact x+y, so normal mod is correct.
+            if (!overflow)
+            {
+                Mod(in sum, in m, out res);
+                return;
+            }
             // 4) General fallback: reduce the 257-bit sum directly: res = S % m
             res = RemSum257ByMod(in sum, s4, in m);
         }
@@ -677,24 +685,12 @@ namespace Nethermind.Int256
             int n = (m.u3 != 0) ? 4 : (m.u2 != 0) ? 3 : 2;
 
             // Normalise divisor
-            ulong v0, v1, v2, v3;
             ulong vHi = (n == 4) ? m.u3 : (n == 3) ? m.u2 : m.u1;
             int sh = BitOperations.LeadingZeroCount(vHi);
 
-            if (sh == 0)
-            {
-                v0 = m.u0; v1 = m.u1; v2 = m.u2; v3 = m.u3;
-            }
-            else
-            {
-                int rs = 64 - sh;
-                v0 = m.u0 << sh;
-                v1 = (m.u1 << sh) | (m.u0 >> rs);
-                v2 = (m.u2 << sh) | (m.u1 >> rs);
-                v3 = (m.u3 << sh) | (m.u2 >> rs);
-            }
+            UInt256 v = ShiftLeftSmall(in m, sh);
 
-            ulong vnHi = (n == 4) ? v3 : (n == 3) ? v2 : v1;
+            ulong vnHi = (n == 4) ? v.u3 : (n == 3) ? v.u2 : v.u1;
             ulong recip = Reciprocal2By1(vnHi);
 
             // Normalise dividend: u is 6 limbs (a0..a4 plus a5=0), shifted left by sh.
@@ -723,10 +719,10 @@ namespace Nethermind.Int256
             if (n == 2)
             {
                 // m = 5-n = 3, j = 3..0
-                _ = DivStep2(ref u3, ref u4, ref u5, v0, v1, recip);
-                _ = DivStep2(ref u2, ref u3, ref u4, v0, v1, recip);
-                _ = DivStep2(ref u1, ref u2, ref u3, v0, v1, recip);
-                _ = DivStep2(ref u0, ref u1, ref u2, v0, v1, recip);
+                _ = DivStep2(ref u3, ref u4, ref u5, v.u0, v.u1, recip);
+                _ = DivStep2(ref u2, ref u3, ref u4, v.u0, v.u1, recip);
+                _ = DivStep2(ref u1, ref u2, ref u3, v.u0, v.u1, recip);
+                _ = DivStep2(ref u0, ref u1, ref u2, v.u0, v.u1, recip);
 
                 UInt256 remN = Create(u0, u1, 0, 0);
                 return (sh == 0) ? remN : ShiftRightSmall(remN, sh);
@@ -734,9 +730,9 @@ namespace Nethermind.Int256
             else if (n == 3)
             {
                 // m = 2, j = 2..0
-                _ = DivStep3(ref u2, ref u3, ref u4, ref u5, v0, v1, v2, recip);
-                _ = DivStep3(ref u1, ref u2, ref u3, ref u4, v0, v1, v2, recip);
-                _ = DivStep3(ref u0, ref u1, ref u2, ref u3, v0, v1, v2, recip);
+                _ = DivStep3(ref u2, ref u3, ref u4, ref u5, v.u0, v.u1, v.u2, recip);
+                _ = DivStep3(ref u1, ref u2, ref u3, ref u4, v.u0, v.u1, v.u2, recip);
+                _ = DivStep3(ref u0, ref u1, ref u2, ref u3, v.u0, v.u1, v.u2, recip);
 
                 UInt256 remN = Create(u0, u1, u2, 0);
                 return (sh == 0) ? remN : ShiftRightSmall(remN, sh);
@@ -744,8 +740,8 @@ namespace Nethermind.Int256
             else
             {
                 // n == 4, m = 1, j = 1..0
-                _ = DivStep4(ref u1, ref u2, ref u3, ref u4, ref u5, v0, v1, v2, v3, recip);
-                _ = DivStep4(ref u0, ref u1, ref u2, ref u3, ref u4, v0, v1, v2, v3, recip);
+                _ = DivStep4(ref u1, ref u2, ref u3, ref u4, ref u5, in v, recip);
+                _ = DivStep4(ref u0, ref u1, ref u2, ref u3, ref u4, in v, recip);
 
                 UInt256 remN = Create(u0, u1, u2, u3);
                 return (sh == 0) ? remN : ShiftRightSmall(remN, sh);
@@ -1123,9 +1119,8 @@ namespace Nethermind.Int256
         {
             // Precondition: d is normalised (bit 63 set).
             // Seed lookup
-            uint idx = (uint)(d >> 55) - 256u; // 0..255
-            ref uint t0 = ref MemoryMarshal.GetReference(ReciprocalSeedTable);
-            ulong v0 = Unsafe.Add(ref t0, (nuint)idx);
+            int idx = (int)(uint)((d >> 55) - 256u); // 0..255
+            ulong v0 = ReciprocalSeedTable[idx];
 
             ulong d40 = (d >> 24) + 1;
 
@@ -2782,19 +2777,7 @@ namespace Nethermind.Int256
             int shift = BitOperations.LeadingZeroCount(y.u3);
 
             // Normalise divisor v = y << shift
-            ulong v0, v1n, v2n, v3n;
-            if (shift == 0)
-            {
-                v0 = y.u0; v1n = y.u1; v2n = y.u2; v3n = y.u3;
-            }
-            else
-            {
-                int rs = 64 - shift;
-                v0 = y.u0 << shift;
-                v1n = (y.u1 << shift) | (y.u0 >> rs);
-                v2n = (y.u2 << shift) | (y.u1 >> rs);
-                v3n = (y.u3 << shift) | (y.u2 >> rs);
-            }
+            UInt256 v = ShiftLeftSmall(in y, shift);
 
             // Normalise dividend u = x << shift into 5 limbs
             ulong u0n2, u1d, u2d, u3d, u4d;
@@ -2812,8 +2795,8 @@ namespace Nethermind.Int256
                 u4d = (x.u3 >> rs);
             }
 
-            ulong vRecip = Reciprocal2By1(v3n);
-            ulong q0 = DivStep4(ref u0n2, ref u1d, ref u2d, ref u3d, ref u4d, v0, v1n, v2n, v3n, vRecip);
+            ulong vRecip = Reciprocal2By1(v.u3);
+            ulong q0 = DivStep4(ref u0n2, ref u1d, ref u2d, ref u3d, ref u4d, in v, vRecip);
 
             q = Create(q0, 0, 0, 0);
 
@@ -2825,24 +2808,118 @@ namespace Nethermind.Int256
 
         // Shift-right by 0..63 (used to unnormalise remainder)
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static UInt256 ShiftRightSmall(in UInt256 v, int s)
+        private static UInt256 ShiftLeftSmall(in UInt256 v, int sh)
         {
-            if (s == 0) return v;
+            if (!Avx2.IsSupported)
+            {
+                ulong a0 = v.u0;
+                ulong a1 = v.u1;
+                ulong a2 = v.u2;
+                ulong a3 = v.u3;
 
-            ulong a0 = v.u0;
-            ulong a1 = v.u1;
-            ulong a2 = v.u2;
-            ulong a3 = v.u3;
+                int rs = 64 - sh;
 
-            int rs = 64 - s;
-            
-            Unsafe.SkipInit(out UInt256 result);
-            Unsafe.AsRef(in result.u0) = (a0 >> s) | (a1 << rs);
-            Unsafe.AsRef(in result.u1) = (a1 >> s) | (a2 << rs);
-            Unsafe.AsRef(in result.u2) = (a2 >> s) | (a3 << rs);
-            Unsafe.AsRef(in result.u3) = (a3 >> s);
+                Unsafe.SkipInit(out UInt256 r);
+                Unsafe.AsRef(in r.u0) = a0 << sh;
+                Unsafe.AsRef(in r.u1) = (a1 << sh) | (a0 >> rs);
+                Unsafe.AsRef(in r.u2) = (a2 << sh) | (a1 >> rs);
+                Unsafe.AsRef(in r.u3) = (a3 << sh) | (a2 >> rs);
 
-            return result;
+                return r;
+            }
+            else
+            {
+                Vector256<ulong> x = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in v));
+                Vector128<ulong> cL = Vector128.CreateScalarUnsafe((ulong)(uint)sh);
+                Vector128<ulong> cR = Vector128.CreateScalarUnsafe(64uL - (ulong)(uint)sh);
+
+                Vector256<ulong> left = Avx2.ShiftLeftLogical(x, cL);
+                Vector256<ulong> y;
+                if (Avx512F.VL.IsSupported)
+                {
+                    Vector256<ulong> prev = Avx512F.VL.AlignRight64(x, default, 3);
+                    Vector256<ulong> right = Avx2.ShiftRightLogical(prev, cR);
+                    y = Avx2.Or(left, right);
+                }
+                else
+                {
+                    Vector256<ulong> right = Avx2.ShiftRightLogical(x, cR);
+                    Vector256<ulong> carry = Avx2.Permute4x64(right, 0x90);
+                    carry = Avx2.And(carry, Vector256.Create(0UL, ulong.MaxValue, ulong.MaxValue, ulong.MaxValue));
+                    y = Avx2.Or(left, carry);
+                }
+
+                Unsafe.SkipInit(out UInt256 r);
+                Unsafe.As<UInt256, Vector256<ulong>>(ref r) = y;
+                return r;
+            }
+        }
+
+        // Shift-right by 0..63 (used to unnormalise remainder)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static UInt256 ShiftRightSmall(in UInt256 v, int sh)
+        {
+            if (!Avx2.IsSupported)
+            {
+                ulong a0 = v.u0;
+                ulong a1 = v.u1;
+                ulong a2 = v.u2;
+                ulong a3 = v.u3;
+
+                // C# shifts mask the count (64 -> 0), so sh == 64 needs an explicit path.
+                if (sh == 64)
+                {
+                    Unsafe.SkipInit(out UInt256 r);
+                    Unsafe.AsRef(in r.u0) = a1;
+                    Unsafe.AsRef(in r.u1) = a2;
+                    Unsafe.AsRef(in r.u2) = a3;
+                    Unsafe.AsRef(in r.u3) = 0;
+                    return r;
+                }
+
+                int rs = 64 - sh;
+
+                Unsafe.SkipInit(out UInt256 result);
+                Unsafe.AsRef(in result.u0) = (a0 >> sh) | (a1 << rs);
+                Unsafe.AsRef(in result.u1) = (a1 >> sh) | (a2 << rs);
+                Unsafe.AsRef(in result.u2) = (a2 >> sh) | (a3 << rs);
+                Unsafe.AsRef(in result.u3) = (a3 >> sh);
+                return result;
+            }
+            else
+            {
+                Vector256<ulong> x = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in v));
+
+                // right = x >> sh
+                Vector128<ulong> cR = Vector128.CreateScalarUnsafe((ulong)sh);
+                Vector256<ulong> right = Avx2.ShiftRightLogical(x, cR);
+
+                // carry = (next limb) << (64 - sh)
+                Vector128<ulong> cL = Vector128.CreateScalarUnsafe((ulong)(64 - sh));
+
+                Vector256<ulong> y;
+                if (Avx512F.VL.IsSupported)
+                {
+                    // next = [a1, a2, a3, 0]
+                    Vector256<ulong> next = Avx512F.VL.AlignRight64(default, x, 1);
+                    Vector256<ulong> carry = Avx2.ShiftLeftLogical(next, cL);
+                    y = Avx2.Or(right, carry);
+                }
+                else
+                {
+                    Vector256<ulong> left = Avx2.ShiftLeftLogical(x, cL);
+
+                    // carry lanes: [a1<<rs, a2<<rs, a3<<rs, a0<<rs] then zero the last lane
+                    Vector256<ulong> carry = Avx2.Permute4x64(left, 0x39);
+                    carry = Avx2.And(carry, Vector256.Create(ulong.MaxValue, ulong.MaxValue, ulong.MaxValue, 0UL));
+
+                    y = Avx2.Or(right, carry);
+                }
+
+                Unsafe.SkipInit(out UInt256 r);
+                Unsafe.As<UInt256, Vector256<ulong>>(ref r) = y;
+                return r;
+            }
         }
         // ------------------------------------------------------------
         // Knuth steps (unrolled)
@@ -2915,30 +2992,30 @@ namespace Nethermind.Int256
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static ulong DivStep4(ref ulong u0, ref ulong u1, ref ulong u2, ref ulong u3, ref ulong u4, ulong v0, ulong v1, ulong v2, ulong v3, ulong recip)
+        private static ulong DivStep4(ref ulong u0, ref ulong u1, ref ulong u2, ref ulong u3, ref ulong u4, in UInt256 v, ulong recip)
         {
             ulong qhat, rhat, rcarry;
-            if (u4 == v3)
+            if (u4 == v.u3)
             {
                 qhat = ulong.MaxValue;
-                ulong sum = u3 + v3;
+                ulong sum = u3 + v.u3;
                 rcarry = (sum < u3) ? 1UL : 0UL;
                 rhat = sum;
             }
             else
             {
-                qhat = UDivRem2By1(u4, recip, v3, u3, out rhat);
+                qhat = UDivRem2By1(u4, recip, v.u3, u3, out rhat);
                 rcarry = 0;
             }
 
-            if (CorrectQHatOnce(ref qhat, ref rhat, ref rcarry, v3, v2, u2))
-                CorrectQHatOnce(ref qhat, ref rhat, ref rcarry, v3, v2, u2);
+            if (CorrectQHatOnce(ref qhat, ref rhat, ref rcarry, v.u3, v.u2, u2))
+                CorrectQHatOnce(ref qhat, ref rhat, ref rcarry, v.u3, v.u2, u2);
 
-            ulong borrow = SubMul4(ref u0, ref u1, ref u2, ref u3, ref u4, v0, v1, v2, v3, qhat);
+            ulong borrow = SubMul4(ref u0, ref u1, ref u2, ref u3, ref u4, v.u0, v.u1, v.u2, v.u3, qhat);
 
             if (borrow != 0)
             {
-                AddBack4(ref u0, ref u1, ref u2, ref u3, ref u4, v0, v1, v2, v3);
+                AddBack4(ref u0, ref u1, ref u2, ref u3, ref u4, v.u0, v.u1, v.u2, v.u3);
                 qhat--;
             }
 
