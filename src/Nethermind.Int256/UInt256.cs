@@ -580,7 +580,7 @@ namespace Nethermind.Int256
 
             // 3) Fast path: if x < m and y < m then S < 2m, so one subtract is enough (carry-aware).
             // (Branchy compare is fine - the fallback is much more expensive anyway.)
-            if (LessThan(in x, in m) && LessThan(in y, in m))
+            if (LessThanBoth(in x, in y, in m))
             {
                 res = ReduceSumAssumingLT2m(in sum, s4, in m);
                 return;
@@ -601,7 +601,6 @@ namespace Nethermind.Int256
         // Fast reduction when S < 2m (eg x<m,y<m).
         // Uses carry-aware single subtract.
         // ----------------------------
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static UInt256 ReduceSumAssumingLT2m(in UInt256 sum, ulong carry, in UInt256 m)
         {
             // diff = sum - m
@@ -631,7 +630,7 @@ namespace Nethermind.Int256
         // Remainder of 5-limb value by 64-bit modulus (fast, fixes your test).
         // Computes ((a4..a0 base 2^64) % d).
         // ----------------------------
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.NoInlining)]
         private static ulong Rem5ByU64(in UInt256 a, ulong a4, ulong d)
         {
             // d != 0 assumed by caller
@@ -678,7 +677,6 @@ namespace Nethermind.Int256
         // General remainder: (257-bit sum) % m, where sum is 5 limbs and m is up to 4 limbs.
         // Uses Knuth D specialised, operating on a 6-limb u (top limb is 0).
         // ----------------------------
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static UInt256 RemSum257ByMod(in UInt256 a, ulong a4, in UInt256 m)
         {
             // divisor limb count n in 2..4 (caller ensured m doesn't fit in 64 bits)
@@ -2375,6 +2373,117 @@ namespace Nethermind.Int256
             // diff != 0 and diff <= 0xF => LZCNT in [28..31] => (31 - lzcnt) == (31 ^ lzcnt)
             int idx = BitOperations.LeadingZeroCount(diff) ^ 31;
             return ((ltMask >> idx) & 1u) != 0;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool LessThanBoth(in UInt256 x, in UInt256 y, in UInt256 m)
+        {
+            if (!Avx2.IsSupported && !Vector256.IsHardwareAccelerated)
+            {
+                return LessThanScalar(in x, in m) && LessThanScalar(in y, in m);
+            }
+
+            return Avx512F.VL.IsSupported && Avx512DQ.IsSupported ?
+                LessThanBothAvx512(in x, in y, in m) :
+                Avx2.IsSupported ?
+                    LessThanBothAvx2(in x, in y, in m) :
+                    LessThanBothVector256(in x, in y, in m);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool LessThanBothAvx512(in UInt256 x, in UInt256 y, in UInt256 m)
+        {
+            Vector256<ulong> vx = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in x));
+            Vector256<ulong> vy = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in y));
+            Vector256<ulong> vm = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in m));
+
+            // lower 256 = x, upper 256 = y
+            Vector512<ulong> vxy = Vector512.Create(vx, vy);
+            Vector512<ulong> vmm = Vector512.Create(vm, vm);
+
+            uint eq = (uint)Avx512DQ.MoveMask(Avx512F.CompareEqual(vxy, vmm));
+            uint lt = (uint)Avx512DQ.MoveMask(Avx512F.CompareLessThan(vxy, vmm));
+
+            uint eqX = eq & 0x0Fu;
+            uint eqY = eq >> 4;
+
+            uint ltX = lt & 0x0Fu;
+            uint ltY = lt >> 4;
+
+            return LessThanFromMasks(eqX, ltX) & LessThanFromMasks(eqY, ltY);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool LessThanBothAvx2(in UInt256 x, in UInt256 y, in UInt256 m)
+        {
+            Vector256<ulong> vecM = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in m));
+
+            var signFlip = Vector256.Create(0x8000_0000_0000_0000UL);
+            var low32Mask = Vector256.Create(0x0000_0000_FFFF_FFFFUL);
+
+            Vector256<long> sM = Avx2.Xor(vecM, signFlip).AsInt64();
+
+            Vector256<ulong> vecX2 = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in x));
+            Vector256<ulong> vecY2 = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in y));
+
+            // All compares first (lets the core overlap work before any movemask/LZCNT).
+            Vector256<ulong> eqXv = Avx2.CompareEqual(vecX2, vecM);
+            Vector256<ulong> eqYv = Avx2.CompareEqual(vecY2, vecM);
+
+            Vector256<long> sX = Avx2.Xor(vecX2, signFlip).AsInt64();
+            Vector256<long> sY = Avx2.Xor(vecY2, signFlip).AsInt64();
+
+            Vector256<ulong> ltXv = Avx2.CompareGreaterThan(sM, sX).AsUInt64();
+            Vector256<ulong> ltYv = Avx2.CompareGreaterThan(sM, sY).AsUInt64();
+
+            // Pack eq(low dword) + lt(high dword) so one movmskps yields both.
+            Vector256<ulong> packedX = Avx2.Or(Avx2.And(eqXv, low32Mask), Avx2.AndNot(low32Mask, ltXv));
+            Vector256<ulong> packedY = Avx2.Or(Avx2.And(eqYv, low32Mask), Avx2.AndNot(low32Mask, ltYv));
+
+            uint maskX = (uint)Avx.MoveMask(packedX.AsSingle());
+            uint maskY = (uint)Avx.MoveMask(packedY.AsSingle());
+
+            return LessThanFromPackedMask8(maskX) & LessThanFromPackedMask8(maskY);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool LessThanFromPackedMask8(uint mask8)
+        {
+            // even bits are eq, odd bits are lt
+            uint mismatchEven = (~mask8) & 0x55u;
+            if (mismatchEven == 0) return false; // all words equal => not less
+
+            int pos = BitOperations.LeadingZeroCount(mismatchEven) ^ 31; // highest mismatching even bit
+            return ((mask8 >> (pos + 1)) & 1u) != 0; // corresponding lt bit
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool LessThanFromMasks(uint eqMask, uint ltMask)
+        {
+            uint diff = eqMask ^ 0xFu;
+            if (diff == 0) return false;
+
+            int idx = BitOperations.LeadingZeroCount(diff) ^ 31;
+            return ((ltMask >> idx) & 1u) != 0;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool LessThanBothVector256(in UInt256 x, in UInt256 y, in UInt256 m)
+        {
+            Vector256<ulong> vecM = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in m));
+
+            // x < m
+            Vector256<ulong> vecX = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in x));
+            uint eqMaskX = Vector256.ExtractMostSignificantBits(Vector256.Equals(vecX, vecM));
+            uint ltMaskX = Vector256.ExtractMostSignificantBits(Vector256.LessThan(vecX, vecM));
+            if (!LessThanFromMasks(eqMaskX, ltMaskX))
+                return false;
+
+            // y < m
+            Vector256<ulong> vecY = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in y));
+            uint eqMaskY = Vector256.ExtractMostSignificantBits(Vector256.Equals(vecY, vecM));
+            uint ltMaskY = Vector256.ExtractMostSignificantBits(Vector256.LessThan(vecY, vecM));
+            return LessThanFromMasks(eqMaskY, ltMaskY);
         }
 
         public static bool operator ==(in UInt256 a, int b) => a.Equals(b);
