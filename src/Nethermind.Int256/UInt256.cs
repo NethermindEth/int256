@@ -3092,7 +3092,7 @@ namespace Nethermind.Int256
         // Knuth steps (unrolled)
         // ------------------------------------------------------------
         [SkipLocalsInit]
-        [MethodImpl(MethodImplOptions.NoInlining)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static ulong DivStep2(ref ulong u0r, ref ulong u1r, ref ulong u2r, ulong v0, ulong v1, ulong recip)
         {
             // Variant B style: load u1/u2 once. Delay u0 until after quotient estimate.
