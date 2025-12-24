@@ -8,6 +8,20 @@ namespace Nethermind.Int256.Test
 {
     public abstract class UInt256TestsTemplate<T> where T : IInteger<T>
     {
+        private static readonly BigInteger Mod256 = BigInteger.One << 256;
+        private static readonly BigInteger Mask256 = Mod256 - 1;
+        private static readonly BigInteger SignBit = BigInteger.One << 255;
+
+        private static BigInteger WrapUInt256(BigInteger x)
+            => x & Mask256; // always 0..2^256-1
+
+        private static BigInteger WrapInt256(BigInteger x)
+        {
+            x &= Mask256; // low 256 bits as unsigned
+            if (x >= SignBit) x -= Mod256; // interpret as signed two's-complement
+            return x;
+        }
+
         protected readonly Func<BigInteger, T> convert;
         protected readonly Func<int, T> convertFromInt;
         protected readonly Func<BigInteger, BigInteger> postprocess;
@@ -552,21 +566,20 @@ namespace Nethermind.Int256.Test
         [TestCaseSource(typeof(UnaryOps), nameof(UnaryOps.TestCases))]
         public virtual void Not(BigInteger test)
         {
-            BigInteger resBigInt = ~test;
-            resBigInt %= (BigInteger.One << 256);
-            if (typeof(T) == typeof(UInt256))
-            {
-                ((Int256)resBigInt)._value.Convert(out resBigInt);
-            }
-            T uint256 = convert(test);
-            T.Not(uint256, out T res);
-            res.Convert(out BigInteger resUInt256);
-            resUInt256.Should().Be(resBigInt);
+            BigInteger resBigInt = typeof(T) == typeof(UInt256)
+                ? WrapUInt256(~test)
+                : WrapInt256(~test);
+
+            T x = convert(test);
+            T.Not(x, out T res);
+            res.Convert(out BigInteger resT);
+
+            resT.Should().Be(resBigInt);
 
             // Test reusing input as output
-            T.Not(uint256, out uint256);
-            uint256.Convert(out resUInt256);
-            resUInt256.Should().Be(resBigInt);
+            T.Not(x, out x);
+            x.Convert(out resT);
+            resT.Should().Be(resBigInt);
         }
 
         [TestCaseSource(typeof(UnaryOps), nameof(UnaryOps.TestCases))]
