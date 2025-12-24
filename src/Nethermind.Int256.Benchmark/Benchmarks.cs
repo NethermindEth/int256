@@ -11,11 +11,13 @@ namespace Nethermind.Int256.Benchmark;
 [NoIntrinsicsJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 3)]
 public class UnsignedBenchmarkBase
 {
-    public IEnumerable<BigInteger> Values => new[] { Numbers.UInt256Max - 1, Numbers.UInt192Max - 1, Numbers.UInt128Max - 1, Numbers.TwoTo64 - 1, BigInteger.One };
+    public IEnumerable<BigInteger> ValuesMinus3 => new[] { Numbers.UInt256Max - 3, Numbers.UInt192Max - 3, Numbers.UInt128Max - 3, Numbers.TwoTo64 - 3, BigInteger.One };
+    public IEnumerable<BigInteger> ValuesMinus2 => ValuesMinus3.Select(x => x + 1);
+    public IEnumerable<BigInteger> ValuesMinus1 => ValuesMinus3.Select(x => x + 2);
 
-    public IEnumerable<UInt256> ValuesUint256 => Values.Select(x => (UInt256)x);
-
-    public IEnumerable<(BigInteger, UInt256)> ValuesTuple => Values.Select(x => (x, (UInt256)x));
+    public IEnumerable<(BigInteger, UInt256)> ValuesMinus3Tuple => ValuesMinus3.Select(x => (x, (UInt256)x));
+    public IEnumerable<(BigInteger, UInt256)> ValuesMinus2Tuple => ValuesMinus2.Select(x => (x, (UInt256)x));
+    public IEnumerable<(BigInteger, UInt256)> ValuesMinus1Tuple => ValuesMinus1.Select(x => (x, (UInt256)x));
 
     public IEnumerable<int> ValuesInt => UnaryOps.RandomInt(3);
 
@@ -26,7 +28,7 @@ public class UnsignedBenchmarkBase
 
 public class UnsignedIntTwoParamBenchmarkBase : UnsignedBenchmarkBase
 {
-    [ParamsSource(nameof(ValuesTuple))]
+    [ParamsSource(nameof(ValuesMinus1Tuple))]
     public (BigInteger, UInt256) A;
 
     [ParamsSource(nameof(ValuesIntTuple))]
@@ -35,16 +37,16 @@ public class UnsignedIntTwoParamBenchmarkBase : UnsignedBenchmarkBase
 
 public class UnsignedTwoParamBenchmarkBase : UnsignedBenchmarkBase
 {
-    [ParamsSource(nameof(ValuesTuple))]
+    [ParamsSource(nameof(ValuesMinus1Tuple))]
     public (BigInteger, UInt256) A;
 
-    [ParamsSource(nameof(ValuesTuple))]
+    [ParamsSource(nameof(ValuesMinus2Tuple))]
     public (BigInteger, UInt256) B;
 }
 
 public class UnsignedThreeParamBenchmarkBase : UnsignedTwoParamBenchmarkBase
 {
-    [ParamsSource(nameof(ValuesTuple))]
+    [ParamsSource(nameof(ValuesMinus3Tuple))]
     public (BigInteger, UInt256) C;
 }
 
