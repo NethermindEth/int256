@@ -1,13 +1,14 @@
 using System;
 using System.Buffers.Binary;
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using System.Runtime.Intrinsics.X86;
 using System.Runtime.Intrinsics;
-using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
+using System.Runtime.Intrinsics.Arm;
+using System.Runtime.Intrinsics.X86;
 
 [assembly: InternalsVisibleTo("Nethermind.Int256.Tests")]
 
@@ -3068,7 +3069,7 @@ namespace Nethermind.Int256
                 rcarry = false;
             }
 
-            hi = Math.BigMul(qhat, v0, out lo); // hi:lo = qhat*v0
+            hi = Mul128(qhat, v0, out lo); // hi:lo = qhat*v0
 
             // Correct at most twice
             if (!rcarry && (hi > rhat || (hi == rhat && lo > u2)))
@@ -3094,7 +3095,7 @@ namespace Nethermind.Int256
             borrow = (u2 < lo) ? 1UL : 0UL;
             u2 -= lo;
 
-            hi1 = Math.BigMul(qhat, v1n, out lo);
+            hi1 = Mul128(qhat, v1n, out lo);
             sum = lo + hi;
             hi = hi1 + ((sum < lo) ? 1UL : 0UL);
 
@@ -3147,7 +3148,7 @@ namespace Nethermind.Int256
                 rcarry = false;
             }
 
-            hi = Math.BigMul(qhat, v0, out lo);
+            hi = Mul128(qhat, v0, out lo);
 
             if (!rcarry && (hi > rhat || (hi == rhat && lo > u1)))
             {
@@ -3171,7 +3172,7 @@ namespace Nethermind.Int256
             borrow = (u1 < lo) ? 1UL : 0UL;
             u1 -= lo;
 
-            hi1 = Math.BigMul(qhat, v1n, out lo);
+            hi1 = Mul128(qhat, v1n, out lo);
             sum = lo + hi;
             hi = hi1 + ((sum < lo) ? 1UL : 0UL);
 
@@ -3223,7 +3224,7 @@ namespace Nethermind.Int256
                 rcarry = false;
             }
 
-            hi = Math.BigMul(qhat, v0, out lo);
+            hi = Mul128(qhat, v0, out lo);
 
             if (!rcarry && (hi > rhat || (hi == rhat && lo > u0)))
             {
@@ -3247,7 +3248,7 @@ namespace Nethermind.Int256
             borrow = (u0 < lo) ? 1UL : 0UL;
             u0 -= lo;
 
-            hi1 = Math.BigMul(qhat, v1n, out lo);
+            hi1 = Mul128(qhat, v1n, out lo);
             sum = lo + hi;
             hi = hi1 + ((sum < lo) ? 1UL : 0UL);
 
@@ -3306,6 +3307,27 @@ namespace Nethermind.Int256
 
             Unsafe.Add(ref rRef, 2) = 0;
             Unsafe.Add(ref rRef, 3) = 0;
+        }
+
+        [SkipLocalsInit]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static ulong Mul128(ulong a, ulong b, out ulong low)
+        {
+            if (Bmi2.X64.IsSupported)
+            {
+                // Two multiplies ends up being faster as it doesn't spill to stack.
+                low = a * b;
+                return Bmi2.X64.MultiplyNoFlags(a, b);
+            }
+            else if (ArmBase.Arm64.IsSupported)
+            {
+                low = a * b;
+                return ArmBase.Arm64.MultiplyHigh(a, b);
+            }
+            else
+            {
+                return Math.BigMul(a, b, out low);
+            }
         }
 
         [SkipLocalsInit]
@@ -3425,7 +3447,7 @@ namespace Nethermind.Int256
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static ulong UDivRem2By1(ulong u1, ulong recip, ulong d, ulong u0, out ulong r)
         {
-            ulong pHi = Math.BigMul(recip, u1, out r); // r = pLo
+            ulong pHi = Mul128(recip, u1, out r); // r = pLo
 
             r += u0;                                   // r = qLoNew
             ulong q = pHi + u1 + 1UL;
@@ -3858,7 +3880,15 @@ namespace Nethermind.Int256
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void Mul128(ulong a, ulong b, out ulong lo, out ulong hi)
         {
-            hi = Math.BigMul(a, b, out lo);
+            if (Bmi2.X64.IsSupported)
+            {
+                hi = Bmi2.X64.MultiplyNoFlags(a, b);
+                lo = a * b;
+            }
+            else
+            {
+                hi = Math.BigMul(a, b, out lo);
+            }
         }
 
         private static ulong Sub(ulong x, ulong y, ref ulong borrow)
