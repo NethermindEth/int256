@@ -1,12 +1,19 @@
+using System;
+using System.Collections.Immutable;
 using System.Collections.Generic;
 using System.Numerics;
 using System.Linq;
 using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Jobs;
+using BenchmarkDotNet.Order;
+using BenchmarkDotNet.Reports;
+using BenchmarkDotNet.Running;
 using Nethermind.Int256.Test;
 
 namespace Nethermind.Int256.Benchmark;
 
+[HideColumns("Job")]
 [SimpleJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 3)]
 [NoIntrinsicsJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 3)]
 public class UnsignedBenchmarkBase
@@ -301,20 +308,56 @@ public class MultiplyModSigned : SignedThreeParamBenchmarkBase
         return res;
     }
 }
-
-public class DivideUnsigned : UnsignedTwoParamBenchmarkBase
+[Config(typeof(Config))]
+[SimpleJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 3)]
+[NoIntrinsicsJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 3)]
+public class DivideUnsigned : UnsignedBenchmarkBase
 {
-    [Benchmark(Baseline = true)]
-    public BigInteger Divide_BigInteger()
+    private sealed class Config : ManualConfig
     {
-        return (A.Item1 / B.Item1);
+        public Config()
+        {
+            WithOrderer(new Orderer<DoubleUInt256>(v => ParamIndex.TryGetValue(v, out var i) ? i : int.MaxValue));
+        }
     }
+    private static IEnumerable<DoubleUInt256> Values
+    {
+        get
+        {
+            foreach (BigInteger x in ValuesMinus1)
+            {
+                foreach (BigInteger y in ValuesMinus2)
+                {
+                    if (y > x)
+                    {
+                        // Skip cases where divisor is greater than dividend
+                        continue;
+                    }
+
+                    yield return new DoubleUInt256((UInt256)x, (UInt256)y);
+                }
+            }
+        }
+    }
+
+    public static DoubleUInt256[] ValuesArray { get; } = [.. Values.OrderBy(o => o.B).ThenBy(o => o.A)];
+
+    private static readonly Dictionary<DoubleUInt256, int> ParamIndex =
+        ValuesArray.Select((v, i) => (v, i)).ToDictionary(t => t.v, t => t.i);
+
+    [ParamsSource(nameof(ValuesArray))]
+    public DoubleUInt256 Param;
 
     [Benchmark]
     public UInt256 Divide_UInt256()
     {
-        UInt256.Divide(A.Item2, B.Item2, out UInt256 res);
+        UInt256.Divide(Param.A, Param.B, out UInt256 res);
         return res;
+    }
+
+    public readonly record struct DoubleUInt256(UInt256 A, UInt256 B)
+    {
+        public override readonly string ToString() => $"{A.BitLen} bits / {B.BitLen} bits";
     }
 }
 
@@ -489,4 +532,34 @@ public class IsZeroOne
     {
         return A.IsOne;
     }
+}
+
+public sealed class Orderer<T> : IOrderer
+{
+    private readonly Func<T, int> _indexOf;
+
+    public Orderer(Func<T, int> indexOf) => _indexOf = indexOf;
+
+    public IEnumerable<BenchmarkCase> GetSummaryOrder(ImmutableArray<BenchmarkCase> benchmarks, Summary summary)
+        => benchmarks
+            .OrderBy(b => _indexOf(GetParam(b)))
+            .ThenBy(b => b.Job.DisplayInfo);
+
+    public IEnumerable<BenchmarkCase> GetExecutionOrder(ImmutableArray<BenchmarkCase> benchmarksCase, IEnumerable<BenchmarkLogicalGroupRule>? order = null)
+        => benchmarksCase
+            .OrderBy(b => _indexOf(GetParam(b)))
+            .ThenBy(b => b.Job.DisplayInfo);
+
+    private static T GetParam(BenchmarkCase b)
+        => (T)b.Parameters.Items.First(p => p.Name == "Param").Value!;
+
+    public string? GetHighlightGroupKey(BenchmarkCase benchmarkCase) => null;
+    public string? GetLogicalGroupKey(ImmutableArray<BenchmarkCase> allBenchmarksCases, BenchmarkCase benchmarkCase) => null;
+
+    public IEnumerable<IGrouping<string, BenchmarkCase>> GetLogicalGroupOrder(IEnumerable<IGrouping<string, BenchmarkCase>> logicalGroups, IEnumerable<BenchmarkLogicalGroupRule>? order = null)
+        => logicalGroups;
+
+    public bool SeparateLogicalGroups => false;
+    public bool SeparateHighlightGroups => false;
+    public bool SeparateReporters => false;
 }
