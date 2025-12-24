@@ -47,7 +47,7 @@ namespace Nethermind.Int256.Test
             // j=0 - 1 correction
             (BigInteger)new UInt256(0xE688558F6E158B6D, 0xC4FF6E1D86DB666F, 0x55B9AD38D5464280),
             (BigInteger)new UInt256(0xEA9108D3F5A64EFA, 0xB3C9574B96942351),
-            // j=0 - 2 corrections (hits the nested "second correction" if)
+            // j=0 - 2 corrections (triggers both the qhat adjustment and the add-back correction)
             (BigInteger)new UInt256(0x6EC311A3B68AFEAE, 0x34B0045330F4129E, 0x83C781A177368C89),
             (BigInteger)new UInt256(0xE946BAB2D13F0B5B, 0x94F2E9ADF2BF1ABE),
 
