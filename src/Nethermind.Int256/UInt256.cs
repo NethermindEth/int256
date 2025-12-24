@@ -1106,45 +1106,37 @@ namespace Nethermind.Int256
         }
 
         [SkipLocalsInit]
-        [MethodImpl(MethodImplOptions.NoInlining)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static ulong Reciprocal2By1(ulong d)
         {
             // Precondition: d is normalised (bit 63 set).
-            // Seed lookup
-            int idx = (int)(uint)((d >> 55) - 256u); // 0..255
+
+            // For normalised d: (d >> 55) is in [256..511], so subtracting 256 yields [0..255].
+            // This form stays identical for valid inputs, but is more obviously "byte range" to humans and JITs.
+            int idx = (int)((d >> 55) - 256UL);
+
             ulong v0 = ReciprocalSeedTable[idx];
 
-            ulong d40 = (d >> 24) + 1;
+            ulong d40 = (d >> 24) + 1UL;
 
-            ulong v1 = (v0 << 11) - ((v0 * v0 * d40) >> 40) - 1;
+            // Keep the original algebra - all ops are modulo 2^64, so reassociation is safe.
+            ulong v1 = (v0 << 11) - ((v0 * v0 * d40) >> 40) - 1UL;
+
             ulong v2 = (v1 << 13) + ((v1 * (0x1000_0000_0000_0000UL - v1 * d40)) >> 47);
 
-            ulong d0 = d & 1;
+            ulong d0 = d & 1UL;
             ulong d63 = (d >> 1) + d0;
 
-            ulong e = ((v2 >> 1) & (0UL - d0)) - v2 * d63;
+            ulong e = ((v2 >> 1) & (0UL - d0)) - (v2 * d63);
 
-            // v3 = (high(v2*e) >> 1) + (v2<<31)
-            ulong v2e_hi = MulHigh(v2, e);
-            ulong v3 = (v2e_hi >> 1) + (v2 << 31);
+            ulong v3 = (MulHigh(v2, e) >> 1) + (v2 << 31);
 
             // v4 = v3 - high(v3*d + d) - d
             ulong prodHi = Multiply64(v3, d, out ulong prodLo);
 
-            ulong sumLo = prodLo + d;
-            prodHi += (sumLo < prodLo) ? 1UL : 0UL;
+            prodHi += (prodLo > ~d) ? 1UL : 0UL;
 
             return v3 - prodHi - d;
-        }
-
-        // ----- table access -----
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static uint ReciprocalSeed(int idx)
-        {
-            // idx in [0..255]
-            ref uint t0 = ref MemoryMarshal.GetReference(ReciprocalSeedTable);
-            return Unsafe.Add(ref t0, idx);
         }
 
         // Your 256-entry ushort table (512 bytes) from earlier:
@@ -1330,6 +1322,17 @@ namespace Nethermind.Int256
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Multiply(in UInt256 x, in UInt256 y, out UInt256 res)
         {
+            if (y.IsZero || x.IsZero)
+            {
+                res = default;
+                return;
+            }
+            if (y.IsOne || x.IsOne)
+            {
+                res = x;
+                return;
+            }
+
             if (!Avx512F.IsSupported || !Avx512DQ.IsSupported || !Avx512DQ.VL.IsSupported)
             {
                 MultiplyScalar(in x, in y, out res);
