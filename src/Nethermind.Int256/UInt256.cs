@@ -2740,6 +2740,8 @@ namespace Nethermind.Int256
             }
             else if (y.u1 != 0)
             {
+                //if (Avx512F.IsSupported) DivideBy128BitsAvx512(in x, in y, out quotient, out remainder);
+                //else
                 DivideBy128Bits(in x, in y, out quotient, out remainder);
             }
             else
@@ -2996,7 +2998,7 @@ namespace Nethermind.Int256
             // ------------------------------------------------------------
             // n >= 2: Knuth D (specialised) with reciprocal qhat
             // ------------------------------------------------------------
-
+            // Preconditions (debug-only)
             Debug.Assert(y.u1 != 0 && y.u2 == 0 && y.u3 == 0);
 
             // Pull loads up front - avoids any alias nastiness with out params.
@@ -3038,17 +3040,347 @@ namespace Nethermind.Int256
 
             ulong vRecip = Reciprocal2By1(v1n);
 
-            // Write quotient limbs directly into the out slot - kills q1/q2 liveness across calls.
+            // Write quotient limbs directly into the out slot.
+            Unsafe.SkipInit(out q);
+            ref ulong qRef = ref Unsafe.As<UInt256, ulong>(ref q);
+
+            // Shared scratch - single logical "out home".
+            // Note: JIT may still choose per-call temps for intrinsic out args, but this keeps IL locals minimal.
+            ulong lo;
+
+            // Shared temps across all 3 quotient digits - keeps the local set small.
+            ulong qhat, rhat, hi, hi1, sum, t, b, borrow;
+            bool rcarry;
+
+            // ------------------------------------------------------------
+            // Step j=2: produce q2 from (u4:u3:u2)
+            // ------------------------------------------------------------
+            if (u4 == v1n)
+            {
+                qhat = ulong.MaxValue;
+                rhat = u3 + v1n;
+                rcarry = rhat < u3;
+            }
+            else
+            {
+                qhat = UDivRem2By1(u4, vRecip, v1n, u3, out lo);
+                rhat = lo;
+                rcarry = false;
+            }
+
+            hi = Math.BigMul(qhat, v0, out lo); // hi:lo = qhat*v0
+
+            // Correct at most twice
+            if (!rcarry && (hi > rhat || (hi == rhat && lo > u2)))
+            {
+                qhat--;
+
+                hi -= (lo < v0) ? 1UL : 0UL;
+                lo -= v0;
+
+                rhat += v1n;
+                rcarry = rhat < v1n;
+
+                if (!rcarry && (hi > rhat || (hi == rhat && lo > u2)))
+                {
+                    qhat--;
+
+                    hi -= (lo < v0) ? 1UL : 0UL;
+                    lo -= v0;
+                }
+            }
+
+            // Subtract qhat*v from u2,u3,u4 (3 limbs)
+            borrow = (u2 < lo) ? 1UL : 0UL;
+            u2 -= lo;
+
+            hi1 = Math.BigMul(qhat, v1n, out lo);
+            sum = lo + hi;
+            hi = hi1 + ((sum < lo) ? 1UL : 0UL);
+
+            t = u3 - sum;
+            b = (u3 < sum) ? 1UL : 0UL;
+            u3 = t - borrow;
+            borrow = b | ((t < borrow) ? 1UL : 0UL);
+
+            t = u4 - hi;
+            b = (u4 < hi) ? 1UL : 0UL;
+            u4 = t - borrow;
+            borrow = b | ((t < borrow) ? 1UL : 0UL);
+
+            if (borrow == 0)
+            {
+                Unsafe.Add(ref qRef, 2) = qhat;
+            }
+            else
+            {
+                // Add-back v and decrement qhat
+                ulong s0 = u2 + v0;
+                ulong c0 = (s0 < u2) ? 1UL : 0UL;
+
+                ulong s1 = u3 + v1n;
+                ulong carry = (s1 < u3) ? 1UL : 0UL;
+
+                ulong s1c = s1 + c0;
+                carry |= (s1c < s1) ? 1UL : 0UL;
+
+                u2 = s0;
+                u3 = s1c;
+                u4 += carry;
+
+                Unsafe.Add(ref qRef, 2) = qhat - 1;
+            }
+
+            // ------------------------------------------------------------
+            // Step j=1: produce q1 from (u3:u2:u1)
+            // ------------------------------------------------------------
+            if (u3 == v1n)
+            {
+                qhat = ulong.MaxValue;
+                rhat = u2 + v1n;
+                rcarry = rhat < u2;
+            }
+            else
+            {
+                qhat = UDivRem2By1(u3, vRecip, v1n, u2, out lo);
+                rhat = lo;
+                rcarry = false;
+            }
+
+            hi = Math.BigMul(qhat, v0, out lo);
+
+            if (!rcarry && (hi > rhat || (hi == rhat && lo > u1)))
+            {
+                qhat--;
+
+                hi -= (lo < v0) ? 1UL : 0UL;
+                lo -= v0;
+
+                rhat += v1n;
+                rcarry = rhat < v1n;
+
+                if (!rcarry && (hi > rhat || (hi == rhat && lo > u1)))
+                {
+                    qhat--;
+
+                    hi -= (lo < v0) ? 1UL : 0UL;
+                    lo -= v0;
+                }
+            }
+
+            borrow = (u1 < lo) ? 1UL : 0UL;
+            u1 -= lo;
+
+            hi1 = Math.BigMul(qhat, v1n, out lo);
+            sum = lo + hi;
+            hi = hi1 + ((sum < lo) ? 1UL : 0UL);
+
+            t = u2 - sum;
+            b = (u2 < sum) ? 1UL : 0UL;
+            u2 = t - borrow;
+            borrow = b | ((t < borrow) ? 1UL : 0UL);
+
+            t = u3 - hi;
+            b = (u3 < hi) ? 1UL : 0UL;
+            u3 = t - borrow;
+            borrow = b | ((t < borrow) ? 1UL : 0UL);
+
+            if (borrow == 0)
+            {
+                Unsafe.Add(ref qRef, 1) = qhat;
+            }
+            else
+            {
+                ulong s0 = u1 + v0;
+                ulong c0 = (s0 < u1) ? 1UL : 0UL;
+
+                ulong s1 = u2 + v1n;
+                ulong carry = (s1 < u2) ? 1UL : 0UL;
+
+                ulong s1c = s1 + c0;
+                carry |= (s1c < s1) ? 1UL : 0UL;
+
+                u1 = s0;
+                u2 = s1c;
+                u3 += carry;
+
+                Unsafe.Add(ref qRef, 1) = qhat - 1;
+            }
+
+            // ------------------------------------------------------------
+            // Step j=0: produce q0 from (u2:u1:u0)
+            // ------------------------------------------------------------
+            if (u2 == v1n)
+            {
+                qhat = ulong.MaxValue;
+                rhat = u1 + v1n;
+                rcarry = rhat < u1;
+            }
+            else
+            {
+                qhat = UDivRem2By1(u2, vRecip, v1n, u1, out lo);
+                rhat = lo;
+                rcarry = false;
+            }
+
+            hi = Math.BigMul(qhat, v0, out lo);
+
+            if (!rcarry && (hi > rhat || (hi == rhat && lo > u0)))
+            {
+                qhat--;
+
+                hi -= (lo < v0) ? 1UL : 0UL;
+                lo -= v0;
+
+                rhat += v1n;
+                rcarry = rhat < v1n;
+
+                if (!rcarry && (hi > rhat || (hi == rhat && lo > u0)))
+                {
+                    qhat--;
+
+                    hi -= (lo < v0) ? 1UL : 0UL;
+                    lo -= v0;
+                }
+            }
+
+            borrow = (u0 < lo) ? 1UL : 0UL;
+            u0 -= lo;
+
+            hi1 = Math.BigMul(qhat, v1n, out lo);
+            sum = lo + hi;
+            hi = hi1 + ((sum < lo) ? 1UL : 0UL);
+
+            t = u1 - sum;
+            b = (u1 < sum) ? 1UL : 0UL;
+            u1 = t - borrow;
+            borrow = b | ((t < borrow) ? 1UL : 0UL);
+
+            t = u2 - hi;
+            b = (u2 < hi) ? 1UL : 0UL;
+            u2 = t - borrow;
+            borrow = b | ((t < borrow) ? 1UL : 0UL);
+
+            if (borrow == 0)
+            {
+                qRef = qhat;
+            }
+            else
+            {
+                ulong s0 = u0 + v0;
+                ulong c0 = (s0 < u0) ? 1UL : 0UL;
+
+                ulong s1 = u1 + v1n;
+                ulong carry = (s1 < u1) ? 1UL : 0UL;
+
+                ulong s1c = s1 + c0;
+                carry |= (s1c < s1) ? 1UL : 0UL;
+
+                u0 = s0;
+                u1 = s1c;
+                u2 += carry;
+
+                qRef = qhat - 1;
+            }
+
+            // q3 is always 0 for 256/128 here.
+            Unsafe.Add(ref qRef, 3) = 0;
+
+            // ------------------------------------------------------------
+            // Remainder (u0..u1 in normalised space) - unnormalise.
+            // ------------------------------------------------------------
+            Unsafe.SkipInit(out remainder);
+            ref ulong rRef = ref Unsafe.As<UInt256, ulong>(ref remainder);
+
+            if (shift == 0)
+            {
+                rRef = u0;
+                Unsafe.Add(ref rRef, 1) = u1;
+            }
+            else
+            {
+                int rs = 64 - shift;
+                rRef = (u0 >> shift) | (u1 << rs);
+                Unsafe.Add(ref rRef, 1) = u1 >> shift;
+            }
+
+            Unsafe.Add(ref rRef, 2) = 0;
+            Unsafe.Add(ref rRef, 3) = 0;
+        }
+
+        [SkipLocalsInit]
+        [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.AggressiveOptimization)]
+        private static void DivideBy128BitsAvx512(in UInt256 x, in UInt256 y, out UInt256 q, out UInt256 remainder)
+        {
+            Debug.Assert(Avx512F.IsSupported);
+            Debug.Assert(y.u1 != 0 && y.u2 == 0 && y.u3 == 0);
+
+            // Pull loads up front - avoids any alias nastiness with out params.
+            ulong y0 = y.u0;
+            ulong y1 = y.u1;
+
+            // Dividend limbs.
+            ulong u0 = x.u0;
+            ulong u1 = x.u1;
+            ulong u2 = x.u2;
+            ulong u3 = x.u3;
+            ulong u4;
+
+            int shift = BitOperations.LeadingZeroCount(y1);
+
+            ulong v0, v1n;
+
+            if (shift != 0)
+            {
+                int rs = 64 - shift;
+
+                // Normalise divisor.
+                v0 = y0 << shift;
+                v1n = (y1 << shift) | (y0 >> rs);
+
+                // Normalise dividend with AVX-512 (mask-free).
+                // uNorm lanes:
+                //   [u0<<sh,
+                //    (u1<<sh)|(u0>>rs),
+                //    (u2<<sh)|(u1>>rs),
+                //    (u3<<sh)|(u2>>rs),
+                //    (0<<sh) |(u3>>rs), ...]
+                Vector512<ulong> u = Vector512.Create(u0, u1, u2, u3, 0UL, 0UL, 0UL, 0UL);
+
+                Vector512<ulong> shv = Vector512.Create((ulong)shift);
+                Vector512<ulong> rsv = Vector512.Create((ulong)rs);
+
+                Vector512<ulong> lo = Avx512F.ShiftLeftLogicalVariable(u, shv);
+                Vector512<ulong> hi = Avx512F.ShiftRightLogicalVariable(u, rsv);
+
+                // Lane-shift hi up by 1: [0, hi0, hi1, hi2, hi3, ...]
+                hi = Avx512F.AlignRight64(hi, Vector512<ulong>.Zero, 7);
+
+                Vector512<ulong> uNorm = Avx512F.Or(lo, hi);
+
+                u0 = uNorm.GetElement(0);
+                u1 = uNorm.GetElement(1);
+                u2 = uNorm.GetElement(2);
+                u3 = uNorm.GetElement(3);
+                u4 = uNorm.GetElement(4);
+            }
+            else
+            {
+                v0 = y0;
+                v1n = y1;
+                u4 = 0;
+            }
+
+            ulong vRecip = Reciprocal2By1(v1n);
+
             Unsafe.SkipInit(out q);
             ref ulong q0Ref = ref Unsafe.As<UInt256, ulong>(ref q);
 
-            Unsafe.Add(ref q0Ref, 2) = DivStep2(ref u2, ref u3, ref u4, v0, v1n, vRecip);
-            Unsafe.Add(ref q0Ref, 1) = DivStep2(ref u1, ref u2, ref u3, v0, v1n, vRecip);
-            q0Ref = DivStep2(ref u0, ref u1, ref u2, v0, v1n, vRecip);
+            Unsafe.Add(ref q0Ref, 2) = DivStep2_NoInline(ref u2, ref u3, ref u4, v0, v1n, vRecip);
+            Unsafe.Add(ref q0Ref, 1) = DivStep2_NoInline(ref u1, ref u2, ref u3, v0, v1n, vRecip);
+            q0Ref = DivStep2_NoInline(ref u0, ref u1, ref u2, v0, v1n, vRecip);
             Unsafe.Add(ref q0Ref, 3) = 0;
 
-            // Remainder is u0..u1 in normalised space; unnormalise with scalar shifts.
-            // This replaces: remN = Create(u0,u1,0,0); remainder = ShiftRightSmall(remN, shift);
             Unsafe.SkipInit(out remainder);
             ref ulong r0Ref = ref Unsafe.As<UInt256, ulong>(ref remainder);
 
@@ -3060,13 +3392,32 @@ namespace Nethermind.Int256
             else
             {
                 int rs = 64 - shift;
-                r0Ref = (u0 >> shift) | (u1 << rs);
-                Unsafe.Add(ref r0Ref, 1) = (u1 >> shift);
+
+                // Mask-free AVX-512 unnormalise of (u1:u0) >> shift.
+                Vector512<ulong> r = Vector512.Create(u0, u1, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL);
+
+                Vector512<ulong> shv = Vector512.Create((ulong)shift);
+                Vector512<ulong> lsv = Vector512.Create((ulong)rs);
+
+                Vector512<ulong> right = Avx512F.ShiftRightLogicalVariable(r, shv);
+                Vector512<ulong> left = Avx512F.ShiftLeftLogicalVariable(r, lsv);
+
+                // carry lane0 = left lane1 (u1<<rs)
+                Vector512<ulong> carry = Avx512F.AlignRight64(Vector512<ulong>.Zero, left, 1);
+
+                Vector512<ulong> rr = Avx512F.Or(right, carry);
+
+                r0Ref = rr.GetElement(0);
+                Unsafe.Add(ref r0Ref, 1) = rr.GetElement(1);
             }
 
             Unsafe.Add(ref r0Ref, 2) = 0;
             Unsafe.Add(ref r0Ref, 3) = 0;
         }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static ulong DivStep2_NoInline(ref ulong u0r, ref ulong u1r, ref ulong u2r, ulong v0, ulong v1, ulong recip)
+            => DivStep2(ref u0r, ref u1r, ref u2r, v0, v1, recip);
         // Preconditions:
         // - d normalised (msb set)
         // - u1 < d
