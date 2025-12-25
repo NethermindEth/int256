@@ -13,9 +13,10 @@ using Nethermind.Int256.Test;
 
 namespace Nethermind.Int256.Benchmark;
 
-[HideColumns("Job")]
+[HideColumns("Job", "RatioSD", "Error")]
 [SimpleJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 3)]
-[NoIntrinsicsJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 3)]
+[NoAvx512Job(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 3)]
+[NoAvx2Job(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 3, baseline: true)]
 public class UnsignedBenchmarkBase
 {
     public static IEnumerable<BigInteger> ValuesMinus3 { get; } = new[] { Numbers.UInt256Max - 3, Numbers.UInt192Max - 3, Numbers.UInt128Max - 3, Numbers.TwoTo64 - 3, BigInteger.One };
@@ -244,10 +245,8 @@ public class SubtractModSigned : SignedThreeParamBenchmarkBase
         return res;
     }
 }
+
 [Config(typeof(Config))]
-[SimpleJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 3)]
-[NoAvx512Job(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 3)]
-[NoIntrinsicsJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 3)]
 public class MultiplyUnsigned : UnsignedBenchmarkBase
 {
     private sealed class Config : ManualConfig
@@ -339,10 +338,8 @@ public class MultiplyModSigned : SignedThreeParamBenchmarkBase
         return res;
     }
 }
+
 [Config(typeof(Config))]
-[SimpleJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 3)]
-[NoAvx512Job(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 3)]
-[NoIntrinsicsJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 3)]
 public class DivideUnsigned : UnsignedBenchmarkBase
 {
     private sealed class Config : ManualConfig
@@ -587,12 +584,13 @@ public sealed class Orderer<T> : IOrderer
         => (T)b.Parameters.Items.First(p => p.Name == "Param").Value!;
 
     public string? GetHighlightGroupKey(BenchmarkCase benchmarkCase) => null;
-    public string? GetLogicalGroupKey(ImmutableArray<BenchmarkCase> allBenchmarksCases, BenchmarkCase benchmarkCase) => null;
+    public string? GetLogicalGroupKey(ImmutableArray<BenchmarkCase> allBenchmarksCases, BenchmarkCase benchmarkCase)
+        => GetParam(benchmarkCase)?.ToString();
 
     public IEnumerable<IGrouping<string, BenchmarkCase>> GetLogicalGroupOrder(IEnumerable<IGrouping<string, BenchmarkCase>> logicalGroups, IEnumerable<BenchmarkLogicalGroupRule>? order = null)
         => logicalGroups;
 
-    public bool SeparateLogicalGroups => false;
+    public bool SeparateLogicalGroups => true;
     public bool SeparateHighlightGroups => false;
     public bool SeparateReporters => false;
 
