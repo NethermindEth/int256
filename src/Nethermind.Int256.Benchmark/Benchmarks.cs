@@ -15,6 +15,7 @@ namespace Nethermind.Int256.Benchmark;
 
 [HideColumns("Job", "RatioSD", "Error")]
 [SimpleJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 3)]
+[NoAvx512Job(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 3)]
 [NoAvx2Job(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 3, baseline: true)]
 public class UnsignedBenchmarkBase
 {
@@ -244,10 +245,8 @@ public class SubtractModSigned : SignedThreeParamBenchmarkBase
         return res;
     }
 }
+
 [Config(typeof(Config))]
-[SimpleJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 3)]
-[NoAvx512Job(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 3)]
-[NoAvx2Job(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 3, baseline: true)]
 public class MultiplyUnsigned : UnsignedBenchmarkBase
 {
     private sealed class Config : ManualConfig
@@ -339,10 +338,8 @@ public class MultiplyModSigned : SignedThreeParamBenchmarkBase
         return res;
     }
 }
+
 [Config(typeof(Config))]
-[SimpleJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 3)]
-[NoAvx512Job(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 3)]
-[NoAvx2Job(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 3, baseline: true)]
 public class DivideUnsigned : UnsignedBenchmarkBase
 {
     private sealed class Config : ManualConfig
