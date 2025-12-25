@@ -838,6 +838,15 @@ namespace Nethermind.Int256
             // y != 0
             // x > y
 
+            if (x.IsUint64)
+            {
+                // If y > x it has already be handled by caller
+                ulong quot = x.u0 / y.u0;
+                ulong rem = x.u0 - (quot * y.u0);
+                res = Create(rem, 0, 0, 0);
+                return;
+            }
+
             DivideImpl(x, y, out _, out res);
         }
 
@@ -1783,6 +1792,13 @@ namespace Nethermind.Int256
             // At this point, we know
             // x/y ; x > y > 0
 
+            if (x.IsUint64)
+            {
+                ulong quot = x.u0 / y.u0;
+                res = Create(quot, 0, 0, 0);
+                return;
+            }
+
             DivideImpl(x, y, out res, out _);
         }
 
@@ -2712,21 +2728,7 @@ namespace Nethermind.Int256
         [SkipLocalsInit]
         private static void DivideImpl(in UInt256 x, in UInt256 y, out UInt256 quotient, out UInt256 remainder)
         {
-            if (y.IsOne)
-            {
-                // Fast path: y == 1
-                remainder = default;
-                quotient = x;
-            }
-            // Shortcut some cases
-            else if (x.IsUint64)
-            {
-                ulong quot = x.u0 / y.u0;
-                ulong rem = x.u0 - (quot * y.u0);
-                quotient = Create(quot, 0, 0, 0);
-                remainder = Create(rem, 0, 0, 0);
-            }
-            else if (y.u3 != 0)
+            if (y.u3 != 0)
             {
                 DivideBy256Bits(in x, in y, out quotient, out remainder);
             }
