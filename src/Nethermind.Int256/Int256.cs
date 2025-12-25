@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2025 Demerzel Solutions Limited
+// SPDX-License-Identifier: MIT
+
 using System;
 using System.Buffers.Binary;
 using System.Numerics;
@@ -7,12 +10,23 @@ using System.Runtime.CompilerServices;
 
 namespace Nethermind.Int256
 {
-    public readonly struct Int256 : IEquatable<Int256>, IComparable, IComparable<Int256>, IInteger<Int256>, IConvertible
+    public readonly partial struct Int256 :
+        IEquatable<Int256>,
+        IComparable,
+        IComparable<Int256>,
+        IConvertible,
+        ISpanFormattable,
+        ISpanParsable<Int256>,
+        IBinaryInteger<Int256>,
+        ISignedNumber<Int256>,
+        IMinMaxValue<Int256>,
+        IInteger<Int256>
     {
         public static readonly Int256 Zero = (Int256)0UL;
         public static readonly Int256 One = (Int256)1UL;
         public static readonly Int256 MinusOne = -1L;
-        public static readonly Int256 Max = new Int256(((BigInteger.One << 255) - 1));
+        public static readonly Int256 MaxValue = new Int256(((BigInteger.One << 255) - 1));
+        public static readonly Int256 MinValue = new Int256(-(BigInteger.One << 255));
 
         internal readonly UInt256 _value;
 
@@ -55,14 +69,17 @@ namespace Nethermind.Int256
 
         public static explicit operator Int256(int n) => new Int256(n);
 
-        public Int256 OneValue => One;
-
-        public Int256 ZeroValue => Zero;
-
         public int Sign => _value.IsZero ? 0 : _value.u3 < 0x8000000000000000ul ? 1 : -1;
         public bool IsNegative => Sign < 0;
 
+        [OverloadResolutionPriority(1)]
         public static Int256 operator +(in Int256 a, in Int256 b)
+        {
+            Add(in a, in b, out Int256 res);
+            return res;
+        }
+
+        public static Int256 operator +(Int256 a, Int256 b)
         {
             Add(in a, in b, out Int256 res);
             return res;
@@ -297,7 +314,7 @@ namespace Nethermind.Int256
             }
         }
 
-        public void Exp(in Int256 exp, out Int256 res) => Exp(this, exp, out res);
+        public void Exp(in Int256 e, out Int256 res) => Exp(this, e, out res);
 
         public static void ExpMod(in Int256 bs, in Int256 exp, in Int256 m, out Int256 res)
         {
@@ -539,15 +556,21 @@ namespace Nethermind.Int256
 
         public override int GetHashCode() => _value.GetHashCode();
 
+        [OverloadResolutionPriority(1)]
         public static bool operator ==(in Int256 a, in Int256 b) => a.Equals(b);
 
+        [OverloadResolutionPriority(1)]
         public static bool operator !=(in Int256 a, in Int256 b) => !(a == b);
 
         public bool IsZero => this == Zero;
 
         public bool IsOne => this == One;
 
-        public Int256 MaximalValue => Max;
+        public Int256 ZeroValue => Zero;
+
+        public Int256 OneValue => One;
+
+        public Int256 MaximalValue => MaxValue;
 
         public int CompareTo(object? obj) => obj is not Int256 int256 ? throw new InvalidOperationException() : CompareTo(int256);
 
@@ -555,6 +578,7 @@ namespace Nethermind.Int256
 
         public static explicit operator UInt256(Int256 z) => z._value;
 
+        [OverloadResolutionPriority(1)]
         public static bool operator <(in Int256 z, in Int256 x)
         {
             int zSign = z.Sign;
@@ -574,6 +598,7 @@ namespace Nethermind.Int256
 
             return z._value < x._value;
         }
+        [OverloadResolutionPriority(1)]
         public static bool operator >(in Int256 z, in Int256 x) => x < z;
 
         public static explicit operator Int256(ulong value) => new((UInt256)value);
@@ -644,5 +669,6 @@ namespace Nethermind.Int256
             UInt256.Not(in a._value, out var o);
             res = new Int256(o);
         }
+
     }
 }
