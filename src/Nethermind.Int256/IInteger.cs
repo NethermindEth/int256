@@ -1,14 +1,8 @@
-// SPDX-FileCopyrightText: 2025 Demerzel Solutions Limited
-// SPDX-License-Identifier: MIT
-
+using System.Runtime.CompilerServices;
 using System.Numerics;
 
 namespace Nethermind.Int256
 {
-    /// <summary>
-    /// Legacy interface for backward compatibility with existing code.
-    /// New code should use the standard .NET numeric interfaces (IBinaryInteger, INumber, etc.)
-    /// </summary>
     public interface IInteger<T> where T : IInteger<T>
     {
         void Add(in T a, out T res);
@@ -35,6 +29,8 @@ namespace Nethermind.Int256
         abstract static void Not(in T a, out T res);
 
         void Convert(out BigInteger big);
+
+        string ToString();
 
         T OneValue { get; }
 
