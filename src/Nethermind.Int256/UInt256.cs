@@ -2738,8 +2738,6 @@ namespace Nethermind.Int256
             }
             else if (y.u1 != 0)
             {
-                //if (Avx512F.IsSupported) DivideBy128BitsAvx512(in x, in y, out quotient, out remainder);
-                //else
                 if (X86Base.X64.IsSupported)
                 {
                     DivideBy128BitsX86Base(in x, in y, out quotient, out remainder);
@@ -3715,13 +3713,15 @@ namespace Nethermind.Int256
 
         [SkipLocalsInit]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static ulong Multiply64(ulong a, ulong b, out ulong low)
+        private unsafe static ulong Multiply64(ulong a, ulong b, out ulong low)
         {
             if (Bmi2.X64.IsSupported)
             {
                 // Two multiplies ends up being faster as it doesn't force spill to stack.
-                low = a * b;
-                return Bmi2.X64.MultiplyNoFlags(a, b);
+                ulong lowLocal;
+                ulong high = Bmi2.X64.MultiplyNoFlags(a, b, &lowLocal);
+                low = lowLocal;
+                return high;
             }
             else if (ArmBase.Arm64.IsSupported)
             {
@@ -3733,117 +3733,6 @@ namespace Nethermind.Int256
                 return Math.BigMul(a, b, out low);
             }
         }
-
-        [SkipLocalsInit]
-        [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.AggressiveOptimization)]
-        private static void DivideBy128BitsAvx512(in UInt256 x, in UInt256 y, out UInt256 q, out UInt256 remainder)
-        {
-            Debug.Assert(Avx512F.IsSupported);
-            Debug.Assert(y.u1 != 0 && y.u2 == 0 && y.u3 == 0);
-
-            // Pull loads up front - avoids any alias nastiness with out params.
-            ulong y0 = y.u0;
-            ulong y1 = y.u1;
-
-            // Dividend limbs.
-            ulong u0 = x.u0;
-            ulong u1 = x.u1;
-            ulong u2 = x.u2;
-            ulong u3 = x.u3;
-            ulong u4;
-
-            int shift = BitOperations.LeadingZeroCount(y1);
-
-            ulong v0, v1n;
-
-            if (shift != 0)
-            {
-                int rs = 64 - shift;
-
-                // Normalise divisor.
-                v0 = y0 << shift;
-                v1n = (y1 << shift) | (y0 >> rs);
-
-                // Normalise dividend with AVX-512 (mask-free).
-                // uNorm lanes:
-                //   [u0<<sh,
-                //    (u1<<sh)|(u0>>rs),
-                //    (u2<<sh)|(u1>>rs),
-                //    (u3<<sh)|(u2>>rs),
-                //    (0<<sh) |(u3>>rs), ...]
-                Vector512<ulong> u = Vector512.Create(u0, u1, u2, u3, 0UL, 0UL, 0UL, 0UL);
-
-                Vector512<ulong> shv = Vector512.Create((ulong)shift);
-                Vector512<ulong> rsv = Vector512.Create((ulong)rs);
-
-                Vector512<ulong> lo = Avx512F.ShiftLeftLogicalVariable(u, shv);
-                Vector512<ulong> hi = Avx512F.ShiftRightLogicalVariable(u, rsv);
-
-                // Lane-shift hi up by 1: [0, hi0, hi1, hi2, hi3, ...]
-                hi = Avx512F.AlignRight64(hi, Vector512<ulong>.Zero, 7);
-
-                Vector512<ulong> uNorm = Avx512F.Or(lo, hi);
-
-                u0 = uNorm.GetElement(0);
-                u1 = uNorm.GetElement(1);
-                u2 = uNorm.GetElement(2);
-                u3 = uNorm.GetElement(3);
-                u4 = uNorm.GetElement(4);
-            }
-            else
-            {
-                v0 = y0;
-                v1n = y1;
-                u4 = 0;
-            }
-
-            ulong vRecip = Reciprocal2By1(v1n);
-
-            Unsafe.SkipInit(out q);
-            ref ulong q0Ref = ref Unsafe.As<UInt256, ulong>(ref q);
-
-            Unsafe.Add(ref q0Ref, 2) = DivStep2_NoInline(ref u2, ref u3, ref u4, v0, v1n, vRecip);
-            Unsafe.Add(ref q0Ref, 1) = DivStep2_NoInline(ref u1, ref u2, ref u3, v0, v1n, vRecip);
-            q0Ref = DivStep2_NoInline(ref u0, ref u1, ref u2, v0, v1n, vRecip);
-            Unsafe.Add(ref q0Ref, 3) = 0;
-
-            Unsafe.SkipInit(out remainder);
-            ref ulong r0Ref = ref Unsafe.As<UInt256, ulong>(ref remainder);
-
-            if (shift == 0)
-            {
-                r0Ref = u0;
-                Unsafe.Add(ref r0Ref, 1) = u1;
-            }
-            else
-            {
-                int rs = 64 - shift;
-
-                // Mask-free AVX-512 unnormalise of (u1:u0) >> shift.
-                Vector512<ulong> r = Vector512.Create(u0, u1, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL);
-
-                Vector512<ulong> shv = Vector512.Create((ulong)shift);
-                Vector512<ulong> lsv = Vector512.Create((ulong)rs);
-
-                Vector512<ulong> right = Avx512F.ShiftRightLogicalVariable(r, shv);
-                Vector512<ulong> left = Avx512F.ShiftLeftLogicalVariable(r, lsv);
-
-                // carry lane0 = left lane1 (u1<<rs)
-                Vector512<ulong> carry = Avx512F.AlignRight64(Vector512<ulong>.Zero, left, 1);
-
-                Vector512<ulong> rr = Avx512F.Or(right, carry);
-
-                r0Ref = rr.GetElement(0);
-                Unsafe.Add(ref r0Ref, 1) = rr.GetElement(1);
-            }
-
-            Unsafe.Add(ref r0Ref, 2) = 0;
-            Unsafe.Add(ref r0Ref, 3) = 0;
-        }
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static ulong DivStep2_NoInline(ref ulong u0r, ref ulong u1r, ref ulong u2r, ulong v0, ulong v1, ulong recip)
-            => DivStep2(ref u0r, ref u1r, ref u2r, v0, v1, recip);
 
         // ------------------------------------------------------------
         // Knuth steps (unrolled)
