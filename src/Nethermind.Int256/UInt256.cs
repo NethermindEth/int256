@@ -2758,27 +2758,25 @@ namespace Nethermind.Int256
             ulong recip = Reciprocal2By1(dn);
 
             // Normalise dividend into 5 limbs
-            ulong u0n, u1n, u2n, u3n, u4;
-            if (s == 0)
-            {
-                u0n = x.u0; u1n = x.u1; u2n = x.u2; u3n = x.u3; u4 = 0;
-            }
-            else
+            ulong u0n = x.u0;
+            ulong u1n = x.u1;
+            ulong u2n = x.u2;
+            ulong u3n = x.u3;
+            ulong rem = 0;
+            if (s > 0)
             {
                 int rs = 64 - s;
-                u0n = x.u0 << s;
-                u1n = (x.u1 << s) | (x.u0 >> rs);
-                u2n = (x.u2 << s) | (x.u1 >> rs);
-                u3n = (x.u3 << s) | (x.u2 >> rs);
-                u4 = (x.u3 >> rs);
+                rem = (u3n >> rs);
+                u3n = (u3n << s) | (u2n >> rs);
+                u2n = (u2n << s) | (u1n >> rs);
+                u1n = (u1n << s) | (u0n >> rs);
+                u0n <<= s;
             }
 
-            ulong rem = u4;
-
-            ulong q3 = UDivRem2By1(rem, recip, dn, u3n, out rem);
-            ulong q2 = UDivRem2By1(rem, recip, dn, u2n, out rem);
-            ulong q1 = UDivRem2By1(rem, recip, dn, u1n, out rem);
-            ulong q0 = UDivRem2By1(rem, recip, dn, u0n, out rem);
+            ulong q3 = ((rem | u3n) == 0) ? 0 : UDivRem2By1(rem, recip, dn, u3n, out rem);
+            ulong q2 = ((rem | u2n) == 0) ? 0 : UDivRem2By1(rem, recip, dn, u2n, out rem);
+            ulong q1 = ((rem | u1n) == 0) ? 0 : UDivRem2By1(rem, recip, dn, u1n, out rem);
+            ulong q0 = ((rem | u0n) == 0) ? 0 : UDivRem2By1(rem, recip, dn, u0n, out rem);
 
             q = Create(q0, q1, q2, q3);
 
@@ -2786,6 +2784,28 @@ namespace Nethermind.Int256
             ulong r0 = rem >> s;
             remainder = Create(r0, 0, 0, 0);
             return;
+        }
+
+        // Preconditions:
+        // - d normalised (msb set)
+        // - u1 < d
+        [SkipLocalsInit]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static ulong UDivRem2By1(ulong u1, ulong recip, ulong d, ulong u0, out ulong r)
+        {
+            ulong pHi = Multiply64(u1, recip, out r); ; // r = pLo
+
+            r += u0;                                   // r = qLoNew
+            ulong q = pHi + u1 + 1UL;
+            q += (r < u0) ? 1UL : 0UL;
+
+            ulong rem = u0 - (q * d);
+
+            if (rem > r) { q--; rem += d; }
+            if (rem >= d) { q++; rem -= d; }
+
+            r = rem;
+            return q;
         }
 
         [SkipLocalsInit]
@@ -3306,28 +3326,6 @@ namespace Nethermind.Int256
 
             Unsafe.AsRef(in remainder.u2) = 0;
             Unsafe.AsRef(in remainder.u3) = 0;
-        }
-
-        // Preconditions:
-        // - d normalised (msb set)
-        // - u1 < d
-        [SkipLocalsInit]
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static ulong UDivRem2By1(ulong u1, ulong recip, ulong d, ulong u0, out ulong r)
-        {
-            ulong pHi = Multiply64(u1, recip, out r); ; // r = pLo
-
-            r += u0;                                   // r = qLoNew
-            ulong q = pHi + u1 + 1UL;
-            q += (r < u0) ? 1UL : 0UL;
-
-            ulong rem = u0 - (q * d);
-
-            if (rem > r) { q--; rem += d; }
-            if (rem >= d) { q++; rem -= d; }
-
-            r = rem;
-            return q;
         }
 
         [SkipLocalsInit]
