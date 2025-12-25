@@ -2740,23 +2740,70 @@ namespace Nethermind.Int256
             {
                 //if (Avx512F.IsSupported) DivideBy128BitsAvx512(in x, in y, out quotient, out remainder);
                 //else
-                DivideBy128Bits(in x, in y, out quotient, out remainder);
+                if (X86Base.X64.IsSupported)
+                {
+                    DivideBy128BitsX86Base(in x, in y, out quotient, out remainder);
+                }
+                else
+                {
+                    DivideBy128Bits(in x, in y, out quotient, out remainder);
+                }
             }
             else
             {
-                DivideBy64Bits(in x, y.u0, out quotient, out remainder);
+                if (X86Base.X64.IsSupported)
+                {
+                    DivideBy64BitsX86Base(in x, y.u0, out quotient, out remainder);
+                }
+                else
+                {
+                    DivideBy64Bits(in x, y.u0, out quotient, out remainder);
+                }
             }
         }
 
         [SkipLocalsInit]
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void DivideBy64Bits(in UInt256 x, ulong d, out UInt256 q, out UInt256 remainder)
+        private static void DivideBy64BitsX86Base(in UInt256 x, ulong divisor, out UInt256 q, out UInt256 remainder)
         {
-            int s = BitOperations.LeadingZeroCount(d);
-            ulong dn = d << s; // normalised divisor (msb set if s>0)
+#pragma warning disable SYSLIB5004 // DivRem is [Experimental] as of net10 docs
+            ulong rem = 0;
+            ulong q3 = 0;
+            ulong u3 = x.u3;
+            if (u3 != 0)
+            {
+                (q3, rem) = X86Base.X64.DivRem(lower: u3, upper: rem, divisor);
+            }
+            ulong u2 = x.u2;
+            ulong q2 = 0;
+            if ((u2 | rem) != 0)
+            {
+                (q2, rem) = X86Base.X64.DivRem(lower: u2, upper: rem, divisor);
+            }
+            ulong u1 = x.u1;
+            ulong q1 = 0;
+            if ((u1 | rem) != 0)
+            {
+                (q1, rem) = X86Base.X64.DivRem(lower: u1, upper: rem, divisor);
+            }
+            ulong u0 = x.u0;
+            ulong q0 = 0;
+            if ((u0 | rem) != 0)
+            {
+                (q0, rem) = X86Base.X64.DivRem(lower: u0, upper: rem, divisor);
+            }
 
-            ulong recip = Reciprocal2By1(dn);
+            q = Create(q0, q1, q2, q3);
+            remainder = Create(rem, 0, 0, 0);
+#pragma warning restore SYSLIB5004
+        }
 
+        [SkipLocalsInit]
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void DivideBy64Bits(in UInt256 x, ulong divisor, out UInt256 q, out UInt256 remainder)
+        {
+            int s = BitOperations.LeadingZeroCount(divisor);
+            ulong dn = divisor << s; // normalised divisor (msb set if s>0)
             // Normalise dividend into 5 limbs
             ulong u0n = x.u0;
             ulong u1n = x.u1;
@@ -2773,17 +2820,16 @@ namespace Nethermind.Int256
                 u0n <<= s;
             }
 
+            ulong recip = Reciprocal2By1(dn);
             ulong q3 = ((rem | u3n) == 0) ? 0 : UDivRem2By1(rem, recip, dn, u3n, out rem);
             ulong q2 = ((rem | u2n) == 0) ? 0 : UDivRem2By1(rem, recip, dn, u2n, out rem);
             ulong q1 = ((rem | u1n) == 0) ? 0 : UDivRem2By1(rem, recip, dn, u1n, out rem);
             ulong q0 = ((rem | u0n) == 0) ? 0 : UDivRem2By1(rem, recip, dn, u0n, out rem);
-
             q = Create(q0, q1, q2, q3);
 
             // Unnormalise remainder (single limb)
             ulong r0 = rem >> s;
             remainder = Create(r0, 0, 0, 0);
-            return;
         }
 
         // Preconditions:
@@ -2791,20 +2837,23 @@ namespace Nethermind.Int256
         // - u1 < d
         [SkipLocalsInit]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static ulong UDivRem2By1(ulong u1, ulong recip, ulong d, ulong u0, out ulong r)
+        private static ulong UDivRem2By1(ulong u1, ulong recip, ulong d, ulong u0, out ulong rem)
         {
-            ulong pHi = Multiply64(u1, recip, out r); ; // r = pLo
+            ulong hi = Multiply64(recip, u1, out ulong low);
 
-            r += u0;                                   // r = qLoNew
-            ulong q = pHi + u1 + 1UL;
-            q += (r < u0) ? 1UL : 0UL;
+            low += u0;
+            ulong q = hi + u1 + 1UL;
+            if (low < u0)
+            {
+                q++;
+            }
 
-            ulong rem = u0 - (q * d);
+            ulong r1 = u0 - (q * d);
 
-            if (rem > r) { q--; rem += d; }
-            if (rem >= d) { q++; rem -= d; }
+            if (r1 > low) { q--; r1 += d; }
+            if (r1 >= d) { q++; r1 -= d; }
 
-            r = rem;
+            rem = r1;
             return q;
         }
 
@@ -3007,6 +3056,342 @@ namespace Nethermind.Int256
                 Unsafe.As<UInt256, Vector256<ulong>>(ref r) = y;
                 return r;
             }
+        }
+
+        private static void DivideBy128BitsX86Base(in UInt256 x, in UInt256 y, out UInt256 q, out UInt256 remainder)
+        {
+            // ------------------------------------------------------------
+            // n >= 2: Knuth D (specialised) with reciprocal qhat
+            // ------------------------------------------------------------
+            Debug.Assert(y.u1 != 0 && y.u2 == 0 && y.u3 == 0);
+
+            // -------------------------
+            // Normalise divisor (2 limbs)
+            // -------------------------
+            ulong y0 = y.u0;
+            ulong y1 = y.u1;
+
+            int shift = BitOperations.LeadingZeroCount(y1);
+
+            ulong v0, v1n;
+            if (shift != 0)
+            {
+                int rs = 64 - shift;
+                v0 = y0 << shift;
+                v1n = (y1 << shift) | (y0 >> rs);
+            }
+            else
+            {
+                v0 = y0;
+                v1n = y1;
+            }
+
+            // -------------------------
+            // Normalise dividend (5 limbs)
+            // -------------------------
+            ulong u0 = x.u0;
+            ulong u1 = x.u1;
+            ulong u2 = x.u2;
+            ulong u3 = x.u3;
+            ulong u4;
+
+            if (shift != 0)
+            {
+                int rs = 64 - shift;
+
+                u4 = u3 >> rs;
+                u3 = (u3 << shift) | (u2 >> rs);
+                u2 = (u2 << shift) | (u1 >> rs);
+                u1 = (u1 << shift) | (u0 >> rs);
+                u0 <<= shift;
+            }
+            else
+            {
+                u4 = 0;
+            }
+
+            Unsafe.SkipInit(out q);
+
+            // ------------------------------------------------------------
+            // Step j=2: q2 from (u4:u3:u2)
+            // ------------------------------------------------------------
+            {
+                ulong rhat;
+                bool rcarry;
+                ulong qhat;
+                // This special-case is REQUIRED for hardware div safety:
+                // if uHi == v1n then the true quotient is >= 2^64, so DIV would #DE.
+                if (u4 == v1n)
+                {
+                    rhat = u3 + v1n;
+                    rcarry = rhat < u3;
+                    qhat = ulong.MaxValue;
+                }
+                else
+                {
+                    rcarry = false;
+
+#pragma warning disable SYSLIB5004 // X86Base.X64.DivRem is marked Experimental/preview
+                    (ulong qhat1, ulong r) = X86Base.X64.DivRem(u3, u4, v1n);
+#pragma warning restore SYSLIB5004
+                    rhat = r;
+                    qhat = qhat1;
+
+                    // Reciprocal path
+                }
+
+                ulong hi = Multiply64(qhat, v0, out var lo);
+
+                // Correct at most twice.
+                if (!rcarry && (hi > rhat || (hi == rhat && lo > u2)))
+                {
+                    qhat--;
+                    ulong lo2 = lo - v0;
+                    hi -= (lo < v0) ? 1UL : 0UL;
+                    lo = lo2;
+
+                    rhat += v1n;
+                    rcarry = rhat < v1n;
+
+                    if (!rcarry && (hi > rhat || (hi == rhat && lo > u2)))
+                    {
+                        qhat--;
+                        lo2 = lo - v0;
+                        hi -= (lo < v0) ? 1UL : 0UL;
+                        lo = lo2;
+                    }
+                }
+
+                // Subtract qhat*v from u2,u3,u4 (3 limbs).
+                ulong borrow = (u2 < lo) ? 1UL : 0UL;
+                u2 -= lo;
+
+                ulong hi1 = Multiply64(qhat, v1n, out lo);
+                ulong sum = lo + hi;
+                hi = hi1 + ((sum < lo) ? 1UL : 0UL);
+
+                ulong t = u3 - sum;
+                ulong b = (u3 < sum) ? 1UL : 0UL;
+                u3 = t - borrow;
+                borrow = b | ((t < borrow) ? 1UL : 0UL);
+
+                t = u4 - hi;
+                b = (u4 < hi) ? 1UL : 0UL;
+                u4 = t - borrow;
+                borrow = b | ((t < borrow) ? 1UL : 0UL);
+
+                if (borrow != 0)
+                {
+                    // Add-back v and decrement qhat.
+                    ulong s0 = u2 + v0;
+                    ulong c = (s0 < u2) ? 1UL : 0UL;
+
+                    ulong s1 = u3 + v1n;
+                    ulong c1 = (s1 < u3) ? 1UL : 0UL;
+                    s1 += c;
+                    c1 |= (s1 < c) ? 1UL : 0UL;
+
+                    u2 = s0;
+                    u3 = s1;
+
+                    qhat--;
+                }
+
+                Unsafe.AsRef(in q.u2) = qhat;
+            }
+
+            // ------------------------------------------------------------
+            // Step j=1: q1 from (u3:u2:u1)
+            // ------------------------------------------------------------
+            {
+                ulong rhat;
+                bool rcarry;
+                ulong qhat;
+                // This special-case is REQUIRED for hardware div safety:
+                // if uHi == v1n then the true quotient is >= 2^64, so DIV would #DE.
+                if (u3 == v1n)
+                {
+                    rhat = u2 + v1n;
+                    rcarry = rhat < u2;
+                    qhat = ulong.MaxValue;
+                }
+                else
+                {
+                    rcarry = false;
+
+#pragma warning disable SYSLIB5004 // X86Base.X64.DivRem is marked Experimental/preview
+                    (ulong qhat1, ulong r) = X86Base.X64.DivRem(u2, u3, v1n);
+#pragma warning restore SYSLIB5004
+                    rhat = r;
+                    qhat = qhat1;
+
+                    // Reciprocal path
+                }
+
+                ulong hi = Multiply64(qhat, v0, out var lo);
+
+                if (!rcarry && (hi > rhat || (hi == rhat && lo > u1)))
+                {
+                    qhat--;
+                    ulong lo2 = lo - v0;
+                    hi -= (lo < v0) ? 1UL : 0UL;
+                    lo = lo2;
+
+                    rhat += v1n;
+                    rcarry = rhat < v1n;
+
+                    if (!rcarry && (hi > rhat || (hi == rhat && lo > u1)))
+                    {
+                        qhat--;
+                        lo2 = lo - v0;
+                        hi -= (lo < v0) ? 1UL : 0UL;
+                        lo = lo2;
+                    }
+                }
+
+                ulong borrow = (u1 < lo) ? 1UL : 0UL;
+                u1 -= lo;
+
+                ulong hi1 = Multiply64(qhat, v1n, out lo);
+                ulong sum = lo + hi;
+                hi = hi1 + ((sum < lo) ? 1UL : 0UL);
+
+                ulong t = u2 - sum;
+                ulong b = (u2 < sum) ? 1UL : 0UL;
+                u2 = t - borrow;
+                borrow = b | ((t < borrow) ? 1UL : 0UL);
+
+                t = u3 - hi;
+                b = (u3 < hi) ? 1UL : 0UL;
+                u3 = t - borrow;
+                borrow = b | ((t < borrow) ? 1UL : 0UL);
+
+                if (borrow != 0)
+                {
+                    ulong s0 = u1 + v0;
+                    ulong c = (s0 < u1) ? 1UL : 0UL;
+
+                    ulong s1 = u2 + v1n;
+                    ulong c1 = (s1 < u2) ? 1UL : 0UL;
+                    s1 += c;
+                    c1 |= (s1 < c) ? 1UL : 0UL;
+
+                    u1 = s0;
+                    u2 = s1;
+
+                    qhat--;
+                }
+
+                Unsafe.AsRef(in q.u1) = qhat;
+            }
+
+            // ------------------------------------------------------------
+            // Step j=0: q0 from (u2:u1:u0)
+            // ------------------------------------------------------------
+            {
+                ulong rhat;
+                bool rcarry;
+                ulong qhat;
+                // This special-case is REQUIRED for hardware div safety:
+                // if uHi == v1n then the true quotient is >= 2^64, so DIV would #DE.
+                if (u2 == v1n)
+                {
+                    rhat = u1 + v1n;
+                    rcarry = rhat < u1;
+                    qhat = ulong.MaxValue;
+                }
+                else
+                {
+                    rcarry = false;
+
+#pragma warning disable SYSLIB5004 // X86Base.X64.DivRem is marked Experimental/preview
+                    (ulong qhat1, ulong r) = X86Base.X64.DivRem(u1, u2, v1n);
+#pragma warning restore SYSLIB5004
+                    rhat = r;
+                    qhat = qhat1;
+
+                    // Reciprocal path
+                }
+
+                ulong hi = Multiply64(qhat, v0, out var lo);
+
+                if (!rcarry && (hi > rhat || (hi == rhat && lo > u0)))
+                {
+                    qhat--;
+                    ulong lo2 = lo - v0;
+                    hi -= (lo < v0) ? 1UL : 0UL;
+                    lo = lo2;
+
+                    rhat += v1n;
+                    rcarry = rhat < v1n;
+
+                    if (!rcarry && (hi > rhat || (hi == rhat && lo > u0)))
+                    {
+                        qhat--;
+                        lo2 = lo - v0;
+                        hi -= (lo < v0) ? 1UL : 0UL;
+                        lo = lo2;
+                    }
+                }
+
+                ulong borrow = (u0 < lo) ? 1UL : 0UL;
+                u0 -= lo;
+
+                ulong hi1 = Multiply64(qhat, v1n, out lo);
+                ulong sum = lo + hi;
+                hi = hi1 + ((sum < lo) ? 1UL : 0UL);
+
+                ulong t = u1 - sum;
+                ulong b = (u1 < sum) ? 1UL : 0UL;
+                u1 = t - borrow;
+                borrow = b | ((t < borrow) ? 1UL : 0UL);
+
+                t = u2 - hi;
+                b = (u2 < hi) ? 1UL : 0UL;
+                u2 = t - borrow;
+                borrow = b | ((t < borrow) ? 1UL : 0UL);
+
+                if (borrow != 0)
+                {
+                    ulong s0 = u0 + v0;
+                    ulong c = (s0 < u0) ? 1UL : 0UL;
+
+                    ulong s1 = u1 + v1n;
+                    ulong c1 = (s1 < u1) ? 1UL : 0UL;
+                    s1 += c;
+                    c1 |= (s1 < c) ? 1UL : 0UL;
+
+                    u0 = s0;
+                    u1 = s1;
+
+                    qhat--;
+                }
+
+                Unsafe.AsRef(in q.u0) = qhat;
+            }
+
+            // q3 is always 0 for 256/128 here.
+            Unsafe.AsRef(in q.u3) = 0;
+
+            // ------------------------------------------------------------
+            // Remainder (u0..u1 in normalised space) - unnormalise.
+            // ------------------------------------------------------------
+            Unsafe.SkipInit(out remainder);
+
+            if (shift == 0)
+            {
+                Unsafe.AsRef(in remainder.u0) = u0;
+                Unsafe.AsRef(in remainder.u1) = u1;
+            }
+            else
+            {
+                int rs = 64 - shift;
+                Unsafe.AsRef(in remainder.u0) = (u0 >> shift) | (u1 << rs);
+                Unsafe.AsRef(in remainder.u1) = u1 >> shift;
+            }
+
+            Unsafe.AsRef(in remainder.u2) = 0;
+            Unsafe.AsRef(in remainder.u3) = 0;
         }
 
         [SkipLocalsInit]
