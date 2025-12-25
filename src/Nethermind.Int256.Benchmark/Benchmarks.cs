@@ -1,8 +1,8 @@
 using System;
-using System.Collections.Immutable;
 using System.Collections.Generic;
-using System.Numerics;
+using System.Collections.Immutable;
 using System.Linq;
+using System.Numerics;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Jobs;
@@ -244,19 +244,50 @@ public class SubtractModSigned : SignedThreeParamBenchmarkBase
         return res;
     }
 }
-
-public class MultiplyUnsigned : UnsignedTwoParamBenchmarkBase
+[Config(typeof(Config))]
+[SimpleJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 3)]
+[NoAvx512Job(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 3)]
+[NoIntrinsicsJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 3)]
+public class MultiplyUnsigned : UnsignedBenchmarkBase
 {
-    [Benchmark(Baseline = true)]
-    public BigInteger Multiply_BigInteger()
+    private sealed class Config : ManualConfig
     {
-        return (A.Item1 * B.Item1) % Numbers.TwoTo256;
+        public Config()
+        {
+            WithOrderer(new Orderer<DoubleUInt256>(v => ParamIndex.TryGetValue(v, out var i) ? i : int.MaxValue));
+        }
     }
+    private static IEnumerable<DoubleUInt256> Values
+    {
+        get
+        {
+            HashSet<string> used = new();
+            foreach (BigInteger x in ValuesMinus1)
+            {
+                foreach (BigInteger y in ValuesMinus2)
+                {
+                    var values = new DoubleUInt256((UInt256)x, (UInt256)y);
+                    if (used.Add(values.ToString()))
+                    {
+                        yield return values;
+                    }
+                }
+            }
+        }
+    }
+
+    public static DoubleUInt256[] ValuesArray { get; } = [.. Values.OrderBy(o => o.B).ThenBy(o => o.A)];
+
+    private static readonly Dictionary<DoubleUInt256, int> ParamIndex =
+        ValuesArray.Select((v, i) => (v, i)).ToDictionary(t => t.v, t => t.i);
+
+    [ParamsSource(nameof(ValuesArray))]
+    public DoubleUInt256 Param;
 
     [Benchmark]
     public UInt256 Multiply_UInt256()
     {
-        UInt256.Multiply(A.Item2, B.Item2, out UInt256 res);
+        UInt256.Multiply(Param.A, Param.B, out UInt256 res);
         return res;
     }
 }
@@ -310,6 +341,7 @@ public class MultiplyModSigned : SignedThreeParamBenchmarkBase
 }
 [Config(typeof(Config))]
 [SimpleJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 3)]
+[NoAvx512Job(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 3)]
 [NoIntrinsicsJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 3)]
 public class DivideUnsigned : UnsignedBenchmarkBase
 {
@@ -353,11 +385,6 @@ public class DivideUnsigned : UnsignedBenchmarkBase
     {
         UInt256.Divide(Param.A, Param.B, out UInt256 res);
         return res;
-    }
-
-    public readonly record struct DoubleUInt256(UInt256 A, UInt256 B)
-    {
-        public override readonly string ToString() => $"{A.BitLen} bits / {B.BitLen} bits";
     }
 }
 
@@ -534,6 +561,11 @@ public class IsZeroOne
     }
 }
 
+public readonly record struct DoubleUInt256(UInt256 A, UInt256 B)
+{
+    public override readonly string ToString() => $"{A.BitLen} bits / {B.BitLen} bits";
+}
+
 public sealed class Orderer<T> : IOrderer
 {
     private readonly Func<T, int> _indexOf;
@@ -543,6 +575,7 @@ public sealed class Orderer<T> : IOrderer
     public IEnumerable<BenchmarkCase> GetSummaryOrder(ImmutableArray<BenchmarkCase> benchmarks, Summary summary)
         => benchmarks
             .OrderBy(b => _indexOf(GetParam(b)))
+            .ThenBy(EnvVarsTotalLength)
             .ThenBy(b => b.Job.DisplayInfo);
 
     public IEnumerable<BenchmarkCase> GetExecutionOrder(ImmutableArray<BenchmarkCase> benchmarksCase, IEnumerable<BenchmarkLogicalGroupRule>? order = null)
@@ -562,4 +595,18 @@ public sealed class Orderer<T> : IOrderer
     public bool SeparateLogicalGroups => false;
     public bool SeparateHighlightGroups => false;
     public bool SeparateReporters => false;
+
+    private static int EnvVarsTotalLength(BenchmarkCase b)
+    {
+        var vars = b.Job?.Environment?.EnvironmentVariables;
+        if (vars is null) return 0;
+
+        int sum = 0;
+        foreach (var e in vars)
+        {
+            // length of "KEY=VALUE" without allocating it
+            sum += (e.Key?.Length ?? 0) + 1 + (e.Value?.Length ?? 0);
+        }
+        return sum;
+    }
 }
