@@ -1333,6 +1333,18 @@ namespace Nethermind.Int256
                 return;
             }
 
+            // If both inputs fit in 64 bits, use a simple multiplication routine.
+            if (x.IsUint64 && y.IsUint64)
+            {
+                // Fast multiply for numbers less than 2^64 (18,446,744,073,709,551,615)
+                ulong high = Multiply64(x.u0, y.u0, out ulong low);
+                // Assignment to res after multiply in case is used as input for x or y (by ref aliasing)
+                res = default;
+                Unsafe.AsRef(in res.u0) = low;
+                Unsafe.AsRef(in res.u1) = high;
+                return;
+            }
+
             if (!Avx512F.IsSupported || !Avx512DQ.IsSupported || !Avx512DQ.VL.IsSupported)
             {
                 MultiplyScalar(in x, in y, out res);
@@ -1346,19 +1358,6 @@ namespace Nethermind.Int256
         [SkipLocalsInit]
         private static void MultiplyScalar(in UInt256 x, in UInt256 y, out UInt256 res)
         {
-            ulong x0 = x.u0;
-            ulong y0 = y.u0;
-            // If both inputs fit in 64 bits, use a simple multiplication routine.
-            if ((x.u1 | x.u2 | x.u3 | y.u1 | y.u2 | y.u3) == 0)
-            {
-                // Fast multiply for numbers less than 2^64 (18,446,744,073,709,551,615)
-                ulong high = Multiply64(x0, y0, out ulong low);
-                // Assignment to res after multiply in case is used as input for x or y (by ref aliasing)
-                res = default;
-                Unsafe.AsRef(in res.u0) = low;
-                Unsafe.AsRef(in res.u1) = high;
-                return;
-            }
             ref ulong rx = ref Unsafe.As<UInt256, ulong>(ref Unsafe.AsRef(in x));
             ref ulong ry = ref Unsafe.As<UInt256, ulong>(ref Unsafe.AsRef(in y));
 
