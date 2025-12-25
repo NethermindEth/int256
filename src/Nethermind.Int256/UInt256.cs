@@ -1,6 +1,3 @@
-// SPDX-FileCopyrightText: 2025 Demerzel Solutions Limited
-// SPDX-License-Identifier: MIT
-
 using System;
 using System.Buffers.Binary;
 using System.Globalization;
@@ -17,17 +14,7 @@ using System.Diagnostics.CodeAnalysis;
 namespace Nethermind.Int256
 {
     [StructLayout(LayoutKind.Explicit)]
-    public readonly partial struct UInt256 :
-        IEquatable<UInt256>,
-        IComparable,
-        IComparable<UInt256>,
-        IConvertible,
-        ISpanFormattable,
-        ISpanParsable<UInt256>,
-        IBinaryInteger<UInt256>,
-        IUnsignedNumber<UInt256>,
-        IMinMaxValue<UInt256>,
-        IInteger<UInt256>
+    public readonly struct UInt256 : IEquatable<UInt256>, IComparable, IComparable<UInt256>, IInteger<UInt256>, IConvertible
     {
         // Ensure that hashes are different for every run of the node and every node, so if are any hash collisions on
         // one node they will not be the same on another node or across a restart so hash collision cannot be used to degrade
@@ -1358,15 +1345,14 @@ namespace Nethermind.Int256
             return !high.IsZero;
         }
 
-        public uint LeadingZeroCount()
-        {
-            if (u3 != 0) return (uint)BitOperations.LeadingZeroCount(u3);
-            if (u2 != 0) return (uint)(64 + BitOperations.LeadingZeroCount(u2));
-            if (u1 != 0) return (uint)(128 + BitOperations.LeadingZeroCount(u1));
-            return (uint)(192 + BitOperations.LeadingZeroCount(u0));
-        }
-
-        public int BitLen => (int)(256 - LeadingZeroCount());
+        public int BitLen =>
+            u3 != 0
+                ? 192 + Len64(u3)
+                : u2 != 0
+                    ? 128 + Len64(u2)
+                    : u1 != 0
+                        ? 64 + Len64(u1)
+                        : Len64(u0);
 
         [SkipLocalsInit]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1403,7 +1389,7 @@ namespace Nethermind.Int256
             }
         }
 
-        public void Exp(in UInt256 e, out UInt256 res) => Exp(this, e, out res);
+        public void Exp(in UInt256 exp, out UInt256 res) => Exp(this, exp, out res);
 
         public static void ExpMod(in UInt256 b, in UInt256 e, in UInt256 m, out UInt256 result)
         {
@@ -1712,14 +1698,7 @@ namespace Nethermind.Int256
             Lsh(this, n, out res);
         }
 
-        [OverloadResolutionPriority(1)]
         public static UInt256 operator <<(in UInt256 a, int n)
-        {
-            a.LeftShift(n, out UInt256 res);
-            return res;
-        }
-
-        public static UInt256 operator <<(UInt256 a, int n)
         {
             a.LeftShift(n, out UInt256 res);
             return res;
@@ -1829,14 +1808,7 @@ namespace Nethermind.Int256
 
         public void RightShift(int n, out UInt256 res) => Rsh(this, n, out res);
 
-        [OverloadResolutionPriority(1)]
         public static UInt256 operator >>(in UInt256 a, int n)
-        {
-            a.RightShift(n, out UInt256 res);
-            return res;
-        }
-
-        public static UInt256 operator >>(UInt256 a, int n)
         {
             a.RightShift(n, out UInt256 res);
             return res;
@@ -1909,16 +1881,9 @@ namespace Nethermind.Int256
             }
         }
 
-        [OverloadResolutionPriority(1)]
         public static UInt256 operator |(in UInt256 a, in UInt256 b)
         {
             Or(a, b, out UInt256 res);
-            return res;
-        }
-
-        public static UInt256 operator |(UInt256 a, UInt256 b)
-        {
-            Or(in a, in b, out UInt256 res);
             return res;
         }
 
@@ -1938,16 +1903,9 @@ namespace Nethermind.Int256
             }
         }
 
-        [OverloadResolutionPriority(1)]
         public static UInt256 operator &(in UInt256 a, in UInt256 b)
         {
             And(a, b, out UInt256 res);
-            return res;
-        }
-
-        public static UInt256 operator &(UInt256 a, UInt256 b)
-        {
-            And(in a, in b, out UInt256 res);
             return res;
         }
 
@@ -1967,59 +1925,30 @@ namespace Nethermind.Int256
             }
         }
 
-        [OverloadResolutionPriority(1)]
         public static UInt256 operator ^(in UInt256 a, in UInt256 b)
         {
             Xor(a, b, out UInt256 res);
             return res;
         }
 
-        public static UInt256 operator ^(UInt256 a, UInt256 b)
-        {
-            Xor(in a, in b, out UInt256 res);
-            return res;
-        }
-
-        [OverloadResolutionPriority(1)]
         public static UInt256 operator ~(in UInt256 a)
         {
             Not(in a, out UInt256 res);
             return res;
         }
 
-        public static UInt256 operator ~(UInt256 a)
-        {
-            Not(in a, out UInt256 res);
-            return res;
-        }
-
-        [OverloadResolutionPriority(1)]
         public static UInt256 operator +(in UInt256 a, in UInt256 b)
         {
             AddOverflow(in a, in b, out UInt256 res);
             return res;
         }
 
-        public static UInt256 operator +(UInt256 a, UInt256 b)
-        {
-            AddOverflow(in a, in b, out UInt256 res);
-            return res;
-        }
-
-        [OverloadResolutionPriority(1)]
         public static UInt256 operator ++(in UInt256 a)
         {
             AddOverflow(in a, 1, out UInt256 res);
             return res;
         }
 
-        public static UInt256 operator ++(UInt256 a)
-        {
-            AddOverflow(in a, 1, out UInt256 res);
-            return res;
-        }
-
-        [OverloadResolutionPriority(1)]
         public static UInt256 operator -(in UInt256 a, in UInt256 b)
         {
             if (SubtractUnderflow(in a, in b, out UInt256 c))
@@ -2030,25 +1959,9 @@ namespace Nethermind.Int256
             return c;
         }
 
-        public static UInt256 operator -(UInt256 a, UInt256 b)
-        {
-            if (SubtractUnderflow(in a, in b, out UInt256 c))
-            {
-                ThrowOverflowException($"Underflow in subtraction {a} - {b}");
-            }
-
-            return c;
-        }
-
-        [OverloadResolutionPriority(1)]
         public static bool operator ==(in UInt256 a, in UInt256 b) => a.Equals(b);
 
-        public static bool operator ==(UInt256 a, UInt256 b) => a.Equals(b);
-
-        [OverloadResolutionPriority(1)]
         public static bool operator !=(in UInt256 a, in UInt256 b) => !(a == b);
-
-        public static bool operator !=(UInt256 a, UInt256 b) => !(a == b);
 
         public static implicit operator UInt256(ulong value) => new UInt256(value, 0ul, 0ul, 0ul);
 
@@ -2132,14 +2045,7 @@ namespace Nethermind.Int256
             return c;
         }
 
-        [OverloadResolutionPriority(1)]
         public static UInt256 operator *(in UInt256 a, in UInt256 b)
-        {
-            Multiply(in a, in b, out UInt256 c);
-            return c;
-        }
-
-        public static UInt256 operator *(UInt256 a, UInt256 b)
         {
             Multiply(in a, in b, out UInt256 c);
             return c;
@@ -2152,22 +2058,13 @@ namespace Nethermind.Int256
             return c;
         }
 
-        [OverloadResolutionPriority(1)]
         public static UInt256 operator /(in UInt256 a, in UInt256 b)
         {
             Divide(in a, in b, out UInt256 c);
             return c;
         }
 
-        public static UInt256 operator /(UInt256 a, UInt256 b)
-        {
-            Divide(in a, in b, out UInt256 c);
-            return c;
-        }
-
-        [OverloadResolutionPriority(1)]
         public static bool operator <(in UInt256 a, in UInt256 b) => LessThan(in a, in b);
-        public static bool operator <(UInt256 a, UInt256 b) => LessThan(in a, in b);
         public static bool operator <(in UInt256 a, int b) => LessThan(in a, b);
         public static bool operator <(int a, in UInt256 b) => LessThan(a, in b);
         public static bool operator <(in UInt256 a, uint b) => LessThan(in a, b);
@@ -2176,9 +2073,7 @@ namespace Nethermind.Int256
         public static bool operator <(long a, in UInt256 b) => LessThan(a, in b);
         public static bool operator <(in UInt256 a, ulong b) => LessThan(in a, b);
         public static bool operator <(ulong a, in UInt256 b) => LessThan(a, in b);
-        [OverloadResolutionPriority(1)]
         public static bool operator <=(in UInt256 a, in UInt256 b) => !LessThan(in b, in a);
-        public static bool operator <=(UInt256 a, UInt256 b) => !LessThan(in b, in a);
         public static bool operator <=(in UInt256 a, int b) => !LessThan(b, in a);
         public static bool operator <=(int a, in UInt256 b) => !LessThan(in b, a);
         public static bool operator <=(in UInt256 a, uint b) => !LessThan(b, in a);
@@ -2187,9 +2082,7 @@ namespace Nethermind.Int256
         public static bool operator <=(long a, in UInt256 b) => !LessThan(in b, a);
         public static bool operator <=(in UInt256 a, ulong b) => !LessThan(b, in a);
         public static bool operator <=(ulong a, UInt256 b) => !LessThan(in b, a);
-        [OverloadResolutionPriority(1)]
         public static bool operator >(in UInt256 a, in UInt256 b) => LessThan(in b, in a);
-        public static bool operator >(UInt256 a, UInt256 b) => LessThan(in b, in a);
         public static bool operator >(in UInt256 a, int b) => LessThan(b, in a);
         public static bool operator >(int a, in UInt256 b) => LessThan(in b, a);
         public static bool operator >(in UInt256 a, uint b) => LessThan(b, in a);
@@ -2198,9 +2091,7 @@ namespace Nethermind.Int256
         public static bool operator >(long a, in UInt256 b) => LessThan(in b, a);
         public static bool operator >(in UInt256 a, ulong b) => LessThan(b, in a);
         public static bool operator >(ulong a, in UInt256 b) => LessThan(in b, a);
-        [OverloadResolutionPriority(1)]
         public static bool operator >=(in UInt256 a, in UInt256 b) => !LessThan(in a, in b);
-        public static bool operator >=(UInt256 a, UInt256 b) => !LessThan(in a, in b);
         public static bool operator >=(in UInt256 a, int b) => !LessThan(in a, b);
         public static bool operator >=(int a, in UInt256 b) => !LessThan(a, in b);
         public static bool operator >=(in UInt256 a, uint b) => !LessThan(in a, b);
@@ -2440,58 +2331,25 @@ namespace Nethermind.Int256
 
         public static UInt256 Parse(string value) => !TryParse(value, out UInt256 c) ? throw new FormatException() : c;
 
-        public static UInt256 Parse(in ReadOnlySpan<char> value, NumberStyles numberStyles) => !TryParseCore(value, numberStyles, CultureInfo.InvariantCulture, out UInt256 c) ? throw new FormatException() : c;
+        public static UInt256 Parse(in ReadOnlySpan<char> value, NumberStyles numberStyles) => !TryParse(value, numberStyles, CultureInfo.InvariantCulture, out UInt256 c) ? throw new FormatException() : c;
 
-        public static UInt256 Parse(ReadOnlySpan<char> s, NumberStyles style, IFormatProvider? provider)
-            => TryParseCore(s, style, provider ?? CultureInfo.InvariantCulture, out UInt256 result)
-                ? result
-                : throw new FormatException();
-
-        public static UInt256 Parse(string s, NumberStyles style, IFormatProvider? provider)
-            => Parse(s.AsSpan(), style, provider);
-
-        public static bool TryParse([NotNullWhen(true)] string? value, out UInt256 result)
-        {
-            if (value is null)
-            {
-                result = Zero;
-                return false;
-            }
-            return TryParse(value.AsSpan(), out result);
-        }
-
-        public static bool TryParse([NotNullWhen(true)] string? s, NumberStyles style, IFormatProvider? provider, out UInt256 result)
-        {
-            if (s is null)
-            {
-                result = Zero;
-                return false;
-            }
-            return TryParseCore(s.AsSpan(), style, provider ?? CultureInfo.InvariantCulture, out result);
-        }
+        public static bool TryParse(string value, out UInt256 result) => TryParse(value.AsSpan(), out result);
 
         public static bool TryParse(ReadOnlySpan<char> value, out UInt256 result) => value.StartsWith("0x", StringComparison.OrdinalIgnoreCase)
-            ? TryParseCore(value[2..], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out result)
-            : TryParseCore(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out result);
+            ? TryParse(value.Slice(2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out result)
+            : TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out result);
 
-        public static bool TryParse(ReadOnlySpan<char> value, NumberStyles style, IFormatProvider? provider, out UInt256 result)
-            => TryParseCore(value, style, provider, out result);
+        public static bool TryParse(string value, NumberStyles style, IFormatProvider provider, out UInt256 result) => TryParse(value.AsSpan(), style, provider, out result);
 
-        private static bool TryParseCore(ReadOnlySpan<char> value, NumberStyles style, IFormatProvider? provider, out UInt256 result)
+        public static bool TryParse(in ReadOnlySpan<char> value, NumberStyles style, IFormatProvider provider, out UInt256 result)
         {
-            if (value.IsEmpty)
-            {
-                result = Zero;
-                return false;
-            }
-
             BigInteger a;
             bool bigParsedProperly;
-            if ((style & NumberStyles.HexNumber) == NumberStyles.HexNumber && value[0] != '0')
+            if ((style & NumberStyles.HexNumber) == NumberStyles.HexNumber && value[0] != 0)
             {
                 Span<char> fixedHexValue = stackalloc char[value.Length + 1];
                 fixedHexValue[0] = '0';
-                value.CopyTo(fixedHexValue[1..]);
+                value.CopyTo(fixedHexValue.Slice(1));
                 bigParsedProperly = BigInteger.TryParse(fixedHexValue, style, provider, out a);
             }
             else
@@ -2541,13 +2399,9 @@ namespace Nethermind.Int256
         private static void ThrowOverflowException(string message) => throw new OverflowException(message);
 
         [DoesNotReturn]
-        private static void ThrowOverflowException() => throw new OverflowException();
-
-        [DoesNotReturn]
         private static void ThrowNotSupportedException() => throw new NotSupportedException();
 
         [DoesNotReturn]
         private static ulong ThrowIndexOutOfRangeException() => throw new IndexOutOfRangeException();
-
     }
 }
