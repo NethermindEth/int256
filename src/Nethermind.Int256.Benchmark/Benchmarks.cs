@@ -15,7 +15,7 @@ namespace Nethermind.Int256.Benchmark;
 
 [HideColumns("Job")]
 [SimpleJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 3)]
-[NoIntrinsicsJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 3)]
+[NoAvx2Job(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 3)]
 public class UnsignedBenchmarkBase
 {
     public static IEnumerable<BigInteger> ValuesMinus3 { get; } = new[] { Numbers.UInt256Max - 3, Numbers.UInt192Max - 3, Numbers.UInt128Max - 3, Numbers.TwoTo64 - 3, BigInteger.One };
@@ -247,7 +247,7 @@ public class SubtractModSigned : SignedThreeParamBenchmarkBase
 [Config(typeof(Config))]
 [SimpleJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 3)]
 [NoAvx512Job(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 3)]
-[NoIntrinsicsJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 3)]
+[NoAvx2Job(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 3)]
 public class MultiplyUnsigned : UnsignedBenchmarkBase
 {
     private sealed class Config : ManualConfig
@@ -342,7 +342,7 @@ public class MultiplyModSigned : SignedThreeParamBenchmarkBase
 [Config(typeof(Config))]
 [SimpleJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 3)]
 [NoAvx512Job(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 3)]
-[NoIntrinsicsJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 3)]
+[NoAvx2Job(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 3)]
 public class DivideUnsigned : UnsignedBenchmarkBase
 {
     private sealed class Config : ManualConfig
@@ -575,7 +575,7 @@ public sealed class Orderer<T> : IOrderer
     public IEnumerable<BenchmarkCase> GetSummaryOrder(ImmutableArray<BenchmarkCase> benchmarks, Summary summary)
         => benchmarks
             .OrderBy(b => _indexOf(GetParam(b)))
-            .ThenBy(EnvVarsTotalLength)
+            .ThenByDescending(EnvVarsTotalLength)
             .ThenBy(b => b.Job.DisplayInfo);
 
     public IEnumerable<BenchmarkCase> GetExecutionOrder(ImmutableArray<BenchmarkCase> benchmarksCase, IEnumerable<BenchmarkLogicalGroupRule>? order = null)
@@ -599,7 +599,7 @@ public sealed class Orderer<T> : IOrderer
     private static int EnvVarsTotalLength(BenchmarkCase b)
     {
         var vars = b.Job?.Environment?.EnvironmentVariables;
-        if (vars is null) return 0;
+        if (vars is null) return 100;
 
         int sum = 0;
         foreach (var e in vars)
