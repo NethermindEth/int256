@@ -65,28 +65,22 @@ namespace Nethermind.Int256.Test
 
         #endregion
 
-        #region Abs Tests
+        #region Abs Tests with TestCaseSource
 
-        [Test]
-        public void UInt256_Abs_ReturnsValue()
+        [TestCaseSource(typeof(UnaryOps), nameof(UnaryOps.TestCases))]
+        public void UInt256_Abs_MatchesBigInteger(BigInteger testValue)
         {
-            var value = (UInt256)12345;
-            UInt256.Abs(value).Should().Be(value);
+            var value = (UInt256)testValue;
+            var result = UInt256.Abs(value);
+            ((BigInteger)result).Should().Be(testValue);
         }
 
-        [Test]
-        public void Int256_Abs_PositiveValue_ReturnsValue()
+        [TestCaseSource(typeof(UnaryOps), nameof(UnaryOps.SignedTestCases))]
+        public void Int256_Abs_MatchesBigInteger(BigInteger testValue)
         {
-            var value = (Int256)12345;
-            Int256.Abs(value).Should().Be(value);
-        }
-
-        [Test]
-        public void Int256_Abs_NegativeValue_ReturnsPositive()
-        {
-            var value = new Int256(-12345);
-            var expected = (Int256)12345;
-            Int256.Abs(value).Should().Be(expected);
+            var value = new Int256(testValue);
+            var result = Int256.Abs(value);
+            ((BigInteger)result).Should().Be(BigInteger.Abs(testValue));
         }
 
         [Test]
@@ -700,184 +694,314 @@ namespace Nethermind.Int256.Test
 
         #endregion
 
-        #region Arithmetic Operators with Standard Types
+        #region Arithmetic Operators with TestCaseSource
 
-        [Test]
-        public void UInt256_Addition_MatchesBigInteger()
+        [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
+        public void UInt256_Addition_MatchesBigInteger((BigInteger A, BigInteger B) test)
         {
-            BigInteger a = TestNumbers.TwoTo128 + 12345;
-            BigInteger b = TestNumbers.TwoTo64 + 67890;
-            BigInteger expected = a + b;
+            BigInteger expected = (test.A + test.B) % TestNumbers.TwoTo256;
 
-            UInt256 ua = (UInt256)a;
-            UInt256 ub = (UInt256)b;
+            UInt256 ua = (UInt256)test.A;
+            UInt256 ub = (UInt256)test.B;
             UInt256 result = ua + ub;
 
             ((BigInteger)result).Should().Be(expected);
         }
 
-        [Test]
-        public void UInt256_Subtraction_MatchesBigInteger()
+        [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
+        public void UInt256_Subtraction_MatchesBigInteger((BigInteger A, BigInteger B) test)
         {
-            BigInteger a = TestNumbers.TwoTo128 + 12345;
-            BigInteger b = TestNumbers.TwoTo64 + 67890;
-            BigInteger expected = a - b;
+            if (test.A < test.B)
+                return; // Skip underflow cases for unsigned subtraction
 
-            UInt256 ua = (UInt256)a;
-            UInt256 ub = (UInt256)b;
+            BigInteger expected = test.A - test.B;
+
+            UInt256 ua = (UInt256)test.A;
+            UInt256 ub = (UInt256)test.B;
             UInt256 result = ua - ub;
 
             ((BigInteger)result).Should().Be(expected);
         }
 
-        [Test]
-        public void UInt256_Multiplication_MatchesBigInteger()
+        [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
+        public void UInt256_Multiplication_MatchesBigInteger((BigInteger A, BigInteger B) test)
         {
-            BigInteger a = TestNumbers.TwoTo64 + 12345;
-            BigInteger b = TestNumbers.TwoTo64 + 67890;
-            BigInteger expected = (a * b) % TestNumbers.TwoTo256;
+            BigInteger expected = (test.A * test.B) % TestNumbers.TwoTo256;
 
-            UInt256 ua = (UInt256)a;
-            UInt256 ub = (UInt256)b;
+            UInt256 ua = (UInt256)test.A;
+            UInt256 ub = (UInt256)test.B;
             UInt256 result = ua * ub;
 
             ((BigInteger)result).Should().Be(expected);
         }
 
-        [Test]
-        public void UInt256_Division_MatchesBigInteger()
+        [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
+        public void UInt256_Division_MatchesBigInteger((BigInteger A, BigInteger B) test)
         {
-            BigInteger a = TestNumbers.TwoTo128 + 12345;
-            BigInteger b = TestNumbers.TwoTo64 + 67890;
-            BigInteger expected = a / b;
+            if (test.B.IsZero)
+                return; // Skip division by zero
 
-            UInt256 ua = (UInt256)a;
-            UInt256 ub = (UInt256)b;
+            BigInteger expected = test.A / test.B;
+
+            UInt256 ua = (UInt256)test.A;
+            UInt256 ub = (UInt256)test.B;
             UInt256 result = ua / ub;
 
             ((BigInteger)result).Should().Be(expected);
         }
 
-        [Test]
-        public void UInt256_Modulus_MatchesBigInteger()
+        [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
+        public void UInt256_Modulus_MatchesBigInteger((BigInteger A, BigInteger B) test)
         {
-            BigInteger a = TestNumbers.TwoTo128 + 12345;
-            BigInteger b = TestNumbers.TwoTo64 + 67890;
-            BigInteger expected = a % b;
+            if (test.B.IsZero)
+                return; // Skip modulus by zero
 
-            UInt256 ua = (UInt256)a;
-            UInt256 ub = (UInt256)b;
+            BigInteger expected = test.A % test.B;
+
+            UInt256 ua = (UInt256)test.A;
+            UInt256 ub = (UInt256)test.B;
             UInt256 result = ua % ub;
 
             ((BigInteger)result).Should().Be(expected);
         }
 
+        [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.SignedTestCases))]
+        public void Int256_Addition_MatchesBigInteger((BigInteger A, BigInteger B) test)
+        {
+            BigInteger sum = test.A + test.B;
+            // Check if result is within Int256 range
+            if (sum > TestNumbers.Int256Max || sum < TestNumbers.Int256Min)
+                return;
+
+            Int256 a = new Int256(test.A);
+            Int256 b = new Int256(test.B);
+            Int256 result = a + b;
+
+            ((BigInteger)result).Should().Be(sum);
+        }
+
+        [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.SignedTestCases))]
+        public void Int256_Subtraction_MatchesBigInteger((BigInteger A, BigInteger B) test)
+        {
+            BigInteger diff = test.A - test.B;
+            // Check if result is within Int256 range
+            if (diff > TestNumbers.Int256Max || diff < TestNumbers.Int256Min)
+                return;
+
+            Int256 a = new Int256(test.A);
+            Int256 b = new Int256(test.B);
+            Int256 result = a - b;
+
+            ((BigInteger)result).Should().Be(diff);
+        }
+
+        [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.SignedTestCases))]
+        public void Int256_Multiplication_MatchesBigInteger((BigInteger A, BigInteger B) test)
+        {
+            BigInteger product = test.A * test.B;
+            // Check if result is within Int256 range
+            if (product > TestNumbers.Int256Max || product < TestNumbers.Int256Min)
+                return;
+
+            Int256 a = new Int256(test.A);
+            Int256 b = new Int256(test.B);
+            Int256 result = a * b;
+
+            ((BigInteger)result).Should().Be(product);
+        }
+
+        [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.SignedTestCases))]
+        public void Int256_Division_MatchesBigInteger((BigInteger A, BigInteger B) test)
+        {
+            if (test.B.IsZero)
+                return; // Skip division by zero
+
+            BigInteger quotient = test.A / test.B;
+            // Check if result is within Int256 range
+            if (quotient > TestNumbers.Int256Max || quotient < TestNumbers.Int256Min)
+                return;
+
+            Int256 a = new Int256(test.A);
+            Int256 b = new Int256(test.B);
+            Int256 result = a / b;
+
+            ((BigInteger)result).Should().Be(quotient);
+        }
+
+        [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.SignedTestCases))]
+        public void Int256_Modulus_MatchesBigInteger((BigInteger A, BigInteger B) test)
+        {
+            if (test.B.IsZero)
+                return; // Skip modulus by zero
+
+            BigInteger remainder = test.A % test.B;
+
+            Int256 a = new Int256(test.A);
+            Int256 b = new Int256(test.B);
+            Int256 result = a % b;
+
+            ((BigInteger)result).Should().Be(remainder);
+        }
+
         #endregion
 
-        #region Bitwise Operations
+        #region Bitwise Operations with TestCaseSource
 
-        [Test]
-        public void UInt256_BitwiseAnd_MatchesBigInteger()
+        [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
+        public void UInt256_BitwiseAnd_MatchesBigInteger((BigInteger A, BigInteger B) test)
         {
-            BigInteger a = TestNumbers.TwoTo128 + 0xFF00FF00;
-            BigInteger b = TestNumbers.TwoTo64 + 0x00FF00FF;
-            BigInteger expected = a & b;
+            BigInteger expected = test.A & test.B;
 
-            UInt256 ua = (UInt256)a;
-            UInt256 ub = (UInt256)b;
+            UInt256 ua = (UInt256)test.A;
+            UInt256 ub = (UInt256)test.B;
             UInt256 result = ua & ub;
 
             ((BigInteger)result).Should().Be(expected);
         }
 
-        [Test]
-        public void UInt256_BitwiseOr_MatchesBigInteger()
+        [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
+        public void UInt256_BitwiseOr_MatchesBigInteger((BigInteger A, BigInteger B) test)
         {
-            BigInteger a = TestNumbers.TwoTo128 + 0xFF00FF00;
-            BigInteger b = TestNumbers.TwoTo64 + 0x00FF00FF;
-            BigInteger expected = a | b;
+            BigInteger expected = test.A | test.B;
 
-            UInt256 ua = (UInt256)a;
-            UInt256 ub = (UInt256)b;
+            UInt256 ua = (UInt256)test.A;
+            UInt256 ub = (UInt256)test.B;
             UInt256 result = ua | ub;
 
             ((BigInteger)result).Should().Be(expected);
         }
 
-        [Test]
-        public void UInt256_BitwiseXor_MatchesBigInteger()
+        [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
+        public void UInt256_BitwiseXor_MatchesBigInteger((BigInteger A, BigInteger B) test)
         {
-            BigInteger a = TestNumbers.TwoTo128 + 0xFF00FF00;
-            BigInteger b = TestNumbers.TwoTo64 + 0x00FF00FF;
-            BigInteger expected = a ^ b;
+            BigInteger expected = test.A ^ test.B;
 
-            UInt256 ua = (UInt256)a;
-            UInt256 ub = (UInt256)b;
+            UInt256 ua = (UInt256)test.A;
+            UInt256 ub = (UInt256)test.B;
             UInt256 result = ua ^ ub;
 
             ((BigInteger)result).Should().Be(expected);
         }
 
-        [Test]
-        public void UInt256_LeftShift_MatchesBigInteger()
+        [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.ShiftTestCases))]
+        public void UInt256_LeftShift_MatchesBigInteger((BigInteger A, int Shift) test)
         {
-            BigInteger a = TestNumbers.TwoTo64 + 12345;
-            int shift = 64;
-            BigInteger expected = (a << shift) % TestNumbers.TwoTo256;
+            BigInteger expected = (test.A << test.Shift) % TestNumbers.TwoTo256;
 
-            UInt256 ua = (UInt256)a;
-            UInt256 result = ua << shift;
+            UInt256 ua = (UInt256)test.A;
+            UInt256 result = ua << test.Shift;
 
             ((BigInteger)result).Should().Be(expected);
         }
 
-        [Test]
-        public void UInt256_RightShift_MatchesBigInteger()
+        [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.ShiftTestCases))]
+        public void UInt256_RightShift_MatchesBigInteger((BigInteger A, int Shift) test)
         {
-            BigInteger a = TestNumbers.TwoTo192 + 12345;
-            int shift = 64;
-            BigInteger expected = a >> shift;
+            BigInteger expected = test.A >> test.Shift;
 
-            UInt256 ua = (UInt256)a;
-            UInt256 result = ua >> shift;
+            UInt256 ua = (UInt256)test.A;
+            UInt256 result = ua >> test.Shift;
+
+            ((BigInteger)result).Should().Be(expected);
+        }
+
+        [TestCaseSource(typeof(UnaryOps), nameof(UnaryOps.TestCases))]
+        public void UInt256_BitwiseComplement_MatchesBigInteger(BigInteger testValue)
+        {
+            BigInteger expected = TestNumbers.UInt256Max - testValue; // ~x for unsigned = MaxValue - x
+
+            UInt256 u = (UInt256)testValue;
+            UInt256 result = ~u;
 
             ((BigInteger)result).Should().Be(expected);
         }
 
         #endregion
 
-        #region Comparison Operators
+        #region Comparison Operators with TestCaseSource
 
-        [Test]
-        public void UInt256_LessThan_Works()
+        [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
+        public void UInt256_LessThan_MatchesBigInteger((BigInteger A, BigInteger B) test)
         {
-            ((UInt256)100 < (UInt256)200).Should().BeTrue();
-            ((UInt256)200 < (UInt256)100).Should().BeFalse();
-            ((UInt256)100 < (UInt256)100).Should().BeFalse();
+            bool expected = test.A < test.B;
+
+            UInt256 ua = (UInt256)test.A;
+            UInt256 ub = (UInt256)test.B;
+            bool result = ua < ub;
+
+            result.Should().Be(expected);
         }
 
-        [Test]
-        public void UInt256_LessThanOrEqual_Works()
+        [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
+        public void UInt256_LessThanOrEqual_MatchesBigInteger((BigInteger A, BigInteger B) test)
         {
-            ((UInt256)100 <= (UInt256)200).Should().BeTrue();
-            ((UInt256)200 <= (UInt256)100).Should().BeFalse();
-            ((UInt256)100 <= (UInt256)100).Should().BeTrue();
+            bool expected = test.A <= test.B;
+
+            UInt256 ua = (UInt256)test.A;
+            UInt256 ub = (UInt256)test.B;
+            bool result = ua <= ub;
+
+            result.Should().Be(expected);
         }
 
-        [Test]
-        public void UInt256_GreaterThan_Works()
+        [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
+        public void UInt256_GreaterThan_MatchesBigInteger((BigInteger A, BigInteger B) test)
         {
-            ((UInt256)200 > (UInt256)100).Should().BeTrue();
-            ((UInt256)100 > (UInt256)200).Should().BeFalse();
-            ((UInt256)100 > (UInt256)100).Should().BeFalse();
+            bool expected = test.A > test.B;
+
+            UInt256 ua = (UInt256)test.A;
+            UInt256 ub = (UInt256)test.B;
+            bool result = ua > ub;
+
+            result.Should().Be(expected);
         }
 
-        [Test]
-        public void UInt256_GreaterThanOrEqual_Works()
+        [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
+        public void UInt256_GreaterThanOrEqual_MatchesBigInteger((BigInteger A, BigInteger B) test)
         {
-            ((UInt256)200 >= (UInt256)100).Should().BeTrue();
-            ((UInt256)100 >= (UInt256)200).Should().BeFalse();
-            ((UInt256)100 >= (UInt256)100).Should().BeTrue();
+            bool expected = test.A >= test.B;
+
+            UInt256 ua = (UInt256)test.A;
+            UInt256 ub = (UInt256)test.B;
+            bool result = ua >= ub;
+
+            result.Should().Be(expected);
+        }
+
+        [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
+        public void UInt256_Equality_MatchesBigInteger((BigInteger A, BigInteger B) test)
+        {
+            bool expected = test.A == test.B;
+
+            UInt256 ua = (UInt256)test.A;
+            UInt256 ub = (UInt256)test.B;
+            bool result = ua == ub;
+
+            result.Should().Be(expected);
+        }
+
+        [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.SignedTestCases))]
+        public void Int256_LessThan_MatchesBigInteger((BigInteger A, BigInteger B) test)
+        {
+            bool expected = test.A < test.B;
+
+            Int256 a = new Int256(test.A);
+            Int256 b = new Int256(test.B);
+            bool result = a < b;
+
+            result.Should().Be(expected);
+        }
+
+        [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.SignedTestCases))]
+        public void Int256_GreaterThan_MatchesBigInteger((BigInteger A, BigInteger B) test)
+        {
+            bool expected = test.A > test.B;
+
+            Int256 a = new Int256(test.A);
+            Int256 b = new Int256(test.B);
+            bool result = a > b;
+
+            result.Should().Be(expected);
         }
 
         [Test]
@@ -890,38 +1014,62 @@ namespace Nethermind.Int256.Test
 
         #endregion
 
-        #region Increment / Decrement Operators
+        #region Increment / Decrement Operators with TestCaseSource
 
-        [Test]
-        public void UInt256_Increment()
+        [TestCaseSource(typeof(UnaryOps), nameof(UnaryOps.TestCases))]
+        public void UInt256_Increment_MatchesBigInteger(BigInteger testValue)
         {
-            UInt256 value = (UInt256)100;
+            if (testValue >= TestNumbers.UInt256Max)
+                return; // Skip values that would overflow
+
+            BigInteger expected = testValue + 1;
+
+            UInt256 value = (UInt256)testValue;
             value++;
-            value.Should().Be((UInt256)101);
+
+            ((BigInteger)value).Should().Be(expected);
         }
 
-        [Test]
-        public void UInt256_Decrement()
+        [TestCaseSource(typeof(UnaryOps), nameof(UnaryOps.TestCases))]
+        public void UInt256_Decrement_MatchesBigInteger(BigInteger testValue)
         {
-            UInt256 value = (UInt256)100;
+            if (testValue <= 0)
+                return; // Skip values that would underflow
+
+            BigInteger expected = testValue - 1;
+
+            UInt256 value = (UInt256)testValue;
             value--;
-            value.Should().Be((UInt256)99);
+
+            ((BigInteger)value).Should().Be(expected);
         }
 
-        [Test]
-        public void Int256_Increment()
+        [TestCaseSource(typeof(UnaryOps), nameof(UnaryOps.SignedTestCases))]
+        public void Int256_Increment_MatchesBigInteger(BigInteger testValue)
         {
-            Int256 value = (Int256)100;
+            if (testValue >= TestNumbers.Int256Max)
+                return; // Skip values that would overflow
+
+            BigInteger expected = testValue + 1;
+
+            Int256 value = new Int256(testValue);
             value++;
-            value.Should().Be((Int256)101);
+
+            ((BigInteger)value).Should().Be(expected);
         }
 
-        [Test]
-        public void Int256_Decrement()
+        [TestCaseSource(typeof(UnaryOps), nameof(UnaryOps.SignedTestCases))]
+        public void Int256_Decrement_MatchesBigInteger(BigInteger testValue)
         {
-            Int256 value = (Int256)100;
+            if (testValue <= TestNumbers.Int256Min)
+                return; // Skip values that would underflow
+
+            BigInteger expected = testValue - 1;
+
+            Int256 value = new Int256(testValue);
             value--;
-            value.Should().Be((Int256)99);
+
+            ((BigInteger)value).Should().Be(expected);
         }
 
         [Test]
@@ -942,159 +1090,81 @@ namespace Nethermind.Int256.Test
 
         #endregion
 
-        #region Generic Math Algorithm Tests
+        #region Sign Tests with TestCaseSource
 
-        [Test]
-        public void UInt256_WorksWithGenericSum()
+        [TestCaseSource(typeof(UnaryOps), nameof(UnaryOps.TestCases))]
+        public void UInt256_Sign_MatchesBigInteger(BigInteger testValue)
         {
-            var values = new[] { (UInt256)1, (UInt256)2, (UInt256)3, (UInt256)4, (UInt256)5 };
-            var result = GenericSum(values);
-            result.Should().Be((UInt256)15);
+            int expected = testValue.Sign;
+
+            UInt256 value = (UInt256)testValue;
+            int result = UInt256.Sign(value);
+
+            result.Should().Be(expected);
         }
 
-        [Test]
-        public void Int256_WorksWithGenericSum()
+        [TestCaseSource(typeof(UnaryOps), nameof(UnaryOps.SignedTestCases))]
+        public void Int256_Sign_MatchesBigInteger(BigInteger testValue)
         {
-            var values = new[] { (Int256)1, new Int256(-2), (Int256)3, new Int256(-4), (Int256)5 };
-            var result = GenericSum(values);
-            ((BigInteger)result).Should().Be(3);
-        }
+            int expected = testValue.Sign;
 
-        private static T GenericSum<T>(T[] values) where T : INumber<T>
-        {
-            T sum = T.Zero;
-            foreach (var v in values)
-                sum += v;
-            return sum;
-        }
+            Int256 value = new Int256(testValue);
+            int result = value.Sign;
 
-        [Test]
-        public void UInt256_WorksWithGenericProduct()
-        {
-            var values = new[] { (UInt256)2, (UInt256)3, (UInt256)4 };
-            var result = GenericProduct(values);
-            result.Should().Be((UInt256)24);
-        }
-
-        private static T GenericProduct<T>(T[] values) where T : INumber<T>
-        {
-            T product = T.One;
-            foreach (var v in values)
-                product *= v;
-            return product;
+            result.Should().Be(expected);
         }
 
         #endregion
 
-        #region Checked Conversion Overflow Tests
+        #region PopCount Tests with TestCaseSource
 
-        [Test]
-        public void UInt256_TryConvertFromChecked_NegativeDouble_ThrowsOverflow()
+        [TestCaseSource(typeof(UnaryOps), nameof(UnaryOps.TestCases))]
+        public void UInt256_PopCount_MatchesBigInteger(BigInteger testValue)
         {
-            Action act = () => CreateChecked<double, UInt256>(-1.0);
-            act.Should().Throw<OverflowException>();
-        }
+            int expected = 0;
+            BigInteger temp = testValue;
+            while (temp > 0)
+            {
+                expected += (int)(temp & 1);
+                temp >>= 1;
+            }
 
-        [Test]
-        public void UInt256_TryConvertFromChecked_NaN_ThrowsOverflow()
-        {
-            Action act = () => CreateChecked<double, UInt256>(double.NaN);
-            act.Should().Throw<OverflowException>();
-        }
+            UInt256 value = (UInt256)testValue;
+            UInt256 result = UInt256.PopCount(value);
 
-        [Test]
-        public void UInt256_TryConvertFromChecked_PositiveInfinity_ThrowsOverflow()
-        {
-            Action act = () => CreateChecked<double, UInt256>(double.PositiveInfinity);
-            act.Should().Throw<OverflowException>();
-        }
-
-        [Test]
-        public void UInt256_TryConvertFromChecked_NegativeDecimal_ThrowsOverflow()
-        {
-            Action act = () => CreateChecked<decimal, UInt256>(-1.0m);
-            act.Should().Throw<OverflowException>();
-        }
-
-        [Test]
-        public void UInt256_TryConvertToChecked_LargeValue_ToNuint_ThrowsOverflow()
-        {
-            UInt256 largeValue = UInt256.MaxValue;
-            Action act = () => CreateChecked<UInt256, nuint>(largeValue);
-            act.Should().Throw<OverflowException>();
-        }
-
-        [Test]
-        public void UInt256_TryConvertToChecked_LargeValue_ToNint_ThrowsOverflow()
-        {
-            UInt256 largeValue = UInt256.MaxValue;
-            Action act = () => CreateChecked<UInt256, nint>(largeValue);
-            act.Should().Throw<OverflowException>();
-        }
-
-        [Test]
-        public void Int256_TryConvertFromChecked_NaN_ThrowsOverflow()
-        {
-            Action act = () => CreateChecked<double, Int256>(double.NaN);
-            act.Should().Throw<OverflowException>();
-        }
-
-        [Test]
-        public void Int256_TryConvertFromChecked_Infinity_ThrowsOverflow()
-        {
-            Action act = () => CreateChecked<double, Int256>(double.PositiveInfinity);
-            act.Should().Throw<OverflowException>();
-        }
-
-        private static TResult CreateChecked<TSource, TResult>(TSource value)
-            where TSource : INumberBase<TSource>
-            where TResult : INumberBase<TResult>
-        {
-            return TResult.CreateChecked(value);
-        }
-
-        private static TResult CreateSaturating<TSource, TResult>(TSource value)
-            where TSource : INumberBase<TSource>
-            where TResult : INumberBase<TResult>
-        {
-            return TResult.CreateSaturating(value);
+            ((BigInteger)result).Should().Be(expected);
         }
 
         #endregion
 
-        #region Rotation Tests
+        #region DivRem Tests with TestCaseSource
 
-        [Test]
-        public void UInt256_RotateLeft_Zero()
+        [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
+        public void UInt256_DivRem_MatchesBigInteger((BigInteger A, BigInteger B) test)
         {
-            var value = (UInt256)0x12345678;
-            var result = RotateLeft(value, 0);
-            result.Should().Be(value);
+            if (test.B.IsZero)
+                return; // Skip division by zero
+
+            BigInteger expectedQuotient = BigInteger.DivRem(test.A, test.B, out BigInteger expectedRemainder);
+
+            var (quotient, remainder) = UInt256.DivRem((UInt256)test.A, (UInt256)test.B);
+
+            ((BigInteger)quotient).Should().Be(expectedQuotient);
+            ((BigInteger)remainder).Should().Be(expectedRemainder);
         }
 
-        [Test]
-        public void UInt256_RotateLeft_ByOne()
+        [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.SignedTestCases))]
+        public void Int256_DivRem_MatchesBigInteger((BigInteger A, BigInteger B) test)
         {
-            var value = (UInt256)1;
-            var result = RotateLeft(value, 1);
-            result.Should().Be((UInt256)2);
-        }
+            if (test.B.IsZero)
+                return; // Skip division by zero
 
-        [Test]
-        public void UInt256_RotateLeft_Wraps()
-        {
-            // Rotate left by 256 should be same as original
-            var value = (UInt256)0x12345678;
-            var result = RotateLeft(value, 256);
-            result.Should().Be(value);
-        }
+            BigInteger expectedQuotient = BigInteger.DivRem(test.A, test.B, out BigInteger expectedRemainder);
 
-        [Test]
-        public void UInt256_RotateRight_ByOne()
-        {
-            var value = (UInt256)2;
-            var result = RotateRight(value, 1);
-            result.Should().Be((UInt256)1);
+            var (quotient, remainder) = Int256.DivRem(new Int256(test.A), new Int256(test.B));
+
+            ((BigInteger)quotient).Should().Be(expectedQuotient);
+            ((BigInteger)remainder).Should().Be(expectedRemainder);
         }
 
         [Test]
@@ -1139,6 +1209,20 @@ namespace Nethermind.Int256.Test
         private static T RotateRight<T>(T value, int rotateAmount) where T : IBinaryInteger<T>
         {
             return T.RotateRight(value, rotateAmount);
+        }
+
+        private static TResult CreateChecked<TSource, TResult>(TSource value)
+            where TSource : INumberBase<TSource>
+            where TResult : INumberBase<TResult>
+        {
+            return TResult.CreateChecked(value);
+        }
+
+        private static TResult CreateSaturating<TSource, TResult>(TSource value)
+            where TSource : INumberBase<TSource>
+            where TResult : INumberBase<TResult>
+        {
+            return TResult.CreateSaturating(value);
         }
 
         #endregion
