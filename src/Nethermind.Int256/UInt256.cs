@@ -849,12 +849,12 @@ namespace Nethermind.Int256
                 return;
             }
 
-            ModSlow(x, y, out res);
+            ModFull(x, y, out res);
         }
 
         [SkipLocalsInit]
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ModSlow(in UInt256 x, in UInt256 y, out UInt256 res)
+        private static void ModFull(in UInt256 x, in UInt256 y, out UInt256 res)
         {
             DivideImpl(x, y, out _, out res);
         }
@@ -1871,7 +1871,7 @@ namespace Nethermind.Int256
 
             // Wide compare gate - decide between {0, 1} and "real division"
             //
-            // We only call DivideSlow when x > y.
+            // We only call DivideFull when x > y.
             // When x < y, quotient is 0.
             // When x == y, quotient is 1.
             //
@@ -3007,10 +3007,7 @@ namespace Nethermind.Int256
                 rcarry = 0;
             }
 
-            bool ret;
-            if (rcarry != 0)
-                ret = false;
-            else
+            if (rcarry == 0)
             {
                 ulong pHi = Multiply64(qhat, v1n, out ulong pLo);
 
@@ -3021,19 +3018,15 @@ namespace Nethermind.Int256
 
                     ulong sum1 = rhat + v2n;
                     if (sum1 < rhat)
+                    {
                         rcarry = 1;
+                    }
 
                     rhat = sum1;
-                    ret = true;
-                }
-                else
-                {
-                    ret = false;
                 }
             }
 
-            if (ret && rcarry == 0)
-
+            if (rcarry == 0)
             {
                 ulong pHi = Multiply64(qhat, v1n, out ulong pLo);
 
@@ -3041,12 +3034,6 @@ namespace Nethermind.Int256
                 if (pHi > rhat || (pHi == rhat && pLo > u2d))
                 {
                     qhat--;
-
-                    ulong sum = rhat + v2n;
-                    if (sum < rhat)
-                        rcarry = 1;
-
-                    rhat = sum;
                 }
             }
 
@@ -3057,21 +3044,21 @@ namespace Nethermind.Int256
             ulong sum2 = pLo1 + carry;
             ulong c2 = (sum2 < pLo1) ? 1UL : 0UL;
             carry = pHi1 + c2;
-            SubInPlace(ref u1d, sum2, ref borrow1);
+            u1d = Sub(u1d, sum2, ref borrow1);
 
             pHi1 = Multiply64(qhat, v1n, out pLo1);
             sum2 = pLo1 + carry;
             c2 = (sum2 < pLo1) ? 1UL : 0UL;
             carry = pHi1 + c2;
-            SubInPlace(ref u2d, sum2, ref borrow1);
+            u2d = Sub(u2d, sum2, ref borrow1);
 
             pHi1 = Multiply64(qhat, v2n, out pLo1);
             sum2 = pLo1 + carry;
             c2 = (sum2 < pLo1) ? 1UL : 0UL;
             carry = pHi1 + c2;
-            SubInPlace(ref u3d, sum2, ref borrow1);
+            u3d = Sub(u3d, sum2, ref borrow1);
 
-            SubInPlace(ref u4d, carry, ref borrow1);
+            u4d = Sub(u4d, carry, ref borrow1);
             ulong borrow = borrow1;
 
             if (borrow != 0)
@@ -3102,10 +3089,7 @@ namespace Nethermind.Int256
                 rcarry1 = 0;
             }
 
-            bool ret1;
-            if (rcarry1 != 0)
-                ret1 = false;
-            else
+            if (rcarry1 == 0)
             {
                 ulong pHi2 = Multiply64(qhat1, v1n, out ulong pLo2);
 
@@ -3116,19 +3100,15 @@ namespace Nethermind.Int256
 
                     ulong sum4 = rhat1 + v2n;
                     if (sum4 < rhat1)
+                    {
                         rcarry1 = 1;
+                    }
 
                     rhat1 = sum4;
-                    ret1 = true;
-                }
-                else
-                {
-                    ret1 = false;
                 }
             }
 
-            if (ret1 && rcarry1 == 0)
-
+            if (rcarry1 == 0)
             {
                 ulong pHi3 = Multiply64(qhat1, v1n, out ulong pLo3);
 
@@ -3136,12 +3116,6 @@ namespace Nethermind.Int256
                 if (pHi3 > rhat1 || (pHi3 == rhat1 && pLo3 > u1d))
                 {
                     qhat1--;
-
-                    ulong sum5 = rhat1 + v2n;
-                    if (sum5 < rhat1)
-                        rcarry1 = 1;
-
-                    rhat1 = sum5;
                 }
             }
 
@@ -3152,21 +3126,21 @@ namespace Nethermind.Int256
             ulong sum6 = pLo4 + carry1;
             ulong c3 = (sum6 < pLo4) ? 1UL : 0UL;
             carry1 = pHi4 + c3;
-            SubInPlace(ref u0n2, sum6, ref borrow2);
+            u0n2 = Sub(u0n2, sum6, ref borrow2);
 
             pHi4 = Multiply64(qhat1, v1n, out pLo4);
             sum6 = pLo4 + carry1;
             c3 = (sum6 < pLo4) ? 1UL : 0UL;
             carry1 = pHi4 + c3;
-            SubInPlace(ref u1d, sum6, ref borrow2);
+            u1d = Sub(u1d, sum6, ref borrow2);
 
             pHi4 = Multiply64(qhat1, v2n, out pLo4);
             sum6 = pLo4 + carry1;
             c3 = (sum6 < pLo4) ? 1UL : 0UL;
             carry1 = pHi4 + c3;
-            SubInPlace(ref u2d, sum6, ref borrow2);
+            u2d = Sub(u2d, sum6, ref borrow2);
 
-            SubInPlace(ref u3d, carry1, ref borrow2);
+            u3d = Sub(u3d, carry1, ref borrow2);
             ulong borrow3 = borrow2;
 
             if (borrow3 != 0)
@@ -3232,7 +3206,6 @@ namespace Nethermind.Int256
                 rcarry = 0;
             }
 
-
             if (rcarry == 0)
             {
                 ulong pHi = Multiply64(qhat, v.u2, out ulong pLo);
@@ -3258,12 +3231,6 @@ namespace Nethermind.Int256
                 if (pHi > rhat || (pHi == rhat && pLo > u.u2))
                 {
                     qhat--;
-
-                    ulong sum = rhat + v.u3;
-                    if (sum < rhat)
-                        rcarry = 1;
-
-                    rhat = sum;
                 }
             }
 
@@ -3401,10 +3368,12 @@ namespace Nethermind.Int256
             }
         }
 
+        [SkipLocalsInit]
+        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void DivideBy128BitsX86Base(in UInt256 x, in UInt256 y, out UInt256 q, out UInt256 remainder)
         {
             // ------------------------------------------------------------
-            // n >= 2: Knuth D (specialised) with reciprocal qhat
+            // n == 2: specialised Knuth D with hardware DivRem
             // ------------------------------------------------------------
             Debug.Assert(y.u1 != 0 && y.u2 == 0 && y.u3 == 0);
 
@@ -3454,34 +3423,72 @@ namespace Nethermind.Int256
             }
 
             Unsafe.SkipInit(out q);
+            ref ulong qRef = ref Unsafe.As<UInt256, ulong>(ref q);
+
+            // ------------------------------------------------------------
+            // Fast path: if the normalised low limb is 0 then V = v1n*B.
+            // That turns the whole thing into a plain 256/64 division on (u4..u1),
+            // with remainder (r:u0).
+            // ------------------------------------------------------------
+            if (v0 == 0)
+            {
+                Debug.Assert(u4 < v1n);
+
+                ulong r = u4;
+
+                (ulong q2, ulong r2) = X86Base.X64.DivRem(u3, r, v1n);
+                r = r2;
+                (ulong q1, ulong r1) = X86Base.X64.DivRem(u2, r, v1n);
+                r = r1;
+                (ulong q0, ulong r0) = X86Base.X64.DivRem(u1, r, v1n);
+                r = r0;
+
+                Unsafe.Add(ref qRef, 0) = q0;
+                Unsafe.Add(ref qRef, 1) = q1;
+                Unsafe.Add(ref qRef, 2) = q2;
+                Unsafe.Add(ref qRef, 3) = 0;
+
+                Unsafe.SkipInit(out remainder);
+                ref ulong rRef = ref Unsafe.As<UInt256, ulong>(ref remainder);
+
+                if (shift == 0)
+                {
+                    Unsafe.Add(ref rRef, 0) = u0;
+                    Unsafe.Add(ref rRef, 1) = r;
+                }
+                else
+                {
+                    int rs = 64 - shift;
+                    Unsafe.Add(ref rRef, 0) = (u0 >> shift) | (r << rs);
+                    Unsafe.Add(ref rRef, 1) = r >> shift;
+                }
+
+                Unsafe.Add(ref rRef, 2) = 0;
+                Unsafe.Add(ref rRef, 3) = 0;
+                return;
+            }
+
+            // ------------------------------------------------------------
+            // n == 2 trick:
+            // After DivRem on v1n:
+            //   (uHi*B + uMid) = qhat*v1n + rhat
+            // So subtracting qhat*(v1n*B + v0) from (uHi:uMid:uLo) reduces to:
+            //   (rhat:uLo) - qhat*v0
+            //
+            // This removes the qhat*v1n multiply and the full 3-limb subtract/add-back.
+            // ------------------------------------------------------------
 
             // ------------------------------------------------------------
             // Step j=2: q2 from (u4:u3:u2)
             // ------------------------------------------------------------
             {
-                ulong rhat;
-                bool rcarry;
-                ulong qhat;
-                // This special-case is REQUIRED for hardware div safety:
-                // if uHi == v1n then the true quotient is >= 2^64, so DIV would #DE.
-                if (u4 == v1n)
-                {
-                    rhat = u3 + v1n;
-                    rcarry = rhat < u3;
-                    qhat = ulong.MaxValue;
-                }
-                else
-                {
-                    rcarry = false;
+                // Always true for this setup: u4 < v1n, so DivRem is safe here.
+                Debug.Assert(u4 < v1n);
 
-                    (ulong qhat1, ulong r) = X86Base.X64.DivRem(u3, u4, v1n);
-                    rhat = r;
-                    qhat = qhat1;
+                (ulong qhat, ulong rhat) = X86Base.X64.DivRem(u3, u4, v1n);
+                bool rcarry = false;
 
-                    // Reciprocal path
-                }
-
-                ulong hi = Multiply64(qhat, v0, out var lo);
+                ulong hi = Multiply64(qhat, v0, out ulong lo);
 
                 // Correct at most twice.
                 if (!rcarry && (hi > rhat || (hi == rhat && lo > u2)))
@@ -3500,45 +3507,16 @@ namespace Nethermind.Int256
                         lo2 = lo - v0;
                         hi -= (lo < v0) ? 1UL : 0UL;
                         lo = lo2;
+
+                        rhat += v1n;
                     }
                 }
 
-                // Subtract qhat*v from u2,u3,u4 (3 limbs).
                 ulong borrow = (u2 < lo) ? 1UL : 0UL;
                 u2 -= lo;
+                u3 = rhat - hi - borrow;
 
-                ulong hi1 = Multiply64(qhat, v1n, out lo);
-                ulong sum = lo + hi;
-                hi = hi1 + ((sum < lo) ? 1UL : 0UL);
-
-                ulong t = u3 - sum;
-                ulong b = (u3 < sum) ? 1UL : 0UL;
-                u3 = t - borrow;
-                borrow = b | ((t < borrow) ? 1UL : 0UL);
-
-                t = u4 - hi;
-                b = (u4 < hi) ? 1UL : 0UL;
-                u4 = t - borrow;
-                borrow = b | ((t < borrow) ? 1UL : 0UL);
-
-                if (borrow != 0)
-                {
-                    // Add-back v and decrement qhat.
-                    ulong s0 = u2 + v0;
-                    ulong c = (s0 < u2) ? 1UL : 0UL;
-
-                    ulong s1 = u3 + v1n;
-                    ulong c1 = (s1 < u3) ? 1UL : 0UL;
-                    s1 += c;
-                    c1 |= (s1 < c) ? 1UL : 0UL;
-
-                    u2 = s0;
-                    u3 = s1;
-
-                    qhat--;
-                }
-
-                Unsafe.AsRef(in q.u2) = qhat;
+                Unsafe.Add(ref qRef, 2) = qhat;
             }
 
             // ------------------------------------------------------------
@@ -3548,25 +3526,21 @@ namespace Nethermind.Int256
                 ulong rhat;
                 bool rcarry;
                 ulong qhat;
-                // This special-case is REQUIRED for hardware div safety:
-                // if uHi == v1n then the true quotient is >= 2^64, so DIV would #DE.
+
+                // Required for DIV safety when uHi == v1n.
                 if (u3 == v1n)
                 {
+                    qhat = ulong.MaxValue;
                     rhat = u2 + v1n;
                     rcarry = rhat < u2;
-                    qhat = ulong.MaxValue;
                 }
                 else
                 {
+                    (qhat, rhat) = X86Base.X64.DivRem(u2, u3, v1n);
                     rcarry = false;
-                    (ulong qhat1, ulong r) = X86Base.X64.DivRem(u2, u3, v1n);
-                    rhat = r;
-                    qhat = qhat1;
-
-                    // Reciprocal path
                 }
 
-                ulong hi = Multiply64(qhat, v0, out var lo);
+                ulong hi = Multiply64(qhat, v0, out ulong lo);
 
                 if (!rcarry && (hi > rhat || (hi == rhat && lo > u1)))
                 {
@@ -3584,43 +3558,16 @@ namespace Nethermind.Int256
                         lo2 = lo - v0;
                         hi -= (lo < v0) ? 1UL : 0UL;
                         lo = lo2;
+
+                        rhat += v1n;
                     }
                 }
 
                 ulong borrow = (u1 < lo) ? 1UL : 0UL;
                 u1 -= lo;
+                u2 = rhat - hi - borrow;
 
-                ulong hi1 = Multiply64(qhat, v1n, out lo);
-                ulong sum = lo + hi;
-                hi = hi1 + ((sum < lo) ? 1UL : 0UL);
-
-                ulong t = u2 - sum;
-                ulong b = (u2 < sum) ? 1UL : 0UL;
-                u2 = t - borrow;
-                borrow = b | ((t < borrow) ? 1UL : 0UL);
-
-                t = u3 - hi;
-                b = (u3 < hi) ? 1UL : 0UL;
-                u3 = t - borrow;
-                borrow = b | ((t < borrow) ? 1UL : 0UL);
-
-                if (borrow != 0)
-                {
-                    ulong s0 = u1 + v0;
-                    ulong c = (s0 < u1) ? 1UL : 0UL;
-
-                    ulong s1 = u2 + v1n;
-                    ulong c1 = (s1 < u2) ? 1UL : 0UL;
-                    s1 += c;
-                    c1 |= (s1 < c) ? 1UL : 0UL;
-
-                    u1 = s0;
-                    u2 = s1;
-
-                    qhat--;
-                }
-
-                Unsafe.AsRef(in q.u1) = qhat;
+                Unsafe.Add(ref qRef, 1) = qhat;
             }
 
             // ------------------------------------------------------------
@@ -3630,25 +3577,21 @@ namespace Nethermind.Int256
                 ulong rhat;
                 bool rcarry;
                 ulong qhat;
-                // This special-case is REQUIRED for hardware div safety:
-                // if uHi == v1n then the true quotient is >= 2^64, so DIV would #DE.
+
+                // Required for DIV safety when uHi == v1n.
                 if (u2 == v1n)
                 {
+                    qhat = ulong.MaxValue;
                     rhat = u1 + v1n;
                     rcarry = rhat < u1;
-                    qhat = ulong.MaxValue;
                 }
                 else
                 {
+                    (qhat, rhat) = X86Base.X64.DivRem(u1, u2, v1n);
                     rcarry = false;
-                    (ulong qhat1, ulong r) = X86Base.X64.DivRem(u1, u2, v1n);
-                    rhat = r;
-                    qhat = qhat1;
-
-                    // Reciprocal path
                 }
 
-                ulong hi = Multiply64(qhat, v0, out var lo);
+                ulong hi = Multiply64(qhat, v0, out ulong lo);
 
                 if (!rcarry && (hi > rhat || (hi == rhat && lo > u0)))
                 {
@@ -3666,67 +3609,41 @@ namespace Nethermind.Int256
                         lo2 = lo - v0;
                         hi -= (lo < v0) ? 1UL : 0UL;
                         lo = lo2;
+
+                        rhat += v1n;
                     }
                 }
 
                 ulong borrow = (u0 < lo) ? 1UL : 0UL;
                 u0 -= lo;
+                u1 = rhat - hi - borrow;
 
-                ulong hi1 = Multiply64(qhat, v1n, out lo);
-                ulong sum = lo + hi;
-                hi = hi1 + ((sum < lo) ? 1UL : 0UL);
-
-                ulong t = u1 - sum;
-                ulong b = (u1 < sum) ? 1UL : 0UL;
-                u1 = t - borrow;
-                borrow = b | ((t < borrow) ? 1UL : 0UL);
-
-                t = u2 - hi;
-                b = (u2 < hi) ? 1UL : 0UL;
-                u2 = t - borrow;
-                borrow = b | ((t < borrow) ? 1UL : 0UL);
-
-                if (borrow != 0)
-                {
-                    ulong s0 = u0 + v0;
-                    ulong c = (s0 < u0) ? 1UL : 0UL;
-
-                    ulong s1 = u1 + v1n;
-                    ulong c1 = (s1 < u1) ? 1UL : 0UL;
-                    s1 += c;
-                    c1 |= (s1 < c) ? 1UL : 0UL;
-
-                    u0 = s0;
-                    u1 = s1;
-
-                    qhat--;
-                }
-
-                Unsafe.AsRef(in q.u0) = qhat;
+                Unsafe.Add(ref qRef, 0) = qhat;
             }
 
             // q3 is always 0 for 256/128 here.
-            Unsafe.AsRef(in q.u3) = 0;
+            Unsafe.Add(ref qRef, 3) = 0;
 
             // ------------------------------------------------------------
             // Remainder (u0..u1 in normalised space) - unnormalise.
             // ------------------------------------------------------------
             Unsafe.SkipInit(out remainder);
+            ref ulong remRef = ref Unsafe.As<UInt256, ulong>(ref remainder);
 
             if (shift == 0)
             {
-                Unsafe.AsRef(in remainder.u0) = u0;
-                Unsafe.AsRef(in remainder.u1) = u1;
+                Unsafe.Add(ref remRef, 0) = u0;
+                Unsafe.Add(ref remRef, 1) = u1;
             }
             else
             {
                 int rs = 64 - shift;
-                Unsafe.AsRef(in remainder.u0) = (u0 >> shift) | (u1 << rs);
-                Unsafe.AsRef(in remainder.u1) = u1 >> shift;
+                Unsafe.Add(ref remRef, 0) = (u0 >> shift) | (u1 << rs);
+                Unsafe.Add(ref remRef, 1) = u1 >> shift;
             }
 
-            Unsafe.AsRef(in remainder.u2) = 0;
-            Unsafe.AsRef(in remainder.u3) = 0;
+            Unsafe.Add(ref remRef, 2) = 0;
+            Unsafe.Add(ref remRef, 3) = 0;
         }
 
         [SkipLocalsInit]
@@ -3849,7 +3766,6 @@ namespace Nethermind.Int256
 
                 t = u4 - hi;
                 b = (u4 < hi) ? 1UL : 0UL;
-                u4 = t - borrow;
                 borrow = b | ((t < borrow) ? 1UL : 0UL);
 
                 if (borrow != 0)
@@ -3861,7 +3777,6 @@ namespace Nethermind.Int256
                     ulong s1 = u3 + v1n;
                     ulong c1 = (s1 < u3) ? 1UL : 0UL;
                     s1 += c;
-                    c1 |= (s1 < c) ? 1UL : 0UL;
 
                     u2 = s0;
                     u3 = s1;
@@ -3926,7 +3841,6 @@ namespace Nethermind.Int256
 
                 t = u3 - hi;
                 b = (u3 < hi) ? 1UL : 0UL;
-                u3 = t - borrow;
                 borrow = b | ((t < borrow) ? 1UL : 0UL);
 
                 if (borrow != 0)
@@ -3937,7 +3851,6 @@ namespace Nethermind.Int256
                     ulong s1 = u2 + v1n;
                     ulong c1 = (s1 < u2) ? 1UL : 0UL;
                     s1 += c;
-                    c1 |= (s1 < c) ? 1UL : 0UL;
 
                     u1 = s0;
                     u2 = s1;
@@ -4002,7 +3915,6 @@ namespace Nethermind.Int256
 
                 t = u2 - hi;
                 b = (u2 < hi) ? 1UL : 0UL;
-                u2 = t - borrow;
                 borrow = b | ((t < borrow) ? 1UL : 0UL);
 
                 if (borrow != 0)
@@ -4013,7 +3925,6 @@ namespace Nethermind.Int256
                     ulong s1 = u1 + v1n;
                     ulong c1 = (s1 < u1) ? 1UL : 0UL;
                     s1 += c;
-                    c1 |= (s1 < c) ? 1UL : 0UL;
 
                     u0 = s0;
                     u1 = s1;
@@ -4191,10 +4102,7 @@ namespace Nethermind.Int256
                 rcarry = 0;
             }
 
-            bool ret;
-            if (rcarry != 0)
-                ret = false;
-            else
+            if (rcarry == 0)
             {
                 ulong pHi = Multiply64(qhat, v1, out ulong pLo);
 
@@ -4208,16 +4116,10 @@ namespace Nethermind.Int256
                         rcarry = 1;
 
                     rhat = sum1;
-                    ret = true;
-                }
-                else
-                {
-                    ret = false;
                 }
             }
 
-            if (ret && rcarry == 0)
-
+            if (rcarry == 0)
             {
                 ulong pHi = Multiply64(qhat, v1, out ulong pLo);
 
@@ -4225,12 +4127,6 @@ namespace Nethermind.Int256
                 if (pHi > rhat || (pHi == rhat && pLo > u1))
                 {
                     qhat--;
-
-                    ulong sum = rhat + v2;
-                    if (sum < rhat)
-                        rcarry = 1;
-
-                    rhat = sum;
                 }
             }
 
@@ -4241,21 +4137,21 @@ namespace Nethermind.Int256
             ulong sum2 = pLo1 + carry;
             ulong c2 = (sum2 < pLo1) ? 1UL : 0UL;
             carry = pHi1 + c2;
-            SubInPlace(ref u0, sum2, ref borrow1);
+            u0 = Sub(u0, sum2, ref borrow1);
 
             pHi1 = Multiply64(qhat, v1, out pLo1);
             sum2 = pLo1 + carry;
             c2 = (sum2 < pLo1) ? 1UL : 0UL;
             carry = pHi1 + c2;
-            SubInPlace(ref u1, sum2, ref borrow1);
+            u1 = Sub(u1, sum2, ref borrow1);
 
             pHi1 = Multiply64(qhat, v2, out pLo1);
             sum2 = pLo1 + carry;
             c2 = (sum2 < pLo1) ? 1UL : 0UL;
             carry = pHi1 + c2;
-            SubInPlace(ref u2, sum2, ref borrow1);
+            u2 = Sub(u2, sum2, ref borrow1);
 
-            SubInPlace(ref u3, carry, ref borrow1);
+            u3 = Sub(u3, carry, ref borrow1);
             ulong borrow = borrow1;
 
             if (borrow != 0)
@@ -4267,39 +4163,6 @@ namespace Nethermind.Int256
             return qhat;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static ulong DivStep4(in UInt256 u, ref ulong u4, in UInt256 v, ulong recip, out UInt256 rem)
-        {
-            ulong qhat, rhat, rcarry;
-            if (u4 == v.u3)
-            {
-                qhat = ulong.MaxValue;
-                ulong sum = u.u3 + v.u3;
-                rcarry = (sum < u.u3) ? 1UL : 0UL;
-                rhat = sum;
-            }
-            else
-            {
-                qhat = UDivRem2By1(u4, recip, v.u3, u.u3, out rhat);
-                rcarry = 0;
-            }
-
-            if (CorrectQHatOnce(ref qhat, ref rhat, ref rcarry, v.u3, v.u2, u.u2))
-                CorrectQHatOnce(ref qhat, ref rhat, ref rcarry, v.u3, v.u2, u.u2);
-
-            ulong borrow = SubMul4(in u, ref u4, in v, qhat, out rem);
-
-            if (borrow != 0)
-            {
-                if (!AddOverflow(in rem, in v, out rem))
-                {
-                    u4 += 1;
-                }
-                qhat--;
-            }
-
-            return qhat;
-        }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static ulong DivStep4(ref ulong u0, ref ulong u1, ref ulong u2, ref ulong u3, ref ulong u4, in UInt256 v, ulong recip)
         {
@@ -4358,39 +4221,6 @@ namespace Nethermind.Int256
             return false;
         }
 
-        // ------------------------------------------------------------
-        // Multiply-subtract and add-back
-        // ------------------------------------------------------------
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static ulong SubMul3(ref ulong u0, ref ulong u1, ref ulong u2, ref ulong u3, ulong v0, ulong v1, ulong v2, ulong q)
-        {
-            ulong borrow = 0;
-            ulong carry = 0;
-
-            ulong pHi = Multiply64(q, v0, out ulong pLo);
-            ulong sum = pLo + carry;
-            ulong c2 = (sum < pLo) ? 1UL : 0UL;
-            carry = pHi + c2;
-            SubInPlace(ref u0, sum, ref borrow);
-
-            pHi = Multiply64(q, v1, out pLo);
-            sum = pLo + carry;
-            c2 = (sum < pLo) ? 1UL : 0UL;
-            carry = pHi + c2;
-            SubInPlace(ref u1, sum, ref borrow);
-
-            pHi = Multiply64(q, v2, out pLo);
-            sum = pLo + carry;
-            c2 = (sum < pLo) ? 1UL : 0UL;
-            carry = pHi + c2;
-            SubInPlace(ref u2, sum, ref borrow);
-
-            SubInPlace(ref u3, carry, ref borrow);
-
-            return borrow;
-        }
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static ulong SubMul4(in UInt256 u, ref ulong u4, in UInt256 v, ulong q, out UInt256 rem)
         {
@@ -4420,11 +4250,12 @@ namespace Nethermind.Int256
             carry = pHi + c2;
             var r3 = Sub(u.u3, sum, ref borrow);
 
-            SubInPlace(ref u4, carry, ref borrow);
+            u4 = Sub(u4, carry, ref borrow);
 
             rem = Create(r0, r1, r2, r3);
             return borrow;
         }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static ulong SubMul4(ref ulong u0, ref ulong u1, ref ulong u2, ref ulong u3, ref ulong u4, ulong v0, ulong v1, ulong v2, ulong v3, ulong q)
         {
@@ -4435,27 +4266,27 @@ namespace Nethermind.Int256
             ulong sum = pLo + carry;
             ulong c2 = (sum < pLo) ? 1UL : 0UL;
             carry = pHi + c2;
-            SubInPlace(ref u0, sum, ref borrow);
+            u0 = Sub(u0, sum, ref borrow);
 
             pHi = Multiply64(q, v1, out pLo);
             sum = pLo + carry;
             c2 = (sum < pLo) ? 1UL : 0UL;
             carry = pHi + c2;
-            SubInPlace(ref u1, sum, ref borrow);
+            u1 = Sub(u1, sum, ref borrow);
 
             pHi = Multiply64(q, v2, out pLo);
             sum = pLo + carry;
             c2 = (sum < pLo) ? 1UL : 0UL;
             carry = pHi + c2;
-            SubInPlace(ref u2, sum, ref borrow);
+            u2 = Sub(u2, sum, ref borrow);
 
             pHi = Multiply64(q, v3, out pLo);
             sum = pLo + carry;
             c2 = (sum < pLo) ? 1UL : 0UL;
             carry = pHi + c2;
-            SubInPlace(ref u3, sum, ref borrow);
+            u3 = Sub(u3, sum, ref borrow);
 
-            SubInPlace(ref u4, carry, ref borrow);
+            u4 = Sub(u4, carry, ref borrow);
 
             return borrow;
         }
@@ -4481,7 +4312,6 @@ namespace Nethermind.Int256
             u4 += c;
         }
 
-
         // ------------------------------------------------------------
         // Low-level arithmetic primitives
         // ------------------------------------------------------------
@@ -4503,6 +4333,7 @@ namespace Nethermind.Int256
             }
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static ulong Sub(ulong x, ulong y, ref ulong borrow)
         {
             ulong t = x - y;
@@ -4511,16 +4342,6 @@ namespace Nethermind.Int256
             ulong b2 = (t < borrow) ? 1UL : 0UL;
             borrow = b1 | b2;
             return t2;
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static void SubInPlace(ref ulong x, ulong y, ref ulong borrow)
-        {
-            ulong t = x - y;
-            ulong b1 = (x < y) ? 1UL : 0UL;
-            ulong t2 = t - borrow;
-            ulong b2 = (t < borrow) ? 1UL : 0UL;
-            x = t2;
-            borrow = b1 | b2;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
