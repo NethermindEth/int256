@@ -816,6 +816,7 @@ namespace Nethermind.Int256
 
         // Mod sets res to the modulus x%y for y != 0.
         // If y == 0, z is set to 0 (OBS: differs from the big.Int)
+        [SkipLocalsInit]
         public static void Mod(in UInt256 x, in UInt256 y, out UInt256 res)
         {
             if (x.IsZero || y.IsZeroOrOne)
@@ -847,6 +848,13 @@ namespace Nethermind.Int256
                 return;
             }
 
+            ModSlow(x, y, out res);
+        }
+
+        [SkipLocalsInit]
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void ModSlow(in UInt256 x, in UInt256 y, out UInt256 res)
+        {
             DivideImpl(x, y, out _, out res);
         }
 
@@ -1769,36 +1777,125 @@ namespace Nethermind.Int256
         }
 
         // Divide sets res to the quotient x/y.
-        // If y == 0, z is set to 0
+        // If y == 0, res is set to 0
+        [SkipLocalsInit]
         public static void Divide(in UInt256 x, in UInt256 y, out UInt256 res)
         {
-            if (y.IsZero || y > x)
+            // Handle y == 0 and y == 1 cheaply
+            //
+            // y0 is the low limb.
+            // We structure this to keep y1/y2/y3 lifetimes short - do not load them unless y0 is 0 or 1.
+            //
+            // (y0 & ~1) == 0 is equivalent to (y0 == 0 || y0 == 1) but compiles well and keeps the branch compact.
+            ulong y0 = y.u0;
+            if ((y0 & ~1UL) == 0)
             {
-                res = default;
-                return;
+                // yHi is the OR of the upper limbs.
+                // - y == 0  iff y0 == 0 and yHi == 0
+                // - y == 1  iff y0 == 1 and yHi == 0
+                //
+                // Computing yHi here (and only here) avoids keeping y1/y2/y3 live across the entire function,
+                // which would force the JIT to use callee-saved regs (rbx/rsi/rdi/rbp/r14/r15) and emit pushes.
+                ulong yHi = y.u1 | y.u2 | y.u3;
+                if (yHi == 0)
+                {
+                    // Exact: if y == 0 -> quotient is 0 (we return default)
+                    //        if y == 1 -> quotient is x (copy x)
+                    //
+                    // Note: written as a conditional expression for brevity.
+                    res = (y0 == 0) ? default : x;
+                    return;
+                }
+                // else y is 2^64 or larger - not a special-case, continue.
             }
-            if (y.IsOne)
+
+            // Decide "u64 fast path" vs "wide path" with minimal register pressure
+            //
+            // Key idea: do not read x1 unless we already know x3|x2 == 0.
+            // If we pull x1/x2/x3 all live at once and then also pull y2/y3 for the wide compare, we run out of
+            // volatile regs (Windows x64 has rcx/rdx/r8 pinned for args; leaves rax/r9/r10/r11 as the main free ones).
+            // That is exactly how you get extra pushes.
+            ulong x3 = x.u3;
+            ulong x2 = x.u2;
+
+            // x fits in 64 bits iff x1==x2==x3==0.
+            // We stage it:
+            // - first check x3|x2 (cheap and already needed for wide compare)
+            // - only then touch x1, so x1 does not become live on the wide path.
+            if ((x3 | x2) == 0 && x.u1 == 0)
             {
-                res = x;
+                // u64 path
+                //
+                // Here x < 2^64. If y has any high limbs set, then y >= 2^64 > x, so quotient is 0.
+                // This avoids any 256-bit division work and avoids the "unsafe" x.u0/y.u0 divide when y doesn't fit.
+                if ((y.u1 | y.u2 | y.u3) != 0)
+                {
+                    res = default;
+                    return;
+                }
+
+                // Now both x and y fit in 64 bits, and y != 0 (we already handled y==0 earlier).
+                ulong x0 = x.u0;
+                ulong yy0 = y.u0; // reload y0 in this scope so we do not keep the earlier y0 live unnecessarily
+
+                // If y > x then quotient is 0.
+                if (yy0 > x0) { res = default; return; }
+
+                // If x == y then quotient is 1.
+                if (yy0 == x0) { res = Create(1, 0, 0, 0); return; }
+
+                // Normal 64-bit division.
+                res = Create(x0 / yy0, 0, 0, 0);
                 return;
             }
 
-            if (x == y)
-            {
-                res = One;
-                return;
-            }
+            // Wide compare gate - decide between {0, 1} and "real division"
+            //
+            // We only call DivideSlow when x > y.
+            // When x < y, quotient is 0.
+            // When x == y, quotient is 1.
+            //
+            // Implemented as lexicographic compare from MS limb to LS limb:
+            // (x3,x2,x1,x0) vs (y3,y2,y1,y0).
+            //
+            // Staged preloads:
+            // - stage A loads y3 and y2 only (paired with x3/x2 already loaded)
+            // - stage B loads x1/y1 and x0/y0 only if stage A says they are equal
+            //
+            // This keeps at most ~4 scalar values live at any time, helping the JIT stay in volatile regs and
+            // avoid callee-saved spills - while still giving the CPU some independent loads to overlap.
+            ulong y3 = y.u3;
+            if (x3 < y3) { res = default; return; }                 // x < y
+            if (x3 > y3) { DivideFull(in x, in y, out res); return; } // x > y -> real division
 
-            // At this point, we know
-            // x/y ; x > y > 0
+            ulong y2 = y.u2;
+            if (x2 < y2) { res = default; return; }                 // x < y
+            if (x2 > y2) { DivideFull(in x, in y, out res); return; } // x > y -> real division
 
-            if (x.IsUint64)
-            {
-                ulong quot = x.u0 / y.u0;
-                res = Create(quot, 0, 0, 0);
-                return;
-            }
+            // Stage B (only reached when x3==y3 and x2==y2)
+            ulong x1 = x.u1;
+            ulong y1 = y.u1;
+            if (x1 < y1) { res = default; return; }                 // x < y
+            if (x1 > y1) { DivideFull(in x, in y, out res); return; } // x > y -> real division
 
+            ulong x0b = x.u0;
+            ulong y0b = y.u0;
+            if (x0b < y0b) { res = default; return; }               // x < y
+            if (x0b == y0b) { res = Create(1, 0, 0, 0); return; }   // x == y -> quotient 1
+
+            // Remaining case: x > y.
+            DivideFull(in x, in y, out res);
+        }
+
+        [SkipLocalsInit]
+        // Slow path is isolated so the wrapper can tailcall it and avoid stack temps like "out _ remainder".
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void DivideFull(in UInt256 x, in UInt256 y, out UInt256 res)
+        {
+            // Full 256-bit division. We discard the remainder via out _.
+            // Keeping this in a separate method prevents the wrapper from needing
+            // a 32-byte stack slot for the remainder, which would otherwise force
+            // a larger frame and extra stores even on fast exits.
             DivideImpl(x, y, out res, out _);
         }
 
@@ -2896,8 +2993,182 @@ namespace Nethermind.Int256
             }
 
             ulong vRecip = Reciprocal2By1(v2n);
-            ulong q1 = DivStep3(ref u1d, ref u2d, ref u3d, ref u4d, v0, v1n, v2n, vRecip);
-            ulong q0 = DivStep3(ref u0n2, ref u1d, ref u2d, ref u3d, v0, v1n, v2n, vRecip);
+            ulong qhat, rhat, rcarry;
+            if (u4d == v2n)
+            {
+                qhat = ulong.MaxValue;
+                ulong sum = u3d + v2n;
+                rcarry = (sum < u3d) ? 1UL : 0UL;
+                rhat = sum;
+            }
+            else
+            {
+                qhat = UDivRem2By1(u4d, vRecip, v2n, u3d, out rhat);
+                rcarry = 0;
+            }
+
+            bool ret;
+            if (rcarry != 0)
+                ret = false;
+            else
+            {
+                ulong pHi = Multiply64(qhat, v1n, out ulong pLo);
+
+                // if qhat*vNext > rhat*b + uCorr then decrement
+                if (pHi > rhat || (pHi == rhat && pLo > u2d))
+                {
+                    qhat--;
+
+                    ulong sum1 = rhat + v2n;
+                    if (sum1 < rhat)
+                        rcarry = 1;
+
+                    rhat = sum1;
+                    ret = true;
+                }
+                else
+                {
+                    ret = false;
+                }
+            }
+
+            if (ret && rcarry == 0)
+
+            {
+                ulong pHi = Multiply64(qhat, v1n, out ulong pLo);
+
+                // if qhat*vNext > rhat*b + uCorr then decrement
+                if (pHi > rhat || (pHi == rhat && pLo > u2d))
+                {
+                    qhat--;
+
+                    ulong sum = rhat + v2n;
+                    if (sum < rhat)
+                        rcarry = 1;
+
+                    rhat = sum;
+                }
+            }
+
+            ulong borrow1 = 0;
+            ulong carry = 0;
+
+            ulong pHi1 = Multiply64(qhat, v0, out ulong pLo1);
+            ulong sum2 = pLo1 + carry;
+            ulong c2 = (sum2 < pLo1) ? 1UL : 0UL;
+            carry = pHi1 + c2;
+            SubInPlace(ref u1d, sum2, ref borrow1);
+
+            pHi1 = Multiply64(qhat, v1n, out pLo1);
+            sum2 = pLo1 + carry;
+            c2 = (sum2 < pLo1) ? 1UL : 0UL;
+            carry = pHi1 + c2;
+            SubInPlace(ref u2d, sum2, ref borrow1);
+
+            pHi1 = Multiply64(qhat, v2n, out pLo1);
+            sum2 = pLo1 + carry;
+            c2 = (sum2 < pLo1) ? 1UL : 0UL;
+            carry = pHi1 + c2;
+            SubInPlace(ref u3d, sum2, ref borrow1);
+
+            SubInPlace(ref u4d, carry, ref borrow1);
+            ulong borrow = borrow1;
+
+            if (borrow != 0)
+            {
+                AddBack3(ref u1d, ref u2d, ref u3d, ref u4d, v0, v1n, v2n);
+                qhat--;
+            }
+
+            ulong q1 = qhat;
+            ulong qhat1, rhat1, rcarry1;
+            if (u3d == v2n)
+            {
+                qhat1 = ulong.MaxValue;
+                ulong sum3 = u2d + v2n;
+                rcarry1 = (sum3 < u2d) ? 1UL : 0UL;
+                rhat1 = sum3;
+            }
+            else
+            {
+                qhat1 = UDivRem2By1(u3d, vRecip, v2n, u2d, out rhat1);
+                rcarry1 = 0;
+            }
+
+            bool ret1;
+            if (rcarry1 != 0)
+                ret1 = false;
+            else
+            {
+                ulong pHi2 = Multiply64(qhat1, v1n, out ulong pLo2);
+
+                // if qhat*vNext > rhat*b + uCorr then decrement
+                if (pHi2 > rhat1 || (pHi2 == rhat1 && pLo2 > u1d))
+                {
+                    qhat1--;
+
+                    ulong sum4 = rhat1 + v2n;
+                    if (sum4 < rhat1)
+                        rcarry1 = 1;
+
+                    rhat1 = sum4;
+                    ret1 = true;
+                }
+                else
+                {
+                    ret1 = false;
+                }
+            }
+
+            if (ret1 && rcarry1 == 0)
+
+            {
+                ulong pHi3 = Multiply64(qhat1, v1n, out ulong pLo3);
+
+                // if qhat*vNext > rhat*b + uCorr then decrement
+                if (pHi3 > rhat1 || (pHi3 == rhat1 && pLo3 > u1d))
+                {
+                    qhat1--;
+
+                    ulong sum5 = rhat1 + v2n;
+                    if (sum5 < rhat1)
+                        rcarry1 = 1;
+
+                    rhat1 = sum5;
+                }
+            }
+
+            ulong borrow2 = 0;
+            ulong carry1 = 0;
+
+            ulong pHi4 = Multiply64(qhat1, v0, out ulong pLo4);
+            ulong sum6 = pLo4 + carry1;
+            ulong c3 = (sum6 < pLo4) ? 1UL : 0UL;
+            carry1 = pHi4 + c3;
+            SubInPlace(ref u0n2, sum6, ref borrow2);
+
+            pHi4 = Multiply64(qhat1, v1n, out pLo4);
+            sum6 = pLo4 + carry1;
+            c3 = (sum6 < pLo4) ? 1UL : 0UL;
+            carry1 = pHi4 + c3;
+            SubInPlace(ref u1d, sum6, ref borrow2);
+
+            pHi4 = Multiply64(qhat1, v2n, out pLo4);
+            sum6 = pLo4 + carry1;
+            c3 = (sum6 < pLo4) ? 1UL : 0UL;
+            carry1 = pHi4 + c3;
+            SubInPlace(ref u2d, sum6, ref borrow2);
+
+            SubInPlace(ref u3d, carry1, ref borrow2);
+            ulong borrow3 = borrow2;
+
+            if (borrow3 != 0)
+            {
+                AddBack3(ref u0n2, ref u1d, ref u2d, ref u3d, v0, v1n, v2n);
+                qhat1--;
+            }
+
+            ulong q0 = qhat1;
 
             q = Create(q0, q1, 0, 0);
 
