@@ -14,6 +14,7 @@ using System.Runtime.Intrinsics.X86;
 
 namespace Nethermind.Int256
 {
+#pragma warning disable SYSLIB5004 // DivRem is [Experimental] as of net10
     [StructLayout(LayoutKind.Explicit)]
     public readonly struct UInt256 : IEquatable<UInt256>, IComparable, IComparable<UInt256>, IInteger<UInt256>, IConvertible
     {
@@ -1056,7 +1057,7 @@ namespace Nethermind.Int256
                 }
                 else
                 {
-                    (qhat, rhat) = Udivrem2by1(u2, u1, dh, reciprocal);
+                    qhat = UDivRem2By1(u2, reciprocal, dh, u1, out rhat);
                     ulong ph = Multiply64(qhat, dl, out ulong pl);
                     if (ph > rhat || (ph == rhat && pl > u0))
                     {
@@ -1116,7 +1117,7 @@ namespace Nethermind.Int256
             ulong rem = u[^1];
             for (int j = u.Length - 2; j >= 0; j--)
             {
-                (Unsafe.Add(ref quot, j), rem) = Udivrem2by1(rem, u[j], d, reciprocal);
+                Unsafe.Add(ref quot, j) = UDivRem2By1(rem, reciprocal, d, u[j], out rem);
             }
 
             return rem;
@@ -1193,34 +1194,29 @@ namespace Nethermind.Int256
             0x040E, 0x040C, 0x040A, 0x0408, 0x0406, 0x0404, 0x0402, 0x0400,
         ];
 
-        // Udivrem2by1 divides <uh, ul> / d and produces both quotient and remainder.
-        // It uses the provided d's reciprocal.
-        // Implementation ported from https://github.com/chfast/intx and is based on
-        // "Improved division by invariant integers", Algorithm 4.
+        // Preconditions:
+        // - d normalised (msb set)
+        // - u1 < d
+        [SkipLocalsInit]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static (ulong quot, ulong rem) Udivrem2by1(ulong uh, ulong ul, ulong d, ulong reciprocal)
+        private static ulong UDivRem2By1(ulong uh, ulong reciprocal, ulong d, ulong ul, out ulong rem)
         {
-            ulong qh = Multiply64(reciprocal, uh, out ulong ql);
-            ulong carry = 0;
-            AddWithCarry(ql, ul, ref carry, out ql);
-            AddWithCarry(qh, uh, ref carry, out qh);
-            qh++;
+            ulong hi = Multiply64(reciprocal, uh, out ulong low);
 
-            ulong r = ul - qh * d;
-
-            if (r > ql)
+            low += ul;
+            ulong q = hi + uh + 1UL;
+            if (low < ul)
             {
-                qh--;
-                r += d;
+                q++;
             }
 
-            if (r >= d)
-            {
-                qh++;
-                r -= d;
-            }
+            ulong r1 = ul - (q * d);
 
-            return (qh, r);
+            if (r1 > low) { q--; r1 += d; }
+            if (r1 >= d) { q++; r1 -= d; }
+
+            rem = r1;
+            return q;
         }
 
         // Subtract sets res to the difference a-b
@@ -2885,7 +2881,6 @@ namespace Nethermind.Int256
         [MethodImpl(MethodImplOptions.NoInlining)]
         private static void DivideBy64BitsX86Base(in UInt256 x, ulong divisor, out UInt256 q, out UInt256 remainder)
         {
-#pragma warning disable SYSLIB5004 // DivRem is [Experimental] as of net10 docs
             ulong rem = 0;
             ulong q3 = 0;
             ulong u3 = x.u3;
@@ -2914,7 +2909,6 @@ namespace Nethermind.Int256
 
             q = Create(q0, q1, q2, q3);
             remainder = Create(rem, 0, 0, 0);
-#pragma warning restore SYSLIB5004
         }
 
         [SkipLocalsInit]
@@ -2951,36 +2945,10 @@ namespace Nethermind.Int256
             remainder = Create(r0, 0, 0, 0);
         }
 
-        // Preconditions:
-        // - d normalised (msb set)
-        // - u1 < d
-        [SkipLocalsInit]
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static ulong UDivRem2By1(ulong u1, ulong recip, ulong d, ulong u0, out ulong rem)
-        {
-            ulong hi = Multiply64(recip, u1, out ulong low);
-
-            low += u0;
-            ulong q = hi + u1 + 1UL;
-            if (low < u0)
-            {
-                q++;
-            }
-
-            ulong r1 = u0 - (q * d);
-
-            if (r1 > low) { q--; r1 += d; }
-            if (r1 >= d) { q++; r1 -= d; }
-
-            rem = r1;
-            return q;
-        }
-
         [SkipLocalsInit]
         [MethodImpl(MethodImplOptions.NoInlining)]
         private static void DivideBy192Bits(in UInt256 x, in UInt256 y, out UInt256 q, out UInt256 remainder)
         {
-#pragma warning disable SYSLIB5004 // X86Base.X64.DivRem is marked Experimental/preview
             // ------------------------------------------------------------
             // n >= 2: Knuth D (specialised) with reciprocal qhat
             // ------------------------------------------------------------
@@ -3215,14 +3183,12 @@ namespace Nethermind.Int256
             UInt256 remN = Create(u0n2, u1d, u2d, 0);
             remainder = (shift == 0) ? remN : ShiftRightSmall(remN, shift);
             return;
-#pragma warning restore SYSLIB5004
         }
 
         [SkipLocalsInit]
         [MethodImpl(MethodImplOptions.NoInlining)]
         private static void DivideBy256Bits(in UInt256 x, in UInt256 y, out UInt256 q, out UInt256 remainder)
         {
-#pragma warning disable SYSLIB5004 // X86Base.X64.DivRem is marked Experimental/preview
             // ------------------------------------------------------------
             // n >= 2: Knuth D (specialised) with reciprocal qhat
             // ------------------------------------------------------------
@@ -3319,7 +3285,6 @@ namespace Nethermind.Int256
             // Remainder is u0..u3
             remainder = (shift == 0) ? rem : ShiftRightSmall(rem, shift);
             return;
-#pragma warning restore SYSLIB5004
         }
 
         // Shift-right by 0..63 (used to unnormalise remainder)
@@ -3509,9 +3474,7 @@ namespace Nethermind.Int256
                 {
                     rcarry = false;
 
-#pragma warning disable SYSLIB5004 // X86Base.X64.DivRem is marked Experimental/preview
                     (ulong qhat1, ulong r) = X86Base.X64.DivRem(u3, u4, v1n);
-#pragma warning restore SYSLIB5004
                     rhat = r;
                     qhat = qhat1;
 
@@ -3596,10 +3559,7 @@ namespace Nethermind.Int256
                 else
                 {
                     rcarry = false;
-
-#pragma warning disable SYSLIB5004 // X86Base.X64.DivRem is marked Experimental/preview
                     (ulong qhat1, ulong r) = X86Base.X64.DivRem(u2, u3, v1n);
-#pragma warning restore SYSLIB5004
                     rhat = r;
                     qhat = qhat1;
 
@@ -3681,10 +3641,7 @@ namespace Nethermind.Int256
                 else
                 {
                     rcarry = false;
-
-#pragma warning disable SYSLIB5004 // X86Base.X64.DivRem is marked Experimental/preview
                     (ulong qhat1, ulong r) = X86Base.X64.DivRem(u1, u2, v1n);
-#pragma warning restore SYSLIB5004
                     rhat = r;
                     qhat = qhat1;
 
@@ -4578,4 +4535,5 @@ namespace Nethermind.Int256
             return r;
         }
     }
+#pragma warning restore SYSLIB5004
 }
