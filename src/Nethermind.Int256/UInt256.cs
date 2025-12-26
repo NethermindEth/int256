@@ -546,15 +546,31 @@ namespace Nethermind.Int256
             // Need subtract if (carry==1) || (sum>=m)
             // sum>=m <=> borrow==0
             ulong needSub = carry | (borrow ^ 1UL);
+            ulong mask = 0UL - needSub;
 
-            // Note: conditional expression generates more asm for these large structs
-            if (needSub == 0)
+            if (mask == 0)
+            {
+                res = sum;
+            }
+            else if (mask == ulong.MaxValue)
             {
                 res = d;
             }
+            else if (Vector256.IsHardwareAccelerated)
+            {
+                Vector256<ulong> dV = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in d));
+                Vector256<ulong> sumV = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in sum));
+                Vector256<ulong> maskV = Vector256.Create(mask);
+
+                Vector256<ulong> resultV = Vector256.ConditionalSelect(dV, sumV, maskV);
+
+                Unsafe.SkipInit(out res);
+                Unsafe.As<UInt256, Vector256<ulong>>(ref res) = resultV;
+            }
             else
             {
-                res = sum;
+                UInt256 mask256 = Create(mask, mask, mask, mask);
+                res = (d & mask256) | (sum & ~mask256);
             }
         }
 
