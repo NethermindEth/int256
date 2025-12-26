@@ -1776,8 +1776,27 @@ namespace Nethermind.Int256
             AddWithCarry(high, 0, ref carry, out high);
         }
 
-        // Divide sets res to the quotient x/y.
-        // If y == 0, res is set to 0
+        /// <summary>
+        /// Sets <paramref name="res"/> to the integer quotient of <paramref name="x"/> divided by <paramref name="y"/>.
+        /// </summary>
+        /// <remarks>
+        /// This performs an unsigned integer division with truncation toward zero (floor for unsigned values).
+        /// <para>
+        /// Special cases:
+        /// <list type="bullet">
+        ///   <item><description>If <paramref name="y"/> is zero, <paramref name="res"/> is set to zero.</description></item>
+        ///   <item><description>If <paramref name="x"/> is less than <paramref name="y"/>, <paramref name="res"/> is set to zero.</description></item>
+        ///   <item><description>If <paramref name="x"/> equals <paramref name="y"/>, <paramref name="res"/> is set to one.</description></item>
+        /// </list>
+        /// </para>
+        /// <para>
+        /// This method does not throw on divide-by-zero. If a <see cref="DivideByZeroException"/> (or equivalent)
+        /// is required, it must be enforced by the caller before invoking this method.
+        /// </para>
+        /// </remarks>
+        /// <param name="x">The dividend.</param>
+        /// <param name="y">The divisor.</param>
+        /// <param name="res">On return, contains the quotient <c>x / y</c>.</param>
         [SkipLocalsInit]
         public static void Divide(in UInt256 x, in UInt256 y, out UInt256 res)
         {
