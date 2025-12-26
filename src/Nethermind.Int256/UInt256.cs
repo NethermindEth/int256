@@ -601,11 +601,11 @@ namespace Nethermind.Int256
                 return;
             }
             // 4) General fallback: reduce the 257-bit sum directly: res = S % m
-            if (y.u3 != 0)
+            if (m.u3 != 0)
             {
                 RemSum257ByMod256Bits(in sum, s4, in m, out res);
             }
-            else if (y.u2 != 0)
+            else if (m.u2 != 0)
             {
                 RemSum257ByMod192Bits(in sum, s4, in m, out res);
             }
@@ -835,7 +835,7 @@ namespace Nethermind.Int256
         {
             Debug.Assert(m.u3 != 0);
 
-            // divisor limb count n in 2..4 (caller ensured m doesn't fit in 64 bits)
+            // divisor limb count n = 4
 
             // Normalise divisor
             ulong vHi = m.u3;
