@@ -43,19 +43,83 @@ public class UnsignedIntTwoParamBenchmarkBase : UnsignedBenchmarkBase
     public (int, UInt256) D;
 }
 
+[Config(typeof(Config))]
 public class UnsignedTwoParamBenchmarkBase : UnsignedBenchmarkBase
 {
-    [ParamsSource(nameof(ValuesMinus1Tuple))]
-    public (BigInteger, UInt256) A;
+    private sealed class Config : ManualConfig
+    {
+        public Config()
+        {
+            WithOrderer(new Orderer<DoubleUInt256>(v => ParamIndex.TryGetValue(v, out var i) ? i : int.MaxValue));
+        }
+    }
+    private static IEnumerable<DoubleUInt256> Values
+    {
+        get
+        {
+            HashSet<string> used = new();
+            foreach (BigInteger x in ValuesMinus1)
+            {
+                foreach (BigInteger y in ValuesMinus2)
+                {
+                    var values = new DoubleUInt256((UInt256)x, (UInt256)y);
+                    if (used.Add(values.ToString()))
+                    {
+                        yield return values;
+                    }
+                }
+            }
+        }
+    }
 
-    [ParamsSource(nameof(ValuesMinus2Tuple))]
-    public (BigInteger, UInt256) B;
+    public static DoubleUInt256[] ValuesArray { get; } = [.. Values.OrderBy(o => o.B).ThenBy(o => o.A)];
+
+    private static readonly Dictionary<DoubleUInt256, int> ParamIndex =
+        ValuesArray.Select((v, i) => (v, i)).ToDictionary(t => t.v, t => t.i);
+
+    [ParamsSource(nameof(ValuesArray))]
+    public DoubleUInt256 Param;
 }
 
-public class UnsignedThreeParamBenchmarkBase : UnsignedTwoParamBenchmarkBase
+[Config(typeof(Config))]
+public class UnsignedThreeParamBenchmarkBase : UnsignedBenchmarkBase
 {
-    [ParamsSource(nameof(ValuesMinus3Tuple))]
-    public (BigInteger, UInt256) C;
+    private sealed class Config : ManualConfig
+    {
+        public Config()
+        {
+            WithOrderer(new Orderer<TripleUInt256>(v => ParamIndex.TryGetValue(v, out var i) ? i : int.MaxValue));
+        }
+    }
+    private static IEnumerable<TripleUInt256> Values
+    {
+        get
+        {
+            HashSet<string> used = new();
+            foreach (BigInteger x in ValuesMinus1)
+            {
+                foreach (BigInteger y in ValuesMinus2)
+                {
+                    foreach (BigInteger z in ValuesMinus3)
+                    {
+                        var values = new TripleUInt256((UInt256)x, (UInt256)z, (UInt256)y);
+                        if (used.Add($"{values.A.BitLen + values.B.BitLen},{values.C.BitLen}".ToString()))
+                        {
+                            yield return values;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    public static TripleUInt256[] ValuesArray { get; } = [.. Values.OrderBy(o => o.C).ThenBy(o => o.A).ThenBy(o => o.B)];
+
+    private static readonly Dictionary<TripleUInt256, int> ParamIndex =
+        ValuesArray.Select((v, i) => (v, i)).ToDictionary(t => t.v, t => t.i);
+
+    [ParamsSource(nameof(ValuesArray))]
+    public TripleUInt256 Param;
 }
 
 [SimpleJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 5)]
@@ -105,31 +169,19 @@ public class SignedIntTwoParamBenchmarkBase : SignedBenchmarkBase
 
 public class LessThanUnsigned : UnsignedTwoParamBenchmarkBase
 {
-    [Benchmark(Baseline = true)]
-    public bool LessThan_BigInteger()
-    {
-        return A.Item1 < B.Item1;
-    }
-
     [Benchmark]
     public bool LessThan_UInt256()
     {
-        return A.Item2 < B.Item2;
+        return Param.A < Param.B;
     }
 }
 
 public class AddUnsigned : UnsignedTwoParamBenchmarkBase
 {
-    [Benchmark(Baseline = true)]
-    public BigInteger Add_BigInteger()
-    {
-        return (A.Item1 + B.Item1) % Numbers.TwoTo256;
-    }
-
     [Benchmark]
     public UInt256 Add_UInt256()
     {
-        UInt256.Add(A.Item2, B.Item2, out UInt256 res);
+        UInt256.Add(Param.A, Param.B, out UInt256 res);
         return res;
     }
 }
@@ -152,16 +204,10 @@ public class AddSigned : SignedTwoParamBenchmarkBase
 
 public class SubtractUnsigned : UnsignedTwoParamBenchmarkBase
 {
-    [Benchmark(Baseline = true)]
-    public BigInteger Subtract_BigInteger()
-    {
-        return (A.Item1 - B.Item1) % Numbers.TwoTo256;
-    }
-
     [Benchmark]
     public UInt256 Subtract_UInt256()
     {
-        UInt256.Subtract(A.Item2, B.Item2, out UInt256 res);
+        UInt256.Subtract(Param.A, Param.B, out UInt256 res);
         return res;
     }
 }
@@ -184,16 +230,10 @@ public class SubtractSigned : SignedTwoParamBenchmarkBase
 
 public class AddModUnsigned : UnsignedThreeParamBenchmarkBase
 {
-    [Benchmark(Baseline = true)]
-    public BigInteger AddMod_BigInteger()
-    {
-        return ((A.Item1 + B.Item1) % C.Item1);
-    }
-
     [Benchmark]
     public UInt256 AddMod_UInt256()
     {
-        UInt256.AddMod(A.Item2, B.Item2, C.Item2, out UInt256 res);
+        UInt256.AddMod(Param.A, Param.B, Param.C, out UInt256 res);
         return res;
     }
 }
@@ -216,16 +256,10 @@ public class AddModSigned : SignedThreeParamBenchmarkBase
 
 public class SubtractModUnsigned : UnsignedThreeParamBenchmarkBase
 {
-    [Benchmark(Baseline = true)]
-    public BigInteger SubtractMod_BigInteger()
-    {
-        return ((A.Item1 - B.Item1) % C.Item1);
-    }
-
     [Benchmark]
     public UInt256 SubtractMod_UInt256()
     {
-        UInt256.SubtractMod(A.Item2, B.Item2, C.Item2, out UInt256 res);
+        UInt256.SubtractMod(Param.A, Param.B, Param.C, out UInt256 res);
         return res;
     }
 }
@@ -246,43 +280,8 @@ public class SubtractModSigned : SignedThreeParamBenchmarkBase
     }
 }
 
-[Config(typeof(Config))]
-public class MultiplyUnsigned : UnsignedBenchmarkBase
+public class MultiplyUnsigned : UnsignedTwoParamBenchmarkBase
 {
-    private sealed class Config : ManualConfig
-    {
-        public Config()
-        {
-            WithOrderer(new Orderer<DoubleUInt256>(v => ParamIndex.TryGetValue(v, out var i) ? i : int.MaxValue));
-        }
-    }
-    private static IEnumerable<DoubleUInt256> Values
-    {
-        get
-        {
-            HashSet<string> used = new();
-            foreach (BigInteger x in ValuesMinus1)
-            {
-                foreach (BigInteger y in ValuesMinus2)
-                {
-                    var values = new DoubleUInt256((UInt256)x, (UInt256)y);
-                    if (used.Add(values.ToString()))
-                    {
-                        yield return values;
-                    }
-                }
-            }
-        }
-    }
-
-    public static DoubleUInt256[] ValuesArray { get; } = [.. Values.OrderBy(o => o.B).ThenBy(o => o.A)];
-
-    private static readonly Dictionary<DoubleUInt256, int> ParamIndex =
-        ValuesArray.Select((v, i) => (v, i)).ToDictionary(t => t.v, t => t.i);
-
-    [ParamsSource(nameof(ValuesArray))]
-    public DoubleUInt256 Param;
-
     [Benchmark]
     public UInt256 Multiply_UInt256()
     {
@@ -309,16 +308,10 @@ public class MultiplySigned : SignedTwoParamBenchmarkBase
 
 public class MultiplyModUnsigned : UnsignedThreeParamBenchmarkBase
 {
-    [Benchmark(Baseline = true)]
-    public BigInteger MultiplyMod_BigInteger()
-    {
-        return ((A.Item1 * B.Item1) % C.Item1);
-    }
-
     [Benchmark]
     public UInt256 MultiplyMod_UInt256()
     {
-        UInt256.MultiplyMod(A.Item2, B.Item2, C.Item2, out UInt256 res);
+        UInt256.MultiplyMod(Param.A, Param.B, Param.C, out UInt256 res);
         return res;
     }
 }
@@ -342,6 +335,14 @@ public class MultiplyModSigned : SignedThreeParamBenchmarkBase
 [Config(typeof(Config))]
 public class DivideUnsigned : UnsignedBenchmarkBase
 {
+    [Benchmark]
+    public UInt256 Divide_UInt256()
+    {
+        UInt256.Divide(Param.A, Param.B, out UInt256 res);
+        return res;
+    }
+
+
     private sealed class Config : ManualConfig
     {
         public Config()
@@ -349,7 +350,8 @@ public class DivideUnsigned : UnsignedBenchmarkBase
             WithOrderer(new Orderer<DoubleUInt256>(v => ParamIndex.TryGetValue(v, out var i) ? i : int.MaxValue));
         }
     }
-    private static IEnumerable<DoubleUInt256> Values
+
+    protected static IEnumerable<DoubleUInt256> Values
     {
         get
         {
@@ -376,13 +378,6 @@ public class DivideUnsigned : UnsignedBenchmarkBase
 
     [ParamsSource(nameof(ValuesArray))]
     public DoubleUInt256 Param;
-
-    [Benchmark]
-    public UInt256 Divide_UInt256()
-    {
-        UInt256.Divide(Param.A, Param.B, out UInt256 res);
-        return res;
-    }
 }
 
 public class DivideSigned : SignedTwoParamBenchmarkBase
@@ -435,16 +430,10 @@ public class ExpSigned : SignedIntTwoParamBenchmarkBase
 
 public class ExpModUnsigned : UnsignedThreeParamBenchmarkBase
 {
-    [Benchmark(Baseline = true)]
-    public BigInteger ExpMod_BigInteger()
-    {
-        return BigInteger.ModPow(A.Item1, B.Item1, C.Item1);
-    }
-
     [Benchmark]
     public UInt256 ExpMod_UInt256()
     {
-        UInt256.ExpMod(A.Item2, B.Item2, C.Item2, out UInt256 res);
+        UInt256.ExpMod(Param.A, Param.B, Param.C, out UInt256 res);
         return res;
     }
 }
@@ -561,6 +550,11 @@ public class IsZeroOne
 public readonly record struct DoubleUInt256(UInt256 A, UInt256 B)
 {
     public override readonly string ToString() => $"{A.BitLen} bits / {B.BitLen} bits";
+}
+
+public readonly record struct TripleUInt256(UInt256 A, UInt256 B, UInt256 C)
+{
+    public override readonly string ToString() => $"{A.BitLen},{B.BitLen},{C.BitLen} bits";
 }
 
 public sealed class Orderer<T> : IOrderer
