@@ -318,25 +318,35 @@ namespace Nethermind.Int256
         public UInt256 MaximalValue => MaxValue;
 
         /// <summary>
-        /// Sets <paramref name="res" /> to the sum of <paramref name="a" /> and <paramref name="b" />.
+        /// Adds two <see cref="UInt256"/> values and returns the wrapped 256-bit result.
         /// </summary>
-        /// <param name="a">The first value to add.</param>
-        /// <param name="b">The second value to add.</param>
-        /// <param name="res">When this method returns, contains the sum of <paramref name="a" /> and <paramref name="b" />.</param>
         /// <remarks>
-        /// This method does not report whether the addition overflows the range of <see cref="UInt256"/>.
-        /// Use <see cref="AddOverflow(in UInt256, in UInt256, out UInt256)"/> if you need to detect overflow.
+        /// Stores the low 256 bits of <c>a + b</c> in <paramref name="res"/>.
+        /// Overflow (carry out of the most-significant bit) is ignored - the result wraps modulo <c>2^256</c>.
+        /// Use <see cref="AddOverflow(in UInt256, in UInt256, out UInt256)"/> to detect overflow.
         /// </remarks>
+        /// <param name="a">The first 256-bit addend.</param>
+        /// <param name="b">The second 256-bit addend.</param>
+        /// <param name="res">On return, contains <c>(a + b) mod 2^256</c>.</param>
         public static void Add(in UInt256 a, in UInt256 b, out UInt256 res)
             => AddOverflow(in a, in b, out res);
 
         /// <summary>
-        /// AddOverflow sets res to the sum a+b, and returns whether overflow occurred
+        /// Adds two <see cref="UInt256"/> values and reports whether the addition overflowed.
         /// </summary>
-        /// <param name="a">The first value to add.</param>
-        /// <param name="b">The second value to add.</param>
-        /// <param name="res">When this method returns, contains the sum of <paramref name="a" /> and <paramref name="b" />.</param>
-        /// <returns><see langword="true"/> if the addition overflows the range of <see cref="UInt256"/>; otherwise, <see langword="false"/>.</returns>
+        /// <remarks>
+        /// Computes the full 256-bit sum of <paramref name="a"/> and <paramref name="b"/> and stores the low 256 bits in
+        /// <paramref name="res"/>. The return value indicates whether the true mathematical sum exceeded the range
+        /// <c>[0, 2^256 - 1]</c>.
+        /// </remarks>
+        /// <param name="a">The first 256-bit addend.</param>
+        /// <param name="b">The second 256-bit addend.</param>
+        /// <param name="res">
+        /// On return, contains the low 256 bits of <c>a + b</c>.
+        /// </param>
+        /// <returns>
+        /// <see langword="true"/> if <c>a + b</c> overflowed (carry out of the most-significant bit); otherwise <see langword="false"/>.
+        /// </returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool AddOverflow(in UInt256 a, in UInt256 b, out UInt256 res)
         {
@@ -464,6 +474,16 @@ namespace Nethermind.Int256
             return (carry & 0b1_0000) != 0;
         }
 
+        /// <summary>
+        /// Adds this value and <paramref name="a"/> and returns the wrapped 256-bit result.
+        /// </summary>
+        /// <remarks>
+        /// Stores the low 256 bits of <c>this + a</c> in <paramref name="res"/>.
+        /// Overflow is ignored - the result wraps modulo <c>2^256</c>.
+        /// Use <see cref="AddOverflow(in UInt256, in UInt256, out UInt256)"/> to detect overflow.
+        /// </remarks>
+        /// <param name="a">The other 256-bit addend.</param>
+        /// <param name="res">On return, contains <c>(this + a) mod 2^256</c>.</param>
         public void Add(in UInt256 a, out UInt256 res) => AddOverflow(this, a, out res);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -474,8 +494,20 @@ namespace Nethermind.Int256
             carry = ((x & y) | ((x | y) & (~sum))) >> 63;
         }
 
-        // AddMod sets res to the sum ( x+y ) mod m.
-        // If m == 0, z is set to 0 (OBS: differs from the big.Int)
+        /// <summary>
+        /// Computes the modular sum of two 256-bit unsigned integers.
+        /// </summary>
+        /// <remarks>
+        /// Sets <paramref name="res"/> to <c>(x + y) mod m</c>.
+        /// If <paramref name="m"/> is zero, <paramref name="res"/> is set to zero.
+        /// This behaviour intentionally differs from <see cref="System.Numerics.BigInteger"/>-style APIs.
+        /// If a <see cref="System.DivideByZeroException"/> is required for a zero modulus, the caller must pre-check
+        /// <paramref name="m"/> and throw before calling this method.
+        /// </remarks>
+        /// <param name="x">The first 256-bit addend.</param>
+        /// <param name="y">The second 256-bit addend.</param>
+        /// <param name="m">The modulus. If zero, the result is defined to be zero.</param>
+        /// <param name="res">On return, contains the value of <c>(x + y) mod m</c>, or zero when <paramref name="m"/> is zero.</param>
         [SkipLocalsInit]
         public static void AddMod(in UInt256 x, in UInt256 y, in UInt256 m, out UInt256 res)
         {
@@ -799,6 +831,18 @@ namespace Nethermind.Int256
             rem = (sh == 0) ? remN : ShiftRightSmall(remN, sh);
         }
 
+        /// <summary>
+        /// Computes the modular sum of this value and <paramref name="a"/>.
+        /// </summary>
+        /// <remarks>
+        /// Sets <paramref name="res"/> to <c>(this + a) mod m</c>.
+        /// If <paramref name="m"/> is zero, <paramref name="res"/> is set to zero.
+        /// If a <see cref="System.DivideByZeroException"/> is required for a zero modulus, the caller must pre-check
+        /// <paramref name="m"/> and throw before calling this method.
+        /// </remarks>
+        /// <param name="a">The other 256-bit addend.</param>
+        /// <param name="m">The modulus. If zero, the result is defined to be zero.</param>
+        /// <param name="res">On return, contains the value of <c>(this + a) mod m</c>, or zero when <paramref name="m"/> is zero.</param>
         public void AddMod(in UInt256 a, in UInt256 m, out UInt256 res) => AddMod(this, a, m, out res);
 
         public byte[] PaddedBytes(int n)
@@ -866,8 +910,19 @@ namespace Nethermind.Int256
             }
         }
 
-        // Mod sets res to the modulus x%y for y != 0.
-        // If y == 0, z is set to 0 (OBS: differs from the big.Int)
+        /// <summary>
+        /// Computes the remainder of dividing one <see cref="UInt256"/> value by another.
+        /// </summary>
+        /// <remarks>
+        /// Sets <paramref name="res"/> to <c>x % y</c> when <paramref name="y"/> is non-zero.
+        /// If <paramref name="y"/> is zero, <paramref name="res"/> is set to zero.
+        /// This behaviour intentionally differs from <see cref="System.Numerics.BigInteger"/>-style APIs.
+        /// If a <see cref="System.DivideByZeroException"/> is required for a zero divisor, the caller must pre-check
+        /// <paramref name="y"/> and throw before calling this method.
+        /// </remarks>
+        /// <param name="x">The dividend.</param>
+        /// <param name="y">The divisor. If zero, the result is defined to be zero.</param>
+        /// <param name="res">On return, contains <c>x % y</c>, or zero when <paramref name="y"/> is zero.</param>
         [SkipLocalsInit]
         public static void Mod(in UInt256 x, in UInt256 y, out UInt256 res)
         {
@@ -910,6 +965,17 @@ namespace Nethermind.Int256
             DivideImpl(x, y, out _, out res);
         }
 
+        /// <summary>
+        /// Computes the remainder of dividing this value by <paramref name="m"/>.
+        /// </summary>
+        /// <remarks>
+        /// Sets <paramref name="res"/> to <c>this % m</c> when <paramref name="m"/> is non-zero.
+        /// If <paramref name="m"/> is zero, <paramref name="res"/> is set to zero.
+        /// If a <see cref="System.DivideByZeroException"/> is required for a zero divisor, the caller must pre-check
+        /// <paramref name="m"/> and throw before calling this method.
+        /// </remarks>
+        /// <param name="m">The divisor. If zero, the result is defined to be zero.</param>
+        /// <param name="res">On return, contains <c>this % m</c>, or zero when <paramref name="m"/> is zero.</param>
         public void Mod(in UInt256 m, out UInt256 res) => Mod(this, m, out res);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1933,6 +1999,18 @@ namespace Nethermind.Int256
             DivideImpl(x, y, out res, out _);
         }
 
+        /// <summary>
+        /// Divides this value by <paramref name="a"/> and returns the integer quotient.
+        /// </summary>
+        /// <remarks>
+        /// Sets <paramref name="res"/> to <c>this / a</c> using unsigned integer division.
+        /// If <paramref name="a"/> is zero, the result depends on the semantics of the underlying static
+        /// <see cref="Divide(in UInt256, in UInt256, out UInt256)"/> implementation.
+        /// If a <see cref="System.DivideByZeroException"/> is required for a zero divisor, the caller must pre-check
+        /// <paramref name="a"/> and throw before calling this method.
+        /// </remarks>
+        /// <param name="a">The divisor.</param>
+        /// <param name="res">On return, contains the quotient <c>this / a</c>.</param>
         public void Divide(in UInt256 a, out UInt256 res) => Divide(this, a, out res);
 
         public static void Lsh(in UInt256 x, int n, out UInt256 res)
