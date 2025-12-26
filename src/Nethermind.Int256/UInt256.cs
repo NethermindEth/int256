@@ -3239,8 +3239,75 @@ namespace Nethermind.Int256
                 u4d = (x.u3 >> rs);
             }
 
-            ulong vRecip = Reciprocal2By1(v.u3);
-            ulong q0 = DivStep4(in u, ref u4d, in v, vRecip, out UInt256 rem);
+            ulong vRecip = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(v.u3);
+            ulong qhat, rhat, rcarry;
+            if (u4d == v.u3)
+            {
+                qhat = ulong.MaxValue;
+                ulong sum = u.u3 + v.u3;
+                rcarry = (sum < u.u3) ? 1UL : 0UL;
+                rhat = sum;
+            }
+            else
+            {
+                if (X86Base.X64.IsSupported)
+                {
+                    (qhat, rhat) = X86Base.X64.DivRem(u.u3, u4d, v.u3); // (upper:lower) = (u4d:u.u3)
+                }
+                else
+                {
+                    qhat = UDivRem2By1(u4d, vRecip, v.u3, u.u3, out rhat);
+                }
+                rcarry = 0;
+            }
+
+
+            if (rcarry == 0)
+            {
+                ulong pHi = Multiply64(qhat, v.u2, out ulong pLo);
+
+                // if qhat*vNext > rhat*b + uCorr then decrement
+                if (pHi > rhat || (pHi == rhat && pLo > u.u2))
+                {
+                    qhat--;
+
+                    ulong sum1 = rhat + v.u3;
+                    if (sum1 < rhat)
+                        rcarry = 1;
+
+                    rhat = sum1;
+                }
+            }
+
+            if (rcarry == 0)
+            {
+                ulong pHi = Multiply64(qhat, v.u2, out ulong pLo);
+
+                // if qhat*vNext > rhat*b + uCorr then decrement
+                if (pHi > rhat || (pHi == rhat && pLo > u.u2))
+                {
+                    qhat--;
+
+                    ulong sum = rhat + v.u3;
+                    if (sum < rhat)
+                        rcarry = 1;
+
+                    rhat = sum;
+                }
+            }
+
+            ulong borrow = SubMul4(in u, ref u4d, in v, qhat, out UInt256 rem);
+
+            if (borrow != 0)
+            {
+                if (!AddOverflow(in rem, in v, out rem))
+                {
+                    u4d += 1;
+                }
+                qhat--;
+            }
+
+            ulong q0 = qhat;
 
             q = Create(q0, 0, 0, 0);
 
