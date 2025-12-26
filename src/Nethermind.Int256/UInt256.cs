@@ -485,13 +485,13 @@ namespace Nethermind.Int256
                 return;
             }
 
-            // 1) Compute 257-bit sum S = x + y as 5 limbs (s0..s3, s4=carry)
+            // Compute 257-bit sum S = x + y as 5 limbs (s0..s3, s4=carry)
             bool overflow = AddOverflow(in x, in y, out UInt256 sum);
             ulong s4 = !overflow ? 0UL : 1UL;
 
-            // 2) If modulus fits in 64 bits, do direct remainder of the 5-limb value.
             if (m.IsUint64)
             {
+                // If modulus fits in 64 bits, do direct remainder of the 5-limb value.
                 if (X86Base.X64.IsSupported)
                 {
                     RemSum257ByMod64BitsX86Base(in sum, s4, m.u0, out res);
@@ -500,34 +500,31 @@ namespace Nethermind.Int256
                 {
                     RemSum257ByMod64Bits(in sum, s4, m.u0, out res);
                 }
-                return;
             }
-
-            // 3) Fast path: if x < m and y < m then S < 2m, so one subtract is enough (carry-aware).
-            // (Branchy compare is fine - the fallback is much more expensive anyway.)
-            if (LessThanBoth(in x, in y, in m))
+            else if (LessThanBoth(in x, in y, in m))
             {
+                // Fast path: if x < m and y < m then S < 2m, so one subtract is enough (carry-aware).
+                // (Branchy compare is fine - the fallback is much more expensive anyway.)
                 ReduceSumAssumingLT2m(in sum, s4, in m, out res);
-                return;
             }
-
-            // No overflow - sum is the exact x+y, so normal mod is correct.
-            if (!overflow)
+            else if (!overflow)
             {
+                // No overflow - sum is the exact x+y, so normal mod is correct.
                 Mod(in sum, in m, out res);
-                return;
             }
-            // 4) General fallback: reduce the 257-bit sum directly: res = S % m
-            if (m.u3 != 0)
+            else if (m.u3 != 0)
             {
+                // reduce the 257-bit sum by the 256 bit mod: res = S % m256
                 RemSum257ByMod256Bits(in sum, s4, in m, out res);
             }
             else if (m.u2 != 0)
             {
+                // reduce the 257-bit sum by the 256 bit mod: res = S % m192
                 RemSum257ByMod192Bits(in sum, s4, in m, out res);
             }
             else
             {
+                // reduce the 257-bit sum by the 256 bit mod: res = S % m128
                 RemSum257ByMod128Bits(in sum, s4, in m, out res);
             }
         }
