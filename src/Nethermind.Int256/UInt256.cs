@@ -2975,6 +2975,7 @@ namespace Nethermind.Int256
         [MethodImpl(MethodImplOptions.NoInlining)]
         private static void DivideBy192Bits(in UInt256 x, in UInt256 y, out UInt256 q, out UInt256 remainder)
         {
+#pragma warning disable SYSLIB5004 // X86Base.X64.DivRem is marked Experimental/preview
             // ------------------------------------------------------------
             // n >= 2: Knuth D (specialised) with reciprocal qhat
             // ------------------------------------------------------------
@@ -3011,7 +3012,7 @@ namespace Nethermind.Int256
                 u4d = (x.u3 >> rs);
             }
 
-            ulong vRecip = Reciprocal2By1(v2n);
+            ulong vRecip = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(v2n);
             ulong qhat, rhat, rcarry;
             if (u4d == v2n)
             {
@@ -3022,7 +3023,14 @@ namespace Nethermind.Int256
             }
             else
             {
-                qhat = UDivRem2By1(u4d, vRecip, v2n, u3d, out rhat);
+                if (X86Base.X64.IsSupported)
+                {
+                    (qhat, rhat) = X86Base.X64.DivRem(u3d, u4d, v2n); // (upper:lower) = (u4d:u3d)
+                }
+                else
+                {
+                    qhat = UDivRem2By1(u4d, vRecip, v2n, u3d, out rhat);
+                }
                 rcarry = 0;
             }
 
@@ -3110,7 +3118,14 @@ namespace Nethermind.Int256
             }
             else
             {
-                qhat1 = UDivRem2By1(u3d, vRecip, v2n, u2d, out rhat1);
+                if (X86Base.X64.IsSupported)
+                {
+                    (qhat1, rhat1) = X86Base.X64.DivRem(u2d, u3d, v2n); // (upper:lower) = (u3d:u2d)
+                }
+                else
+                {
+                    qhat1 = UDivRem2By1(u3d, vRecip, v2n, u2d, out rhat1);
+                }
                 rcarry1 = 0;
             }
 
@@ -3195,12 +3210,14 @@ namespace Nethermind.Int256
             UInt256 remN = Create(u0n2, u1d, u2d, 0);
             remainder = (shift == 0) ? remN : ShiftRightSmall(remN, shift);
             return;
+#pragma warning restore SYSLIB5004
         }
 
         [SkipLocalsInit]
         [MethodImpl(MethodImplOptions.NoInlining)]
         private static void DivideBy256Bits(in UInt256 x, in UInt256 y, out UInt256 q, out UInt256 remainder)
         {
+#pragma warning disable SYSLIB5004 // X86Base.X64.DivRem is marked Experimental/preview
             // ------------------------------------------------------------
             // n >= 2: Knuth D (specialised) with reciprocal qhat
             // ------------------------------------------------------------
@@ -3230,6 +3247,7 @@ namespace Nethermind.Int256
             // Remainder is u0..u3
             remainder = (shift == 0) ? rem : ShiftRightSmall(rem, shift);
             return;
+#pragma warning restore SYSLIB5004
         }
 
         // Shift-right by 0..63 (used to unnormalise remainder)
