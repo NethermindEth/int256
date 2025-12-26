@@ -559,6 +559,7 @@ namespace Nethermind.Int256
 
         // AddMod sets res to the sum ( x+y ) mod m.
         // If m == 0, z is set to 0 (OBS: differs from the big.Int)
+        [SkipLocalsInit]
         public static void AddMod(in UInt256 x, in UInt256 y, in UInt256 m, out UInt256 res)
         {
             if (m.IsZero || m.IsOne)
@@ -574,9 +575,14 @@ namespace Nethermind.Int256
             // 2) If modulus fits in 64 bits, do direct remainder of the 5-limb value.
             if (m.IsUint64)
             {
-                ulong r0 = Rem5ByU64(in sum, s4, m.u0);
-                res = default;
-                Unsafe.AsRef(in res.u0) = r0;
+                if (X86Base.X64.IsSupported)
+                {
+                    RemSum257ByMod64BitsX86Base(in sum, s4, m.u0, out res);
+                }
+                else
+                {
+                    RemSum257ByMod64Bits(in sum, s4, m.u0, out res);
+                }
                 return;
             }
 
@@ -584,7 +590,7 @@ namespace Nethermind.Int256
             // (Branchy compare is fine - the fallback is much more expensive anyway.)
             if (LessThanBoth(in x, in y, in m))
             {
-                res = ReduceSumAssumingLT2m(in sum, s4, in m);
+                ReduceSumAssumingLT2m(in sum, s4, in m, out res);
                 return;
             }
 
@@ -595,15 +601,27 @@ namespace Nethermind.Int256
                 return;
             }
             // 4) General fallback: reduce the 257-bit sum directly: res = S % m
-            res = RemSum257ByMod(in sum, s4, in m);
+            if (y.u3 != 0)
+            {
+                RemSum257ByMod256Bits(in sum, s4, in m, out res);
+            }
+            else if (y.u2 != 0)
+            {
+                RemSum257ByMod192Bits(in sum, s4, in m, out res);
+            }
+            else
+            {
+                RemSum257ByMod128Bits(in sum, s4, in m, out res);
+            }
         }
-
 
         // ----------------------------
         // Fast reduction when S < 2m (eg x<m,y<m).
         // Uses carry-aware single subtract.
         // ----------------------------
-        private static UInt256 ReduceSumAssumingLT2m(in UInt256 sum, ulong carry, in UInt256 m)
+        [SkipLocalsInit]
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void ReduceSumAssumingLT2m(in UInt256 sum, ulong carry, in UInt256 m, out UInt256 res)
         {
             // diff = sum - m
             ulong borrow = !SubtractUnderflow(in sum, in m, out UInt256 d) ? 0UL : 1UL;
@@ -615,16 +633,19 @@ namespace Nethermind.Int256
 
             if (mask == 0)
             {
-                return sum;
+                res = sum;
+                return;
             }
             else if (mask == ulong.MaxValue)
             {
-                return d;
+                res = d;
+                return;
             }
             else
             {
                 var mask256 = new UInt256(mask, mask, mask, mask);
-                return (d & mask256) | (sum & ~mask256);
+                res = (d & mask256) | (sum & ~mask256);
+                return;
             }
         }
 
@@ -632,8 +653,9 @@ namespace Nethermind.Int256
         // Remainder of 5-limb value by 64-bit modulus (fast, fixes your test).
         // Computes ((a4..a0 base 2^64) % d).
         // ----------------------------
+        [SkipLocalsInit]
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private static ulong Rem5ByU64(in UInt256 a, ulong a4, ulong d)
+        private static void RemSum257ByMod64Bits(in UInt256 a, ulong a4, ulong d, out UInt256 rem)
         {
             // d != 0 assumed by caller
             int s = BitOperations.LeadingZeroCount(d);
@@ -671,26 +693,49 @@ namespace Nethermind.Int256
             _ = UDivRem2By1(r, recip, dn, u2, out r);
             _ = UDivRem2By1(r, recip, dn, u1, out r);
             _ = UDivRem2By1(r, recip, dn, u0, out r);
-
-            return (s == 0) ? r : (r >> s);
+            
+            rem = default;
+            Unsafe.AsRef(in rem.u0) = (s == 0) ? r : (r >> s);
         }
 
+        [SkipLocalsInit]
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void RemSum257ByMod64BitsX86Base(in UInt256 a, ulong a4, ulong d, out UInt256 rem)
+        {
+            // Pull limbs up-front to encourage register residency and avoid repeated loads.
+            // (Does not change semantics - just helps the JIT and OoO core.)
+            ulong u0 = a.u0;
+            ulong u1 = a.u1;
+            ulong u2 = a.u2;
+            ulong u3 = a.u3;
+
+            // Treat the top as a single 128-bit chunk (a4:u3) and take its remainder in ONE DivRem.
+            // This is valid as long as a4 < d. For a carry limb (0/1) and d>1, that's guaranteed.
+            ulong r = X86Base.X64.DivRem(u3, a4, d).Remainder;
+            r = X86Base.X64.DivRem(u2, r, d).Remainder;
+            r = X86Base.X64.DivRem(u1, r, d).Remainder;
+            r = X86Base.X64.DivRem(u0, r, d).Remainder;
+
+            rem = default;
+            Unsafe.AsRef(in rem.u0) = r;
+        }
         // ----------------------------
         // General remainder: (257-bit sum) % m, where sum is 5 limbs and m is up to 4 limbs.
         // Uses Knuth D specialised, operating on a 6-limb u (top limb is 0).
         // ----------------------------
-        private static UInt256 RemSum257ByMod(in UInt256 a, ulong a4, in UInt256 m)
+        [SkipLocalsInit]
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void RemSum257ByMod128Bits(in UInt256 a, ulong a4, in UInt256 m, out UInt256 rem)
         {
-            // divisor limb count n in 2..4 (caller ensured m doesn't fit in 64 bits)
-            int n = (m.u3 != 0) ? 4 : (m.u2 != 0) ? 3 : 2;
+            Debug.Assert(m.u3 == 0 && m.u2 == 0 && m.u1 != 0);
 
             // Normalise divisor
-            ulong vHi = (n == 4) ? m.u3 : (n == 3) ? m.u2 : m.u1;
+            ulong vHi = m.u1;
             int sh = BitOperations.LeadingZeroCount(vHi);
 
             UInt256 v = ShiftLeftSmall(in m, sh);
 
-            ulong vnHi = (n == 4) ? v.u3 : (n == 3) ? v.u2 : v.u1;
+            ulong vnHi = v.u1;
             ulong recip = Reciprocal2By1(vnHi);
 
             // Normalise dividend: u is 6 limbs (a0..a4 plus a5=0), shifted left by sh.
@@ -716,36 +761,120 @@ namespace Nethermind.Int256
             }
 
             // Run Knuth steps for dividendLen=5 (plus leading u5) and divisorLen=n.
-            if (n == 2)
-            {
-                // m = 5-n = 3, j = 3..0
-                _ = DivStep2(ref u3, ref u4, ref u5, v.u0, v.u1, recip);
-                _ = DivStep2(ref u2, ref u3, ref u4, v.u0, v.u1, recip);
-                _ = DivStep2(ref u1, ref u2, ref u3, v.u0, v.u1, recip);
-                _ = DivStep2(ref u0, ref u1, ref u2, v.u0, v.u1, recip);
+            // m = 5-n = 3, j = 3..0
+            _ = DivStep2(ref u3, ref u4, ref u5, v.u0, v.u1, recip);
+            _ = DivStep2(ref u2, ref u3, ref u4, v.u0, v.u1, recip);
+            _ = DivStep2(ref u1, ref u2, ref u3, v.u0, v.u1, recip);
+            _ = DivStep2(ref u0, ref u1, ref u2, v.u0, v.u1, recip);
 
-                UInt256 remN = Create(u0, u1, 0, 0);
-                return (sh == 0) ? remN : ShiftRightSmall(remN, sh);
-            }
-            else if (n == 3)
-            {
-                // m = 2, j = 2..0
-                _ = DivStep3(ref u2, ref u3, ref u4, ref u5, v.u0, v.u1, v.u2, recip);
-                _ = DivStep3(ref u1, ref u2, ref u3, ref u4, v.u0, v.u1, v.u2, recip);
-                _ = DivStep3(ref u0, ref u1, ref u2, ref u3, v.u0, v.u1, v.u2, recip);
+            UInt256 remN = Create(u0, u1, 0, 0);
+            rem = (sh == 0) ? remN : ShiftRightSmall(remN, sh);
+        }
 
-                UInt256 remN = Create(u0, u1, u2, 0);
-                return (sh == 0) ? remN : ShiftRightSmall(remN, sh);
+        // ----------------------------
+        // General remainder: (257-bit sum) % m, where sum is 5 limbs and m is up to 4 limbs.
+        // Uses Knuth D specialised, operating on a 6-limb u (top limb is 0).
+        // ----------------------------
+        [SkipLocalsInit]
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void RemSum257ByMod192Bits(in UInt256 a, ulong a4, in UInt256 m, out UInt256 rem)
+        {
+            Debug.Assert(m.u3 == 0 && m.u2 != 0);
+            // divisor limb count n in 2..4 (caller ensured m doesn't fit in 64 bits)
+
+            // Normalise divisor
+            ulong vHi = m.u2;
+            int sh = BitOperations.LeadingZeroCount(vHi);
+
+            UInt256 v = ShiftLeftSmall(in m, sh);
+
+            ulong vnHi = v.u2;
+            ulong recip = Reciprocal2By1(vnHi);
+
+            // Normalise dividend: u is 6 limbs (a0..a4 plus a5=0), shifted left by sh.
+            ulong u0, u1, u2, u3, u4, u5;
+            if (sh == 0)
+            {
+                u0 = a.u0;
+                u1 = a.u1;
+                u2 = a.u2;
+                u3 = a.u3;
+                u4 = a4;
+                u5 = 0;
             }
             else
             {
-                // n == 4, m = 1, j = 1..0
-                _ = DivStep4(ref u1, ref u2, ref u3, ref u4, ref u5, in v, recip);
-                _ = DivStep4(ref u0, ref u1, ref u2, ref u3, ref u4, in v, recip);
-
-                UInt256 remN = Create(u0, u1, u2, u3);
-                return (sh == 0) ? remN : ShiftRightSmall(remN, sh);
+                int rs = 64 - sh;
+                u0 = a.u0 << sh;
+                u1 = (a.u1 << sh) | (a.u0 >> rs);
+                u2 = (a.u2 << sh) | (a.u1 >> rs);
+                u3 = (a.u3 << sh) | (a.u2 >> rs);
+                u4 = (a4 << sh) | (a.u3 >> rs);
+                u5 = (a4 >> rs); // a5=0
             }
+
+            // Run Knuth steps for dividendLen=5 (plus leading u5) and divisorLen=n.
+
+            // m = 2, j = 2..0
+            _ = DivStep3(ref u2, ref u3, ref u4, ref u5, v.u0, v.u1, v.u2, recip);
+            _ = DivStep3(ref u1, ref u2, ref u3, ref u4, v.u0, v.u1, v.u2, recip);
+            _ = DivStep3(ref u0, ref u1, ref u2, ref u3, v.u0, v.u1, v.u2, recip);
+
+            UInt256 remN = Create(u0, u1, u2, 0);
+            rem = (sh == 0) ? remN : ShiftRightSmall(remN, sh);
+
+        }
+
+        // ----------------------------
+        // General remainder: (257-bit sum) % m, where sum is 5 limbs and m is up to 4 limbs.
+        // Uses Knuth D specialised, operating on a 6-limb u (top limb is 0).
+        // ----------------------------
+        [SkipLocalsInit]
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void RemSum257ByMod256Bits(in UInt256 a, ulong a4, in UInt256 m, out UInt256 rem)
+        {
+            Debug.Assert(m.u3 != 0);
+
+            // divisor limb count n in 2..4 (caller ensured m doesn't fit in 64 bits)
+
+            // Normalise divisor
+            ulong vHi = m.u3;
+            int sh = BitOperations.LeadingZeroCount(vHi);
+
+            UInt256 v = ShiftLeftSmall(in m, sh);
+
+            ulong vnHi = v.u3;
+            ulong recip = Reciprocal2By1(vnHi);
+
+            // Normalise dividend: u is 6 limbs (a0..a4 plus a5=0), shifted left by sh.
+            ulong u0, u1, u2, u3, u4, u5;
+            if (sh == 0)
+            {
+                u0 = a.u0;
+                u1 = a.u1;
+                u2 = a.u2;
+                u3 = a.u3;
+                u4 = a4;
+                u5 = 0;
+            }
+            else
+            {
+                int rs = 64 - sh;
+                u0 = a.u0 << sh;
+                u1 = (a.u1 << sh) | (a.u0 >> rs);
+                u2 = (a.u2 << sh) | (a.u1 >> rs);
+                u3 = (a.u3 << sh) | (a.u2 >> rs);
+                u4 = (a4 << sh) | (a.u3 >> rs);
+                u5 = (a4 >> rs); // a5=0
+            }
+
+            // Run Knuth steps for dividendLen=5 (plus leading u5) and divisorLen=n.
+            // n == 4, m = 1, j = 1..0
+            _ = DivStep4(ref u1, ref u2, ref u3, ref u4, ref u5, in v, recip);
+            _ = DivStep4(ref u0, ref u1, ref u2, ref u3, ref u4, in v, recip);
+
+            UInt256 remN = Create(u0, u1, u2, u3);
+            rem = (sh == 0) ? remN : ShiftRightSmall(remN, sh);
         }
 
         public void AddMod(in UInt256 a, in UInt256 m, out UInt256 res) => AddMod(this, a, m, out res);
