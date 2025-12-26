@@ -350,7 +350,7 @@ namespace Nethermind.Int256
             {
                 Neg(y, out yIn);
             }
-            UInt256.Mod((UInt256)xIn, (UInt256)yIn, out UInt256 value);
+            UInt256.Mod(in xIn._value, in yIn._value, out UInt256 value);
             res = new Int256(value);
             if (xs == -1)
             {
