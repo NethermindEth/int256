@@ -1344,9 +1344,14 @@ namespace Nethermind.Int256
                 res = default;
                 return;
             }
-            if (y.IsOne || x.IsOne)
+            if (y.IsOne)
             {
                 res = x;
+                return;
+            }
+            if (x.IsOne)
+            {
+                res = y;
                 return;
             }
 
