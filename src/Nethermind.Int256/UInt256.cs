@@ -551,18 +551,26 @@ namespace Nethermind.Int256
             if (mask == 0)
             {
                 res = sum;
-                return;
             }
             else if (mask == ulong.MaxValue)
             {
                 res = d;
-                return;
+            }
+            else if (Vector256.IsHardwareAccelerated)
+            {
+                Vector256<ulong> dV = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in d));
+                Vector256<ulong> sumV = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in sum));
+                Vector256<ulong> maskV = Vector256.Create(mask);
+
+                Vector256<ulong> resultV = Vector256.ConditionalSelect(maskV, dV, sumV);
+
+                Unsafe.SkipInit(out res);
+                Unsafe.As<UInt256, Vector256<ulong>>(ref res) = resultV;
             }
             else
             {
-                var mask256 = new UInt256(mask, mask, mask, mask);
+                UInt256 mask256 = Create(mask, mask, mask, mask);
                 res = (d & mask256) | (sum & ~mask256);
-                return;
             }
         }
 
@@ -610,7 +618,7 @@ namespace Nethermind.Int256
             _ = UDivRem2By1(r, recip, dn, u2, out r);
             _ = UDivRem2By1(r, recip, dn, u1, out r);
             _ = UDivRem2By1(r, recip, dn, u0, out r);
-            
+
             rem = default;
             Unsafe.AsRef(in rem.u0) = (s == 0) ? r : (r >> s);
         }
