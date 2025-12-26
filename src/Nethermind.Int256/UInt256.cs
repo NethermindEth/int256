@@ -562,7 +562,7 @@ namespace Nethermind.Int256
                 Vector256<ulong> sumV = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in sum));
                 Vector256<ulong> maskV = Vector256.Create(mask);
 
-                Vector256<ulong> resultV = Vector256.ConditionalSelect(maskV, dV, sumV);
+                Vector256<ulong> resultV = Vector256.ConditionalSelect(dV, sumV, maskV);
 
                 Unsafe.SkipInit(out res);
                 Unsafe.As<UInt256, Vector256<ulong>>(ref res) = resultV;
