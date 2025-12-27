@@ -677,18 +677,20 @@ namespace Nethermind.Int256
             rem = default;
             Unsafe.AsRef(in rem.u0) = r;
         }
-        // ----------------------------
-        // General remainder: (257-bit sum) % m, where sum is 5 limbs and m is up to 4 limbs.
-        // Uses Knuth D specialised, operating on a 6-limb u (top limb is 0).
-        // ----------------------------
-        [MethodImpl(MethodImplOptions.NoInlining)]
+
+        // General remainder: (257-bit sum) % m, where sum is 5 limbs and m is 2 limbs (<=128-bit).
+        // We run Knuth D (base 2^64) specialised to a 2-limb divisor, using a 3-limb rolling window.
+        // Dividend is treated as u[0..5] with u5==0 (extra top limb), and here u4==1 from the 257th bit.
+        // Result is a 2-limb remainder in rem.u0..rem.u1.
         [SkipLocalsInit]
+        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void RemSum257ByMod128Bits(in UInt256 a, in UInt256 m, out UInt256 rem)
         {
             const ulong a4 = 1;
             Debug.Assert(m.u3 == 0 && m.u2 == 0 && m.u1 != 0);
 
-            // Normalise divisor (128-bit only): v = (v1:v0), with v1 MSB set.
+            // D1 - Normalise divisor: shift so v1 has its MSB set.
+            // m is 128-bit: v = (v1:v0). sh in [0..63].
             ulong v0 = m.u0;
             ulong v1 = m.u1;
             int sh = BitOperations.LeadingZeroCount(v1);
@@ -700,8 +702,11 @@ namespace Nethermind.Int256
                 v1 = (v1 << sh) | (v0 >> rs);
             }
 
+            // Precompute reciprocal for 2-by-1 division when we do not have fast hardware div.
             ulong recip = X86Base.X64.IsSupported ? 0UL : Reciprocal2By1(v1);
-            // Normalise dividend into 5 limbs (u0..u4). With a4 == 1, u5 is always 0.
+
+            // D1 - Normalise dividend into 5 limbs u0..u4, plus implicit u5==0.
+            // u4 is the top (257th) limb and is always 1 before normalisation.
             ulong u0, u1, u2, u3, u4;
             if (sh == 0)
             {
@@ -709,7 +714,7 @@ namespace Nethermind.Int256
                 u1 = a.u1;
                 u2 = a.u2;
                 u3 = a.u3;
-                u4 = a4; // 1
+                u4 = a4; // top limb
             }
             else
             {
@@ -718,11 +723,14 @@ namespace Nethermind.Int256
                 u1 = u.u1;
                 u2 = u.u2;
                 u3 = u.u3;
-                u4 = (a4 << sh) | (a.u3 >> (64 - sh)); // a4==1
+
+                // u4 = (a4:a.u3) << sh, but a4==1 so we fold the carry from a.u3.
+                u4 = (a4 << sh) | (a.u3 >> (64 - sh));
             }
 
-            // With a4==1: q3 can only be 1 when sh==63.
-            // Proof sketch: for sh<=62, u4 < 2^63 <= v1, so (u4:u3) < (v1:v0).
+            // Top-step shortcut: only possible quotient from the topmost pair (u4:u3) is q3 in {0,1}.
+            // For sh<=62, u4 < 2^63 <= v1, so (u4:u3) < (v1:v0) => q3==0.
+            // Only when sh==63 can q3 be 1; if so, subtract v once to pre-reduce.
             if (sh == 63)
             {
                 if (u4 > v1 || (u4 == v1 && u3 >= v0))
@@ -734,11 +742,15 @@ namespace Nethermind.Int256
                 }
             }
 
-            // Remaining 3 Knuth steps (j=2..0) with a rolling window.
+            // D2-D7 over remaining positions j=2..0.
+            // Rolling window invariant: we divide the 3-limb chunk (u4:u3:u2) by 2-limb v.
+            // After each step we slide down one limb: (u4,u3,u2,u1,u0) <- (u3,u2,u1,u0,discard).
             int j = 2;
             while (true)
             {
-                // Estimate qhat and rhat from (un2:un1) / v1.
+                // D3 - Estimate qhat from (u4:u3) / v1, with rhat remainder of that 2-by-1 divide.
+                // Special-case u4==v1 to avoid overflow and match Knuth's qhat=base-1 path.
+                // rcarry tracks rhat overflow when we do rhat = u3 + v1 in that special-case.
                 ulong qhat, rhat;
                 bool rcarry;
 
@@ -752,7 +764,7 @@ namespace Nethermind.Int256
                 {
                     if (X86Base.X64.IsSupported)
                     {
-                        (qhat, rhat) = X86Base.X64.DivRem(u3, u4, v1); // (upper:lower) = (un2:un1)
+                        (qhat, rhat) = X86Base.X64.DivRem(u3, u4, v1); // (u4:u3) / v1
                     }
                     else
                     {
@@ -762,10 +774,12 @@ namespace Nethermind.Int256
                     rcarry = false;
                 }
 
-                // p0 = qhat * v0
+                // p0 = qhat * v0 (128-bit)
                 ulong p0Hi = Multiply64(qhat, v0, out ulong pLo);
 
-                // Correct at most twice (Knuth D3).
+                // D3 correction: ensure qhat is not too large.
+                // Compare (p0Hi:p0Lo) vs (rhat:u2). If too big, decrement qhat and adjust rhat.
+                // At most two corrections are needed.
                 if (!rcarry && (p0Hi > rhat || (p0Hi == rhat && pLo > u2)))
                 {
                     qhat--;
@@ -787,12 +801,16 @@ namespace Nethermind.Int256
                     }
                 }
 
-                // Subtract qhat*v from (un0, un1, un2) - retain updated un0 and un1.
+                // D4 - Subtract qhat * v from the 3-limb chunk (u4:u3:u2).
+                // We compute:
+                //   (u2,u3,u4) -= qhat*(v0,v1) with full carry/borrow propagation.
+                // Keep u2,u3,u4 as the updated chunk for next iteration/slide.
                 ulong borrow0 = (u2 < pLo) ? 1UL : 0UL;
                 u2 -= pLo;
 
                 ulong p1Hi = Multiply64(qhat, v1, out pLo);
 
+                // Combine cross terms: q*v0 contributes p0Hi into the next limb.
                 ulong sum1 = pLo + p0Hi;
                 ulong hi = p1Hi + ((sum1 < pLo) ? 1UL : 0UL);
 
@@ -805,9 +823,10 @@ namespace Nethermind.Int256
                 ulong b2 = (u4 < hi) ? 1UL : 0UL;
                 borrow = b2 | ((t2 < borrow) ? 1UL : 0UL);
 
+                // D6 - If subtraction underflowed, add v back once (and implicitly qhat--, but we only need the remainder).
+                // Add-back is only on the lower 2 limbs of the chunk (u3:u2) since v is 2 limbs.
                 if (borrow != 0)
                 {
-                    // Add-back once (Knuth D6).
                     ulong s0 = u2 + v0;
                     ulong c0 = (s0 < u2) ? 1UL : 0UL;
 
@@ -821,7 +840,7 @@ namespace Nethermind.Int256
                     break;
                 }
 
-                // Slide the window down.
+                // Slide window down by one limb for next quotient digit.
                 u4 = u3;
                 u3 = u2;
                 u2 = u1;
@@ -830,7 +849,8 @@ namespace Nethermind.Int256
                 j--;
             }
 
-            // De-normalise remainder (128-bit).
+            // D8 - De-normalise remainder: undo the initial left shift.
+            // The remainder is in (u3:u2) in normalised space; shift right by sh to restore.
             if (sh != 0)
             {
                 int rs = 64 - sh;
