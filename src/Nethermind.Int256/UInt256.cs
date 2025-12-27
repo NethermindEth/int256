@@ -685,34 +685,24 @@ namespace Nethermind.Int256
         [SkipLocalsInit]
         private static void RemSum257ByMod128Bits(in UInt256 a, in UInt256 m, out UInt256 rem)
         {
+            const ulong a4 = 1;
             Debug.Assert(m.u3 == 0 && m.u2 == 0 && m.u1 != 0);
 
-            const ulong a4 = 1;
-
             // Normalise divisor (128-bit only): v = (v1:v0), with v1 MSB set.
-            ulong m0 = m.u0;
-            ulong m1 = m.u1;
+            ulong v0 = m.u0;
+            ulong v1 = m.u1;
+            int sh = BitOperations.LeadingZeroCount(v1);
 
-            int sh = BitOperations.LeadingZeroCount(m1);
-
-            ulong v0, v1;
-            if (sh == 0)
-            {
-                v0 = m0;
-                v1 = m1;
-            }
-            else
+            if (sh > 0)
             {
                 int rs = 64 - sh;
-                v0 = m0 << sh;
-                v1 = (m1 << sh) | (m0 >> rs);
+                v0 <<= sh;
+                v1 = (v1 << sh) | (v0 >> rs);
             }
 
             ulong recip = X86Base.X64.IsSupported ? 0UL : Reciprocal2By1(v1);
-
             // Normalise dividend into 5 limbs (u0..u4). With a4 == 1, u5 is always 0.
             ulong u0, u1, u2, u3, u4;
-
             if (sh == 0)
             {
                 u0 = a.u0;
@@ -723,12 +713,12 @@ namespace Nethermind.Int256
             }
             else
             {
-                int rs = 64 - sh;
-                u0 = a.u0 << sh;
-                u1 = (a.u1 << sh) | (a.u0 >> rs);
-                u2 = (a.u2 << sh) | (a.u1 >> rs);
-                u3 = (a.u3 << sh) | (a.u2 >> rs);
-                u4 = (a4   << sh) | (a.u3 >> rs); // a4==1
+                UInt256 u = ShiftLeftSmall(in a, sh);
+                u0 = u.u0;
+                u1 = u.u1;
+                u2 = u.u2;
+                u3 = u.u3;
+                u4 = (a4 << sh) | (a.u3 >> (64 - sh)); // a4==1
             }
 
             // With a4==1: q3 can only be 1 when sh==63.
