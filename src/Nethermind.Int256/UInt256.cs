@@ -1343,167 +1343,116 @@ namespace Nethermind.Int256
             rem = (sh == 0) ? remN : ShiftRightSmall(remN, sh);
         }
 
-// ----------------------------
-// General remainder: (257-bit sum) % m, where sum is 5 limbs and m is up to 4 limbs.
-// Uses Knuth D specialised, operating on a 6-limb u (top limb is 0).
-// ----------------------------
-[SkipLocalsInit]
-[MethodImpl(MethodImplOptions.NoInlining)]
-private static void RemSum257ByMod256Bits(in UInt256 a, ulong a4, in UInt256 m, out UInt256 rem)
-{
-    Debug.Assert(m.u3 != 0);
-
-    // divisor limb count n = 4
-
-    // Normalise divisor
-    ulong vHi = m.u3;
-    int sh = BitOperations.LeadingZeroCount(vHi);
-
-    UInt256 v = ShiftLeftSmall(in m, sh);
-
-    ulong vnHi = v.u3;
-    ulong recip = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(vnHi);
-
-    // Normalise dividend: u is 6 limbs (a0..a4 plus a5=0), shifted left by sh.
-    ulong u0, u1, u2, u3, u4, u5;
-    if (sh == 0)
-    {
-        u0 = a.u0;
-        u1 = a.u1;
-        u2 = a.u2;
-        u3 = a.u3;
-        u4 = a4;
-        u5 = 0;
-    }
-    else
-    {
-        int rs = 64 - sh;
-        u0 = a.u0 << sh;
-        u1 = (a.u1 << sh) | (a.u0 >> rs);
-        u2 = (a.u2 << sh) | (a.u1 >> rs);
-        u3 = (a.u3 << sh) | (a.u2 >> rs);
-        u4 = (a4 << sh) | (a.u3 >> rs);
-        u5 = (a4 >> rs); // a5=0
-    }
-
-    // Run Knuth steps for dividendLen=5 (plus leading u5) and divisorLen=n.
-    // n == 4, m = 1, j = 1..0
-    ulong qhat, rhat, rcarry;
-    if (u5 == v.u3)
-    {
-        qhat = ulong.MaxValue;
-        ulong sum = u4 + v.u3;
-        rcarry = (sum < u4) ? 1UL : 0UL;
-        rhat = sum;
-    }
-    else
-    {
-        if (X86Base.X64.IsSupported)
+        // ----------------------------
+        // General remainder: (257-bit sum) % m, where sum is 5 limbs and m is up to 4 limbs.
+        // Uses Knuth D specialised, operating on a 6-limb u (top limb is 0).
+        // ----------------------------
+        [SkipLocalsInit]
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void RemSum257ByMod256Bits(in UInt256 a, ulong a4, in UInt256 m, out UInt256 rem)
         {
-            (qhat, rhat) = X86Base.X64.DivRem(u4, u5, v.u3); // (upper:lower) = (u5:u4)
-        }
-        else
-        {
-            qhat = UDivRem2By1(u5, recip, v.u3, u4, out rhat);
-        }
-        rcarry = 0;
-    }
+            Debug.Assert(m.u3 != 0);
+            Debug.Assert((a4 & ~1UL) == 0); // 257-bit sum assumption
 
-    if (rcarry == 0)
-    {
-        ulong pHi = Multiply64(qhat, v.u2, out ulong pLo);
+            // Normalise divisor
+            int sh = BitOperations.LeadingZeroCount(m.u3);
+            UInt256 v = (sh == 0) ? m : ShiftLeftSmall(in m, sh);
 
-        // if qhat*vNext > rhat*b + uCorr then decrement
-        if (pHi > rhat || (pHi == rhat && pLo > u3))
-        {
-            qhat--;
+            ulong v0 = v.u0, v1 = v.u1, v2 = v.u2, v3 = v.u3;
 
-            ulong sum2 = rhat + v.u3;
-            if (sum2 < rhat)
-                rcarry = 1;
+            ulong recip = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(v3);
 
-            rhat = sum2;
-        }
-    }
-
-    if (rcarry == 0)
-    {
-        ulong pHi = Multiply64(qhat, v.u2, out ulong pLo);
-
-        // if qhat*vNext > rhat*b + uCorr then decrement
-        if (pHi > rhat || (pHi == rhat && pLo > u3))
-        {
-            qhat--;
-        }
-    }
-
-    ulong borrow = SubMul4(ref u1, ref u2, ref u3, ref u4, ref u5, v.u0, v.u1, v.u2, v.u3, qhat);
-
-    if (borrow != 0)
-    {
-        AddBack4(ref u1, ref u2, ref u3, ref u4, ref u5, v.u0, v.u1, v.u2, v.u3);
-    }
-
-    ulong qhat1, rhat1, rcarry1;
-    if (u4 == v.u3)
-    {
-        qhat1 = ulong.MaxValue;
-        ulong sum1 = u3 + v.u3;
-        rcarry1 = (sum1 < u3) ? 1UL : 0UL;
-        rhat1 = sum1;
-    }
-    else
-    {
-        if (X86Base.X64.IsSupported)
-        {
-            (qhat1, rhat1) = X86Base.X64.DivRem(u3, u4, v.u3); // (upper:lower) = (u4:u3)
-        }
-        else
-        {
-            qhat1 = UDivRem2By1(u4, recip, v.u3, u3, out rhat1);
-        }
-        rcarry1 = 0;
-    }
-
-    if (rcarry1 == 0)
-    {
-        ulong pHi1 = Multiply64(qhat1, v.u2, out ulong pLo1);
-
-        // if qhat*vNext > rhat*b + uCorr then decrement
-        if (pHi1 > rhat1 || (pHi1 == rhat1 && pLo1 > u2))
-        {
-            qhat1--;
-
-            ulong sum3 = rhat1 + v.u3;
-            if (sum3 < rhat1)
-                rcarry1 = 1;
-
-            rhat1 = sum3;
-        }
-
-        if (rcarry1 == 0)
-        {
-            ulong pHi = Multiply64(qhat1, v.u2, out ulong pLo);
-
-            // if qhat*vNext > rhat*b + uCorr then decrement
-            if (pHi > rhat1 || (pHi == rhat1 && pLo > u2))
+            // Normalise dividend: u5 is guaranteed 0 for a 257-bit input
+            ulong u0, u1, u2, u3, u4;
+            if (sh == 0)
             {
-                qhat1--;
+                u0 = a.u0;
+                u1 = a.u1;
+                u2 = a.u2;
+                u3 = a.u3;
+                u4 = a4;
             }
+            else
+            {
+                int rs = 64 - sh;
+                u0 = a.u0 << sh;
+                u1 = (a.u1 << sh) | (a.u0 >> rs);
+                u2 = (a.u2 << sh) | (a.u1 >> rs);
+                u3 = (a.u3 << sh) | (a.u2 >> rs);
+                u4 = (a4 << sh) | (a.u3 >> rs);
+            }
+
+            // High quotient digit q1 is only 0 or 1 (since u5==0, v3 has top bit set).
+            // Implement as "attempt subtract V*B".
+            if (u4 >= v3)
+            {
+                ulong b = 0;
+                u1 = Sub(u1, v0, ref b);
+                u2 = Sub(u2, v1, ref b);
+                u3 = Sub(u3, v2, ref b);
+                u4 = Sub(u4, v3, ref b);
+
+                // If we borrowed past u4, we would have borrowed from u5 (which is 0) - so undo.
+                if (b != 0)
+                {
+                    ulong c = 0;
+                    AddWithCarry(u1, v0, ref c, out u1);
+                    AddWithCarry(u2, v1, ref c, out u2);
+                    AddWithCarry(u3, v2, ref c, out u3);
+                    AddWithCarry(u4, v3, ref c, out u4);
+                    // ignore final carry - it would go into u5
+                }
+            }
+
+            // Now only one Knuth step remains (j = 0)
+            ulong q0, r0, rcarry0;
+
+            if (u4 == v3)
+            {
+                q0 = ulong.MaxValue;
+                ulong sum = u3 + v3;
+                rcarry0 = (sum < u3) ? 1UL : 0UL;
+                r0 = sum;
+            }
+            else
+            {
+                if (X86Base.X64.IsSupported)
+                    (q0, r0) = X86Base.X64.DivRem(u3, u4, v3); // (upper:lower) = (u4:u3)
+                else
+                    q0 = UDivRem2By1(u4, recip, v3, u3, out r0);
+
+                rcarry0 = 0;
+            }
+
+            // q0 correction - only do the second check if we decremented once
+            if (rcarry0 == 0)
+            {
+                ulong pHi = Multiply64(q0, v2, out ulong pLo);
+
+                if (pHi > r0 || (pHi == r0 && pLo > u2))
+                {
+                    q0--;
+
+                    ulong sum = r0 + v3;
+                    rcarry0 = (sum < r0) ? 1UL : 0UL;
+                    r0 = sum;
+
+                    if (rcarry0 == 0)
+                    {
+                        pHi = Multiply64(q0, v2, out pLo);
+                        if (pHi > r0 || (pHi == r0 && pLo > u2))
+                            q0--;
+                    }
+                }
+            }
+
+            ulong borrow = SubMul4(ref u0, ref u1, ref u2, ref u3, ref u4, v0, v1, v2, v3, q0);
+            if (borrow != 0)
+                AddBack4(ref u0, ref u1, ref u2, ref u3, ref u4, v0, v1, v2, v3);
+
+            UInt256 remN = Create(u0, u1, u2, u3);
+            rem = (sh == 0) ? remN : ShiftRightSmall(remN, sh);
         }
-    }
-
-    ulong borrow1 = SubMul4(ref u0, ref u1, ref u2, ref u3, ref u4, v.u0, v.u1, v.u2, v.u3, qhat1);
-
-    if (borrow1 != 0)
-    {
-        AddBack4(ref u0, ref u1, ref u2, ref u3, ref u4, v.u0, v.u1, v.u2, v.u3);
-    }
-
-    UInt256 remN = Create(u0, u1, u2, u3);
-    rem = (sh == 0) ? remN : ShiftRightSmall(remN, sh);
-}
-
         /// <summary>
         /// Computes the modular sum of this value and <paramref name="a"/>.
         /// </summary>
