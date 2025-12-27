@@ -745,38 +745,28 @@ namespace Nethermind.Int256
             }
 
             // Remaining 3 Knuth steps (j=2..0) with a rolling window.
-            ulong un2 = u4;
-            ulong un1 = u3;
-
-            // Feed un0 as u2 -> u1 -> u0 without taking refs to struct fields.
-            ulong un0  = u2;
-            ulong next = u1;
-            ulong last = u0;
-
             int j = 2;
-            ulong r0, r1;
-
             while (true)
             {
                 // Estimate qhat and rhat from (un2:un1) / v1.
                 ulong qhat, rhat;
                 bool rcarry;
 
-                if (un2 == v1)
+                if (u4 == v1)
                 {
                     qhat = ulong.MaxValue;
-                    rhat = un1 + v1;
-                    rcarry = rhat < un1;
+                    rhat = u3 + v1;
+                    rcarry = rhat < u3;
                 }
                 else
                 {
                     if (X86Base.X64.IsSupported)
                     {
-                        (qhat, rhat) = X86Base.X64.DivRem(un1, un2, v1); // (upper:lower) = (un2:un1)
+                        (qhat, rhat) = X86Base.X64.DivRem(u3, u4, v1); // (upper:lower) = (un2:un1)
                     }
                     else
                     {
-                        qhat = UDivRem2By1(un2, recip, v1, un1, out rhat);
+                        qhat = UDivRem2By1(u4, recip, v1, u3, out rhat);
                     }
 
                     rcarry = false;
@@ -786,7 +776,7 @@ namespace Nethermind.Int256
                 ulong p0Hi = Multiply64(qhat, v0, out ulong pLo);
 
                 // Correct at most twice (Knuth D3).
-                if (!rcarry && (p0Hi > rhat || (p0Hi == rhat && pLo > un0)))
+                if (!rcarry && (p0Hi > rhat || (p0Hi == rhat && pLo > u2)))
                 {
                     qhat--;
 
@@ -798,7 +788,7 @@ namespace Nethermind.Int256
                     rcarry = sum < rhat;
                     rhat = sum;
 
-                    if (!rcarry && (p0Hi > rhat || (p0Hi == rhat && pLo > un0)))
+                    if (!rcarry && (p0Hi > rhat || (p0Hi == rhat && pLo > u2)))
                     {
                         qhat--;
 
@@ -808,47 +798,44 @@ namespace Nethermind.Int256
                 }
 
                 // Subtract qhat*v from (un0, un1, un2) - retain updated un0 and un1.
-                ulong borrow0 = (un0 < pLo) ? 1UL : 0UL;
-                un0 -= pLo;
+                ulong borrow0 = (u2 < pLo) ? 1UL : 0UL;
+                u2 -= pLo;
 
                 ulong p1Hi = Multiply64(qhat, v1, out pLo);
 
                 ulong sum1 = pLo + p0Hi;
                 ulong hi = p1Hi + ((sum1 < pLo) ? 1UL : 0UL);
 
-                ulong t1 = un1 - sum1;
-                ulong b1 = (un1 < sum1) ? 1UL : 0UL;
-                un1 = t1 - borrow0;
+                ulong t1 = u3 - sum1;
+                ulong b1 = (u3 < sum1) ? 1UL : 0UL;
+                u3 = t1 - borrow0;
                 ulong borrow = b1 | ((t1 < borrow0) ? 1UL : 0UL);
 
-                ulong t2 = un2 - hi;
-                ulong b2 = (un2 < hi) ? 1UL : 0UL;
+                ulong t2 = u4 - hi;
+                ulong b2 = (u4 < hi) ? 1UL : 0UL;
                 borrow = b2 | ((t2 < borrow) ? 1UL : 0UL);
 
                 if (borrow != 0)
                 {
                     // Add-back once (Knuth D6).
-                    ulong s0 = un0 + v0;
-                    ulong c0 = (s0 < un0) ? 1UL : 0UL;
+                    ulong s0 = u2 + v0;
+                    ulong c0 = (s0 < u2) ? 1UL : 0UL;
 
-                    ulong s1 = un1 + v1;
-                    un1 = s1 + c0;
-                    un0 = s0;
+                    ulong s1 = u3 + v1;
+                    u3 = s1 + c0;
+                    u2 = s0;
                 }
 
                 if (j == 0)
                 {
-                    r0 = un0;
-                    r1 = un1;
                     break;
                 }
 
                 // Slide the window down.
-                un2 = un1;
-                un1 = un0;
-
-                un0 = next;
-                next = last;
+                u4 = u3;
+                u3 = u2;
+                u2 = u1;
+                u1 = u0;
 
                 j--;
             }
@@ -857,11 +844,11 @@ namespace Nethermind.Int256
             if (sh != 0)
             {
                 int rs = 64 - sh;
-                r0 = (r0 >> sh) | (r1 << rs);
-                r1 >>= sh;
+                u2 = (u2 >> sh) | (u3 << rs);
+                u3 >>= sh;
             }
 
-            rem = Create(r0, r1, 0, 0);
+            rem = Create(u2, u3, 0, 0);
         }
 
         // ----------------------------
