@@ -611,7 +611,9 @@ namespace Nethermind.Int256
         [MethodImpl(MethodImplOptions.NoInlining)]
         private static void RemSum257ByMod64Bits(in UInt256 a, ulong a4, ulong d, out UInt256 rem)
         {
-            // d != 0 assumed by caller
+            Debug.Assert(d != 0);
+            Debug.Assert(a4 <= 1);
+
             int s = BitOperations.LeadingZeroCount(d);
             ulong dn = (s != 0) ? (d << s) : d;       // normalised (msb set) if s>0
             ulong recip = Reciprocal2By1(dn);
@@ -656,6 +658,8 @@ namespace Nethermind.Int256
         [MethodImpl(MethodImplOptions.NoInlining)]
         private static void RemSum257ByMod64BitsX86Base(in UInt256 a, ulong a4, ulong d, out UInt256 rem)
         {
+            Debug.Assert(d != 0);
+            Debug.Assert(a4 <= 1);
             // Pull limbs up-front to encourage register residency and avoid repeated loads.
             // (Does not change semantics - just helps the JIT and OoO core.)
             ulong u0 = a.u0;
@@ -682,7 +686,7 @@ namespace Nethermind.Int256
         private static void RemSum257ByMod128Bits(in UInt256 a, ulong a4, in UInt256 m, out UInt256 rem)
         {
             Debug.Assert(m.u3 == 0 && m.u2 == 0 && m.u1 != 0);
-
+            Debug.Assert(a4 <= 1);
             // Normalise divisor
             ulong vHi = m.u1;
             int sh = BitOperations.LeadingZeroCount(vHi);
@@ -1060,7 +1064,7 @@ namespace Nethermind.Int256
             // Cold path: add-back and decrement qhat
 
             UInt256 remN = Create(u0, u1, 0, 0);
-            rem = (sh == 0) ? remN : ShiftRightSmall(remN, sh);
+            rem = ShiftRightSmall(remN, sh);
         }
 
         // ----------------------------
@@ -1072,7 +1076,8 @@ namespace Nethermind.Int256
         private static void RemSum257ByMod192Bits(in UInt256 a, ulong a4, in UInt256 m, out UInt256 rem)
         {
             Debug.Assert(m.u3 == 0 && m.u2 != 0);
-            // divisor limb count n in 2..4 (caller ensured m doesn't fit in 64 bits)
+            Debug.Assert(a4 <= 1);
+            // divisor limb count n in 3 (caller ensured m doesn't fit in 64 bits)
 
             // Normalise divisor
             ulong vHi = m.u2;
@@ -1339,8 +1344,19 @@ namespace Nethermind.Int256
                 AddBack3(ref u0, ref u1, ref u2, ref u3, v.u0, v.u1, v.u2);
             }
 
-            UInt256 remN = Create(u0, u1, u2, 0);
-            rem = (sh == 0) ? remN : ShiftRightSmall(remN, sh);
+            if (sh == 0)
+            {
+                rem = Create(u0, u1, u2, 0);
+                return;
+            }
+
+            {
+                int rs = 64 - sh;
+                ulong o0 = (u0 >> sh) | (u1 << rs);
+                ulong o1 = (u1 >> sh) | (u2 << rs);
+                ulong o2 = (u2 >> sh);
+                rem = Create(o0, o1, o2, 0);
+            }
         }
 
         // ----------------------------
@@ -1352,35 +1368,26 @@ namespace Nethermind.Int256
         private static void RemSum257ByMod256Bits(in UInt256 a, ulong a4, in UInt256 m, out UInt256 rem)
         {
             Debug.Assert(m.u3 != 0);
-            Debug.Assert((a4 & ~1UL) == 0); // 257-bit sum assumption
+            Debug.Assert(a4 <= 1);
 
             // Normalise divisor
             int sh = BitOperations.LeadingZeroCount(m.u3);
-            UInt256 v = (sh == 0) ? m : ShiftLeftSmall(in m, sh);
+            UInt256 v = ShiftLeftSmall(in m, sh);
+            UInt256 u = ShiftLeftSmall(in a, sh);
 
-            ulong v0 = v.u0, v1 = v.u1, v2 = v.u2, v3 = v.u3;
+            ulong v3 = v.u3;
 
             ulong recip = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(v3);
-
             // Normalise dividend: u5 is guaranteed 0 for a 257-bit input
-            ulong u0, u1, u2, u3, u4;
-            if (sh == 0)
-            {
-                u0 = a.u0;
-                u1 = a.u1;
-                u2 = a.u2;
-                u3 = a.u3;
-                u4 = a4;
-            }
-            else
-            {
-                int rs = 64 - sh;
-                u0 = a.u0 << sh;
-                u1 = (a.u1 << sh) | (a.u0 >> rs);
-                u2 = (a.u2 << sh) | (a.u1 >> rs);
-                u3 = (a.u3 << sh) | (a.u2 >> rs);
-                u4 = (a4 << sh) | (a.u3 >> rs);
-            }
+            ulong u0 = u.u0;
+            ulong u1 = u.u1;
+            ulong u2 = u.u2;
+            ulong u3 = u.u3;
+            ulong u4 = (sh == 0) ? a4 : (a4 << sh) | (a.u3 >> (64 - sh));
+
+            ulong v0 = v.u0;
+            ulong v1 = v.u1;
+            ulong v2 = v.u2;
 
             // High quotient digit q1 is only 0 or 1 (since u5==0, v3 has top bit set).
             // Implement as "attempt subtract V*B".
@@ -1417,9 +1424,13 @@ namespace Nethermind.Int256
             else
             {
                 if (X86Base.X64.IsSupported)
+                {
                     (q0, r0) = X86Base.X64.DivRem(u3, u4, v3); // (upper:lower) = (u4:u3)
+                }
                 else
+                {
                     q0 = UDivRem2By1(u4, recip, v3, u3, out r0);
+                }
 
                 rcarry0 = 0;
             }
@@ -1448,10 +1459,12 @@ namespace Nethermind.Int256
 
             ulong borrow = SubMul4(ref u0, ref u1, ref u2, ref u3, ref u4, v0, v1, v2, v3, q0);
             if (borrow != 0)
+            {
                 AddBack4(ref u0, ref u1, ref u2, ref u3, ref u4, v0, v1, v2, v3);
+            }
 
             UInt256 remN = Create(u0, u1, u2, u3);
-            rem = (sh == 0) ? remN : ShiftRightSmall(remN, sh);
+            rem = ShiftRightSmall(in remN, sh);
         }
         /// <summary>
         /// Computes the modular sum of this value and <paramref name="a"/>.
@@ -3854,7 +3867,7 @@ namespace Nethermind.Int256
 
             // Remainder is u0..u2
             UInt256 remN = Create(u0n2, u1d, u2d, 0);
-            remainder = (shift == 0) ? remN : ShiftRightSmall(remN, shift);
+            remainder = ShiftRightSmall(remN, shift);
         }
 
         [SkipLocalsInit]
@@ -3945,13 +3958,15 @@ namespace Nethermind.Int256
             q = Create(q0, 0, 0, 0);
 
             // Remainder is u0..u3
-            remainder = (shift == 0) ? rem : ShiftRightSmall(rem, shift);
+            remainder = ShiftRightSmall(rem, shift);
         }
 
         // Shift-right by 0..63 (used to unnormalise remainder)
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static UInt256 ShiftLeftSmall(in UInt256 v, int sh)
         {
+            if (sh == 0) return v;
+
             if (!Avx2.IsSupported)
             {
                 ulong a0 = v.u0;
@@ -4001,6 +4016,8 @@ namespace Nethermind.Int256
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static UInt256 ShiftRightSmall(in UInt256 v, int sh)
         {
+            if (sh == 0) return v;
+
             if (!Avx2.IsSupported)
             {
                 ulong a0 = v.u0;
@@ -4752,11 +4769,23 @@ namespace Nethermind.Int256
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void AddBack3(ref ulong u0, ref ulong u1, ref ulong u2, ref ulong u3, ulong v0, ulong v1, ulong v2)
         {
-            ulong c = 0;
-            AddWithCarry(u0, v0, ref c, out u0);
-            AddWithCarry(u1, v1, ref c, out u1);
-            AddWithCarry(u2, v2, ref c, out u2);
-            u3 += c;
+            ulong sum = u0 + v0;
+            ulong carry = (sum < u0) ? 1UL : 0UL;
+            u0 = sum;
+
+            sum = u1 + v1;
+            ulong c = (sum < u1) ? 1UL : 0UL;
+            sum += carry;
+            carry = c | ((sum < carry) ? 1UL : 0UL);
+            u1 = sum;
+
+            sum = u2 + v2;
+            c = (sum < u2) ? 1UL : 0UL;
+            sum += carry;
+            carry = c | ((sum < carry) ? 1UL : 0UL);
+            u2 = sum;
+
+            u3 += carry;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -4805,13 +4834,21 @@ namespace Nethermind.Int256
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static UInt256 Create(ulong u0, ulong u1, ulong u2, ulong u3)
         {
-            Unsafe.SkipInit(out UInt256 r);
-            ref ulong p = ref Unsafe.As<UInt256, ulong>(ref r);
-            p = u0;
-            Unsafe.Add(ref p, 1) = u1;
-            Unsafe.Add(ref p, 2) = u2;
-            Unsafe.Add(ref p, 3) = u3;
-            return r;
+            if (Vector256.IsHardwareAccelerated)
+            {
+                Vector256<ulong> v = Vector256.Create(u0, u1, u2, u3);
+                return Unsafe.As<Vector256<ulong>, UInt256>(ref v);
+            }
+            else
+            {
+                Unsafe.SkipInit(out UInt256 r);
+                ref ulong p = ref Unsafe.As<UInt256, ulong>(ref r);
+                p = u0;
+                Unsafe.Add(ref p, 1) = u1;
+                Unsafe.Add(ref p, 2) = u2;
+                Unsafe.Add(ref p, 3) = u3;
+                return r;
+            }
         }
     }
 #pragma warning restore SYSLIB5004
