@@ -716,10 +716,348 @@ namespace Nethermind.Int256
 
             // Run Knuth steps for dividendLen=5 (plus leading u5) and divisorLen=n.
             // m = 5-n = 3, j = 3..0
-            _ = DivStep2(ref u3, ref u4, ref u5, v.u0, v.u1, recip);
-            _ = DivStep2(ref u2, ref u3, ref u4, v.u0, v.u1, recip);
-            _ = DivStep2(ref u1, ref u2, ref u3, v.u0, v.u1, recip);
-            _ = DivStep2(ref u0, ref u1, ref u2, v.u0, v.u1, recip);
+            // Variant B style: load u1/u2 once. Delay u0 until after quotient estimate.
+            ulong u6 = u4;
+            ulong u7 = u5;
+
+            ulong qhat;
+            ulong rhat;
+            bool rcarry;
+
+            // Single shared out-home for everything.
+            ulong lo;
+
+            if (u7 == v.u1)
+            {
+                qhat = ulong.MaxValue;
+                rhat = u6 + v.u1;
+                rcarry = rhat < u6;
+            }
+            else
+            {
+                qhat = UDivRem2By1(u7, recip, v.u1, u6, out lo);
+                rhat = lo;
+                rcarry = false;
+            }
+
+            ulong u8 = u3;
+
+            // qhat*v0 once - reused for correction + subtraction
+            ulong hi = Multiply64(qhat, v.u0, out lo); // hi:lo = qhat*v0
+
+            // Correct at most twice
+            if (!rcarry && (hi > rhat || (hi == rhat && lo > u8)))
+            {
+                qhat--;
+
+                // (hi:lo) -= v0
+                hi -= (lo < v.u0) ? 1UL : 0UL;
+                lo -= v.u0;
+
+                ulong sum = rhat + v.u1;
+                rcarry = sum < rhat;
+                rhat = sum;
+
+                if (!rcarry && (hi > rhat || (hi == rhat && lo > u8)))
+                {
+                    qhat--;
+
+                    hi -= (lo < v.u0) ? 1UL : 0UL;
+                    lo -= v.u0;
+                }
+            }
+
+            // Subtract qhat*v from u (3 limbs)
+            ulong borrow = (u8 < lo) ? 1UL : 0UL;
+            u8 -= lo;
+
+            ulong hi1 = Multiply64(qhat, v.u1, out lo);
+            ulong sum1 = lo + hi;
+            hi = hi1 + ((sum1 < lo) ? 1UL : 0UL);
+
+            ulong t = u6 - sum1;
+            ulong b = (u6 < sum1) ? 1UL : 0UL;
+            u6 = t - borrow;
+            borrow = b | ((t < borrow) ? 1UL : 0UL);
+
+            t = u7 - hi;
+            b = (u7 < hi) ? 1UL : 0UL;
+            borrow = b | ((t < borrow) ? 1UL : 0UL);
+
+            // Store raw subtraction results first (preserves aliasing behaviour)
+            u3 = u8;
+            u4 = u6;
+
+            if (borrow != 0)
+            {
+                ulong s0 = u8 + v.u0;
+                ulong c0 = (s0 < u8) ? 1UL : 0UL;
+
+                ulong s1 = u6 + v.u1;
+
+                ulong s1c = s1 + c0;
+
+                // Write order matters for ref-aliasing semantics - match original: u0r, then u1r, then u2r += carry
+                u3 = s0;
+                u4 = s1c;
+            }
+
+            // Cold path: add-back and decrement qhat
+            // Variant B style: load u1/u2 once. Delay u0 until after quotient estimate.
+            ulong u9 = u3;
+            ulong u10 = u4;
+
+            ulong qhat1;
+            ulong rhat1;
+            bool rcarry1;
+
+            // Single shared out-home for everything.
+            ulong lo1;
+
+            if (u10 == v.u1)
+            {
+                qhat1 = ulong.MaxValue;
+                rhat1 = u9 + v.u1;
+                rcarry1 = rhat1 < u9;
+            }
+            else
+            {
+                qhat1 = UDivRem2By1(u10, recip, v.u1, u9, out lo1);
+                rhat1 = lo1;
+                rcarry1 = false;
+            }
+
+            ulong u11 = u2;
+
+            // qhat*v0 once - reused for correction + subtraction
+            ulong hi2 = Multiply64(qhat1, v.u0, out lo1); // hi:lo = qhat*v0
+
+            // Correct at most twice
+            if (!rcarry1 && (hi2 > rhat1 || (hi2 == rhat1 && lo1 > u11)))
+            {
+                qhat1--;
+
+                // (hi:lo) -= v0
+                hi2 -= (lo1 < v.u0) ? 1UL : 0UL;
+                lo1 -= v.u0;
+
+                ulong sum2 = rhat1 + v.u1;
+                rcarry1 = sum2 < rhat1;
+                rhat1 = sum2;
+
+                if (!rcarry1 && (hi2 > rhat1 || (hi2 == rhat1 && lo1 > u11)))
+                {
+                    qhat1--;
+
+                    hi2 -= (lo1 < v.u0) ? 1UL : 0UL;
+                    lo1 -= v.u0;
+                }
+            }
+
+            // Subtract qhat*v from u (3 limbs)
+            ulong borrow1 = (u11 < lo1) ? 1UL : 0UL;
+            u11 -= lo1;
+
+            ulong hi3 = Multiply64(qhat1, v.u1, out lo1);
+            ulong sum3 = lo1 + hi2;
+            hi2 = hi3 + ((sum3 < lo1) ? 1UL : 0UL);
+
+            ulong t1 = u9 - sum3;
+            ulong b1 = (u9 < sum3) ? 1UL : 0UL;
+            u9 = t1 - borrow1;
+            borrow1 = b1 | ((t1 < borrow1) ? 1UL : 0UL);
+
+            t1 = u10 - hi2;
+            b1 = (u10 < hi2) ? 1UL : 0UL;
+            borrow1 = b1 | ((t1 < borrow1) ? 1UL : 0UL);
+
+            // Store raw subtraction results first (preserves aliasing behaviour)
+            u2 = u11;
+            u3 = u9;
+
+            if (borrow1 != 0)
+            {
+                ulong s2 = u11 + v.u0;
+                ulong c3 = (s2 < u11) ? 1UL : 0UL;
+                ulong s3 = u9 + v.u1;
+                ulong s1C = s3 + c3;
+
+                // Write order matters for ref-aliasing semantics - match original: u0r, then u1r, then u2r += carry
+                u2 = s2;
+                u3 = s1C;
+            }
+
+            // Cold path: add-back and decrement qhat
+            // Variant B style: load u1/u2 once. Delay u0 until after quotient estimate.
+            ulong u12 = u2;
+            ulong u13 = u3;
+
+            ulong qhat2;
+            ulong rhat2;
+            bool rcarry2;
+
+            // Single shared out-home for everything.
+            ulong lo2;
+
+            if (u13 == v.u1)
+            {
+                qhat2 = ulong.MaxValue;
+                rhat2 = u12 + v.u1;
+                rcarry2 = rhat2 < u12;
+            }
+            else
+            {
+                qhat2 = UDivRem2By1(u13, recip, v.u1, u12, out lo2);
+                rhat2 = lo2;
+                rcarry2 = false;
+            }
+
+            ulong u14 = u1;
+
+            // qhat*v0 once - reused for correction + subtraction
+            ulong hi4 = Multiply64(qhat2, v.u0, out lo2); // hi:lo = qhat*v0
+
+            // Correct at most twice
+            if (!rcarry2 && (hi4 > rhat2 || (hi4 == rhat2 && lo2 > u14)))
+            {
+                qhat2--;
+
+                // (hi:lo) -= v0
+                hi4 -= (lo2 < v.u0) ? 1UL : 0UL;
+                lo2 -= v.u0;
+
+                ulong sum4 = rhat2 + v.u1;
+                rcarry2 = sum4 < rhat2;
+                rhat2 = sum4;
+
+                if (!rcarry2 && (hi4 > rhat2 || (hi4 == rhat2 && lo2 > u14)))
+                {
+                    qhat2--;
+
+                    hi4 -= (lo2 < v.u0) ? 1UL : 0UL;
+                    lo2 -= v.u0;
+                }
+            }
+
+            // Subtract qhat*v from u (3 limbs)
+            ulong borrow2 = (u14 < lo2) ? 1UL : 0UL;
+            u14 -= lo2;
+
+            ulong hi5 = Multiply64(qhat2, v.u1, out lo2);
+            ulong sum5 = lo2 + hi4;
+            hi4 = hi5 + ((sum5 < lo2) ? 1UL : 0UL);
+
+            ulong t2 = u12 - sum5;
+            ulong b2 = (u12 < sum5) ? 1UL : 0UL;
+            u12 = t2 - borrow2;
+            borrow2 = b2 | ((t2 < borrow2) ? 1UL : 0UL);
+
+            t2 = u13 - hi4;
+            b2 = (u13 < hi4) ? 1UL : 0UL;
+            borrow2 = b2 | ((t2 < borrow2) ? 1UL : 0UL);
+
+            // Store raw subtraction results first (preserves aliasing behaviour)
+            u1 = u14;
+            u2 = u12;
+
+            if (borrow2 != 0)
+            {
+                ulong s4 = u14 + v.u0;
+                ulong c6 = (s4 < u14) ? 1UL : 0UL;
+                ulong s5 = u12 + v.u1;
+                ulong s1C1 = s5 + c6;
+
+                // Write order matters for ref-aliasing semantics - match original: u0r, then u1r, then u2r += carry
+                u1 = s4;
+                u2 = s1C1;
+            }
+
+            // Cold path: add-back and decrement qhat
+            // Variant B style: load u1/u2 once. Delay u0 until after quotient estimate.
+            ulong u15 = u1;
+            ulong u16 = u2;
+
+            ulong qhat3;
+            ulong rhat3;
+            bool rcarry3;
+
+            // Single shared out-home for everything.
+            ulong lo3;
+
+            if (u16 == v.u1)
+            {
+                qhat3 = ulong.MaxValue;
+                rhat3 = u15 + v.u1;
+                rcarry3 = rhat3 < u15;
+            }
+            else
+            {
+                qhat3 = UDivRem2By1(u16, recip, v.u1, u15, out lo3);
+                rhat3 = lo3;
+                rcarry3 = false;
+            }
+
+            ulong u17 = u0;
+
+            // qhat*v0 once - reused for correction + subtraction
+            ulong hi6 = Multiply64(qhat3, v.u0, out lo3); // hi:lo = qhat*v0
+
+            // Correct at most twice
+            if (!rcarry3 && (hi6 > rhat3 || (hi6 == rhat3 && lo3 > u17)))
+            {
+                qhat3--;
+
+                // (hi:lo) -= v0
+                hi6 -= (lo3 < v.u0) ? 1UL : 0UL;
+                lo3 -= v.u0;
+
+                ulong sum6 = rhat3 + v.u1;
+                rcarry3 = sum6 < rhat3;
+                rhat3 = sum6;
+
+                if (!rcarry3 && (hi6 > rhat3 || (hi6 == rhat3 && lo3 > u17)))
+                {
+                    qhat3--;
+
+                    hi6 -= (lo3 < v.u0) ? 1UL : 0UL;
+                    lo3 -= v.u0;
+                }
+            }
+
+            // Subtract qhat*v from u (3 limbs)
+            ulong borrow3 = (u17 < lo3) ? 1UL : 0UL;
+            u17 -= lo3;
+
+            ulong hi7 = Multiply64(qhat3, v.u1, out lo3);
+            ulong sum7 = lo3 + hi6;
+            hi6 = hi7 + ((sum7 < lo3) ? 1UL : 0UL);
+
+            ulong t3 = u15 - sum7;
+            ulong b3 = (u15 < sum7) ? 1UL : 0UL;
+            u15 = t3 - borrow3;
+            borrow3 = b3 | ((t3 < borrow3) ? 1UL : 0UL);
+
+            t3 = u16 - hi6;
+            b3 = (u16 < hi6) ? 1UL : 0UL;
+            borrow3 = b3 | ((t3 < borrow3) ? 1UL : 0UL);
+
+            // Store raw subtraction results first (preserves aliasing behaviour)
+            u0 = u17;
+            u1 = u15;
+
+            if (borrow3 != 0)
+            {
+                ulong s6 = u17 + v.u0;
+                ulong c9 = (s6 < u17) ? 1UL : 0UL;
+                ulong s7 = u15 + v.u1;
+                ulong s1C2 = s7 + c9;
+
+                // Write order matters for ref-aliasing semantics - match original: u0r, then u1r, then u2r += carry
+                u0 = s6;
+                u1 = s1C2;
+            }
+
+            // Cold path: add-back and decrement qhat
 
             UInt256 remN = Create(u0, u1, 0, 0);
             rem = (sh == 0) ? remN : ShiftRightSmall(remN, sh);
@@ -743,7 +1081,7 @@ namespace Nethermind.Int256
             UInt256 v = ShiftLeftSmall(in m, sh);
 
             ulong vnHi = v.u2;
-            ulong recip = Reciprocal2By1(vnHi);
+            ulong recip = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(vnHi);
 
             // Normalise dividend: u is 6 limbs (a0..a4 plus a5=0), shifted left by sh.
             ulong u0, u1, u2, u3, u4, u5;
@@ -770,66 +1108,401 @@ namespace Nethermind.Int256
             // Run Knuth steps for dividendLen=5 (plus leading u5) and divisorLen=n.
 
             // m = 2, j = 2..0
-            _ = DivStep3(ref u2, ref u3, ref u4, ref u5, v.u0, v.u1, v.u2, recip);
-            _ = DivStep3(ref u1, ref u2, ref u3, ref u4, v.u0, v.u1, v.u2, recip);
-            _ = DivStep3(ref u0, ref u1, ref u2, ref u3, v.u0, v.u1, v.u2, recip);
-
-            UInt256 remN = Create(u0, u1, u2, 0);
-            rem = (sh == 0) ? remN : ShiftRightSmall(remN, sh);
-
-        }
-
-        // ----------------------------
-        // General remainder: (257-bit sum) % m, where sum is 5 limbs and m is up to 4 limbs.
-        // Uses Knuth D specialised, operating on a 6-limb u (top limb is 0).
-        // ----------------------------
-        [SkipLocalsInit]
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void RemSum257ByMod256Bits(in UInt256 a, ulong a4, in UInt256 m, out UInt256 rem)
-        {
-            Debug.Assert(m.u3 != 0);
-
-            // divisor limb count n = 4
-
-            // Normalise divisor
-            ulong vHi = m.u3;
-            int sh = BitOperations.LeadingZeroCount(vHi);
-
-            UInt256 v = ShiftLeftSmall(in m, sh);
-
-            ulong vnHi = v.u3;
-            ulong recip = Reciprocal2By1(vnHi);
-
-            // Normalise dividend: u is 6 limbs (a0..a4 plus a5=0), shifted left by sh.
-            ulong u0, u1, u2, u3, u4, u5;
-            if (sh == 0)
+            ulong qhat, rhat, rcarry;
+            if (u5 == v.u2)
             {
-                u0 = a.u0;
-                u1 = a.u1;
-                u2 = a.u2;
-                u3 = a.u3;
-                u4 = a4;
-                u5 = 0;
+                qhat = ulong.MaxValue;
+                ulong sum = u4 + v.u2;
+                rcarry = (sum < u4) ? 1UL : 0UL;
+                rhat = sum;
             }
             else
             {
-                int rs = 64 - sh;
-                u0 = a.u0 << sh;
-                u1 = (a.u1 << sh) | (a.u0 >> rs);
-                u2 = (a.u2 << sh) | (a.u1 >> rs);
-                u3 = (a.u3 << sh) | (a.u2 >> rs);
-                u4 = (a4 << sh) | (a.u3 >> rs);
-                u5 = (a4 >> rs); // a5=0
+                if (X86Base.X64.IsSupported)
+                {
+                    (qhat, rhat) = X86Base.X64.DivRem(u4, u5, v.u2); // (upper:lower) = (u5:u4)
+                }
+                else
+                {
+                    qhat = UDivRem2By1(u5, recip, v.u2, u4, out rhat);
+                }
+                rcarry = 0;
             }
 
-            // Run Knuth steps for dividendLen=5 (plus leading u5) and divisorLen=n.
-            // n == 4, m = 1, j = 1..0
-            _ = DivStep4(ref u1, ref u2, ref u3, ref u4, ref u5, in v, recip);
-            _ = DivStep4(ref u0, ref u1, ref u2, ref u3, ref u4, in v, recip);
+            if (rcarry == 0)
+            {
+                ulong pHi = Multiply64(qhat, v.u1, out ulong pLo);
 
-            UInt256 remN = Create(u0, u1, u2, u3);
+                // if qhat*vNext > rhat*b + uCorr then decrement
+                if (pHi > rhat || (pHi == rhat && pLo > u3))
+                {
+                    qhat--;
+
+                    ulong sum1 = rhat + v.u2;
+                    if (sum1 < rhat)
+                        rcarry = 1;
+
+                    rhat = sum1;
+                }
+            }
+
+            if (rcarry == 0)
+            {
+                ulong pHi = Multiply64(qhat, v.u1, out ulong pLo);
+
+                // if qhat*vNext > rhat*b + uCorr then decrement
+                if (pHi > rhat || (pHi == rhat && pLo > u3))
+                {
+                    qhat--;
+                }
+            }
+
+            ulong borrow1 = 0;
+
+            ulong pHi1 = Multiply64(qhat, v.u0, out ulong pLo1);
+            ulong sum2 = pLo1;
+            ulong c2 = (sum2 < pLo1) ? 1UL : 0UL;
+            ulong carry = pHi1 + c2;
+            u2 = Sub(u2, sum2, ref borrow1);
+
+            pHi1 = Multiply64(qhat, v.u1, out pLo1);
+            sum2 = pLo1 + carry;
+            c2 = (sum2 < pLo1) ? 1UL : 0UL;
+            carry = pHi1 + c2;
+            u3 = Sub(u3, sum2, ref borrow1);
+
+            pHi1 = Multiply64(qhat, v.u2, out pLo1);
+            sum2 = pLo1 + carry;
+            c2 = (sum2 < pLo1) ? 1UL : 0UL;
+            carry = pHi1 + c2;
+            u4 = Sub(u4, sum2, ref borrow1);
+
+            u5 = Sub(u5, carry, ref borrow1);
+            ulong borrow = borrow1;
+
+            if (borrow != 0)
+            {
+                AddBack3(ref u2, ref u3, ref u4, ref u5, v.u0, v.u1, v.u2);
+            }
+
+            ulong qhat1, rhat1, rcarry1;
+            if (u4 == v.u2)
+            {
+                qhat1 = ulong.MaxValue;
+                ulong sum3 = u3 + v.u2;
+                rcarry1 = (sum3 < u3) ? 1UL : 0UL;
+                rhat1 = sum3;
+            }
+            else
+            {
+                if (X86Base.X64.IsSupported)
+                {
+                    (qhat1, rhat1) = X86Base.X64.DivRem(u3, u4, v.u2); // (upper:lower) = (u4:u3)
+                }
+                else
+                {
+                    qhat1 = UDivRem2By1(u4, recip, v.u2, u3, out rhat1);
+                }
+                rcarry1 = 0;
+            }
+
+            if (rcarry1 == 0)
+            {
+                ulong pHi2 = Multiply64(qhat1, v.u1, out ulong pLo2);
+
+                // if qhat*vNext > rhat*b + uCorr then decrement
+                if (pHi2 > rhat1 || (pHi2 == rhat1 && pLo2 > u2))
+                {
+                    qhat1--;
+
+                    ulong sum4 = rhat1 + v.u2;
+                    if (sum4 < rhat1)
+                        rcarry1 = 1;
+
+                    rhat1 = sum4;
+                }
+            }
+
+            if (rcarry1 == 0)
+            {
+                ulong pHi3 = Multiply64(qhat1, v.u1, out ulong pLo3);
+
+                // if qhat*vNext > rhat*b + uCorr then decrement
+                if (pHi3 > rhat1 || (pHi3 == rhat1 && pLo3 > u2))
+                {
+                    qhat1--;
+                }
+            }
+
+            ulong borrow2 = 0;
+
+            ulong pHi4 = Multiply64(qhat1, v.u0, out ulong pLo4);
+            ulong sum5 = pLo4;
+            ulong c3 = (sum5 < pLo4) ? 1UL : 0UL;
+            ulong carry1 = pHi4 + c3;
+            u1 = Sub(u1, sum5, ref borrow2);
+
+            pHi4 = Multiply64(qhat1, v.u1, out pLo4);
+            sum5 = pLo4 + carry1;
+            c3 = (sum5 < pLo4) ? 1UL : 0UL;
+            carry1 = pHi4 + c3;
+            u2 = Sub(u2, sum5, ref borrow2);
+
+            pHi4 = Multiply64(qhat1, v.u2, out pLo4);
+            sum5 = pLo4 + carry1;
+            c3 = (sum5 < pLo4) ? 1UL : 0UL;
+            carry1 = pHi4 + c3;
+            u3 = Sub(u3, sum5, ref borrow2);
+
+            u4 = Sub(u4, carry1, ref borrow2);
+            ulong borrow3 = borrow2;
+
+            if (borrow3 != 0)
+            {
+                AddBack3(ref u1, ref u2, ref u3, ref u4, v.u0, v.u1, v.u2);
+            }
+
+            ulong qhat2, rhat2, rcarry2;
+            if (u3 == v.u2)
+            {
+                qhat2 = ulong.MaxValue;
+                ulong sum6 = u2 + v.u2;
+                rcarry2 = (sum6 < u2) ? 1UL : 0UL;
+                rhat2 = sum6;
+            }
+            else
+            {
+                if (X86Base.X64.IsSupported)
+                {
+                    (qhat2, rhat2) = X86Base.X64.DivRem(u2, u3, v.u2); // (upper:lower) = (u3:u2)
+                }
+                else
+                {
+                    qhat2 = UDivRem2By1(u3, recip, v.u2, u2, out rhat2);
+                }
+                rcarry2 = 0;
+            }
+
+            if (rcarry2 == 0)
+            {
+                ulong pHi5 = Multiply64(qhat2, v.u1, out ulong pLo5);
+
+                // if qhat*vNext > rhat*b + uCorr then decrement
+                if (pHi5 > rhat2 || (pHi5 == rhat2 && pLo5 > u1))
+                {
+                    qhat2--;
+
+                    ulong sum7 = rhat2 + v.u2;
+                    if (sum7 < rhat2)
+                        rcarry2 = 1;
+
+                    rhat2 = sum7;
+                }
+            }
+
+            if (rcarry2 == 0)
+            {
+                ulong pHi6 = Multiply64(qhat2, v.u1, out ulong pLo6);
+
+                // if qhat*vNext > rhat*b + uCorr then decrement
+                if (pHi6 > rhat2 || (pHi6 == rhat2 && pLo6 > u1))
+                {
+                    qhat2--;
+                }
+            }
+
+            ulong borrow4 = 0;
+
+            ulong pHi7 = Multiply64(qhat2, v.u0, out ulong pLo7);
+            ulong sum8 = pLo7;
+            ulong c4 = (sum8 < pLo7) ? 1UL : 0UL;
+            ulong carry2 = pHi7 + c4;
+            u0 = Sub(u0, sum8, ref borrow4);
+
+            pHi7 = Multiply64(qhat2, v.u1, out pLo7);
+            sum8 = pLo7 + carry2;
+            c4 = (sum8 < pLo7) ? 1UL : 0UL;
+            carry2 = pHi7 + c4;
+            u1 = Sub(u1, sum8, ref borrow4);
+
+            pHi7 = Multiply64(qhat2, v.u2, out pLo7);
+            sum8 = pLo7 + carry2;
+            c4 = (sum8 < pLo7) ? 1UL : 0UL;
+            carry2 = pHi7 + c4;
+            u2 = Sub(u2, sum8, ref borrow4);
+
+            u3 = Sub(u3, carry2, ref borrow4);
+            ulong borrow5 = borrow4;
+
+            if (borrow5 != 0)
+            {
+                AddBack3(ref u0, ref u1, ref u2, ref u3, v.u0, v.u1, v.u2);
+            }
+
+            UInt256 remN = Create(u0, u1, u2, 0);
             rem = (sh == 0) ? remN : ShiftRightSmall(remN, sh);
         }
+
+// ----------------------------
+// General remainder: (257-bit sum) % m, where sum is 5 limbs and m is up to 4 limbs.
+// Uses Knuth D specialised, operating on a 6-limb u (top limb is 0).
+// ----------------------------
+[SkipLocalsInit]
+[MethodImpl(MethodImplOptions.NoInlining)]
+private static void RemSum257ByMod256Bits(in UInt256 a, ulong a4, in UInt256 m, out UInt256 rem)
+{
+    Debug.Assert(m.u3 != 0);
+
+    // divisor limb count n = 4
+
+    // Normalise divisor
+    ulong vHi = m.u3;
+    int sh = BitOperations.LeadingZeroCount(vHi);
+
+    UInt256 v = ShiftLeftSmall(in m, sh);
+
+    ulong vnHi = v.u3;
+    ulong recip = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(vnHi);
+
+    // Normalise dividend: u is 6 limbs (a0..a4 plus a5=0), shifted left by sh.
+    ulong u0, u1, u2, u3, u4, u5;
+    if (sh == 0)
+    {
+        u0 = a.u0;
+        u1 = a.u1;
+        u2 = a.u2;
+        u3 = a.u3;
+        u4 = a4;
+        u5 = 0;
+    }
+    else
+    {
+        int rs = 64 - sh;
+        u0 = a.u0 << sh;
+        u1 = (a.u1 << sh) | (a.u0 >> rs);
+        u2 = (a.u2 << sh) | (a.u1 >> rs);
+        u3 = (a.u3 << sh) | (a.u2 >> rs);
+        u4 = (a4 << sh) | (a.u3 >> rs);
+        u5 = (a4 >> rs); // a5=0
+    }
+
+    // Run Knuth steps for dividendLen=5 (plus leading u5) and divisorLen=n.
+    // n == 4, m = 1, j = 1..0
+    ulong qhat, rhat, rcarry;
+    if (u5 == v.u3)
+    {
+        qhat = ulong.MaxValue;
+        ulong sum = u4 + v.u3;
+        rcarry = (sum < u4) ? 1UL : 0UL;
+        rhat = sum;
+    }
+    else
+    {
+        if (X86Base.X64.IsSupported)
+        {
+            (qhat, rhat) = X86Base.X64.DivRem(u4, u5, v.u3); // (upper:lower) = (u5:u4)
+        }
+        else
+        {
+            qhat = UDivRem2By1(u5, recip, v.u3, u4, out rhat);
+        }
+        rcarry = 0;
+    }
+
+    if (rcarry == 0)
+    {
+        ulong pHi = Multiply64(qhat, v.u2, out ulong pLo);
+
+        // if qhat*vNext > rhat*b + uCorr then decrement
+        if (pHi > rhat || (pHi == rhat && pLo > u3))
+        {
+            qhat--;
+
+            ulong sum2 = rhat + v.u3;
+            if (sum2 < rhat)
+                rcarry = 1;
+
+            rhat = sum2;
+        }
+    }
+
+    if (rcarry == 0)
+    {
+        ulong pHi = Multiply64(qhat, v.u2, out ulong pLo);
+
+        // if qhat*vNext > rhat*b + uCorr then decrement
+        if (pHi > rhat || (pHi == rhat && pLo > u3))
+        {
+            qhat--;
+        }
+    }
+
+    ulong borrow = SubMul4(ref u1, ref u2, ref u3, ref u4, ref u5, v.u0, v.u1, v.u2, v.u3, qhat);
+
+    if (borrow != 0)
+    {
+        AddBack4(ref u1, ref u2, ref u3, ref u4, ref u5, v.u0, v.u1, v.u2, v.u3);
+    }
+
+    ulong qhat1, rhat1, rcarry1;
+    if (u4 == v.u3)
+    {
+        qhat1 = ulong.MaxValue;
+        ulong sum1 = u3 + v.u3;
+        rcarry1 = (sum1 < u3) ? 1UL : 0UL;
+        rhat1 = sum1;
+    }
+    else
+    {
+        if (X86Base.X64.IsSupported)
+        {
+            (qhat1, rhat1) = X86Base.X64.DivRem(u3, u4, v.u3); // (upper:lower) = (u4:u3)
+        }
+        else
+        {
+            qhat1 = UDivRem2By1(u4, recip, v.u3, u3, out rhat1);
+        }
+        rcarry1 = 0;
+    }
+
+    if (rcarry1 == 0)
+    {
+        ulong pHi1 = Multiply64(qhat1, v.u2, out ulong pLo1);
+
+        // if qhat*vNext > rhat*b + uCorr then decrement
+        if (pHi1 > rhat1 || (pHi1 == rhat1 && pLo1 > u2))
+        {
+            qhat1--;
+
+            ulong sum3 = rhat1 + v.u3;
+            if (sum3 < rhat1)
+                rcarry1 = 1;
+
+            rhat1 = sum3;
+        }
+
+        if (rcarry1 == 0)
+        {
+            ulong pHi = Multiply64(qhat1, v.u2, out ulong pLo);
+
+            // if qhat*vNext > rhat*b + uCorr then decrement
+            if (pHi > rhat1 || (pHi == rhat1 && pLo > u2))
+            {
+                qhat1--;
+            }
+        }
+    }
+
+    ulong borrow1 = SubMul4(ref u0, ref u1, ref u2, ref u3, ref u4, v.u0, v.u1, v.u2, v.u3, qhat1);
+
+    if (borrow1 != 0)
+    {
+        AddBack4(ref u0, ref u1, ref u2, ref u3, ref u4, v.u0, v.u1, v.u2, v.u3);
+    }
+
+    UInt256 remN = Create(u0, u1, u2, u3);
+    rem = (sh == 0) ? remN : ShiftRightSmall(remN, sh);
+}
 
         /// <summary>
         /// Computes the modular sum of this value and <paramref name="a"/>.
@@ -1122,7 +1795,7 @@ namespace Nethermind.Int256
 
             UdivremKnuth(ref quot, un, dnS);
 
-            ulong rem0 = 0, rem1 = 0, rem2 = 0, rem3 = 0;
+            ulong rem0, rem1 = 0, rem2 = 0, rem3 = 0;
             switch (dLen)
             {
                 case 1:
@@ -1146,7 +1819,6 @@ namespace Nethermind.Int256
         r1:
             rem0 = NativeRsh(un[0], shift) | Lsh(un[1], 64 - shift);
         r0:
-
             rem = new UInt256(rem0, rem1, rem2, rem3);
         }
 
@@ -1166,7 +1838,7 @@ namespace Nethermind.Int256
                 var u1 = u[j + d.Length - 1];
                 var u0 = u[j + d.Length - 2];
 
-                ulong qhat, rhat;
+                ulong qhat;
                 if (u2 >= dh)
                 {
                     qhat = ~((ulong)0);
@@ -1174,7 +1846,7 @@ namespace Nethermind.Int256
                 }
                 else
                 {
-                    qhat = UDivRem2By1(u2, reciprocal, dh, u1, out rhat);
+                    qhat = UDivRem2By1(u2, reciprocal, dh, u1, out var rhat);
                     ulong ph = Multiply64(qhat, dl, out ulong pl);
                     if (ph > rhat || (ph == rhat && pl > u0))
                     {
@@ -2146,7 +2818,6 @@ namespace Nethermind.Int256
                 }
 
                 x.Rsh192(out res);
-                z0 = res.u0;
                 z1 = res.u1;
                 z2 = res.u2;
                 z3 = res.u3;
@@ -2156,8 +2827,6 @@ namespace Nethermind.Int256
             else if (n > 128)
             {
                 x.Rsh128(out res);
-                z0 = res.u0;
-                z1 = res.u1;
                 z2 = res.u2;
                 z3 = res.u3;
                 n -= 128;
@@ -2166,9 +2835,6 @@ namespace Nethermind.Int256
             else if (n > 64)
             {
                 x.Rsh64(out res);
-                z0 = res.u0;
-                z1 = res.u1;
-                z2 = res.u2;
                 z3 = res.u3;
                 n -= 64;
                 goto sh64;
@@ -2176,10 +2842,6 @@ namespace Nethermind.Int256
             else
             {
                 res = x;
-                z0 = res.u0;
-                z1 = res.u1;
-                z2 = res.u2;
-                z3 = res.u3;
             }
 
             // remaining shifts
@@ -3130,17 +3792,14 @@ namespace Nethermind.Int256
             }
 
             ulong borrow1 = 0;
-            ulong carry = 0;
 
             ulong pHi1 = Multiply64(qhat, v0, out ulong pLo1);
+            u1d = Sub(u1d, pLo1, ref borrow1);
+
+            ulong carry = pHi1;
+            pHi1 = Multiply64(qhat, v1n, out pLo1);
             ulong sum2 = pLo1 + carry;
             ulong c2 = (sum2 < pLo1) ? 1UL : 0UL;
-            carry = pHi1 + c2;
-            u1d = Sub(u1d, sum2, ref borrow1);
-
-            pHi1 = Multiply64(qhat, v1n, out pLo1);
-            sum2 = pLo1 + carry;
-            c2 = (sum2 < pLo1) ? 1UL : 0UL;
             carry = pHi1 + c2;
             u2d = Sub(u2d, sum2, ref borrow1);
 
@@ -3212,12 +3871,11 @@ namespace Nethermind.Int256
             }
 
             ulong borrow2 = 0;
-            ulong carry1 = 0;
 
             ulong pHi4 = Multiply64(qhat1, v0, out ulong pLo4);
-            ulong sum6 = pLo4 + carry1;
+            ulong sum6 = pLo4;
             ulong c3 = (sum6 < pLo4) ? 1UL : 0UL;
-            carry1 = pHi4 + c3;
+            ulong carry1 = pHi4 + c3;
             u0n2 = Sub(u0n2, sum6, ref borrow2);
 
             pHi4 = Multiply64(qhat1, v1n, out pLo4);
@@ -3248,7 +3906,6 @@ namespace Nethermind.Int256
             // Remainder is u0..u2
             UInt256 remN = Create(u0n2, u1d, u2d, 0);
             remainder = (shift == 0) ? remN : ShiftRightSmall(remN, shift);
-            return;
         }
 
         [SkipLocalsInit]
@@ -3330,10 +3987,7 @@ namespace Nethermind.Int256
 
             if (borrow != 0)
             {
-                if (!AddOverflow(in rem, in v, out rem))
-                {
-                    u4d += 1;
-                }
+                Add(in rem, in v, out rem);
                 qhat--;
             }
 
@@ -3343,7 +3997,6 @@ namespace Nethermind.Int256
 
             // Remainder is u0..u3
             remainder = (shift == 0) ? rem : ShiftRightSmall(rem, shift);
-            return;
         }
 
         // Shift-right by 0..63 (used to unnormalise remainder)
@@ -3867,7 +4520,6 @@ namespace Nethermind.Int256
                     ulong c = (s0 < u2) ? 1UL : 0UL;
 
                     ulong s1 = u3 + v1n;
-                    ulong c1 = (s1 < u3) ? 1UL : 0UL;
                     s1 += c;
 
                     u2 = s0;
@@ -3941,7 +4593,6 @@ namespace Nethermind.Int256
                     ulong c = (s0 < u1) ? 1UL : 0UL;
 
                     ulong s1 = u2 + v1n;
-                    ulong c1 = (s1 < u2) ? 1UL : 0UL;
                     s1 += c;
 
                     u1 = s0;
@@ -4015,7 +4666,6 @@ namespace Nethermind.Int256
                     ulong c = (s0 < u0) ? 1UL : 0UL;
 
                     ulong s1 = u1 + v1n;
-                    ulong c1 = (s1 < u1) ? 1UL : 0UL;
                     s1 += c;
 
                     u0 = s0;
@@ -4077,252 +4727,20 @@ namespace Nethermind.Int256
         // ------------------------------------------------------------
         // Knuth steps (unrolled)
         // ------------------------------------------------------------
-        [SkipLocalsInit]
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static ulong DivStep2(ref ulong u0r, ref ulong u1r, ref ulong u2r, ulong v0, ulong v1, ulong recip)
-        {
-            // Variant B style: load u1/u2 once. Delay u0 until after quotient estimate.
-            ulong u1 = u1r;
-            ulong u2 = u2r;
-
-            ulong qhat;
-            ulong rhat;
-            bool rcarry;
-
-            // Single shared out-home for everything.
-            ulong lo;
-
-            if (u2 == v1)
-            {
-                qhat = ulong.MaxValue;
-                rhat = u1 + v1;
-                rcarry = rhat < u1;
-            }
-            else
-            {
-                qhat = UDivRem2By1(u2, recip, v1, u1, out lo);
-                rhat = lo;
-                rcarry = false;
-            }
-
-            ulong u0 = u0r;
-
-            // qhat*v0 once - reused for correction + subtraction
-            ulong hi = Multiply64(qhat, v0, out lo); // hi:lo = qhat*v0
-
-            // Correct at most twice
-            if (!rcarry && (hi > rhat || (hi == rhat && lo > u0)))
-            {
-                qhat--;
-
-                // (hi:lo) -= v0
-                hi -= (lo < v0) ? 1UL : 0UL;
-                lo -= v0;
-
-                ulong sum = rhat + v1;
-                rcarry = sum < rhat;
-                rhat = sum;
-
-                if (!rcarry && (hi > rhat || (hi == rhat && lo > u0)))
-                {
-                    qhat--;
-
-                    hi -= (lo < v0) ? 1UL : 0UL;
-                    lo -= v0;
-                }
-            }
-
-            // Subtract qhat*v from u (3 limbs)
-            ulong borrow = (u0 < lo) ? 1UL : 0UL;
-            u0 -= lo;
-
-            ulong hi1 = Multiply64(qhat, v1, out lo);
-            ulong sum1 = lo + hi;
-            hi = hi1 + ((sum1 < lo) ? 1UL : 0UL);
-
-            ulong t = u1 - sum1;
-            ulong b = (u1 < sum1) ? 1UL : 0UL;
-            u1 = t - borrow;
-            borrow = b | ((t < borrow) ? 1UL : 0UL);
-
-            t = u2 - hi;
-            b = (u2 < hi) ? 1UL : 0UL;
-            u2 = t - borrow;
-            borrow = b | ((t < borrow) ? 1UL : 0UL);
-
-            // Store raw subtraction results first (preserves aliasing behaviour)
-            u0r = u0;
-            u1r = u1;
-            u2r = u2;
-
-            if (borrow == 0)
-                return qhat;
-
-            // Cold path: add-back and decrement qhat
-
-            ulong s0 = u0 + v0;
-            ulong c0 = (s0 < u0) ? 1UL : 0UL;
-
-            ulong s1 = u1 + v1;
-            ulong c1 = (s1 < u1) ? 1UL : 0UL;
-
-            ulong s1c = s1 + c0;
-            ulong c2 = (s1c < s1) ? 1UL : 0UL;
-
-            // Write order matters for ref-aliasing semantics - match original: u0r, then u1r, then u2r += carry
-            u0r = s0;
-            u1r = s1c;
-            u2r += (c1 | c2);
-
-            return qhat - 1;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static ulong DivStep3(ref ulong u0, ref ulong u1, ref ulong u2, ref ulong u3, ulong v0, ulong v1, ulong v2, ulong recip)
-        {
-            ulong qhat, rhat, rcarry;
-            if (u3 == v2)
-            {
-                qhat = ulong.MaxValue;
-                ulong sum = u2 + v2;
-                rcarry = (sum < u2) ? 1UL : 0UL;
-                rhat = sum;
-            }
-            else
-            {
-                qhat = UDivRem2By1(u3, recip, v2, u2, out rhat);
-                rcarry = 0;
-            }
-
-            if (rcarry == 0)
-            {
-                ulong pHi = Multiply64(qhat, v1, out ulong pLo);
-
-                // if qhat*vNext > rhat*b + uCorr then decrement
-                if (pHi > rhat || (pHi == rhat && pLo > u1))
-                {
-                    qhat--;
-
-                    ulong sum1 = rhat + v2;
-                    if (sum1 < rhat)
-                        rcarry = 1;
-
-                    rhat = sum1;
-                }
-            }
-
-            if (rcarry == 0)
-            {
-                ulong pHi = Multiply64(qhat, v1, out ulong pLo);
-
-                // if qhat*vNext > rhat*b + uCorr then decrement
-                if (pHi > rhat || (pHi == rhat && pLo > u1))
-                {
-                    qhat--;
-                }
-            }
-
-            ulong borrow1 = 0;
-            ulong carry = 0;
-
-            ulong pHi1 = Multiply64(qhat, v0, out ulong pLo1);
-            ulong sum2 = pLo1 + carry;
-            ulong c2 = (sum2 < pLo1) ? 1UL : 0UL;
-            carry = pHi1 + c2;
-            u0 = Sub(u0, sum2, ref borrow1);
-
-            pHi1 = Multiply64(qhat, v1, out pLo1);
-            sum2 = pLo1 + carry;
-            c2 = (sum2 < pLo1) ? 1UL : 0UL;
-            carry = pHi1 + c2;
-            u1 = Sub(u1, sum2, ref borrow1);
-
-            pHi1 = Multiply64(qhat, v2, out pLo1);
-            sum2 = pLo1 + carry;
-            c2 = (sum2 < pLo1) ? 1UL : 0UL;
-            carry = pHi1 + c2;
-            u2 = Sub(u2, sum2, ref borrow1);
-
-            u3 = Sub(u3, carry, ref borrow1);
-            ulong borrow = borrow1;
-
-            if (borrow != 0)
-            {
-                AddBack3(ref u0, ref u1, ref u2, ref u3, v0, v1, v2);
-                qhat--;
-            }
-
-            return qhat;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static ulong DivStep4(ref ulong u0, ref ulong u1, ref ulong u2, ref ulong u3, ref ulong u4, in UInt256 v, ulong recip)
-        {
-            ulong qhat, rhat, rcarry;
-            if (u4 == v.u3)
-            {
-                qhat = ulong.MaxValue;
-                ulong sum = u3 + v.u3;
-                rcarry = (sum < u3) ? 1UL : 0UL;
-                rhat = sum;
-            }
-            else
-            {
-                qhat = UDivRem2By1(u4, recip, v.u3, u3, out rhat);
-                rcarry = 0;
-            }
-
-            if (CorrectQHatOnce(ref qhat, ref rhat, ref rcarry, v.u3, v.u2, u2))
-                CorrectQHatOnce(ref qhat, ref rhat, ref rcarry, v.u3, v.u2, u2);
-
-            ulong borrow = SubMul4(ref u0, ref u1, ref u2, ref u3, ref u4, v.u0, v.u1, v.u2, v.u3, qhat);
-
-            if (borrow != 0)
-            {
-                AddBack4(ref u0, ref u1, ref u2, ref u3, ref u4, v.u0, v.u1, v.u2, v.u3);
-                qhat--;
-            }
-
-            return qhat;
-        }
 
         // ------------------------------------------------------------
         // qhat correction (at most twice in Knuth D)
         // ------------------------------------------------------------
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static bool CorrectQHatOnce(ref ulong qhat, ref ulong rhat, ref ulong rcarry, ulong vHi, ulong vNext, ulong uCorr)
-        {
-            if (rcarry != 0)
-                return false;
-
-            ulong pHi = Multiply64(qhat, vNext, out ulong pLo);
-
-            // if qhat*vNext > rhat*b + uCorr then decrement
-            if (pHi > rhat || (pHi == rhat && pLo > uCorr))
-            {
-                qhat--;
-
-                ulong sum = rhat + vHi;
-                if (sum < rhat)
-                    rcarry = 1;
-
-                rhat = sum;
-                return true;
-            }
-
-            return false;
-        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static ulong SubMul4(in UInt256 u, ref ulong u4, in UInt256 v, ulong q, out UInt256 rem)
         {
             ulong borrow = 0;
-            ulong carry = 0;
 
             ulong pHi = Multiply64(q, v.u0, out ulong pLo);
-            ulong sum = pLo + carry;
+            ulong sum = pLo;
             ulong c2 = (sum < pLo) ? 1UL : 0UL;
-            carry = pHi + c2;
+            ulong carry = pHi + c2;
             var r0 = Sub(u.u0, sum, ref borrow);
 
             pHi = Multiply64(q, v.u1, out pLo);
@@ -4352,12 +4770,11 @@ namespace Nethermind.Int256
         private static ulong SubMul4(ref ulong u0, ref ulong u1, ref ulong u2, ref ulong u3, ref ulong u4, ulong v0, ulong v1, ulong v2, ulong v3, ulong q)
         {
             ulong borrow = 0;
-            ulong carry = 0;
 
             ulong pHi = Multiply64(q, v0, out ulong pLo);
-            ulong sum = pLo + carry;
+            ulong sum = pLo;
             ulong c2 = (sum < pLo) ? 1UL : 0UL;
-            carry = pHi + c2;
+            ulong carry = pHi + c2;
             u0 = Sub(u0, sum, ref borrow);
 
             pHi = Multiply64(q, v1, out pLo);
