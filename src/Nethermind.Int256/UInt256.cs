@@ -283,7 +283,7 @@ namespace Nethermind.Int256
             {
                 if (Vector256.IsHardwareAccelerated)
                 {
-                    var v = Unsafe.As<ulong, Vector256<ulong>>(ref Unsafe.AsRef(in u0));
+                    Vector256<ulong> v = Unsafe.As<ulong, Vector256<ulong>>(ref Unsafe.AsRef(in u0));
                     return v == default;
                 }
                 else
@@ -299,7 +299,7 @@ namespace Nethermind.Int256
             {
                 if (Vector256.IsHardwareAccelerated)
                 {
-                    var v = Unsafe.As<ulong, Vector256<ulong>>(ref Unsafe.AsRef(in u0));
+                    Vector256<ulong> v = Unsafe.As<ulong, Vector256<ulong>>(ref Unsafe.AsRef(in u0));
                     return v == Vector256.CreateScalar(1UL);
                 }
                 else
@@ -599,14 +599,12 @@ namespace Nethermind.Int256
             }
         }
 
-        // ----------------------------
-        // Remainder of 5-limb value by 64-bit modulus (fast, fixes your test).
-        // Computes ((a4..a0 base 2^64) % d).
-        // ----------------------------
         [SkipLocalsInit]
         [MethodImpl(MethodImplOptions.NoInlining)]
         private static void Remainder257By64Bits(in UInt256 a, ulong a4, ulong d, out UInt256 rem)
         {
+            // Remainder of 5-limb value by 64-bit modulus.
+            // Computes ((a4..a0 base 2^64) % d).
             Debug.Assert(d != 0);
             Debug.Assert(a4 <= 1);
 
@@ -860,345 +858,353 @@ namespace Nethermind.Int256
             remainder = Create(remLo, remHi, 0, 0);
         }
 
-        // ----------------------------
-        // General remainder: (257-bit sum) % m, where sum is 5 limbs and m is up to 4 limbs.
-        // Uses Knuth D specialised, operating on a 6-limb u (top limb is 0).
-        // ----------------------------
         [SkipLocalsInit]
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void Remainder257By192Bits(in UInt256 a, in UInt256 m, out UInt256 rem)
+        private static void Remainder257By192Bits(in UInt256 valueLo256, in UInt256 modulus192, out UInt256 remainder)
         {
-            ulong a4 = 1;
-            Debug.Assert(m.u3 == 0 && m.u2 != 0);
-            Debug.Assert(a4 <= 1);
+            // Computes: ( (1 << 256) + valueLo256 ) % modulus192
+            // - Dividend is 257-bit: 4 explicit limbs plus an implicit top limb == 1.
+            // - Modulus is 192-bit: 3 limbs (mod2:mod1:mod0), with mod2 != 0 and mod3 == 0.
+            // Uses Knuth D in base 2^64, specialised to a 3-limb divisor.
+            // We operate on a 5-limb dividend window (u0..u4); the implicit u5 is provably 0 here.
+            const ulong implicitTopLimb = 1;
+            Debug.Assert(modulus192.u3 == 0 && modulus192.u2 != 0);
 
-            // Normalise divisor so v2 has MSB set.
-            ulong vHi = m.u2;
-            int sh = BitOperations.LeadingZeroCount(vHi);
+            // D1 - Normalise modulus so its top limb has the MSB set.
+            ulong modTop = modulus192.u2;
+            int normShiftBits = BitOperations.LeadingZeroCount(modTop);
 
-            UInt256 v = ShiftLeftSmall(in m, sh);
-            ulong v0 = v.u0;
-            ulong v1 = v.u1;
-            ulong v2 = v.u2;
+            UInt256 normMod = ShiftLeftSmall(in modulus192, normShiftBits);
+            ulong mod0 = normMod.u0;
+            ulong mod1 = normMod.u1;
+            ulong mod2 = normMod.u2;
 
-            ulong recip = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(v2);
+            ulong recipMod2 = X86Base.X64.IsSupported ? 0UL : Reciprocal2By1(mod2);
 
-            // Normalise dividend: keep only u0..u4.
-            // With a4 <= 1, u5 is provably always 0, so we do not materialise it.
-            ulong u0, u1, u2a, u3, u4;
-            if (sh == 0)
+            // D1 - Normalise the 257-bit dividend into limbs u0..u4 (u5 is implicitly 0).
+            // Using explicit shifts avoids building a full UInt256 temporary on the hot path.
+            ulong u0, u1, u2, u3, u4;
+            if (normShiftBits == 0)
             {
-                u0 = a.u0;
-                u1 = a.u1;
-                u2a = a.u2;
-                u3 = a.u3;
-                u4 = a4;
+                u0 = valueLo256.u0;
+                u1 = valueLo256.u1;
+                u2 = valueLo256.u2;
+                u3 = valueLo256.u3;
+                u4 = implicitTopLimb;
             }
             else
             {
-                int rs = 64 - sh;
-                u0 = a.u0 << sh;
-                u1 = (a.u1 << sh) | (a.u0 >> rs);
-                u2a = (a.u2 << sh) | (a.u1 >> rs);
-                u3 = (a.u3 << sh) | (a.u2 >> rs);
-                u4 = (a4 << sh) | (a.u3 >> rs);
-                // u5 would be (a4 >> rs) and is always 0 because a4 <= 1 and rs in 1..63.
+                int inv = 64 - normShiftBits;
+                u0 = valueLo256.u0 << normShiftBits;
+                u1 = (valueLo256.u1 << normShiftBits) | (valueLo256.u0 >> inv);
+                u2 = (valueLo256.u2 << normShiftBits) | (valueLo256.u1 >> inv);
+                u3 = (valueLo256.u3 << normShiftBits) | (valueLo256.u2 >> inv);
+                u4 = (implicitTopLimb << normShiftBits) | (valueLo256.u3 >> inv);
+                // u5 would be (implicitTopLimb >> inv) which is always 0 for inv in 1..63.
             }
 
-            // --------------------------------------------------------------------
-            // j = 2 (top quotient digit) specialisation:
-            // u5 is 0, v2 has MSB set, so q2 is in {0,1}.
-            // Compute q2 exactly by 3-limb compare and subtract v once if needed.
-            // --------------------------------------------------------------------
-            if (u4 > v2 || (u4 == v2 && (u3 > v1 || (u3 == v1 && u2a >= v0))))
+            // j = 2 (top digit) specialisation:
+            // With u5 == 0 and mod2 normalised, the top quotient digit is in {0,1}.
+            // Compute it exactly by comparing (u4:u3:u2) against (mod2:mod1:mod0).
+            if (u4 > mod2 || (u4 == mod2 && (u3 > mod1 || (u3 == mod1 && u2 >= mod0))))
             {
-                ulong b = 0;
-                u2a = Sub(u2a, v0, ref b);
-                u3 = Sub(u3, v1, ref b);
-                u4 = Sub(u4, v2, ref b);
-                Debug.Assert(b == 0);
+                ulong borrow = 0;
+                u2 = Sub(u2, mod0, ref borrow);
+                u3 = Sub(u3, mod1, ref borrow);
+                u4 = Sub(u4, mod2, ref borrow);
+                Debug.Assert(borrow == 0);
             }
 
-            // --------------------------------------------------------------------
             // j = 1
-            // --------------------------------------------------------------------
             {
-                ulong qhat, rhat, rcarry;
+                // Estimate q from (u4:u3) / mod2, tracking r (the remainder of that divide).
+                ulong qEst, rEst;
+                ulong rCarry;
 
-                if (u4 == v2)
+                if (u4 == mod2)
                 {
-                    qhat = ulong.MaxValue;
-                    ulong sum = u3 + v2;
-                    rcarry = (sum < u3) ? 1UL : 0UL;
-                    rhat = sum;
+                    qEst = ulong.MaxValue;
+                    ulong sum = u3 + mod2;
+                    rCarry = (sum < u3) ? 1UL : 0UL;
+                    rEst = sum;
                 }
                 else
                 {
                     if (X86Base.X64.IsSupported)
                     {
-                        (qhat, rhat) = X86Base.X64.DivRem(u3, u4, v2);
+                        (qEst, rEst) = X86Base.X64.DivRem(u3, u4, mod2);
                     }
                     else
                     {
-                        qhat = UDivRem2By1(u4, recip, v2, u3, out rhat);
+                        qEst = UDivRem2By1(u4, recipMod2, mod2, u3, out rEst);
                     }
-                    rcarry = 0;
+                    rCarry = 0;
                 }
 
-                // Compute qhat*v1 ONCE - used for correction and for the mul-sub.
-                ulong qv1Hi = Multiply64(qhat, v1, out ulong qv1Lo);
+                // Precompute q*mod1 once - used in correction and in the mul-sub.
+                ulong qMod1Hi = Multiply64(qEst, mod1, out ulong qMod1Lo);
 
-                if (rcarry == 0 && (qv1Hi > rhat || (qv1Hi == rhat && qv1Lo > u2a)))
+                // Knuth correction: compare (q*mod1) against (r:u2). At most two decrements.
+                if (rCarry == 0 && (qMod1Hi > rEst || (qMod1Hi == rEst && qMod1Lo > u2)))
                 {
-                    qhat--;
+                    qEst--;
 
-                    // qv1 -= v1 (128-bit)
-                    ulong t = qv1Lo - v1;
-                    qv1Hi -= (t > qv1Lo) ? 1UL : 0UL;
-                    qv1Lo = t;
+                    // (q*mod1) -= mod1 (128-bit)
+                    ulong t = qMod1Lo - mod1;
+                    qMod1Hi -= (t > qMod1Lo) ? 1UL : 0UL;
+                    qMod1Lo = t;
 
-                    ulong sum = rhat + v2;
-                    rcarry = (sum < rhat) ? 1UL : 0UL;
-                    rhat = sum;
+                    ulong sum = rEst + mod2;
+                    rCarry = (sum < rEst) ? 1UL : 0UL;
+                    rEst = sum;
                 }
 
-                if (rcarry == 0 && (qv1Hi > rhat || (qv1Hi == rhat && qv1Lo > u2a)))
+                if (rCarry == 0 && (qMod1Hi > rEst || (qMod1Hi == rEst && qMod1Lo > u2)))
                 {
-                    qhat--;
+                    qEst--;
 
-                    // qv1 -= v1 (128-bit)
-                    ulong t = qv1Lo - v1;
-                    qv1Hi -= (t > qv1Lo) ? 1UL : 0UL;
-                    qv1Lo = t;
-                    // No need to update rhat again - not used after this point.
+                    ulong t = qMod1Lo - mod1;
+                    qMod1Hi -= (t > qMod1Lo) ? 1UL : 0UL;
+                    qMod1Lo = t;
+                    // rEst not needed after this point for j=1.
                 }
 
-                // Mul-sub 3 limbs into u1..u4, reusing qhat*v1.
+                // Mul-sub q*mod from the 4-limb window u1..u4 (producing updated u1..u4).
                 ulong borrow = 0;
 
-                ulong p0Hi = Multiply64(qhat, v0, out ulong p0Lo);
-                u1 = Sub(u1, p0Lo, ref borrow);
-                ulong carry = p0Hi;
+                ulong qMod0Hi = Multiply64(qEst, mod0, out ulong qMod0Lo);
+                u1 = Sub(u1, qMod0Lo, ref borrow);
+                ulong carry = qMod0Hi;
 
-                ulong sum1 = qv1Lo + carry;
-                ulong c1 = (sum1 < qv1Lo) ? 1UL : 0UL;
-                carry = qv1Hi + c1;
-                u2a = Sub(u2a, sum1, ref borrow);
+                ulong sum1 = qMod1Lo + carry;
+                ulong c1 = (sum1 < qMod1Lo) ? 1UL : 0UL;
+                carry = qMod1Hi + c1;
+                u2 = Sub(u2, sum1, ref borrow);
 
-                ulong p2Hi = Multiply64(qhat, v2, out ulong p2Lo);
-                ulong sum2 = p2Lo + carry;
-                ulong c2 = (sum2 < p2Lo) ? 1UL : 0UL;
-                carry = p2Hi + c2;
+                ulong qMod2Hi = Multiply64(qEst, mod2, out ulong qMod2Lo);
+                ulong sum2 = qMod2Lo + carry;
+                ulong c2 = (sum2 < qMod2Lo) ? 1UL : 0UL;
+                carry = qMod2Hi + c2;
                 u3 = Sub(u3, sum2, ref borrow);
 
                 u4 = Sub(u4, carry, ref borrow);
 
                 if (borrow != 0)
                 {
-                    AddBack3(ref u1, ref u2a, ref u3, ref u4, v0, v1, v2);
+                    AddBack3(ref u1, ref u2, ref u3, ref u4, mod0, mod1, mod2);
                 }
             }
 
-            // --------------------------------------------------------------------
             // j = 0
-            // --------------------------------------------------------------------
             {
-                ulong qhat, rhat, rcarry;
+                // Estimate q from (u3:u2) / mod2.
+                ulong qEst, rEst;
+                ulong rCarry;
 
-                if (u3 == v2)
+                if (u3 == mod2)
                 {
-                    qhat = ulong.MaxValue;
-                    ulong sum = u2a + v2;
-                    rcarry = (sum < u2a) ? 1UL : 0UL;
-                    rhat = sum;
+                    qEst = ulong.MaxValue;
+                    ulong sum = u2 + mod2;
+                    rCarry = (sum < u2) ? 1UL : 0UL;
+                    rEst = sum;
                 }
                 else
                 {
                     if (X86Base.X64.IsSupported)
                     {
-                        (qhat, rhat) = X86Base.X64.DivRem(u2a, u3, v2);
+                        (qEst, rEst) = X86Base.X64.DivRem(u2, u3, mod2);
                     }
                     else
                     {
-                        qhat = UDivRem2By1(u3, recip, v2, u2a, out rhat);
+                        qEst = UDivRem2By1(u3, recipMod2, mod2, u2, out rEst);
                     }
-                    rcarry = 0;
+                    rCarry = 0;
                 }
 
-                // qhat*v1 once (correction + mul-sub)
-                ulong qv1Hi = Multiply64(qhat, v1, out ulong qv1Lo);
+                // q*mod1 once (correction + mul-sub)
+                ulong qMod1Hi = Multiply64(qEst, mod1, out ulong qMod1Lo);
 
-                if (rcarry == 0 && (qv1Hi > rhat || (qv1Hi == rhat && qv1Lo > u1)))
+                if (rCarry == 0 && (qMod1Hi > rEst || (qMod1Hi == rEst && qMod1Lo > u1)))
                 {
-                    qhat--;
+                    qEst--;
 
-                    ulong t = qv1Lo - v1;
-                    qv1Hi -= (t > qv1Lo) ? 1UL : 0UL;
-                    qv1Lo = t;
+                    ulong t = qMod1Lo - mod1;
+                    qMod1Hi -= (t > qMod1Lo) ? 1UL : 0UL;
+                    qMod1Lo = t;
 
-                    ulong sum = rhat + v2;
-                    rcarry = (sum < rhat) ? 1UL : 0UL;
-                    rhat = sum;
+                    ulong sum = rEst + mod2;
+                    rCarry = (sum < rEst) ? 1UL : 0UL;
+                    rEst = sum;
                 }
 
-                if (rcarry == 0 && (qv1Hi > rhat || (qv1Hi == rhat && qv1Lo > u1)))
+                if (rCarry == 0 && (qMod1Hi > rEst || (qMod1Hi == rEst && qMod1Lo > u1)))
                 {
-                    qhat--;
+                    qEst--;
 
-                    ulong t = qv1Lo - v1;
-                    qv1Hi -= (t > qv1Lo) ? 1UL : 0UL;
-                    qv1Lo = t;
+                    ulong t = qMod1Lo - mod1;
+                    qMod1Hi -= (t > qMod1Lo) ? 1UL : 0UL;
+                    qMod1Lo = t;
                 }
 
-                // Mul-sub into u0..u3 (remainder will end up in u0..u2a).
+                // Mul-sub q*mod from the 4-limb window u0..u3. Final remainder ends up in u0..u2.
                 ulong borrow = 0;
 
-                ulong p0Hi = Multiply64(qhat, v0, out ulong p0Lo);
-                u0 = Sub(u0, p0Lo, ref borrow);
-                ulong carry = p0Hi;
+                ulong qMod0Hi = Multiply64(qEst, mod0, out ulong qMod0Lo);
+                u0 = Sub(u0, qMod0Lo, ref borrow);
+                ulong carry = qMod0Hi;
 
-                ulong sum1 = qv1Lo + carry;
-                ulong c1 = (sum1 < qv1Lo) ? 1UL : 0UL;
-                carry = qv1Hi + c1;
+                ulong sum1 = qMod1Lo + carry;
+                ulong c1 = (sum1 < qMod1Lo) ? 1UL : 0UL;
+                carry = qMod1Hi + c1;
                 u1 = Sub(u1, sum1, ref borrow);
 
-                ulong p2Hi = Multiply64(qhat, v2, out ulong p2Lo);
-                ulong sum2 = p2Lo + carry;
-                ulong c2 = (sum2 < p2Lo) ? 1UL : 0UL;
-                carry = p2Hi + c2;
-                u2a = Sub(u2a, sum2, ref borrow);
+                ulong qMod2Hi = Multiply64(qEst, mod2, out ulong qMod2Lo);
+                ulong sum2 = qMod2Lo + carry;
+                ulong c2 = (sum2 < qMod2Lo) ? 1UL : 0UL;
+                carry = qMod2Hi + c2;
+                u2 = Sub(u2, sum2, ref borrow);
 
                 u3 = Sub(u3, carry, ref borrow);
 
                 if (borrow != 0)
                 {
-                    AddBack3(ref u0, ref u1, ref u2a, ref u3, v0, v1, v2);
+                    AddBack3(ref u0, ref u1, ref u2, ref u3, mod0, mod1, mod2);
                 }
             }
 
-            // Unnormalise remainder
-            if (sh == 0)
+            // D8 - De-normalise remainder.
+            if (normShiftBits == 0)
             {
-                rem = Create(u0, u1, u2a, 0);
+                remainder = Create(u0, u1, u2, 0);
                 return;
             }
+
             {
-                int rs = 64 - sh;
-                ulong o0 = (u0 >> sh) | (u1 << rs);
-                ulong o1 = (u1 >> sh) | (u2a << rs);
-                ulong o2 = (u2a >> sh);
-                rem = Create(o0, o1, o2, 0);
+                int inv = 64 - normShiftBits;
+                ulong r0 = (u0 >> normShiftBits) | (u1 << inv);
+                ulong r1 = (u1 >> normShiftBits) | (u2 << inv);
+                ulong r2 = (u2 >> normShiftBits);
+                remainder = Create(r0, r1, r2, 0);
             }
         }
 
-        // ----------------------------
-        // General remainder: (257-bit sum) % m, where sum is 5 limbs and m is up to 4 limbs.
-        // Uses Knuth D specialised, operating on a 6-limb u (top limb is 0).
-        // ----------------------------
         [SkipLocalsInit]
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void Remainder257By256Bits(in UInt256 a, in UInt256 m, out UInt256 rem)
+        private static void Remainder257By256Bits(in UInt256 valueLo256, in UInt256 modulus256, out UInt256 remainder)
         {
-            ulong a4 = 1;
-            Debug.Assert(m.u3 != 0);
-            Debug.Assert(a4 <= 1);
+            // Computes: ( (1 << 256) + valueLo256 ) % modulus256
+            // - Dividend is 257-bit: 4 explicit limbs plus an implicit top limb == 1.
+            // - Modulus is up to 256-bit (4 limbs), and must have a non-zero top limb.
+            // Uses Knuth D in base 2^64, specialised to a 4-limb divisor, with the top dividend limb u5 == 0.
+            const ulong implicitTopLimb = 1;
+            Debug.Assert(modulus256.u3 != 0);
 
-            // Normalise divisor
-            int sh = BitOperations.LeadingZeroCount(m.u3);
-            UInt256 v = ShiftLeftSmall(in m, sh);
-            UInt256 u = ShiftLeftSmall(in a, sh);
+            // D1 - Normalise modulus so its high limb has the top bit set.
+            int normShiftBits = BitOperations.LeadingZeroCount(modulus256.u3);
+            UInt256 normMod = ShiftLeftSmall(in modulus256, normShiftBits);
+            UInt256 normValue = ShiftLeftSmall(in valueLo256, normShiftBits);
 
-            ulong v3 = v.u3;
+            ulong mod3 = normMod.u3;
+            ulong recipMod3 = X86Base.X64.IsSupported ? 0UL : Reciprocal2By1(mod3);
 
-            ulong recip = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(v3);
-            // Normalise dividend: u5 is guaranteed 0 for a 257-bit input
-            ulong u0 = u.u0;
-            ulong u1 = u.u1;
-            ulong u2 = u.u2;
-            ulong u3 = u.u3;
-            ulong u4 = (sh == 0) ? a4 : (a4 << sh) | (a.u3 >> (64 - sh));
+            // D1 - Normalise the 257-bit dividend into limbs u0..u4 (u5 is implicitly 0).
+            ulong u0 = normValue.u0;
+            ulong u1 = normValue.u1;
+            ulong u2 = normValue.u2;
+            ulong u3 = normValue.u3;
+            ulong u4 = (normShiftBits == 0)
+                ? implicitTopLimb
+                : (implicitTopLimb << normShiftBits) | (valueLo256.u3 >> (64 - normShiftBits));
 
-            ulong v0 = v.u0;
-            ulong v1 = v.u1;
-            ulong v2 = v.u2;
+            ulong mod0 = normMod.u0;
+            ulong mod1 = normMod.u1;
+            ulong mod2 = normMod.u2;
 
-            // High quotient digit q1 is only 0 or 1 (since u5==0, v3 has top bit set).
-            // Implement as "attempt subtract V*B".
-            if (u4 >= v3)
+            // High quotient digit (from the top limb) can only be 0 or 1 because:
+            // - u5 == 0 for a 257-bit dividend
+            // - mod3 has its MSB set after normalisation
+            // So we implement "qHigh = 1?" as a single attempted subtraction of the modulus.
+            if (u4 >= mod3)
             {
-                ulong b = 0;
-                u1 = Sub(u1, v0, ref b);
-                u2 = Sub(u2, v1, ref b);
-                u3 = Sub(u3, v2, ref b);
-                u4 = Sub(u4, v3, ref b);
+                ulong borrow = 0;
+                u1 = Sub(u1, mod0, ref borrow);
+                u2 = Sub(u2, mod1, ref borrow);
+                u3 = Sub(u3, mod2, ref borrow);
+                u4 = Sub(u4, mod3, ref borrow);
 
-                // If we borrowed past u4, we would have borrowed from u5 (which is 0) - so undo.
-                if (b != 0)
+                // If we borrowed past u4, we'd be borrowing from u5 (which is 0), so undo the subtraction.
+                if (borrow != 0)
                 {
-                    ulong c = 0;
-                    AddWithCarry(u1, v0, ref c, out u1);
-                    AddWithCarry(u2, v1, ref c, out u2);
-                    AddWithCarry(u3, v2, ref c, out u3);
-                    AddWithCarry(u4, v3, ref c, out u4);
-                    // ignore final carry - it would go into u5
+                    ulong carry = 0;
+                    AddWithCarry(u1, mod0, ref carry, out u1);
+                    AddWithCarry(u2, mod1, ref carry, out u2);
+                    AddWithCarry(u3, mod2, ref carry, out u3);
+                    AddWithCarry(u4, mod3, ref carry, out u4);
+                    // carry into u5 is ignored (u5 is outside the represented range)
                 }
             }
 
-            // Now only one Knuth step remains (j = 0)
-            ulong q0, r0, rcarry0;
+            // Only one Knuth step remains (j = 0), estimating q0 from (u4:u3) / mod3.
+            ulong q0, rHat;
+            ulong rHatCarry;
 
-            if (u4 == v3)
+            if (u4 == mod3)
             {
                 q0 = ulong.MaxValue;
-                ulong sum = u3 + v3;
-                rcarry0 = (sum < u3) ? 1UL : 0UL;
-                r0 = sum;
+                ulong sum = u3 + mod3;
+                rHatCarry = (sum < u3) ? 1UL : 0UL;
+                rHat = sum;
             }
             else
             {
                 if (X86Base.X64.IsSupported)
                 {
-                    (q0, r0) = X86Base.X64.DivRem(u3, u4, v3); // (upper:lower) = (u4:u3)
+                    (q0, rHat) = X86Base.X64.DivRem(u3, u4, mod3); // (u4:u3) / mod3
                 }
                 else
                 {
-                    q0 = UDivRem2By1(u4, recip, v3, u3, out r0);
+                    q0 = UDivRem2By1(u4, recipMod3, mod3, u3, out rHat);
                 }
 
-                rcarry0 = 0;
+                rHatCarry = 0;
             }
 
-            // q0 correction - only do the second check if we decremented once
-            if (rcarry0 == 0)
+            // D3 correction: ensure q0 isn't too large by checking q0*mod2 against (rHat:u2).
+            // Only do the second check if we decremented once.
+            if (rHatCarry == 0)
             {
-                ulong pHi = Multiply64(q0, v2, out ulong pLo);
+                ulong qMod2Hi = Multiply64(q0, mod2, out ulong qMod2Lo);
 
-                if (pHi > r0 || (pHi == r0 && pLo > u2))
+                if (qMod2Hi > rHat || (qMod2Hi == rHat && qMod2Lo > u2))
                 {
                     q0--;
 
-                    ulong sum = r0 + v3;
-                    rcarry0 = (sum < r0) ? 1UL : 0UL;
-                    r0 = sum;
+                    ulong sum = rHat + mod3;
+                    rHatCarry = (sum < rHat) ? 1UL : 0UL;
+                    rHat = sum;
 
-                    if (rcarry0 == 0)
+                    if (rHatCarry == 0)
                     {
-                        pHi = Multiply64(q0, v2, out pLo);
-                        if (pHi > r0 || (pHi == r0 && pLo > u2))
+                        qMod2Hi = Multiply64(q0, mod2, out qMod2Lo);
+                        if (qMod2Hi > rHat || (qMod2Hi == rHat && qMod2Lo > u2))
                             q0--;
                     }
                 }
             }
 
-            ulong borrow = SubMul4(ref u0, ref u1, ref u2, ref u3, ref u4, v0, v1, v2, v3, q0);
-            if (borrow != 0)
+            // D4/D6 - Subtract q0 * modulus from the 5-limb window (u0..u4).
+            // If it underflows, add modulus back once.
+            ulong underflow = SubMul4(ref u0, ref u1, ref u2, ref u3, ref u4, mod0, mod1, mod2, mod3, q0);
+            if (underflow != 0)
             {
-                AddBack4(ref u0, ref u1, ref u2, ref u3, ref u4, v0, v1, v2, v3);
+                AddBack4(ref u0, ref u1, ref u2, ref u3, ref u4, mod0, mod1, mod2, mod3);
             }
 
-            UInt256 remN = Create(u0, u1, u2, u3);
-            rem = ShiftRightSmall(in remN, sh);
+            // D8 - De-normalise the remainder.
+            UInt256 normRem = Create(u0, u1, u2, u3);
+            remainder = ShiftRightSmall(in normRem, normShiftBits);
         }
+
         /// <summary>
         /// Computes the modular sum of this value and <paramref name="a"/>.
         /// </summary>
@@ -2601,7 +2607,7 @@ namespace Nethermind.Int256
         {
             if (Vector256.IsHardwareAccelerated)
             {
-                var av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
+                Vector256<ulong> av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
                 // Mark res as initalized so we can use it as left said of ref assignment
                 Unsafe.SkipInit(out res);
                 Unsafe.As<UInt256, Vector256<ulong>>(ref res) = Vector256.Xor(av, Vector256<ulong>.AllBitsSet);
@@ -2620,8 +2626,8 @@ namespace Nethermind.Int256
         {
             if (Vector256.IsHardwareAccelerated)
             {
-                var av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
-                var bv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
+                Vector256<ulong> av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
+                Vector256<ulong> bv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
                 // Mark res as initalized so we can use it as left said of ref assignment
                 Unsafe.SkipInit(out res);
                 Unsafe.As<UInt256, Vector256<ulong>>(ref res) = Vector256.BitwiseOr(av, bv);
@@ -2642,8 +2648,8 @@ namespace Nethermind.Int256
         {
             if (Vector256.IsHardwareAccelerated)
             {
-                var av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
-                var bv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
+                Vector256<ulong> av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
+                Vector256<ulong> bv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
                 // Mark res as initalized so we can use it as left said of ref assignment
                 Unsafe.SkipInit(out res);
                 Unsafe.As<UInt256, Vector256<ulong>>(ref res) = Vector256.BitwiseAnd(av, bv);
@@ -2664,8 +2670,8 @@ namespace Nethermind.Int256
         {
             if (Vector256.IsHardwareAccelerated)
             {
-                var av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
-                var bv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
+                Vector256<ulong> av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
+                Vector256<ulong> bv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
                 // Mark res as initalized so we can use it as left said of ref assignment
                 Unsafe.SkipInit(out res);
                 Unsafe.As<UInt256, Vector256<ulong>>(ref res) = Vector256.Xor(av, bv);
@@ -3126,7 +3132,7 @@ namespace Nethermind.Int256
         {
             if (Vector256.IsHardwareAccelerated)
             {
-                var v = Unsafe.As<ulong, Vector256<uint>>(ref Unsafe.AsRef(in u0));
+                Vector256<uint> v = Unsafe.As<ulong, Vector256<uint>>(ref Unsafe.AsRef(in u0));
                 return v == Vector256.CreateScalar(other);
             }
             else
@@ -3141,7 +3147,7 @@ namespace Nethermind.Int256
         {
             if (Vector256.IsHardwareAccelerated)
             {
-                var v = Unsafe.As<ulong, Vector256<ulong>>(ref Unsafe.AsRef(in u0));
+                Vector256<ulong> v = Unsafe.As<ulong, Vector256<ulong>>(ref Unsafe.AsRef(in u0));
                 return v == Vector256.CreateScalar(other);
             }
             else
@@ -3154,15 +3160,15 @@ namespace Nethermind.Int256
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Equals(in UInt256 other)
         {
-            var v1 = Unsafe.As<ulong, Vector256<ulong>>(ref Unsafe.AsRef(in u0));
-            var v2 = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in other));
+            Vector256<ulong> v1 = Unsafe.As<ulong, Vector256<ulong>>(ref Unsafe.AsRef(in u0));
+            Vector256<ulong> v2 = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in other));
             return v1 == v2;
         }
 
         public bool Equals(UInt256 other)
         {
-            var v1 = Unsafe.As<ulong, Vector256<ulong>>(ref Unsafe.AsRef(in u0));
-            var v2 = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in other));
+            Vector256<ulong> v1 = Unsafe.As<ulong, Vector256<ulong>>(ref Unsafe.AsRef(in u0));
+            Vector256<ulong> v2 = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in other));
             return v1 == v2;
         }
 
