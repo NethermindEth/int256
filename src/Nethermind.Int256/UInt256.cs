@@ -489,9 +489,10 @@ namespace Nethermind.Int256
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void AddWithCarry(ulong x, ulong y, ref ulong carry, out ulong sum)
         {
-            sum = x + y + carry;
+            ulong result = x + y + carry;
             // both msb bits are 1 or one of them is 1 and we had carry from lower bits
-            carry = ((x & y) | ((x | y) & (~sum))) >> 63;
+            carry = ((x & y) | ((x | y) & (~result))) >> 63;
+            sum = result;
         }
 
         /// <summary>
@@ -1785,8 +1786,9 @@ namespace Nethermind.Int256
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void SubtractWithBorrow(ulong a, ulong b, ref ulong borrow, out ulong res)
         {
-            res = a - b - borrow;
-            borrow = (((~a) & b) | (~(a ^ b)) & res) >> 63;
+            ulong result = a - b - borrow;
+            borrow = (((~a) & b) | (~(a ^ b)) & result) >> 63;
+            res = result;
         }
 
         /// <summary>
@@ -1796,6 +1798,7 @@ namespace Nethermind.Int256
         /// <param name="x">The first 256‑bit unsigned integer.</param>
         /// <param name="y">The second 256‑bit unsigned integer.</param>
         /// <param name="res">When this method returns, contains the 256‑bit product of x and y.</param>
+        [SkipLocalsInit]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Multiply(in UInt256 x, in UInt256 y, out UInt256 res)
         {
@@ -4480,6 +4483,7 @@ namespace Nethermind.Int256
 
         // Knuth steps (unrolled)
         // qhat correction (at most twice in Knuth D)
+        [SkipLocalsInit]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static ulong SubMul4(in UInt256 u, ref ulong u4, in UInt256 v, ulong q, out UInt256 rem)
         {
