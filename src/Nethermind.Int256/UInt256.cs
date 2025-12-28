@@ -557,19 +557,18 @@ namespace Nethermind.Int256
             }
         }
 
-        // ----------------------------
-        // Fast reduction when S < 2m (eg x<m,y<m).
-        // Uses carry-aware single subtract.
-        // ----------------------------
         [SkipLocalsInit]
         [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ReduceSumAssumingLT2m(in UInt256 sum, ulong carry, in UInt256 m, out UInt256 res)
         {
+            // Fast reduction when S < 2m (eg x<m,y<m).
+            // Uses carry-aware single subtract.
+
             // diff = sum - m
             ulong borrow = !SubtractUnderflow(in sum, in m, out UInt256 d) ? 0UL : 1UL;
 
-            // Need subtract if (carry==1) || (sum>=m)
-            // sum>=m <=> borrow==0
+            // Need subtract if (carry == 1) || (sum >= m)
+            // sum >= m <=> borrow == 0
             ulong needSub = carry | (borrow ^ 1UL);
             ulong mask = 0UL - needSub;
 
@@ -3404,9 +3403,7 @@ namespace Nethermind.Int256
         [MethodImpl(MethodImplOptions.NoInlining)]
         private static void DivideBy192Bits(in UInt256 x, in UInt256 y, out UInt256 q, out UInt256 remainder)
         {
-            // ------------------------------------------------------------
             // n >= 2: Knuth D (specialised) with reciprocal qhat
-            // ------------------------------------------------------------
 
             int shift = BitOperations.LeadingZeroCount(y.u2);
 
@@ -3613,9 +3610,7 @@ namespace Nethermind.Int256
         [MethodImpl(MethodImplOptions.NoInlining)]
         private static void DivideBy256Bits(in UInt256 x, in UInt256 y, out UInt256 q, out UInt256 remainder)
         {
-            // ------------------------------------------------------------
             // n >= 2: Knuth D (specialised) with reciprocal qhat
-            // ------------------------------------------------------------
 
             int shift = BitOperations.LeadingZeroCount(y.u3);
 
@@ -3822,14 +3817,10 @@ namespace Nethermind.Int256
         [MethodImpl(MethodImplOptions.NoInlining)]
         private static void DivideBy128BitsX86Base(in UInt256 x, in UInt256 y, out UInt256 q, out UInt256 remainder)
         {
-            // ------------------------------------------------------------
             // n == 2: specialised Knuth D with hardware DivRem
-            // ------------------------------------------------------------
             Debug.Assert(y.u1 != 0 && y.u2 == 0 && y.u3 == 0);
 
-            // -------------------------
             // Normalise divisor (2 limbs)
-            // -------------------------
             ulong y0 = y.u0;
             ulong y1 = y.u1;
 
@@ -3848,9 +3839,7 @@ namespace Nethermind.Int256
                 v1n = y1;
             }
 
-            // -------------------------
             // Normalise dividend (5 limbs)
-            // -------------------------
             ulong u0 = x.u0;
             ulong u1 = x.u1;
             ulong u2 = x.u2;
@@ -3875,11 +3864,9 @@ namespace Nethermind.Int256
             Unsafe.SkipInit(out q);
             ref ulong qRef = ref Unsafe.As<UInt256, ulong>(ref q);
 
-            // ------------------------------------------------------------
             // Fast path: if the normalised low limb is 0 then V = v1n*B.
             // That turns the whole thing into a plain 256/64 division on (u4..u1),
             // with remainder (r:u0).
-            // ------------------------------------------------------------
             if (v0 == 0)
             {
                 Debug.Assert(u4 < v1n);
@@ -3918,7 +3905,6 @@ namespace Nethermind.Int256
                 return;
             }
 
-            // ------------------------------------------------------------
             // n == 2 trick:
             // After DivRem on v1n:
             //   (uHi*B + uMid) = qhat*v1n + rhat
@@ -3926,11 +3912,8 @@ namespace Nethermind.Int256
             //   (rhat:uLo) - qhat*v0
             //
             // This removes the qhat*v1n multiply and the full 3-limb subtract/add-back.
-            // ------------------------------------------------------------
 
-            // ------------------------------------------------------------
             // Step j=2: q2 from (u4:u3:u2)
-            // ------------------------------------------------------------
             {
                 // Always true for this setup: u4 < v1n, so DivRem is safe here.
                 Debug.Assert(u4 < v1n);
@@ -3969,9 +3952,7 @@ namespace Nethermind.Int256
                 Unsafe.Add(ref qRef, 2) = qhat;
             }
 
-            // ------------------------------------------------------------
             // Step j=1: q1 from (u3:u2:u1)
-            // ------------------------------------------------------------
             {
                 ulong rhat;
                 bool rcarry;
@@ -4020,9 +4001,7 @@ namespace Nethermind.Int256
                 Unsafe.Add(ref qRef, 1) = qhat;
             }
 
-            // ------------------------------------------------------------
             // Step j=0: q0 from (u2:u1:u0)
-            // ------------------------------------------------------------
             {
                 ulong rhat;
                 bool rcarry;
@@ -4074,9 +4053,7 @@ namespace Nethermind.Int256
             // q3 is always 0 for 256/128 here.
             Unsafe.Add(ref qRef, 3) = 0;
 
-            // ------------------------------------------------------------
             // Remainder (u0..u1 in normalised space) - unnormalise.
-            // ------------------------------------------------------------
             Unsafe.SkipInit(out remainder);
             ref ulong remRef = ref Unsafe.As<UInt256, ulong>(ref remainder);
 
@@ -4100,15 +4077,11 @@ namespace Nethermind.Int256
         [MethodImpl(MethodImplOptions.NoInlining)]
         private static void DivideBy128Bits(in UInt256 x, in UInt256 y, out UInt256 q, out UInt256 remainder)
         {
-            // ------------------------------------------------------------
             // n >= 2: Knuth D (specialised) with reciprocal qhat
-            // ------------------------------------------------------------
             // Preconditions (debug-only)
             Debug.Assert(y.u1 != 0 && y.u2 == 0 && y.u3 == 0);
 
-            // -------------------------
             // Normalise divisor (2 limbs)
-            // -------------------------
             ulong y0 = y.u0;
             ulong y1 = y.u1;
 
@@ -4130,10 +4103,8 @@ namespace Nethermind.Int256
             // Reciprocal of the normalised high limb.
             ulong vRecip = Reciprocal2By1(v1n);
 
-            // -------------------------
             // Normalise dividend (5 limbs)
             // Load after divisor prep - avoids keeping u-limbs live across the Reciprocal call.
-            // -------------------------
             ulong u0 = x.u0;
             ulong u1 = x.u1;
             ulong u2 = x.u2;
@@ -4159,9 +4130,7 @@ namespace Nethermind.Int256
             // Start touching out params only after all input loads are done (alias-safe).
             Unsafe.SkipInit(out q);
 
-            // ------------------------------------------------------------
             // Step j=2: q2 from (u4:u3:u2)
-            // ------------------------------------------------------------
             {
                 ulong qhat;
                 ulong rhat;
@@ -4235,9 +4204,7 @@ namespace Nethermind.Int256
                 Unsafe.AsRef(in q.u2) = qhat;
             }
 
-            // ------------------------------------------------------------
             // Step j=1: q1 from (u3:u2:u1)
-            // ------------------------------------------------------------
             {
                 ulong qhat;
                 ulong rhat;
@@ -4308,9 +4275,7 @@ namespace Nethermind.Int256
                 Unsafe.AsRef(in q.u1) = qhat;
             }
 
-            // ------------------------------------------------------------
             // Step j=0: q0 from (u2:u1:u0)
-            // ------------------------------------------------------------
             {
                 ulong qhat;
                 ulong rhat;
@@ -4385,9 +4350,7 @@ namespace Nethermind.Int256
             // q3 is always 0 for 256/128 here.
             Unsafe.AsRef(in q.u3) = 0;
 
-            // ------------------------------------------------------------
             // Remainder (u0..u1 in normalised space) - unnormalise.
-            // ------------------------------------------------------------
             Unsafe.SkipInit(out remainder);
 
             if (shift == 0)
@@ -4429,14 +4392,8 @@ namespace Nethermind.Int256
             }
         }
 
-        // ------------------------------------------------------------
         // Knuth steps (unrolled)
-        // ------------------------------------------------------------
-
-        // ------------------------------------------------------------
         // qhat correction (at most twice in Knuth D)
-        // ------------------------------------------------------------
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static ulong SubMul4(in UInt256 u, ref ulong u4, in UInt256 v, ulong q, out UInt256 rem)
         {
@@ -4538,9 +4495,6 @@ namespace Nethermind.Int256
             u4 += c;
         }
 
-        // ------------------------------------------------------------
-        // Low-level arithmetic primitives
-        // ------------------------------------------------------------
         [SkipLocalsInit]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static ulong MulHigh(ulong a, ulong b)
