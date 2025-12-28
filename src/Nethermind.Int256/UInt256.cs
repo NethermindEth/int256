@@ -3287,7 +3287,10 @@ namespace Nethermind.Int256
             return v1 == v2;
         }
 
-        public int CompareTo(UInt256 b) => this < b ? -1 : Equals(b) ? 0 : 1;
+        public int CompareTo(UInt256 b) => CompareTo(in b);
+
+        [OverloadResolutionPriority(1)]
+        public int CompareTo(in UInt256 b) => this < b ? -1 : Equals(b) ? 0 : 1;
 
         public override bool Equals(object? obj) => obj is UInt256 other && Equals(other);
 
