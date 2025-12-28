@@ -93,7 +93,7 @@ jobs:
         run: dotnet test -c ${{ matrix.build-config }} --no-restore
 
       - name: Publish
-        if: matrix.build-config == 'release' && matrix.intrinsics == 'HWIntrinsics' && matrix.avx2  == 'Avx2' &&
+        if: matrix.build-config == 'release' && matrix.intrinsics == 'HWIntrinsics' && matrix.avx2 == 'Avx2' &&
           (github.event_name == 'workflow_dispatch' && github.event.inputs.publish != 'No' || github.event_name == 'release')
         working-directory: src
         run: |
