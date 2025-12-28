@@ -108,7 +108,7 @@ namespace Nethermind.Int256
                         }
                     }
                     else
-                    { 
+                    {
                         u3 = BinaryPrimitives.ReadUInt64BigEndian(bytes.Slice(0, 8));
                         u2 = BinaryPrimitives.ReadUInt64BigEndian(bytes.Slice(8, 8));
                         u1 = BinaryPrimitives.ReadUInt64BigEndian(bytes.Slice(16, 8));
