@@ -23,6 +23,56 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
+        include:
+          # debug - 3 OS
+          - os: windows-latest
+            build-config: debug
+            DOTNET_EnableHWIntrinsic: 1
+            DOTNET_EnableAVX2: 1
+          - os: macos-latest
+            build-config: debug
+            DOTNET_EnableHWIntrinsic: 1
+            DOTNET_EnableAVX2: 0
+          - os: ubuntu-latest
+            build-config: debug
+            DOTNET_EnableAVX2: 1
+            DOTNET_EnableHWIntrinsic: 1
+            
+          # windows-latest - 2 variants
+          - os: windows-latest
+            build-config: release
+            DOTNET_EnableHWIntrinsic: 0
+            DOTNET_EnableAVX2: 0
+          - os: windows-latest
+            build-config: release
+            DOTNET_EnableHWIntrinsic: 1
+            DOTNET_EnableAVX2: 1
+
+          # macos-latest - 2 variants
+          - os: macos-latest
+            build-config: release
+            DOTNET_EnableHWIntrinsic: 0
+            DOTNET_EnableAVX2: 0
+          - os: macos-latest
+            build-config: release
+            DOTNET_EnableHWIntrinsic: 1
+            DOTNET_EnableAVX2: 0
+
+
+          # ubuntu-latest - 3 variants            
+          - os: ubuntu-latest
+            build-config: release
+            DOTNET_EnableAVX2: 1
+            DOTNET_EnableHWIntrinsic: 1
+          - os: ubuntu-latest
+            build-config: release
+            DOTNET_EnableAVX2: 0
+            DOTNET_EnableHWIntrinsic: 1
+          - os: ubuntu-latest
+            build-config: release
+            DOTNET_EnableAVX2: 0
+            DOTNET_EnableHWIntrinsic: 0
+            
         os: [ubuntu-latest, windows-latest, macos-latest]
         build-config: [debug, release]
         hardware-intrinsics: [0, 1]
