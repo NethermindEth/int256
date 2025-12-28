@@ -540,8 +540,11 @@ namespace Nethermind.Int256
         public Int256 MaximalValue => Max;
 
         public int CompareTo(object? obj) => obj is not Int256 int256 ? throw new InvalidOperationException() : CompareTo(int256);
+        
+        public int CompareTo(Int256 b) => CompareTo(in b);
 
-        public int CompareTo(Int256 b) => this < b ? -1 : Equals(b) ? 0 : 1;
+        [OverloadResolutionPriority(1)]
+        public int CompareTo(in Int256 b) => this < b ? -1 : Equals(b) ? 0 : 1;
 
         public static explicit operator UInt256(Int256 z) => z._value;
 
