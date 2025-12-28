@@ -2075,35 +2075,109 @@ namespace Nethermind.Int256
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void Squared(out UInt256 result)
         {
-            ulong carry0 = Multiply64(u0, u0, out ulong res0);
-            (carry0, ulong temp1) = UmulHopi(carry0, u0, u1);
-            (carry0, ulong temp2) = UmulHopi(carry0, u0, u2);
-
-            (ulong carry1, ulong res1) = UmulHopi(temp1, u0, u1);
-            (carry1, temp2) = UmulStepi(temp2, u1, u1, carry1);
-
-            (ulong carry2, ulong res2) = UmulHopi(temp2, u0, u2);
-
-            // Don't care about carry here
-            ulong res3 = 2 * (u0 * u3 + u1 * u2) + carry0 + carry1 + carry2;
-
             Unsafe.SkipInit(out result);
-            Unsafe.As<ulong, Vector256<ulong>>(ref Unsafe.AsRef(in result.u0)) = Vector256.Create(res0, res1, res2, res3);
+            // Copy limbs up-front - breaks any aliasing between 'this' and 'result'.
+            ulong a0 = u0;
+            ulong a1 = u1;
+            ulong a2 = u2;
+            ulong a3 = u3;
+
+            // p00 = a0*a0
+            ulong p00_hi = Multiply64(a0, a0, out ulong pLo);
+            ulong r0 = pLo;
+            // p01 = a0*a1
+            ulong p01_hi = Multiply64(a0, a1, out pLo);
+            ulong p01_lo = pLo;
+
+            // 2*p01 as a 129-bit value:
+            // lo2 = lo<<1
+            // hi2 = (hi<<1) + (lo>>63)
+            // extra carry into next limb = hi>>63   (THIS matters for limb3 because p01 is shifted by 1 limb)
+            ulong p01_lo2 = p01_lo << 1;
+            ulong p01_hi2 = (p01_hi << 1) + (p01_lo >> 63);
+            ulong p01_carry_to_l3 = p01_hi >> 63;
+
+            // limb1: r1 = hi(p00) + lo(2*p01)
+            ulong r1 = p01_lo2 + p00_hi;
+            ulong carry1 = (r1 < p01_lo2) ? 1UL : 0UL;
+
+            // Start limb2 with hi(2*p01) + carry1
+            // This add cannot overflow for 64x64 products (bounds guarantee it), so no carry-out needed here.
+            ulong r2 = p01_hi2 + carry1;
+
+            // p02 = a0*a2
+            ulong p02_hi = Multiply64(a0, a2, out pLo);
+            ulong p02_lo = pLo;
+            ulong p02_lo2 = p02_lo << 1;
+            ulong p02_hi2 = (p02_hi << 1) + (p02_lo >> 63); // carry beyond this is limb4 - ignored for mod 2^256
+
+            // limb2 += lo(2*p02)
+            ulong t = r2 + p02_lo2;
+            ulong carry2 = (t < r2) ? 1UL : 0UL;
+            r2 = t;
+
+            // p11 = a1*a1
+            ulong p11_hi = Multiply64(a1, a1, out pLo);
+            ulong p11_lo = pLo;
+
+            // limb2 += lo(p11)
+            t = r2 + p11_lo;
+            carry2 += (t < r2) ? 1UL : 0UL;
+            r2 = t;
+
+            // limb3 base: hi(2*p02) + hi(p11) + carries from limb2 + carry from doubling p01's high
+            ulong r3 = p02_hi2 + p11_hi + carry2 + p01_carry_to_l3;
+
+            // cross terms for limb3 (low-only is enough): 2*(a0*a3 + a1*a2)
+            ulong cross = a0 * a3 + a1 * a2;
+            cross += cross;
+
+            r3 += cross;
+
+            // Single writeback at the end - no alias-driven reloads.
+            ref ulong pr = ref Unsafe.As<UInt256, ulong>(ref result);
+            pr = r0;
+            Unsafe.Add(ref pr, 1) = r1;
+            Unsafe.Add(ref pr, 2) = r2;
+            Unsafe.Add(ref pr, 3) = r3;
         }
 
         public static void Exp(in UInt256 b, in UInt256 e, out UInt256 result)
         {
-            result = One;
-            UInt256 bs = b;
-            int len = e.BitLen;
-            for (int i = 0; i < len; i++)
+            int bitLen = e.BitLen;
+            if (bitLen == 0)
             {
+                result = One;
+                return;
+            }
+            if (b.IsUint64)
+            {
+                if (b.IsZero)
+                {
+                    result = default;
+                    return;
+                }
+                if (b.IsOne)
+                {
+                    result = One;
+                    return;
+                }
+            }
+
+            // Seed with b so we do not need to "include" the always-set top bit via a multiply.
+            UInt256 val = b;
+            for (int i = bitLen - 2; i >= 0; --i)
+            {
+                // val = val * val
+                val.Squared(out val);
+
                 if (e.Bit(i))
                 {
-                    Multiply(result, bs, out result);
+                    MultiplyScalar(in val, in b, out val);
                 }
-                bs.Squared(out bs);
             }
+
+            result = val;
         }
 
         public void Exp(in UInt256 exp, out UInt256 res) => Exp(this, exp, out res);
@@ -2484,9 +2558,9 @@ namespace Nethermind.Int256
 
         public bool Bit(int n)
         {
-            int bucket = (n / 64) % 4;
+            uint bucket = ((uint)n / 64) % 4;
             int position = n % 64;
-            return (this[bucket] & ((ulong)1 << position)) != 0;
+            return (Unsafe.Add(ref Unsafe.AsRef(in u0), bucket) & ((ulong)1 << position)) != 0;
         }
 
         public static void Rsh(in UInt256 x, int n, out UInt256 res)
