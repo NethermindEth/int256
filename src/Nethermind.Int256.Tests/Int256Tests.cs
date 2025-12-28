@@ -38,6 +38,9 @@ namespace Nethermind.Int256.Test
         [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.SignedTestCases))]
         public override void Div((BigInteger A, BigInteger B) test) => base.Div(test);
 
+        [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.SignedTestCases))]
+        public override void Mod((BigInteger A, BigInteger B) test) => base.Mod(test);
+
         [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.SignedShiftTestCases))]
         public override void Exp((BigInteger A, int n) test) => base.Exp(test);
 

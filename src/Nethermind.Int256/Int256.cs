@@ -350,7 +350,7 @@ namespace Nethermind.Int256
             {
                 Neg(y, out yIn);
             }
-            UInt256.Mod((UInt256)xIn, (UInt256)yIn, out UInt256 value);
+            UInt256.Mod(in xIn._value, in yIn._value, out UInt256 value);
             res = new Int256(value);
             if (xs == -1)
             {
@@ -441,8 +441,8 @@ namespace Nethermind.Int256
                         return;
                 }
             }
-            res = x;
-            ulong z0 = x._value.u0, z1 = x._value.u1, z2 = x._value.u2, z3 = x._value.u3;
+
+            ulong z0, z1, z2, z3;
             ulong a = UInt256.Lsh(ulong.MaxValue, 64 - (n % 64));
             // Big swaps first
             if (n > 192)
@@ -453,7 +453,6 @@ namespace Nethermind.Int256
                     return;
                 }
                 x.Srsh192(out res);
-                z0 = res._value.u0;
                 z1 = res._value.u1;
                 z2 = res._value.u2;
                 z3 = res._value.u3;
@@ -463,8 +462,6 @@ namespace Nethermind.Int256
             else if (n > 128)
             {
                 x.Srsh128(out res);
-                z0 = res._value.u0;
-                z1 = res._value.u1;
                 z2 = res._value.u2;
                 z3 = res._value.u3;
                 n -= 128;
@@ -473,9 +470,6 @@ namespace Nethermind.Int256
             else if (n > 64)
             {
                 x.Srsh64(out res);
-                z0 = res._value.u0;
-                z1 = res._value.u1;
-                z2 = res._value.u2;
                 z3 = res._value.u3;
                 n -= 64;
                 goto sh64;
@@ -483,10 +477,6 @@ namespace Nethermind.Int256
             else
             {
                 res = x;
-                z0 = res._value.u0;
-                z1 = res._value.u1;
-                z2 = res._value.u2;
-                z3 = res._value.u3;
             }
 
             // remaining shifts

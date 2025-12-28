@@ -369,6 +369,36 @@ namespace Nethermind.Int256.Test
         }
 
         [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
+        public virtual void Mod((BigInteger A, BigInteger B) test)
+        {
+            if (test.B.IsZero)
+            {
+                return;
+            }
+            BigInteger resBigInt = (test.A % test.B) % (BigInteger.One << 256);
+            resBigInt = postprocess(resBigInt);
+
+            T uint256a = convert(test.A);
+            T uint256b = convert(test.B);
+            uint256a.Mod(uint256b, out T res);
+            res.Convert(out BigInteger resUInt256);
+
+            resUInt256.Should().Be(resBigInt);
+
+            // Test reusing input as output
+            uint256a.Mod(uint256b, out uint256a);
+            uint256a.Convert(out resUInt256);
+
+            resUInt256.Should().Be(resBigInt);
+
+            uint256a = convert(test.A);
+            uint256a.Mod(uint256b, out uint256b);
+            uint256b.Convert(out resUInt256);
+
+            resUInt256.Should().Be(resBigInt);
+        }
+
+        [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
         public virtual void And((BigInteger A, BigInteger B) test)
         {
             BigInteger resBigInt = test.A & test.B;
