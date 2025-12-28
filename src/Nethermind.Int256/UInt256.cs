@@ -523,14 +523,13 @@ namespace Nethermind.Int256
 
             if (m.IsUint64)
             {
-                // If modulus fits in 64 bits, do direct remainder of the 5-limb value.
                 if (X86Base.X64.IsSupported)
                 {
-                    RemSum257ByMod64BitsX86Base(in sum, s4, m.u0, out res);
+                    Remainder257By64BitsX86Base(in sum, s4, m.u0, out res);
                 }
                 else
                 {
-                    RemSum257ByMod64Bits(in sum, s4, m.u0, out res);
+                    Remainder257By64Bits(in sum, s4, m.u0, out res);
                 }
             }
             else if (LessThanBoth(in x, in y, in m))
@@ -546,18 +545,15 @@ namespace Nethermind.Int256
             }
             else if (m.u3 != 0)
             {
-                // reduce the 257-bit sum by the 256 bit mod: res = S % m256
-                RemSum257ByMod256Bits(in sum, in m, out res);
+                Remainder257By256Bits(in sum, in m, out res);
             }
             else if (m.u2 != 0)
             {
-                // reduce the 257-bit sum by the 256 bit mod: res = S % m192
-                RemSum257ByMod192Bits(in sum, in m, out res);
+                Remainder257By192Bits(in sum, in m, out res);
             }
             else
             {
-                // reduce the 257-bit sum by the 256 bit mod: res = S % m128
-                RemSum257ByMod128Bits(in sum, in m, out res);
+                Remainder257By128Bits(in sum, in m, out res);
             }
         }
 
@@ -609,7 +605,7 @@ namespace Nethermind.Int256
         // ----------------------------
         [SkipLocalsInit]
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void RemSum257ByMod64Bits(in UInt256 a, ulong a4, ulong d, out UInt256 rem)
+        private static void Remainder257By64Bits(in UInt256 a, ulong a4, ulong d, out UInt256 rem)
         {
             Debug.Assert(d != 0);
             Debug.Assert(a4 <= 1);
@@ -656,7 +652,7 @@ namespace Nethermind.Int256
 
         [SkipLocalsInit]
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void RemSum257ByMod64BitsX86Base(in UInt256 a, ulong a4, ulong d, out UInt256 rem)
+        private static void Remainder257By64BitsX86Base(in UInt256 a, ulong a4, ulong d, out UInt256 rem)
         {
             Debug.Assert(d != 0);
             Debug.Assert(a4 <= 1);
@@ -678,187 +674,190 @@ namespace Nethermind.Int256
             Unsafe.AsRef(in rem.u0) = r;
         }
 
-        // General remainder: (257-bit sum) % m, where sum is 5 limbs and m is 2 limbs (<=128-bit).
-        // We run Knuth D (base 2^64) specialised to a 2-limb divisor, using a 3-limb rolling window.
-        // Dividend is treated as u[0..5] with u5==0 (extra top limb), and here u4==1 from the 257th bit.
-        // Result is a 2-limb remainder in rem.u0..rem.u1.
         [SkipLocalsInit]
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void RemSum257ByMod128Bits(in UInt256 a, in UInt256 m, out UInt256 rem)
+        private static void Remainder257By128Bits(in UInt256 dividendLo256, in UInt256 mod128, out UInt256 remainder)
         {
-            const ulong a4 = 1;
-            Debug.Assert(m.u3 == 0 && m.u2 == 0 && m.u1 != 0);
+            // (257-bit sum) % mod, where dividend is 5 limbs (implicit top limb) and mod is 2 limbs (<= 128-bit)
+            // We run Knuth D (base 2^64) specialised to a 2-limb divisor, using a 3-limb rolling window.
+            // Dividend is treated as n[0..5] with n5 == 0 (extra top limb), and here n4 == 1 from the 257th bit.
+            // Result is a 2-limb remainder in remainder.u0..remainder.u1
+            const ulong topLimb = 1;
+            Debug.Assert(mod128.u3 == 0 && mod128.u2 == 0 && mod128.u1 != 0);
 
-            // D1 - Normalise divisor: shift so v1 has its MSB set.
-            // m is 128-bit: v = (v1:v0). sh in [0..63].
-            ulong v0 = m.u0;
-            ulong v1 = m.u1;
-            int sh = BitOperations.LeadingZeroCount(v1);
+            // D1 - Normalise divisor: shift so vHi has its MSB set.
+            // mod128 is 128-bit: v = (vHi:vLo). normShift in [0..63].
+            ulong vLo = mod128.u0;
+            ulong vHi = mod128.u1;
+            int normShift = BitOperations.LeadingZeroCount(vHi);
 
-            if (sh > 0)
+            if (normShift > 0)
             {
-                int rs = 64 - sh;
-                v0 <<= sh;
-                v1 = (v1 << sh) | (v0 >> rs);
+                int invShift = 64 - normShift;
+                vHi = (vHi << normShift) | (vLo >> invShift);
+                vLo <<= normShift;
             }
 
             // Precompute reciprocal for 2-by-1 division when we do not have fast hardware div.
-            ulong recip = X86Base.X64.IsSupported ? 0UL : Reciprocal2By1(v1);
+            ulong recipVHi = X86Base.X64.IsSupported ? 0UL : Reciprocal2By1(vHi);
 
-            // D1 - Normalise dividend into 5 limbs u0..u4, plus implicit u5==0.
-            // u4 is the top (257th) limb and is always 1 before normalisation.
-            ulong u0, u1, u2, u3, u4;
-            if (sh == 0)
+            // D1 - Normalise dividend into 5 limbs n0..n4, plus implicit n5 == 0.
+            // n4 is the top (257th) limb and is always 1 before normalisation.
+            ulong n0, n1, n2, n3, n4;
+            if (normShift == 0)
             {
-                u0 = a.u0;
-                u1 = a.u1;
-                u2 = a.u2;
-                u3 = a.u3;
-                u4 = a4; // top limb
+                n0 = dividendLo256.u0;
+                n1 = dividendLo256.u1;
+                n2 = dividendLo256.u2;
+                n3 = dividendLo256.u3;
+                n4 = topLimb; // top limb
             }
             else
             {
-                UInt256 u = ShiftLeftSmall(in a, sh);
-                u0 = u.u0;
-                u1 = u.u1;
-                u2 = u.u2;
-                u3 = u.u3;
+                UInt256 shifted = ShiftLeftSmall(in dividendLo256, normShift);
+                n0 = shifted.u0;
+                n1 = shifted.u1;
+                n2 = shifted.u2;
+                n3 = shifted.u3;
 
-                // u4 = (a4:a.u3) << sh, but a4==1 so we fold the carry from a.u3.
-                u4 = (a4 << sh) | (a.u3 >> (64 - sh));
+                // n4 = (topLimb:dividendLo256.u3) << normShift, but topLimb == 1 so we fold
+                // the carry from dividendLo256.u3
+                n4 = (topLimb << normShift) | (dividendLo256.u3 >> (64 - normShift));
             }
 
-            // Top-step shortcut: only possible quotient from the topmost pair (u4:u3) is q3 in {0,1}.
-            // For sh<=62, u4 < 2^63 <= v1, so (u4:u3) < (v1:v0) => q3==0.
-            // Only when sh==63 can q3 be 1; if so, subtract v once to pre-reduce.
-            if (sh == 63)
+            // Top-step shortcut: only possible quotient from the topmost pair (n4:n3) is q3 in {0,1}.
+            // For normShift <= 62, n4 < 2^63 <= vHi, so (n4:n3) < (vHi:vLo) => q3 == 0.
+            // Only when normShift == 63 can q3 be 1; if so, subtract v once to pre-reduce.
+            if (normShift == 63)
             {
-                if (u4 > v1 || (u4 == v1 && u3 >= v0))
+                if (n4 > vHi || (n4 == vHi && n3 >= vLo))
                 {
-                    ulong t = u3 - v0;
-                    ulong b = (u3 < v0) ? 1UL : 0UL;
-                    u3 = t;
-                    u4 = u4 - v1 - b;
+                    ulong t = n3 - vLo;
+                    ulong b = (n3 < vLo) ? 1UL : 0UL;
+                    n3 = t;
+                    n4 = n4 - vHi - b;
                 }
             }
 
-            // D2-D7 over remaining positions j=2..0.
-            // Rolling window invariant: we divide the 3-limb chunk (u4:u3:u2) by 2-limb v.
-            // After each step we slide down one limb: (u4,u3,u2,u1,u0) <- (u3,u2,u1,u0,discard).
-            int j = 2;
+            // D2-D7 over remaining positions digit = 2..0.
+            // Rolling window invariant: we divide the 3-limb chunk (n4:n3:n2) by 2-limb v.
+            // After each step we slide down one limb: (n4,n3,n2,n1,n0) <- (n3,n2,n1,n0,discard).
+            int digit = 2;
             while (true)
             {
-                // D3 - Estimate qhat from (u4:u3) / v1, with rhat remainder of that 2-by-1 divide.
-                // Special-case u4==v1 to avoid overflow and match Knuth's qhat=base-1 path.
-                // rcarry tracks rhat overflow when we do rhat = u3 + v1 in that special-case.
+                // D3 - Estimate qhat from (n4:n3) / vHi, with rhat remainder of that 2-by-1 divide.
+                // Special-case n4 == vHi to avoid overflow and match Knuth's qhat = base-1 path.
+                // rhatCarry tracks rhat overflow when we do rhat = n3 + vHi in that special-case.
                 ulong qhat, rhat;
-                bool rcarry;
+                bool rhatCarry;
 
-                if (u4 == v1)
+                if (n4 == vHi)
                 {
                     qhat = ulong.MaxValue;
-                    rhat = u3 + v1;
-                    rcarry = rhat < u3;
+                    rhat = n3 + vHi;
+                    rhatCarry = rhat < n3;
                 }
                 else
                 {
                     if (X86Base.X64.IsSupported)
                     {
-                        (qhat, rhat) = X86Base.X64.DivRem(u3, u4, v1); // (u4:u3) / v1
+                        (qhat, rhat) = X86Base.X64.DivRem(n3, n4, vHi); // (n4:n3) / vHi
                     }
                     else
                     {
-                        qhat = UDivRem2By1(u4, recip, v1, u3, out rhat);
+                        qhat = UDivRem2By1(n4, recipVHi, vHi, n3, out rhat);
                     }
 
-                    rcarry = false;
+                    rhatCarry = false;
                 }
 
-                // p0 = qhat * v0 (128-bit)
-                ulong p0Hi = Multiply64(qhat, v0, out ulong pLo);
+                // qv0 = qhat * vLo (128-bit)
+                ulong qv0Hi = Multiply64(qhat, vLo, out ulong qv0Lo);
 
                 // D3 correction: ensure qhat is not too large.
-                // Compare (p0Hi:p0Lo) vs (rhat:u2). If too big, decrement qhat and adjust rhat.
+                // Compare (qv0Hi:qv0Lo) vs (rhat:n2). If too big, decrement qhat and adjust rhat.
                 // At most two corrections are needed.
-                if (!rcarry && (p0Hi > rhat || (p0Hi == rhat && pLo > u2)))
+                if (!rhatCarry && (qv0Hi > rhat || (qv0Hi == rhat && qv0Lo > n2)))
                 {
                     qhat--;
 
-                    // (p0Hi:p0Lo) -= v0
-                    p0Hi -= (pLo < v0) ? 1UL : 0UL;
-                    pLo -= v0;
+                    // (qv0Hi:qv0Lo) -= vLo
+                    qv0Hi -= (qv0Lo < vLo) ? 1UL : 0UL;
+                    qv0Lo -= vLo;
 
-                    ulong sum = rhat + v1;
-                    rcarry = sum < rhat;
+                    ulong sum = rhat + vHi;
+                    rhatCarry = sum < rhat;
                     rhat = sum;
 
-                    if (!rcarry && (p0Hi > rhat || (p0Hi == rhat && pLo > u2)))
+                    if (!rhatCarry && (qv0Hi > rhat || (qv0Hi == rhat && qv0Lo > n2)))
                     {
                         qhat--;
 
-                        p0Hi -= (pLo < v0) ? 1UL : 0UL;
-                        pLo -= v0;
+                        qv0Hi -= (qv0Lo < vLo) ? 1UL : 0UL;
+                        qv0Lo -= vLo;
                     }
                 }
 
-                // D4 - Subtract qhat * v from the 3-limb chunk (u4:u3:u2).
+                // D4 - Subtract qhat * v from the 3-limb chunk (n4:n3:n2).
                 // We compute:
-                //   (u2,u3,u4) -= qhat*(v0,v1) with full carry/borrow propagation.
-                // Keep u2,u3,u4 as the updated chunk for next iteration/slide.
-                ulong borrow0 = (u2 < pLo) ? 1UL : 0UL;
-                u2 -= pLo;
+                //   (n2,n3,n4) -= qhat*(vLo,vHi) with full carry/borrow propagation.
+                // Keep n2,n3 as the updated chunk for next iteration/slide (n4 is discarded after this digit).
+                ulong borrowLo = (n2 < qv0Lo) ? 1UL : 0UL;
+                n2 -= qv0Lo;
 
-                ulong p1Hi = Multiply64(qhat, v1, out pLo);
+                ulong qv1Hi = Multiply64(qhat, vHi, out ulong qv1Lo);
 
-                // Combine cross terms: q*v0 contributes p0Hi into the next limb.
-                ulong sum1 = pLo + p0Hi;
-                ulong hi = p1Hi + ((sum1 < pLo) ? 1UL : 0UL);
+                // Combine cross terms: q * vLo contributes qv0Hi into the next limb.
+                ulong midLo = qv1Lo + qv0Hi;
+                ulong midHi = qv1Hi + ((midLo < qv1Lo) ? 1UL : 0UL);
 
-                ulong t1 = u3 - sum1;
-                ulong b1 = (u3 < sum1) ? 1UL : 0UL;
-                u3 = t1 - borrow0;
-                ulong borrow = b1 | ((t1 < borrow0) ? 1UL : 0UL);
+                ulong tmpN3 = n3 - midLo;
+                ulong borrowMid = (n3 < midLo) ? 1UL : 0UL;
+                n3 = tmpN3 - borrowLo;
+                ulong borrowOut = borrowMid | ((tmpN3 < borrowLo) ? 1UL : 0UL);
 
-                ulong t2 = u4 - hi;
-                ulong b2 = (u4 < hi) ? 1UL : 0UL;
-                borrow = b2 | ((t2 < borrow) ? 1UL : 0UL);
+                // Top limb (n4) only used to detect underflow; it is discarded after this digit.
+                ulong tmpN4 = n4 - midHi;
+                ulong borrowHi = (n4 < midHi) ? 1UL : 0UL;
+                borrowOut = borrowHi | ((tmpN4 < borrowOut) ? 1UL : 0UL);
 
                 // D6 - If subtraction underflowed, add v back once (and implicitly qhat--, but we only need the remainder).
-                // Add-back is only on the lower 2 limbs of the chunk (u3:u2) since v is 2 limbs.
-                if (borrow != 0)
+                // Add-back is only on the lower 2 limbs of the chunk (n3:n2) since v is 2 limbs.
+                if (borrowOut != 0)
                 {
-                    ulong s0 = u2 + v0;
-                    ulong c0 = (s0 < u2) ? 1UL : 0UL;
+                    ulong s0 = n2 + vLo;
+                    ulong c0 = (s0 < n2) ? 1UL : 0UL;
 
-                    ulong s1 = u3 + v1;
-                    u3 = s1 + c0;
-                    u2 = s0;
+                    ulong s1 = n3 + vHi;
+                    n3 = s1 + c0;
+                    n2 = s0;
                 }
 
-                if (j == 0)
-                {
+                if (digit == 0)
                     break;
-                }
 
                 // Slide window down by one limb for next quotient digit.
-                u4 = u3;
-                u3 = u2;
-                u2 = u1;
-                u1 = u0;
+                n4 = n3;
+                n3 = n2;
+                n2 = n1;
+                n1 = n0;
 
-                j--;
+                digit--;
             }
 
             // D8 - De-normalise remainder: undo the initial left shift.
-            // The remainder is in (u3:u2) in normalised space; shift right by sh to restore.
-            if (sh != 0)
+            // The remainder is in (n3:n2) in normalised space; shift right by normShift to restore.
+            ulong remLo = n2;
+            ulong remHi = n3;
+
+            if (normShift != 0)
             {
-                int rs = 64 - sh;
-                u2 = (u2 >> sh) | (u3 << rs);
-                u3 >>= sh;
+                int invShift = 64 - normShift;
+                remLo = (remLo >> normShift) | (remHi << invShift);
+                remHi >>= normShift;
             }
 
-            rem = Create(u2, u3, 0, 0);
+            remainder = Create(remLo, remHi, 0, 0);
         }
 
         // ----------------------------
@@ -867,7 +866,7 @@ namespace Nethermind.Int256
         // ----------------------------
         [SkipLocalsInit]
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void RemSum257ByMod192Bits(in UInt256 a, in UInt256 m, out UInt256 rem)
+        private static void Remainder257By192Bits(in UInt256 a, in UInt256 m, out UInt256 rem)
         {
             ulong a4 = 1;
             Debug.Assert(m.u3 == 0 && m.u2 != 0);
@@ -1098,7 +1097,7 @@ namespace Nethermind.Int256
         // ----------------------------
         [SkipLocalsInit]
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void RemSum257ByMod256Bits(in UInt256 a, in UInt256 m, out UInt256 rem)
+        private static void Remainder257By256Bits(in UInt256 a, in UInt256 m, out UInt256 rem)
         {
             ulong a4 = 1;
             Debug.Assert(m.u3 != 0);
