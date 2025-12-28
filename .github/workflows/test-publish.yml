@@ -23,11 +23,60 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        build-config: [debug, release]
-        hardware-intrinsics: [0, 1]
+        include:
+          # debug - 3 OS
+          - os: windows-latest
+            build-config: debug
+            intrinsics: HWIntrinsics
+            avx2: Avx2
+          - os: macos-latest
+            build-config: debug
+            intrinsics: HWIntrinsics
+            avx2: NoAvx2
+          - os: ubuntu-latest
+            build-config: debug
+            intrinsics: HWIntrinsics
+            avx2: NoAvx2
+            
+          # windows-latest - 2 variants
+          - os: windows-latest
+            build-config: release
+            intrinsics: NoHWIntrinsics
+            avx2: NoAvx2
+          - os: windows-latest
+            build-config: release
+            intrinsics: HWIntrinsics
+            avx2: Avx2
+
+          # macos-latest - 2 variants
+          - os: macos-latest
+            build-config: release
+            intrinsics: NoHWIntrinsics
+            avx2: NoAvx2
+          - os: macos-latest
+            build-config: release
+            intrinsics: HWIntrinsics
+            avx2: NoAvx2
+
+
+          # ubuntu-latest - 3 variants            
+          - os: ubuntu-latest
+            build-config: release
+            intrinsics: HWIntrinsics
+            avx2: Avx2
+          - os: ubuntu-latest
+            build-config: release
+            intrinsics: HWIntrinsics
+            avx2: NoAvx2
+          - os: ubuntu-latest
+            build-config: release
+            intrinsics: NoHWIntrinsics
+            avx2: NoAvx2
+            
     env:
-      DOTNET_EnableHWIntrinsic: ${{ matrix.hardware-intrinsics }}
+      DOTNET_EnableAVX2: ${{ matrix.avx2 == 'NoAvx2' && '0' || '1' }}
+      DOTNET_EnableHWIntrinsic: ${{ matrix.intrinsics == 'NoHWIntrinsics' && '0' || '1' }}
+      
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
@@ -44,7 +93,7 @@ jobs:
         run: dotnet test -c ${{ matrix.build-config }} --no-restore
 
       - name: Publish
-        if: matrix.build-config == 'release' && matrix.hardware-intrinsics == 1 &&
+        if: matrix.build-config == 'release' && matrix.intrinsics == 'HWIntrinsics' && matrix.avx2 == 'Avx2' &&
           (github.event_name == 'workflow_dispatch' && github.event.inputs.publish != 'No' || github.event_name == 'release')
         working-directory: src
         run: |
