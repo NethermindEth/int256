@@ -499,20 +499,35 @@ namespace Nethermind.Int256
         /// </summary>
         /// <remarks>
         /// Sets <paramref name="res"/> to <c>(x + y) mod m</c>.
-        /// If <paramref name="m"/> is zero, <paramref name="res"/> is set to zero.
-        /// This behaviour intentionally differs from <see cref="System.Numerics.BigInteger"/>-style APIs.
-        /// If a <see cref="System.DivideByZeroException"/> is required for a zero modulus, the caller must pre-check
-        /// <paramref name="m"/> and throw before calling this method.
+        /// <para>
+        /// <strong>Warning:</strong> if <paramref name="m"/> is zero, <paramref name="res"/> is set to zero and
+        /// no <see cref="System.DivideByZeroException"/> (or any other exception) is thrown. This behaviour
+        /// intentionally differs from <see cref="System.Numerics.BigInteger"/>-style APIs and from standard
+        /// modulo semantics, and can mask bugs in calling code that accidentally passes a zero modulus.
+        /// Callers that require an exception for a zero modulus must validate <paramref name="m"/> and throw
+        /// (for example, <see cref="System.DivideByZeroException"/>) before calling this method.
+        /// </para>
+        /// <para>Example (zero modulus):</para>
+        /// <code>
+        /// UInt256 x = 10;
+        /// UInt256 y = 20;
+        /// UInt256 m = UInt256.Zero;
+        /// UInt256 res;
+        ///
+        /// // res will be 0 here; no exception is thrown:
+        /// UInt256.AddMod(in x, in y, in m, out res);
+        /// </code>
         /// </remarks>
         /// <param name="x">The first 256-bit addend.</param>
         /// <param name="y">The second 256-bit addend.</param>
-        /// <param name="m">The modulus. If zero, the result is defined to be zero.</param>
+        /// <param name="m">The modulus. If zero, the result is defined to be zero and no exception is thrown.</param>
         /// <param name="res">On return, contains the value of <c>(x + y) mod m</c>, or zero when <paramref name="m"/> is zero.</param>
         [SkipLocalsInit]
         public static void AddMod(in UInt256 x, in UInt256 y, in UInt256 m, out UInt256 res)
         {
             if (m.IsZero || m.IsOne)
             {
+                // Any value mod 0 is defined here to be 0, and any value mod 1 is mathematically 0.
                 res = default;
                 return;
             }
@@ -725,15 +740,12 @@ namespace Nethermind.Int256
             // Top-step shortcut: only possible quotient from the topmost pair (n4:n3) is q3 in {0,1}.
             // For normShift <= 62, n4 < 2^63 <= vHi, so (n4:n3) < (vHi:vLo) => q3 == 0.
             // Only when normShift == 63 can q3 be 1; if so, subtract v once to pre-reduce.
-            if (normShift == 63)
+            if (normShift == 63 && (n4 > vHi || (n4 == vHi && n3 >= vLo)))
             {
-                if (n4 > vHi || (n4 == vHi && n3 >= vLo))
-                {
-                    ulong t = n3 - vLo;
-                    ulong b = (n3 < vLo) ? 1UL : 0UL;
-                    n3 = t;
-                    n4 = n4 - vHi - b;
-                }
+                ulong t = n3 - vLo;
+                ulong b = (n3 < vLo) ? 1UL : 0UL;
+                n3 = t;
+                n4 = n4 - vHi - b;
             }
 
             // D2-D7 over remaining positions digit = 2..0.
