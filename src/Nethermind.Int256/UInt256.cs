@@ -83,20 +83,47 @@ namespace Nethermind.Int256
             {
                 if (isBigEndian)
                 {
-                    u3 = BinaryPrimitives.ReadUInt64BigEndian(bytes.Slice(0, 8));
-                    u2 = BinaryPrimitives.ReadUInt64BigEndian(bytes.Slice(8, 8));
-                    u1 = BinaryPrimitives.ReadUInt64BigEndian(bytes.Slice(16, 8));
-                    u0 = BinaryPrimitives.ReadUInt64BigEndian(bytes.Slice(24, 8));
+                    if (Avx2.IsSupported)
+                    {
+                        Unsafe.SkipInit(out u0);
+                        Unsafe.SkipInit(out u1);
+                        Unsafe.SkipInit(out u2);
+                        Unsafe.SkipInit(out u3);
+                        Vector256<byte> data = Unsafe.ReadUnaligned<Vector256<byte>>(ref MemoryMarshal.GetReference(bytes));
+                        Vector256<byte> shuffle = Vector256.Create(
+                            0x18191a1b1c1d1e1ful,
+                            0x1011121314151617ul,
+                            0x08090a0b0c0d0e0ful,
+                            0x0001020304050607ul).AsByte();
+                        if (Avx512Vbmi.VL.IsSupported)
+                        {
+                            Vector256<byte> convert = Avx512Vbmi.VL.PermuteVar32x8(data, shuffle);
+                            Unsafe.As<ulong, Vector256<byte>>(ref u0) = convert;
+                        }
+                        else
+                        {
+                            Vector256<byte> convert = Avx2.Shuffle(data, shuffle);
+                            Vector256<ulong> permute = Avx2.Permute4x64(Unsafe.As<Vector256<byte>, Vector256<ulong>>(ref convert), 0b_01_00_11_10);
+                            Unsafe.As<ulong, Vector256<ulong>>(ref u0) = permute;
+                        }
+                    }
+                    else
+                    {
+                        u3 = BinaryPrimitives.ReadUInt64BigEndian(bytes.Slice(0, 8));
+                        u2 = BinaryPrimitives.ReadUInt64BigEndian(bytes.Slice(8, 8));
+                        u1 = BinaryPrimitives.ReadUInt64BigEndian(bytes.Slice(16, 8));
+                        u0 = BinaryPrimitives.ReadUInt64BigEndian(bytes.Slice(24, 8));
+                    }
                 }
                 else
                 {
                     if (Vector256.IsHardwareAccelerated)
                     {
-                        Unsafe.SkipInit(out this.u0);
-                        Unsafe.SkipInit(out this.u1);
-                        Unsafe.SkipInit(out this.u2);
-                        Unsafe.SkipInit(out this.u3);
-                        Unsafe.As<ulong, Vector256<byte>>(ref this.u0) = Vector256.Create<byte>(bytes);
+                        Unsafe.SkipInit(out u0);
+                        Unsafe.SkipInit(out u1);
+                        Unsafe.SkipInit(out u2);
+                        Unsafe.SkipInit(out u3);
+                        Unsafe.As<ulong, Vector256<byte>>(ref u0) = Vector256.Create(bytes);
                     }
                     else
                     {
