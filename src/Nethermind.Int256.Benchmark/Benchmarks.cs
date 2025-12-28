@@ -398,18 +398,12 @@ public class DivideSigned : SignedTwoParamBenchmarkBase
     }
 }
 
-public class ExpUnsigned : UnsignedIntTwoParamBenchmarkBase
+public class ExpUnsigned : UnsignedTwoParamBenchmarkBase
 {
-    [Benchmark(Baseline = true)]
-    public BigInteger Exp_BigInteger()
-    {
-        return BigInteger.ModPow(A.Item1, D.Item1, Numbers.TwoTo256);
-    }
-
     [Benchmark]
     public UInt256 Exp_UInt256()
     {
-        UInt256.Exp(A.Item2, D.Item2, out UInt256 res);
+        UInt256.Exp(Param.A, Param.B, out UInt256 res);
         return res;
     }
 }
