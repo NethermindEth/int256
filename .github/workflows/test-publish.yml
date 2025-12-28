@@ -35,14 +35,14 @@ jobs:
             avx2: NoAvx2
           - os: ubuntu-latest
             build-config: debug
-            avx2: NoAvx2
             intrinsics: HWIntrinsics
+            avx2: NoAvx2
             
           # windows-latest - 2 variants
           - os: windows-latest
             build-config: release
             intrinsics: NoHWIntrinsics
-            avx2: NoAvx20
+            avx2: NoAvx2
           - os: windows-latest
             build-config: release
             intrinsics: HWIntrinsics
@@ -62,16 +62,16 @@ jobs:
           # ubuntu-latest - 3 variants            
           - os: ubuntu-latest
             build-config: release
+            intrinsics: HWIntrinsics
             avx2: Avx2
-            intrinsics: HWIntrinsics
           - os: ubuntu-latest
             build-config: release
-            avx2: NoAvx2
             intrinsics: HWIntrinsics
+            avx2: NoAvx2
           - os: ubuntu-latest
             build-config: release
-            avx2: NoAvx2
             intrinsics: NoHWIntrinsics
+            avx2: NoAvx2
             
     env:
       DOTNET_EnableAVX2: ${{ matrix.avx2 == 'NoAvx2' && '0' || '1' }}
