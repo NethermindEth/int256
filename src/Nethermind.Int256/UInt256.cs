@@ -1432,230 +1432,6 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         return a >> n;
     }
 
-    // Udivrem divides u by d and produces both quotient and remainder.
-    // Throws if d is zero.
-    // The quotient is stored in provided quot - len(u)-len(d)+1 words.
-    // It loosely follows the Knuth's division algorithm (sometimes referenced as "schoolbook" division) using 64-bit words.
-    // See Knuth, Volume 2, section 4.3.1, Algorithm D.
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void Udivrem(ref ulong quot, ref ulong u, int length, in UInt256 d, out UInt256 rem)
-    {
-        Unsafe.SkipInit(out int dLen);
-        Unsafe.SkipInit(out int shift);
-
-        if (Vector256.IsHardwareAccelerated)
-        {
-            // Use the fact that u0, u1, u2, u3 can be loaded as a vector
-            Vector256<ulong> v = Vector256.LoadUnsafe(in d.u0);
-
-            // Check which ulongs are zero
-            var isZero = Vector256.IsZero(v);
-
-            const int ulongCount = 4;
-            const uint mask = (1 << ulongCount) - 1;
-
-            // The nth most significant bit is 1 if a nth ulong is 0. Negate and mask with 4 bits to find the most significant set.
-            var nonZeroUlongBits = ~isZero.ExtractMostSignificantBits() & mask;
-            dLen = 32 - BitOperations.LeadingZeroCount(nonZeroUlongBits);
-            shift = LeadingZeros(Unsafe.Add(ref Unsafe.AsRef(in d.u0), dLen - 1));
-        }
-        else
-        {
-            if (d.u3 != 0)
-            {
-                dLen = 4;
-                shift = LeadingZeros(d.u3);
-            }
-            else if (d.u2 != 0)
-            {
-                dLen = 3;
-                shift = LeadingZeros(d.u2);
-            }
-            else if (d.u1 != 0)
-            {
-                dLen = 2;
-                shift = LeadingZeros(d.u1);
-            }
-            else if (d.u0 != 0)
-            {
-                dLen = 1;
-                shift = LeadingZeros(d.u0);
-            }
-        }
-
-        if (dLen == 0)
-        {
-            ThrowDivideByZeroException();
-        }
-
-        int uLen = 0;
-        for (int i = length - 1; i >= 0; i--)
-        {
-            if (Unsafe.Add(ref u, i) != 0)
-            {
-                uLen = i + 1;
-                break;
-            }
-        }
-
-        Span<ulong> un = stackalloc ulong[uLen + 1];
-        un[uLen] = Rsh(Unsafe.Add(ref u, uLen - 1), 64 - shift);
-        for (int i = uLen - 1; i > 0; i--)
-        {
-            un[i] = NativeLsh(Unsafe.Add(ref u, i), shift) | Rsh(Unsafe.Add(ref u, i - 1), 64 - shift);
-        }
-
-        un[0] = NativeLsh(u, shift);
-
-        // TODO: Skip the highest word of numerator if not significant.
-
-        if (dLen == 1)
-        {
-            ulong dnn0 = NativeLsh(d.u0, shift);
-            ulong r = UdivremBy1(ref quot, un, dnn0);
-            r = NativeRsh(r, shift);
-            rem = (UInt256)r;
-            return;
-        }
-
-        ulong dn0 = NativeLsh(d.u0, shift);
-        ulong dn1 = 0;
-        ulong dn2 = 0;
-        ulong dn3 = 0;
-        switch (dLen)
-        {
-            case 4:
-                dn3 = NativeLsh(d.u3, shift) | Rsh(d.u2, 64 - shift);
-                goto case 3;
-            case 3:
-                dn2 = NativeLsh(d.u2, shift) | Rsh(d.u1, 64 - shift);
-                goto case 2;
-            case 2:
-                dn1 = NativeLsh(d.u1, shift) | Rsh(d.u0, 64 - shift);
-                break;
-        }
-        Span<ulong> dnS = stackalloc ulong[4] { dn0, dn1, dn2, dn3 };
-        dnS = dnS.Slice(0, dLen);
-
-        UdivremKnuth(ref quot, un, dnS);
-
-        ulong rem0, rem1 = 0, rem2 = 0, rem3 = 0;
-        switch (dLen)
-        {
-            case 1:
-                rem0 = NativeRsh(un[dLen - 1], shift);
-                goto r0;
-            case 2:
-                rem1 = NativeRsh(un[dLen - 1], shift);
-                goto r1;
-            case 3:
-                rem2 = NativeRsh(un[dLen - 1], shift);
-                goto r2;
-            case 4:
-                rem3 = NativeRsh(un[dLen - 1], shift);
-                goto r3;
-        }
-
-    r3:
-        rem2 = NativeRsh(un[2], shift) | Lsh(un[3], 64 - shift);
-    r2:
-        rem1 = NativeRsh(un[1], shift) | Lsh(un[2], 64 - shift);
-    r1:
-        rem0 = NativeRsh(un[0], shift) | Lsh(un[1], 64 - shift);
-    r0:
-        rem = new UInt256(rem0, rem1, rem2, rem3);
-    }
-
-    // UdivremKnuth implements the division of u by normalized multiple word d from the Knuth's division algorithm.
-    // The quotient is stored in provided quot - len(u)-len(d) words.
-    // Updates u to contain the remainder - len(d) words.
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void UdivremKnuth(ref ulong quot, Span<ulong> u, in Span<ulong> d)
-    {
-        var dh = d[^1];
-        var dl = d[^2];
-        var reciprocal = Reciprocal2By1(dh);
-
-        for (int j = u.Length - d.Length - 1; j >= 0; j--)
-        {
-            var u2 = u[j + d.Length];
-            var u1 = u[j + d.Length - 1];
-            var u0 = u[j + d.Length - 2];
-
-            ulong qhat;
-            if (u2 >= dh)
-            {
-                qhat = ~((ulong)0);
-                // TODO: Add "qhat one to big" adjustment (not needed for correctness, but helps avoiding "add back" case).
-            }
-            else
-            {
-                qhat = UDivRem2By1(u2, reciprocal, dh, u1, out var rhat);
-                ulong ph = Multiply64(qhat, dl, out ulong pl);
-                if (ph > rhat || (ph == rhat && pl > u0))
-                {
-                    qhat--;
-                    // TODO: Add "qhat one to big" adjustment (not needed for correctness, but helps avoiding "add back" case).
-                }
-            }
-
-            // Multiply and subtract.
-            var borrow = SubMulTo(u.Slice(j), d, qhat);
-            u[j + d.Length] = u2 - borrow;
-            if (u2 < borrow)
-            {
-                // Too much subtracted, add back.
-                qhat--;
-                u[j + d.Length] += AddTo(u.Slice(j), d);
-            }
-
-            Unsafe.Add(ref quot, j) = qhat; // Store quotient digit.
-        }
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static ulong SubMulTo(Span<ulong> x, in Span<ulong> y, ulong multiplier)
-    {
-        ulong borrow = 0;
-        for (int i = 0; i < y.Length; i++)
-        {
-            ulong borrow1 = 0;
-            SubtractWithBorrow(x[i], borrow, ref borrow1, out ulong s);
-            ulong ph = Multiply64(y[i], multiplier, out ulong pl);
-            ulong borrow2 = 0;
-            SubtractWithBorrow(s, pl, ref borrow2, out ulong t);
-            x[i] = t;
-            borrow = ph + borrow1 + borrow2;
-        }
-
-        return borrow;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static ulong AddTo(Span<ulong> x, in Span<ulong> y)
-    {
-        ulong carry = 0;
-        for (int i = 0; i < y.Length; i++)
-        {
-            AddWithCarry(x[i], y[i], ref carry, out x[i]);
-        }
-
-        return carry;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static ulong UdivremBy1(ref ulong quot, Span<ulong> u, ulong d)
-    {
-        ulong reciprocal = Reciprocal2By1(d);
-        ulong rem = u[^1];
-        for (int j = u.Length - 2; j >= 0; j--)
-        {
-            Unsafe.Add(ref quot, j) = UDivRem2By1(rem, reciprocal, d, u[j], out rem);
-        }
-
-        return rem;
-    }
-
     [SkipLocalsInit]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static ulong Reciprocal2By1(ulong d)
@@ -1861,42 +1637,76 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
             return;
         }
 
-        if (!Avx512F.IsSupported || !Avx512DQ.IsSupported || !Avx512DQ.VL.IsSupported)
+        if (false && Avx512F.IsSupported && Avx512DQ.IsSupported && Avx512DQ.VL.IsSupported)
         {
-            MultiplyScalar(in x, in y, out res);
+            // Recent optimizations have made scalar faster
+            MultiplyAvx512F(in x, in y, out res);
         }
         else
         {
-            MultiplyAvx512F(in x, in y, out res);
+            MultiplyScalar(in x, in y, out res);
         }
     }
 
     [SkipLocalsInit]
     private static void MultiplyScalar(in UInt256 x, in UInt256 y, out UInt256 res)
     {
-        ref ulong rx = ref Unsafe.As<UInt256, ulong>(ref Unsafe.AsRef(in x));
-        ref ulong ry = ref Unsafe.As<UInt256, ulong>(ref Unsafe.AsRef(in y));
-
-        ulong carry = Multiply64(rx, ry, out ulong r0);
-        UmulHop(carry, Unsafe.Add(ref rx, 1), ry, out carry, out ulong res1);
-        UmulHop(carry, Unsafe.Add(ref rx, 2), ry, out carry, out ulong res2);
-        ulong res3 = Unsafe.Add(ref rx, 3) * ry + carry;
-
-        UmulHop(res1, rx, Unsafe.Add(ref ry, 1), out carry, out ulong r1);
-        UmulStep(res2, Unsafe.Add(ref rx, 1), Unsafe.Add(ref ry, 1), carry, out carry, out res2);
-        res3 = res3 + Unsafe.Add(ref rx, 2) * Unsafe.Add(ref ry, 1) + carry;
-
-        UmulHop(res2, rx, Unsafe.Add(ref ry, 2), out carry, out ulong r2);
-        res3 = res3 + Unsafe.Add(ref rx, 1) * Unsafe.Add(ref ry, 2) + carry;
-
-        ulong r3 = res3 + rx * Unsafe.Add(ref ry, 3);
+        ulong x0 = x.u0;
+        ulong y0 = y.u0;
+        ulong x1 = x.u1;
+        ulong y1 = y.u1;
+        ulong x2 = x.u2;
+        ulong y2 = y.u2;
 
         Unsafe.SkipInit(out res);
         ref ulong pr = ref Unsafe.As<UInt256, ulong>(ref res);
-        pr = r0;
-        Unsafe.Add(ref pr, 1) = r1;
-        Unsafe.Add(ref pr, 2) = r2;
-        Unsafe.Add(ref pr, 3) = r3;
+
+        ulong a0 = Multiply64(x0, y0, out pr);
+
+        // Column 1
+        ulong a1 = 0;
+        ulong a2 = 0;
+        MultiplyAddCarry(ref a0, ref a1, ref a2, x0, y1);
+        MultiplyAddCarry(ref a0, ref a1, ref a2, x1, y0);
+        Unsafe.Add(ref pr, 1) = a0;
+
+        // carry into column 2 is (a2:a1) as a 128-bit value, aligned as (lo=a1, hi=a2)
+
+        // Column 2
+        a0 = a1;
+        a1 = a2;
+        a2 = 0;
+        MultiplyAddCarry(ref a0, ref a1, ref a2, x0, y2);
+        MultiplyAddCarry(ref a0, ref a1, ref a2, x1, y1);
+        MultiplyAddCarry(ref a0, ref a1, ref a2, x2, y0);
+        ulong s1 = x0 * y.u3 + x.u3 * y0;
+        ulong s0 = x1 * y2 + x2 * y1;
+        Unsafe.Add(ref pr, 2) = a0;
+
+        // For r3 we only need the low 64 of the incoming carry, which is a1 here.
+        Unsafe.Add(ref pr, 3) = a1 + s0 + s1;
+    }
+
+    [SkipLocalsInit]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void MultiplyAddCarry(ref ulong a0, ref ulong a1, ref ulong a2, ulong x, ulong y)
+    {
+        ulong hi = Multiply64(x, y, out ulong lo);
+
+        // a0 += lo; c0 = carry out
+        ulong s0 = a0 + lo;
+        ulong c0 = s0 < a0 ? 1UL : 0UL;
+        a0 = s0;
+
+        // a1 += hi + c0; c1 = carry out (0..2)
+        ulong s1 = a1 + hi;
+        ulong c1 = s1 < a1 ? 1UL : 0UL;
+        s1 += c0;
+        c1 += s1 < c0 ? 1UL : 0UL;
+        a1 = s1;
+
+        // a2 += c1 (a2 stays small here)
+        a2 += c1;
     }
 
     [SkipLocalsInit]
@@ -2092,7 +1902,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
 
     public static bool MultiplyOverflow(in UInt256 x, in UInt256 y, out UInt256 res)
     {
-        Umul(x, y, out res, out UInt256 high);
+        Multiply256To512Bit(x, y, out res, out UInt256 high);
         return !high.IsZero;
     }
 
@@ -2109,71 +1919,67 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void Squared(out UInt256 result)
     {
+        ulong x0 = u0;
+        ulong x1 = u1;
+        ulong x2 = u2;
+
         Unsafe.SkipInit(out result);
-        // Copy limbs up-front - breaks any aliasing between 'this' and 'result'.
-        ulong a0 = u0;
-        ulong a1 = u1;
-        ulong a2 = u2;
-        ulong a3 = u3;
-
-        // p00 = a0*a0
-        ulong p00_hi = Multiply64(a0, a0, out ulong pLo);
-        ulong r0 = pLo;
-        // p01 = a0*a1
-        ulong p01_hi = Multiply64(a0, a1, out pLo);
-        ulong p01_lo = pLo;
-
-        // 2*p01 as a 129-bit value:
-        // lo2 = lo<<1
-        // hi2 = (hi<<1) + (lo>>63)
-        // extra carry into next limb = hi>>63   (THIS matters for limb3 because p01 is shifted by 1 limb)
-        ulong p01_lo2 = p01_lo << 1;
-        ulong p01_hi2 = (p01_hi << 1) + (p01_lo >> 63);
-        ulong p01_carry_to_l3 = p01_hi >> 63;
-
-        // limb1: r1 = hi(p00) + lo(2*p01)
-        ulong r1 = p01_lo2 + p00_hi;
-        ulong carry1 = (r1 < p01_lo2) ? 1UL : 0UL;
-
-        // Start limb2 with hi(2*p01) + carry1
-        // This add cannot overflow for 64x64 products (bounds guarantee it), so no carry-out needed here.
-        ulong r2 = p01_hi2 + carry1;
-
-        // p02 = a0*a2
-        ulong p02_hi = Multiply64(a0, a2, out pLo);
-        ulong p02_lo = pLo;
-        ulong p02_lo2 = p02_lo << 1;
-        ulong p02_hi2 = (p02_hi << 1) + (p02_lo >> 63); // carry beyond this is limb4 - ignored for mod 2^256
-
-        // limb2 += lo(2*p02)
-        ulong t = r2 + p02_lo2;
-        ulong carry2 = (t < r2) ? 1UL : 0UL;
-        r2 = t;
-
-        // p11 = a1*a1
-        ulong p11_hi = Multiply64(a1, a1, out pLo);
-        ulong p11_lo = pLo;
-
-        // limb2 += lo(p11)
-        t = r2 + p11_lo;
-        carry2 += (t < r2) ? 1UL : 0UL;
-        r2 = t;
-
-        // limb3 base: hi(2*p02) + hi(p11) + carries from limb2 + carry from doubling p01's high
-        ulong r3 = p02_hi2 + p11_hi + carry2 + p01_carry_to_l3;
-
-        // cross terms for limb3 (low-only is enough): 2*(a0*a3 + a1*a2)
-        ulong cross = a0 * a3 + a1 * a2;
-        cross += cross;
-
-        r3 += cross;
-
-        // Single writeback at the end - no alias-driven reloads.
         ref ulong pr = ref Unsafe.As<UInt256, ulong>(ref result);
-        pr = r0;
-        Unsafe.Add(ref pr, 1) = r1;
-        Unsafe.Add(ref pr, 2) = r2;
-        Unsafe.Add(ref pr, 3) = r3;
+
+        // Column 0
+        ulong a0 = Multiply64(x0, x0, out pr);
+
+        // Column 1: 2*x0*x1
+        ulong a1 = 0;
+        ulong a2 = 0;
+        MultiplyAddCarryDouble(ref a0, ref a1, ref a2, x0, x1);
+        Unsafe.Add(ref pr, 1) = a0;
+
+        // carry into column 2 is (a2:a1) as a 128-bit value, aligned as (lo=a1, hi=a2)
+
+        // Column 2: 2*x0*x2 + x1*x1
+        a0 = a1;
+        a1 = a2;
+        a2 = 0;
+        MultiplyAddCarryDouble(ref a0, ref a1, ref a2, x0, x2);
+        MultiplyAddCarry(ref a0, ref a1, ref a2, x1, x1);
+        Unsafe.Add(ref pr, 2) = a0;
+
+        // For r3 we only need the low 64 of the incoming carry, which is a1 here.
+        ulong x3 = u3;
+
+        // Column 3: 2*x0*x3 + 2*x1*x2 (low 64 only - anything spilling past 64 goes to r4+)
+        ulong s0 = (x1 * x2) << 1;
+        ulong s1 = (x0 * x3) << 1;
+        Unsafe.Add(ref pr, 3) = a1 + s0 + s1;
+    }
+
+    [SkipLocalsInit]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void MultiplyAddCarryDouble(ref ulong a0, ref ulong a1, ref ulong a2, ulong x, ulong y)
+    {
+        // 128-bit product in (hi:lo)
+        ulong hi = Multiply64(x, y, out ulong lo);
+
+        // Double it: (hi:lo) <<= 1, producing a 129-bit value.
+        ulong extra = hi >> 63;                 // bit 128 (carry out of hi when shifted)
+        hi = (hi << 1) | (lo >> 63);            // new high 64
+        lo <<= 1;                               // new low 64
+
+        // a0 += lo; c0 = carry out
+        ulong s0 = a0 + lo;
+        ulong c0 = s0 < a0 ? 1UL : 0UL;
+        a0 = s0;
+
+        // a1 += hi + c0; c1 = carry out (0..2)
+        ulong s1 = a1 + hi;
+        ulong c1 = s1 < a1 ? 1UL : 0UL;
+        s1 += c0;
+        c1 += s1 < c0 ? 1UL : 0UL;
+        a1 = s1;
+
+        // a2 += c1 + extra (a2 stays small here)
+        a2 += c1 + extra;
     }
 
     public static void Exp(in UInt256 b, in UInt256 e, out UInt256 result)
@@ -2240,44 +2046,897 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
 
     public void ExpMod(in UInt256 exp, in UInt256 m, out UInt256 res) => ExpMod(this, exp, m, out res);
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private void ToSpan(ref Span<ulong> res)
-    {
-        res[0] = u0;
-        res[1] = u1;
-        res[2] = u2;
-        res[3] = u3;
-    }
-
     // MulMod calculates the modulo-m multiplication of x and y and
     // sets res to its result.
+    [SkipLocalsInit]
     public static void MultiplyMod(in UInt256 x, in UInt256 y, in UInt256 m, out UInt256 res)
     {
-        Umul(x, y, out UInt256 pl, out UInt256 ph);
+        if (m.IsZero) ThrowDivideByZeroException();
 
-        // If the multiplication is within 256 bits use Mod().
-        if (ph.IsZero)
+        if (m.IsOne || x.IsZero || y.IsZero)
         {
-            Mod(in pl, in m, out res);
+            res = default;
             return;
         }
 
-        const int length = 8;
-        Span<ulong> p = stackalloc ulong[length];
-        Span<ulong> pLow = p.Slice(0, 4);
-        pl.ToSpan(ref pLow);
-        Span<ulong> pHigh = p.Slice(4, 4);
-        ph.ToSpan(ref pHigh);
-        Span<ulong> quot = stackalloc ulong[length];
-        Udivrem(ref MemoryMarshal.GetReference(quot), ref MemoryMarshal.GetReference(p), length, m, out res);
+        // Trivial no-mul cases first.
+        if (y.IsOne) { Mod(in x, in m, out res); return; }
+        if (x.IsOne) { Mod(in y, in m, out res); return; }
+
+        // Modulus-size dispatch first - keeps all the tiny-mod magic.
+        if (m.IsUint64)
+        {
+            MulModBy64Bits(in x, in y, m.u0, out res);
+            return;
+        }
+
+        if ((m.u2 | m.u3) == 0)
+        {
+            // Hybrid: if both operands are > 128-bit, avoid two 256->128 reductions.
+            if (((x.u2 | x.u3) != 0) && ((y.u2 | y.u3) != 0))
+            {
+                Multiply256To512Bit(in x, in y, out UInt256 lo2, out UInt256 hi2);
+                Remainder512By128Bits(in lo2, in hi2, in m, out res); // dLen will be 2
+                return;
+            }
+
+            MulModBy128Bits(in x, in y, m.u0, m.u1, out res);
+            return;
+        }
+
+        Multiply256To512Bit(in x, in y, out UInt256 lo, out UInt256 hi);
+
+        if (hi.IsZero)
+        {
+            Mod(in lo, in m, out res);
+            return;
+        }
+
+        Remainder512By256Bits(in lo, in hi, in m, out res);
+    }
+
+    [SkipLocalsInit]
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+    private static void MulModBy64Bits(in UInt256 x, in UInt256 y, ulong mod, out UInt256 res)
+    {
+        if (mod == 1) { res = default; return; }
+
+        // Power-of-two.
+        if ((mod & (mod - 1)) == 0)
+        {
+            ulong mask = mod - 1;
+            ulong a = x.u0 & mask;
+            ulong b = y.u0 & mask;
+            ulong prodLo = unchecked(a * b);
+            res = new UInt256(prodLo & mask, 0, 0, 0);
+            return;
+        }
+
+        // Fast reduce x if it is already 64-bit.
+        ulong xr;
+        if ((x.u1 | x.u2 | x.u3) == 0)
+        {
+            ulong a = x.u0;
+            xr = a < mod ? a : a % mod;
+        }
+        else
+        {
+            int shift = LeadingZeros(mod);
+            ulong dn = mod << shift;
+            ulong reciprocal = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(dn);
+            xr = X86Base.X64.IsSupported
+                ? Remainder256By64BitsX86Base(in x, dn, shift)
+                : Remainder256By64Bits(in x, dn, reciprocal, shift);
+        }
+
+        // If y == 1, we are done (return reduced x).
+        if (y.IsOne)
+        {
+            res = new UInt256(xr, 0, 0, 0);
+            return;
+        }
+
+        // Now reduce y similarly - but avoid recomputing shift/dn if we took the slow path.
+        int sh = LeadingZeros(mod);
+        ulong dnn = mod << sh;
+        ulong rec = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(dnn);
+
+        ulong yr;
+        if ((y.u1 | y.u2 | y.u3) == 0)
+        {
+            ulong b = y.u0;
+            yr = b < mod ? b : b % mod;
+        }
+        else
+        {
+            yr = X86Base.X64.IsSupported
+                ? Remainder256By64BitsX86Base(in y, dnn, sh)
+                : Remainder256By64Bits(in y, dnn, rec, sh);
+        }
+
+        if (x.IsOne)
+        {
+            res = new UInt256(yr, 0, 0, 0);
+            return;
+        }
+
+        ulong ph = Multiply64(xr, yr, out ulong pl);
+        ulong r = X86Base.X64.IsSupported
+            ? Remainder128By64BitsX86Base(ph, pl, dnn, sh)
+            : Remainder128By64Bits(ph, pl, dnn, rec, sh);
+
+        res = new UInt256(r, 0, 0, 0);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static ulong Remainder256By64Bits(in UInt256 a, ulong dn, ulong reciprocal, int shift)
+    {
+        UInt256 un = ShiftLeftSmall(in a, shift);
+        ulong r = shift == 0 ? 0 : a.u3 >> (64 - shift);
+
+        _ = UDivRem2By1(r, reciprocal, dn, un.u3, out r);
+        _ = UDivRem2By1(r, reciprocal, dn, un.u2, out r);
+        _ = UDivRem2By1(r, reciprocal, dn, un.u1, out r);
+        _ = UDivRem2By1(r, reciprocal, dn, un.u0, out r);
+
+        // Denormalise remainder.
+        return r >> shift;
+    }
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static ulong Remainder256By64BitsX86Base(in UInt256 a, ulong dn, int shift)
+    {
+        UInt256 un = ShiftLeftSmall(in a, shift);
+        ulong r = shift == 0 ? 0 : a.u3 >> (64 - shift);
+
+        (_, r) = X86Base.X64.DivRem(un.u3, r, dn);
+        (_, r) = X86Base.X64.DivRem(un.u2, r, dn);
+        (_, r) = X86Base.X64.DivRem(un.u1, r, dn);
+        (_, r) = X86Base.X64.DivRem(un.u0, r, dn);
+
+        // Denormalise remainder.
+        return r >> shift;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static ulong Remainder128By64Bits(ulong hi, ulong lo, ulong dn, ulong reciprocal, int shift)
+    {
+        if (shift == 0)
+        {
+            ulong r = 0;
+            _ = UDivRem2By1(r, reciprocal, dn, hi, out r);
+            _ = UDivRem2By1(r, reciprocal, dn, lo, out r);
+            return r;
+        }
+        else
+        {
+            int rshift = 64 - shift; // 1..63
+
+            ulong un2 = hi >> rshift;
+            ulong un1 = (hi << shift) | (lo >> rshift);
+            ulong un0 = lo << shift;
+
+            ulong r = un2;
+            _ = UDivRem2By1(r, reciprocal, dn, un1, out r);
+            _ = UDivRem2By1(r, reciprocal, dn, un0, out r);
+
+            return r >> shift;
+        }
+    }
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static ulong Remainder128By64BitsX86Base(ulong hi, ulong lo, ulong dn, int shift)
+    {
+        if (shift == 0)
+        {
+            ulong r = 0;
+            (_, r) = X86Base.X64.DivRem(hi, r, dn);
+            (_, r) = X86Base.X64.DivRem(lo, r, dn);
+            return r;
+        }
+        else
+        {
+            int rshift = 64 - shift; // 1..63
+
+            ulong un2 = hi >> rshift;
+            ulong un1 = (hi << shift) | (lo >> rshift);
+            ulong un0 = lo << shift;
+
+            ulong r = un2;
+            (_, r) = X86Base.X64.DivRem(un1, r, dn);
+            (_, r) = X86Base.X64.DivRem(un0, r, dn);
+
+            return r >> shift;
+        }
+    }
+    [SkipLocalsInit]
+    private static void MulModBy128Bits(in UInt256 x, in UInt256 y, ulong m0, ulong m1, out UInt256 res)
+    {
+        // m1 != 0 here.
+        if (y.IsOne)
+        {
+            Remainder256By128Bits(in x, m0, m1, out ulong r0, out ulong r1);
+            res = new UInt256(r0, r1, 0, 0);
+            return;
+        }
+
+        if (x.IsOne)
+        {
+            Remainder256By128Bits(in y, m0, m1, out ulong r0, out ulong r1);
+            res = new UInt256(r0, r1, 0, 0);
+            return;
+        }
+
+        Remainder256By128Bits(in x, m0, m1, out ulong x0, out ulong x1);
+        Remainder256By128Bits(in y, m0, m1, out ulong y0, out ulong y1);
+
+        Mul128(x0, x1, y0, y1, out ulong p0, out ulong p1, out ulong p2, out ulong p3);
+        Remainder256By128Bits(p0, p1, p2, p3, m0, m1, out ulong rr0, out ulong rr1);
+
+        res = new UInt256(rr0, rr1, 0, 0);
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct ULong5
+    {
+        public ulong w0, w1, w2, w3, w4;
+    }
+
+    [SkipLocalsInit]
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+    private static void Remainder256By128Bits(in UInt256 a, ulong d0, ulong d1, out ulong r0, out ulong r1)
+        => Remainder256By128Bits(a.u0, a.u1, a.u2, a.u3, d0, d1, out r0, out r1);
+
+    [SkipLocalsInit]
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+    private static void Remainder256By128Bits(ulong u0, ulong u1, ulong u2, ulong u3, ulong d0, ulong d1, out ulong r0, out ulong r1)
+    {
+        // d1 != 0 (caller guarantees 128-bit modulus)
+        int shift = LeadingZeros(d1);
+
+        // If numerator < 2^64, remainder is numerator (since divisor >= 2^64).
+        if ((u1 | u2 | u3) == 0)
+        {
+            r0 = u0;
+            r1 = 0;
+            return;
+        }
+
+        ulong nd0, nd1;
+
+        Unsafe.SkipInit(out ULong5 un);
+
+        if (shift == 0)
+        {
+            // Normalised == original
+            un.w0 = u0; un.w1 = u1; un.w2 = u2; un.w3 = u3; un.w4 = 0;
+            nd0 = d0; nd1 = d1;
+        }
+        else
+        {
+            int rshift = 64 - shift;
+
+            un.w4 = u3 >> rshift;
+            un.w3 = (u3 << shift) | (u2 >> rshift);
+            un.w2 = (u2 << shift) | (u1 >> rshift);
+            un.w1 = (u1 << shift) | (u0 >> rshift);
+            un.w0 = u0 << shift;
+
+            nd0 = d0 << shift;
+            nd1 = (d1 << shift) | (d0 >> rshift);
+        }
+
+        // Determine uLen (significant limbs of original numerator).
+        int uLen = u3 != 0 ? 4 : (u2 != 0 ? 3 : 2); // we already handled uLen 1 above
+
+        // dLen is 2.
+        int m = uLen - 2;
+
+        ref ulong un0 = ref un.w0;
+
+        // Knuth remainder-only for dLen=2 with corrected qhat.
+        UremKnuth2(ref un0, m, nd0, nd1);
+
+        // Denormalise remainder from un[0..1].
+        if (shift == 0)
+        {
+            r0 = un.w0;
+            r1 = un.w1;
+            return;
+        }
+        else
+        {
+            int rshift = 64 - shift;
+            r0 = (un.w0 >> shift) | (un.w1 << rshift);
+            r1 = (un.w1 >> shift);
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void Mul128(ulong a0, ulong a1, ulong b0, ulong b1,
+    out ulong p0, out ulong p1, out ulong p2, out ulong p3)
+    {
+        // Products:
+        // a = a0 + a1*2^64
+        // b = b0 + b1*2^64
+        //
+        // a*b = p0 + p1*2^64 + p2*2^128 + p3*2^192
+
+        ulong hi00 = Multiply64(a0, b0, out p0);
+        ulong hi01 = Multiply64(a0, b1, out ulong lo01);
+        ulong hi10 = Multiply64(a1, b0, out ulong lo10);
+        ulong hi11 = Multiply64(a1, b1, out ulong lo11);
+
+        // p1 = hi00 + lo01 + lo10
+        ulong s1 = hi00 + lo01;
+        ulong c1 = s1 < hi00 ? 1UL : 0UL;     // carry from first add
+        ulong t1 = s1 + lo10;
+        c1 += t1 < s1 ? 1UL : 0UL;            // carry from second add (c1 is now 0..2)
+        p1 = t1;
+
+        // p2 = hi01 + hi10 + lo11 + c1
+        ulong s2 = hi01 + hi10;
+        ulong c2 = s2 < hi01 ? 1UL : 0UL;
+        ulong t2 = s2 + lo11;
+        c2 += t2 < s2 ? 1UL : 0UL;            // c2 is 0..2 so far
+
+        ulong t3 = t2 + c1;                   // add c1 as a value (0..2)
+        c2 += t3 < t2 ? 1UL : 0UL;            // at most +1 overflow here, c2 becomes 0..3
+        p2 = t3;
+
+        // p3 = hi11 + c2  (fits, since overall product is 256-bit)
+        p3 = hi11 + c2;
+    }
+[SkipLocalsInit]
+private static void Remainder512By128Bits(in UInt256 lo, in UInt256 hi, in UInt256 d, out UInt256 rem)
+{
+Debug.Assert((d.u2 | d.u3) == 0);
+
+ulong d0 = d.u0;
+ulong d1 = d.u1;
+Debug.Assert((d0 | d1) != 0);
+
+// Numerator limbs (u0 is least significant).
+ulong u0 = lo.u0, u1 = lo.u1, u2 = lo.u2, u3 = lo.u3;
+ulong u4 = hi.u0, u5 = hi.u1, u6 = hi.u2, u7 = hi.u3;
+
+// In the slow path hi != 0, so uLen is always 5..8 (as in your original).
+int uLen = u7 != 0 ? 8 : (u6 != 0 ? 7 : (u5 != 0 ? 6 : 5));
+
+// ---------------------------
+// 128-bit divisor (d1 != 0)
+// ---------------------------
+int sh = LeadingZeros(d1);
+
+Unsafe.SkipInit(out ULong9 unBuf);
+ulong nd0, nd1;
+
+if (sh == 0)
+{
+    unBuf.w0 = u0; unBuf.w1 = u1; unBuf.w2 = u2; unBuf.w3 = u3;
+    unBuf.w4 = u4; unBuf.w5 = u5; unBuf.w6 = u6; unBuf.w7 = u7;
+    unBuf.w8 = 0;
+
+    nd0 = d0;
+    nd1 = d1;
+}
+else
+{
+    int rsh = 64 - sh;
+
+    unBuf.w8 = u7 >> rsh;
+    unBuf.w7 = (u7 << sh) | (u6 >> rsh);
+    unBuf.w6 = (u6 << sh) | (u5 >> rsh);
+    unBuf.w5 = (u5 << sh) | (u4 >> rsh);
+    unBuf.w4 = (u4 << sh) | (u3 >> rsh);
+    unBuf.w3 = (u3 << sh) | (u2 >> rsh);
+    unBuf.w2 = (u2 << sh) | (u1 >> rsh);
+    unBuf.w1 = (u1 << sh) | (u0 >> rsh);
+    unBuf.w0 = u0 << sh;
+
+    nd0 = d0 << sh;
+    nd1 = (d1 << sh) | (d0 >> rsh);
+}
+
+ref ulong un0 = ref unBuf.w0;
+
+// dLen is fixed at 2 here.
+UremKnuth2(ref un0, uLen - 2, nd0, nd1);
+
+// Denormalise remainder from un[0..1].
+if (sh == 0)
+{
+    rem = new UInt256(unBuf.w0, unBuf.w1, 0, 0);
+    return;
+}
+else
+{
+    int rsh = 64 - sh;
+    ulong r0 = (unBuf.w0 >> sh) | (unBuf.w1 << rsh);
+    ulong r1 = unBuf.w1 >> sh;
+    rem = new UInt256(r0, r1, 0, 0);
+    return;
+}
+}
+
+    [SkipLocalsInit]
+    private static void Remainder512By256Bits(in UInt256 lo, in UInt256 hi, in UInt256 d, out UInt256 rem)
+    {
+        ulong d0 = d.u0, d1 = d.u1, d2 = d.u2, d3 = d.u3;
+        if ((d0 | d1 | d2 | d3) == 0)
+            ThrowDivideByZeroException();
+
+        // Divisor length (1..4) and normalisation shift.
+        int dLen;
+        int shift;
+        if (d3 != 0) { dLen = 4; shift = LeadingZeros(d3); }
+        else if (d2 != 0) { dLen = 3; shift = LeadingZeros(d2); }
+        else if (d1 != 0) { dLen = 2; shift = LeadingZeros(d1); }
+        else { dLen = 1; shift = LeadingZeros(d0); }
+
+        // Numerator limbs (u0 is least significant).
+        ulong u0 = lo.u0, u1n = lo.u1, u2n = lo.u2, u3n = lo.u3;
+        ulong u4 = hi.u0, u5 = hi.u1, u6 = hi.u2, u7 = hi.u3;
+
+        // In the slow path hi != 0, so uLen is always 5..8.
+        int uLen = u7 != 0 ? 8 : (u6 != 0 ? 7 : (u5 != 0 ? 6 : 5));
+
+        // Normalise numerator into 9 limbs (always fully assigned - safe with SkipLocalsInit).
+        Unsafe.SkipInit(out ULong9 unBuf);
+
+        // Normalise divisor digits too (compute all 4, slice by dLen logically).
+        ulong nd0, nd1, nd2v, nd3v;
+
+        if (shift == 0)
+        {
+            // un[0..7] = u[0..7], un[8] = 0
+            unBuf.w0 = u0; unBuf.w1 = u1n; unBuf.w2 = u2n; unBuf.w3 = u3n;
+            unBuf.w4 = u4; unBuf.w5 = u5; unBuf.w6 = u6; unBuf.w7 = u7;
+            unBuf.w8 = 0;
+
+            nd0 = d0; nd1 = d1; nd2v = d2; nd3v = d3;
+        }
+        else
+        {
+            int rshift = 64 - shift; // 1..63
+
+            unBuf.w8 = u7 >> rshift;
+            unBuf.w7 = (u7 << shift) | (u6 >> rshift);
+            unBuf.w6 = (u6 << shift) | (u5 >> rshift);
+            unBuf.w5 = (u5 << shift) | (u4 >> rshift);
+            unBuf.w4 = (u4 << shift) | (u3n >> rshift);
+            unBuf.w3 = (u3n << shift) | (u2n >> rshift);
+            unBuf.w2 = (u2n << shift) | (u1n >> rshift);
+            unBuf.w1 = (u1n << shift) | (u0 >> rshift);
+            unBuf.w0 = u0 << shift;
+
+            nd0 = d0 << shift;
+            nd1 = (d1 << shift) | (d0 >> rshift);
+            nd2v = (d2 << shift) | (d1 >> rshift);
+            nd3v = (d3 << shift) | (d2 >> rshift);
+        }
+
+        ref ulong un0 = ref unBuf.w0;
+
+        // Divide (remainder only). m = uLen - dLen, loop j = m..0.
+        int mQ = uLen - dLen;
+
+        switch (dLen)
+        {
+            case 1:
+                {
+                    ulong dn = nd0; // normalised 1-limb divisor (MSB set unless original d was 0).
+                    ulong reciprocal = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(dn);
+
+                    // Long division by 1 word across the significant window only.
+                    ulong r = Unsafe.Add(ref un0, uLen); // un[uLen] is the top carry limb (0 if shift == 0).
+                    for (int j = uLen - 1; j >= 0; j--)
+                    {
+                        if (X86Base.X64.IsSupported)
+                        {
+                            (_, r) = X86Base.X64.DivRem(Unsafe.Add(ref un0, j), r, dn);
+                        }
+                        else
+                        {
+                            _ = UDivRem2By1(r, reciprocal, dn, Unsafe.Add(ref un0, j), out r);
+                        }
+                    }
+
+                    if (shift != 0)
+                        r >>= shift;
+
+                    rem = new UInt256(r, 0, 0, 0);
+                    return;
+                }
+
+            case 2:
+                UremKnuth2(ref un0, mQ, nd0, nd1);
+                break;
+
+            case 3:
+                UremKnuth3(ref un0, mQ, nd0, nd1, nd2v);
+                break;
+
+            default: // 4
+                UremKnuth4(ref un0, mQ, nd0, nd1, nd2v, nd3v);
+                break;
+        }
+
+        // Denormalise remainder from un[0..dLen-1].
+        if (shift == 0)
+        {
+            rem = dLen switch
+            {
+                2 => new UInt256(unBuf.w0, unBuf.w1, 0, 0),
+                3 => new UInt256(unBuf.w0, unBuf.w1, unBuf.w2, 0),
+                _ => new UInt256(unBuf.w0, unBuf.w1, unBuf.w2, unBuf.w3),
+            };
+            return;
+        }
+        else
+        {
+            int rshift = 64 - shift;
+
+            if (dLen == 2)
+            {
+                ulong r0 = (unBuf.w0 >> shift) | (unBuf.w1 << rshift);
+                ulong r1 = (unBuf.w1 >> shift);
+                rem = new UInt256(r0, r1, 0, 0);
+                return;
+            }
+
+            if (dLen == 3)
+            {
+                ulong r0 = (unBuf.w0 >> shift) | (unBuf.w1 << rshift);
+                ulong r1 = (unBuf.w1 >> shift) | (unBuf.w2 << rshift);
+                ulong r2 = (unBuf.w2 >> shift);
+                rem = new UInt256(r0, r1, r2, 0);
+                return;
+            }
+
+            // dLen == 4
+            ulong rr0 = (unBuf.w0 >> shift) | (unBuf.w1 << rshift);
+            ulong rr1 = (unBuf.w1 >> shift) | (unBuf.w2 << rshift);
+            ulong rr2 = (unBuf.w2 >> shift) | (unBuf.w3 << rshift);
+            ulong rr3 = (unBuf.w3 >> shift);
+            rem = new UInt256(rr0, rr1, rr2, rr3);
+        }
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct ULong9
+    {
+        public ulong w0, w1, w2, w3, w4, w5, w6, w7, w8;
+    }
+
+    // ----------------- Knuth remainder-only cores -----------------
+
+    [SkipLocalsInit]
+    private static void UremKnuth2(ref ulong un0, int m, ulong d0, ulong d1)
+    {
+        ulong dh = d1;
+        ulong dl = d0; // d[n-2]
+        ulong reciprocal = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(dh);
+
+        for (int j = m; j >= 0; j--)
+        {
+            ref ulong uJ = ref Unsafe.Add(ref un0, j);
+
+            ulong u2 = Unsafe.Add(ref uJ, 2);
+            ulong u1 = Unsafe.Add(ref uJ, 1);
+            ulong u0 = uJ;
+
+            ulong qhat = X86Base.X64.IsSupported ? EstimateQhatX86Base(u2, u1, u0, dh, dl) : EstimateQhat(u2, u1, u0, dh, dl, reciprocal);
+
+            ulong borrow = SubMulTo2(ref uJ, d0, d1, qhat);
+            ulong newU2 = u2 - borrow;
+            Unsafe.Add(ref uJ, 2) = newU2;
+
+            if (u2 < borrow)
+            {
+                newU2 += AddTo2(ref uJ, d0, d1);
+                Unsafe.Add(ref uJ, 2) = newU2;
+            }
+        }
+    }
+
+    [SkipLocalsInit]
+    private static void UremKnuth3(ref ulong un0, int m, ulong d0, ulong d1, ulong d2)
+    {
+        ulong dh = d2;
+        ulong dl = d1; // d[n-2]
+        ulong reciprocal = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(dh);
+
+        for (int j = m; j >= 0; j--)
+        {
+            ref ulong uJ = ref Unsafe.Add(ref un0, j);
+
+            ulong u2 = Unsafe.Add(ref uJ, 3);
+            ulong u1 = Unsafe.Add(ref uJ, 2);
+            ulong u0 = Unsafe.Add(ref uJ, 1);
+
+            ulong qhat = X86Base.X64.IsSupported ? EstimateQhatX86Base(u2, u1, u0, dh, dl) : EstimateQhat(u2, u1, u0, dh, dl, reciprocal);
+
+            ulong borrow = SubMulTo3(ref uJ, d0, d1, d2, qhat);
+            ulong newU2 = u2 - borrow;
+            Unsafe.Add(ref uJ, 3) = newU2;
+
+            if (u2 < borrow)
+            {
+                newU2 += AddTo3(ref uJ, d0, d1, d2);
+                Unsafe.Add(ref uJ, 3) = newU2;
+            }
+        }
+    }
+
+    [SkipLocalsInit]
+    private static void UremKnuth4(ref ulong un0, int m, ulong d0, ulong d1, ulong d2, ulong d3)
+    {
+        ulong dh = d3;
+        ulong dl = d2; // d[n-2]
+        ulong reciprocal = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(dh);
+
+        for (int j = m; j >= 0; j--)
+        {
+            ref ulong uJ = ref Unsafe.Add(ref un0, j);
+
+            ulong u2 = Unsafe.Add(ref uJ, 4);
+            ulong u1 = Unsafe.Add(ref uJ, 3);
+            ulong u0 = Unsafe.Add(ref uJ, 2);
+
+            ulong qhat = X86Base.X64.IsSupported ? EstimateQhatX86Base(u2, u1, u0, dh, dl) : EstimateQhat(u2, u1, u0, dh, dl, reciprocal);
+
+            ulong borrow = SubMulTo4(ref uJ, d0, d1, d2, d3, qhat);
+            ulong newU2 = u2 - borrow;
+            Unsafe.Add(ref uJ, 4) = newU2;
+
+            if (u2 < borrow)
+            {
+                newU2 += AddTo4(ref uJ, d0, d1, d2, d3);
+                Unsafe.Add(ref uJ, 4) = newU2;
+            }
+        }
+    }
+
+    // ----------------- Correct qhat estimation (Knuth correction loop) -----------------
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static ulong EstimateQhat(ulong u2, ulong u1, ulong u0, ulong dh, ulong dl, ulong reciprocal)
+    {
+        // qhat = min((u2:b + u1) / dh, b - 1)
+        // then while qhat*dl > (rhat:b + u0): qhat--, rhat += dh (stop if rhat overflows base).
+        ulong qhat;
+        ulong rhat;
+
+        if (u2 > dh)
+        {
+            // Quotient digit saturates at b - 1. No correction needed (rhat would be >= b).
+            return ulong.MaxValue;
+        }
+
+        if (u2 == dh)
+        {
+            qhat = ulong.MaxValue;
+            rhat = u1 + dh;
+
+            // If rhat overflowed base b, the correction inequality cannot hold.
+            if (rhat < u1)
+                return qhat;
+        }
+        else
+        {
+            qhat = UDivRem2By1(u2, reciprocal, dh, u1, out rhat);
+        }
+
+        // At most 2 iterations in practice for Knuth D.
+        while (true)
+        {
+            ulong ph = Multiply64(qhat, dl, out ulong pl);
+            if (ph < rhat || (ph == rhat && pl <= u0))
+                break;
+
+            qhat--;
+
+            ulong prev = rhat;
+            rhat += dh;
+
+            // rhat >= b => correction test cannot hold any more.
+            if (rhat < prev)
+                break;
+        }
+
+        return qhat;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static ulong EstimateQhatX86Base(ulong u2, ulong u1, ulong u0, ulong dh, ulong dl)
+    {
+        // qhat = min((u2:b + u1) / dh, b - 1)
+        // then while qhat*dl > (rhat:b + u0): qhat--, rhat += dh (stop if rhat overflows base).
+        ulong qhat;
+        ulong rhat;
+
+        if (u2 > dh)
+        {
+            // Quotient digit saturates at b - 1. No correction needed (rhat would be >= b).
+            return ulong.MaxValue;
+        }
+
+        if (u2 == dh)
+        {
+            qhat = ulong.MaxValue;
+            rhat = u1 + dh;
+
+            // If rhat overflowed base b, the correction inequality cannot hold.
+            if (rhat < u1)
+                return qhat;
+        }
+        else
+        {
+            (qhat, rhat) = X86Base.X64.DivRem(u1, u2, dh);
+        }
+
+        // At most 2 iterations in practice for Knuth D.
+        while (true)
+        {
+            ulong ph = Multiply64(qhat, dl, out ulong pl);
+            if (ph < rhat || (ph == rhat && pl <= u0))
+                break;
+
+            qhat--;
+
+            ulong prev = rhat;
+            rhat += dh;
+
+            // rhat >= b => correction test cannot hold any more.
+            if (rhat < prev)
+                break;
+        }
+
+        return qhat;
+    }
+
+    // ----------------- Fixed-length mul-sub and add-back helpers -----------------
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static ulong SubMulTo2(ref ulong x0, ulong y0, ulong y1, ulong mul)
+    {
+        ref ulong x1 = ref Unsafe.Add(ref x0, 1);
+
+        ulong borrow = 0;
+
+        ulong b1 = 0;
+        SubtractWithBorrow(x0, borrow, ref b1, out ulong s0);
+        ulong ph0 = Multiply64(y0, mul, out ulong pl0);
+        ulong b2 = 0;
+        SubtractWithBorrow(s0, pl0, ref b2, out x0);
+        borrow = ph0 + b1 + b2;
+
+        b1 = 0;
+        SubtractWithBorrow(x1, borrow, ref b1, out ulong s1);
+        ulong ph1 = Multiply64(y1, mul, out ulong pl1);
+        b2 = 0;
+        SubtractWithBorrow(s1, pl1, ref b2, out x1);
+        borrow = ph1 + b1 + b2;
+
+        return borrow;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static ulong SubMulTo3(ref ulong x0, ulong y0, ulong y1, ulong y2, ulong mul)
+    {
+        ref ulong x1 = ref Unsafe.Add(ref x0, 1);
+        ref ulong x2 = ref Unsafe.Add(ref x0, 2);
+
+        ulong borrow = 0;
+
+        ulong b1 = 0;
+        SubtractWithBorrow(x0, borrow, ref b1, out ulong s0);
+        ulong ph0 = Multiply64(y0, mul, out ulong pl0);
+        ulong b2 = 0;
+        SubtractWithBorrow(s0, pl0, ref b2, out x0);
+        borrow = ph0 + b1 + b2;
+
+        b1 = 0;
+        SubtractWithBorrow(x1, borrow, ref b1, out ulong s1);
+        ulong ph1 = Multiply64(y1, mul, out ulong pl1);
+        b2 = 0;
+        SubtractWithBorrow(s1, pl1, ref b2, out x1);
+        borrow = ph1 + b1 + b2;
+
+        b1 = 0;
+        SubtractWithBorrow(x2, borrow, ref b1, out ulong s2);
+        ulong ph2 = Multiply64(y2, mul, out ulong pl2);
+        b2 = 0;
+        SubtractWithBorrow(s2, pl2, ref b2, out x2);
+        borrow = ph2 + b1 + b2;
+
+        return borrow;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static ulong SubMulTo4(ref ulong x0, ulong y0, ulong y1, ulong y2, ulong y3, ulong mul)
+    {
+        ref ulong x1 = ref Unsafe.Add(ref x0, 1);
+        ref ulong x2 = ref Unsafe.Add(ref x0, 2);
+        ref ulong x3 = ref Unsafe.Add(ref x0, 3);
+
+        ulong borrow = 0;
+
+        ulong b1 = 0;
+        SubtractWithBorrow(x0, borrow, ref b1, out ulong s0);
+        ulong ph0 = Multiply64(y0, mul, out ulong pl0);
+        ulong b2 = 0;
+        SubtractWithBorrow(s0, pl0, ref b2, out x0);
+        borrow = ph0 + b1 + b2;
+
+        b1 = 0;
+        SubtractWithBorrow(x1, borrow, ref b1, out ulong s1);
+        ulong ph1 = Multiply64(y1, mul, out ulong pl1);
+        b2 = 0;
+        SubtractWithBorrow(s1, pl1, ref b2, out x1);
+        borrow = ph1 + b1 + b2;
+
+        b1 = 0;
+        SubtractWithBorrow(x2, borrow, ref b1, out ulong s2);
+        ulong ph2 = Multiply64(y2, mul, out ulong pl2);
+        b2 = 0;
+        SubtractWithBorrow(s2, pl2, ref b2, out x2);
+        borrow = ph2 + b1 + b2;
+
+        b1 = 0;
+        SubtractWithBorrow(x3, borrow, ref b1, out ulong s3);
+        ulong ph3 = Multiply64(y3, mul, out ulong pl3);
+        b2 = 0;
+        SubtractWithBorrow(s3, pl3, ref b2, out x3);
+        borrow = ph3 + b1 + b2;
+
+        return borrow;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static ulong AddTo2(ref ulong x0, ulong y0, ulong y1)
+    {
+        ref ulong x1 = ref Unsafe.Add(ref x0, 1);
+
+        ulong carry = 0;
+        AddWithCarry(x0, y0, ref carry, out x0);
+        AddWithCarry(x1, y1, ref carry, out x1);
+        return carry;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static ulong AddTo3(ref ulong x0, ulong y0, ulong y1, ulong y2)
+    {
+        ref ulong x1 = ref Unsafe.Add(ref x0, 1);
+        ref ulong x2 = ref Unsafe.Add(ref x0, 2);
+
+        ulong carry = 0;
+        AddWithCarry(x0, y0, ref carry, out x0);
+        AddWithCarry(x1, y1, ref carry, out x1);
+        AddWithCarry(x2, y2, ref carry, out x2);
+        return carry;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static ulong AddTo4(ref ulong x0, ulong y0, ulong y1, ulong y2, ulong y3)
+    {
+        ref ulong x1 = ref Unsafe.Add(ref x0, 1);
+        ref ulong x2 = ref Unsafe.Add(ref x0, 2);
+        ref ulong x3 = ref Unsafe.Add(ref x0, 3);
+
+        ulong carry = 0;
+        AddWithCarry(x0, y0, ref carry, out x0);
+        AddWithCarry(x1, y1, ref carry, out x1);
+        AddWithCarry(x2, y2, ref carry, out x2);
+        AddWithCarry(x3, y3, ref carry, out x3);
+        return carry;
     }
 
     public void MultiplyMod(in UInt256 a, in UInt256 m, out UInt256 res) => MultiplyMod(this, a, m, out res);
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void Umul(in UInt256 x, in UInt256 y, out UInt256 low, out UInt256 high)
+    [SkipLocalsInit]
+    private static void Multiply256To512Bit(in UInt256 x, in UInt256 y, out UInt256 low, out UInt256 high)
     {
-        if ((x.u1 | x.u2 | x.u3 | y.u1 | y.u2 | y.u3) == 0)
+        if (x.IsUint64 && y.IsUint64)
         {
             // Fast multiply for numbers less than 2^64 (18,446,744,073,709,551,615)
             ulong highUL = Multiply64(x.u0, y.u0, out ulong lowUL);
@@ -2289,64 +2948,71 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
             return;
         }
 
-        ulong carry = Multiply64(x.u0, y.u0, out ulong l0);
-        (carry, ulong res1) = UmulHopi(carry, x.u1, y.u0);
-        (carry, ulong res2) = UmulHopi(carry, x.u2, y.u0);
-        (ulong carry4, ulong res3) = UmulHopi(carry, x.u3, y.u0);
-
-        (carry, ulong l1) = UmulHopi(res1, x.u0, y.u1);
-        (carry, res2) = UmulStepi(res2, x.u1, y.u1, carry);
-        (carry, res3) = UmulStepi(res3, x.u2, y.u1, carry);
-        (ulong carry5, ulong res4) = UmulStepi(carry4, x.u3, y.u1, carry);
-
-        (carry, ulong l2) = UmulHopi(res2, x.u0, y.u2);
-        (carry, res3) = UmulStepi(res3, x.u1, y.u2, carry);
-        (carry, res4) = UmulStepi(res4, x.u2, y.u2, carry);
-        (ulong carry6, ulong res5) = UmulStepi(carry5, x.u3, y.u2, carry);
-
-        (carry, ulong l3) = UmulHopi(res3, x.u0, y.u3);
-        (carry, ulong h0) = UmulStepi(res4, x.u1, y.u3, carry);
-        (carry, ulong h1) = UmulStepi(res5, x.u2, y.u3, carry);
-        (ulong h3, ulong h2) = UmulStepi(carry6, x.u3, y.u3, carry);
-        low = new UInt256(l0, l1, l2, l3);
-        high = new UInt256(h0, h1, h2, h3);
+        Multiply256To512BitLarge(x, y, out low, out high);
     }
 
-    // UmulStep computes (hi * 2^64 + lo) = z + (x * y) + carry.
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void UmulStep(ulong z, ulong x, ulong y, ulong carry, out ulong high, out ulong low)
+    [SkipLocalsInit]
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void Multiply256To512BitLarge(UInt256 x, UInt256 y, out UInt256 low, out UInt256 high)
     {
-        high = Multiply64(x, y, out low);
-        ulong c = 0;
-        AddWithCarry(low, carry, ref c, out low);
-        AddWithCarry(high, 0, ref c, out high);
-        c = 0;
-        AddWithCarry(low, z, ref c, out low);
-        AddWithCarry(high, 0, ref c, out high);
-    }
+        // Copy inputs up front - this breaks aliasing with out params so we can store early.
+        ulong x0 = x.u0, x1 = x.u1, x2 = x.u2, x3 = x.u3;
+        ulong y0 = y.u0, y1 = y.u1, y2 = y.u2, y3 = y.u3;
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static (ulong hi, ulong lo) UmulStepi(ulong z, ulong x, ulong y, ulong carry)
-    {
-        UmulStep(z, x, y, carry, out ulong hi, out ulong lo);
-        return (hi, lo);
-    }
+        Unsafe.SkipInit(out low);
+        Unsafe.SkipInit(out high);
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static (ulong hi, ulong low) UmulHopi(ulong z, ulong x, ulong y)
-    {
-        UmulHop(z, x, y, out ulong hi, out ulong lo);
-        return (hi, lo);
-    }
+        // Column 0: p0 = x0*y0 (low), carry = high
+        ulong carryLo = Multiply64(x0, y0, out ulong p0);
+        ulong carryHi = 0;
+        Unsafe.AsRef(in low.u0) = p0;
 
-    // UmulHop computes (hi * 2^64 + lo) = z + (x * y)
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void UmulHop(ulong z, ulong x, ulong y, out ulong high, out ulong low)
-    {
-        high = Multiply64(x, y, out low);
-        ulong carry = 0ul;
-        AddWithCarry(low, z, ref carry, out low);
-        AddWithCarry(high, 0, ref carry, out high);
+        // Column 1: p1 = carry + x0*y1 + x1*y0
+        ulong a0 = carryLo, a1 = carryHi, a2 = 0;
+        MultiplyAddCarry(ref a0, ref a1, ref a2, x0, y1);
+        MultiplyAddCarry(ref a0, ref a1, ref a2, x1, y0);
+        Unsafe.AsRef(in low.u1) = a0;
+        carryLo = a1; carryHi = a2;
+
+        // Column 2: p2 = carry + x0*y2 + x1*y1 + x2*y0
+        a0 = carryLo; a1 = carryHi; a2 = 0;
+        MultiplyAddCarry(ref a0, ref a1, ref a2, x0, y2);
+        MultiplyAddCarry(ref a0, ref a1, ref a2, x1, y1);
+        MultiplyAddCarry(ref a0, ref a1, ref a2, x2, y0);
+        Unsafe.AsRef(in low.u2) = a0;
+        carryLo = a1; carryHi = a2;
+
+        // Column 3: p3 = carry + x0*y3 + x1*y2 + x2*y1 + x3*y0
+        a0 = carryLo; a1 = carryHi; a2 = 0;
+        MultiplyAddCarry(ref a0, ref a1, ref a2, x0, y3);
+        MultiplyAddCarry(ref a0, ref a1, ref a2, x1, y2);
+        MultiplyAddCarry(ref a0, ref a1, ref a2, x2, y1);
+        MultiplyAddCarry(ref a0, ref a1, ref a2, x3, y0);
+        Unsafe.AsRef(in low.u3) = a0;
+        carryLo = a1; carryHi = a2;
+
+        // Column 4: p4 = carry + x1*y3 + x2*y2 + x3*y1
+        a0 = carryLo; a1 = carryHi; a2 = 0;
+        MultiplyAddCarry(ref a0, ref a1, ref a2, x1, y3);
+        MultiplyAddCarry(ref a0, ref a1, ref a2, x2, y2);
+        MultiplyAddCarry(ref a0, ref a1, ref a2, x3, y1);
+        Unsafe.AsRef(in high.u0) = a0;
+        carryLo = a1; carryHi = a2;
+
+        // Column 5: p5 = carry + x2*y3 + x3*y2
+        a0 = carryLo; a1 = carryHi; a2 = 0;
+        MultiplyAddCarry(ref a0, ref a1, ref a2, x2, y3);
+        MultiplyAddCarry(ref a0, ref a1, ref a2, x3, y2);
+        Unsafe.AsRef(in high.u1) = a0;
+        carryLo = a1; carryHi = a2;
+
+        // Column 6: p6 = carry + x3*y3
+        a0 = carryLo; a1 = carryHi; a2 = 0;
+        MultiplyAddCarry(ref a0, ref a1, ref a2, x3, y3);
+        Unsafe.AsRef(in high.u2) = a0;
+
+        // Column 7: remaining carry (a1). For 256x256, a2 must end up 0 here.
+        Unsafe.AsRef(in high.u3) = a1;
     }
 
     /// <summary>
@@ -3399,7 +4065,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     public uint ToUInt32(IFormatProvider? provider) => System.Convert.ToUInt32(ToDecimal(provider), provider);
     public ulong ToUInt64(IFormatProvider? provider) => System.Convert.ToUInt64(ToDecimal(provider), provider);
 
-    [DoesNotReturn]
+    [DoesNotReturn, StackTraceHidden]
     private static void ThrowDivideByZeroException() => throw new DivideByZeroException();
 
     [DoesNotReturn]
@@ -3881,17 +4547,6 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
             ulong a1 = v.u1;
             ulong a2 = v.u2;
             ulong a3 = v.u3;
-
-            // C# shifts mask the count (64 -> 0), so sh == 64 needs an explicit path.
-            if (sh == 64)
-            {
-                Unsafe.SkipInit(out UInt256 r);
-                Unsafe.AsRef(in r.u0) = a1;
-                Unsafe.AsRef(in r.u1) = a2;
-                Unsafe.AsRef(in r.u2) = a3;
-                Unsafe.AsRef(in r.u3) = 0;
-                return r;
-            }
 
             int rs = 64 - sh;
 
