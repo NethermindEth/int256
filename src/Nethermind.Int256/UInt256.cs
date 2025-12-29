@@ -22,16 +22,16 @@ namespace Nethermind.Int256;
 [StructLayout(LayoutKind.Explicit)]
 public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComparable<UInt256>, IInteger<UInt256>, IConvertible
 {
-    // Ensure that hashes are different for every run of the node and every node, so if are any hash collisions on
-    // one node they will not be the same on another node or across a restart so hash collision cannot be used to degrade
-    // the performance of the network as a whole.
-    private static readonly uint s_instanceRandom = (uint)System.Security.Cryptography.RandomNumberGenerator.GetInt32(int.MinValue, int.MaxValue);
-
     public static readonly UInt256 Zero = 0ul;
     public static readonly UInt256 One = 1ul;
     public static readonly UInt256 MinValue = Zero;
     public static readonly UInt256 MaxValue = ~Zero;
     public static readonly UInt256 UInt128MaxValue = new(ulong.MaxValue, ulong.MaxValue);
+
+    // Ensure that hashes are different for every run of the node and every node, so if are any hash collisions on
+    // one node they will not be the same on another node or across a restart so hash collision cannot be used to degrade
+    // the performance of the network as a whole.
+    private static uint _hashSeed;
 
     /* in little endian order so u3 is the most significant ulong */
     [FieldOffset(0)]
@@ -3304,7 +3304,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         // Very fast hardware accelerated non-cryptographic hash function
 
         // Start with instance random, length and first ulong as seed
-        uint hash = BitOperations.Crc32C(s_instanceRandom, u0);
+        uint hash = BitOperations.Crc32C(_hashSeed, u0);
 
         // Crc32C is 3 cycle latency, 1 cycle throughput
         // So we use same initial 3 times to not create a dependency chain
@@ -3376,6 +3376,8 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         result = (UInt256)a;
         return true;
     }
+
+    public static void SetHashSeed(uint seed) => _hashSeed = seed;
 
     public TypeCode GetTypeCode() => TypeCode.Object;
     public bool ToBoolean(IFormatProvider? provider) => !IsZero;
