@@ -26,6 +26,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     // Ensure that hashes are different for every run of the node and every node, so if are any hash collisions on
     // one node they will not be the same on another node or across a restart so hash collision cannot be used to degrade
     // the performance of the network as a whole.
+    // Constant by default for zkVM-compatibility.
     private static readonly uint _hashSeed =
         AppContext.TryGetSwitch("Nethermind.Int256.UseRandomSeed", out var useRandomSeed) && useRandomSeed
             ? (uint)RandomNumberGenerator.GetInt32(int.MinValue, int.MaxValue)
