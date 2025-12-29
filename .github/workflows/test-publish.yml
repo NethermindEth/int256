@@ -18,13 +18,12 @@ on:
           - Production
 
 jobs:
-  test-publish:
+  test:
     name: Test
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         include:
-          # debug - 3 OS
           - os: windows-latest
             build-config: debug
             intrinsics: HWIntrinsics
@@ -37,8 +36,7 @@ jobs:
             build-config: debug
             intrinsics: HWIntrinsics
             avx2: NoAvx2
-            
-          # windows-latest - 2 variants
+          
           - os: windows-latest
             build-config: release
             intrinsics: NoHWIntrinsics
@@ -48,7 +46,6 @@ jobs:
             intrinsics: HWIntrinsics
             avx2: Avx2
 
-          # macos-latest - 2 variants
           - os: macos-latest
             build-config: release
             intrinsics: NoHWIntrinsics
@@ -58,8 +55,6 @@ jobs:
             intrinsics: HWIntrinsics
             avx2: NoAvx2
 
-
-          # ubuntu-latest - 3 variants            
           - os: ubuntu-latest
             build-config: release
             intrinsics: HWIntrinsics
@@ -84,21 +79,29 @@ jobs:
       - name: Set up .NET
         uses: actions/setup-dotnet@v5
 
-      - name: Install dependencies
-        working-directory: src
-        run: dotnet restore
-
       - name: Test
         working-directory: src/Nethermind.Int256.Tests
-        run: dotnet test -c ${{ matrix.build-config }} --no-restore
+        run: dotnet test -c ${{ matrix.build-config }}
+
+  publish:
+    name: Publish
+    needs: test
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.publish != 'No' || github.event_name == 'release'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
 
       - name: Publish
-        if: matrix.build-config == 'release' && matrix.intrinsics == 'HWIntrinsics' && matrix.avx2 == 'Avx2' &&
-          (github.event_name == 'workflow_dispatch' && github.event.inputs.publish != 'No' || github.event_name == 'release')
+        env:
+          DOTNET_EnableAVX2: 1
+          DOTNET_EnableHWIntrinsic: 1
+          NUGET_API_KEY: ${{ github.event.inputs.publish == 'Staging' && secrets.NUGETTEST_API_KEY || secrets.NUGET_API_KEY }}
         working-directory: src
         run: |
-          dotnet pack ./Nethermind.Int256 -c ${{ matrix.build-config }} --no-build
-          dotnet nuget push ./artifacts/package/${{ matrix.build-config }}/*.nupkg \
-            -k ${{ github.event.inputs.publish == 'Staging' && secrets.NUGETTEST_API_KEY || secrets.NUGET_API_KEY }} \
+          dotnet pack ./Nethermind.Int256 -c release
+          dotnet nuget push ./artifacts/package/release/*.nupkg -k $NUGET_API_KEY \
             -s ${{ github.event.inputs.publish == 'Staging' && 'https://apiint.nugettest.org/v3/index.json' || 'https://api.nuget.org/v3/index.json' }}
-
