@@ -31,7 +31,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     // Ensure that hashes are different for every run of the node and every node, so if are any hash collisions on
     // one node they will not be the same on another node or across a restart so hash collision cannot be used to degrade
     // the performance of the network as a whole.
-    private static uint _hashSeed;
+    private static uint _hashSeed = 2098026241;
 
     /* in little endian order so u3 is the most significant ulong */
     [FieldOffset(0)]
