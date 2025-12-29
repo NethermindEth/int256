@@ -1,51 +1,53 @@
+// SPDX-FileCopyrightText: 2025 Demerzel Solutions Limited
+// SPDX-License-Identifier: LGPL-3.0-only
+
 using System.Collections.Generic;
 using System.Numerics;
 using System.Linq;
 
-namespace Nethermind.Int256.Test
+namespace Nethermind.Int256.Test;
+
+public static class TernaryOps
 {
-    public static class TernaryOps
+    public static IEnumerable<(BigInteger, BigInteger, BigInteger)> TestCases
     {
-        public static IEnumerable<(BigInteger, BigInteger, BigInteger)> TestCases
+        get
         {
-            get
+            foreach ((var case1, var case2) in BinaryOps.TestCases)
             {
-                foreach ((var case1, var case2) in BinaryOps.TestCases)
+                foreach (var case3 in UnaryOps.TestCases)
                 {
-                    foreach (var case3 in UnaryOps.TestCases)
-                    {
-                        yield return (case1, case2, case3);
-                    }
+                    yield return (case1, case2, case3);
                 }
             }
         }
+    }
 
-        public static IEnumerable<(BigInteger, BigInteger, BigInteger)> SignedTestCases
+    public static IEnumerable<(BigInteger, BigInteger, BigInteger)> SignedTestCases
+    {
+        get
         {
-            get
+            foreach ((var case1, var case2) in BinaryOps.SignedTestCases)
             {
-                foreach ((var case1, var case2) in BinaryOps.SignedTestCases)
+                foreach (var case3 in UnaryOps.SignedTestCases)
                 {
-                    foreach (var case3 in UnaryOps.SignedTestCases)
-                    {
-                        yield return (case1, case2, case3);
-                    }
+                    yield return (case1, case2, case3);
                 }
             }
         }
+    }
 
-        public static IEnumerable<(BigInteger, BigInteger, BigInteger)> SignedModTestCases => SignedTestCases.Where(v => v.Item3 >= 0);
+    public static IEnumerable<(BigInteger, BigInteger, BigInteger)> SignedModTestCases => SignedTestCases.Where(v => v.Item3 >= 0);
 
-        public static IEnumerable<(ulong, ulong, ulong)> ULongTestCases
+    public static IEnumerable<(ulong, ulong, ulong)> ULongTestCases
+    {
+        get
         {
-            get
+            foreach ((var case1, var case2) in BinaryOps.ULongTestCases)
             {
-                foreach ((var case1, var case2) in BinaryOps.ULongTestCases)
+                foreach (var case3 in UnaryOps.ULongTestCases)
                 {
-                    foreach (var case3 in UnaryOps.ULongTestCases)
-                    {
-                        yield return (case1, case2, case3);
-                    }
+                    yield return (case1, case2, case3);
                 }
             }
         }
