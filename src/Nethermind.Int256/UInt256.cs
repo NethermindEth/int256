@@ -14,6 +14,7 @@ using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
 using System.Runtime.Intrinsics.Arm;
 using System.Runtime.Intrinsics.X86;
+using System.Security.Cryptography;
 
 [assembly: InternalsVisibleTo("Nethermind.Int256.Tests")]
 
@@ -22,16 +23,19 @@ namespace Nethermind.Int256;
 [StructLayout(LayoutKind.Explicit)]
 public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComparable<UInt256>, IInteger<UInt256>, IConvertible
 {
+    // Ensure that hashes are different for every run of the node and every node, so if are any hash collisions on
+    // one node they will not be the same on another node or across a restart so hash collision cannot be used to degrade
+    // the performance of the network as a whole.
+    private static readonly uint _hashSeed =
+        AppContext.TryGetSwitch("Nethermind.Int256.UseRandomSeed", out var useRandomSeed) && useRandomSeed
+            ? (uint)RandomNumberGenerator.GetInt32(int.MinValue, int.MaxValue)
+            : 2098026241U; // just a random prime number
+
     public static readonly UInt256 Zero = 0ul;
     public static readonly UInt256 One = 1ul;
     public static readonly UInt256 MinValue = Zero;
     public static readonly UInt256 MaxValue = ~Zero;
     public static readonly UInt256 UInt128MaxValue = new(ulong.MaxValue, ulong.MaxValue);
-
-    // Ensure that hashes are different for every run of the node and every node, so if are any hash collisions on
-    // one node they will not be the same on another node or across a restart so hash collision cannot be used to degrade
-    // the performance of the network as a whole.
-    private static uint _hashSeed = 2098026241;
 
     /* in little endian order so u3 is the most significant ulong */
     [FieldOffset(0)]
@@ -3376,8 +3380,6 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         result = (UInt256)a;
         return true;
     }
-
-    public static void SetHashSeed(uint seed) => _hashSeed = seed;
 
     public TypeCode GetTypeCode() => TypeCode.Object;
     public bool ToBoolean(IFormatProvider? provider) => !IsZero;
