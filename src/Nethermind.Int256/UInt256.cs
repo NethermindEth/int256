@@ -18,6 +18,7 @@ namespace Nethermind.Int256;
 [StructLayout(LayoutKind.Explicit)]
 public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComparable<UInt256>, IInteger<UInt256>, IConvertible
 {
+    public const int Len = 4;
     // Ensure that hashes are different for every run of the node and every node, so if are any hash collisions on
     // one node they will not be the same on another node or across a restart so hash collision cannot be used to degrade
     // the performance of the network as a whole.
@@ -373,9 +374,6 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
             res = new UInt256(res0, res1, res2, res3);
             return borrow != 0;
         }
-        // #if DEBUG
-        //             Debug.Assert((BigInteger)res == ((BigInteger)a - (BigInteger)b + ((BigInteger)1 << 256)) % ((BigInteger)1 << 256));
-        // #endif
     }
 
     public void Subtract(in UInt256 b, out UInt256 res) => Subtract(this, b, out res);
@@ -1424,24 +1422,9 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         _ => ThrowIndexOutOfRangeException(),
     };
 
-
     public static UInt256 Max(in UInt256 a, in UInt256 b) => LessThan(in b, in a) ? a : b;
 
     public static UInt256 Min(in UInt256 a, in UInt256 b) => LessThan(in b, in a) ? b : a;
-
-    public const int Len = 4;
-
-    [DoesNotReturn, StackTraceHidden]
-    private static void ThrowDivideByZeroException() => throw new DivideByZeroException();
-
-    [DoesNotReturn]
-    private static void ThrowOverflowException(string message) => throw new OverflowException(message);
-
-    [DoesNotReturn]
-    private static void ThrowNotSupportedException() => throw new NotSupportedException();
-
-    [DoesNotReturn]
-    private static ulong ThrowIndexOutOfRangeException() => throw new IndexOutOfRangeException();
 
     [SkipLocalsInit]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1476,4 +1459,16 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         borrow = b1 | b2;
         return t2;
     }
+
+    [DoesNotReturn, StackTraceHidden]
+    private static void ThrowDivideByZeroException() => throw new DivideByZeroException();
+
+    [DoesNotReturn, StackTraceHidden]
+    private static void ThrowOverflowException(string message) => throw new OverflowException(message);
+
+    [DoesNotReturn, StackTraceHidden]
+    private static void ThrowNotSupportedException() => throw new NotSupportedException();
+
+    [DoesNotReturn, StackTraceHidden]
+    private static ulong ThrowIndexOutOfRangeException() => throw new IndexOutOfRangeException();
 }
