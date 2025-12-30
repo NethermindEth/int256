@@ -1975,17 +1975,26 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void Remainder256By128Bits(ulong u0, ulong u1, ulong u2, ulong u3, ulong d0, ulong d1, out ulong r0, out ulong r1)
     {
-        // d1 != 0 (caller guarantees 128-bit modulus)
-        int shift = LeadingZeros(d1);
-
         // If numerator < 2^64, remainder is numerator (since divisor >= 2^64).
-        if ((u1 | u2 | u3) == 0)
+        if ((u2 | u3) == 0)
         {
-            r0 = u0;
-            r1 = 0;
-            return;
+            if (u1 == 0)
+            { 
+                r0 = u0;
+                r1 = 0;
+                return;
+            }
+            // u is (u1:u0)
+            if (u1 < d1 || (u1 == d1 && u0 < d0))
+            {
+                r0 = u0;
+                r1 = u1;
+                return;
+            }
         }
 
+        // d1 != 0 (caller guarantees 128-bit modulus)
+        int shift = LeadingZeros(d1);
         ulong nd0, nd1;
 
         Unsafe.SkipInit(out ULong5 un);
@@ -2033,7 +2042,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
 
             ulong qhat = X86Base.X64.IsSupported ? EstimateQhatX86Base(u4, u5, u6, dh, dl) : EstimateQhat(u4, u5, u6, dh, dl, reciprocal);
 
-            ulong borrow = SubMulTo2(ref uJ, nd0, nd1, qhat);
+            ulong borrow = SubMulTo2(ref uJ, ref Unsafe.Add(ref uJ, 1), nd0, nd1, qhat);
             ulong newU2 = u4 - borrow;
             Unsafe.Add(ref uJ, 2) = newU2;
 
@@ -2096,19 +2105,18 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     }
     
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static ulong SubMulTo2(ref ulong x0, ulong y0, ulong y1, ulong mul)
+    private static ulong SubMulTo2(ref ulong x0, ref ulong x1, ulong y0, ulong y1, ulong mul)
     {
         // Subtract q*(y1:y0) from (x1:x0) and return the borrow to subtract from x2.
         // This is the standard "mul then subtract" for Knuth D, n=2.
-
-        ref ulong x1 = ref Unsafe.Add(ref x0, 1);
 
         ulong hi0 = Multiply64(y0, mul, out ulong lo0);
         ulong hi1 = Multiply64(y1, mul, out ulong lo1);
 
         // x0 -= lo0
-        ulong t0 = x0 - lo0;
-        ulong b0 = x0 < lo0 ? 1UL : 0UL;
+        ulong x00 = x0;
+        ulong t0 = x00 - lo0;
+        ulong b0 = x00 < lo0 ? 1UL : 0UL;
         x0 = t0;
 
         // mid = hi0 + lo1 + b0, with carryMid (0/1)
@@ -2120,8 +2128,9 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         mid = mid2;
 
         // x1 -= mid
-        ulong t1 = x1 - mid;
-        ulong b1 = x1 < mid ? 1UL : 0UL;
+        ulong x11 = x1;
+        ulong t1 = x11 - mid;
+        ulong b1 = x11 < mid ? 1UL : 0UL;
         x1 = t1;
 
         // borrow for x2
@@ -2389,7 +2398,7 @@ else
 
             ulong qhat = X86Base.X64.IsSupported ? EstimateQhatX86Base(u2, u1, u0, dh, dl) : EstimateQhat(u2, u1, u0, dh, dl, reciprocal);
 
-            ulong borrow = SubMulTo2(ref uJ, d0, d1, qhat);
+            ulong borrow = SubMulTo2(ref uJ, ref Unsafe.Add(ref uJ, 1), d0, d1, qhat);
             ulong newU2 = u2 - borrow;
             Unsafe.Add(ref uJ, 2) = newU2;
 
