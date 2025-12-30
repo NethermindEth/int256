@@ -2039,7 +2039,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
 
             if (u4 < borrow)
             {
-                newU2 += AddTo2(ref uJ, nd0, nd1);
+                newU2 += AddTo2(ref uJ, ref Unsafe.Add(ref uJ, 1), nd0, nd1);
                 Unsafe.Add(ref uJ, 2) = newU2;
             }
         }
@@ -2098,40 +2098,53 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static ulong SubMulTo2(ref ulong x0, ulong y0, ulong y1, ulong mul)
     {
-        // Compute y * mul as 192-bit value: [pl0, mid, high]
-        ulong ph0 = Multiply64(y0, mul, out ulong pl0);
-        ulong ph1 = Multiply64(y1, mul, out ulong pl1);
-    
-        // Accumulate middle: ph0 + pl1 with carry to high
-        ulong mid = ph0 + pl1;
-        ulong high = ph1 + (mid < ph0 ? 1UL : 0UL);
-    
-        // Subtract [pl0, mid, high] from [x0, x1, implicit_x2]
+        // Subtract q*(y1:y0) from (x1:x0) and return the borrow to subtract from x2.
+        // This is the standard "mul then subtract" for Knuth D, n=2.
+
         ref ulong x1 = ref Unsafe.Add(ref x0, 1);
-    
-        ulong r0 = x0 - pl0;
-        ulong b0 = x0 < pl0 ? 1UL : 0UL;  // Simple comparison - JIT knows this pattern
-    
+
+        ulong hi0 = Multiply64(y0, mul, out ulong lo0);
+        ulong hi1 = Multiply64(y1, mul, out ulong lo1);
+
+        // x0 -= lo0
+        ulong t0 = x0 - lo0;
+        ulong b0 = x0 < lo0 ? 1UL : 0UL;
+        x0 = t0;
+
+        // mid = hi0 + lo1 + b0, with carryMid (0/1)
+        ulong mid = hi0 + lo1;
+        ulong carryMid = mid < hi0 ? 1UL : 0UL;
+
+        ulong mid2 = mid + b0;
+        carryMid |= mid2 < b0 ? 1UL : 0UL; // b0 is 0/1
+        mid = mid2;
+
+        // x1 -= mid
         ulong t1 = x1 - mid;
         ulong b1 = x1 < mid ? 1UL : 0UL;
-        ulong r1 = t1 - b0;
-        b1 += r1 > t1 ? 1UL : 0UL;  // Borrow from subtracting b0
-    
-        x0 = r0;
-        x1 = r1;
-    
-        return high + b1;
+        x1 = t1;
+
+        // borrow for x2
+        return hi1 + carryMid + b1;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static ulong AddTo2(ref ulong x0, ulong y0, ulong y1)
+    private static ulong AddTo2(ref ulong x0, ref ulong x1, ulong y0, ulong y1)
     {
-        ref ulong x1 = ref Unsafe.Add(ref x0, 1);
+        ulong x00 = x0;
+        ulong s0 = x00 + y0;
+        ulong c0 = s0 < x00 ? 1UL : 0UL;
+        x0 = s0;
 
-        ulong carry = 0;
-        AddWithCarry(x0, y0, ref carry, out x0);
-        AddWithCarry(x1, y1, ref carry, out x1);
-        return carry;
+        ulong x11 = x1;
+        ulong s1 = x11 + y1;
+        ulong c1 = s1 < x11 ? 1UL : 0UL;
+
+        ulong s1c = s1 + c0;
+        ulong c2 = s1c < s1 ? 1UL : 0UL;
+        x1 = s1c;
+
+        return c1 | c2;
     }
 
 
@@ -2382,7 +2395,7 @@ else
 
             if (u2 < borrow)
             {
-                newU2 += AddTo2(ref uJ, d0, d1);
+                newU2 += AddTo2(ref uJ, ref Unsafe.Add(ref uJ, 1), d0, d1);
                 Unsafe.Add(ref uJ, 2) = newU2;
             }
         }
