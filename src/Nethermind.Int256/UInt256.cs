@@ -2098,25 +2098,29 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static ulong SubMulTo2(ref ulong x0, ulong y0, ulong y1, ulong mul)
     {
-        ref ulong x1 = ref Unsafe.Add(ref x0, 1);
-
-        ulong borrow = 0;
-
-        ulong b1 = 0;
-        SubtractWithBorrow(x0, borrow, ref b1, out ulong s0);
+        // Compute y * mul as 192-bit value: [pl0, mid, high]
         ulong ph0 = Multiply64(y0, mul, out ulong pl0);
-        ulong b2 = 0;
-        SubtractWithBorrow(s0, pl0, ref b2, out x0);
-        borrow = ph0 + b1 + b2;
-
-        b1 = 0;
-        SubtractWithBorrow(x1, borrow, ref b1, out ulong s1);
         ulong ph1 = Multiply64(y1, mul, out ulong pl1);
-        b2 = 0;
-        SubtractWithBorrow(s1, pl1, ref b2, out x1);
-        borrow = ph1 + b1 + b2;
-
-        return borrow;
+    
+        // Accumulate middle: ph0 + pl1 with carry to high
+        ulong mid = ph0 + pl1;
+        ulong high = ph1 + (mid < ph0 ? 1UL : 0UL);
+    
+        // Subtract [pl0, mid, high] from [x0, x1, implicit_x2]
+        ref ulong x1 = ref Unsafe.Add(ref x0, 1);
+    
+        ulong r0 = x0 - pl0;
+        ulong b0 = x0 < pl0 ? 1UL : 0UL;  // Simple comparison - JIT knows this pattern
+    
+        ulong t1 = x1 - mid;
+        ulong b1 = x1 < mid ? 1UL : 0UL;
+        ulong r1 = t1 - b0;
+        b1 += r1 > t1 ? 1UL : 0UL;  // Borrow from subtracting b0
+    
+        x0 = r0;
+        x1 = r1;
+    
+        return high + b1;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
