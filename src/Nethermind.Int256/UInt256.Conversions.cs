@@ -39,7 +39,6 @@ public readonly partial struct UInt256
     public ushort ToUInt16(IFormatProvider? provider) => System.Convert.ToUInt16(ToDecimal(provider), provider);
     public uint ToUInt32(IFormatProvider? provider) => System.Convert.ToUInt32(ToDecimal(provider), provider);
     public ulong ToUInt64(IFormatProvider? provider) => System.Convert.ToUInt64(ToDecimal(provider), provider);
-    
     public byte[] PaddedBytes(int n)
     {
         byte[] b = new byte[n];
