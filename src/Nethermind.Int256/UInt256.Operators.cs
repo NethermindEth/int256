@@ -43,7 +43,6 @@ public readonly partial struct UInt256
 
     public static explicit operator UInt256(long a) =>
         a < 0 ? throw new ArgumentException($"Expected a positive number and got {a}", nameof(a)) : new UInt256((ulong)a);
-    
 
     public static UInt256 operator ^(in UInt256 a, in UInt256 b)
     {
