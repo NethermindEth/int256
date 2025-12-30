@@ -21,13 +21,11 @@ public readonly partial struct UInt256
     /// </summary>
     /// <remarks>
     /// Sets <paramref name="res"/> to <c>this / a</c> using unsigned integer division.
-    /// If <paramref name="a"/> is zero, the result depends on the semantics of the underlying static
-    /// <see cref="Divide(in UInt256, in UInt256, out UInt256)"/> implementation.
-    /// If a <see cref="System.DivideByZeroException"/> is required for a zero divisor, the caller must pre-check
-    /// <paramref name="a"/> and throw before calling this method.
+    /// Throws a <see cref="System.DivideByZeroException"/> if <paramref name="a"/> is zero.
     /// </remarks>
     /// <param name="a">The divisor.</param>
     /// <param name="res">On return, contains the quotient <c>this / a</c>.</param>
+    /// <exception cref="System.DivideByZeroException"><paramref name="a"/> is zero.</exception>
     public void Divide(in UInt256 a, out UInt256 res) => Divide(this, a, out res);
 
     /// <summary>
@@ -38,19 +36,15 @@ public readonly partial struct UInt256
     /// <para>
     /// Special cases:
     /// <list type="bullet">
-    ///   <item><description>If <paramref name="y"/> is zero, <paramref name="res"/> is set to zero.</description></item>
     ///   <item><description>If <paramref name="x"/> is less than <paramref name="y"/>, <paramref name="res"/> is set to zero.</description></item>
     ///   <item><description>If <paramref name="x"/> equals <paramref name="y"/>, <paramref name="res"/> is set to one.</description></item>
     /// </list>
-    /// </para>
-    /// <para>
-    /// This method does not throw on divide-by-zero. If a <see cref="DivideByZeroException"/> (or equivalent)
-    /// is required, it must be enforced by the caller before invoking this method.
     /// </para>
     /// </remarks>
     /// <param name="x">The dividend.</param>
     /// <param name="y">The divisor.</param>
     /// <param name="res">On return, contains the quotient <c>x / y</c>.</param>
+    /// <exception cref="System.DivideByZeroException"><paramref name="y"/> is zero.</exception>
     [SkipLocalsInit]
     public static void Divide(in UInt256 x, in UInt256 y, out UInt256 res)
     {
@@ -165,28 +159,25 @@ public readonly partial struct UInt256
     /// Computes the remainder of dividing this value by <paramref name="m"/>.
     /// </summary>
     /// <remarks>
-    /// Sets <paramref name="res"/> to <c>this % m</c> when <paramref name="m"/> is non-zero.
-    /// If <paramref name="m"/> is zero, <paramref name="res"/> is set to zero.
-    /// If a <see cref="System.DivideByZeroException"/> is required for a zero divisor, the caller must pre-check
-    /// <paramref name="m"/> and throw before calling this method.
+    /// Sets <paramref name="res"/> to <c>this % m</c> using unsigned integer division.
+    /// Throws a <see cref="System.DivideByZeroException"/> if <paramref name="m"/> is zero.
     /// </remarks>
-    /// <param name="m">The divisor. If zero, the result is defined to be zero.</param>
-    /// <param name="res">On return, contains <c>this % m</c>, or zero when <paramref name="m"/> is zero.</param>
+    /// <param name="m">The divisor.</param>
+    /// <param name="res">On return, contains <c>this % m</c>.</param>
+    /// <exception cref="System.DivideByZeroException"><paramref name="m"/> is zero.</exception>
     public void Mod(in UInt256 m, out UInt256 res) => Mod(this, m, out res);
 
     /// <summary>
     /// Computes the remainder of dividing one <see cref="UInt256"/> value by another.
     /// </summary>
     /// <remarks>
-    /// Sets <paramref name="res"/> to <c>x % y</c> when <paramref name="y"/> is non-zero.
-    /// If <paramref name="y"/> is zero, <paramref name="res"/> is set to zero.
-    /// This behaviour intentionally differs from <see cref="System.Numerics.BigInteger"/>-style APIs.
-    /// If a <see cref="System.DivideByZeroException"/> is required for a zero divisor, the caller must pre-check
-    /// <paramref name="y"/> and throw before calling this method.
+    /// Sets <paramref name="res"/> to <c>x % y</c> using unsigned integer division.
+    /// Throws a <see cref="System.DivideByZeroException"/> if <paramref name="y"/> is zero.
     /// </remarks>
     /// <param name="x">The dividend.</param>
-    /// <param name="y">The divisor. If zero, the result is defined to be zero.</param>
-    /// <param name="res">On return, contains <c>x % y</c>, or zero when <paramref name="y"/> is zero.</param>
+    /// <param name="y">The divisor.</param>
+    /// <param name="res">On return, contains <c>x % y</c>.</param>
+    /// <exception cref="System.DivideByZeroException"><paramref name="y"/> is zero.</exception>
     [SkipLocalsInit]
     public static void Mod(in UInt256 x, in UInt256 y, out UInt256 res)
     {
@@ -228,13 +219,12 @@ public readonly partial struct UInt256
     /// </summary>
     /// <remarks>
     /// Sets <paramref name="res"/> to <c>(this + a) mod m</c>.
-    /// If <paramref name="m"/> is zero, <paramref name="res"/> is set to zero.
-    /// If a <see cref="System.DivideByZeroException"/> is required for a zero modulus, the caller must pre-check
-    /// <paramref name="m"/> and throw before calling this method.
+    /// Throws a <see cref="System.DivideByZeroException"/> if <paramref name="m"/> is zero.
     /// </remarks>
     /// <param name="a">The other 256-bit addend.</param>
-    /// <param name="m">The modulus. If zero, the result is defined to be zero.</param>
-    /// <param name="res">On return, contains the value of <c>(this + a) mod m</c>, or zero when <paramref name="m"/> is zero.</param>
+    /// <param name="m">The modulus.</param>
+    /// <param name="res">On return, contains the value of <c>(this + a) mod m</c>.</param>
+    /// <exception cref="System.DivideByZeroException"><paramref name="m"/> is zero.</exception>
     public void AddMod(in UInt256 a, in UInt256 m, out UInt256 res) => AddMod(this, a, m, out res);
 
     /// <summary>
@@ -242,29 +232,12 @@ public readonly partial struct UInt256
     /// </summary>
     /// <remarks>
     /// Sets <paramref name="res"/> to <c>(x + y) mod m</c>.
-    /// <para>
-    /// <strong>Warning:</strong> if <paramref name="m"/> is zero, <paramref name="res"/> is set to zero and
-    /// no <see cref="System.DivideByZeroException"/> (or any other exception) is thrown. This behaviour
-    /// intentionally differs from <see cref="System.Numerics.BigInteger"/>-style APIs and from standard
-    /// modulo semantics, and can mask bugs in calling code that accidentally passes a zero modulus.
-    /// Callers that require an exception for a zero modulus must validate <paramref name="m"/> and throw
-    /// (for example, <see cref="System.DivideByZeroException"/>) before calling this method.
-    /// </para>
-    /// <para>Example (zero modulus):</para>
-    /// <code>
-    /// UInt256 x = 10;
-    /// UInt256 y = 20;
-    /// UInt256 m = UInt256.Zero;
-    /// UInt256 res;
-    ///
-    /// // res will be 0 here; no exception is thrown:
-    /// UInt256.AddMod(in x, in y, in m, out res);
-    /// </code>
     /// </remarks>
     /// <param name="x">The first 256-bit addend.</param>
     /// <param name="y">The second 256-bit addend.</param>
-    /// <param name="m">The modulus. If zero, the result is defined to be zero and no exception is thrown.</param>
-    /// <param name="res">On return, contains the value of <c>(x + y) mod m</c>, or zero when <paramref name="m"/> is zero.</param>
+    /// <param name="m">The modulus.</param>
+    /// <param name="res">On return, contains the value of <c>(x + y) mod m</c>.</param>
+    /// <exception cref="System.DivideByZeroException"><paramref name="m"/> is zero.</exception>
     [SkipLocalsInit]
     public static void AddMod(in UInt256 x, in UInt256 y, in UInt256 m, out UInt256 res)
     {
@@ -316,10 +289,31 @@ public readonly partial struct UInt256
         }
     }
 
+    /// <summary>
+    /// Computes the modular product of this value and <paramref name="a"/>.
+    /// </summary>
+    /// <remarks>
+    /// Sets <paramref name="res"/> to <c>(this * a) mod m</c>.
+    /// Throws a <see cref="System.DivideByZeroException"/> if <paramref name="m"/> is zero.
+    /// </remarks>
+    /// <param name="a">The other 256-bit factor.</param>
+    /// <param name="m">The modulus.</param>
+    /// <param name="res">On return, contains the value of <c>(this * a) mod m</c>.</param>
+    /// <exception cref="System.DivideByZeroException"><paramref name="m"/> is zero.</exception>
     public void MultiplyMod(in UInt256 a, in UInt256 m, out UInt256 res) => MultiplyMod(this, a, m, out res);
 
-    // MulMod calculates the modulo-m multiplication of x and y and
-    // sets res to its result.
+    /// <summary>
+    /// Computes the modular product of two 256-bit unsigned integers.
+    /// </summary>
+    /// <remarks>
+    /// Sets <paramref name="res"/> to <c>(x * y) mod m</c>.
+    /// Throws a <see cref="System.DivideByZeroException"/> if <paramref name="m"/> is zero.
+    /// </remarks>
+    /// <param name="x">The first 256-bit factor.</param>
+    /// <param name="y">The second 256-bit factor.</param>
+    /// <param name="m">The modulus.</param>
+    /// <param name="res">On return, contains the value of <c>(x * y) mod m</c>.</param>
+    /// <exception cref="System.DivideByZeroException"><paramref name="m"/> is zero.</exception>
     [SkipLocalsInit]
     public static void MultiplyMod(in UInt256 x, in UInt256 y, in UInt256 m, out UInt256 res)
     {
@@ -366,8 +360,31 @@ public readonly partial struct UInt256
         Remainder512By256Bits(in lo, in hi, in m, out res);
     }
 
+    /// <summary>
+    /// Computes the modular exponentiation of this value raised to <paramref name="exp"/> modulo <paramref name="m"/>.
+    /// </summary>
+    /// <remarks>
+    /// Sets <paramref name="res"/> to <c>(this^exp) mod m</c>.
+    /// Throws a <see cref="System.DivideByZeroException"/> if <paramref name="m"/> is zero.
+    /// </remarks>
+    /// <param name="exp">The exponent.</param>
+    /// <param name="m">The modulus.</param>
+    /// <param name="res">On return, contains the value of <c>(this^exp) mod m</c>.</param>
+    /// <exception cref="System.DivideByZeroException"><paramref name="m"/> is zero.</exception>
     public void ExpMod(in UInt256 exp, in UInt256 m, out UInt256 res) => ExpMod(this, exp, m, out res);
 
+    /// <summary>
+    /// Computes the modular exponentiation of <paramref name="b"/> raised to <paramref name="e"/> modulo <paramref name="m"/>.
+    /// </summary>
+    /// <remarks>
+    /// Sets <paramref name="result"/> to <c>(b^e) mod m</c>.
+    /// Throws a <see cref="System.DivideByZeroException"/> if <paramref name="m"/> is zero.
+    /// </remarks>
+    /// <param name="b">The base.</param>
+    /// <param name="e">The exponent.</param>
+    /// <param name="m">The modulus.</param>
+    /// <param name="result">On return, contains the value of <c>(b^e) mod m</c>.</param>
+    /// <exception cref="System.DivideByZeroException"><paramref name="m"/> is zero.</exception>
     public static void ExpMod(in UInt256 b, in UInt256 e, in UInt256 m, out UInt256 result)
     {
         if (m.IsZero) ThrowDivideByZeroException();
