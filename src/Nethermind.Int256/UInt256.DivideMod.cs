@@ -1295,141 +1295,121 @@ public readonly partial struct UInt256
             Remainder256By128Bits(u0, u1, u2, u3, m0, m1, out r0, out r1);
         }
         res = new UInt256(r0, r1, 0, 0);
-    }
 
-    [SkipLocalsInit]
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void Remainder256By128Bits(ulong u0, ulong u1, ulong u2, ulong u3, ulong d0, ulong d1, out ulong r0, out ulong r1)
-    {
-        // Early exits for small numerators
-        if ((u2 | u3) == 0)
+        [SkipLocalsInit]
+        static void Mul128(ulong a0, ulong a1, ulong b0, ulong b1,
+            out ulong p0, out ulong p1, out ulong p2, out ulong p3)
         {
-            if (u1 == 0)
+            // Products:
+            // a = a0 + a1*2^64
+            // b = b0 + b1*2^64
+            //
+            // a*b = p0 + p1*2^64 + p2*2^128 + p3*2^192
+
+            ulong hi00 = Multiply64(a0, b0, out p0);
+            ulong hi01 = Multiply64(a0, b1, out ulong lo01);
+            ulong hi10 = Multiply64(a1, b0, out ulong lo10);
+            ulong hi11 = Multiply64(a1, b1, out ulong lo11);
+
+            // p1 = hi00 + lo01 + lo10
+            ulong s1 = hi00 + lo01;
+            ulong c1 = s1 < hi00 ? 1UL : 0UL;     // carry from first add
+            ulong t1 = s1 + lo10;
+            c1 += t1 < s1 ? 1UL : 0UL;            // carry from second add (c1 is now 0..2)
+            p1 = t1;
+
+            // p2 = hi01 + hi10 + lo11 + c1
+            ulong s2 = hi01 + hi10;
+            ulong c2 = s2 < hi01 ? 1UL : 0UL;
+            ulong t2 = s2 + lo11;
+            c2 += t2 < s2 ? 1UL : 0UL;            // c2 is 0..2 so far
+
+            ulong t3 = t2 + c1;                   // add c1 as a value (0..2)
+            c2 += t3 < t2 ? 1UL : 0UL;            // at most +1 overflow here, c2 becomes 0..3
+            p2 = t3;
+
+            // p3 = hi11 + c2  (fits, since overall product is 256-bit)
+            p3 = hi11 + c2;
+        }
+
+        [SkipLocalsInit]
+        static void Remainder256By128Bits(ulong u0, ulong u1, ulong u2, ulong u3, ulong d0, ulong d1, out ulong r0, out ulong r1)
+        {
+            // Early exits for small numerators
+            if ((u2 | u3) == 0)
             {
-                r0 = u0;
-                r1 = 0;
-                return;
+                if (u1 == 0)
+                {
+                    r0 = u0;
+                    r1 = 0;
+                    return;
+                }
+                if (u1 < d1 || (u1 == d1 && u0 < d0))
+                {
+                    r0 = u0;
+                    r1 = u1;
+                    return;
+                }
             }
-            if (u1 < d1 || (u1 == d1 && u0 < d0))
+
+            int shift = LeadingZeros(d1);
+            ulong nd0, nd1;
+            ulong un0, un1, un2, un3, un4;
+
+            if (shift == 0)
             {
-                r0 = u0;
-                r1 = u1;
-                return;
+                un0 = u0; un1 = u1; un2 = u2; un3 = u3; un4 = 0;
+                nd0 = d0; nd1 = d1;
+            }
+            else
+            {
+                int rshift = 64 - shift;
+                un4 = u3 >> rshift;
+                un3 = (u3 << shift) | (u2 >> rshift);
+                un2 = (u2 << shift) | (u1 >> rshift);
+                un1 = (u1 << shift) | (u0 >> rshift);
+                un0 = u0 << shift;
+                nd0 = d0 << shift;
+                nd1 = (d1 << shift) | (d0 >> rshift);
+            }
+
+            ulong reciprocal = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(nd1);
+
+            // Unroll by limb count - no dynamic indexing, no struct
+            if (u3 != 0)
+            {
+                // 4-limb numerator: 3 Knuth steps (j = 2, 1, 0)
+                KnuthStep(ref un2, ref un3, ref un4, nd0, nd1, reciprocal);
+                KnuthStep(ref un1, ref un2, ref un3, nd0, nd1, reciprocal);
+                KnuthStep(ref un0, ref un1, ref un2, nd0, nd1, reciprocal);
+            }
+            else if (u2 != 0)
+            {
+                // 3-limb numerator: 2 Knuth steps (j = 1, 0)
+                KnuthStep(ref un1, ref un2, ref un3, nd0, nd1, reciprocal);
+                KnuthStep(ref un0, ref un1, ref un2, nd0, nd1, reciprocal);
+            }
+            else
+            {
+                // 2-limb numerator: 1 Knuth step (j = 0)
+                KnuthStep(ref un0, ref un1, ref un2, nd0, nd1, reciprocal);
+            }
+
+            // Denormalise
+            if (shift == 0)
+            {
+                r0 = un0;
+                r1 = un1;
+            }
+            else
+            {
+                int rshift = 64 - shift;
+                r0 = (un0 >> shift) | (un1 << rshift);
+                r1 = un1 >> shift;
             }
         }
-
-        int shift = LeadingZeros(d1);
-        ulong nd0, nd1;
-        ulong un0, un1, un2, un3, un4;
-
-        if (shift == 0)
-        {
-            un0 = u0; un1 = u1; un2 = u2; un3 = u3; un4 = 0;
-            nd0 = d0; nd1 = d1;
-        }
-        else
-        {
-            int rshift = 64 - shift;
-            un4 = u3 >> rshift;
-            un3 = (u3 << shift) | (u2 >> rshift);
-            un2 = (u2 << shift) | (u1 >> rshift);
-            un1 = (u1 << shift) | (u0 >> rshift);
-            un0 = u0 << shift;
-            nd0 = d0 << shift;
-            nd1 = (d1 << shift) | (d0 >> rshift);
-        }
-
-        ulong reciprocal = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(nd1);
-
-        // Unroll by limb count - no dynamic indexing, no struct
-        if (u3 != 0)
-        {
-            // 4-limb numerator: 3 Knuth steps (j = 2, 1, 0)
-            KnuthStep(ref un2, ref un3, ref un4, nd0, nd1, reciprocal);
-            KnuthStep(ref un1, ref un2, ref un3, nd0, nd1, reciprocal);
-            KnuthStep(ref un0, ref un1, ref un2, nd0, nd1, reciprocal);
-        }
-        else if (u2 != 0)
-        {
-            // 3-limb numerator: 2 Knuth steps (j = 1, 0)
-            KnuthStep(ref un1, ref un2, ref un3, nd0, nd1, reciprocal);
-            KnuthStep(ref un0, ref un1, ref un2, nd0, nd1, reciprocal);
-        }
-        else
-        {
-            // 2-limb numerator: 1 Knuth step (j = 0)
-            KnuthStep(ref un0, ref un1, ref un2, nd0, nd1, reciprocal);
-        }
-
-        // Denormalise
-        if (shift == 0)
-        {
-            r0 = un0;
-            r1 = un1;
-        }
-        else
-        {
-            int rshift = 64 - shift;
-            r0 = (un0 >> shift) | (un1 << rshift);
-            r1 = un1 >> shift;
-        }
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static ulong EstimateQhatEst(ulong u2, ulong u1, ulong dh, ulong reciprocal)
-    {
-        // Quotient digit saturates at b - 1. No correction needed (rhat would be >= b).
-        return u2 >= dh ? ulong.MaxValue : UDivRem2By1(u2, reciprocal, dh, u1, out _);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static ulong EstimateQhatEstX86Base(ulong u2, ulong u1, ulong dh)
-    {
-        if (u2 >= dh)
-        {
-            // Quotient digit saturates at b - 1. No correction needed (rhat would be >= b).
-            return ulong.MaxValue;
-        }
-
-        (ulong qhat, _) = X86Base.X64.DivRem(u1, u2, dh);
-        return qhat;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void Mul128(ulong a0, ulong a1, ulong b0, ulong b1,
-    out ulong p0, out ulong p1, out ulong p2, out ulong p3)
-    {
-        // Products:
-        // a = a0 + a1*2^64
-        // b = b0 + b1*2^64
-        //
-        // a*b = p0 + p1*2^64 + p2*2^128 + p3*2^192
-
-        ulong hi00 = Multiply64(a0, b0, out p0);
-        ulong hi01 = Multiply64(a0, b1, out ulong lo01);
-        ulong hi10 = Multiply64(a1, b0, out ulong lo10);
-        ulong hi11 = Multiply64(a1, b1, out ulong lo11);
-
-        // p1 = hi00 + lo01 + lo10
-        ulong s1 = hi00 + lo01;
-        ulong c1 = s1 < hi00 ? 1UL : 0UL;     // carry from first add
-        ulong t1 = s1 + lo10;
-        c1 += t1 < s1 ? 1UL : 0UL;            // carry from second add (c1 is now 0..2)
-        p1 = t1;
-
-        // p2 = hi01 + hi10 + lo11 + c1
-        ulong s2 = hi01 + hi10;
-        ulong c2 = s2 < hi01 ? 1UL : 0UL;
-        ulong t2 = s2 + lo11;
-        c2 += t2 < s2 ? 1UL : 0UL;            // c2 is 0..2 so far
-
-        ulong t3 = t2 + c1;                   // add c1 as a value (0..2)
-        c2 += t3 < t2 ? 1UL : 0UL;            // at most +1 overflow here, c2 becomes 0..3
-        p2 = t3;
-
-        // p3 = hi11 + c2  (fits, since overall product is 256-bit)
-        p3 = hi11 + c2;
-    }
 
     [SkipLocalsInit]
     private static void Remainder512By128Bits(in UInt256 lo, in UInt256 hi, in UInt256 d, out UInt256 rem)
@@ -1670,6 +1650,26 @@ public readonly partial struct UInt256
             CorrectStep(ref u0, ref u1, ref u2, d0, d1);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static ulong EstimateQhatEst(ulong u2, ulong u1, ulong dh, ulong reciprocal)
+        {
+            // Quotient digit saturates at b - 1. No correction needed (rhat would be >= b).
+            return u2 >= dh ? ulong.MaxValue : UDivRem2By1(u2, reciprocal, dh, u1, out _);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static ulong EstimateQhatEstX86Base(ulong u2, ulong u1, ulong dh)
+        {
+            if (u2 >= dh)
+            {
+                // Quotient digit saturates at b - 1. No correction needed (rhat would be >= b).
+                return ulong.MaxValue;
+            }
+
+            (ulong qhat, _) = X86Base.X64.DivRem(u1, u2, dh);
+            return qhat;
+        }
+
         [MethodImpl(MethodImplOptions.NoInlining)]
         static void CorrectStep(ref ulong u0, ref ulong u1, ref ulong u2, ulong d0, ulong d1)
         {
@@ -1758,9 +1758,7 @@ public readonly partial struct UInt256
             ulong u1 = Unsafe.Add(ref uJ, 2);
             ulong u0 = Unsafe.Add(ref uJ, 1);
 
-            ulong qhat = X86Base.X64.IsSupported ?
-                EstimateQhatX86Base(u2, u1, u0, d2, d1) :
-                EstimateQhat(u2, u1, u0, d2, d1, reciprocal);
+            ulong qhat = EstimateQhat(u2, u1, u0, d2, d1, reciprocal);
 
             ulong borrow = SubMulTo3(ref uJ, d0, d1, d2, qhat);
             ulong newU2 = u2 - borrow;
@@ -1845,9 +1843,7 @@ public readonly partial struct UInt256
             ulong u1 = Unsafe.Add(ref uJ, 3);
             ulong u0 = Unsafe.Add(ref uJ, 2);
 
-            ulong qhat = X86Base.X64.IsSupported ?
-                EstimateQhatX86Base(u2, u1, u0, d3, d2) :
-                EstimateQhat(u2, u1, u0, d3, d2, reciprocal);
+            ulong qhat = EstimateQhat(u2, u1, u0, d3, d2, reciprocal);
 
             ulong borrow = SubMulTo4(ref uJ, d0, d1, d2, d3, qhat);
             ulong newU2 = u2 - borrow;
@@ -1963,56 +1959,14 @@ public readonly partial struct UInt256
         }
         else
         {
-            qhat = UDivRem2By1(u2, reciprocal, dh, u1, out rhat);
-        }
-
-        // At most 2 iterations in practice for Knuth D.
-        while (true)
-        {
-            ulong ph = Multiply64(qhat, dl, out ulong pl);
-            if (ph < rhat || (ph == rhat && pl <= u0))
-                break;
-
-            qhat--;
-
-            ulong prev = rhat;
-            rhat += dh;
-
-            // rhat >= b => correction test cannot hold any more.
-            if (rhat < prev)
-                break;
-        }
-
-        return qhat;
-    }
-
-    [SkipLocalsInit]
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static ulong EstimateQhatX86Base(ulong u2, ulong u1, ulong u0, ulong dh, ulong dl)
-    {
-        // qhat = min((u2:b + u1) / dh, b - 1)
-        // then while qhat*dl > (rhat:b + u0): qhat--, rhat += dh (stop if rhat overflows base).
-        ulong qhat;
-        ulong rhat;
-
-        if (u2 > dh)
-        {
-            // Quotient digit saturates at b - 1. No correction needed (rhat would be >= b).
-            return ulong.MaxValue;
-        }
-
-        if (u2 == dh)
-        {
-            qhat = ulong.MaxValue;
-            rhat = u1 + dh;
-
-            // If rhat overflowed base b, the correction inequality cannot hold.
-            if (rhat < u1)
-                return qhat;
-        }
-        else
-        {
-            (qhat, rhat) = X86Base.X64.DivRem(u1, u2, dh);
+            if (X86Base.X64.IsSupported)
+            {
+                (qhat, rhat) = X86Base.X64.DivRem(u1, u2, dh);
+            }
+            else
+            {
+                qhat = UDivRem2By1(u2, reciprocal, dh, u1, out rhat);
+            }
         }
 
         // At most 2 iterations in practice for Knuth D.
