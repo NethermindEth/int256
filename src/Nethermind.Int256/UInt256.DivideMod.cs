@@ -1751,7 +1751,7 @@ public readonly partial struct UInt256
     [SkipLocalsInit]
     private static void URemKnuth3(ref ulong un0, int m, ulong d0, ulong d1, ulong d2)
     {
-        ulong reciprocal = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(d1);
+        ulong reciprocal = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(d2);
 
         for (int j = m; j >= 0; j--)
         {
