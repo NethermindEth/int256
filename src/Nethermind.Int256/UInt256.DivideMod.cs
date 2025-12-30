@@ -1431,59 +1431,6 @@ public readonly partial struct UInt256
         p3 = hi11 + c2;
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static ulong SubMulTo2(ref ulong x0, ref ulong x1, ulong y0, ulong y1, ulong mul)
-    {
-        // Subtract q*(y1:y0) from (x1:x0) and return the borrow to subtract from x2.
-        // This is the standard "mul then subtract" for Knuth D, n=2.
-
-        ulong hi0 = Multiply64(y0, mul, out ulong lo0);
-        ulong hi1 = Multiply64(y1, mul, out ulong lo1);
-
-        // x0 -= lo0
-        ulong x00 = x0;
-        ulong t0 = x00 - lo0;
-        ulong b0 = x00 < lo0 ? 1UL : 0UL;
-        x0 = t0;
-
-        // mid = hi0 + lo1 + b0, with carryMid (0/1)
-        ulong mid = hi0 + lo1;
-        ulong carryMid = mid < hi0 ? 1UL : 0UL;
-
-        ulong mid2 = mid + b0;
-        carryMid |= mid2 < b0 ? 1UL : 0UL; // b0 is 0/1
-        mid = mid2;
-
-        // x1 -= mid
-        ulong x11 = x1;
-        ulong t1 = x11 - mid;
-        ulong b1 = x11 < mid ? 1UL : 0UL;
-        x1 = t1;
-
-        // borrow for x2
-        return hi1 + carryMid + b1;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static ulong AddTo2(ref ulong x0, ref ulong x1, ulong y0, ulong y1)
-    {
-        ulong x00 = x0;
-        ulong s0 = x00 + y0;
-        ulong c0 = s0 < x00 ? 1UL : 0UL;
-        x0 = s0;
-
-        ulong x11 = x1;
-        ulong s1 = x11 + y1;
-        ulong c1 = s1 < x11 ? 1UL : 0UL;
-
-        ulong s1c = s1 + c0;
-        ulong c2 = s1c < s1 ? 1UL : 0UL;
-        x1 = s1c;
-
-        return c1 | c2;
-    }
-
-
     [SkipLocalsInit]
     private static void Remainder512By128Bits(in UInt256 lo, in UInt256 hi, in UInt256 d, out UInt256 rem)
     {
@@ -1732,6 +1679,58 @@ public readonly partial struct UInt256
                 // Overshoot-by-2 fix (very rare).
                 u2 += AddTo2(ref u0, ref u1, d0, d1);
             }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static ulong SubMulTo2(ref ulong x0, ref ulong x1, ulong y0, ulong y1, ulong mul)
+        {
+            // Subtract q*(y1:y0) from (x1:x0) and return the borrow to subtract from x2.
+            // This is the standard "mul then subtract" for Knuth D, n=2.
+
+            ulong hi0 = Multiply64(y0, mul, out ulong lo0);
+            ulong hi1 = Multiply64(y1, mul, out ulong lo1);
+
+            // x0 -= lo0
+            ulong x00 = x0;
+            ulong t0 = x00 - lo0;
+            ulong b0 = x00 < lo0 ? 1UL : 0UL;
+            x0 = t0;
+
+            // mid = hi0 + lo1 + b0, with carryMid (0/1)
+            ulong mid = hi0 + lo1;
+            ulong carryMid = mid < hi0 ? 1UL : 0UL;
+
+            ulong mid2 = mid + b0;
+            carryMid |= mid2 < b0 ? 1UL : 0UL; // b0 is 0/1
+            mid = mid2;
+
+            // x1 -= mid
+            ulong x11 = x1;
+            ulong t1 = x11 - mid;
+            ulong b1 = x11 < mid ? 1UL : 0UL;
+            x1 = t1;
+
+            // borrow for x2
+            return hi1 + carryMid + b1;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static ulong AddTo2(ref ulong x0, ref ulong x1, ulong y0, ulong y1)
+        {
+            ulong x00 = x0;
+            ulong s0 = x00 + y0;
+            ulong c0 = s0 < x00 ? 1UL : 0UL;
+            x0 = s0;
+
+            ulong x11 = x1;
+            ulong s1 = x11 + y1;
+            ulong c1 = s1 < x11 ? 1UL : 0UL;
+
+            ulong s1c = s1 + c0;
+            ulong c2 = s1c < s1 ? 1UL : 0UL;
+            x1 = s1c;
+
+            return c1 | c2;
         }
     }
 

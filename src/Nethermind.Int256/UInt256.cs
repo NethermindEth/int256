@@ -266,10 +266,10 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void AddWithCarry(ulong x, ulong y, ref ulong carry, out ulong sum)
     {
-        ulong result = x + y + carry;
-        // both msb bits are 1 or one of them is 1 and we had carry from lower bits
-        carry = ((x & y) | ((x | y) & (~result))) >> 63;
-        sum = result;
+        ulong t = x + y;
+        ulong r = t + carry;
+        carry = (t < x ? 1UL : 0UL) + (r < t ? 1UL : 0UL);
+        sum = r;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
