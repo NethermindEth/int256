@@ -1376,35 +1376,6 @@ public readonly partial struct UInt256
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void KnuthStep(ref ulong x0, ref ulong x1, ref ulong x2, ulong nd0, ulong nd1, ulong reciprocal)
-    {
-        ulong oldX2 = x2;
-        ulong qhat = X86Base.X64.IsSupported
-            ? EstimateQhatEstX86Base(x2, x1, nd1)
-            : EstimateQhatEst(x2, x1, nd1, reciprocal);
-
-        ulong borrow = SubMulTo2(ref x0, ref x1, nd0, nd1, qhat);
-        x2 = oldX2 - borrow;
-
-        if (oldX2 < borrow)
-        {
-            // Overshoot-by-1 fix (rare).
-            CorrectStep(ref x0, ref x1, ref x2, nd0, nd1);
-        }
-    }
-
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void CorrectStep(ref ulong x0, ref ulong x1, ref ulong x2, ulong nd0, ulong nd1)
-    {
-        x2 += AddTo2(ref x0, ref x1, nd0, nd1);
-        if (x2 != 0)
-        {
-            // Overshoot-by-2 fix (very rare).
-            x2 += AddTo2(ref x0, ref x1, nd0, nd1);
-        }
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static ulong EstimateQhatEst(ulong u2, ulong u1, ulong dh, ulong reciprocal)
     {
         // Quotient digit saturates at b - 1. No correction needed (rhat would be >= b).
@@ -1567,7 +1538,7 @@ public readonly partial struct UInt256
         ref ulong un0 = ref unBuf.w0;
 
         // dLen is fixed at 2 here.
-        UremKnuth2(ref un0, uLen - 2, nd0, nd1);
+        URemKnuth2(ref un0, uLen - 2, nd0, nd1);
 
         // Denormalise remainder from un[0..1].
         if (sh == 0)
@@ -1676,15 +1647,15 @@ public readonly partial struct UInt256
                 }
 
             case 2:
-                UremKnuth2(ref un0, mQ, nd0, nd1);
+                URemKnuth2(ref un0, mQ, nd0, nd1);
                 break;
 
             case 3:
-                UremKnuth3(ref un0, mQ, nd0, nd1, nd2v);
+                URemKnuth3(ref un0, mQ, nd0, nd1, nd2v);
                 break;
 
             default: // 4
-                UremKnuth4(ref un0, mQ, nd0, nd1, nd2v, nd3v);
+                URemKnuth4(ref un0, mQ, nd0, nd1, nd2v, nd3v);
                 break;
         }
 
@@ -1735,41 +1706,50 @@ public readonly partial struct UInt256
         public ulong w0, w1, w2, w3, w4, w5, w6, w7, w8;
     }
 
-    [SkipLocalsInit]
-    private static void UremKnuth2(ref ulong un0, int m, ulong d0, ulong d1)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void KnuthStep(ref ulong u0, ref ulong u1, ref ulong u2, ulong d0, ulong d1, ulong reciprocal)
     {
-        ulong dh = d1;
-        ulong dl = d0; // d[n-2]
-        ulong reciprocal = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(dh);
+        ulong oldU2 = u2;
+        ulong qhat = X86Base.X64.IsSupported
+            ? EstimateQhatEstX86Base(u2, u1, d1)
+            : EstimateQhatEst(u2, u1, d1, reciprocal);
 
-        for (int j = m; j >= 0; j--)
+        ulong borrow = SubMulTo2(ref u0, ref u1, d0, d1, qhat);
+        u2 = oldU2 - borrow;
+
+        if (oldU2 < borrow)
         {
-            ref ulong uJ = ref Unsafe.Add(ref un0, j);
+            // Overshoot-by-1 or 2 fix (rare).
+            CorrectStep(ref u0, ref u1, ref u2, d0, d1);
+        }
 
-            ulong u2 = Unsafe.Add(ref uJ, 2);
-            ulong u1 = Unsafe.Add(ref uJ, 1);
-            ulong u0 = uJ;
-
-            ulong qhat = X86Base.X64.IsSupported ? EstimateQhatX86Base(u2, u1, u0, dh, dl) : EstimateQhat(u2, u1, u0, dh, dl, reciprocal);
-
-            ulong borrow = SubMulTo2(ref uJ, ref Unsafe.Add(ref uJ, 1), d0, d1, qhat);
-            ulong newU2 = u2 - borrow;
-            Unsafe.Add(ref uJ, 2) = newU2;
-
-            if (u2 < borrow)
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void CorrectStep(ref ulong u0, ref ulong u1, ref ulong u2, ulong d0, ulong d1)
+        {
+            u2 += AddTo2(ref u0, ref u1, d0, d1);
+            if (u2 != 0)
             {
-                newU2 += AddTo2(ref uJ, ref Unsafe.Add(ref uJ, 1), d0, d1);
-                Unsafe.Add(ref uJ, 2) = newU2;
+                // Overshoot-by-2 fix (very rare).
+                u2 += AddTo2(ref u0, ref u1, d0, d1);
             }
         }
     }
 
     [SkipLocalsInit]
-    private static void UremKnuth3(ref ulong un0, int m, ulong d0, ulong d1, ulong d2)
+    private static void URemKnuth2(ref ulong un0, int m, ulong d0, ulong d1)
     {
-        ulong dh = d2;
-        ulong dl = d1; // d[n-2]
-        ulong reciprocal = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(dh);
+        ulong reciprocal = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(d1);
+        for (int j = m; j >= 0; j--)
+        {
+            ref ulong uJ = ref Unsafe.Add(ref un0, j);
+            KnuthStep(ref uJ, ref Unsafe.Add(ref uJ, 1), ref Unsafe.Add(ref uJ, 2), d0, d1, reciprocal);
+        }
+    }
+
+    [SkipLocalsInit]
+    private static void URemKnuth3(ref ulong un0, int m, ulong d0, ulong d1, ulong d2)
+    {
+        ulong reciprocal = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(d1);
 
         for (int j = m; j >= 0; j--)
         {
@@ -1779,7 +1759,9 @@ public readonly partial struct UInt256
             ulong u1 = Unsafe.Add(ref uJ, 2);
             ulong u0 = Unsafe.Add(ref uJ, 1);
 
-            ulong qhat = X86Base.X64.IsSupported ? EstimateQhatX86Base(u2, u1, u0, dh, dl) : EstimateQhat(u2, u1, u0, dh, dl, reciprocal);
+            ulong qhat = X86Base.X64.IsSupported ?
+                EstimateQhatX86Base(u2, u1, u0, d2, d1) :
+                EstimateQhat(u2, u1, u0, d2, d1, reciprocal);
 
             ulong borrow = SubMulTo3(ref uJ, d0, d1, d2, qhat);
             ulong newU2 = u2 - borrow;
@@ -1791,14 +1773,70 @@ public readonly partial struct UInt256
                 Unsafe.Add(ref uJ, 3) = newU2;
             }
         }
+
+        [SkipLocalsInit]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static ulong SubMulTo3(ref ulong x0, ulong y0, ulong y1, ulong y2, ulong mul)
+        {
+            ref ulong x1 = ref Unsafe.Add(ref x0, 1);
+            ref ulong x2 = ref Unsafe.Add(ref x0, 2);
+
+            // Limb 0: x0 -= y0 * mul
+            ulong ph0 = Multiply64(y0, mul, out ulong pl0);
+            ulong v0 = x0;
+            x0 = v0 - pl0;
+            ulong borrow = ph0 + (v0 < pl0 ? 1UL : 0UL);
+
+            // Limb 1: x1 -= (y1 * mul) + borrow
+            ulong ph1 = Multiply64(y1, mul, out ulong pl1);
+            ulong v1 = x1;
+            ulong sum1 = pl1 + borrow;
+            ulong c1 = sum1 < borrow ? 1UL : 0UL;  // addition overflow
+            x1 = v1 - sum1;
+            borrow = ph1 + c1 + (v1 < sum1 ? 1UL : 0UL);
+
+            // Limb 2: x2 -= (y2 * mul) + borrow
+            ulong ph2 = Multiply64(y2, mul, out ulong pl2);
+            ulong v2 = x2;
+            ulong sum2 = pl2 + borrow;
+            ulong c2 = sum2 < borrow ? 1UL : 0UL;
+            x2 = v2 - sum2;
+            borrow = ph2 + c2 + (v2 < sum2 ? 1UL : 0UL);
+
+            return borrow;
+        }
+
+        [SkipLocalsInit]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static ulong AddTo3(ref ulong x0, ulong y0, ulong y1, ulong y2)
+        {
+            ulong a = x0;
+            ulong b = Unsafe.Add(ref x0, 1);
+            ulong c = Unsafe.Add(ref x0, 2);
+
+            ulong s0 = a + y0;
+            ulong c0 = s0 < a ? 1UL : 0UL;
+
+            ulong t1 = b + y1;
+            ulong s1 = t1 + c0;
+            ulong c1 = (t1 < b ? 1UL : 0UL) | (s1 < c0 ? 1UL : 0UL);
+
+            ulong t2 = c + y2;
+            ulong s2 = t2 + c1;
+            ulong c2 = (t2 < c ? 1UL : 0UL) | (s2 < c1 ? 1UL : 0UL);
+
+            x0 = s0;
+            Unsafe.Add(ref x0, 1) = s1;
+            Unsafe.Add(ref x0, 2) = s2;
+
+            return c2;
+        }
     }
 
     [SkipLocalsInit]
-    private static void UremKnuth4(ref ulong un0, int m, ulong d0, ulong d1, ulong d2, ulong d3)
+    private static void URemKnuth4(ref ulong un0, int m, ulong d0, ulong d1, ulong d2, ulong d3)
     {
-        ulong dh = d3;
-        ulong dl = d2; // d[n-2]
-        ulong reciprocal = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(dh);
+        ulong reciprocal = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(d3);
 
         for (int j = m; j >= 0; j--)
         {
@@ -1808,7 +1846,9 @@ public readonly partial struct UInt256
             ulong u1 = Unsafe.Add(ref uJ, 3);
             ulong u0 = Unsafe.Add(ref uJ, 2);
 
-            ulong qhat = X86Base.X64.IsSupported ? EstimateQhatX86Base(u2, u1, u0, dh, dl) : EstimateQhat(u2, u1, u0, dh, dl, reciprocal);
+            ulong qhat = X86Base.X64.IsSupported ?
+                EstimateQhatX86Base(u2, u1, u0, d3, d2) :
+                EstimateQhat(u2, u1, u0, d3, d2, reciprocal);
 
             ulong borrow = SubMulTo4(ref uJ, d0, d1, d2, d3, qhat);
             ulong newU2 = u2 - borrow;
@@ -1820,10 +1860,85 @@ public readonly partial struct UInt256
                 Unsafe.Add(ref uJ, 4) = newU2;
             }
         }
+
+        [SkipLocalsInit]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static ulong SubMulTo4(ref ulong x0, ulong y0, ulong y1, ulong y2, ulong y3, ulong mul)
+        {
+            // Limb 0 - no incoming borrow
+            ulong v0 = x0;
+            ulong hi0 = Multiply64(y0, mul, out ulong lo0);
+            ulong r0 = v0 - lo0;
+            x0 = r0;
+            ulong borrow = hi0 + (lo0 > v0 ? 1UL : 0UL);
+
+            // Limb 1
+            ref ulong x1 = ref Unsafe.Add(ref x0, 1);
+            ulong v1 = x1;
+            ulong hi1 = Multiply64(y1, mul, out ulong lo1);
+            ulong t1 = v1 - borrow;
+            ulong r1 = t1 - lo1;
+            x1 = r1;
+            borrow = hi1 + (borrow > v1 ? 1UL : 0UL) + (lo1 > t1 ? 1UL : 0UL);
+
+            // Limb 2
+            ref ulong x2 = ref Unsafe.Add(ref x0, 2);
+            ulong v2 = x2;
+            ulong hi2 = Multiply64(y2, mul, out ulong lo2);
+            ulong t2 = v2 - borrow;
+            ulong r2 = t2 - lo2;
+            x2 = r2;
+            borrow = hi2 + (borrow > v2 ? 1UL : 0UL) + (lo2 > t2 ? 1UL : 0UL);
+
+            // Limb 3
+            ref ulong x3 = ref Unsafe.Add(ref x0, 3);
+            ulong v3 = x3;
+            ulong hi3 = Multiply64(y3, mul, out ulong lo3);
+            ulong t3 = v3 - borrow;
+            ulong r3 = t3 - lo3;
+            x3 = r3;
+            return hi3 + (borrow > v3 ? 1UL : 0UL) + (lo3 > t3 ? 1UL : 0UL);
+        }
+
+        [SkipLocalsInit]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static ulong AddTo4(ref ulong x0, ulong y0, ulong y1, ulong y2, ulong y3)
+        {
+            ulong a0 = x0;
+            ulong a1 = Unsafe.Add(ref x0, 1);
+            ulong a2 = Unsafe.Add(ref x0, 2);
+            ulong a3 = Unsafe.Add(ref x0, 3);
+
+            // Limb 0 - no carry in
+            ulong s0 = a0 + y0;
+            ulong c = s0 < a0 ? 1UL : 0UL;
+
+            // Limb 1
+            ulong t1 = a1 + y1;
+            ulong s1 = t1 + c;
+            c = (t1 < a1 ? 1UL : 0UL) | (s1 < c ? 1UL : 0UL);
+
+            // Limb 2
+            ulong t2 = a2 + y2;
+            ulong s2 = t2 + c;
+            c = (t2 < a2 ? 1UL : 0UL) | (s2 < c ? 1UL : 0UL);
+
+            // Limb 3
+            ulong t3 = a3 + y3;
+            ulong s3 = t3 + c;
+            c = (t3 < a3 ? 1UL : 0UL) | (s3 < c ? 1UL : 0UL);
+
+            x0 = s0;
+            Unsafe.Add(ref x0, 1) = s1;
+            Unsafe.Add(ref x0, 2) = s2;
+            Unsafe.Add(ref x0, 3) = s3;
+
+            return c;
+        }
     }
 
     // ----------------- Correct qhat estimation (Knuth correction loop) -----------------
-
+    [SkipLocalsInit]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static ulong EstimateQhat(ulong u2, ulong u1, ulong u0, ulong dh, ulong dl, ulong reciprocal)
     {
@@ -1872,6 +1987,7 @@ public readonly partial struct UInt256
         return qhat;
     }
 
+    [SkipLocalsInit]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static ulong EstimateQhatX86Base(ulong u2, ulong u1, ulong u0, ulong dh, ulong dl)
     {
@@ -1918,107 +2034,6 @@ public readonly partial struct UInt256
         }
 
         return qhat;
-    }
-
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static ulong SubMulTo3(ref ulong x0, ulong y0, ulong y1, ulong y2, ulong mul)
-    {
-        ref ulong x1 = ref Unsafe.Add(ref x0, 1);
-        ref ulong x2 = ref Unsafe.Add(ref x0, 2);
-
-        ulong borrow = 0;
-
-        ulong b1 = 0;
-        SubtractWithBorrow(x0, borrow, ref b1, out ulong s0);
-        ulong ph0 = Multiply64(y0, mul, out ulong pl0);
-        ulong b2 = 0;
-        SubtractWithBorrow(s0, pl0, ref b2, out x0);
-        borrow = ph0 + b1 + b2;
-
-        b1 = 0;
-        SubtractWithBorrow(x1, borrow, ref b1, out ulong s1);
-        ulong ph1 = Multiply64(y1, mul, out ulong pl1);
-        b2 = 0;
-        SubtractWithBorrow(s1, pl1, ref b2, out x1);
-        borrow = ph1 + b1 + b2;
-
-        b1 = 0;
-        SubtractWithBorrow(x2, borrow, ref b1, out ulong s2);
-        ulong ph2 = Multiply64(y2, mul, out ulong pl2);
-        b2 = 0;
-        SubtractWithBorrow(s2, pl2, ref b2, out x2);
-        borrow = ph2 + b1 + b2;
-
-        return borrow;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static ulong SubMulTo4(ref ulong x0, ulong y0, ulong y1, ulong y2, ulong y3, ulong mul)
-    {
-        ref ulong x1 = ref Unsafe.Add(ref x0, 1);
-        ref ulong x2 = ref Unsafe.Add(ref x0, 2);
-        ref ulong x3 = ref Unsafe.Add(ref x0, 3);
-
-        ulong borrow = 0;
-
-        ulong b1 = 0;
-        SubtractWithBorrow(x0, borrow, ref b1, out ulong s0);
-        ulong ph0 = Multiply64(y0, mul, out ulong pl0);
-        ulong b2 = 0;
-        SubtractWithBorrow(s0, pl0, ref b2, out x0);
-        borrow = ph0 + b1 + b2;
-
-        b1 = 0;
-        SubtractWithBorrow(x1, borrow, ref b1, out ulong s1);
-        ulong ph1 = Multiply64(y1, mul, out ulong pl1);
-        b2 = 0;
-        SubtractWithBorrow(s1, pl1, ref b2, out x1);
-        borrow = ph1 + b1 + b2;
-
-        b1 = 0;
-        SubtractWithBorrow(x2, borrow, ref b1, out ulong s2);
-        ulong ph2 = Multiply64(y2, mul, out ulong pl2);
-        b2 = 0;
-        SubtractWithBorrow(s2, pl2, ref b2, out x2);
-        borrow = ph2 + b1 + b2;
-
-        b1 = 0;
-        SubtractWithBorrow(x3, borrow, ref b1, out ulong s3);
-        ulong ph3 = Multiply64(y3, mul, out ulong pl3);
-        b2 = 0;
-        SubtractWithBorrow(s3, pl3, ref b2, out x3);
-        borrow = ph3 + b1 + b2;
-
-        return borrow;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static ulong AddTo3(ref ulong x0, ulong y0, ulong y1, ulong y2)
-    {
-        ref ulong x1 = ref Unsafe.Add(ref x0, 1);
-        ref ulong x2 = ref Unsafe.Add(ref x0, 2);
-
-        ulong carry = 0;
-        AddWithCarry(x0, y0, ref carry, out x0);
-        AddWithCarry(x1, y1, ref carry, out x1);
-        AddWithCarry(x2, y2, ref carry, out x2);
-        return carry;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static ulong AddTo4(ref ulong x0, ulong y0, ulong y1, ulong y2, ulong y3)
-    {
-        ref ulong x1 = ref Unsafe.Add(ref x0, 1);
-        ref ulong x2 = ref Unsafe.Add(ref x0, 2);
-        ref ulong x3 = ref Unsafe.Add(ref x0, 3);
-
-        ulong carry = 0;
-        AddWithCarry(x0, y0, ref carry, out x0);
-        AddWithCarry(x1, y1, ref carry, out x1);
-        AddWithCarry(x2, y2, ref carry, out x2);
-        AddWithCarry(x3, y3, ref carry, out x3);
-        return carry;
     }
 
     [SkipLocalsInit]
