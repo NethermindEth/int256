@@ -17,6 +17,20 @@ namespace Nethermind.Int256;
 public readonly partial struct UInt256
 {
     /// <summary>
+    /// Divides this value by <paramref name="a"/> and returns the integer quotient.
+    /// </summary>
+    /// <remarks>
+    /// Sets <paramref name="res"/> to <c>this / a</c> using unsigned integer division.
+    /// If <paramref name="a"/> is zero, the result depends on the semantics of the underlying static
+    /// <see cref="Divide(in UInt256, in UInt256, out UInt256)"/> implementation.
+    /// If a <see cref="System.DivideByZeroException"/> is required for a zero divisor, the caller must pre-check
+    /// <paramref name="a"/> and throw before calling this method.
+    /// </remarks>
+    /// <param name="a">The divisor.</param>
+    /// <param name="res">On return, contains the quotient <c>this / a</c>.</param>
+    public void Divide(in UInt256 a, out UInt256 res) => Divide(this, a, out res);
+
+    /// <summary>
     /// Sets <paramref name="res"/> to the integer quotient of <paramref name="x"/> divided by <paramref name="y"/>.
     /// </summary>
     /// <remarks>
@@ -146,33 +160,80 @@ public readonly partial struct UInt256
         DivideFull(in x, in y, out res);
     }
 
+    /// <summary>
+    /// Computes the remainder of dividing this value by <paramref name="m"/>.
+    /// </summary>
+    /// <remarks>
+    /// Sets <paramref name="res"/> to <c>this % m</c> when <paramref name="m"/> is non-zero.
+    /// If <paramref name="m"/> is zero, <paramref name="res"/> is set to zero.
+    /// If a <see cref="System.DivideByZeroException"/> is required for a zero divisor, the caller must pre-check
+    /// <paramref name="m"/> and throw before calling this method.
+    /// </remarks>
+    /// <param name="m">The divisor. If zero, the result is defined to be zero.</param>
+    /// <param name="res">On return, contains <c>this % m</c>, or zero when <paramref name="m"/> is zero.</param>
+    public void Mod(in UInt256 m, out UInt256 res) => Mod(this, m, out res);
+
+    /// <summary>
+    /// Computes the remainder of dividing one <see cref="UInt256"/> value by another.
+    /// </summary>
+    /// <remarks>
+    /// Sets <paramref name="res"/> to <c>x % y</c> when <paramref name="y"/> is non-zero.
+    /// If <paramref name="y"/> is zero, <paramref name="res"/> is set to zero.
+    /// This behaviour intentionally differs from <see cref="System.Numerics.BigInteger"/>-style APIs.
+    /// If a <see cref="System.DivideByZeroException"/> is required for a zero divisor, the caller must pre-check
+    /// <paramref name="y"/> and throw before calling this method.
+    /// </remarks>
+    /// <param name="x">The dividend.</param>
+    /// <param name="y">The divisor. If zero, the result is defined to be zero.</param>
+    /// <param name="res">On return, contains <c>x % y</c>, or zero when <paramref name="y"/> is zero.</param>
     [SkipLocalsInit]
-    // Slow path is isolated so the wrapper can tailcall it and avoid stack temps like "out _ remainder".
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void DivideFull(in UInt256 x, in UInt256 y, out UInt256 res)
+    public static void Mod(in UInt256 x, in UInt256 y, out UInt256 res)
     {
-        // Full 256-bit division. We discard the remainder via out _.
-        // Keeping this in a separate method prevents the wrapper from needing
-        // a 32-byte stack slot for the remainder, which would otherwise force
-        // a larger frame and extra stores even on fast exits.
-        DivideImpl(x, y, out res, out _);
+        if (x.IsZero || y.IsZeroOrOne)
+        {
+            res = default;
+            return;
+        }
+
+        switch (x.CompareTo(y))
+        {
+            case -1:
+                res = x;
+                return;
+            case 0:
+                res = default;
+                return;
+        }
+        // At this point:
+        // x != 0
+        // y != 0
+        // x > y
+
+        if (x.IsUint64)
+        {
+            // If y > x it has already be handled by caller
+            ulong quot = x.u0 / y.u0;
+            ulong rem = x.u0 - (quot * y.u0);
+            res = Create(rem, 0, 0, 0);
+            return;
+        }
+
+        ModFull(x, y, out res);
     }
 
     /// <summary>
-    /// Divides this value by <paramref name="a"/> and returns the integer quotient.
+    /// Computes the modular sum of this value and <paramref name="a"/>.
     /// </summary>
     /// <remarks>
-    /// Sets <paramref name="res"/> to <c>this / a</c> using unsigned integer division.
-    /// If <paramref name="a"/> is zero, the result depends on the semantics of the underlying static
-    /// <see cref="Divide(in UInt256, in UInt256, out UInt256)"/> implementation.
-    /// If a <see cref="System.DivideByZeroException"/> is required for a zero divisor, the caller must pre-check
-    /// <paramref name="a"/> and throw before calling this method.
+    /// Sets <paramref name="res"/> to <c>(this + a) mod m</c>.
+    /// If <paramref name="m"/> is zero, <paramref name="res"/> is set to zero.
+    /// If a <see cref="System.DivideByZeroException"/> is required for a zero modulus, the caller must pre-check
+    /// <paramref name="m"/> and throw before calling this method.
     /// </remarks>
-    /// <param name="a">The divisor.</param>
-    /// <param name="res">On return, contains the quotient <c>this / a</c>.</param>
-    public void Divide(in UInt256 a, out UInt256 res) => Divide(this, a, out res);
-
-    
+    /// <param name="a">The other 256-bit addend.</param>
+    /// <param name="m">The modulus. If zero, the result is defined to be zero.</param>
+    /// <param name="res">On return, contains the value of <c>(this + a) mod m</c>, or zero when <paramref name="m"/> is zero.</param>
+    public void AddMod(in UInt256 a, in UInt256 m, out UInt256 res) => AddMod(this, a, m, out res);
 
     /// <summary>
     /// Computes the modular sum of two 256-bit unsigned integers.
@@ -250,6 +311,93 @@ public readonly partial struct UInt256
         {
             Remainder257By128Bits(in sum, in m, out res);
         }
+    }
+
+    public void MultiplyMod(in UInt256 a, in UInt256 m, out UInt256 res) => MultiplyMod(this, a, m, out res);
+
+    // MulMod calculates the modulo-m multiplication of x and y and
+    // sets res to its result.
+    [SkipLocalsInit]
+    public static void MultiplyMod(in UInt256 x, in UInt256 y, in UInt256 m, out UInt256 res)
+    {
+        if (m.IsZero) ThrowDivideByZeroException();
+
+        if (m.IsOne || x.IsZero || y.IsZero)
+        {
+            res = default;
+            return;
+        }
+
+        // Trivial no-mul cases first.
+        if (y.IsOne) { Mod(in x, in m, out res); return; }
+        if (x.IsOne) { Mod(in y, in m, out res); return; }
+
+        // Modulus-size dispatch first - keeps all the tiny-mod magic.
+        if (m.IsUint64)
+        {
+            MulModBy64Bits(in x, in y, m.u0, out res);
+            return;
+        }
+
+        if ((m.u2 | m.u3) == 0)
+        {
+            // Hybrid: if both operands are > 128-bit, avoid two 256->128 reductions.
+            if (((x.u2 | x.u3) != 0) && ((y.u2 | y.u3) != 0))
+            {
+                Multiply256To512Bit(in x, in y, out UInt256 lo2, out UInt256 hi2);
+                Remainder512By128Bits(in lo2, in hi2, in m, out res); // dLen will be 2
+                return;
+            }
+
+            MulModBy128Bits(in x, in y, m.u0, m.u1, out res);
+            return;
+        }
+
+        Multiply256To512Bit(in x, in y, out UInt256 lo, out UInt256 hi);
+
+        if (hi.IsZero)
+        {
+            Mod(in lo, in m, out res);
+            return;
+        }
+
+        Remainder512By256Bits(in lo, in hi, in m, out res);
+    }
+
+    public void ExpMod(in UInt256 exp, in UInt256 m, out UInt256 res) => ExpMod(this, exp, m, out res);
+
+    public static void ExpMod(in UInt256 b, in UInt256 e, in UInt256 m, out UInt256 result)
+    {
+        if (m.IsOne)
+        {
+            result = Zero;
+            return;
+        }
+        UInt256 intermediate = One;
+        UInt256 bs = b;
+        int len = e.BitLen;
+        for (int i = 0; i < len; i++)
+        {
+            if (e.Bit(i))
+            {
+                MultiplyMod(intermediate, bs, m, out intermediate);
+            }
+            MultiplyMod(bs, bs, m, out bs);
+        }
+
+        result = intermediate;
+    }
+
+    [SkipLocalsInit]
+    // Slow path is isolated so the wrapper can tailcall it and avoid stack temps like "out _ remainder".
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void DivideFull(in UInt256 x, in UInt256 y, out UInt256 res)
+    {
+        // Full 256-bit division. We discard the remainder via out _.
+        // Keeping this in a separate method prevents the wrapper from needing
+        // a 32-byte stack slot for the remainder, which would otherwise force
+        // a larger frame and extra stores even on fast exits.
+        DivideImpl(x, y, out res, out _);
     }
 
     [SkipLocalsInit]
@@ -896,89 +1044,12 @@ public readonly partial struct UInt256
         remainder = ShiftRightSmall(in normRem, normShiftBits);
     }
 
-    /// <summary>
-    /// Computes the modular sum of this value and <paramref name="a"/>.
-    /// </summary>
-    /// <remarks>
-    /// Sets <paramref name="res"/> to <c>(this + a) mod m</c>.
-    /// If <paramref name="m"/> is zero, <paramref name="res"/> is set to zero.
-    /// If a <see cref="System.DivideByZeroException"/> is required for a zero modulus, the caller must pre-check
-    /// <paramref name="m"/> and throw before calling this method.
-    /// </remarks>
-    /// <param name="a">The other 256-bit addend.</param>
-    /// <param name="m">The modulus. If zero, the result is defined to be zero.</param>
-    /// <param name="res">On return, contains the value of <c>(this + a) mod m</c>, or zero when <paramref name="m"/> is zero.</param>
-    public void AddMod(in UInt256 a, in UInt256 m, out UInt256 res) => AddMod(this, a, m, out res);
-
-    /// <summary>
-    /// Computes the remainder of dividing one <see cref="UInt256"/> value by another.
-    /// </summary>
-    /// <remarks>
-    /// Sets <paramref name="res"/> to <c>x % y</c> when <paramref name="y"/> is non-zero.
-    /// If <paramref name="y"/> is zero, <paramref name="res"/> is set to zero.
-    /// This behaviour intentionally differs from <see cref="System.Numerics.BigInteger"/>-style APIs.
-    /// If a <see cref="System.DivideByZeroException"/> is required for a zero divisor, the caller must pre-check
-    /// <paramref name="y"/> and throw before calling this method.
-    /// </remarks>
-    /// <param name="x">The dividend.</param>
-    /// <param name="y">The divisor. If zero, the result is defined to be zero.</param>
-    /// <param name="res">On return, contains <c>x % y</c>, or zero when <paramref name="y"/> is zero.</param>
-    [SkipLocalsInit]
-    public static void Mod(in UInt256 x, in UInt256 y, out UInt256 res)
-    {
-        if (x.IsZero || y.IsZeroOrOne)
-        {
-            res = default;
-            return;
-        }
-
-        switch (x.CompareTo(y))
-        {
-            case -1:
-                res = x;
-                return;
-            case 0:
-                res = default;
-                return;
-        }
-        // At this point:
-        // x != 0
-        // y != 0
-        // x > y
-
-        if (x.IsUint64)
-        {
-            // If y > x it has already be handled by caller
-            ulong quot = x.u0 / y.u0;
-            ulong rem = x.u0 - (quot * y.u0);
-            res = Create(rem, 0, 0, 0);
-            return;
-        }
-
-        ModFull(x, y, out res);
-    }
-
     [SkipLocalsInit]
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void ModFull(in UInt256 x, in UInt256 y, out UInt256 res)
     {
         DivideImpl(x, y, out _, out res);
     }
-
-    /// <summary>
-    /// Computes the remainder of dividing this value by <paramref name="m"/>.
-    /// </summary>
-    /// <remarks>
-    /// Sets <paramref name="res"/> to <c>this % m</c> when <paramref name="m"/> is non-zero.
-    /// If <paramref name="m"/> is zero, <paramref name="res"/> is set to zero.
-    /// If a <see cref="System.DivideByZeroException"/> is required for a zero divisor, the caller must pre-check
-    /// <paramref name="m"/> and throw before calling this method.
-    /// </remarks>
-    /// <param name="m">The divisor. If zero, the result is defined to be zero.</param>
-    /// <param name="res">On return, contains <c>this % m</c>, or zero when <paramref name="m"/> is zero.</param>
-    public void Mod(in UInt256 m, out UInt256 res) => Mod(this, m, out res);
-
-    
 
     [SkipLocalsInit]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1037,81 +1108,6 @@ public readonly partial struct UInt256
 
         rem = r1;
         return q;
-    }
-
-    
-
-    public static void ExpMod(in UInt256 b, in UInt256 e, in UInt256 m, out UInt256 result)
-    {
-        if (m.IsOne)
-        {
-            result = Zero;
-            return;
-        }
-        UInt256 intermediate = One;
-        UInt256 bs = b;
-        int len = e.BitLen;
-        for (int i = 0; i < len; i++)
-        {
-            if (e.Bit(i))
-            {
-                MultiplyMod(intermediate, bs, m, out intermediate);
-            }
-            MultiplyMod(bs, bs, m, out bs);
-        }
-
-        result = intermediate;
-    }
-
-    public void ExpMod(in UInt256 exp, in UInt256 m, out UInt256 res) => ExpMod(this, exp, m, out res);
-
-    // MulMod calculates the modulo-m multiplication of x and y and
-    // sets res to its result.
-    [SkipLocalsInit]
-    public static void MultiplyMod(in UInt256 x, in UInt256 y, in UInt256 m, out UInt256 res)
-    {
-        if (m.IsZero) ThrowDivideByZeroException();
-
-        if (m.IsOne || x.IsZero || y.IsZero)
-        {
-            res = default;
-            return;
-        }
-
-        // Trivial no-mul cases first.
-        if (y.IsOne) { Mod(in x, in m, out res); return; }
-        if (x.IsOne) { Mod(in y, in m, out res); return; }
-
-        // Modulus-size dispatch first - keeps all the tiny-mod magic.
-        if (m.IsUint64)
-        {
-            MulModBy64Bits(in x, in y, m.u0, out res);
-            return;
-        }
-
-        if ((m.u2 | m.u3) == 0)
-        {
-            // Hybrid: if both operands are > 128-bit, avoid two 256->128 reductions.
-            if (((x.u2 | x.u3) != 0) && ((y.u2 | y.u3) != 0))
-            {
-                Multiply256To512Bit(in x, in y, out UInt256 lo2, out UInt256 hi2);
-                Remainder512By128Bits(in lo2, in hi2, in m, out res); // dLen will be 2
-                return;
-            }
-
-            MulModBy128Bits(in x, in y, m.u0, m.u1, out res);
-            return;
-        }
-
-        Multiply256To512Bit(in x, in y, out UInt256 lo, out UInt256 hi);
-
-        if (hi.IsZero)
-        {
-            Mod(in lo, in m, out res);
-            return;
-        }
-
-        Remainder512By256Bits(in lo, in hi, in m, out res);
     }
 
     [SkipLocalsInit]
@@ -1309,7 +1305,7 @@ public readonly partial struct UInt256
         if ((u2 | u3) == 0)
         {
             if (u1 == 0)
-            { 
+            {
                 r0 = u0;
                 r1 = 0;
                 return;
@@ -1383,8 +1379,8 @@ public readonly partial struct UInt256
     private static void KnuthStep(ref ulong x0, ref ulong x1, ref ulong x2, ulong nd0, ulong nd1, ulong reciprocal)
     {
         ulong oldX2 = x2;
-        ulong qhat = X86Base.X64.IsSupported 
-            ? EstimateQhatEstX86Base(x2, x1, nd1) 
+        ulong qhat = X86Base.X64.IsSupported
+            ? EstimateQhatEstX86Base(x2, x1, nd1)
             : EstimateQhatEst(x2, x1, nd1, reciprocal);
 
         ulong borrow = SubMulTo2(ref x0, ref x1, nd0, nd1, qhat);
@@ -1463,7 +1459,7 @@ public readonly partial struct UInt256
         // p3 = hi11 + c2  (fits, since overall product is 256-bit)
         p3 = hi11 + c2;
     }
-    
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static ulong SubMulTo2(ref ulong x0, ref ulong x1, ulong y0, ulong y1, ulong mul)
     {
@@ -1517,77 +1513,77 @@ public readonly partial struct UInt256
     }
 
 
-[SkipLocalsInit]
-private static void Remainder512By128Bits(in UInt256 lo, in UInt256 hi, in UInt256 d, out UInt256 rem)
-{
-Debug.Assert((d.u2 | d.u3) == 0);
+    [SkipLocalsInit]
+    private static void Remainder512By128Bits(in UInt256 lo, in UInt256 hi, in UInt256 d, out UInt256 rem)
+    {
+        Debug.Assert((d.u2 | d.u3) == 0);
 
-ulong d0 = d.u0;
-ulong d1 = d.u1;
-Debug.Assert((d0 | d1) != 0);
+        ulong d0 = d.u0;
+        ulong d1 = d.u1;
+        Debug.Assert((d0 | d1) != 0);
 
-// Numerator limbs (u0 is least significant).
-ulong u0 = lo.u0, u1 = lo.u1, u2 = lo.u2, u3 = lo.u3;
-ulong u4 = hi.u0, u5 = hi.u1, u6 = hi.u2, u7 = hi.u3;
+        // Numerator limbs (u0 is least significant).
+        ulong u0 = lo.u0, u1 = lo.u1, u2 = lo.u2, u3 = lo.u3;
+        ulong u4 = hi.u0, u5 = hi.u1, u6 = hi.u2, u7 = hi.u3;
 
-// In the slow path hi != 0, so uLen is always 5..8 (as in your original).
-int uLen = u7 != 0 ? 8 : (u6 != 0 ? 7 : (u5 != 0 ? 6 : 5));
+        // In the slow path hi != 0, so uLen is always 5..8 (as in your original).
+        int uLen = u7 != 0 ? 8 : (u6 != 0 ? 7 : (u5 != 0 ? 6 : 5));
 
-// ---------------------------
-// 128-bit divisor (d1 != 0)
-// ---------------------------
-int sh = LeadingZeros(d1);
+        // ---------------------------
+        // 128-bit divisor (d1 != 0)
+        // ---------------------------
+        int sh = LeadingZeros(d1);
 
-Unsafe.SkipInit(out ULong9 unBuf);
-ulong nd0, nd1;
+        Unsafe.SkipInit(out ULong9 unBuf);
+        ulong nd0, nd1;
 
-if (sh == 0)
-{
-    unBuf.w0 = u0; unBuf.w1 = u1; unBuf.w2 = u2; unBuf.w3 = u3;
-    unBuf.w4 = u4; unBuf.w5 = u5; unBuf.w6 = u6; unBuf.w7 = u7;
-    unBuf.w8 = 0;
+        if (sh == 0)
+        {
+            unBuf.w0 = u0; unBuf.w1 = u1; unBuf.w2 = u2; unBuf.w3 = u3;
+            unBuf.w4 = u4; unBuf.w5 = u5; unBuf.w6 = u6; unBuf.w7 = u7;
+            unBuf.w8 = 0;
 
-    nd0 = d0;
-    nd1 = d1;
-}
-else
-{
-    int rsh = 64 - sh;
+            nd0 = d0;
+            nd1 = d1;
+        }
+        else
+        {
+            int rsh = 64 - sh;
 
-    unBuf.w8 = u7 >> rsh;
-    unBuf.w7 = (u7 << sh) | (u6 >> rsh);
-    unBuf.w6 = (u6 << sh) | (u5 >> rsh);
-    unBuf.w5 = (u5 << sh) | (u4 >> rsh);
-    unBuf.w4 = (u4 << sh) | (u3 >> rsh);
-    unBuf.w3 = (u3 << sh) | (u2 >> rsh);
-    unBuf.w2 = (u2 << sh) | (u1 >> rsh);
-    unBuf.w1 = (u1 << sh) | (u0 >> rsh);
-    unBuf.w0 = u0 << sh;
+            unBuf.w8 = u7 >> rsh;
+            unBuf.w7 = (u7 << sh) | (u6 >> rsh);
+            unBuf.w6 = (u6 << sh) | (u5 >> rsh);
+            unBuf.w5 = (u5 << sh) | (u4 >> rsh);
+            unBuf.w4 = (u4 << sh) | (u3 >> rsh);
+            unBuf.w3 = (u3 << sh) | (u2 >> rsh);
+            unBuf.w2 = (u2 << sh) | (u1 >> rsh);
+            unBuf.w1 = (u1 << sh) | (u0 >> rsh);
+            unBuf.w0 = u0 << sh;
 
-    nd0 = d0 << sh;
-    nd1 = (d1 << sh) | (d0 >> rsh);
-}
+            nd0 = d0 << sh;
+            nd1 = (d1 << sh) | (d0 >> rsh);
+        }
 
-ref ulong un0 = ref unBuf.w0;
+        ref ulong un0 = ref unBuf.w0;
 
-// dLen is fixed at 2 here.
-UremKnuth2(ref un0, uLen - 2, nd0, nd1);
+        // dLen is fixed at 2 here.
+        UremKnuth2(ref un0, uLen - 2, nd0, nd1);
 
-// Denormalise remainder from un[0..1].
-if (sh == 0)
-{
-    rem = new UInt256(unBuf.w0, unBuf.w1, 0, 0);
-    return;
-}
-else
-{
-    int rsh = 64 - sh;
-    ulong r0 = (unBuf.w0 >> sh) | (unBuf.w1 << rsh);
-    ulong r1 = unBuf.w1 >> sh;
-    rem = new UInt256(r0, r1, 0, 0);
-    return;
-}
-}
+        // Denormalise remainder from un[0..1].
+        if (sh == 0)
+        {
+            rem = new UInt256(unBuf.w0, unBuf.w1, 0, 0);
+            return;
+        }
+        else
+        {
+            int rsh = 64 - sh;
+            ulong r0 = (unBuf.w0 >> sh) | (unBuf.w1 << rsh);
+            ulong r1 = unBuf.w1 >> sh;
+            rem = new UInt256(r0, r1, 0, 0);
+            return;
+        }
+    }
 
     [SkipLocalsInit]
     private static void Remainder512By256Bits(in UInt256 lo, in UInt256 hi, in UInt256 d, out UInt256 rem)
@@ -1738,8 +1734,6 @@ else
     {
         public ulong w0, w1, w2, w3, w4, w5, w6, w7, w8;
     }
-
-    // ----------------- Knuth remainder-only cores -----------------
 
     [SkipLocalsInit]
     private static void UremKnuth2(ref ulong un0, int m, ulong d0, ulong d1)
@@ -2027,8 +2021,6 @@ else
         return carry;
     }
 
-    public void MultiplyMod(in UInt256 a, in UInt256 m, out UInt256 res) => MultiplyMod(this, a, m, out res);
-
     [SkipLocalsInit]
     private static void Multiply256To512Bit(in UInt256 x, in UInt256 y, out UInt256 low, out UInt256 high)
     {
@@ -2111,7 +2103,6 @@ else
         Unsafe.AsRef(in high.u3) = a1;
     }
 
-    
     // Preconditions (enforced by public Divide wrapper):
     // - y != 0
     // - x > y
