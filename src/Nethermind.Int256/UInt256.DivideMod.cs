@@ -54,6 +54,7 @@ public readonly partial struct UInt256
     [SkipLocalsInit]
     public static void Divide(in UInt256 x, in UInt256 y, out UInt256 res)
     {
+        if (y.IsZero) ThrowDivideByZeroException();
         // Handle y == 0 and y == 1 cheaply
         //
         // y0 is the low limb.
@@ -189,7 +190,8 @@ public readonly partial struct UInt256
     [SkipLocalsInit]
     public static void Mod(in UInt256 x, in UInt256 y, out UInt256 res)
     {
-        if (x.IsZero || y.IsZeroOrOne)
+        if (y.IsZero) ThrowDivideByZeroException();
+        if (x.IsZero || y.IsOne)
         {
             res = default;
             return;
@@ -266,9 +268,10 @@ public readonly partial struct UInt256
     [SkipLocalsInit]
     public static void AddMod(in UInt256 x, in UInt256 y, in UInt256 m, out UInt256 res)
     {
-        if (m.IsZero || m.IsOne)
+        if (m.IsZero) ThrowDivideByZeroException();
+        if (m.IsOne)
         {
-            // Any value mod 0 is defined here to be 0, and any value mod 1 is mathematically 0.
+            // Any value mod 1 is mathematically 0.
             res = default;
             return;
         }
@@ -321,7 +324,6 @@ public readonly partial struct UInt256
     public static void MultiplyMod(in UInt256 x, in UInt256 y, in UInt256 m, out UInt256 res)
     {
         if (m.IsZero) ThrowDivideByZeroException();
-
         if (m.IsOne || x.IsZero || y.IsZero)
         {
             res = default;
@@ -368,6 +370,7 @@ public readonly partial struct UInt256
 
     public static void ExpMod(in UInt256 b, in UInt256 e, in UInt256 m, out UInt256 result)
     {
+        if (m.IsZero) ThrowDivideByZeroException();
         if (m.IsOne)
         {
             result = Zero;
