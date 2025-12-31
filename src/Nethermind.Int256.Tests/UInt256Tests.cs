@@ -101,17 +101,19 @@ public abstract class UInt256TestsTemplate<T> where T : IInteger<T>
     [TestCaseSource(typeof(TernaryOps), nameof(TernaryOps.TestCases))]
     public virtual void AddMod((BigInteger A, BigInteger B, BigInteger M) test)
     {
+        T uint256a = convert(test.A);
+        T uint256b = convert(test.B);
+        T uint256m = convert(test.M);
         if (test.M.IsZero)
         {
+            Action act = () => uint256a.AddMod(uint256b, uint256m, out T res);
+            act.Should().Throw<DivideByZeroException>();
             return;
         }
         BigInteger resBigInt = (test.A + test.B) % test.M;
         resBigInt %= (BigInteger.One << 256);
         resBigInt = postprocess(resBigInt);
 
-        T uint256a = convert(test.A);
-        T uint256b = convert(test.B);
-        T uint256m = convert(test.M);
         uint256a.AddMod(uint256b, uint256m, out T res);
         res.Convert(out BigInteger resUInt256);
 
@@ -179,8 +181,13 @@ public abstract class UInt256TestsTemplate<T> where T : IInteger<T>
 
     protected void SubtractModCore((BigInteger A, BigInteger B, BigInteger M) test, bool convertToUnsigned)
     {
+        T uint256a = convert(test.A);
+        T uint256b = convert(test.B);
+        T uint256m = convert(test.M);
         if (test.M.IsZero)
         {
+            Action act = () => uint256a.SubtractMod(uint256b, uint256m, out T res);
+            act.Should().Throw<DivideByZeroException>();
             return;
         }
         BigInteger resBigInt = (test.A - test.B) % test.M;
@@ -194,9 +201,6 @@ public abstract class UInt256TestsTemplate<T> where T : IInteger<T>
         resBigInt %= (BigInteger.One << 256);
         resBigInt = postprocess(resBigInt);
 
-        T uint256a = convert(test.A);
-        T uint256b = convert(test.B);
-        T uint256m = convert(test.M);
         uint256a.SubtractMod(uint256b, uint256m, out T res);
         res.Convert(out BigInteger resUInt256);
 
@@ -307,16 +311,19 @@ public abstract class UInt256TestsTemplate<T> where T : IInteger<T>
     [TestCaseSource(typeof(TernaryOps), nameof(TernaryOps.TestCases))]
     public virtual void MultiplyMod((BigInteger A, BigInteger B, BigInteger M) test)
     {
+        T uint256a = convert(test.A);
+        T uint256b = convert(test.B);
+        T uint256m = convert(test.M);
+
         if (test.M.IsZero)
         {
+            Action act = () => uint256a.MultiplyMod(uint256b, uint256m, out T res);
+            act.Should().Throw<DivideByZeroException>();
             return;
         }
         BigInteger resBigInt = ((test.A * test.B) % test.M) % (BigInteger.One << 256);
         resBigInt = postprocess(resBigInt);
 
-        T uint256a = convert(test.A);
-        T uint256b = convert(test.B);
-        T uint256m = convert(test.M);
         uint256a.MultiplyMod(uint256b, uint256m, out T res);
         res.Convert(out BigInteger resUInt256);
 
@@ -344,15 +351,17 @@ public abstract class UInt256TestsTemplate<T> where T : IInteger<T>
     [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
     public virtual void Div((BigInteger A, BigInteger B) test)
     {
+        T uint256a = convert(test.A);
+        T uint256b = convert(test.B);
         if (test.B.IsZero)
         {
+            Action act = () => uint256a.Divide(uint256b, out T res);
+            act.Should().Throw<DivideByZeroException>();
             return;
         }
         BigInteger resBigInt = (test.A / test.B) % (BigInteger.One << 256);
         resBigInt = postprocess(resBigInt);
 
-        T uint256a = convert(test.A);
-        T uint256b = convert(test.B);
         uint256a.Divide(uint256b, out T res);
         res.Convert(out BigInteger resUInt256);
 
@@ -374,15 +383,17 @@ public abstract class UInt256TestsTemplate<T> where T : IInteger<T>
     [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
     public virtual void Mod((BigInteger A, BigInteger B) test)
     {
+        T uint256a = convert(test.A);
+        T uint256b = convert(test.B);
         if (test.B.IsZero)
         {
+            Action act = () => uint256a.Mod(uint256b, out T res);
+            act.Should().Throw<DivideByZeroException>();
             return;
         }
         BigInteger resBigInt = (test.A % test.B) % (BigInteger.One << 256);
         resBigInt = postprocess(resBigInt);
 
-        T uint256a = convert(test.A);
-        T uint256b = convert(test.B);
         uint256a.Mod(uint256b, out T res);
         res.Convert(out BigInteger resUInt256);
 
@@ -504,17 +515,25 @@ public abstract class UInt256TestsTemplate<T> where T : IInteger<T>
     [TestCaseSource(typeof(TernaryOps), nameof(TernaryOps.TestCases))]
     public virtual void ExpMod((BigInteger A, BigInteger B, BigInteger M) test)
     {
-        if (test.M.IsZero || test.B < 0)
-        {
-            return;
-        }
-        BigInteger resBigInt = BigInteger.ModPow(test.A, test.B, test.M);
-        resBigInt %= (BigInteger.One << 256);
-        resBigInt = postprocess(resBigInt);
-
         T uint256a = convert(test.A);
         T uint256b = convert(test.B);
         T uint256m = convert(test.M);
+        if (test.B < 0)
+        {
+            Action act = () => uint256a.ExpMod(uint256b, uint256m, out T res);
+            act.Should().Throw<ArgumentException>();
+            return;
+        }
+        if (test.M.IsZero)
+        {
+            Action act = () => uint256a.ExpMod(uint256b, uint256m, out T res);
+            act.Should().Throw<DivideByZeroException>();
+            return;
+        }
+
+        BigInteger resBigInt = BigInteger.ModPow(test.A, test.B, test.M);
+        resBigInt %= (BigInteger.One << 256);
+        resBigInt = postprocess(resBigInt);
 
         uint256a.ExpMod(uint256b, uint256m, out T res);
         res.Convert(out BigInteger resUInt256);
