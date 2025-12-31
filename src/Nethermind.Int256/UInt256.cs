@@ -452,9 +452,9 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
             return;
         }
 
+        // Recent optimizations have made scalar faster
         if (false && Avx512F.IsSupported && Avx512DQ.IsSupported && Avx512DQ.VL.IsSupported)
         {
-            // Recent optimizations have made scalar faster
             MultiplyAvx512F(in x, in y, out res);
         }
         else
