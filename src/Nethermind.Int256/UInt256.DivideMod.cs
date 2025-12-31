@@ -1154,7 +1154,7 @@ public readonly partial struct UInt256
         }
         else
         {
-            int shift = LeadingZeros(mod);
+            int shift = BitOperations.LeadingZeroCount(mod);
             ulong dn = mod << shift;
             ulong reciprocal = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(dn);
             xr = X86Base.X64.IsSupported
@@ -1170,7 +1170,7 @@ public readonly partial struct UInt256
         }
 
         // Now reduce y similarly - but avoid recomputing shift/dn if we took the slow path.
-        int sh = LeadingZeros(mod);
+        int sh = BitOperations.LeadingZeroCount(mod);
         ulong dnn = mod << sh;
         ulong rec = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(dnn);
 
@@ -1376,7 +1376,7 @@ public readonly partial struct UInt256
                 return;
             }
 
-            int shift = LeadingZeros(d1);
+            int shift = BitOperations.LeadingZeroCount(d1);
             ulong nd0, nd1;
             ulong un0, un1, un2;
 
@@ -1434,7 +1434,7 @@ public readonly partial struct UInt256
                 }
             }
 
-            int shift = LeadingZeros(d1);
+            int shift = BitOperations.LeadingZeroCount(d1);
             ulong nd0, nd1;
             ulong un0, un1, un2, un3, un4;
 
@@ -1512,7 +1512,7 @@ public readonly partial struct UInt256
         // ---------------------------
         // 128-bit divisor (d1 != 0)
         // ---------------------------
-        int sh = LeadingZeros(d1);
+        int sh = BitOperations.LeadingZeroCount(d1);
 
         Unsafe.SkipInit(out ULong9 unBuf);
         ulong nd0, nd1;
@@ -1573,10 +1573,10 @@ public readonly partial struct UInt256
         // Divisor length (1..4) and normalisation shift.
         int dLen;
         int shift;
-        if (d3 != 0) { dLen = 4; shift = LeadingZeros(d3); }
-        else if (d2 != 0) { dLen = 3; shift = LeadingZeros(d2); }
-        else if (d1 != 0) { dLen = 2; shift = LeadingZeros(d1); }
-        else { dLen = 1; shift = LeadingZeros(d0); }
+        if (d3 != 0) { dLen = 4; shift = BitOperations.LeadingZeroCount(d3); }
+        else if (d2 != 0) { dLen = 3; shift = BitOperations.LeadingZeroCount(d2); }
+        else if (d1 != 0) { dLen = 2; shift = BitOperations.LeadingZeroCount(d1); }
+        else { dLen = 1; shift = BitOperations.LeadingZeroCount(d0); }
 
         // Numerator limbs (u0 is least significant).
         ulong u0 = lo.u0, u1n = lo.u1, u2n = lo.u2, u3n = lo.u3;

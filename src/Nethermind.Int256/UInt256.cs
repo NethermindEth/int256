@@ -272,12 +272,6 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         sum = r;
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static int Len64(ulong x) => 64 - BitOperations.LeadingZeroCount(x);
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static int LeadingZeros(ulong x) => BitOperations.LeadingZeroCount(x);
-
     // It avoids c#'s way of shifting a 64-bit number by 64-bit, i.e. in c# a << 64 == a, in our version a << 64 == 0.
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static ulong Lsh(ulong a, int n)
@@ -723,12 +717,12 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
 
     public int BitLen =>
         u3 != 0
-            ? 192 + Len64(u3)
+            ? 256 - BitOperations.LeadingZeroCount(u3)
             : u2 != 0
-                ? 128 + Len64(u2)
+                ? 192 - BitOperations.LeadingZeroCount(u2)
                 : u1 != 0
-                    ? 64 + Len64(u1)
-                    : Len64(u0);
+                    ? 128 - BitOperations.LeadingZeroCount(u1)
+                    : 64 - BitOperations.LeadingZeroCount(u0);
 
     [SkipLocalsInit]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
