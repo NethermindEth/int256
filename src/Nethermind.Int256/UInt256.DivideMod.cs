@@ -1300,13 +1300,21 @@ public readonly partial struct UInt256
         ulong r1;
         if (Unsafe.IsNullRef(in q))
         {
-            ulong u0 = x.u0, u1 = x.u1, u2 = x.u2, u3 = x.u3;
-            Remainder256By128Bits(u0, u1, u2, u3, m0, m1, out ulong x0, out ulong x1);
-            u0 = y.u0; u1 = y.u1; u2 = y.u2; u3 = y.u3;
-            Remainder256By128Bits(u0, u1, u2, u3, m0, m1, out ulong y0, out ulong y1);
+            if (x.IsUint64 && y.IsUint64)
+            {
+                ulong hi = Multiply64(x.u0, y.u0, out ulong low);
+                Remainder128By128Bits(low, hi, m0, m1, out r0, out r1);
+            }
+            else
+            {
+                ulong u0 = x.u0, u1 = x.u1, u2 = x.u2, u3 = x.u3;
+                Remainder256By128Bits(u0, u1, u2, u3, m0, m1, out ulong x0, out ulong x1);
+                u0 = y.u0; u1 = y.u1; u2 = y.u2; u3 = y.u3;
+                Remainder256By128Bits(u0, u1, u2, u3, m0, m1, out ulong y0, out ulong y1);
 
-            Mul128(x0, x1, y0, y1, out ulong p0, out ulong p1, out ulong p2, out ulong p3);
-            Remainder256By128Bits(p0, p1, p2, p3, m0, m1, out r0, out r1);
+                Mul128(x0, x1, y0, y1, out ulong p0, out ulong p1, out ulong p2, out ulong p3);
+                Remainder256By128Bits(p0, p1, p2, p3, m0, m1, out r0, out r1);
+            }
         }
         else
         {
@@ -1350,6 +1358,61 @@ public readonly partial struct UInt256
 
             // p3 = hi11 + c2  (fits, since overall product is 256-bit)
             p3 = hi11 + c2;
+        }
+        
+        [SkipLocalsInit]
+        static void Remainder128By128Bits(ulong u0, ulong u1, ulong d0, ulong d1, out ulong r0, out ulong r1)
+        {
+            // Early exits for small numerators
+            if (u1 == 0)
+            {
+                r0 = u0;
+                r1 = 0;
+                return;
+            }
+            if (u1 < d1 || (u1 == d1 && u0 < d0))
+            {
+                r0 = u0;
+                r1 = u1;
+                return;
+            }
+
+            int shift = LeadingZeros(d1);
+            ulong nd0, nd1;
+            ulong un0, un1, un2;
+
+            if (shift == 0)
+            {
+                un0 = u0; un1 = u1; un2 = 0;
+                nd0 = d0; nd1 = d1;
+            }
+            else
+            {
+                int rshift = 64 - shift;
+                un2 = (u1 >> rshift);
+                un1 = (u1 << shift) | (u0 >> rshift);
+                un0 = u0 << shift;
+                nd0 = d0 << shift;
+                nd1 = (d1 << shift) | (d0 >> rshift);
+            }
+
+            ulong reciprocal = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(nd1);
+
+            // 2-limb numerator: 1 Knuth step (j = 0)
+            KnuthStep(ref un0, ref un1, ref un2, nd0, nd1, reciprocal);
+
+            // Denormalise
+            if (shift == 0)
+            {
+                r0 = un0;
+                r1 = un1;
+            }
+            else
+            {
+                int rshift = 64 - shift;
+                r0 = (un0 >> shift) | (un1 << rshift);
+                r1 = un1 >> shift;
+            }
         }
 
         [SkipLocalsInit]
@@ -1507,8 +1570,6 @@ public readonly partial struct UInt256
     private static void Remainder512By256Bits(in UInt256 lo, in UInt256 hi, in UInt256 d, out UInt256 rem)
     {
         ulong d0 = d.u0, d1 = d.u1, d2 = d.u2, d3 = d.u3;
-        if ((d0 | d1 | d2 | d3) == 0)
-            ThrowDivideByZeroException();
 
         // Divisor length (1..4) and normalisation shift.
         int dLen;
