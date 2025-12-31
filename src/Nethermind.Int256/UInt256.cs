@@ -1354,7 +1354,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         }
         else
         {
-            return u0 == other && u1 == 0 && u2 == 0 && u3 == 0;
+            return u0 == other && IsUint64;
         }
     }
 
@@ -1369,7 +1369,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         }
         else
         {
-            return u0 == other && u1 == 0 && u2 == 0 && u3 == 0;
+            return u0 == other && IsUint64;
         }
     }
 

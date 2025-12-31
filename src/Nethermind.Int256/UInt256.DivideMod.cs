@@ -64,8 +64,7 @@ public readonly partial struct UInt256
             //
             // Computing yHi here (and only here) avoids keeping y1/y2/y3 live across the entire function,
             // which would force the JIT to use callee-saved regs (rbx/rsi/rdi/rbp/r14/r15) and emit pushes.
-            ulong yHi = y.u1 | y.u2 | y.u3;
-            if (yHi == 0)
+            if (y.IsUInt64)
             {
                 // Exact: if y == 0 -> quotient is 0 (we return default)
                 //        if y == 1 -> quotient is x (copy x)
