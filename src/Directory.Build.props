@@ -13,7 +13,7 @@
     <Authors>Nethermind</Authors>
     <Copyright>Demerzel Solutions Limited</Copyright>
     <VersionPrefix>1.4.0</VersionPrefix>
-    <VersionSuffix></VersionSuffix>
+    <VersionSuffix>preview.2</VersionSuffix>
   </PropertyGroup>
 
 </Project>
