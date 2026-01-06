@@ -24,12 +24,12 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     // one node they will not be the same on another node or across a restart so hash collision cannot be used to degrade
     // the performance of the network as a whole.
     // Constant by default for zkVM-compatibility -- subject to change in the near feature
-    private static readonly uint _hashSeed = UseHashRandomizer
+    private static readonly uint _hashSeed = UseHashCodeRandomizer
         ? (uint)RandomNumberGenerator.GetInt32(int.MinValue, int.MaxValue)
         : 2098026241U; // just a random prime number
 
     [FeatureSwitchDefinition("Nethermind.Int256.UseHashCodeRandomizer")]
-    public static bool UseHashRandomizer => AppContext.TryGetSwitch("Nethermind.Int256.UseHashCodeRandomizer", out var useHashCodeRandomizer) && useHashCodeRandomizer;
+    public static bool UseHashCodeRandomizer => AppContext.TryGetSwitch("Nethermind.Int256.UseHashCodeRandomizer", out var useHashCodeRandomizer) && useHashCodeRandomizer;
 
     public static readonly UInt256 Zero = 0ul;
     public static readonly UInt256 One = 1ul;
