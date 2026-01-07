@@ -852,4 +852,14 @@ public class UInt256Tests : UInt256TestsTemplate<UInt256>
             (uint256a == b).Should().Be(test.A == b);
         }
     }
+
+    [NonParallelizable]
+    [TestCase(false)]
+    [TestCase(true)]
+    public void Shoud_respect_appcontext_switch(bool useHashCodeRandomizer)
+    {
+        AppContext.SetSwitch("Nethermind.Int256.UseHashCodeRandomizer", useHashCodeRandomizer);
+
+        Assert.That(UInt256.UseHashCodeRandomizer, Is.EqualTo(useHashCodeRandomizer));
+    }
 }

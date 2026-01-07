@@ -10,6 +10,7 @@ using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
 using System.Runtime.Intrinsics.Arm;
 using System.Runtime.Intrinsics.X86;
+using System.Security.Cryptography;
 
 [assembly: InternalsVisibleTo("Nethermind.Int256.Tests")]
 
@@ -22,7 +23,13 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     // Ensure that hashes are different for every run of the node and every node, so if are any hash collisions on
     // one node they will not be the same on another node or across a restart so hash collision cannot be used to degrade
     // the performance of the network as a whole.
-    private static readonly uint s_instanceRandom = (uint)System.Security.Cryptography.RandomNumberGenerator.GetInt32(int.MinValue, int.MaxValue);
+    // Constant by default for zkVM-compatibility -- subject to change in the near feature
+    private static readonly uint _hashSeed = UseHashCodeRandomizer
+        ? (uint)RandomNumberGenerator.GetInt32(int.MinValue, int.MaxValue)
+        : 2098026241U; // just a random prime number
+
+    [FeatureSwitchDefinition("Nethermind.Int256.UseHashCodeRandomizer")]
+    public static bool UseHashCodeRandomizer => AppContext.TryGetSwitch("Nethermind.Int256.UseHashCodeRandomizer", out var useHashCodeRandomizer) && useHashCodeRandomizer;
 
     public static readonly UInt256 Zero = 0ul;
     public static readonly UInt256 One = 1ul;
@@ -1396,7 +1403,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         // Very fast hardware accelerated non-cryptographic hash function
 
         // Start with instance random, length and first ulong as seed
-        uint hash = BitOperations.Crc32C(s_instanceRandom, u0);
+        uint hash = BitOperations.Crc32C(_hashSeed, u0);
 
         // Crc32C is 3 cycle latency, 1 cycle throughput
         // So we use same initial 3 times to not create a dependency chain
