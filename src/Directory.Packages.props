@@ -6,9 +6,9 @@
     <PackageVersion Include="BenchmarkDotNet" Version="0.15.8" />
     <PackageVersion Include="BenchmarkDotNet.Diagnostics.dotTrace" Version="0.15.8" />
     <PackageVersion Include="FluentAssertions" Version="[7.1.0]" />
-    <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="8.0.0" />
+    <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="10.0.102" />
     <PackageVersion Include="NUnit" Version="4.4.0" />
     <PackageVersion Include="NUnit.Analyzers" Version="4.11.2" />
-    <PackageVersion Include="NUnit3TestAdapter" Version="5.2.0" />
+    <PackageVersion Include="NUnit3TestAdapter" Version="6.1.0" />
   </ItemGroup>
 </Project>
