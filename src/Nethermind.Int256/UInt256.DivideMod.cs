@@ -1568,15 +1568,18 @@ public readonly partial struct UInt256
     [SkipLocalsInit]
     private static void Remainder512By256Bits(in UInt256 lo, in UInt256 hi, in UInt256 d, out UInt256 rem)
     {
+        Unsafe.SkipInit(out rem);
         ulong d0 = d.u0, d1 = d.u1, d2 = d.u2, d3 = d.u3;
 
         // Divisor length (1..4) and normalisation shift.
+        // Extract top non-zero limb so we call lzcnt once (avoids JIT store-reload artifact).
         int dLen;
-        int shift;
-        if (d3 != 0) { dLen = 4; shift = BitOperations.LeadingZeroCount(d3); }
-        else if (d2 != 0) { dLen = 3; shift = BitOperations.LeadingZeroCount(d2); }
-        else if (d1 != 0) { dLen = 2; shift = BitOperations.LeadingZeroCount(d1); }
-        else { dLen = 1; shift = BitOperations.LeadingZeroCount(d0); }
+        ulong dTop;
+        if (d3 != 0) { dLen = 4; dTop = d3; }
+        else if (d2 != 0) { dLen = 3; dTop = d2; }
+        else if (d1 != 0) { dLen = 2; dTop = d1; }
+        else { dLen = 1; dTop = d0; }
+        int shift = BitOperations.LeadingZeroCount(dTop);
 
         // Numerator limbs (u0 is least significant).
         ulong u0 = lo.u0, u1n = lo.u1, u2n = lo.u2, u3n = lo.u3;
@@ -1633,23 +1636,30 @@ public readonly partial struct UInt256
                     ulong reciprocal = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(dn);
 
                     // Long division by 1 word across the significant window only.
-                    ulong r = Unsafe.Add(ref un0, uLen); // un[uLen] is the top carry limb (0 if shift == 0).
-                    for (int j = uLen - 1; j >= 0; j--)
+                    // Use a descending ref pointer so the JIT keeps the base in a callee-saved
+                    // register instead of recomputing lea [rsp+offset] every iteration (div clobbers rax).
+                    ref ulong pCur = ref Unsafe.Add(ref un0, uLen);
+                    ulong r = pCur; // un[uLen] is the top carry limb (0 if shift == 0).
+                    for (int j = uLen; j > 0; j--)
                     {
+                        pCur = ref Unsafe.Subtract(ref pCur, 1);
                         if (X86Base.X64.IsSupported)
                         {
-                            (_, r) = X86Base.X64.DivRem(Unsafe.Add(ref un0, j), r, dn);
+                            (_, r) = X86Base.X64.DivRem(pCur, r, dn);
                         }
                         else
                         {
-                            _ = UDivRem2By1(r, reciprocal, dn, Unsafe.Add(ref un0, j), out r);
+                            _ = UDivRem2By1(r, reciprocal, dn, pCur, out r);
                         }
                     }
 
                     if (shift != 0)
                         r >>= shift;
 
-                    rem = new UInt256(r, 0, 0, 0);
+                    Unsafe.AsRef(in rem.u0) = r;
+                    Unsafe.AsRef(in rem.u1) = 0;
+                    Unsafe.AsRef(in rem.u2) = 0;
+                    Unsafe.AsRef(in rem.u3) = 0;
                     return;
                 }
 
@@ -1667,43 +1677,41 @@ public readonly partial struct UInt256
         }
 
         // Denormalise remainder from un[0..dLen-1].
+        // Write fields directly to avoid UInt256 constructor call overhead (not inlined by JIT).
         if (shift == 0)
         {
-            rem = dLen switch
-            {
-                2 => new UInt256(unBuf.w0, unBuf.w1, 0, 0),
-                3 => new UInt256(unBuf.w0, unBuf.w1, unBuf.w2, 0),
-                _ => new UInt256(unBuf.w0, unBuf.w1, unBuf.w2, unBuf.w3),
-            };
+            Unsafe.AsRef(in rem.u0) = unBuf.w0;
+            Unsafe.AsRef(in rem.u1) = unBuf.w1;
+            Unsafe.AsRef(in rem.u2) = dLen >= 3 ? unBuf.w2 : 0;
+            Unsafe.AsRef(in rem.u3) = dLen >= 4 ? unBuf.w3 : 0;
             return;
         }
         else
         {
             int rshift = 64 - shift;
 
+            Unsafe.AsRef(in rem.u0) = (unBuf.w0 >> shift) | (unBuf.w1 << rshift);
+
             if (dLen == 2)
             {
-                ulong r0 = (unBuf.w0 >> shift) | (unBuf.w1 << rshift);
-                ulong r1 = (unBuf.w1 >> shift);
-                rem = new UInt256(r0, r1, 0, 0);
+                Unsafe.AsRef(in rem.u1) = unBuf.w1 >> shift;
+                Unsafe.AsRef(in rem.u2) = 0;
+                Unsafe.AsRef(in rem.u3) = 0;
                 return;
             }
 
+            Unsafe.AsRef(in rem.u1) = (unBuf.w1 >> shift) | (unBuf.w2 << rshift);
+
             if (dLen == 3)
             {
-                ulong r0 = (unBuf.w0 >> shift) | (unBuf.w1 << rshift);
-                ulong r1 = (unBuf.w1 >> shift) | (unBuf.w2 << rshift);
-                ulong r2 = (unBuf.w2 >> shift);
-                rem = new UInt256(r0, r1, r2, 0);
+                Unsafe.AsRef(in rem.u2) = unBuf.w2 >> shift;
+                Unsafe.AsRef(in rem.u3) = 0;
                 return;
             }
 
             // dLen == 4
-            ulong rr0 = (unBuf.w0 >> shift) | (unBuf.w1 << rshift);
-            ulong rr1 = (unBuf.w1 >> shift) | (unBuf.w2 << rshift);
-            ulong rr2 = (unBuf.w2 >> shift) | (unBuf.w3 << rshift);
-            ulong rr3 = (unBuf.w3 >> shift);
-            rem = new UInt256(rr0, rr1, rr2, rr3);
+            Unsafe.AsRef(in rem.u2) = (unBuf.w2 >> shift) | (unBuf.w3 << rshift);
+            Unsafe.AsRef(in rem.u3) = unBuf.w3 >> shift;
         }
     }
 
