@@ -356,7 +356,14 @@ public readonly partial struct UInt256
             return;
         }
 
-        Remainder512By256Bits(in lo, in hi, in m, out res);
+        if (m.u3 != 0)
+        {
+            Remainder512By256Bits(in lo, in hi, in m, out res);
+        }
+        else
+        {
+            Remainder512By192Bits(in lo, in hi, in m, out res);
+        }
     }
 
     /// <summary>
@@ -1566,46 +1573,105 @@ public readonly partial struct UInt256
     }
 
     [SkipLocalsInit]
+    private static void Remainder512By192Bits(in UInt256 lo, in UInt256 hi, in UInt256 d, out UInt256 rem)
+    {
+        Debug.Assert(d.u3 == 0 && d.u2 != 0);
+        Debug.Assert(!hi.IsZero);
+
+        Unsafe.SkipInit(out rem);
+        ulong d0 = d.u0, d1 = d.u1, d2 = d.u2;
+
+        int shift = BitOperations.LeadingZeroCount(d2);
+
+        ulong u4 = hi.u0, u5 = hi.u1, u6 = hi.u2, u7 = hi.u3;
+        int uLen = u7 != 0 ? 8 : (u6 != 0 ? 7 : (u5 != 0 ? 6 : 5));
+
+        Unsafe.SkipInit(out ULong9 unBuf);
+        ulong nd0, nd1, nd2;
+
+        if (shift == 0)
+        {
+            unBuf.w0 = lo.u0; unBuf.w1 = lo.u1; unBuf.w2 = lo.u2; unBuf.w3 = lo.u3;
+            unBuf.w4 = u4; unBuf.w5 = u5; unBuf.w6 = u6; unBuf.w7 = u7;
+            unBuf.w8 = 0;
+            nd0 = d0; nd1 = d1; nd2 = d2;
+        }
+        else
+        {
+            ulong u0 = lo.u0, u1n = lo.u1, u2n = lo.u2, u3n = lo.u3;
+            int rshift = 64 - shift;
+            unBuf.w8 = u7 >> rshift;
+            unBuf.w7 = (u7 << shift) | (u6 >> rshift);
+            unBuf.w6 = (u6 << shift) | (u5 >> rshift);
+            unBuf.w5 = (u5 << shift) | (u4 >> rshift);
+            unBuf.w4 = (u4 << shift) | (u3n >> rshift);
+            unBuf.w3 = (u3n << shift) | (u2n >> rshift);
+            unBuf.w2 = (u2n << shift) | (u1n >> rshift);
+            unBuf.w1 = (u1n << shift) | (u0 >> rshift);
+            unBuf.w0 = u0 << shift;
+            nd0 = d0 << shift;
+            nd1 = (d1 << shift) | (d0 >> rshift);
+            nd2 = (d2 << shift) | (d1 >> rshift);
+        }
+
+        ref ulong un0 = ref unBuf.w0;
+        URemKnuth3(ref un0, uLen - 3, nd0, nd1, nd2);
+
+        ulong rw0 = unBuf.w0, rw1 = unBuf.w1, rw2 = unBuf.w2;
+
+        if (shift == 0)
+        {
+            Unsafe.AsRef(in rem.u0) = rw0;
+            Unsafe.AsRef(in rem.u1) = rw1;
+            Unsafe.AsRef(in rem.u2) = rw2;
+            Unsafe.AsRef(in rem.u3) = 0;
+        }
+        else
+        {
+            int rshift = 64 - shift;
+            Unsafe.AsRef(in rem.u0) = (rw0 >> shift) | (rw1 << rshift);
+            Unsafe.AsRef(in rem.u1) = (rw1 >> shift) | (rw2 << rshift);
+            Unsafe.AsRef(in rem.u2) = rw2 >> shift;
+            Unsafe.AsRef(in rem.u3) = 0;
+        }
+    }
+
+    [SkipLocalsInit]
     private static void Remainder512By256Bits(in UInt256 lo, in UInt256 hi, in UInt256 d, out UInt256 rem)
     {
+        Debug.Assert(d.u3 != 0);
+        Debug.Assert(!hi.IsZero);
+
         Unsafe.SkipInit(out rem);
         ulong d0 = d.u0, d1 = d.u1, d2 = d.u2, d3 = d.u3;
 
-        // Divisor length (1..4) and normalisation shift.
-        // Extract top non-zero limb so we call lzcnt once (avoids JIT store-reload artifact).
-        int dLen;
-        ulong dTop;
-        if (d3 != 0) { dLen = 4; dTop = d3; }
-        else if (d2 != 0) { dLen = 3; dTop = d2; }
-        else if (d1 != 0) { dLen = 2; dTop = d1; }
-        else { dLen = 1; dTop = d0; }
-        int shift = BitOperations.LeadingZeroCount(dTop);
+        // d.u3 != 0 guarantees a 4-limb divisor; shift on the top limb.
+        int shift = BitOperations.LeadingZeroCount(d3);
 
-        // Numerator limbs (u0 is least significant).
-        ulong u0 = lo.u0, u1n = lo.u1, u2n = lo.u2, u3n = lo.u3;
+        // Load hi limbs first; lo limbs are deferred to inside each branch to avoid
+        // intermediate register spills when registers are exhausted.
         ulong u4 = hi.u0, u5 = hi.u1, u6 = hi.u2, u7 = hi.u3;
 
         // In the slow path hi != 0, so uLen is always 5..8.
         int uLen = u7 != 0 ? 8 : (u6 != 0 ? 7 : (u5 != 0 ? 6 : 5));
 
-        // Normalise numerator into 9 limbs (always fully assigned - safe with SkipLocalsInit).
         Unsafe.SkipInit(out ULong9 unBuf);
-
-        // Normalise divisor digits too (compute all 4, slice by dLen logically).
-        ulong nd0, nd1, nd2v, nd3v;
+        ulong nd0, nd1, nd2, nd3;
 
         if (shift == 0)
         {
-            // un[0..7] = u[0..7], un[8] = 0
-            unBuf.w0 = u0; unBuf.w1 = u1n; unBuf.w2 = u2n; unBuf.w3 = u3n;
+            // Read lo directly from the in-parameter pointer into unBuf — no intermediate locals.
+            unBuf.w0 = lo.u0; unBuf.w1 = lo.u1; unBuf.w2 = lo.u2; unBuf.w3 = lo.u3;
             unBuf.w4 = u4; unBuf.w5 = u5; unBuf.w6 = u6; unBuf.w7 = u7;
             unBuf.w8 = 0;
 
-            nd0 = d0; nd1 = d1; nd2v = d2; nd3v = d3;
+            nd0 = d0; nd1 = d1; nd2 = d2; nd3 = d3;
         }
         else
         {
-            int rshift = 64 - shift; // 1..63
+            // Load lo into locals only here — needed for shift computation.
+            ulong u0 = lo.u0, u1n = lo.u1, u2n = lo.u2, u3n = lo.u3;
+            int rshift = 64 - shift;
 
             unBuf.w8 = u7 >> rshift;
             unBuf.w7 = (u7 << shift) | (u6 >> rshift);
@@ -1619,99 +1685,32 @@ public readonly partial struct UInt256
 
             nd0 = d0 << shift;
             nd1 = (d1 << shift) | (d0 >> rshift);
-            nd2v = (d2 << shift) | (d1 >> rshift);
-            nd3v = (d3 << shift) | (d2 >> rshift);
+            nd2 = (d2 << shift) | (d1 >> rshift);
+            nd3 = (d3 << shift) | (d2 >> rshift);
         }
 
         ref ulong un0 = ref unBuf.w0;
 
-        // Divide (remainder only). m = uLen - dLen, loop j = m..0.
-        int mQ = uLen - dLen;
+        // Always 4-limb divisor (d.u3 != 0).
+        URemKnuth4(ref un0, uLen - 4, nd0, nd1, nd2, nd3);
 
-        switch (dLen)
-        {
-            case 1:
-                {
-                    ulong dn = nd0; // normalised 1-limb divisor (MSB set unless original d was 0).
-                    ulong reciprocal = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(dn);
+        // Denormalise remainder from un[0..3].
+        ulong rw0 = unBuf.w0, rw1 = unBuf.w1, rw2 = unBuf.w2, rw3 = unBuf.w3;
 
-                    // Long division by 1 word across the significant window only.
-                    // Use a descending ref pointer so the JIT keeps the base in a callee-saved
-                    // register instead of recomputing lea [rsp+offset] every iteration (div clobbers rax).
-                    ref ulong pCur = ref Unsafe.Add(ref un0, uLen);
-                    ulong r = pCur; // un[uLen] is the top carry limb (0 if shift == 0).
-                    for (int j = uLen; j > 0; j--)
-                    {
-                        pCur = ref Unsafe.Subtract(ref pCur, 1);
-                        if (X86Base.X64.IsSupported)
-                        {
-                            (_, r) = X86Base.X64.DivRem(pCur, r, dn);
-                        }
-                        else
-                        {
-                            _ = UDivRem2By1(r, reciprocal, dn, pCur, out r);
-                        }
-                    }
-
-                    if (shift != 0)
-                        r >>= shift;
-
-                    Unsafe.AsRef(in rem.u0) = r;
-                    Unsafe.AsRef(in rem.u1) = 0;
-                    Unsafe.AsRef(in rem.u2) = 0;
-                    Unsafe.AsRef(in rem.u3) = 0;
-                    return;
-                }
-
-            case 2:
-                URemKnuth2(ref un0, mQ, nd0, nd1);
-                break;
-
-            case 3:
-                URemKnuth3(ref un0, mQ, nd0, nd1, nd2v);
-                break;
-
-            default: // 4
-                URemKnuth4(ref un0, mQ, nd0, nd1, nd2v, nd3v);
-                break;
-        }
-
-        // Denormalise remainder from un[0..dLen-1].
-        // Write fields directly to avoid UInt256 constructor call overhead (not inlined by JIT).
         if (shift == 0)
         {
-            Unsafe.AsRef(in rem.u0) = unBuf.w0;
-            Unsafe.AsRef(in rem.u1) = unBuf.w1;
-            Unsafe.AsRef(in rem.u2) = dLen >= 3 ? unBuf.w2 : 0;
-            Unsafe.AsRef(in rem.u3) = dLen >= 4 ? unBuf.w3 : 0;
-            return;
+            Unsafe.AsRef(in rem.u0) = rw0;
+            Unsafe.AsRef(in rem.u1) = rw1;
+            Unsafe.AsRef(in rem.u2) = rw2;
+            Unsafe.AsRef(in rem.u3) = rw3;
         }
         else
         {
             int rshift = 64 - shift;
-
-            Unsafe.AsRef(in rem.u0) = (unBuf.w0 >> shift) | (unBuf.w1 << rshift);
-
-            if (dLen == 2)
-            {
-                Unsafe.AsRef(in rem.u1) = unBuf.w1 >> shift;
-                Unsafe.AsRef(in rem.u2) = 0;
-                Unsafe.AsRef(in rem.u3) = 0;
-                return;
-            }
-
-            Unsafe.AsRef(in rem.u1) = (unBuf.w1 >> shift) | (unBuf.w2 << rshift);
-
-            if (dLen == 3)
-            {
-                Unsafe.AsRef(in rem.u2) = unBuf.w2 >> shift;
-                Unsafe.AsRef(in rem.u3) = 0;
-                return;
-            }
-
-            // dLen == 4
-            Unsafe.AsRef(in rem.u2) = (unBuf.w2 >> shift) | (unBuf.w3 << rshift);
-            Unsafe.AsRef(in rem.u3) = unBuf.w3 >> shift;
+            Unsafe.AsRef(in rem.u0) = (rw0 >> shift) | (rw1 << rshift);
+            Unsafe.AsRef(in rem.u1) = (rw1 >> shift) | (rw2 << rshift);
+            Unsafe.AsRef(in rem.u2) = (rw2 >> shift) | (rw3 << rshift);
+            Unsafe.AsRef(in rem.u3) = rw3 >> shift;
         }
     }
 
@@ -1919,6 +1918,7 @@ public readonly partial struct UInt256
     }
 
     [SkipLocalsInit]
+    [MethodImpl(MethodImplOptions.NoInlining)]
     private static void URemKnuth4(ref ulong un0, int m, ulong d0, ulong d1, ulong d2, ulong d3)
     {
         ulong reciprocal = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(d3);
