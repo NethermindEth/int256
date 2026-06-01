@@ -27,6 +27,24 @@ public static class BigIntegerExtensions
             throw new ArgumentException($"Target length should be 32 and is {target.Length}", nameof(target));
         }
 
+        // Try to write the unsigned, big-endian representation directly into the target without
+        // allocating an intermediate array. BigInteger.TryWriteBytes succeeds whenever the value
+        // fits in 32 bytes; otherwise we fall back to the slower allocating path that preserves the
+        // historical behaviour (including throwing for values that do not fit in 256 bits).
+        target.Clear();
+        if (value.TryWriteBytes(target, out int bytesWritten, isUnsigned: true, isBigEndian: true))
+        {
+            // TryWriteBytes left-aligns the written bytes; shift them to be right-aligned (big-endian
+            // with leading zero padding) when the value is narrower than 32 bytes.
+            if (bytesWritten < 32)
+            {
+                target.Slice(0, bytesWritten).CopyTo(target.Slice(32 - bytesWritten, bytesWritten));
+                target.Slice(0, 32 - bytesWritten).Clear();
+            }
+
+            return;
+        }
+
         ReadOnlySpan<byte> bytes = value.ToByteArray(true, true);
         if (bytes.Length > 32)
         {
