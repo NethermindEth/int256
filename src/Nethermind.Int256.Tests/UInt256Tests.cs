@@ -647,6 +647,55 @@ public class UInt256Tests : UInt256TestsTemplate<UInt256>
 {
     public UInt256Tests() : base((BigInteger x) => (UInt256)x, (int x) => (UInt256)x, x => x, TestNumbers.UInt256Max) { }
 
+    // PaddedBytes returns the big-endian, right-aligned, left-zero-padded representation of the
+    // value in a byte[n]: when n > 32 the leading bytes are zero, when n < 32 the most-significant
+    // bytes are truncated. These cases pin that behavior across the boundary.
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(8)]
+    [TestCase(20)]
+    [TestCase(31)]
+    [TestCase(32)]
+    [TestCase(33)]
+    [TestCase(64)]
+    public void PaddedBytes_Matches_BigEndian_RightAligned(int n)
+    {
+        BigInteger value = BigInteger.Parse("123456789012345678901234567890");
+        UInt256 v = (UInt256)value;
+
+        byte[] padded = v.PaddedBytes(n);
+        padded.Length.Should().Be(n);
+
+        // Expected: the low min(32, n) bytes of the 32-byte big-endian form, right-aligned, with
+        // the remaining leading bytes zero.
+        byte[] full = v.ToBigEndian(); // 32-byte big-endian
+        int copy = Math.Min(32, n);
+        byte[] expected = new byte[n];
+        full.AsSpan(32 - copy, copy).CopyTo(expected.AsSpan(n - copy, copy));
+
+        padded.Should().Equal(expected);
+    }
+
+    [Test]
+    public void PaddedBytes_Into_Span_WritesOnlyLowBytes_AndLeavesExtraLeadingBytesUntouched()
+    {
+        UInt256 v = (UInt256)0x0102030405060708UL;
+
+        // n > 32: only the low 32 bytes (the tail) are written; the extra leading bytes the span
+        // overload never touches keep their prior contents (caller owns any zeroing).
+        Span<byte> target = stackalloc byte[40];
+        target.Fill(0xAA);
+
+        v.PaddedBytes(target);
+
+        // The 8 leading bytes beyond the 32-byte word are untouched.
+        for (int i = 0; i < 8; i++) target[i].Should().Be(0xAA);
+        // The 32-byte word is written big-endian, right-aligned: high bytes zero, value in the tail.
+        for (int i = 8; i < 32; i++) target[i].Should().Be(0x00);
+        target[32].Should().Be(0x01);
+        target[39].Should().Be(0x08);
+    }
+
     [Test]
     public virtual void Zero_is_min_value()
     {
