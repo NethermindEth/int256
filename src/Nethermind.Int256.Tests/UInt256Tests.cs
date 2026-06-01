@@ -658,6 +658,8 @@ public class UInt256Tests : UInt256TestsTemplate<UInt256>
         new BigInteger(ulong.MaxValue),
         (BigInteger.One << 128) - 1,
         (BigInteger.One << 200) - 1,
+        BigInteger.One << 255,          // top bit set: BCL would grow to 33 bytes unsigned without the unsigned flag
+        (BigInteger.One << 255) - 1,    // unsigned-encoding boundary just below the top bit
         TestNumbers.UInt256Max,
     ];
 
@@ -669,11 +671,24 @@ public class UInt256Tests : UInt256TestsTemplate<UInt256>
         actual.Should().Be(value);
     }
 
-    [Test]
-    public void Cast_From_BigInteger_Throws_When_Over_256_Bits()
+    [TestCase(256)]   // 2^256: smallest 33-byte value
+    [TestCase(257)]   // 2^257
+    public void Cast_From_BigInteger_Throws_When_Over_256_Bits(int shift)
     {
-        Action act = () => { _ = (UInt256)(BigInteger.One << 256); };
-        act.Should().Throw<ArgumentOutOfRangeException>();
+        Action exact = () => { _ = (UInt256)(BigInteger.One << shift); };
+        exact.Should().Throw<ArgumentOutOfRangeException>();
+
+        Action plusOne = () => { _ = (UInt256)((BigInteger.One << shift) + 1); };
+        plusOne.Should().Throw<ArgumentOutOfRangeException>();
+    }
+
+    [Test]
+    public void Cast_From_Negative_BigInteger_Throws()
+    {
+        // BigInteger.TryWriteBytes(isUnsigned: true) rejects negative values, matching the
+        // legacy ToByteArray(true, true) path which also threw OverflowException.
+        Action act = () => { _ = (UInt256)BigInteger.MinusOne; };
+        act.Should().Throw<OverflowException>();
     }
 
     [TestCaseSource(nameof(CastRoundTripValues))]
