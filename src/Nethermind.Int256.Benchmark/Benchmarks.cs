@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Globalization;
 using System.Linq;
 using System.Numerics;
 using BenchmarkDotNet.Attributes;
@@ -19,8 +20,8 @@ namespace Nethermind.Int256.Benchmark;
 //[DotTraceDiagnoser]
 [HideColumns("Job", "RatioSD", "Error")]
 [SimpleJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 3)]
-//[NoAvx512Job(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 3)]
-//[NoAvx2Job(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 3, baseline: true)]
+[NoAvx512Job(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 3)]
+[NoAvx2Job(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 3)]
 public class UnsignedBenchmarkBase
 {
     public static IEnumerable<BigInteger> ValuesMinus3 { get; } = new[] { Numbers.UInt256Max - 3, Numbers.UInt192Max - 3, Numbers.UInt128Max - 3, Numbers.TwoTo64 - 3, BigInteger.One };
@@ -461,6 +462,75 @@ public class ExpModSigned : SignedBenchmarkBase
     }
 }
 
+[SimpleJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 5, invocationCount: 128)]
+public class ExpModTargeted
+{
+    public static TripleUInt256[] Values { get; } =
+    [
+        new TripleUInt256(5UL, 1UL, 97UL),
+        new TripleUInt256(123456789UL, 17UL, 18446744073709551557UL),
+        new TripleUInt256(
+            new UInt256(ulong.MaxValue, ulong.MaxValue, 0, 0),
+            new UInt256(ulong.MaxValue, 0, 0, 0),
+            new UInt256(ulong.MaxValue - 58, ulong.MaxValue, 0, 0)),
+        new TripleUInt256(
+            new UInt256(ulong.MaxValue, ulong.MaxValue, ulong.MaxValue, ulong.MaxValue),
+            new UInt256(ulong.MaxValue, ulong.MaxValue, 0, 0),
+            new UInt256(ulong.MaxValue - 58, ulong.MaxValue, ulong.MaxValue, 0)),
+    ];
+
+    [ParamsSource(nameof(Values))]
+    public TripleUInt256 Param;
+
+    [Benchmark(Baseline = true)]
+    public UInt256 ExpMod_WithFinalSquare()
+    {
+        UInt256 intermediate = UInt256.One;
+        UInt256 bs = Param.A;
+        int len = Param.B.BitLen;
+        for (int i = 0; i < len; i++)
+        {
+            if ((Param.B[i / 64] & (1UL << (i % 64))) != 0)
+            {
+                UInt256.MultiplyMod(intermediate, bs, Param.C, out intermediate);
+            }
+
+            UInt256.MultiplyMod(bs, bs, Param.C, out bs);
+        }
+
+        return intermediate;
+    }
+
+    [Benchmark]
+    public UInt256 ExpMod_UInt256()
+    {
+        UInt256.ExpMod(Param.A, Param.B, Param.C, out UInt256 res);
+        return res;
+    }
+}
+
+[SimpleJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 5, invocationCount: 256)]
+[NoIntrinsicsJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 5, invocationCount: 256)]
+public class MultiplyMod64Targeted
+{
+    public static TripleUInt256[] Values { get; } =
+    [
+        new TripleUInt256(new UInt256(ulong.MaxValue, ulong.MaxValue, 0, 0), 123456789UL, 18446744073709551557UL),
+        new TripleUInt256(new UInt256(ulong.MaxValue, ulong.MaxValue, 0, 0), new UInt256(ulong.MaxValue - 1, ulong.MaxValue, 0, 0), 18446744073709551557UL),
+        new TripleUInt256(new UInt256(ulong.MaxValue, ulong.MaxValue, ulong.MaxValue, 0), new UInt256(ulong.MaxValue - 1, ulong.MaxValue, ulong.MaxValue, 0), 9223372036854775783UL),
+    ];
+
+    [ParamsSource(nameof(Values))]
+    public TripleUInt256 Param;
+
+    [Benchmark]
+    public UInt256 MultiplyMod_UInt256()
+    {
+        UInt256.MultiplyMod(Param.A, Param.B, Param.C, out UInt256 res);
+        return res;
+    }
+}
+
 public class LeftShiftUnsigned : UnsignedIntTwoParamBenchmarkBase
 {
     [Benchmark(Baseline = true)]
@@ -542,6 +612,95 @@ public class IsZeroOne
     public bool IsOne()
     {
         return A.IsOne;
+    }
+}
+
+public abstract class ParseUnsignedBenchmarkBase
+{
+    public static string[] HexValues { get; } =
+    [
+        "0x0",
+        "0x1",
+        "0xffffffffffffffff",
+        "0xffffffffffffffffffffffffffffffff",
+        "0xffffffffffffffffffffffffffffffffffffffffffffffff",
+        "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    ];
+
+    public static string[] DecimalValues { get; } =
+    [
+        "0",
+        "1",
+        "18446744073709551615",
+        "340282366920938463463374607431768211455",
+        "6277101735386680763835789423207666416102355444464034512895",
+        "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+    ];
+
+    protected static UInt256 ParseBigIntegerHex(string value)
+    {
+        ReadOnlySpan<char> digits = value.AsSpan(2);
+        Span<char> positiveDigits = stackalloc char[digits.Length + 1];
+        positiveDigits[0] = '0';
+        digits.CopyTo(positiveDigits[1..]);
+        BigInteger parsed = BigInteger.Parse(positiveDigits, NumberStyles.HexNumber, CultureInfo.InvariantCulture);
+        return (UInt256)parsed;
+    }
+
+    protected static UInt256 ParseBigIntegerDecimal(string value)
+    {
+        BigInteger parsed = BigInteger.Parse(value, NumberStyles.Integer, CultureInfo.InvariantCulture);
+        return (UInt256)parsed;
+    }
+}
+
+[SimpleJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 1, iterationCount: 5, invocationCount: 256)]
+public class ParseHexUnsigned : ParseUnsignedBenchmarkBase
+{
+    [ParamsSource(nameof(HexValues))]
+    public string Value { get; set; } = null!;
+
+    [Benchmark(Baseline = true)]
+    public UInt256 Parse_BigInteger()
+    {
+        return ParseBigIntegerHex(Value);
+    }
+
+    [Benchmark]
+    public UInt256 Parse_UInt256()
+    {
+        return UInt256.Parse(Value);
+    }
+
+    [Benchmark]
+    public bool TryParse_UInt256()
+    {
+        return UInt256.TryParse(Value, out _);
+    }
+}
+
+[SimpleJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 1, iterationCount: 5, invocationCount: 256)]
+public class ParseDecimalUnsigned : ParseUnsignedBenchmarkBase
+{
+    [ParamsSource(nameof(DecimalValues))]
+    public string Value { get; set; } = null!;
+
+    [Benchmark(Baseline = true)]
+    public UInt256 Parse_BigInteger()
+    {
+        return ParseBigIntegerDecimal(Value);
+    }
+
+    [Benchmark]
+    public UInt256 Parse_UInt256()
+    {
+        return UInt256.Parse(Value);
+    }
+
+    [Benchmark]
+    public bool TryParse_UInt256()
+    {
+        return UInt256.TryParse(Value, out _);
     }
 }
 
