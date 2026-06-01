@@ -42,13 +42,31 @@ public readonly partial struct UInt256
     public byte[] PaddedBytes(int n)
     {
         byte[] b = new byte[n];
-
-        for (int i = 0; i < 32 && i < n; i++)
-        {
-            b[n - 1 - i] = (byte)(this[i / 8] >> (8 * (i % 8)));
-        }
-
+        PaddedBytes(b);
         return b;
+    }
+
+    /// <summary>
+    /// Writes the big-endian, right-aligned, left-zero-padded representation of this value into
+    /// <paramref name="target"/>. When the target is shorter than 32 bytes the most-significant
+    /// bytes are truncated; when it is longer the extra leading bytes are left untouched (the
+    /// caller is responsible for any required zeroing, e.g. via a freshly allocated array).
+    /// </summary>
+    public void PaddedBytes(Span<byte> target)
+    {
+        int n = target.Length;
+
+        // Produce the full 32-byte big-endian form once using block writes, then copy the low
+        // min(32, n) bytes into the right-aligned tail of the target. This avoids the per-byte
+        // limb-indexer + variable-shift loop the previous implementation used.
+        Span<byte> be = stackalloc byte[32];
+        BinaryPrimitives.WriteUInt64BigEndian(be.Slice(0, 8), u3);
+        BinaryPrimitives.WriteUInt64BigEndian(be.Slice(8, 8), u2);
+        BinaryPrimitives.WriteUInt64BigEndian(be.Slice(16, 8), u1);
+        BinaryPrimitives.WriteUInt64BigEndian(be.Slice(24, 8), u0);
+
+        int copy = Math.Min(32, n);
+        be.Slice(32 - copy, copy).CopyTo(target.Slice(n - copy, copy));
     }
 
     public byte[] ToBigEndian()
