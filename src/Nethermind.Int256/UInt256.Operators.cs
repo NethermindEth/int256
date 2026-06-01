@@ -86,7 +86,8 @@ public readonly partial struct UInt256
 
     public static explicit operator UInt256(in BigInteger value)
     {
-        byte[] bytes32 = value.ToBytes32(true);
+        Span<byte> bytes32 = stackalloc byte[32];
+        value.ToBytes32(bytes32, true);
         return new UInt256(bytes32, true);
     }
 

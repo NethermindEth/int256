@@ -647,6 +647,46 @@ public class UInt256Tests : UInt256TestsTemplate<UInt256>
 {
     public UInt256Tests() : base((BigInteger x) => (UInt256)x, (int x) => (UInt256)x, x => x, TestNumbers.UInt256Max) { }
 
+    // The (UInt256)BigInteger cast is allocation-free: it writes the value into a stackalloc
+    // span via BigInteger.TryWriteBytes instead of allocating intermediate byte[] arrays.
+    // These tests pin both the numeric result (right-aligned big-endian, all magnitudes) and
+    // the preserved overflow-throws-for-values-that-do-not-fit-in-256-bits behavior.
+    public static BigInteger[] CastRoundTripValues { get; } =
+    [
+        BigInteger.Zero,
+        BigInteger.One,
+        new BigInteger(ulong.MaxValue),
+        (BigInteger.One << 128) - 1,
+        (BigInteger.One << 200) - 1,
+        TestNumbers.UInt256Max,
+    ];
+
+    [TestCaseSource(nameof(CastRoundTripValues))]
+    public void Cast_From_BigInteger_RoundTrips(BigInteger value)
+    {
+        UInt256 cast = (UInt256)value;
+        cast.Convert(out BigInteger actual);
+        actual.Should().Be(value);
+    }
+
+    [Test]
+    public void Cast_From_BigInteger_Throws_When_Over_256_Bits()
+    {
+        Action act = () => { _ = (UInt256)(BigInteger.One << 256); };
+        act.Should().Throw<ArgumentOutOfRangeException>();
+    }
+
+    [TestCaseSource(nameof(CastRoundTripValues))]
+    public void ToBytes32_Produces_RightAligned_BigEndian(BigInteger value)
+    {
+        Span<byte> bytes = stackalloc byte[32];
+        value.ToBytes32(bytes, true);
+
+        // The bytes must reconstruct the original value as an unsigned big-endian 256-bit word.
+        BigInteger reconstructed = new(bytes, isUnsigned: true, isBigEndian: true);
+        reconstructed.Should().Be(value);
+    }
+
     [Test]
     public virtual void Zero_is_min_value()
     {
