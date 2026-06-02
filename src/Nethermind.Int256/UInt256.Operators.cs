@@ -183,7 +183,18 @@ public readonly partial struct UInt256
         return c;
     }
 
-    public static bool operator <(in UInt256 a, in UInt256 b) => LessThan(in a, in b);
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool operator <(in UInt256 a, in UInt256 b)
+    {
+        // Direct scalar high-to-low limb compare (the SIMD LessThan path was removed).
+        if (a.u3 != b.u3)
+            return a.u3 < b.u3;
+        if (a.u2 != b.u2)
+            return a.u2 < b.u2;
+        if (a.u1 != b.u1)
+            return a.u1 < b.u1;
+        return a.u0 < b.u0;
+    }
     public static bool operator <(in UInt256 a, int b) => LessThan(in a, b);
     public static bool operator <(int a, in UInt256 b) => LessThan(a, in b);
     public static bool operator <(in UInt256 a, uint b) => LessThan(in a, b);
@@ -192,7 +203,8 @@ public readonly partial struct UInt256
     public static bool operator <(long a, in UInt256 b) => LessThan(a, in b);
     public static bool operator <(in UInt256 a, ulong b) => LessThan(in a, b);
     public static bool operator <(ulong a, in UInt256 b) => LessThan(a, in b);
-    public static bool operator <=(in UInt256 a, in UInt256 b) => !LessThan(in b, in a);
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool operator <=(in UInt256 a, in UInt256 b) => !(b < a);
     public static bool operator <=(in UInt256 a, int b) => !LessThan(b, in a);
     public static bool operator <=(int a, in UInt256 b) => !LessThan(in b, a);
     public static bool operator <=(in UInt256 a, uint b) => !LessThan(b, in a);
@@ -201,7 +213,8 @@ public readonly partial struct UInt256
     public static bool operator <=(long a, in UInt256 b) => !LessThan(in b, a);
     public static bool operator <=(in UInt256 a, ulong b) => !LessThan(b, in a);
     public static bool operator <=(ulong a, UInt256 b) => !LessThan(in b, a);
-    public static bool operator >(in UInt256 a, in UInt256 b) => LessThan(in b, in a);
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool operator >(in UInt256 a, in UInt256 b) => b < a;
     public static bool operator >(in UInt256 a, int b) => LessThan(b, in a);
     public static bool operator >(int a, in UInt256 b) => LessThan(in b, a);
     public static bool operator >(in UInt256 a, uint b) => LessThan(b, in a);
@@ -210,7 +223,8 @@ public readonly partial struct UInt256
     public static bool operator >(long a, in UInt256 b) => LessThan(in b, a);
     public static bool operator >(in UInt256 a, ulong b) => LessThan(b, in a);
     public static bool operator >(ulong a, in UInt256 b) => LessThan(in b, a);
-    public static bool operator >=(in UInt256 a, in UInt256 b) => !LessThan(in a, in b);
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool operator >=(in UInt256 a, in UInt256 b) => !(a < b);
     public static bool operator >=(in UInt256 a, int b) => !LessThan(in a, b);
     public static bool operator >=(int a, in UInt256 b) => !LessThan(a, in b);
     public static bool operator >=(in UInt256 a, uint b) => !LessThan(in a, b);

@@ -1127,14 +1127,10 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool LessThan(in UInt256 a, in UInt256 b)
     {
-        if (!Avx2.IsSupported && !Vector256.IsHardwareAccelerated)
-        {
-            return LessThanScalar(in a, in b);
-        }
-
-        return Avx2.IsSupported ?
-            LessThanAvx2(in a, in b) :
-            LessThanVector256(in a, in b);
+        // Scalar high-to-low limb compare. Benchmarking showed it beats the AVX2/Vector256
+        // mask-based compare in the real production call shape, so the SIMD paths were removed.
+        // See PR description. LessThanScalar is retained because LessThanBoth still uses it.
+        return LessThanScalar(in a, in b);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1147,61 +1143,6 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         if (a.u1 != b.u1)
             return a.u1 < b.u1;
         return a.u0 < b.u0;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool LessThanAvx2(in UInt256 a, in UInt256 b)
-    {
-        // Load the four 64-bit words into a 256-bit register.
-        Vector256<ulong> vecL = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
-        Vector256<ulong> vecR = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
-
-        uint eqMask;
-        uint ltMask;
-        if (Avx512F.VL.IsSupported && Avx512DQ.IsSupported)
-        {
-            // Best case: AVX-512 compare produces k-mask; MoveMask uses KMOVB.
-            // Avx512DQ.MoveMask is documented as KMOVB r32,k1.
-            eqMask = (uint)Avx512DQ.MoveMask(Avx512F.VL.CompareEqual(vecL, vecR));     // VPCMPUQ + KMOVB
-            ltMask = (uint)Avx512DQ.MoveMask(Avx512F.VL.CompareLessThan(vecL, vecR));  // VPCMPUQ + KMOVB
-        }
-        else
-        {
-            // Equality mask - AVX2 compare -> movmskpd
-            eqMask = (uint)Avx.MoveMask(Avx2.CompareEqual(vecL, vecR).AsDouble());
-            // AVX2 unsigned-compare trick (flip sign bit, signed compare)
-            var signFlip = Vector256.Create(0x8000_0000_0000_0000UL);
-            Vector256<long> sL = Avx2.Xor(vecL, signFlip).AsInt64();
-            Vector256<long> sR = Avx2.Xor(vecR, signFlip).AsInt64();
-            ltMask = (uint)Avx.MoveMask(Avx2.CompareGreaterThan(sR, sL).AsDouble());
-        }
-
-        uint diff = eqMask ^ 0xFu;
-        if (diff == 0) return false;
-
-        // Slightly nicer than BitOperations.Log2 here:
-        // diff != 0 and diff <= 0xF => LZCNT in [28..31] => (31 - lzcnt) == (31 ^ lzcnt)
-        int idx = BitOperations.LeadingZeroCount(diff) ^ 31;
-        return ((ltMask >> idx) & 1u) != 0;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool LessThanVector256(in UInt256 a, in UInt256 b)
-    {
-        // Load the four 64-bit words into a 256-bit register.
-        Vector256<ulong> vecL = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
-        Vector256<ulong> vecR = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
-
-        uint eqMask = Vector256.ExtractMostSignificantBits(Vector256.Equals(vecL, vecR));
-        uint ltMask = Vector256.ExtractMostSignificantBits(Vector256.LessThan(vecL, vecR));
-
-        uint diff = eqMask ^ 0xFu;
-        if (diff == 0) return false;
-
-        // Slightly nicer than BitOperations.Log2 here:
-        // diff != 0 and diff <= 0xF => LZCNT in [28..31] => (31 - lzcnt) == (31 ^ lzcnt)
-        int idx = BitOperations.LeadingZeroCount(diff) ^ 31;
-        return ((ltMask >> idx) & 1u) != 0;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

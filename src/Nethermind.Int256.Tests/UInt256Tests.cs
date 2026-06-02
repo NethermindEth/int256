@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Numerics;
 using FluentAssertions;
@@ -646,6 +647,44 @@ public abstract class UInt256TestsTemplate<T> where T : IInteger<T>
 public class UInt256Tests : UInt256TestsTemplate<UInt256>
 {
     public UInt256Tests() : base((BigInteger x) => (UInt256)x, (int x) => (UInt256)x, x => x, TestNumbers.UInt256Max) { }
+
+    // operator< / LessThan are now scalar high-to-low limb compares (the AVX2/Vector256 mask
+    // paths were removed). These cases pin the decision at each limb position (the difference
+    // must be resolved by the most-significant differing limb), equality, and the derived
+    // operators (>, <=, >=) which are defined in terms of <.
+    public static IEnumerable<(BigInteger a, BigInteger b)> ComparePairs()
+    {
+        BigInteger two64 = BigInteger.One << 64;
+        BigInteger two128 = BigInteger.One << 128;
+        BigInteger two192 = BigInteger.One << 192;
+        BigInteger max = TestNumbers.UInt256Max;
+        yield return (BigInteger.Zero, BigInteger.Zero);                 // equal
+        yield return (max, max);                                        // equal at all-ones
+        yield return (BigInteger.Zero, BigInteger.One);                 // differ in u0
+        yield return (two64, two64 + 1);                                // differ in u0, equal u1
+        yield return (two64 - 1, two64);                                // u0 high vs u1 set: u1 decides
+        yield return (two128, two128 + (two64 - 1));                    // differ in u1, equal u2/u3
+        yield return (two128 - 1, two128);                              // u2 differs, lower limbs misleading
+        yield return (two192, two192 + (two128 - 1));                   // differ in u2, equal u3
+        yield return (two192 - 1, two192);                              // u3 differs, lower limbs all-ones
+        yield return (max - 1, max);                                    // differ only in u0 at the top
+    }
+
+    [TestCaseSource(nameof(ComparePairs))]
+    public void Comparison_ScalarLimbCompare_MatchesBigInteger((BigInteger a, BigInteger b) test)
+    {
+        UInt256 a = (UInt256)test.a;
+        UInt256 b = (UInt256)test.b;
+
+        (a < b).Should().Be(test.a < test.b);
+        (b < a).Should().Be(test.b < test.a);
+        (a > b).Should().Be(test.a > test.b);
+        (a <= b).Should().Be(test.a <= test.b);
+        (a >= b).Should().Be(test.a >= test.b);
+        // Reflexivity / antisymmetry sanity
+        (a < a).Should().BeFalse();
+        (a <= a).Should().BeTrue();
+    }
 
     [Test]
     public virtual void Zero_is_min_value()
