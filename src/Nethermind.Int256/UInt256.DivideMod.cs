@@ -401,7 +401,11 @@ public readonly partial struct UInt256
             {
                 MultiplyMod(intermediate, bs, m, out intermediate);
             }
-            MultiplyMod(bs, bs, m, out bs);
+
+            if (i != len - 1)
+            {
+                MultiplyMod(bs, bs, m, out bs);
+            }
         }
 
         result = intermediate;
@@ -1145,6 +1149,10 @@ public readonly partial struct UInt256
             return;
         }
 
+        int shift = BitOperations.LeadingZeroCount(mod);
+        ulong dn = mod << shift;
+        ulong reciprocal = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(dn);
+
         // Fast reduce x if it is already 64-bit.
         ulong xr;
         if ((x.u1 | x.u2 | x.u3) == 0)
@@ -1154,9 +1162,6 @@ public readonly partial struct UInt256
         }
         else
         {
-            int shift = BitOperations.LeadingZeroCount(mod);
-            ulong dn = mod << shift;
-            ulong reciprocal = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(dn);
             xr = X86Base.X64.IsSupported
                 ? Remainder256By64BitsX86Base(in x, dn, shift)
                 : Remainder256By64Bits(in x, dn, reciprocal, shift);
@@ -1169,11 +1174,7 @@ public readonly partial struct UInt256
             return;
         }
 
-        // Now reduce y similarly - but avoid recomputing shift/dn if we took the slow path.
-        int sh = BitOperations.LeadingZeroCount(mod);
-        ulong dnn = mod << sh;
-        ulong rec = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(dnn);
-
+        // Now reduce y with the same normalized modulus.
         ulong yr;
         if ((y.u1 | y.u2 | y.u3) == 0)
         {
@@ -1183,8 +1184,8 @@ public readonly partial struct UInt256
         else
         {
             yr = X86Base.X64.IsSupported
-                ? Remainder256By64BitsX86Base(in y, dnn, sh)
-                : Remainder256By64Bits(in y, dnn, rec, sh);
+                ? Remainder256By64BitsX86Base(in y, dn, shift)
+                : Remainder256By64Bits(in y, dn, reciprocal, shift);
         }
 
         if (x.IsOne)
@@ -1195,8 +1196,8 @@ public readonly partial struct UInt256
 
         ulong ph = Multiply64(xr, yr, out ulong pl);
         ulong r = X86Base.X64.IsSupported
-            ? Remainder128By64BitsX86Base(ph, pl, dnn, sh)
-            : Remainder128By64Bits(ph, pl, dnn, rec, sh);
+            ? Remainder128By64BitsX86Base(ph, pl, dn, shift)
+            : Remainder128By64Bits(ph, pl, dn, reciprocal, shift);
 
         res = new UInt256(r, 0, 0, 0);
     }
