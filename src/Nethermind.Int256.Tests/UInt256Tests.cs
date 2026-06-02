@@ -702,6 +702,71 @@ public class UInt256Tests : UInt256TestsTemplate<UInt256>
         reconstructed.Should().Be(value);
     }
 
+    // PaddedBytes returns the big-endian, right-aligned, left-zero-padded representation of the
+    // value in a byte[n]: when n > 32 the leading bytes are zero, when n < 32 the most-significant
+    // bytes are truncated. These cases pin that behavior across the boundary, exercising the
+    // all-ones top limb (MaxValue), all-zeros (Zero), and a mixed mid-sized value.
+    public static BigInteger[] PaddedBytesValues { get; } =
+    [
+        BigInteger.Zero,
+        BigInteger.Parse("123456789012345678901234567890"),
+        TestNumbers.UInt256Max,
+    ];
+
+    [Test]
+    public void PaddedBytes_Matches_BigEndian_RightAligned(
+        [ValueSource(nameof(PaddedBytesValues))] BigInteger value,
+        [Values(0, 1, 8, 20, 31, 32, 33, 64)] int n)
+    {
+        UInt256 v = (UInt256)value;
+
+        byte[] padded = v.PaddedBytes(n);
+        padded.Length.Should().Be(n);
+
+        // Expected: the low min(32, n) bytes of the 32-byte big-endian form, right-aligned, with
+        // the remaining leading bytes zero.
+        byte[] full = v.ToBigEndian(); // 32-byte big-endian
+        int copy = Math.Min(32, n);
+        byte[] expected = new byte[n];
+        full.AsSpan(32 - copy, copy).CopyTo(expected.AsSpan(n - copy, copy));
+
+        padded.Should().Equal(expected);
+    }
+
+    [Test]
+    public void PaddedBytes_Into_Span_ZeroesLeadingBytes_When_Longer_Than_Word()
+    {
+        UInt256 v = (UInt256)0x0102030405060708UL;
+
+        // n > 32: the whole span is written. The leading bytes beyond the 32-byte word are zeroed
+        // (parity with the array overload), and the prior buffer contents are overwritten.
+        Span<byte> target = stackalloc byte[40];
+        target.Fill(0xAA);
+
+        v.PaddedBytes(target);
+
+        for (int i = 0; i < 32; i++) target[i].Should().Be(0x00);
+        target[32].Should().Be(0x01);
+        target[39].Should().Be(0x08);
+    }
+
+    [Test]
+    public void PaddedBytes_Into_Span_Truncates_And_RightAligns_When_Shorter_Than_Word()
+    {
+        UInt256 v = (UInt256)0x0102030405060708UL;
+
+        // n < 32: only the low n bytes are emitted, right-aligned; the high bytes of the value are
+        // truncated and the whole (pre-filled) buffer is overwritten.
+        Span<byte> target = stackalloc byte[6];
+        target.Fill(0xAA);
+
+        v.PaddedBytes(target);
+
+        // Low 6 bytes of the big-endian value: 03 04 05 06 07 08 (the 01 02 are truncated).
+        byte[] expected = { 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 };
+        target.ToArray().Should().Equal(expected);
+    }
+
     [Test]
     public virtual void Zero_is_min_value()
     {

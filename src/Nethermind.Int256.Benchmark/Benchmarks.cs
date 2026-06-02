@@ -750,6 +750,24 @@ public class DecimalParseAllocation
     }
 }
 
+[MemoryDiagnoser]
+[SimpleJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 5, invocationCount: 256)]
+[NoIntrinsicsJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 5, invocationCount: 256)]
+public class PaddedBytesUnsigned
+{
+    public static UInt256 Value { get; } = UInt256.MaxValue;
+
+    // Common pad widths: 20 = address, 32 = EVM word, 33/64 = left-padded wider forms.
+    [Params(20, 32, 33, 64)]
+    public int N;
+
+    [Benchmark]
+    public byte[] PaddedBytes_UInt256()
+    {
+        return Value.PaddedBytes(N);
+    }
+}
+
 public readonly record struct DoubleUInt256(UInt256 A, UInt256 B)
 {
     public override readonly string ToString() => $"{A.BitLen} bits / {B.BitLen} bits";

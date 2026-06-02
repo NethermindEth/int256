@@ -39,16 +39,49 @@ public readonly partial struct UInt256
     public ushort ToUInt16(IFormatProvider? provider) => System.Convert.ToUInt16(ToDecimal(provider), provider);
     public uint ToUInt32(IFormatProvider? provider) => System.Convert.ToUInt32(ToDecimal(provider), provider);
     public ulong ToUInt64(IFormatProvider? provider) => System.Convert.ToUInt64(ToDecimal(provider), provider);
+    /// <summary>
+    /// Returns a new <paramref name="n"/>-byte array holding the big-endian, right-aligned,
+    /// left-zero-padded representation of this value. When <paramref name="n"/> is shorter than 32
+    /// the most-significant bytes are truncated; when it is longer the extra leading bytes are zero.
+    /// </summary>
+    /// <param name="n">The length of the returned array, in bytes.</param>
+    /// <returns>A freshly allocated <paramref name="n"/>-byte big-endian representation.</returns>
     public byte[] PaddedBytes(int n)
     {
         byte[] b = new byte[n];
+        PaddedBytes(b);
+        return b;
+    }
 
-        for (int i = 0; i < 32 && i < n; i++)
+    /// <summary>
+    /// Writes the big-endian, right-aligned, left-zero-padded representation of this value into
+    /// <paramref name="target"/>, filling the entire span. When the target is shorter than 32 bytes
+    /// the most-significant bytes are truncated; when it is longer the extra leading bytes are
+    /// zeroed, matching the <see cref="PaddedBytes(int)"/> array overload.
+    /// </summary>
+    /// <param name="target">The destination span; fully overwritten.</param>
+    public void PaddedBytes(Span<byte> target)
+    {
+        int n = target.Length;
+
+        // Produce the full 32-byte big-endian form once using block writes, then copy the low
+        // min(32, n) bytes into the right-aligned tail of the target. This avoids the per-byte
+        // limb-indexer + variable-shift loop the previous implementation used.
+        Span<byte> be = stackalloc byte[32];
+        BinaryPrimitives.WriteUInt64BigEndian(be.Slice(0, 8), u3);
+        BinaryPrimitives.WriteUInt64BigEndian(be.Slice(8, 8), u2);
+        BinaryPrimitives.WriteUInt64BigEndian(be.Slice(16, 8), u1);
+        BinaryPrimitives.WriteUInt64BigEndian(be.Slice(24, 8), u0);
+
+        int copy = Math.Min(32, n);
+        // Zero any leading bytes beyond the 32-byte word for parity with the array overload (the
+        // array overload's bytes are already zero, so the JIT elides this there).
+        if (n > copy)
         {
-            b[n - 1 - i] = (byte)(this[i / 8] >> (8 * (i % 8)));
+            target.Slice(0, n - copy).Clear();
         }
 
-        return b;
+        be.Slice(32 - copy, copy).CopyTo(target.Slice(n - copy, copy));
     }
 
     public byte[] ToBigEndian()
