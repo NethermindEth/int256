@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Numerics;
 using FluentAssertions;
@@ -646,6 +647,42 @@ public abstract class UInt256TestsTemplate<T> where T : IInteger<T>
 public class UInt256Tests : UInt256TestsTemplate<UInt256>
 {
     public UInt256Tests() : base((BigInteger x) => (UInt256)x, (int x) => (UInt256)x, x => x, TestNumbers.UInt256Max) { }
+
+    // AddOverflow is now scalar-only (the AVX2/Vector256 carry-cascade paths were removed).
+    // These cases pin the carry propagation across every limb boundary and the cascade case
+    // (all-ones lower limbs) that the removed SIMD path handled via the broadcast lookup table.
+    public static IEnumerable<(BigInteger a, BigInteger b, bool overflow)> AddCarryCases()
+    {
+        BigInteger two64 = BigInteger.One << 64;
+        BigInteger two128 = BigInteger.One << 128;
+        BigInteger two192 = BigInteger.One << 192;
+        BigInteger max = TestNumbers.UInt256Max;
+        yield return (BigInteger.Zero, BigInteger.Zero, false);
+        yield return (two64 - 1, BigInteger.One, false);                 // carry u0 -> u1
+        yield return (two128 - 1, BigInteger.One, false);                // carry u0->u1->u2 cascade
+        yield return (two192 - 1, BigInteger.One, false);                // carry through u0,u1,u2 -> u3
+        yield return (max, BigInteger.One, true);                        // full cascade, overflow out of u3
+        yield return (max, max, true);                                   // max + max
+        yield return (two64 - 1, two64 - 1, false);                      // no cross-limb carry past u1
+        yield return (max - 1, BigInteger.One, false);                   // lands exactly on max, no overflow
+    }
+
+    [TestCaseSource(nameof(AddCarryCases))]
+    public void AddOverflow_ScalarCarryPropagation((BigInteger a, BigInteger b, bool overflow) test)
+    {
+        UInt256 a = (UInt256)test.a;
+        UInt256 b = (UInt256)test.b;
+
+        bool overflow = UInt256.AddOverflow(a, b, out UInt256 res);
+        res.Convert(out BigInteger actual);
+
+        actual.Should().Be((test.a + test.b) % (BigInteger.One << 256));
+        overflow.Should().Be(test.overflow);
+
+        // Add (wrapping) must match the low 256 bits regardless of overflow.
+        UInt256.Add(a, b, out UInt256 wrapped);
+        wrapped.Should().Be(res);
+    }
 
     [Test]
     public virtual void Zero_is_min_value()

@@ -136,16 +136,13 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool AddOverflow(in UInt256 a, in UInt256 b, out UInt256 res)
     {
-        if (!Avx2.IsSupported && !Vector256.IsHardwareAccelerated)
-        {
-            return AddScalar(in a, in b, out res);
-        }
-
-        return Avx2.IsSupported ?
-            AddAvx2(in a, in b, out res) :
-            AddVector256(in a, in b, out res);
+        // Scalar carry propagation. Benchmarking showed the 4-limb scalar add (with the
+        // small-operand fast path below) beats the Vector256/AVX2 carry-cascade approach in the
+        // real production call shape, so the SIMD paths were removed. See PR description.
+        return AddScalar(in a, in b, out res);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool AddScalar(in UInt256 a, in UInt256 b, out UInt256 res)
     {
         ulong a0 = a.u0;
@@ -172,92 +169,6 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         AddWithCarry(a.u3, b.u3, ref c, out ulong r3);
         res = new UInt256(r0, r1, r2, r3);
         return c != 0;
-    }
-
-    private static bool AddAvx2(in UInt256 a, in UInt256 b, out UInt256 res)
-    {
-        Vector256<ulong> av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
-        Vector256<ulong> bv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
-
-        Vector256<ulong> result = Avx2.Add(av, bv);
-        Vector256<ulong> vCarry;
-        if (Avx512F.VL.IsSupported)
-        {
-            vCarry = Avx512F.VL.CompareLessThan(result, av);
-        }
-        else
-        {
-            // Work around for missing Vector256.CompareLessThan
-            Vector256<ulong> carryFromBothHighBits = Avx2.And(av, bv);
-            Vector256<ulong> eitherHighBit = Avx2.Or(av, bv);
-            Vector256<ulong> highBitNotInResult = Avx2.AndNot(result, eitherHighBit);
-
-            // Set high bits where carry occurs
-            vCarry = Avx2.Or(carryFromBothHighBits, highBitNotInResult);
-        }
-        // Move carry from Vector space to uint
-        uint carry = (uint)(Avx512DQ.IsSupported ?
-            Avx512DQ.MoveMask(vCarry) :
-            Avx.MoveMask(vCarry.AsDouble()));
-
-        // All bits set will cascade another carry when carry is added to it
-        Vector256<ulong> vCascade = Avx2.CompareEqual(result, Vector256<ulong>.AllBitsSet);
-        // Move cascade from Vector space to uint
-        uint cascade = (uint)(Avx512DQ.IsSupported ?
-            Avx512DQ.MoveMask(vCascade) :
-            Avx.MoveMask(Unsafe.As<Vector256<ulong>, Vector256<double>>(ref vCascade)));
-
-        // Use ints to work out the Vector cross lane cascades
-        // Move carry to next bit and add cascade
-        carry = cascade + 2 * carry; // lea
-        // Remove cascades not affected by carry
-        cascade ^= carry;
-        // Choice of 16 vectors
-        cascade &= 0x0f;
-
-        // Lookup the carries to broadcast to the Vectors
-        Vector256<ulong> cascadedCarries = Unsafe.Add(ref Unsafe.As<byte, Vector256<ulong>>(ref MemoryMarshal.GetReference(BroadcastLookup)), cascade);
-
-        // Mark res as initialized so we can use it as left side of ref assignment
-        Unsafe.SkipInit(out res);
-        // Add the cascadedCarries to the result
-        Unsafe.As<UInt256, Vector256<ulong>>(ref res) = Avx2.Add(result, cascadedCarries);
-
-        return (carry & 0b1_0000) != 0;
-    }
-
-    private static bool AddVector256(in UInt256 a, in UInt256 b, out UInt256 res)
-    {
-        Vector256<ulong> av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
-        Vector256<ulong> bv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
-
-        Vector256<ulong> result = Vector256.Add(av, bv);
-        Vector256<ulong> vCarry = Vector256.LessThan(result, av);
-
-        uint carry = Vector256.ExtractMostSignificantBits(vCarry);
-
-        // All bits set will cascade another carry when carry is added to it
-        Vector256<ulong> vCascade = Vector256.Equals(result, Vector256<ulong>.AllBitsSet);
-        // Move cascade from Vector space to uint
-        uint cascade = Vector256.ExtractMostSignificantBits(vCascade);
-
-        // Use ints to work out the Vector cross lane cascades
-        // Move carry to next bit and add cascade
-        carry = cascade + 2 * carry; // lea
-        // Remove cascades not affected by carry
-        cascade ^= carry;
-        // Choice of 16 vectors
-        cascade &= 0x0f;
-
-        // Lookup the carries to broadcast to the Vectors
-        Vector256<ulong> cascadedCarries = Unsafe.Add(ref Unsafe.As<byte, Vector256<ulong>>(ref MemoryMarshal.GetReference(BroadcastLookup)), cascade);
-
-        // Mark res as initialized so we can use it as left side of ref assignment
-        Unsafe.SkipInit(out res);
-        // Add the cascadedCarries to the result
-        Unsafe.As<UInt256, Vector256<ulong>>(ref res) = Vector256.Add(result, cascadedCarries);
-
-        return (carry & 0b1_0000) != 0;
     }
 
     /// <summary>
