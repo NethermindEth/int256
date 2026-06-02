@@ -751,6 +751,69 @@ public class UInt256Tests : UInt256TestsTemplate<UInt256>
         Assert.That((UInt256)bigIntWith66Zeroes, Is.EqualTo(UintParsedValue));
     }
 
+    public static TestCaseData[] ParseTestCases { get; } =
+    [
+        new TestCaseData("0", BigInteger.Zero),
+        new TestCaseData("+1", BigInteger.One),
+        new TestCaseData(" 18446744073709551615 ", new BigInteger(ulong.MaxValue)),
+        new TestCaseData("0x0", BigInteger.Zero),
+        new TestCaseData("0x" + new string('0', 66), BigInteger.Zero),
+        new TestCaseData("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", TestNumbers.UInt256Max),
+        new TestCaseData("115792089237316195423570985008687907853269984665640564039457584007913129639935", TestNumbers.UInt256Max),
+    ];
+
+    [TestCaseSource(nameof(ParseTestCases))]
+    public void TryParse_ReturnsExpectedValue(string value, BigInteger expected)
+    {
+        UInt256.TryParse(value, out UInt256 parsed).Should().BeTrue();
+
+        parsed.Convert(out BigInteger actual);
+        actual.Should().Be(expected);
+    }
+
+    [TestCase("")]
+    [TestCase("0x")]
+    [TestCase("-1")]
+    [TestCase("0x1g")]
+    [TestCase("115792089237316195423570985008687907853269984665640564039457584007913129639936")]
+    public void TryParse_ReturnsFalseForInvalidValues(string value)
+    {
+        UInt256.TryParse(value, out UInt256 parsed).Should().BeFalse();
+        parsed.Should().Be(UInt256.Zero);
+    }
+
+    // The direct (non-BigInteger) parsing path introduced on this branch changed behavior for a
+    // few inputs relative to the previous BigInteger round-trip. These tests pin the new behavior
+    // so the intent is explicit and any future change is deliberate. See the PR open questions.
+
+    // "0x0" is a valid zero, but a bare "0x" prefix with no digits is rejected. The old
+    // BigInteger path returned 0 for "0x"; the new path requires at least one digit.
+    [TestCase("0x0", true, 0u)]
+    [TestCase("0x00", true, 0u)]
+    [TestCase("0x", false, 0u)]
+    public void TryParse_BarePrefixVsZero(string value, bool expectedSuccess, uint expectedValue)
+    {
+        UInt256.TryParse(value, out UInt256 parsed).Should().Be(expectedSuccess);
+        if (expectedSuccess)
+        {
+            parsed.Should().Be((UInt256)expectedValue);
+        }
+    }
+
+    // Whitespace immediately after the "0x" prefix is now tolerated (trimmed), whereas the old
+    // BigInteger path rejected it. Internal whitespace between digits is still rejected.
+    [TestCase("0x ff", true, 255u)]
+    [TestCase("0xff ", true, 255u)]
+    [TestCase("0x f f", false, 0u)]
+    public void TryParse_HexWhitespaceHandling(string value, bool expectedSuccess, uint expectedValue)
+    {
+        UInt256.TryParse(value, out UInt256 parsed).Should().Be(expectedSuccess);
+        if (expectedSuccess)
+        {
+            parsed.Should().Be((UInt256)expectedValue);
+        }
+    }
+
     [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
     public void ComparisonOperators((BigInteger A, BigInteger B) test)
     {
