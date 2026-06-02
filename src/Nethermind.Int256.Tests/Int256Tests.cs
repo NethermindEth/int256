@@ -85,4 +85,57 @@ public class Int256Tests : UInt256TestsTemplate<Int256>
         }
         catch (Exception e) when (e.GetType() == expectedException) { }
     }
+
+    // The accessors that gained AggressiveInlining hints (Sign, IsZero, IsOne, CompareTo, <, >)
+    // are behaviorally unchanged. These cases pin their results across the sign boundary so the
+    // inlining change is locked in as a no-op on semantics.
+    public static (string value, int sign, bool isZero, bool isOne)[] SignAccessorCases { get; } =
+    [
+        ("0", 0, true, false),
+        ("1", 1, false, true),
+        ("-1", -1, false, false),
+        ("12345678901234567890", 1, false, false),
+        ("-12345678901234567890", -1, false, false),
+        ("57896044618658097711785492504343953926634992332820282019728792003956564819967", 1, false, false),   // Int256.Max
+        ("-57896044618658097711785492504343953926634992332820282019728792003956564819968", -1, false, false),  // Int256.Min
+    ];
+
+    [TestCaseSource(nameof(SignAccessorCases))]
+    public void SignZeroOne_Accessors((string value, int sign, bool isZero, bool isOne) test)
+    {
+        Int256 v = (Int256)BigInteger.Parse(test.value);
+        v.Sign.Should().Be(test.sign);
+        v.IsZero.Should().Be(test.isZero);
+        v.IsOne.Should().Be(test.isOne);
+        v.IsNegative.Should().Be(test.sign < 0);
+    }
+
+    public static (string a, string b)[] SignedComparePairs { get; } =
+    [
+        ("0", "0"),
+        ("-1", "1"),            // negative < positive
+        ("1", "-1"),
+        ("-2", "-1"),           // both negative: -2 < -1
+        ("-1", "-2"),
+        ("5", "5"),
+        ("-12345678901234567890", "12345678901234567890"),
+        ("57896044618658097711785492504343953926634992332820282019728792003956564819967",
+         "-57896044618658097711785492504343953926634992332820282019728792003956564819968"),   // Max vs Min
+    ];
+
+    [TestCaseSource(nameof(SignedComparePairs))]
+    public void Compare_And_Operators_MatchBigInteger((string a, string b) test)
+    {
+        BigInteger ba = BigInteger.Parse(test.a);
+        BigInteger bb = BigInteger.Parse(test.b);
+        Int256 a = (Int256)ba;
+        Int256 b = (Int256)bb;
+
+        (a < b).Should().Be(ba < bb);
+        (a > b).Should().Be(ba > bb);
+        Math.Sign(a.CompareTo(b)).Should().Be(ba.CompareTo(bb));
+        Math.Sign(a.CompareTo((object)b)).Should().Be(ba.CompareTo(bb));
+        (a < a).Should().BeFalse();
+        a.CompareTo(a).Should().Be(0);
+    }
 }

@@ -62,7 +62,11 @@ public readonly struct Int256 : IEquatable<Int256>, IComparable, IComparable<Int
 
     public Int256 ZeroValue => Zero;
 
-    public int Sign => _value.IsZero ? 0 : _value.u3 < 0x8000000000000000ul ? 1 : -1;
+    public int Sign
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => _value.IsZero ? 0 : _value.u3 < 0x8000000000000000ul ? 1 : -1;
+    }
     public bool IsNegative => Sign < 0;
 
     public static Int256 operator +(in Int256 a, in Int256 b)
@@ -536,21 +540,32 @@ public readonly struct Int256 : IEquatable<Int256>, IComparable, IComparable<Int
 
     public static bool operator !=(in Int256 a, in Int256 b) => !(a == b);
 
-    public bool IsZero => this == Zero;
+    public bool IsZero
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => this == Zero;
+    }
 
-    public bool IsOne => this == One;
+    public bool IsOne
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => this == One;
+    }
 
     public Int256 MaximalValue => Max;
 
     public int CompareTo(object? obj) => obj is not Int256 int256 ? throw new InvalidOperationException() : CompareTo(int256);
-    
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public int CompareTo(Int256 b) => CompareTo(in b);
 
     [OverloadResolutionPriority(1)]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public int CompareTo(in Int256 b) => this < b ? -1 : Equals(b) ? 0 : 1;
 
     public static explicit operator UInt256(Int256 z) => z._value;
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool operator <(in Int256 z, in Int256 x)
     {
         int zSign = z.Sign;
@@ -570,6 +585,7 @@ public readonly struct Int256 : IEquatable<Int256>, IComparable, IComparable<Int
 
         return z._value < x._value;
     }
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool operator >(in Int256 z, in Int256 x) => x < z;
 
     public static explicit operator Int256(ulong value) => new((UInt256)value);
