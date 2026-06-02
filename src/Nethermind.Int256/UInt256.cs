@@ -313,70 +313,26 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     }
 
     // Subtract sets res to the difference a-b
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void Subtract(in UInt256 a, in UInt256 b, out UInt256 res)
     {
         SubtractImpl(in a, in b, out res);
     }
 
-    // Subtract sets res to the difference a-b
+    // Subtract sets res to the difference a-b.
+    // Scalar borrow propagation. Benchmarking showed the 4-limb scalar subtract beats the
+    // Avx2 borrow-cascade approach in the real production call shape, so the SIMD path was
+    // removed. See PR description.
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool SubtractImpl(in UInt256 a, in UInt256 b, out UInt256 res)
     {
-        if (Avx2.IsSupported)
-        {
-            Vector256<ulong> av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
-            Vector256<ulong> bv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
-
-            Vector256<ulong> result = Avx2.Subtract(av, bv);
-            Vector256<ulong> vBorrow;
-            if (Avx512F.VL.IsSupported)
-            {
-                vBorrow = Avx512F.VL.CompareGreaterThan(result, av);
-            }
-            else
-            {
-                // Invert top bits as Avx2.CompareGreaterThan is only available for longs, not unsigned
-                Vector256<ulong> signFlip = Vector256.Create(0x8000_0000_0000_0000UL);
-                Vector256<ulong> resultSigned = Avx2.Xor(result, signFlip);
-                Vector256<ulong> avSigned = Avx2.Xor(av, signFlip);
-
-                // Which vectors need to borrow from the next
-                vBorrow = Avx2.CompareGreaterThan(resultSigned.AsInt64(), avSigned.AsInt64()).AsUInt64();
-            }
-            // Move borrow from Vector space to int
-            int borrow = Avx.MoveMask(vBorrow.AsDouble());
-
-            // All zeros will cascade another borrow when borrow is subtracted from it
-            Vector256<ulong> vCascade = Avx2.CompareEqual(result, Vector256<ulong>.Zero);
-            // Move cascade from Vector space to int
-            int cascade = Avx.MoveMask(vCascade.AsDouble());
-
-            // Use ints to work out the Vector cross lane cascades
-            // Move borrow to next bit and add cascade
-            borrow = cascade + 2 * borrow; // lea
-            // Remove cascades not effected by borrow
-            cascade ^= borrow;
-            // Choice of 16 vectors
-            cascade &= 0x0f;
-
-            // Lookup the borrows to broadcast to the Vectors
-            Vector256<ulong> cascadedBorrows = Unsafe.Add(ref Unsafe.As<byte, Vector256<ulong>>(ref MemoryMarshal.GetReference(BroadcastLookup)), cascade);
-
-            // Mark res as initialized so we can use it as left said of ref assignment
-            Unsafe.SkipInit(out res);
-            // Subtract the cascadedBorrows from the result
-            Unsafe.As<UInt256, Vector256<ulong>>(ref res) = Avx2.Subtract(result, cascadedBorrows);
-            return (borrow & 0b1_0000) != 0;
-        }
-        else
-        {
-            ulong borrow = 0ul;
-            SubtractWithBorrow(a.u0, b.u0, ref borrow, out ulong res0);
-            SubtractWithBorrow(a.u1, b.u1, ref borrow, out ulong res1);
-            SubtractWithBorrow(a.u2, b.u2, ref borrow, out ulong res2);
-            SubtractWithBorrow(a.u3, b.u3, ref borrow, out ulong res3);
-            res = new UInt256(res0, res1, res2, res3);
-            return borrow != 0;
-        }
+        ulong borrow = 0ul;
+        SubtractWithBorrow(a.u0, b.u0, ref borrow, out ulong res0);
+        SubtractWithBorrow(a.u1, b.u1, ref borrow, out ulong res1);
+        SubtractWithBorrow(a.u2, b.u2, ref borrow, out ulong res2);
+        SubtractWithBorrow(a.u3, b.u3, ref borrow, out ulong res3);
+        res = new UInt256(res0, res1, res2, res3);
+        return borrow != 0;
     }
 
     public void Subtract(in UInt256 b, out UInt256 res) => Subtract(this, b, out res);

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Numerics;
 using FluentAssertions;
@@ -646,6 +647,43 @@ public abstract class UInt256TestsTemplate<T> where T : IInteger<T>
 public class UInt256Tests : UInt256TestsTemplate<UInt256>
 {
     public UInt256Tests() : base((BigInteger x) => (UInt256)x, (int x) => (UInt256)x, x => x, TestNumbers.UInt256Max) { }
+
+    // SubtractImpl is now scalar-only (the AVX2 borrow-cascade path was removed). These cases pin
+    // borrow propagation across every limb boundary, the underflow (wrap mod 2^256) result, and
+    // the all-zero-lower-limbs cascade the removed SIMD path handled via the broadcast lookup.
+    public static IEnumerable<(BigInteger a, BigInteger b, bool underflow)> SubtractBorrowCases()
+    {
+        BigInteger two64 = BigInteger.One << 64;
+        BigInteger two128 = BigInteger.One << 128;
+        BigInteger two192 = BigInteger.One << 192;
+        BigInteger max = TestNumbers.UInt256Max;
+        yield return (BigInteger.Zero, BigInteger.Zero, false);
+        yield return (two64, BigInteger.One, false);                     // borrow out of u1 into u0
+        yield return (two128, BigInteger.One, false);                    // borrow cascade u2->u1->u0
+        yield return (two192, BigInteger.One, false);                    // borrow cascade through u3
+        yield return (BigInteger.Zero, BigInteger.One, true);            // 0 - 1 underflow -> wraps to max
+        yield return (BigInteger.One, two64, true);                      // underflow across u1 boundary
+        yield return (max, max, false);                                  // max - max = 0
+        yield return (two128, two64, false);                             // partial borrow, no underflow
+    }
+
+    [TestCaseSource(nameof(SubtractBorrowCases))]
+    public void Subtract_ScalarBorrowPropagation((BigInteger a, BigInteger b, bool underflow) test)
+    {
+        UInt256 a = (UInt256)test.a;
+        UInt256 b = (UInt256)test.b;
+
+        bool underflow = UInt256.SubtractUnderflow(a, b, out UInt256 res);
+        res.Convert(out BigInteger actual);
+
+        BigInteger expected = ((test.a - test.b) % (BigInteger.One << 256) + (BigInteger.One << 256)) % (BigInteger.One << 256);
+        actual.Should().Be(expected);
+        underflow.Should().Be(test.underflow);
+
+        // Subtract (wrapping) must produce the same low-256-bit result.
+        UInt256.Subtract(a, b, out UInt256 plain);
+        plain.Should().Be(res);
+    }
 
     [Test]
     public virtual void Zero_is_min_value()
