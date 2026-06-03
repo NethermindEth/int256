@@ -925,4 +925,87 @@ public class UInt256Tests : UInt256TestsTemplate<UInt256>
 
         Assert.That(UInt256.UseHashCodeRandomizer, Is.EqualTo(useHashCodeRandomizer));
     }
+
+    // Magnitudes spanning the full 256-bit range, including the top-bit-set and all-ones cases, used
+    // to exercise the vectorized ToBigEndian(Span<byte>) write path against an independent oracle.
+    public static BigInteger[] ToBigEndianValues { get; } =
+    [
+        BigInteger.Zero,
+        BigInteger.One,
+        new BigInteger(ulong.MaxValue),
+        (BigInteger.One << 64),
+        (BigInteger.One << 128) - 1,
+        (BigInteger.One << 200) - 1,
+        BigInteger.One << 255,          // top bit set
+        (BigInteger.One << 255) - 1,
+        TestNumbers.UInt256Max,
+    ];
+
+    // ToBigEndian(Span<byte>) of length 32 writes the value as an unsigned big-endian 256-bit word.
+    // Pins the vectorized 32-byte path against an independent BigInteger oracle across all magnitudes
+    // and verifies the whole buffer is overwritten (pre-filled with 0xAA).
+    [TestCaseSource(nameof(ToBigEndianValues))]
+    public void ToBigEndian_Span32_Matches_BigInteger(BigInteger value)
+    {
+        UInt256 v = (UInt256)value;
+
+        Span<byte> target = stackalloc byte[32];
+        target.Fill(0xAA);
+        v.ToBigEndian(target);
+
+        BigInteger reconstructed = new(target, isUnsigned: true, isBigEndian: true);
+        reconstructed.Should().Be(value);
+    }
+
+    // The 20-byte (address) overload writes the low 20 bytes of the 32-byte big-endian form.
+    [TestCaseSource(nameof(ToBigEndianValues))]
+    public void ToBigEndian_Span20_Matches_Low20Bytes(BigInteger value)
+    {
+        UInt256 v = (UInt256)value;
+
+        Span<byte> full = stackalloc byte[32];
+        v.ToBigEndian(full);
+
+        Span<byte> target = stackalloc byte[20];
+        target.Fill(0xAA);
+        v.ToBigEndian(target);
+
+        target.ToArray().Should().Equal(full.Slice(12, 20).ToArray());
+    }
+
+    // The vectorized path must use an unaligned store: serialization targets are not guaranteed to be
+    // 32-byte aligned. Writing into a deliberately misaligned slice must still produce the correct
+    // bytes and must not disturb the neighbouring bytes.
+    [TestCaseSource(nameof(ToBigEndianValues))]
+    public void ToBigEndian_Span32_Unaligned_Target(BigInteger value)
+    {
+        UInt256 v = (UInt256)value;
+
+        byte[] backing = new byte[40];
+        backing.AsSpan().Fill(0xCC);
+        Span<byte> target = backing.AsSpan(3, 32); // offset 3 => unaligned
+        v.ToBigEndian(target);
+
+        BigInteger reconstructed = new(target, isUnsigned: true, isBigEndian: true);
+        reconstructed.Should().Be(value);
+
+        backing.AsSpan(0, 3).ToArray().Should().Equal(new byte[] { 0xCC, 0xCC, 0xCC });
+        backing.AsSpan(35, 5).ToArray().Should().Equal(new byte[] { 0xCC, 0xCC, 0xCC, 0xCC, 0xCC });
+    }
+
+    // ToBigEndian only handles lengths 32 and 20; any other length is a no-op (matching prior
+    // behavior). Pins that contract so the vectorized 32-byte branch does not change it.
+    [TestCase(16)]
+    [TestCase(31)]
+    [TestCase(33)]
+    public void ToBigEndian_Span_OtherLengths_AreNoOp(int length)
+    {
+        UInt256 v = UInt256.MaxValue;
+
+        byte[] target = new byte[length];
+        target.AsSpan().Fill(0xAA);
+        v.ToBigEndian(target);
+
+        target.Should().OnlyContain(b => b == 0xAA);
+    }
 }
