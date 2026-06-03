@@ -1062,6 +1062,21 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         res = new UInt256(u3);
     }
 
+#if ZK_EVM
+    // riscv64: no SIMD; the Vector256 branch is dead but blocks inlining of these hot bitwise
+    // opcodes (NOT/OR/AND/XOR). Scalar-only + inline.
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void Not(in UInt256 a, out UInt256 res) => res = new UInt256(~a.u0, ~a.u1, ~a.u2, ~a.u3);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void Or(in UInt256 a, in UInt256 b, out UInt256 res) => res = new UInt256(a.u0 | b.u0, a.u1 | b.u1, a.u2 | b.u2, a.u3 | b.u3);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void And(in UInt256 a, in UInt256 b, out UInt256 res) => res = new UInt256(a.u0 & b.u0, a.u1 & b.u1, a.u2 & b.u2, a.u3 & b.u3);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void Xor(in UInt256 a, in UInt256 b, out UInt256 res) => res = new UInt256(a.u0 ^ b.u0, a.u1 ^ b.u1, a.u2 ^ b.u2, a.u3 ^ b.u3);
+#else
     public static void Not(in UInt256 a, out UInt256 res)
     {
         if (Vector256.IsHardwareAccelerated)
@@ -1128,6 +1143,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
             res = new UInt256(a.u0 ^ b.u0, a.u1 ^ b.u1, a.u2 ^ b.u2, a.u3 ^ b.u3);
         }
     }
+#endif
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool LessThan(in UInt256 a, long b) => b >= 0 && a.u3 == 0 && a.u2 == 0 && a.u1 == 0 && a.u0 < (ulong)b;
@@ -1141,6 +1157,13 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool LessThan(ulong a, in UInt256 b) => b.u3 != 0 || b.u2 != 0 || b.u1 != 0 || a < b.u0;
 
+#if ZK_EVM
+    // ZisK/riscv64 has no SIMD: the Avx2/Vector256 branches are dead, but referencing them
+    // blocks the NativeAOT inliner from inlining this hot comparison (LT/GT/SLT/SGT + many
+    // internal UInt256 ops). Scalar-only so it inlines.
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool LessThan(in UInt256 a, in UInt256 b) => LessThanScalar(in a, in b);
+#else
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool LessThan(in UInt256 a, in UInt256 b)
     {
@@ -1153,6 +1176,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
             LessThanAvx2(in a, in b) :
             LessThanVector256(in a, in b);
     }
+#endif
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool LessThanScalar(in UInt256 a, in UInt256 b)
@@ -1221,6 +1245,12 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         return ((ltMask >> idx) & 1u) != 0;
     }
 
+#if ZK_EVM
+    // riscv64: scalar-only so it inlines (see LessThan).
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool LessThanBoth(in UInt256 x, in UInt256 y, in UInt256 m)
+        => LessThanScalar(in x, in m) && LessThanScalar(in y, in m);
+#else
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool LessThanBoth(in UInt256 x, in UInt256 y, in UInt256 m)
     {
@@ -1235,6 +1265,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
                 LessThanBothAvx2(in x, in y, in m) :
                 LessThanBothVector256(in x, in y, in m);
     }
+#endif
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool LessThanBothAvx512(in UInt256 x, in UInt256 y, in UInt256 m)
@@ -1365,6 +1396,10 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         return other >= 0 && Equals((uint)other);
     }
 
+#if ZK_EVM
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool Equals(uint other) => u0 == other && (u1 | u2 | u3) == 0;
+#else
     public bool Equals(uint other)
     {
         if (Vector256.IsHardwareAccelerated)
@@ -1377,9 +1412,14 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
             return u0 == other && IsUint64;
         }
     }
+#endif
 
     public bool Equals(long other) => other >= 0 && Equals((ulong)other);
 
+#if ZK_EVM
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool Equals(ulong other) => u0 == other && (u1 | u2 | u3) == 0;
+#else
     public bool Equals(ulong other)
     {
         if (Vector256.IsHardwareAccelerated)
@@ -1392,7 +1432,15 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
             return u0 == other && IsUint64;
         }
     }
+#endif
 
+#if ZK_EVM
+    // The priority-1 hot overload (== and CompareTo resolve here). riscv64 has no SIMD; scalar.
+    [OverloadResolutionPriority(1)]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool Equals(in UInt256 other)
+        => ((u0 ^ other.u0) | (u1 ^ other.u1) | (u2 ^ other.u2) | (u3 ^ other.u3)) == 0;
+#else
     [OverloadResolutionPriority(1)]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Equals(in UInt256 other)
@@ -1401,13 +1449,22 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         Vector256<ulong> v2 = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in other));
         return v1 == v2;
     }
+#endif
 
+#if ZK_EVM
+    // riscv64 has no SIMD: the Vector256 form falls back to slow software vector ops and never
+    // inlines. This getter is hot (EQ opcode, CompareTo, and many internal UInt256 ops). Scalar.
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool Equals(UInt256 other)
+        => ((u0 ^ other.u0) | (u1 ^ other.u1) | (u2 ^ other.u2) | (u3 ^ other.u3)) == 0;
+#else
     public bool Equals(UInt256 other)
     {
         Vector256<ulong> v1 = Unsafe.As<ulong, Vector256<ulong>>(ref Unsafe.AsRef(in u0));
         Vector256<ulong> v2 = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in other));
         return v1 == v2;
     }
+#endif
 
     public int CompareTo(UInt256 b) => CompareTo(in b);
 
