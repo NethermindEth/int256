@@ -526,12 +526,32 @@ public readonly partial struct UInt256
         ulong u2 = a.u2;
         ulong u3 = a.u3;
 
-        // Treat the top as a single 128-bit chunk (a4:u3) and take its remainder in ONE DivRem.
-        // This is valid as long as a4 < d. For a carry limb (0/1) and d>1, that's guaranteed.
-        ulong r = X86Base.X64.DivRem(u3, a4, d).Remainder;
-        r = X86Base.X64.DivRem(u2, r, d).Remainder;
-        r = X86Base.X64.DivRem(u1, r, d).Remainder;
-        r = X86Base.X64.DivRem(u0, r, d).Remainder;
+        ulong r;
+        if ((u2 | u3 | a4) == 0)
+        {
+            // The 257-bit sum actually fits in 128 bits (u1:u0). This is the common case when ADDMOD's
+            // operands are already reduced (x,y < m < 2^64 => sum < 2^65). x86 DIV is expensive
+            // (~20-40 cycles), so skip the two divides that would just reduce the zero high limbs.
+            if (u1 < d)
+            {
+                // u1 < d guarantees the quotient fits in 64 bits, so one DivRem yields (u1:u0) % d.
+                r = X86Base.X64.DivRem(u0, u1, d).Remainder;
+            }
+            else
+            {
+                ulong hi = X86Base.X64.DivRem(u1, 0UL, d).Remainder; // u1 % d (high half is zero)
+                r = X86Base.X64.DivRem(u0, hi, d).Remainder;
+            }
+        }
+        else
+        {
+            // Treat the top as a single 128-bit chunk (a4:u3) and take its remainder in ONE DivRem.
+            // This is valid as long as a4 < d. For a carry limb (0/1) and d>1, that's guaranteed.
+            r = X86Base.X64.DivRem(u3, a4, d).Remainder;
+            r = X86Base.X64.DivRem(u2, r, d).Remainder;
+            r = X86Base.X64.DivRem(u1, r, d).Remainder;
+            r = X86Base.X64.DivRem(u0, r, d).Remainder;
+        }
 
         rem = default;
         Unsafe.AsRef(in rem.u0) = r;
