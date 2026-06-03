@@ -15,6 +15,7 @@ using Arm = System.Runtime.Intrinsics.Arm;
 using x64 = System.Runtime.Intrinsics.X86;
 
 [assembly: InternalsVisibleTo("Nethermind.Int256.Tests")]
+[assembly: InternalsVisibleTo("Nethermind.Int256.Benchmark")]
 
 namespace Nethermind.Int256;
 
@@ -146,7 +147,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
             AddVector256(in a, in b, out res);
     }
 
-    private static bool AddScalar(in UInt256 a, in UInt256 b, out UInt256 res)
+    internal static bool AddScalar(in UInt256 a, in UInt256 b, out UInt256 res)
     {
         ulong a0 = a.u0;
         ulong b0 = b.u0;
@@ -174,7 +175,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         return c != 0;
     }
 
-    private static bool AddAvx2(in UInt256 a, in UInt256 b, out UInt256 res)
+    internal static bool AddAvx2(in UInt256 a, in UInt256 b, out UInt256 res)
     {
         Vector256<ulong> av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
         Vector256<ulong> bv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
@@ -1127,18 +1128,27 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool LessThan(in UInt256 a, in UInt256 b)
     {
-        if (!Avx2.IsSupported && !Vector256.IsHardwareAccelerated)
+        // The scalar limb compare short-circuits on the most-significant differing limb and beats the
+        // AVX2 path (compare + movemask + lzcnt lane select, using the sign-flip unsigned-compare
+        // emulation) for every operand distribution on AVX2-only hardware. Only AVX-512's native
+        // unsigned k-mask compare (used by LessThanAvx2 when Avx512F.VL + Avx512DQ are present) is
+        // faster, so reserve the vector path for AVX-512. Measured in-process on Alder Lake (AVX2,
+        // no AVX-512): scalar 0.91/1.28/1.13 ns vs AVX2 1.38/1.59/1.36 ns for operands differing in
+        // the high limb / only the low limb / fully equal. The ARM (non-AVX2 Vector256) path is left
+        // unchanged.
+        if (Avx512F.VL.IsSupported && Avx512DQ.IsSupported)
         {
-            return LessThanScalar(in a, in b);
+            return LessThanAvx2(in a, in b);
         }
-
-        return Avx2.IsSupported ?
-            LessThanAvx2(in a, in b) :
-            LessThanVector256(in a, in b);
+        if (!Avx2.IsSupported && Vector256.IsHardwareAccelerated)
+        {
+            return LessThanVector256(in a, in b);
+        }
+        return LessThanScalar(in a, in b);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool LessThanScalar(in UInt256 a, in UInt256 b)
+    internal static bool LessThanScalar(in UInt256 a, in UInt256 b)
     {
         if (a.u3 != b.u3)
             return a.u3 < b.u3;
@@ -1150,7 +1160,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool LessThanAvx2(in UInt256 a, in UInt256 b)
+    internal static bool LessThanAvx2(in UInt256 a, in UInt256 b)
     {
         // Load the four 64-bit words into a 256-bit register.
         Vector256<ulong> vecL = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));

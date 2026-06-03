@@ -7,6 +7,8 @@ using System.Collections.Immutable;
 using System.Globalization;
 using System.Linq;
 using System.Numerics;
+using System.Runtime.CompilerServices;
+using System.Runtime.Intrinsics;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Jobs;
@@ -214,6 +216,140 @@ public class SubtractUnsigned : UnsignedTwoParamBenchmarkBase
     {
         UInt256.Subtract(Param.A, Param.B, out UInt256 res);
         return res;
+    }
+}
+
+// Decisive A/B for the arithmetic dispatch question: do the AVX2 carry/borrow-cascade paths or the
+// scalar limb paths win on AVX2-only hardware? Sub-nanosecond cross-run comparisons are unreliable
+// (code layout / frequency / ASLR cause ~50% run-to-run swings), so this calls the library's actual
+// internal AddScalar/AddAvx2/LessThanScalar/LessThanAvx2 implementations side-by-side in the SAME
+// process over identical operand arrays. The A/B ratio within one run is what matters and is robust.
+// Operands are full-width random (u3 != 0) so neither implementation can short-circuit; the
+// accumulator and array stores defeat dead-code elimination.
+[SimpleJob(RuntimeMoniker.Net10_0, launchCount: 6, warmupCount: 3, iterationCount: 10)]
+public class ArithmeticPathAB
+{
+    private const int N = 1024;
+    private UInt256[] _a = null!;
+    private UInt256[] _b = null!;
+
+    [GlobalSetup]
+    public void Setup()
+    {
+        _a = new UInt256[N];
+        _b = new UInt256[N];
+        Random rnd = new(42);
+        for (int i = 0; i < N; i++)
+        {
+            _a[i] = RandomWide(rnd);
+            _b[i] = RandomWide(rnd);
+        }
+    }
+
+    private static UInt256 RandomWide(Random rnd) => new(
+        (ulong)rnd.NextInt64(),
+        (ulong)rnd.NextInt64(),
+        (ulong)rnd.NextInt64(),
+        (ulong)rnd.NextInt64() | 0x8000_0000_0000_0000UL);
+
+    [Benchmark(Baseline = true, OperationsPerInvoke = N)]
+    public ulong Add_Avx2()
+    {
+        UInt256[] a = _a, b = _b;
+        ulong acc = 0;
+        for (int i = 0; i < a.Length; i++)
+        {
+            UInt256.AddAvx2(in a[i], in b[i], out UInt256 res);
+            acc ^= res.u0;
+        }
+        return acc;
+    }
+
+    [Benchmark(OperationsPerInvoke = N)]
+    public ulong Add_Scalar()
+    {
+        UInt256[] a = _a, b = _b;
+        ulong acc = 0;
+        for (int i = 0; i < a.Length; i++)
+        {
+            UInt256.AddScalar(in a[i], in b[i], out UInt256 res);
+            acc ^= res.u0;
+        }
+        return acc;
+    }
+
+}
+
+// Focused LessThan A/B across operand relationships, to check whether scalar's early-exit limb
+// compare beats the AVX2 compare+movemask+lzcnt for ALL cases (not just random full-width, where
+// scalar exits on the first/u3 limb). DifferHigh = differ in u3 (scalar best case); DifferLow =
+// equal in u1..u3, differ only in u0 (scalar worst case: all four limbs compared); Equal = fully
+// equal (scalar also walks all four limbs). Same-process A/B, robust ratio.
+public enum LtCase
+{
+    DifferHigh,
+    DifferLow,
+    Equal,
+}
+
+[SimpleJob(RuntimeMoniker.Net10_0, launchCount: 6, warmupCount: 3, iterationCount: 10)]
+public class LessThanPathAB
+{
+    private const int N = 1024;
+    private UInt256[] _a = null!;
+    private UInt256[] _b = null!;
+
+    [Params(LtCase.DifferHigh, LtCase.DifferLow, LtCase.Equal)]
+    public LtCase Case;
+
+    [GlobalSetup]
+    public void Setup()
+    {
+        _a = new UInt256[N];
+        _b = new UInt256[N];
+        Random rnd = new(42);
+        for (int i = 0; i < N; i++)
+        {
+            ulong x0 = (ulong)rnd.NextInt64();
+            ulong x1 = (ulong)rnd.NextInt64();
+            ulong x2 = (ulong)rnd.NextInt64();
+            ulong x3 = (ulong)rnd.NextInt64() | 0x8000_0000_0000_0000UL;
+            UInt256 a = new(x0, x1, x2, x3);
+            _a[i] = a;
+            _b[i] = Case switch
+            {
+                // Differ in the most-significant limb -> scalar exits after one compare.
+                LtCase.DifferHigh => new UInt256(x0, x1, x2, x3 ^ 0x4000_0000_0000_0000UL),
+                // Equal in u1..u3, differ only in u0 -> scalar must compare all four limbs.
+                LtCase.DifferLow => new UInt256(x0 ^ 1UL, x1, x2, x3),
+                // Fully equal -> scalar walks all four limbs, returns false.
+                _ => a,
+            };
+        }
+    }
+
+    [Benchmark(Baseline = true, OperationsPerInvoke = N)]
+    public int LessThan_Avx2()
+    {
+        UInt256[] a = _a, b = _b;
+        int acc = 0;
+        for (int i = 0; i < a.Length; i++)
+        {
+            if (UInt256.LessThanAvx2(in a[i], in b[i])) acc++;
+        }
+        return acc;
+    }
+
+    [Benchmark(OperationsPerInvoke = N)]
+    public int LessThan_Scalar()
+    {
+        UInt256[] a = _a, b = _b;
+        int acc = 0;
+        for (int i = 0; i < a.Length; i++)
+        {
+            if (UInt256.LessThanScalar(in a[i], in b[i])) acc++;
+        }
+        return acc;
     }
 }
 
