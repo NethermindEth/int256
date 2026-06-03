@@ -2,11 +2,16 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 
 using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Linq;
 using System.Numerics;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using System.Runtime.Intrinsics;
+using System.Runtime.Intrinsics.X86;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Jobs;
@@ -701,6 +706,89 @@ public class ParseDecimalUnsigned : ParseUnsignedBenchmarkBase
     public bool TryParse_UInt256()
     {
         return UInt256.TryParse(Value, out _);
+    }
+}
+
+// In-process A/B for the 32-byte ToBigEndian write path (MSTORE-style serialization, RLP/RPC/trie).
+// The current implementation writes four BSWAPped 64-bit limbs (ScalarWriteBe); the proposed one
+// reinterprets the value as a Vector256<byte> and reverses all 32 bytes with a single shuffle/permute
+// (mirroring the already-vectorized big-endian READ ctor), storing the result with WriteUnaligned.
+// Both strategies are replicated inline here and measured in the SAME process so the A/B ratio is
+// robust to cross-run variance. Results escape into the _dst field buffer so the writes are not
+// elided; _dst is re-read into the accumulator to anchor the store. Default job = AVX2 on this host.
+[SimpleJob(RuntimeMoniker.Net10_0, launchCount: 6, warmupCount: 3, iterationCount: 10)]
+public class ToBigEndianAB
+{
+    private const int N = 1024;
+    private UInt256[] _src = null!;
+    private byte[] _dst = null!;
+
+    [GlobalSetup]
+    public void Setup()
+    {
+        _src = new UInt256[N];
+        _dst = new byte[32];
+        Random rnd = new(42);
+        for (int i = 0; i < N; i++)
+        {
+            _src[i] = new UInt256(
+                (ulong)rnd.NextInt64(),
+                (ulong)rnd.NextInt64(),
+                (ulong)rnd.NextInt64(),
+                (ulong)rnd.NextInt64());
+        }
+    }
+
+    // Current implementation: four big-endian 64-bit stores (BSWAP + mov).
+    [Benchmark(Baseline = true, OperationsPerInvoke = N)]
+    public byte ScalarWriteBe()
+    {
+        UInt256[] src = _src;
+        Span<byte> dst = _dst;
+        byte acc = 0;
+        for (int i = 0; i < src.Length; i++)
+        {
+            ref readonly UInt256 v = ref src[i];
+            BinaryPrimitives.WriteUInt64BigEndian(dst.Slice(0, 8), v.u3);
+            BinaryPrimitives.WriteUInt64BigEndian(dst.Slice(8, 8), v.u2);
+            BinaryPrimitives.WriteUInt64BigEndian(dst.Slice(16, 8), v.u1);
+            BinaryPrimitives.WriteUInt64BigEndian(dst.Slice(24, 8), v.u0);
+            acc ^= dst[0];
+        }
+        return acc;
+    }
+
+    // Proposed implementation: full 32-byte reverse via one shuffle (AVX2) or permute (AVX-512 VBMI),
+    // then an unaligned 256-bit store. The byte-reverse permutation is an involution, so the same
+    // shuffle constant the big-endian read ctor uses also performs the big-endian write.
+    [Benchmark(OperationsPerInvoke = N)]
+    public byte VectorWriteBe()
+    {
+        UInt256[] src = _src;
+        Span<byte> dst = _dst;
+        ref byte dst0 = ref MemoryMarshal.GetReference(dst);
+        Vector256<byte> shuffle = Vector256.Create(
+            0x18191a1b1c1d1e1ful,
+            0x1011121314151617ul,
+            0x08090a0b0c0d0e0ful,
+            0x0001020304050607ul).AsByte();
+        byte acc = 0;
+        for (int i = 0; i < src.Length; i++)
+        {
+            Vector256<byte> data = Unsafe.As<UInt256, Vector256<byte>>(ref Unsafe.AsRef(in src[i]));
+            if (Avx512Vbmi.VL.IsSupported)
+            {
+                Unsafe.WriteUnaligned(ref dst0, Avx512Vbmi.VL.PermuteVar32x8(data, shuffle));
+            }
+            else
+            {
+                Vector256<byte> convert = Avx2.Shuffle(data, shuffle);
+                Vector256<ulong> permute = Avx2.Permute4x64(convert.AsUInt64(), 0b_01_00_11_10);
+                Unsafe.WriteUnaligned(ref dst0, permute);
+            }
+            acc ^= dst[0];
+        }
+        return acc;
     }
 }
 
