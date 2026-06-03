@@ -63,6 +63,22 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
 
     public (ulong value, bool overflow) UlongWithOverflow => (u0, (u1 | u2 | u3) != 0);
 
+#if ZK_EVM
+    // ZisK/riscv64 has no SIMD: the Vector256 branch is always dead, and its mere
+    // presence (a Vector256<ulong> reference + Unsafe.As) blocks the NativeAOT inliner
+    // from inlining this hot per-opcode getter. Scalar-only here so it inlines.
+    public bool IsZero
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => (u0 | u1 | u2 | u3) == 0;
+    }
+
+    public bool IsOne
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => ((u0 ^ 1UL) | u1 | u2 | u3) == 0;
+    }
+#else
     public bool IsZero
     {
         get
@@ -94,6 +110,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
             }
         }
     }
+#endif
 
     public bool IsZeroOrOne => ((u0 >> 1) | u1 | u2 | u3) == 0;
 
