@@ -7,6 +7,9 @@
     <Nullable>enable</Nullable>
     <TargetFramework>net10.0</TargetFramework>
     <UseArtifactsOutput>true</UseArtifactsOutput>
+    <!-- ZisK guest build (pack with -p:EnableZkEvm=true): lets hot getters drop the
+         dead Vector256 SIMD branch so the NativeAOT inliner can inline them on riscv64. -->
+    <DefineConstants Condition="'$(EnableZkEvm)' == 'true'">$(DefineConstants);ZK_EVM</DefineConstants>
   </PropertyGroup>
 
   <PropertyGroup Label="ProductInfo">
