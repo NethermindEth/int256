@@ -63,36 +63,35 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
 
     public (ulong value, bool overflow) UlongWithOverflow => (u0, (u1 | u2 | u3) != 0);
 
+    // The Vector256 fast path is split into a private helper so the public method's own body
+    // stays small enough for the inliner. On targets with 256-bit SIMD the helper inlines back
+    // in (no call); on targets without it (e.g. ZisK/riscv64) Vector256.IsHardwareAccelerated
+    // folds to a constant false, the dead call is eliminated, and the scalar body is left to
+    // inline into the hot per-opcode callers. Same pattern for the bitwise and Equals helpers.
     public bool IsZero
     {
-        get
-        {
-            if (Vector256.IsHardwareAccelerated)
-            {
-                Vector256<ulong> v = Unsafe.As<ulong, Vector256<ulong>>(ref Unsafe.AsRef(in u0));
-                return v == default;
-            }
-            else
-            {
-                return (u0 | u1 | u2 | u3) == 0;
-            }
-        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => Vector256.IsHardwareAccelerated ? IsZeroVector(in this) : (u0 | u1 | u2 | u3) == 0;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool IsZeroVector(in UInt256 a)
+    {
+        Vector256<ulong> v = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
+        return v == default;
     }
 
     public bool IsOne
     {
-        get
-        {
-            if (Vector256.IsHardwareAccelerated)
-            {
-                Vector256<ulong> v = Unsafe.As<ulong, Vector256<ulong>>(ref Unsafe.AsRef(in u0));
-                return v == Vector256.CreateScalar(1UL);
-            }
-            else
-            {
-                return ((u0 ^ 1UL) | u1 | u2 | u3) == 0;
-            }
-        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => Vector256.IsHardwareAccelerated ? IsOneVector(in this) : ((u0 ^ 1UL) | u1 | u2 | u3) == 0;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool IsOneVector(in UInt256 a)
+    {
+        Vector256<ulong> v = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
+        return v == Vector256.CreateScalar(1UL);
     }
 
     public bool IsZeroOrOne => ((u0 >> 1) | u1 | u2 | u3) == 0;
@@ -1045,71 +1044,87 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         res = new UInt256(u3);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void Not(in UInt256 a, out UInt256 res)
     {
         if (Vector256.IsHardwareAccelerated)
         {
-            Vector256<ulong> av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
-            // Mark res as initalized so we can use it as left said of ref assignment
-            Unsafe.SkipInit(out res);
-            Unsafe.As<UInt256, Vector256<ulong>>(ref res) = Vector256.Xor(av, Vector256<ulong>.AllBitsSet);
+            NotVector(in a, out res);
+            return;
         }
-        else
-        {
-            ulong u0 = ~a.u0;
-            ulong u1 = ~a.u1;
-            ulong u2 = ~a.u2;
-            ulong u3 = ~a.u3;
-            res = new UInt256(u0, u1, u2, u3);
-        }
+        res = new UInt256(~a.u0, ~a.u1, ~a.u2, ~a.u3);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void NotVector(in UInt256 a, out UInt256 res)
+    {
+        Vector256<ulong> av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
+        // Mark res as initalized so we can use it as left said of ref assignment
+        Unsafe.SkipInit(out res);
+        Unsafe.As<UInt256, Vector256<ulong>>(ref res) = Vector256.Xor(av, Vector256<ulong>.AllBitsSet);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void Or(in UInt256 a, in UInt256 b, out UInt256 res)
     {
         if (Vector256.IsHardwareAccelerated)
         {
-            Vector256<ulong> av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
-            Vector256<ulong> bv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
-            // Mark res as initalized so we can use it as left said of ref assignment
-            Unsafe.SkipInit(out res);
-            Unsafe.As<UInt256, Vector256<ulong>>(ref res) = Vector256.BitwiseOr(av, bv);
+            OrVector(in a, in b, out res);
+            return;
         }
-        else
-        {
-            res = new UInt256(a.u0 | b.u0, a.u1 | b.u1, a.u2 | b.u2, a.u3 | b.u3);
-        }
+        res = new UInt256(a.u0 | b.u0, a.u1 | b.u1, a.u2 | b.u2, a.u3 | b.u3);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void OrVector(in UInt256 a, in UInt256 b, out UInt256 res)
+    {
+        Vector256<ulong> av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
+        Vector256<ulong> bv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
+        // Mark res as initalized so we can use it as left said of ref assignment
+        Unsafe.SkipInit(out res);
+        Unsafe.As<UInt256, Vector256<ulong>>(ref res) = Vector256.BitwiseOr(av, bv);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void And(in UInt256 a, in UInt256 b, out UInt256 res)
     {
         if (Vector256.IsHardwareAccelerated)
         {
-            Vector256<ulong> av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
-            Vector256<ulong> bv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
-            // Mark res as initalized so we can use it as left said of ref assignment
-            Unsafe.SkipInit(out res);
-            Unsafe.As<UInt256, Vector256<ulong>>(ref res) = Vector256.BitwiseAnd(av, bv);
+            AndVector(in a, in b, out res);
+            return;
         }
-        else
-        {
-            res = new UInt256(a.u0 & b.u0, a.u1 & b.u1, a.u2 & b.u2, a.u3 & b.u3);
-        }
+        res = new UInt256(a.u0 & b.u0, a.u1 & b.u1, a.u2 & b.u2, a.u3 & b.u3);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void AndVector(in UInt256 a, in UInt256 b, out UInt256 res)
+    {
+        Vector256<ulong> av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
+        Vector256<ulong> bv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
+        // Mark res as initalized so we can use it as left said of ref assignment
+        Unsafe.SkipInit(out res);
+        Unsafe.As<UInt256, Vector256<ulong>>(ref res) = Vector256.BitwiseAnd(av, bv);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void Xor(in UInt256 a, in UInt256 b, out UInt256 res)
     {
         if (Vector256.IsHardwareAccelerated)
         {
-            Vector256<ulong> av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
-            Vector256<ulong> bv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
-            // Mark res as initalized so we can use it as left said of ref assignment
-            Unsafe.SkipInit(out res);
-            Unsafe.As<UInt256, Vector256<ulong>>(ref res) = Vector256.Xor(av, bv);
+            XorVector(in a, in b, out res);
+            return;
         }
-        else
-        {
-            res = new UInt256(a.u0 ^ b.u0, a.u1 ^ b.u1, a.u2 ^ b.u2, a.u3 ^ b.u3);
-        }
+        res = new UInt256(a.u0 ^ b.u0, a.u1 ^ b.u1, a.u2 ^ b.u2, a.u3 ^ b.u3);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void XorVector(in UInt256 a, in UInt256 b, out UInt256 res)
+    {
+        Vector256<ulong> av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
+        Vector256<ulong> bv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
+        // Mark res as initalized so we can use it as left said of ref assignment
+        Unsafe.SkipInit(out res);
+        Unsafe.As<UInt256, Vector256<ulong>>(ref res) = Vector256.Xor(av, bv);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1348,49 +1363,47 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         return other >= 0 && Equals((uint)other);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Equals(uint other)
+        => Vector256.IsHardwareAccelerated ? EqualsVector(in this, other) : u0 == other && IsUint64;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool EqualsVector(in UInt256 a, uint other)
     {
-        if (Vector256.IsHardwareAccelerated)
-        {
-            Vector256<uint> v = Unsafe.As<ulong, Vector256<uint>>(ref Unsafe.AsRef(in u0));
-            return v == Vector256.CreateScalar(other);
-        }
-        else
-        {
-            return u0 == other && IsUint64;
-        }
+        Vector256<uint> v = Unsafe.As<UInt256, Vector256<uint>>(ref Unsafe.AsRef(in a));
+        return v == Vector256.CreateScalar(other);
     }
 
     public bool Equals(long other) => other >= 0 && Equals((ulong)other);
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Equals(ulong other)
+        => Vector256.IsHardwareAccelerated ? EqualsVector(in this, other) : u0 == other && IsUint64;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool EqualsVector(in UInt256 a, ulong other)
     {
-        if (Vector256.IsHardwareAccelerated)
-        {
-            Vector256<ulong> v = Unsafe.As<ulong, Vector256<ulong>>(ref Unsafe.AsRef(in u0));
-            return v == Vector256.CreateScalar(other);
-        }
-        else
-        {
-            return u0 == other && IsUint64;
-        }
+        Vector256<ulong> v = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
+        return v == Vector256.CreateScalar(other);
     }
 
     [OverloadResolutionPriority(1)]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Equals(in UInt256 other)
+        => Vector256.IsHardwareAccelerated
+            ? EqualsVector(in this, in other)
+            : ((u0 ^ other.u0) | (u1 ^ other.u1) | (u2 ^ other.u2) | (u3 ^ other.u3)) == 0;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool EqualsVector(in UInt256 a, in UInt256 b)
     {
-        Vector256<ulong> v1 = Unsafe.As<ulong, Vector256<ulong>>(ref Unsafe.AsRef(in u0));
-        Vector256<ulong> v2 = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in other));
+        Vector256<ulong> v1 = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
+        Vector256<ulong> v2 = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
         return v1 == v2;
     }
 
-    public bool Equals(UInt256 other)
-    {
-        Vector256<ulong> v1 = Unsafe.As<ulong, Vector256<ulong>>(ref Unsafe.AsRef(in u0));
-        Vector256<ulong> v2 = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in other));
-        return v1 == v2;
-    }
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool Equals(UInt256 other) => Equals(in other);
 
     public int CompareTo(UInt256 b) => CompareTo(in b);
 
