@@ -1059,7 +1059,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     private static void NotVector(in UInt256 a, out UInt256 res)
     {
         Vector256<ulong> av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
-        // Mark res as initalized so we can use it as left said of ref assignment
+        // Mark res as initialized so we can use it as left side of ref assignment
         Unsafe.SkipInit(out res);
         Unsafe.As<UInt256, Vector256<ulong>>(ref res) = Vector256.Xor(av, Vector256<ulong>.AllBitsSet);
     }
@@ -1080,7 +1080,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     {
         Vector256<ulong> av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
         Vector256<ulong> bv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
-        // Mark res as initalized so we can use it as left said of ref assignment
+        // Mark res as initialized so we can use it as left side of ref assignment
         Unsafe.SkipInit(out res);
         Unsafe.As<UInt256, Vector256<ulong>>(ref res) = Vector256.BitwiseOr(av, bv);
     }
@@ -1101,7 +1101,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     {
         Vector256<ulong> av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
         Vector256<ulong> bv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
-        // Mark res as initalized so we can use it as left said of ref assignment
+        // Mark res as initialized so we can use it as left side of ref assignment
         Unsafe.SkipInit(out res);
         Unsafe.As<UInt256, Vector256<ulong>>(ref res) = Vector256.BitwiseAnd(av, bv);
     }
@@ -1122,7 +1122,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     {
         Vector256<ulong> av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
         Vector256<ulong> bv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
-        // Mark res as initalized so we can use it as left said of ref assignment
+        // Mark res as initialized so we can use it as left side of ref assignment
         Unsafe.SkipInit(out res);
         Unsafe.As<UInt256, Vector256<ulong>>(ref res) = Vector256.Xor(av, bv);
     }
