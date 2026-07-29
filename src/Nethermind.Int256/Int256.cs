@@ -536,9 +536,9 @@ public readonly struct Int256 : IEquatable<Int256>, IComparable, IComparable<Int
 
     public static bool operator !=(in Int256 a, in Int256 b) => !(a == b);
 
-    public bool IsZero => this == Zero;
+    public bool IsZero => _value.IsZero;
 
-    public bool IsOne => this == One;
+    public bool IsOne => _value.IsOne;
 
     public Int256 MaximalValue => Max;
 
@@ -553,19 +553,12 @@ public readonly struct Int256 : IEquatable<Int256>, IComparable, IComparable<Int
 
     public static bool operator <(in Int256 z, in Int256 x)
     {
-        int zSign = z.Sign;
-        int xSign = x.Sign;
-
-        if (zSign >= 0)
+        // If the sign bits differ, the negative operand is smaller; otherwise two's-complement
+        // order within the same sign class equals unsigned order of the raw bits.
+        bool zNeg = (long)z._value.u3 < 0;
+        if (zNeg != ((long)x._value.u3 < 0))
         {
-            if (xSign < 0)
-            {
-                return false;
-            }
-        }
-        else if (xSign >= 0)
-        {
-            return true;
+            return zNeg;
         }
 
         return z._value < x._value;
