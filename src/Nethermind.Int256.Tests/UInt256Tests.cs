@@ -686,6 +686,41 @@ public class UInt256Tests : UInt256TestsTemplate<UInt256>
     }
 
     [Test]
+    public void Multiply_random_values_match_BigInteger()
+    {
+        Random random = new(0);
+        byte[] operands = new byte[64];
+
+        for (int i = 0; i < 4096; i++)
+        {
+            random.NextBytes(operands);
+            UInt256 x = new(operands.AsSpan(0, 32));
+            UInt256 y = new(operands.AsSpan(32, 32));
+            UInt256 small = new((ulong)i * 0x9E3779B97F4A7C15UL + 1);
+
+            AssertResult(in x, in y);
+            AssertResult(in x, in small);
+            AssertResult(in small, in y);
+        }
+
+        static void AssertResult(in UInt256 x, in UInt256 y)
+        {
+            BigInteger expected = (BigInteger)x * (BigInteger)y % TestNumbers.TwoTo256;
+
+            UInt256.Multiply(in x, in y, out UInt256 result);
+            ((BigInteger)result).Should().Be(expected);
+
+            UInt256 left = x;
+            left.Multiply(in y, out left);
+            ((BigInteger)left).Should().Be(expected);
+
+            UInt256 right = y;
+            x.Multiply(in right, out right);
+            ((BigInteger)right).Should().Be(expected);
+        }
+    }
+
+    [Test]
     public virtual void ToBigEndian_And_Back()
     {
         byte[] bidEndian = convert(1000000000000000000).ToBigEndian();

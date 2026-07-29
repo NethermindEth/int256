@@ -295,6 +295,71 @@ public class MultiplyUnsigned : UnsignedTwoParamBenchmarkBase
     }
 }
 
+[SimpleJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 5, iterationCount: 10)]
+public class MultiplyScalarTargeted
+{
+    private const int OperationCount = 256;
+    private DoubleUInt256[] _values = null!;
+
+    [Params("Full", "OneSmall", "Small", "ProductionMix")]
+    public string Shape { get; set; } = null!;
+
+    [GlobalSetup]
+    public void Setup()
+    {
+        _values = new DoubleUInt256[OperationCount];
+        for (int i = 0; i < _values.Length; i++)
+        {
+            ulong seed = (ulong)i * 0x9E3779B97F4A7C15UL + 0xD1B54A32D192ED03UL;
+            _values[i] = Shape switch
+            {
+                "Full" => CreateFull(seed),
+                "OneSmall" => CreateOneSmall(seed),
+                "Small" => new DoubleUInt256(seed | 2, (seed >> 1) | 2),
+                _ => (i % 100) switch
+                {
+                    < 31 => CreateOneSmall(seed),
+                    < 53 => CreateFull(seed),
+                    < 63 => Create192(seed),
+                    < 91 => Create128(seed),
+                    _ => new DoubleUInt256(seed | 2, (seed >> 1) | 2),
+                },
+            };
+        }
+    }
+
+    [Benchmark(OperationsPerInvoke = OperationCount)]
+    public UInt256 Multiply()
+    {
+        UInt256 aggregate = default;
+        foreach (DoubleUInt256 value in _values)
+        {
+            UInt256 a = value.A;
+            UInt256 b = value.B;
+            UInt256.Multiply(in a, in b, out UInt256 result);
+            UInt256.Xor(in aggregate, in result, out aggregate);
+        }
+
+        return aggregate;
+    }
+
+    private static DoubleUInt256 Create128(ulong seed) =>
+        new(new UInt256(seed, seed ^ 0xA0761D6478BD642FUL), new UInt256(~seed, seed ^ 0xE7037ED1A0B428DBUL));
+
+    private static DoubleUInt256 Create192(ulong seed) =>
+        new(
+            new UInt256(seed, seed ^ 0xA0761D6478BD642FUL, seed ^ 0xE7037ED1A0B428DBUL),
+            new UInt256(~seed, seed ^ 0x8EBC6AF09C88C6E3UL, seed ^ 0x589965CC75374CC3UL));
+
+    private static DoubleUInt256 CreateFull(ulong seed) =>
+        new(
+            new UInt256(seed, seed ^ 0xA0761D6478BD642FUL, seed ^ 0xE7037ED1A0B428DBUL, seed ^ 0x8EBC6AF09C88C6E3UL),
+            new UInt256(~seed, seed ^ 0x589965CC75374CC3UL, seed ^ 0x1D8E4E27C47D124FUL, seed ^ 0xEB44ACCAB455D165UL));
+
+    private static DoubleUInt256 CreateOneSmall(ulong seed) =>
+        new(CreateFull(seed).A, (seed >> 1) | 2);
+}
+
 public class MultiplySigned : SignedTwoParamBenchmarkBase
 {
     [Benchmark(Baseline = true)]
