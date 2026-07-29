@@ -219,6 +219,143 @@ public class SubtractUnsigned : UnsignedTwoParamBenchmarkBase
     }
 }
 
+// Same-process A/B of the library's internal scalar vs AVX2 Add paths; sub-nanosecond cross-run
+// comparisons are too noisy, the within-run ratio is robust. Full-width operands (u3 != 0) so
+// neither path can short-circuit.
+[SimpleJob(RuntimeMoniker.Net10_0, launchCount: 6, warmupCount: 3, iterationCount: 10)]
+public class ArithmeticPathAB
+{
+    private const int N = 1024;
+    private UInt256[] _a = null!;
+    private UInt256[] _b = null!;
+
+    [GlobalSetup]
+    public void Setup()
+    {
+        if (!Avx2.IsSupported)
+        {
+            throw new PlatformNotSupportedException($"{nameof(ArithmeticPathAB)} requires AVX2.");
+        }
+
+        _a = new UInt256[N];
+        _b = new UInt256[N];
+        Random rnd = new(42);
+        for (int i = 0; i < N; i++)
+        {
+            _a[i] = RandomWide(rnd);
+            _b[i] = RandomWide(rnd);
+        }
+    }
+
+    private static UInt256 RandomWide(Random rnd) => new(
+        (ulong)rnd.NextInt64(),
+        (ulong)rnd.NextInt64(),
+        (ulong)rnd.NextInt64(),
+        (ulong)rnd.NextInt64() | 0x8000_0000_0000_0000UL);
+
+    [Benchmark(Baseline = true, OperationsPerInvoke = N)]
+    public ulong Add_Avx2()
+    {
+        UInt256[] a = _a, b = _b;
+        ulong acc = 0;
+        for (int i = 0; i < a.Length; i++)
+        {
+            UInt256.AddAvx2(in a[i], in b[i], out UInt256 res);
+            acc ^= res.u0;
+        }
+        return acc;
+    }
+
+    [Benchmark(OperationsPerInvoke = N)]
+    public ulong Add_Scalar()
+    {
+        UInt256[] a = _a, b = _b;
+        ulong acc = 0;
+        for (int i = 0; i < a.Length; i++)
+        {
+            UInt256.AddScalar(in a[i], in b[i], out UInt256 res);
+            acc ^= res.u0;
+        }
+        return acc;
+    }
+
+}
+
+// LessThan A/B across operand relationships: DifferHigh (scalar exits after one compare),
+// DifferLow and Equal (scalar walks all four limbs).
+public enum LtCase
+{
+    DifferHigh,
+    DifferLow,
+    Equal,
+}
+
+[SimpleJob(RuntimeMoniker.Net10_0, launchCount: 6, warmupCount: 3, iterationCount: 10)]
+public class LessThanPathAB
+{
+    private const int N = 1024;
+    private UInt256[] _a = null!;
+    private UInt256[] _b = null!;
+
+    [Params(LtCase.DifferHigh, LtCase.DifferLow, LtCase.Equal)]
+    public LtCase Case;
+
+    [GlobalSetup]
+    public void Setup()
+    {
+        if (!Avx2.IsSupported)
+        {
+            throw new PlatformNotSupportedException($"{nameof(LessThanPathAB)} requires AVX2.");
+        }
+
+        _a = new UInt256[N];
+        _b = new UInt256[N];
+        Random rnd = new(42);
+        for (int i = 0; i < N; i++)
+        {
+            ulong x0 = (ulong)rnd.NextInt64();
+            ulong x1 = (ulong)rnd.NextInt64();
+            ulong x2 = (ulong)rnd.NextInt64();
+            ulong x3 = (ulong)rnd.NextInt64() | 0x8000_0000_0000_0000UL;
+            UInt256 a = new(x0, x1, x2, x3);
+            _a[i] = a;
+            _b[i] = Case switch
+            {
+                // Differ in the most-significant limb -> scalar exits after one compare.
+                LtCase.DifferHigh => new UInt256(x0, x1, x2, x3 ^ 0x4000_0000_0000_0000UL),
+                // Equal in u1..u3, differ only in u0 -> scalar must compare all four limbs.
+                LtCase.DifferLow => new UInt256(x0 ^ 1UL, x1, x2, x3),
+                // Fully equal -> scalar walks all four limbs, returns false.
+                _ => a,
+            };
+        }
+    }
+
+    [Benchmark(Baseline = true, OperationsPerInvoke = N)]
+    public int LessThan_Avx2()
+    {
+        UInt256[] a = _a, b = _b;
+        int acc = 0;
+        for (int i = 0; i < a.Length; i++)
+        {
+            if (UInt256.LessThanAvx2(in a[i], in b[i])) acc++;
+        }
+        return acc;
+    }
+
+    [Benchmark(OperationsPerInvoke = N)]
+    public int LessThan_Scalar()
+    {
+        UInt256[] a = _a, b = _b;
+        int acc = 0;
+        for (int i = 0; i < a.Length; i++)
+        {
+            if (UInt256.LessThanScalar(in a[i], in b[i])) acc++;
+        }
+        return acc;
+    }
+}
+
 public class SubtractSigned : SignedTwoParamBenchmarkBase
 {
     [Benchmark(Baseline = true)]
