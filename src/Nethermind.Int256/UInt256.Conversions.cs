@@ -49,7 +49,8 @@ public readonly partial struct UInt256
     public byte[] PaddedBytes(int n)
     {
         byte[] b = new byte[n];
-        PaddedBytes(b);
+        // For n > 32 the leading bytes are already zero, so write only the right-aligned tail.
+        PaddedBytes(n > 32 ? b.AsSpan(n - 32) : b.AsSpan());
         return b;
     }
 
@@ -64,6 +65,12 @@ public readonly partial struct UInt256
     public void PaddedBytes(Span<byte> target)
     {
         int n = target.Length;
+        if (n is 32 or 20)
+        {
+            // ToBigEndian writes these widths directly, skipping the staging buffer and copy.
+            ToBigEndian(target);
+            return;
+        }
 
         Span<byte> be = stackalloc byte[32];
         BinaryPrimitives.WriteUInt64BigEndian(be.Slice(0, 8), u3);
