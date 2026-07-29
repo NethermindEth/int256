@@ -71,11 +71,8 @@ public readonly partial struct UInt256
         {
             if (Avx2.IsSupported)
             {
-                // Reinterpret the four little-endian limbs as 32 bytes and reverse all of them into
-                // big-endian order in one shuffle/permute, then store unaligned. This mirrors the
-                // big-endian read ctor (UInt256.Ctors.cs): a full 32-byte reversal is an involution,
-                // so the SAME shuffle constant performs both the read and the write. Measured ~2x
-                // faster than four BinaryPrimitives.WriteUInt64BigEndian stores on Alder Lake.
+                // Full 32-byte reversal is an involution, so this reuses the shuffle constant of the
+                // big-endian read ctor (UInt256.Ctors.cs).
                 Vector256<byte> data = Unsafe.As<ulong, Vector256<byte>>(ref Unsafe.AsRef(in u0));
                 Vector256<byte> shuffle = Vector256.Create(
                     0x18191a1b1c1d1e1ful,
@@ -85,7 +82,6 @@ public readonly partial struct UInt256
                 if (Avx512Vbmi.VL.IsSupported)
                 {
                     Vector256<byte> convert = Avx512Vbmi.VL.PermuteVar32x8(data, shuffle);
-                    // Unaligned store: EVM/serialization targets are not guaranteed 32-byte aligned.
                     Unsafe.WriteUnaligned(ref MemoryMarshal.GetReference(target), convert);
                 }
                 else
