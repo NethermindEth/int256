@@ -551,12 +551,13 @@ public readonly struct Int256 : IEquatable<Int256>, IComparable, IComparable<Int
 
     public static explicit operator UInt256(Int256 z) => z._value;
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool operator <(in Int256 z, in Int256 x)
     {
         // If the sign bits differ, the negative operand is smaller; otherwise two's-complement
         // order within the same sign class equals unsigned order of the raw bits.
-        bool zNeg = (long)z._value.u3 < 0;
-        if (zNeg != ((long)x._value.u3 < 0))
+        bool zNeg = unchecked((long)z._value.u3) < 0;
+        if (zNeg != (unchecked((long)x._value.u3) < 0))
         {
             return zNeg;
         }

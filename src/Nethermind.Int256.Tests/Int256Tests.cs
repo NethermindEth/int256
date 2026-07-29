@@ -112,7 +112,7 @@ public class Int256Tests : UInt256TestsTemplate<Int256>
 
         (a < b).Should().Be(test.A < test.B);
         (a > b).Should().Be(test.A > test.B);
-        Math.Sign(a.CompareTo(b)).Should().Be(test.A.CompareTo(test.B));
+        Math.Sign(a.CompareTo(b)).Should().Be(Math.Sign(test.A.CompareTo(test.B)));
     }
 
     [Test]
