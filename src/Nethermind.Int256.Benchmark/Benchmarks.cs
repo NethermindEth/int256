@@ -219,6 +219,143 @@ public class SubtractUnsigned : UnsignedTwoParamBenchmarkBase
     }
 }
 
+// Same-process A/B of the library's internal scalar vs AVX2 Add paths; sub-nanosecond cross-run
+// comparisons are too noisy, the within-run ratio is robust. Full-width operands (u3 != 0) so
+// neither path can short-circuit.
+[SimpleJob(RuntimeMoniker.Net10_0, launchCount: 6, warmupCount: 3, iterationCount: 10)]
+public class ArithmeticPathAB
+{
+    private const int N = 1024;
+    private UInt256[] _a = null!;
+    private UInt256[] _b = null!;
+
+    [GlobalSetup]
+    public void Setup()
+    {
+        if (!Avx2.IsSupported)
+        {
+            throw new PlatformNotSupportedException($"{nameof(ArithmeticPathAB)} requires AVX2.");
+        }
+
+        _a = new UInt256[N];
+        _b = new UInt256[N];
+        Random rnd = new(42);
+        for (int i = 0; i < N; i++)
+        {
+            _a[i] = RandomWide(rnd);
+            _b[i] = RandomWide(rnd);
+        }
+    }
+
+    private static UInt256 RandomWide(Random rnd) => new(
+        (ulong)rnd.NextInt64(),
+        (ulong)rnd.NextInt64(),
+        (ulong)rnd.NextInt64(),
+        (ulong)rnd.NextInt64() | 0x8000_0000_0000_0000UL);
+
+    [Benchmark(Baseline = true, OperationsPerInvoke = N)]
+    public ulong Add_Avx2()
+    {
+        UInt256[] a = _a, b = _b;
+        ulong acc = 0;
+        for (int i = 0; i < a.Length; i++)
+        {
+            UInt256.AddAvx2(in a[i], in b[i], out UInt256 res);
+            acc ^= res.u0;
+        }
+        return acc;
+    }
+
+    [Benchmark(OperationsPerInvoke = N)]
+    public ulong Add_Scalar()
+    {
+        UInt256[] a = _a, b = _b;
+        ulong acc = 0;
+        for (int i = 0; i < a.Length; i++)
+        {
+            UInt256.AddScalar(in a[i], in b[i], out UInt256 res);
+            acc ^= res.u0;
+        }
+        return acc;
+    }
+
+}
+
+// LessThan A/B across operand relationships: DifferHigh (scalar exits after one compare),
+// DifferLow and Equal (scalar walks all four limbs).
+public enum LtCase
+{
+    DifferHigh,
+    DifferLow,
+    Equal,
+}
+
+[SimpleJob(RuntimeMoniker.Net10_0, launchCount: 6, warmupCount: 3, iterationCount: 10)]
+public class LessThanPathAB
+{
+    private const int N = 1024;
+    private UInt256[] _a = null!;
+    private UInt256[] _b = null!;
+
+    [Params(LtCase.DifferHigh, LtCase.DifferLow, LtCase.Equal)]
+    public LtCase Case;
+
+    [GlobalSetup]
+    public void Setup()
+    {
+        if (!Avx2.IsSupported)
+        {
+            throw new PlatformNotSupportedException($"{nameof(LessThanPathAB)} requires AVX2.");
+        }
+
+        _a = new UInt256[N];
+        _b = new UInt256[N];
+        Random rnd = new(42);
+        for (int i = 0; i < N; i++)
+        {
+            ulong x0 = (ulong)rnd.NextInt64();
+            ulong x1 = (ulong)rnd.NextInt64();
+            ulong x2 = (ulong)rnd.NextInt64();
+            ulong x3 = (ulong)rnd.NextInt64() | 0x8000_0000_0000_0000UL;
+            UInt256 a = new(x0, x1, x2, x3);
+            _a[i] = a;
+            _b[i] = Case switch
+            {
+                // Differ in the most-significant limb -> scalar exits after one compare.
+                LtCase.DifferHigh => new UInt256(x0, x1, x2, x3 ^ 0x4000_0000_0000_0000UL),
+                // Equal in u1..u3, differ only in u0 -> scalar must compare all four limbs.
+                LtCase.DifferLow => new UInt256(x0 ^ 1UL, x1, x2, x3),
+                // Fully equal -> scalar walks all four limbs, returns false.
+                _ => a,
+            };
+        }
+    }
+
+    [Benchmark(Baseline = true, OperationsPerInvoke = N)]
+    public int LessThan_Avx2()
+    {
+        UInt256[] a = _a, b = _b;
+        int acc = 0;
+        for (int i = 0; i < a.Length; i++)
+        {
+            if (UInt256.LessThanAvx2(in a[i], in b[i])) acc++;
+        }
+        return acc;
+    }
+
+    [Benchmark(OperationsPerInvoke = N)]
+    public int LessThan_Scalar()
+    {
+        UInt256[] a = _a, b = _b;
+        int acc = 0;
+        for (int i = 0; i < a.Length; i++)
+        {
+            if (UInt256.LessThanScalar(in a[i], in b[i])) acc++;
+        }
+        return acc;
+    }
+}
+
 public class SubtractSigned : SignedTwoParamBenchmarkBase
 {
     [Benchmark(Baseline = true)]
@@ -295,6 +432,71 @@ public class MultiplyUnsigned : UnsignedTwoParamBenchmarkBase
         UInt256.Multiply(Param.A, Param.B, out UInt256 res);
         return res;
     }
+}
+
+[SimpleJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 5, iterationCount: 10)]
+public class MultiplyScalarTargeted
+{
+    private const int OperationCount = 256;
+    private DoubleUInt256[] _values = null!;
+
+    [Params("Full", "OneSmall", "Small", "ProductionMix")]
+    public string Shape { get; set; } = null!;
+
+    [GlobalSetup]
+    public void Setup()
+    {
+        _values = new DoubleUInt256[OperationCount];
+        for (int i = 0; i < _values.Length; i++)
+        {
+            ulong seed = (ulong)i * 0x9E3779B97F4A7C15UL + 0xD1B54A32D192ED03UL;
+            _values[i] = Shape switch
+            {
+                "Full" => CreateFull(seed),
+                "OneSmall" => CreateOneSmall(seed),
+                "Small" => new DoubleUInt256(seed | 2, (seed >> 1) | 2),
+                _ => (i % 100) switch
+                {
+                    < 31 => CreateOneSmall(seed),
+                    < 53 => CreateFull(seed),
+                    < 63 => Create192(seed),
+                    < 91 => Create128(seed),
+                    _ => new DoubleUInt256(seed | 2, (seed >> 1) | 2),
+                },
+            };
+        }
+    }
+
+    [Benchmark(OperationsPerInvoke = OperationCount)]
+    public UInt256 Multiply()
+    {
+        UInt256 aggregate = default;
+        foreach (DoubleUInt256 value in _values)
+        {
+            UInt256 a = value.A;
+            UInt256 b = value.B;
+            UInt256.Multiply(in a, in b, out UInt256 result);
+            UInt256.Xor(in aggregate, in result, out aggregate);
+        }
+
+        return aggregate;
+    }
+
+    private static DoubleUInt256 Create128(ulong seed) =>
+        new(new UInt256(seed, seed ^ 0xA0761D6478BD642FUL), new UInt256(~seed, seed ^ 0xE7037ED1A0B428DBUL));
+
+    private static DoubleUInt256 Create192(ulong seed) =>
+        new(
+            new UInt256(seed, seed ^ 0xA0761D6478BD642FUL, seed ^ 0xE7037ED1A0B428DBUL),
+            new UInt256(~seed, seed ^ 0x8EBC6AF09C88C6E3UL, seed ^ 0x589965CC75374CC3UL));
+
+    private static DoubleUInt256 CreateFull(ulong seed) =>
+        new(
+            new UInt256(seed, seed ^ 0xA0761D6478BD642FUL, seed ^ 0xE7037ED1A0B428DBUL, seed ^ 0x8EBC6AF09C88C6E3UL),
+            new UInt256(~seed, seed ^ 0x589965CC75374CC3UL, seed ^ 0x1D8E4E27C47D124FUL, seed ^ 0xEB44ACCAB455D165UL));
+
+    private static DoubleUInt256 CreateOneSmall(ulong seed) =>
+        new(CreateFull(seed).A, (seed >> 1) | 2);
 }
 
 public class MultiplySigned : SignedTwoParamBenchmarkBase

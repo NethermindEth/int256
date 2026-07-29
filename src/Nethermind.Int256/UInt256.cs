@@ -14,6 +14,7 @@ using Arm = System.Runtime.Intrinsics.Arm;
 using x64 = System.Runtime.Intrinsics.X86;
 
 [assembly: InternalsVisibleTo("Nethermind.Int256.Tests")]
+[assembly: InternalsVisibleTo("Nethermind.Int256.Benchmark")]
 
 namespace Nethermind.Int256;
 
@@ -103,7 +104,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
             AddVector256(in a, in b, out res);
     }
 
-    private static bool AddScalar(in UInt256 a, in UInt256 b, out UInt256 res)
+    internal static bool AddScalar(in UInt256 a, in UInt256 b, out UInt256 res)
     {
         ulong a0 = a.u0;
         ulong b0 = b.u0;
@@ -131,7 +132,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         return c != 0;
     }
 
-    private static bool AddAvx2(in UInt256 a, in UInt256 b, out UInt256 res)
+    internal static bool AddAvx2(in UInt256 a, in UInt256 b, out UInt256 res)
     {
         Vector256<ulong> av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
         Vector256<ulong> bv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
@@ -432,34 +433,82 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         ulong y1 = y.u1;
         ulong x2 = x.u2;
         ulong y2 = y.u2;
+        ulong x3 = x.u3;
+        ulong y3 = y.u3;
 
+        if ((y1 | y2 | y3) == 0)
+        {
+            MultiplyByUInt64(in x, y0, out res);
+            return;
+        }
+        if ((x1 | x2 | x3) == 0)
+        {
+            MultiplyByUInt64(in y, x0, out res);
+            return;
+        }
+
+        ulong h00 = Multiply64(x0, y0, out ulong r0);
+        ulong h01 = Multiply64(x0, y1, out ulong l01);
+        ulong h10 = Multiply64(x1, y0, out ulong l10);
+        ulong h02 = Multiply64(x0, y2, out ulong l02);
+        ulong h11 = Multiply64(x1, y1, out ulong l11);
+        ulong h20 = Multiply64(x2, y0, out ulong l20);
+
+        ulong carry = 0;
+        ulong r1 = AddAndCountCarry(h00, l01, ref carry);
+        r1 = AddAndCountCarry(r1, l10, ref carry);
+
+        ulong r2 = carry;
+        carry = 0;
+        r2 = AddAndCountCarry(r2, h01, ref carry);
+        r2 = AddAndCountCarry(r2, h10, ref carry);
+        r2 = AddAndCountCarry(r2, l02, ref carry);
+        r2 = AddAndCountCarry(r2, l11, ref carry);
+        r2 = AddAndCountCarry(r2, l20, ref carry);
+
+        ulong r3 = carry + h02 + h11 + h20
+            + x0 * y3 + x1 * y2 + x2 * y1 + x3 * y0;
         Unsafe.SkipInit(out res);
         ref ulong pr = ref Unsafe.As<UInt256, ulong>(ref res);
+        pr = r0;
+        Unsafe.Add(ref pr, 1) = r1;
+        Unsafe.Add(ref pr, 2) = r2;
+        Unsafe.Add(ref pr, 3) = r3;
+    }
 
-        ulong a0 = Multiply64(x0, y0, out pr);
+    [SkipLocalsInit]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void MultiplyByUInt64(in UInt256 x, ulong y, out UInt256 res)
+    {
+        ulong x0 = x.u0;
+        ulong x1 = x.u1;
+        ulong x2 = x.u2;
+        ulong x3 = x.u3;
 
-        // Column 1
-        ulong a1 = 0;
-        ulong a2 = 0;
-        MultiplyAddCarry(ref a0, ref a1, ref a2, x0, y1);
-        MultiplyAddCarry(ref a0, ref a1, ref a2, x1, y0);
-        Unsafe.Add(ref pr, 1) = a0;
+        ulong carry = Multiply64(x0, y, out ulong r0);
+        ulong high = Multiply64(x1, y, out ulong low);
+        ulong r1 = low + carry;
+        carry = high + (r1 < low ? 1UL : 0UL);
 
-        // carry into column 2 is (a2:a1) as a 128-bit value, aligned as (lo=a1, hi=a2)
+        high = Multiply64(x2, y, out low);
+        ulong r2 = low + carry;
+        carry = high + (r2 < low ? 1UL : 0UL);
 
-        // Column 2
-        a0 = a1;
-        a1 = a2;
-        a2 = 0;
-        MultiplyAddCarry(ref a0, ref a1, ref a2, x0, y2);
-        MultiplyAddCarry(ref a0, ref a1, ref a2, x1, y1);
-        MultiplyAddCarry(ref a0, ref a1, ref a2, x2, y0);
-        ulong s1 = x0 * y.u3 + x.u3 * y0;
-        ulong s0 = x1 * y2 + x2 * y1;
-        Unsafe.Add(ref pr, 2) = a0;
+        ulong r3 = x3 * y + carry;
+        Unsafe.SkipInit(out res);
+        ref ulong pr = ref Unsafe.As<UInt256, ulong>(ref res);
+        pr = r0;
+        Unsafe.Add(ref pr, 1) = r1;
+        Unsafe.Add(ref pr, 2) = r2;
+        Unsafe.Add(ref pr, 3) = r3;
+    }
 
-        // For r3 we only need the low 64 of the incoming carry, which is a1 here.
-        Unsafe.Add(ref pr, 3) = a1 + s0 + s1;
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static ulong AddAndCountCarry(ulong x, ulong y, ref ulong carry)
+    {
+        ulong sum = x + y;
+        carry += sum < x ? 1UL : 0UL;
+        return sum;
     }
 
     [SkipLocalsInit]
@@ -1015,7 +1064,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     private static bool LessThan(ulong a, in UInt256 b) => b.u3 != 0 || b.u2 != 0 || b.u1 != 0 || a < b.u0;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool LessThanScalar(in UInt256 a, in UInt256 b)
+    internal static bool LessThanScalar(in UInt256 a, in UInt256 b)
     {
         if (a.u3 != b.u3)
             return a.u3 < b.u3;
@@ -1027,7 +1076,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool LessThanAvx2(in UInt256 a, in UInt256 b)
+    internal static bool LessThanAvx2(in UInt256 a, in UInt256 b)
     {
         // Load the four 64-bit words into a 256-bit register.
         Vector256<ulong> vecL = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
@@ -1222,57 +1271,39 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
 
     public override bool Equals(object? obj) => obj is UInt256 other && Equals(other);
 
-    [SkipLocalsInit]
-    public readonly override int GetHashCode()
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal readonly int GetCrcHashCode(uint seed)
     {
-        // Very fast hardware accelerated non-cryptographic hash function
-        uint seed = _hashSeed;
+        ulong hash0 = BitOperations.Crc32C(seed, u0);
+        ulong hash1 = BitOperations.Crc32C(seed ^ 0x9E3779B9u, u1);
+        ulong hash2 = BitOperations.Crc32C(seed ^ 0x85EBCA6Bu, u2);
+        ulong hash3 = BitOperations.Crc32C(seed ^ 0xC2B2AE35u, u3);
+        return FoldHash(MumFold(hash0 | (hash1 << 32), hash2 | (hash3 << 32)));
+    }
 
-        if (x64.Aes.IsSupported)
-        {
-            Vector128<byte> key = Unsafe.As<ulong, Vector128<byte>>(ref Unsafe.AsRef(in u0));
-            Vector128<byte> data = Unsafe.As<ulong, Vector128<byte>>(ref Unsafe.AsRef(in u2));
-            // Mix in the instance-random seed
-            key ^= Vector128.CreateScalar(seed).AsByte();
-            // Single AESENC is a powerful mixer - 4 cycles, full diffusion
-            Vector128<byte> mixed = x64.Aes.Encrypt(data, key);
-            ulong compressed = mixed.AsUInt64().GetElement(0) ^ mixed.AsUInt64().GetElement(1);
-            return (int)(uint)(compressed ^ (compressed >> 32));
-        }
-        else if (Arm.Aes.IsSupported)
-        {
-            Vector128<byte> key = Unsafe.As<ulong, Vector128<byte>>(ref Unsafe.AsRef(in u0));
-            Vector128<byte> data = Unsafe.As<ulong, Vector128<byte>>(ref Unsafe.AsRef(in u2));
-            // Mix in the instance-random seed
-            key ^= Vector128.CreateScalar(seed).AsByte();
-            // ARM needs explicit MixColumns for equivalent diffusion
-            Vector128<byte> mixed = Arm.Aes.MixColumns(Arm.Aes.Encrypt(data, key));
-            ulong compressed = mixed.AsUInt64().GetElement(0) ^ mixed.AsUInt64().GetElement(1);
-            return (int)(uint)(compressed ^ (compressed >> 32));
-        }
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Vector128<byte> HashAesRound(Vector128<byte> state, Vector128<byte> roundKey)
+        => x64.Aes.IsSupported
+            ? x64.Aes.Encrypt(state, roundKey)
+            // Keep the round key outside AESE so state and roundKey have distinct roles in the mixer.
+            : Arm.Aes.MixColumns(Arm.Aes.Encrypt(state, Vector128<byte>.Zero)) ^ roundKey;
 
-        uint hash0 = BitOperations.Crc32C(seed, u0);
-        uint hash1 = BitOperations.Crc32C(seed ^ 0x9E3779B9u, u1);
-        uint hash2 = BitOperations.Crc32C(seed ^ 0x85EBCA6Bu, u2);
-        uint hash3 = BitOperations.Crc32C(seed ^ 0xC2B2AE35u, u3);
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static long MumFold(ulong a, ulong b)
+    {
+        ulong low = Math.BigMul(a ^ 0x9E3779B97F4A7C15UL, b ^ 0xBF58476D1CE4E5B9UL, out ulong high);
+        return (long)(low ^ high);
+    }
 
-        hash0 += BitOperations.RotateLeft(hash1, 11);
-        hash2 = BitOperations.RotateLeft(hash2, 17) + BitOperations.RotateLeft(hash3, 23);
-        uint hash = hash2 + hash0;
-        return FinalMix(hash);
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static long MumFold(Vector128<byte> mixed)
+        => MumFold(mixed.AsUInt64().GetElement(0), mixed.AsUInt64().GetElement(1));
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static int FinalMix(uint x)
-        {
-            // A tiny finaliser to improve avalanche:
-            // - xor-fold high bits down
-            // - multiply by an odd constant to spread changes across bits
-            // - xor-fold again to propagate the multiply result
-            x ^= x >> 16;
-            x *= 0x9E3779B1u;
-            x ^= x >> 16;
-            return (int)x;
-        }
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static int FoldHash(long hash)
+    {
+        ulong value = (ulong)hash;
+        return (int)(value ^ (value >> 32));
     }
 
     public ulong this[int index] => index switch

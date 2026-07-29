@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: MIT
 
 using System.Runtime.CompilerServices;
+using System.Runtime.Intrinsics;
+using Arm = System.Runtime.Intrinsics.Arm;
+using x64 = System.Runtime.Intrinsics.X86;
 
 namespace Nethermind.Int256;
 
@@ -9,6 +12,26 @@ public readonly partial struct UInt256
 {
     // Guest execution requires stable hashes across runs.
     private static readonly uint _hashSeed = 2098026241U;
+    private static readonly ulong _aesHashSeed0 = 0x1F83D9ABFB41BD6BUL;
+    private static readonly ulong _aesHashSeed1 = 0x5BE0CD19137E2179UL;
+
+    [SkipLocalsInit]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public readonly override int GetHashCode()
+    {
+        if (x64.Aes.IsSupported || Arm.Aes.IsSupported)
+        {
+            Vector128<byte> key = Unsafe.As<ulong, Vector128<byte>>(ref Unsafe.AsRef(in u0));
+            Vector128<byte> data = Unsafe.As<ulong, Vector128<byte>>(ref Unsafe.AsRef(in u2));
+            key ^= Vector128.Create(_aesHashSeed0, _aesHashSeed1).AsByte();
+            Vector128<byte> mixed = HashAesRound(data, key);
+            mixed = HashAesRound(mixed, key);
+            return FoldHash(MumFold(mixed));
+        }
+
+        // Include the 32-byte input length in the deterministic fallback seed.
+        return GetCrcHashCode(unchecked(_hashSeed + 32u));
+    }
 
     public bool IsZero
     {

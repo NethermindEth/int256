@@ -1,18 +1,58 @@
 // SPDX-FileCopyrightText: 2026 Demerzel Solutions Limited
 // SPDX-License-Identifier: MIT
 
+using System;
+using System.Buffers.Binary;
+using System.IO.Hashing;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
 using System.Runtime.Intrinsics.X86;
 using System.Security.Cryptography;
+using Arm = System.Runtime.Intrinsics.Arm;
+using x64 = System.Runtime.Intrinsics.X86;
 
 namespace Nethermind.Int256;
 
 public readonly partial struct UInt256
 {
     // Vary the seed between processes to keep hash distribution independent across nodes and restarts.
-    private static readonly uint _hashSeed =
-        (uint)RandomNumberGenerator.GetInt32(int.MinValue, int.MaxValue);
+    private static readonly ulong _aesHashSeed0 = CreateHashSeed();
+    private static readonly ulong _aesHashSeed1 = CreateHashSeed();
+    private static readonly long _xxHashSeed = unchecked((long)CreateHashSeed());
+
+    [SkipLocalsInit]
+    private static ulong CreateHashSeed()
+    {
+        Span<byte> bytes = stackalloc byte[sizeof(ulong)];
+        RandomNumberGenerator.Fill(bytes);
+        return BinaryPrimitives.ReadUInt64LittleEndian(bytes);
+    }
+
+    [SkipLocalsInit]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public readonly override int GetHashCode()
+    {
+        if (x64.Aes.IsSupported || Arm.Aes.IsSupported)
+        {
+            Vector128<byte> key = Unsafe.As<ulong, Vector128<byte>>(ref Unsafe.AsRef(in u0));
+            Vector128<byte> data = Unsafe.As<ulong, Vector128<byte>>(ref Unsafe.AsRef(in u2));
+            key ^= Vector128.Create(_aesHashSeed0, _aesHashSeed1).AsByte();
+            Vector128<byte> mixed = HashAesRound(data, key);
+            mixed = HashAesRound(mixed, key);
+            return FoldHash(MumFold(mixed));
+        }
+
+        return GetXxHashCode(_xxHashSeed);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal readonly int GetXxHashCode(long seed)
+    {
+        ref byte start = ref Unsafe.As<ulong, byte>(ref Unsafe.AsRef(in u0));
+        ulong hash = XxHash3.HashToUInt64(MemoryMarshal.CreateReadOnlySpan(ref start, 32), seed);
+        return FoldHash((long)hash);
+    }
 
     // Vector256 paths live in separate helpers to keep the public bodies small enough to inline.
     public bool IsZero
@@ -101,14 +141,19 @@ public readonly partial struct UInt256
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool LessThan(in UInt256 a, in UInt256 b)
     {
-        if (!Avx2.IsSupported && !Vector256.IsHardwareAccelerated)
+        // Without AVX-512's native unsigned k-mask compare, the short-circuiting scalar limb compare
+        // generally beats the AVX2 sign-flip emulation - see the LessThanPathAB benchmark.
+        if (Avx512F.VL.IsSupported && Avx512DQ.IsSupported)
         {
-            return LessThanScalar(in a, in b);
+            return LessThanAvx2(in a, in b);
         }
 
-        return Avx2.IsSupported ?
-            LessThanAvx2(in a, in b) :
-            LessThanVector256(in a, in b);
+        if (!Avx2.IsSupported && Vector256.IsHardwareAccelerated)
+        {
+            return LessThanVector256(in a, in b);
+        }
+
+        return LessThanScalar(in a, in b);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
