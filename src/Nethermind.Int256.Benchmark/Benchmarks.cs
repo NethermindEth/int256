@@ -531,6 +531,23 @@ public class MultiplyMod64Targeted
     }
 }
 
+[SimpleJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 5)]
+[NoIntrinsicsJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 5)]
+public class MultiplyModMaxValueTargeted
+{
+    private static readonly UInt256 A =
+        new(0x89ABCDEF01234567, 0x76543210FEDCBA98, 0x1122334455667788, 0xFFEEDDCCBBAA0099);
+    private static readonly UInt256 B =
+        new(0x1020304050607080, 0x8877665544332211, 0xABCDEF0123456789, 0x9988776655443322);
+
+    [Benchmark]
+    public UInt256 MultiplyMod_UInt256()
+    {
+        UInt256.MultiplyMod(A, B, UInt256.MaxValue, out UInt256 res);
+        return res;
+    }
+}
+
 public class LeftShiftUnsigned : UnsignedIntTwoParamBenchmarkBase
 {
     [Benchmark(Baseline = true)]
