@@ -1394,8 +1394,6 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     public readonly override int GetHashCode()
     {
         // Very fast hardware accelerated non-cryptographic hash function
-        uint seed = _hashSeed;
-
         if (x64.Aes.IsSupported || Arm.Aes.IsSupported)
         {
             Vector128<byte> key = Unsafe.As<ulong, Vector128<byte>>(ref Unsafe.AsRef(in u0));
@@ -1407,6 +1405,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
             return FoldHash(MumFold(mixed));
         }
 
+        uint seed = _hashSeed;
         ulong hash0 = BitOperations.Crc32C(seed, u0);
         ulong hash1 = BitOperations.Crc32C(seed ^ 0x9E3779B9u, u1);
         ulong hash2 = BitOperations.Crc32C(seed ^ 0x85EBCA6Bu, u2);
