@@ -7,8 +7,7 @@ using System.Collections.Immutable;
 using System.Globalization;
 using System.Linq;
 using System.Numerics;
-using System.Runtime.CompilerServices;
-using System.Runtime.Intrinsics;
+using System.Runtime.Intrinsics.X86;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Jobs;
@@ -219,13 +218,9 @@ public class SubtractUnsigned : UnsignedTwoParamBenchmarkBase
     }
 }
 
-// Decisive A/B for the arithmetic dispatch question: do the AVX2 carry/borrow-cascade paths or the
-// scalar limb paths win on AVX2-only hardware? Sub-nanosecond cross-run comparisons are unreliable
-// (code layout / frequency / ASLR cause ~50% run-to-run swings), so this calls the library's actual
-// internal AddScalar/AddAvx2/LessThanScalar/LessThanAvx2 implementations side-by-side in the SAME
-// process over identical operand arrays. The A/B ratio within one run is what matters and is robust.
-// Operands are full-width random (u3 != 0) so neither implementation can short-circuit; the
-// accumulator and array stores defeat dead-code elimination.
+// Same-process A/B of the library's internal scalar vs AVX2 Add paths; sub-nanosecond cross-run
+// comparisons are too noisy, the within-run ratio is robust. Full-width operands (u3 != 0) so
+// neither path can short-circuit.
 [SimpleJob(RuntimeMoniker.Net10_0, launchCount: 6, warmupCount: 3, iterationCount: 10)]
 public class ArithmeticPathAB
 {
@@ -236,6 +231,11 @@ public class ArithmeticPathAB
     [GlobalSetup]
     public void Setup()
     {
+        if (!Avx2.IsSupported)
+        {
+            throw new PlatformNotSupportedException($"{nameof(ArithmeticPathAB)} requires AVX2.");
+        }
+
         _a = new UInt256[N];
         _b = new UInt256[N];
         Random rnd = new(42);
@@ -280,11 +280,8 @@ public class ArithmeticPathAB
 
 }
 
-// Focused LessThan A/B across operand relationships, to check whether scalar's early-exit limb
-// compare beats the AVX2 compare+movemask+lzcnt for ALL cases (not just random full-width, where
-// scalar exits on the first/u3 limb). DifferHigh = differ in u3 (scalar best case); DifferLow =
-// equal in u1..u3, differ only in u0 (scalar worst case: all four limbs compared); Equal = fully
-// equal (scalar also walks all four limbs). Same-process A/B, robust ratio.
+// LessThan A/B across operand relationships: DifferHigh (scalar exits after one compare),
+// DifferLow and Equal (scalar walks all four limbs).
 public enum LtCase
 {
     DifferHigh,
@@ -305,6 +302,11 @@ public class LessThanPathAB
     [GlobalSetup]
     public void Setup()
     {
+        if (!Avx2.IsSupported)
+        {
+            throw new PlatformNotSupportedException($"{nameof(LessThanPathAB)} requires AVX2.");
+        }
+
         _a = new UInt256[N];
         _b = new UInt256[N];
         Random rnd = new(42);

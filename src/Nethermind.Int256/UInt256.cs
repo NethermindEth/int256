@@ -1128,14 +1128,8 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool LessThan(in UInt256 a, in UInt256 b)
     {
-        // The scalar limb compare short-circuits on the most-significant differing limb and beats the
-        // AVX2 path (compare + movemask + lzcnt lane select, using the sign-flip unsigned-compare
-        // emulation) for every operand distribution on AVX2-only hardware. Only AVX-512's native
-        // unsigned k-mask compare (used by LessThanAvx2 when Avx512F.VL + Avx512DQ are present) is
-        // faster, so reserve the vector path for AVX-512. Measured in-process on Alder Lake (AVX2,
-        // no AVX-512): scalar 0.91/1.28/1.13 ns vs AVX2 1.38/1.59/1.36 ns for operands differing in
-        // the high limb / only the low limb / fully equal. The ARM (non-AVX2 Vector256) path is left
-        // unchanged.
+        // Without AVX-512's native unsigned k-mask compare, the short-circuiting scalar limb compare
+        // generally beats the AVX2 sign-flip emulation - see the LessThanPathAB benchmark.
         if (Avx512F.VL.IsSupported && Avx512DQ.IsSupported)
         {
             return LessThanAvx2(in a, in b);
