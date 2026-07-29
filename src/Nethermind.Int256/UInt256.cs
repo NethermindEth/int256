@@ -5,6 +5,7 @@ using System;
 using System.Buffers.Binary;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.IO.Hashing;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -27,15 +28,19 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     // one node they will not be the same on another node or across a restart so hash collision cannot be used to degrade
     // the performance of the network as a whole.
     // Constant by default for zkVM-compatibility -- subject to change in the near feature
-    private static readonly uint _hashSeed = UseHashCodeRandomizer
+    private static readonly bool _useHashCodeRandomizer = UseHashCodeRandomizer;
+    private static readonly uint _hashSeed = _useHashCodeRandomizer
         ? (uint)RandomNumberGenerator.GetInt32(int.MinValue, int.MaxValue)
         : 2098026241U; // just a random prime number
-    private static readonly ulong _aesHashSeed0 = UseHashCodeRandomizer
+    private static readonly ulong _aesHashSeed0 = _useHashCodeRandomizer
         ? CreateHashSeed()
         : 0x1F83D9ABFB41BD6BUL;
-    private static readonly ulong _aesHashSeed1 = UseHashCodeRandomizer
+    private static readonly ulong _aesHashSeed1 = _useHashCodeRandomizer
         ? CreateHashSeed()
         : 0x5BE0CD19137E2179UL;
+    private static readonly long _xxHashSeed = _useHashCodeRandomizer
+        ? unchecked((long)CreateHashSeed())
+        : 0;
 
     [FeatureSwitchDefinition("Nethermind.Int256.UseHashCodeRandomizer")]
     public static bool UseHashCodeRandomizer => AppContext.TryGetSwitch("Nethermind.Int256.UseHashCodeRandomizer", out var useHashCodeRandomizer) && useHashCodeRandomizer;
@@ -1405,7 +1410,22 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
             return FoldHash(MumFold(mixed));
         }
 
-        uint seed = _hashSeed;
+        return _useHashCodeRandomizer
+            ? GetXxHashCode(_xxHashSeed)
+            : GetCrcHashCode(unchecked(_hashSeed + 32u));
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal readonly int GetXxHashCode(long seed)
+    {
+        ref byte start = ref Unsafe.As<ulong, byte>(ref Unsafe.AsRef(in u0));
+        ulong hash = XxHash3.HashToUInt64(MemoryMarshal.CreateReadOnlySpan(ref start, 32), seed);
+        return FoldHash((long)hash);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal readonly int GetCrcHashCode(uint seed)
+    {
         ulong hash0 = BitOperations.Crc32C(seed, u0);
         ulong hash1 = BitOperations.Crc32C(seed ^ 0x9E3779B9u, u1);
         ulong hash2 = BitOperations.Crc32C(seed ^ 0x85EBCA6Bu, u2);
