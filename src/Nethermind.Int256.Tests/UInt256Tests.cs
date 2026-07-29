@@ -953,8 +953,10 @@ public class UInt256Tests : UInt256TestsTemplate<UInt256>
         target.Fill(0xAA);
         v.ToBigEndian(target);
 
-        BigInteger reconstructed = new(target, isUnsigned: true, isBigEndian: true);
-        reconstructed.Should().Be(value);
+        Span<byte> expected = stackalloc byte[32];
+        int byteCount = value.GetByteCount(isUnsigned: true);
+        value.TryWriteBytes(expected.Slice(32 - byteCount), out _, isUnsigned: true, isBigEndian: true);
+        target.ToArray().Should().Equal(expected.ToArray());
     }
 
     // The 20-byte (address) overload writes the low 20 bytes of the 32-byte big-endian form.

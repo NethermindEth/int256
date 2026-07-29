@@ -726,6 +726,11 @@ public class ToBigEndianAB
     [GlobalSetup]
     public void Setup()
     {
+        if (!Avx2.IsSupported)
+        {
+            throw new PlatformNotSupportedException($"{nameof(ToBigEndianAB)} requires AVX2.");
+        }
+
         _src = new UInt256[N];
         _dst = new byte[32];
         Random rnd = new(42);
