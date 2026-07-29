@@ -2,10 +2,14 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Numerics;
+using System.Runtime.Intrinsics;
 using FluentAssertions;
 using NUnit.Framework;
+using Arm = System.Runtime.Intrinsics.Arm;
+using x64 = System.Runtime.Intrinsics.X86;
 
 namespace Nethermind.Int256.Test;
 
@@ -645,6 +649,8 @@ public abstract class UInt256TestsTemplate<T> where T : IInteger<T>
 [Parallelizable(ParallelScope.All)]
 public class UInt256Tests : UInt256TestsTemplate<UInt256>
 {
+    private const int HashDistributionSampleCount = 4096;
+
     public UInt256Tests() : base((BigInteger x) => (UInt256)x, (int x) => (UInt256)x, x => x, TestNumbers.UInt256Max) { }
 
     [Test]
@@ -949,6 +955,113 @@ public class UInt256Tests : UInt256TestsTemplate<UInt256>
             (uint256a >= b).Should().Be(test.A >= b);
             (uint256a == b).Should().Be(test.A == b);
         }
+    }
+
+    [Test]
+    public void GetHashCode_FastPathMaintainsDistribution()
+    {
+        if (!x64.Aes.IsSupported && !Arm.Aes.IsSupported)
+        {
+            Assert.Ignore("The hardware-accelerated hash path is not available on this CPU.");
+        }
+
+        AssertHashCodesAreDistributed(value =>
+        {
+            Vector128<byte> second = Vector128.Create((uint)value, 0u, 0u, 0u).AsByte();
+            Vector128<byte> first = AesRound(second);
+            UInt256 input = new(
+                first.AsUInt64().GetElement(0),
+                first.AsUInt64().GetElement(1),
+                second.AsUInt64().GetElement(0),
+                second.AsUInt64().GetElement(1));
+
+            return input.GetHashCode();
+        }, "fast path");
+
+        static Vector128<byte> AesRound(Vector128<byte> state)
+            => x64.Aes.IsSupported
+                ? x64.Aes.Encrypt(state, Vector128<byte>.Zero)
+                : Arm.Aes.MixColumns(Arm.Aes.Encrypt(state, Vector128<byte>.Zero));
+    }
+
+    [TestCase(0u)]
+    [TestCase(1u)]
+    [TestCase(0xDEADBEEFu)]
+    public void GetHashCode_DeterministicFallbackMaintainsDistribution(uint seed)
+    {
+        AssertHashCodesAreDistributed(value =>
+        {
+            ulong first = (uint)value;
+            ulong third = SolveCrcInput(BitOperations.Crc32C(0u, first));
+            return new UInt256(first, 0, third, 0).GetCrcHashCode(seed);
+        }, $"deterministic fallback for seed {seed}");
+    }
+
+    [TestCase(0L)]
+    [TestCase(1L)]
+    [TestCase(0x00000000DEADBEEFL)]
+    public void GetHashCode_RandomizedFallbackMaintainsDistribution(long seed)
+        => AssertHashCodesAreDistributed(
+            value => new UInt256(0, 0, 0, (uint)value).GetXxHashCode(seed),
+            $"randomized fallback for seed {seed}");
+
+    private static void AssertHashCodesAreDistributed(Func<int, int> getHash, string context)
+    {
+        HashSet<int> hashes = new(HashDistributionSampleCount);
+        for (int value = 0; value < HashDistributionSampleCount; value++)
+        {
+            hashes.Add(getHash(value));
+        }
+
+        Assert.That(hashes.Count, Is.GreaterThan(HashDistributionSampleCount - 32),
+            $"{context} produced {hashes.Count}/{HashDistributionSampleCount} distinct hashes");
+    }
+
+    private static ulong SolveCrcInput(uint target)
+    {
+        Span<uint> pivotBasis = stackalloc uint[32];
+        Span<ulong> pivotSource = stackalloc ulong[32];
+        pivotBasis.Clear();
+        ulong dependentInput = 0;
+
+        for (int i = 0; i < 64; i++)
+        {
+            uint basis = BitOperations.Crc32C(0u, 1UL << i);
+            ulong source = 1UL << i;
+            while (basis != 0)
+            {
+                int column = BitOperations.TrailingZeroCount(basis);
+                if (pivotBasis[column] == 0)
+                {
+                    pivotBasis[column] = basis;
+                    pivotSource[column] = source;
+                    break;
+                }
+
+                basis ^= pivotBasis[column];
+                source ^= pivotSource[column];
+            }
+
+            if (basis == 0 && dependentInput == 0)
+            {
+                dependentInput = source;
+            }
+        }
+
+        if (target == 0)
+        {
+            return dependentInput;
+        }
+
+        ulong input = 0;
+        while (target != 0)
+        {
+            int column = BitOperations.TrailingZeroCount(target);
+            target ^= pivotBasis[column];
+            input ^= pivotSource[column];
+        }
+
+        return input;
     }
 
     [NonParallelizable]

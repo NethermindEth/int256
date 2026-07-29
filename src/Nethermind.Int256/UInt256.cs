@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: MIT
 
 using System;
+using System.Buffers.Binary;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.IO.Hashing;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -27,12 +29,30 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     // one node they will not be the same on another node or across a restart so hash collision cannot be used to degrade
     // the performance of the network as a whole.
     // Constant by default for zkVM-compatibility -- subject to change in the near feature
-    private static readonly uint _hashSeed = UseHashCodeRandomizer
+    private static readonly bool _useHashCodeRandomizer = UseHashCodeRandomizer;
+    private static readonly uint _hashSeed = _useHashCodeRandomizer
         ? (uint)RandomNumberGenerator.GetInt32(int.MinValue, int.MaxValue)
         : 2098026241U; // just a random prime number
+    private static readonly ulong _aesHashSeed0 = _useHashCodeRandomizer
+        ? CreateHashSeed()
+        : 0x1F83D9ABFB41BD6BUL;
+    private static readonly ulong _aesHashSeed1 = _useHashCodeRandomizer
+        ? CreateHashSeed()
+        : 0x5BE0CD19137E2179UL;
+    private static readonly long _xxHashSeed = _useHashCodeRandomizer
+        ? unchecked((long)CreateHashSeed())
+        : 0;
 
     [FeatureSwitchDefinition("Nethermind.Int256.UseHashCodeRandomizer")]
     public static bool UseHashCodeRandomizer => AppContext.TryGetSwitch("Nethermind.Int256.UseHashCodeRandomizer", out var useHashCodeRandomizer) && useHashCodeRandomizer;
+
+    [SkipLocalsInit]
+    private static ulong CreateHashSeed()
+    {
+        Span<byte> bytes = stackalloc byte[sizeof(ulong)];
+        RandomNumberGenerator.Fill(bytes);
+        return BinaryPrimitives.ReadUInt64LittleEndian(bytes);
+    }
 
     public static readonly UInt256 Zero = 0ul;
     public static readonly UInt256 One = 1ul;
@@ -1427,56 +1447,67 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     public override bool Equals(object? obj) => obj is UInt256 other && Equals(other);
 
     [SkipLocalsInit]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public readonly override int GetHashCode()
     {
         // Very fast hardware accelerated non-cryptographic hash function
-        uint seed = _hashSeed;
-
-        if (x64.Aes.IsSupported)
+        if (x64.Aes.IsSupported || Arm.Aes.IsSupported)
         {
             Vector128<byte> key = Unsafe.As<ulong, Vector128<byte>>(ref Unsafe.AsRef(in u0));
             Vector128<byte> data = Unsafe.As<ulong, Vector128<byte>>(ref Unsafe.AsRef(in u2));
-            // Mix in the instance-random seed
-            key ^= Vector128.CreateScalar(seed).AsByte();
-            // Single AESENC is a powerful mixer - 4 cycles, full diffusion
-            Vector128<byte> mixed = x64.Aes.Encrypt(data, key);
-            ulong compressed = mixed.AsUInt64().GetElement(0) ^ mixed.AsUInt64().GetElement(1);
-            return (int)(uint)(compressed ^ (compressed >> 32));
-        }
-        else if (Arm.Aes.IsSupported)
-        {
-            Vector128<byte> key = Unsafe.As<ulong, Vector128<byte>>(ref Unsafe.AsRef(in u0));
-            Vector128<byte> data = Unsafe.As<ulong, Vector128<byte>>(ref Unsafe.AsRef(in u2));
-            // Mix in the instance-random seed
-            key ^= Vector128.CreateScalar(seed).AsByte();
-            // ARM needs explicit MixColumns for equivalent diffusion
-            Vector128<byte> mixed = Arm.Aes.MixColumns(Arm.Aes.Encrypt(data, key));
-            ulong compressed = mixed.AsUInt64().GetElement(0) ^ mixed.AsUInt64().GetElement(1);
-            return (int)(uint)(compressed ^ (compressed >> 32));
+            key ^= Vector128.Create(_aesHashSeed0, _aesHashSeed1).AsByte();
+            // Two rounds maintain good distribution across the accelerated path.
+            Vector128<byte> mixed = HashAesRound(data, key);
+            mixed = HashAesRound(mixed, key);
+            return FoldHash(MumFold(mixed));
         }
 
-        uint hash0 = BitOperations.Crc32C(seed, u0);
-        uint hash1 = BitOperations.Crc32C(seed ^ 0x9E3779B9u, u1);
-        uint hash2 = BitOperations.Crc32C(seed ^ 0x85EBCA6Bu, u2);
-        uint hash3 = BitOperations.Crc32C(seed ^ 0xC2B2AE35u, u3);
+        return _useHashCodeRandomizer
+            ? GetXxHashCode(_xxHashSeed)
+            : GetCrcHashCode(unchecked(_hashSeed + 32u));
+    }
 
-        hash0 += BitOperations.RotateLeft(hash1, 11);
-        hash2 = BitOperations.RotateLeft(hash2, 17) + BitOperations.RotateLeft(hash3, 23);
-        uint hash = hash2 + hash0;
-        return FinalMix(hash);
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal readonly int GetXxHashCode(long seed)
+    {
+        ref byte start = ref Unsafe.As<ulong, byte>(ref Unsafe.AsRef(in u0));
+        ulong hash = XxHash3.HashToUInt64(MemoryMarshal.CreateReadOnlySpan(ref start, 32), seed);
+        return FoldHash((long)hash);
+    }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static int FinalMix(uint x)
-        {
-            // A tiny finaliser to improve avalanche:
-            // - xor-fold high bits down
-            // - multiply by an odd constant to spread changes across bits
-            // - xor-fold again to propagate the multiply result
-            x ^= x >> 16;
-            x *= 0x9E3779B1u;
-            x ^= x >> 16;
-            return (int)x;
-        }
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal readonly int GetCrcHashCode(uint seed)
+    {
+        ulong hash0 = BitOperations.Crc32C(seed, u0);
+        ulong hash1 = BitOperations.Crc32C(seed ^ 0x9E3779B9u, u1);
+        ulong hash2 = BitOperations.Crc32C(seed ^ 0x85EBCA6Bu, u2);
+        ulong hash3 = BitOperations.Crc32C(seed ^ 0xC2B2AE35u, u3);
+        return FoldHash(MumFold(hash0 | (hash1 << 32), hash2 | (hash3 << 32)));
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Vector128<byte> HashAesRound(Vector128<byte> state, Vector128<byte> roundKey)
+        => x64.Aes.IsSupported
+            ? x64.Aes.Encrypt(state, roundKey)
+            // Keep the round key outside AESE so state and roundKey have distinct roles in the mixer.
+            : Arm.Aes.MixColumns(Arm.Aes.Encrypt(state, Vector128<byte>.Zero)) ^ roundKey;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static long MumFold(ulong a, ulong b)
+    {
+        ulong low = Math.BigMul(a ^ 0x9E3779B97F4A7C15UL, b ^ 0xBF58476D1CE4E5B9UL, out ulong high);
+        return (long)(low ^ high);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static long MumFold(Vector128<byte> mixed)
+        => MumFold(mixed.AsUInt64().GetElement(0), mixed.AsUInt64().GetElement(1));
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static int FoldHash(long hash)
+    {
+        ulong value = (ulong)hash;
+        return (int)(value ^ (value >> 32));
     }
 
     public ulong this[int index] => index switch
