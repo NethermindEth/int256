@@ -67,7 +67,11 @@ public readonly struct Int256 : IEquatable<Int256>, IComparable, IComparable<Int
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get => _value.IsZero ? 0 : _value.u3 < 0x8000000000000000ul ? 1 : -1;
     }
-    public bool IsNegative => Sign < 0;
+    public bool IsNegative
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => Sign < 0;
+    }
 
     public static Int256 operator +(in Int256 a, in Int256 b)
     {
