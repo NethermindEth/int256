@@ -466,16 +466,53 @@ public readonly partial struct UInt256
 
     [SkipLocalsInit]
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void Remainder257By64Bits(in UInt256 a, ulong a4, ulong d, out UInt256 rem)
+    internal static void Remainder257By64Bits(in UInt256 a, ulong a4, ulong d, out UInt256 rem)
     {
         // Remainder of 5-limb value by 64-bit modulus.
         // Computes ((a4..a0 base 2^64) % d).
         Debug.Assert(d != 0);
         Debug.Assert(a4 <= 1);
 
+        ulong r;
+        if ((a.u1 | a.u2 | a.u3 | a4) == 0)
+        {
+            // Single-limb sum: one hardware remainder beats the reciprocal chain below.
+            rem = default;
+            Unsafe.AsRef(in rem.u0) = a.u0 < d ? a.u0 : a.u0 % d;
+            return;
+        }
+
         int s = BitOperations.LeadingZeroCount(d);
         ulong dn = (s != 0) ? (d << s) : d;       // normalised (msb set) if s>0
         ulong recip = Reciprocal2By1(dn);
+
+        if ((a.u2 | a.u3 | a4) == 0)
+        {
+            // The sum fits in 128 bits (u1:u0) - the common ADDMOD case with already-reduced
+            // operands. Normalise just the two low limbs; the bits shifted out of u1 seed the
+            // remainder (they are < 2^s <= dn, satisfying UDivRem2By1's r < d precondition).
+            ulong l0, l1;
+            if (s == 0)
+            {
+                r = 0;
+                l1 = a.u1;
+                l0 = a.u0;
+            }
+            else
+            {
+                int rs = 64 - s;
+                r = a.u1 >> rs;
+                l1 = (a.u1 << s) | (a.u0 >> rs);
+                l0 = a.u0 << s;
+            }
+
+            _ = UDivRem2By1(r, recip, dn, l1, out r);
+            _ = UDivRem2By1(r, recip, dn, l0, out r);
+
+            rem = default;
+            Unsafe.AsRef(in rem.u0) = (s == 0) ? r : (r >> s);
+            return;
+        }
 
         // Normalise dividend (we treat it as 6 limbs with top limb 0)
         ulong u0, u1, u2, u3, u4, u5;
@@ -501,7 +538,7 @@ public readonly partial struct UInt256
 
         // Horner-like remainder using exact 2-by-1 divisions:
         // r = (((((u5*b + u4)*b + u3)*b + u2)*b + u1)*b + u0) % dn
-        ulong r = 0;
+        r = 0;
         _ = UDivRem2By1(r, recip, dn, u5, out r);
         _ = UDivRem2By1(r, recip, dn, u4, out r);
         _ = UDivRem2By1(r, recip, dn, u3, out r);
