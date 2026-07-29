@@ -7,6 +7,7 @@ using System.Collections.Immutable;
 using System.Globalization;
 using System.Linq;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Jobs;
@@ -701,6 +702,94 @@ public class ParseDecimalUnsigned : ParseUnsignedBenchmarkBase
     public bool TryParse_UInt256()
     {
         return UInt256.TryParse(Value, out _);
+    }
+}
+
+// In-process A/B for the Int256 signed-comparison preamble: master's Sign-based classification
+// (replicated below via the public surface) vs operator<'s top-bit test.
+public enum SignedCmpCase
+{
+    DifferSign,          // operands of opposite sign - decided by the preamble alone
+    SameSignDifferHigh,  // both negative, differ in the top limb
+    Equal,               // fully equal - full limb compare on both paths
+}
+
+[SimpleJob(RuntimeMoniker.Net10_0, launchCount: 6, warmupCount: 3, iterationCount: 10)]
+public class SignedCompareAB
+{
+    private const int N = 1024;
+    private Int256[] _a = null!;
+    private Int256[] _b = null!;
+
+    [Params(SignedCmpCase.DifferSign, SignedCmpCase.SameSignDifferHigh, SignedCmpCase.Equal)]
+    public SignedCmpCase Case;
+
+    [GlobalSetup]
+    public void Setup()
+    {
+        _a = new Int256[N];
+        _b = new Int256[N];
+        Random rnd = new(42);
+        for (int i = 0; i < N; i++)
+        {
+            ulong x0 = (ulong)rnd.NextInt64();
+            ulong x1 = (ulong)rnd.NextInt64();
+            ulong x2 = (ulong)rnd.NextInt64();
+            ulong x3 = (ulong)rnd.NextInt64() | 0x8000_0000_0000_0000UL;
+            _a[i] = new Int256(new UInt256(x0, x1, x2, x3));
+            _b[i] = Case switch
+            {
+                SignedCmpCase.DifferSign => new Int256(new UInt256(x0, x1, x2, x3 & ~0x8000_0000_0000_0000UL)),
+                SignedCmpCase.SameSignDifferHigh => new Int256(new UInt256(x0, x1, x2, x3 ^ 0x4000_0000_0000_0000UL)),
+                _ => _a[i],
+            };
+        }
+    }
+
+    // Master's operator< shape: full Sign for both operands, then the unsigned limb compare.
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool LessThanSignBased(in Int256 z, in Int256 x)
+    {
+        int zSign = z.Sign;
+        int xSign = x.Sign;
+
+        if (zSign >= 0)
+        {
+            if (xSign < 0)
+            {
+                return false;
+            }
+        }
+        else if (xSign >= 0)
+        {
+            return true;
+        }
+
+        return Unsafe.As<Int256, UInt256>(ref Unsafe.AsRef(in z)) < Unsafe.As<Int256, UInt256>(ref Unsafe.AsRef(in x));
+    }
+
+    [Benchmark(Baseline = true, OperationsPerInvoke = N)]
+    public int LessThan_SignBased()
+    {
+        Int256[] a = _a, b = _b;
+        int acc = 0;
+        for (int i = 0; i < a.Length; i++)
+        {
+            if (LessThanSignBased(in a[i], in b[i])) acc++;
+        }
+        return acc;
+    }
+
+    [Benchmark(OperationsPerInvoke = N)]
+    public int LessThan_TopBit()
+    {
+        Int256[] a = _a, b = _b;
+        int acc = 0;
+        for (int i = 0; i < a.Length; i++)
+        {
+            if (a[i] < b[i]) acc++;
+        }
+        return acc;
     }
 }
 
