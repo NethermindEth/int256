@@ -84,6 +84,7 @@ public readonly partial struct UInt256
 
     public static implicit operator UInt256(ulong value) => new UInt256(value, 0ul, 0ul, 0ul);
 
+    [SkipLocalsInit]
     public static explicit operator UInt256(in BigInteger value)
     {
         Span<byte> bytes32 = stackalloc byte[32];
