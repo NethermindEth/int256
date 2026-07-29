@@ -529,17 +529,15 @@ public readonly partial struct UInt256
         ulong r;
         if ((u2 | u3 | a4) == 0)
         {
-            // The 257-bit sum actually fits in 128 bits (u1:u0). This is the common case when ADDMOD's
-            // operands are already reduced (x,y < m < 2^64 => sum < 2^65). x86 DIV is expensive
-            // (~20-40 cycles), so skip the two divides that would just reduce the zero high limbs.
+            // Sum fits in 128 bits (u1:u0) - the common ADDMOD case (x,y < m < 2^64). Skip the two
+            // divides that would just reduce the zero high limbs.
             if (u1 < d)
             {
-                // u1 < d guarantees the quotient fits in 64 bits, so one DivRem yields (u1:u0) % d.
                 r = X86Base.X64.DivRem(u0, u1, d).Remainder;
             }
             else
             {
-                ulong hi = X86Base.X64.DivRem(u1, 0UL, d).Remainder; // u1 % d (high half is zero)
+                ulong hi = X86Base.X64.DivRem(u1, 0UL, d).Remainder;
                 r = X86Base.X64.DivRem(u0, hi, d).Remainder;
             }
         }

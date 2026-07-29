@@ -705,18 +705,13 @@ public class ParseDecimalUnsigned : ParseUnsignedBenchmarkBase
     }
 }
 
-// In-process A/B for the ADDMOD-by-64-bit-modulus reduction (Remainder257By64BitsX86Base). The
-// current code issues four 64-bit hardware DivRems unconditionally (one per limb of the 257-bit
-// sum). x86 DIV is ~20-40 cycles, so when the sum fits in <=128 bits - the common case when ADDMOD's
-// operands are already reduced (x,y < m < 2^64), giving a sum < 2^65 - two or three of those divides
-// are pure waste (dividing zero high limbs). FastPath detects (u2|u3|carry)==0 and reduces the
-// 128-bit (u1:u0) value with one DivRem when u1<d, else two. The Full case (sum > 128 bits) takes the
-// same four-DivRem path in both, so it is a no-regression guard. Operands generated from a fixed seed.
+// In-process A/B for Remainder257By64BitsX86Base's fast path, which skips DivRems on zero high
+// limbs. Full is a no-regression guard: both paths take all four DivRems there.
 public enum SumWidth
 {
-    Small,   // x,y < 2^64  => sum < 2^65 (u1 in {0,1}); 1 DivRem on the fast path
-    Mid128,  // sum is a full 128-bit value (u1 large, < d not guaranteed); 2 DivRems on the fast path
-    Full,    // full 257-bit sum; 4 DivRems on both paths (regression guard)
+    Small,   // sum < 2^65; 1 DivRem on the fast path
+    Mid128,  // full 128-bit sum; 2 DivRems on the fast path
+    Full,    // full 257-bit sum; 4 DivRems on both paths
 }
 
 #pragma warning disable SYSLIB5004 // X86Base.X64.DivRem is [Experimental]; the library already uses it
@@ -737,6 +732,11 @@ public class AddModReduce64AB
     [GlobalSetup]
     public void Setup()
     {
+        if (!X86Base.X64.IsSupported)
+        {
+            throw new PlatformNotSupportedException($"{nameof(AddModReduce64AB)} requires x86-64 (X86Base.X64.DivRem).");
+        }
+
         _u0 = new ulong[N];
         _u1 = new ulong[N];
         _u2 = new ulong[N];
