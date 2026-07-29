@@ -67,10 +67,16 @@ jobs:
             build-config: release
             intrinsics: NoHWIntrinsics
             avx2: NoAvx2
+          - os: ubuntu-latest
+            build-config: release
+            intrinsics: NoHWIntrinsics
+            avx2: NoAvx2
+            variant: zkevm
             
     env:
       DOTNET_EnableAVX2: ${{ matrix.avx2 == 'NoAvx2' && '0' || '1' }}
       DOTNET_EnableHWIntrinsic: ${{ matrix.intrinsics == 'NoHWIntrinsics' && '0' || '1' }}
+      ENABLE_ZKEVM: ${{ matrix.variant == 'zkevm' && 'true' || 'false' }}
       
     steps:
       - name: Check out repository
@@ -81,7 +87,7 @@ jobs:
 
       - name: Test
         working-directory: src/Nethermind.Int256.Tests
-        run: dotnet test -c ${{ matrix.build-config }}
+        run: dotnet test -c ${{ matrix.build-config }} -p:EnableZkEvm=${{ env.ENABLE_ZKEVM }}
 
   publish:
     name: Publish

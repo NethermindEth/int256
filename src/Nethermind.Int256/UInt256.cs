@@ -10,7 +10,6 @@ using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
 using System.Runtime.Intrinsics.Arm;
 using System.Runtime.Intrinsics.X86;
-using System.Security.Cryptography;
 using Arm = System.Runtime.Intrinsics.Arm;
 using x64 = System.Runtime.Intrinsics.X86;
 
@@ -22,16 +21,6 @@ namespace Nethermind.Int256;
 public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComparable<UInt256>, IInteger<UInt256>, IConvertible
 {
     public const int Len = 4;
-    // Ensure that hashes are different for every run of the node and every node, so if are any hash collisions on
-    // one node they will not be the same on another node or across a restart so hash collision cannot be used to degrade
-    // the performance of the network as a whole.
-    // Constant by default for zkVM-compatibility -- subject to change in the near feature
-    private static readonly uint _hashSeed = UseHashCodeRandomizer
-        ? (uint)RandomNumberGenerator.GetInt32(int.MinValue, int.MaxValue)
-        : 2098026241U; // just a random prime number
-
-    [FeatureSwitchDefinition("Nethermind.Int256.UseHashCodeRandomizer")]
-    public static bool UseHashCodeRandomizer => AppContext.TryGetSwitch("Nethermind.Int256.UseHashCodeRandomizer", out var useHashCodeRandomizer) && useHashCodeRandomizer;
 
     public static readonly UInt256 Zero = 0ul;
     public static readonly UInt256 One = 1ul;
@@ -62,46 +51,6 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     }
 
     public (ulong value, bool overflow) UlongWithOverflow => (u0, (u1 | u2 | u3) != 0);
-
-#if ZK_EVM
-    // ZisK/riscv64 has no SIMD: the Vector256 branch is always dead, and its mere
-    // presence (a Vector256<ulong> reference + Unsafe.As) blocks the NativeAOT inliner
-    // from inlining this hot per-opcode getter. Scalar-only here so it inlines.
-    public bool IsZero
-    {
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get => (u0 | u1 | u2 | u3) == 0;
-    }
-
-    public bool IsOne
-    {
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get => ((u0 ^ 1UL) | u1 | u2 | u3) == 0;
-    }
-#else
-    // Vector256 paths live in separate helpers (here and in the bitwise/Equals members) to keep
-    // the public bodies small enough to inline into hot callers on non-SIMD targets (e.g. riscv64),
-    // where the helper call is dead code.
-    public bool IsZero
-    {
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get => Vector256.IsHardwareAccelerated ? IsZeroVector(in this) : (u0 | u1 | u2 | u3) == 0;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool IsZeroVector(in UInt256 a)
-        => Unsafe.BitCast<UInt256, Vector256<ulong>>(a) == default;
-
-    public bool IsOne
-    {
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get => Vector256.IsHardwareAccelerated ? IsOneVector(in this) : ((u0 ^ 1UL) | u1 | u2 | u3) == 0;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool IsOneVector(in UInt256 a)
-        => Unsafe.BitCast<UInt256, Vector256<ulong>>(a) == Vector256.CreateScalar(1UL);
-#endif
 
     public bool IsZeroOrOne => ((u0 >> 1) | u1 | u2 | u3) == 0;
 
@@ -1053,85 +1002,6 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         res = new UInt256(u3);
     }
 
-#if ZK_EVM
-    // riscv64: no SIMD; the Vector256 branch is dead but blocks inlining of these hot bitwise
-    // opcodes (NOT/OR/AND/XOR). Scalar-only + inline.
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void Not(in UInt256 a, out UInt256 res) => res = new UInt256(~a.u0, ~a.u1, ~a.u2, ~a.u3);
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void Or(in UInt256 a, in UInt256 b, out UInt256 res) => res = new UInt256(a.u0 | b.u0, a.u1 | b.u1, a.u2 | b.u2, a.u3 | b.u3);
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void And(in UInt256 a, in UInt256 b, out UInt256 res) => res = new UInt256(a.u0 & b.u0, a.u1 & b.u1, a.u2 & b.u2, a.u3 & b.u3);
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void Xor(in UInt256 a, in UInt256 b, out UInt256 res) => res = new UInt256(a.u0 ^ b.u0, a.u1 ^ b.u1, a.u2 ^ b.u2, a.u3 ^ b.u3);
-#else
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void Not(in UInt256 a, out UInt256 res)
-    {
-        if (Vector256.IsHardwareAccelerated)
-        {
-            NotVector(in a, out res);
-            return;
-        }
-        res = new UInt256(~a.u0, ~a.u1, ~a.u2, ~a.u3);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void NotVector(in UInt256 a, out UInt256 res)
-        => res = Unsafe.BitCast<Vector256<ulong>, UInt256>(~Unsafe.BitCast<UInt256, Vector256<ulong>>(a));
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void Or(in UInt256 a, in UInt256 b, out UInt256 res)
-    {
-        if (Vector256.IsHardwareAccelerated)
-        {
-            OrVector(in a, in b, out res);
-            return;
-        }
-        res = new UInt256(a.u0 | b.u0, a.u1 | b.u1, a.u2 | b.u2, a.u3 | b.u3);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void OrVector(in UInt256 a, in UInt256 b, out UInt256 res)
-        => res = Unsafe.BitCast<Vector256<ulong>, UInt256>(
-            Unsafe.BitCast<UInt256, Vector256<ulong>>(a) | Unsafe.BitCast<UInt256, Vector256<ulong>>(b));
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void And(in UInt256 a, in UInt256 b, out UInt256 res)
-    {
-        if (Vector256.IsHardwareAccelerated)
-        {
-            AndVector(in a, in b, out res);
-            return;
-        }
-        res = new UInt256(a.u0 & b.u0, a.u1 & b.u1, a.u2 & b.u2, a.u3 & b.u3);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void AndVector(in UInt256 a, in UInt256 b, out UInt256 res)
-        => res = Unsafe.BitCast<Vector256<ulong>, UInt256>(
-            Unsafe.BitCast<UInt256, Vector256<ulong>>(a) & Unsafe.BitCast<UInt256, Vector256<ulong>>(b));
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void Xor(in UInt256 a, in UInt256 b, out UInt256 res)
-    {
-        if (Vector256.IsHardwareAccelerated)
-        {
-            XorVector(in a, in b, out res);
-            return;
-        }
-        res = new UInt256(a.u0 ^ b.u0, a.u1 ^ b.u1, a.u2 ^ b.u2, a.u3 ^ b.u3);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void XorVector(in UInt256 a, in UInt256 b, out UInt256 res)
-        => res = Unsafe.BitCast<Vector256<ulong>, UInt256>(
-            Unsafe.BitCast<UInt256, Vector256<ulong>>(a) ^ Unsafe.BitCast<UInt256, Vector256<ulong>>(b));
-#endif
-
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool LessThan(in UInt256 a, long b) => b >= 0 && a.u3 == 0 && a.u2 == 0 && a.u1 == 0 && a.u0 < (ulong)b;
 
@@ -1143,27 +1013,6 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool LessThan(ulong a, in UInt256 b) => b.u3 != 0 || b.u2 != 0 || b.u1 != 0 || a < b.u0;
-
-#if ZK_EVM
-    // ZisK/riscv64 has no SIMD: the Avx2/Vector256 branches are dead, but referencing them
-    // blocks the NativeAOT inliner from inlining this hot comparison (LT/GT/SLT/SGT + many
-    // internal UInt256 ops). Scalar-only so it inlines.
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool LessThan(in UInt256 a, in UInt256 b) => LessThanScalar(in a, in b);
-#else
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool LessThan(in UInt256 a, in UInt256 b)
-    {
-        if (!Avx2.IsSupported && !Vector256.IsHardwareAccelerated)
-        {
-            return LessThanScalar(in a, in b);
-        }
-
-        return Avx2.IsSupported ?
-            LessThanAvx2(in a, in b) :
-            LessThanVector256(in a, in b);
-    }
-#endif
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool LessThanScalar(in UInt256 a, in UInt256 b)
@@ -1231,28 +1080,6 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         int idx = BitOperations.LeadingZeroCount(diff) ^ 31;
         return ((ltMask >> idx) & 1u) != 0;
     }
-
-#if ZK_EVM
-    // riscv64: scalar-only so it inlines (see LessThan).
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool LessThanBoth(in UInt256 x, in UInt256 y, in UInt256 m)
-        => LessThanScalar(in x, in m) && LessThanScalar(in y, in m);
-#else
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool LessThanBoth(in UInt256 x, in UInt256 y, in UInt256 m)
-    {
-        if (!Avx2.IsSupported && !Vector256.IsHardwareAccelerated)
-        {
-            return LessThanScalar(in x, in m) && LessThanScalar(in y, in m);
-        }
-
-        return Avx512F.VL.IsSupported && Avx512DQ.IsSupported ?
-            LessThanBothAvx512(in x, in y, in m) :
-            Avx2.IsSupported ?
-                LessThanBothAvx2(in x, in y, in m) :
-                LessThanBothVector256(in x, in y, in m);
-    }
-#endif
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool LessThanBothAvx512(in UInt256 x, in UInt256 y, in UInt256 m)
@@ -1383,52 +1210,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         return other >= 0 && Equals((uint)other);
     }
 
-#if ZK_EVM
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool Equals(uint other) => u0 == other && (u1 | u2 | u3) == 0;
-#else
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool Equals(uint other)
-        => Vector256.IsHardwareAccelerated ? EqualsVector(in this, other) : u0 == other && IsUint64;
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool EqualsVector(in UInt256 a, uint other)
-        => Unsafe.BitCast<UInt256, Vector256<uint>>(a) == Vector256.CreateScalar(other);
-#endif
-
     public bool Equals(long other) => other >= 0 && Equals((ulong)other);
-
-#if ZK_EVM
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool Equals(ulong other) => u0 == other && (u1 | u2 | u3) == 0;
-#else
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool Equals(ulong other)
-        => Vector256.IsHardwareAccelerated ? EqualsVector(in this, other) : u0 == other && IsUint64;
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool EqualsVector(in UInt256 a, ulong other)
-        => Unsafe.BitCast<UInt256, Vector256<ulong>>(a) == Vector256.CreateScalar(other);
-#endif
-
-#if ZK_EVM
-    // The priority-1 hot overload (== and CompareTo resolve here). riscv64 has no SIMD; scalar.
-    [OverloadResolutionPriority(1)]
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool Equals(in UInt256 other)
-        => ((u0 ^ other.u0) | (u1 ^ other.u1) | (u2 ^ other.u2) | (u3 ^ other.u3)) == 0;
-#else
-    [OverloadResolutionPriority(1)]
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool Equals(in UInt256 other)
-        => Vector256.IsHardwareAccelerated
-            ? EqualsVector(in this, in other)
-            : ((u0 ^ other.u0) | (u1 ^ other.u1) | (u2 ^ other.u2) | (u3 ^ other.u3)) == 0;
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool EqualsVector(in UInt256 a, in UInt256 b)
-        => Unsafe.BitCast<UInt256, Vector256<ulong>>(a) == Unsafe.BitCast<UInt256, Vector256<ulong>>(b);
-#endif
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Equals(UInt256 other) => Equals(in other);
