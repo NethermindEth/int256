@@ -7,6 +7,7 @@ using System.Collections.Immutable;
 using System.Globalization;
 using System.Linq;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using System.Runtime.Intrinsics.X86;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Configs;
@@ -841,6 +842,212 @@ public class ParseDecimalUnsigned : ParseUnsignedBenchmarkBase
         return UInt256.TryParse(Value, out _);
     }
 }
+
+// In-process A/B for the Int256 signed-comparison preamble: master's Sign-based classification
+// (replicated below via the public surface) vs operator<'s top-bit test.
+public enum SignedCmpCase
+{
+    DifferSign,          // operands of opposite sign - decided by the preamble alone
+    SameSignDifferHigh,  // both negative, differ in the top limb
+    Equal,               // fully equal - full limb compare on both paths
+}
+
+[SimpleJob(RuntimeMoniker.Net10_0, launchCount: 6, warmupCount: 3, iterationCount: 10)]
+public class SignedCompareAB
+{
+    private const int N = 1024;
+    private Int256[] _a = null!;
+    private Int256[] _b = null!;
+
+    [Params(SignedCmpCase.DifferSign, SignedCmpCase.SameSignDifferHigh, SignedCmpCase.Equal)]
+    public SignedCmpCase Case;
+
+    [GlobalSetup]
+    public void Setup()
+    {
+        _a = new Int256[N];
+        _b = new Int256[N];
+        Random rnd = new(42);
+        for (int i = 0; i < N; i++)
+        {
+            ulong x0 = (ulong)rnd.NextInt64();
+            ulong x1 = (ulong)rnd.NextInt64();
+            ulong x2 = (ulong)rnd.NextInt64();
+            ulong x3 = (ulong)rnd.NextInt64() | 0x8000_0000_0000_0000UL;
+            _a[i] = new Int256(new UInt256(x0, x1, x2, x3));
+            _b[i] = Case switch
+            {
+                SignedCmpCase.DifferSign => new Int256(new UInt256(x0, x1, x2, x3 & ~0x8000_0000_0000_0000UL)),
+                SignedCmpCase.SameSignDifferHigh => new Int256(new UInt256(x0, x1, x2, x3 ^ 0x4000_0000_0000_0000UL)),
+                _ => _a[i],
+            };
+        }
+    }
+
+    // Master's operator< shape: full Sign for both operands, then the unsigned limb compare.
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool LessThanSignBased(in Int256 z, in Int256 x)
+    {
+        int zSign = z.Sign;
+        int xSign = x.Sign;
+
+        if (zSign >= 0)
+        {
+            if (xSign < 0)
+            {
+                return false;
+            }
+        }
+        else if (xSign >= 0)
+        {
+            return true;
+        }
+
+        return Unsafe.As<Int256, UInt256>(ref Unsafe.AsRef(in z)) < Unsafe.As<Int256, UInt256>(ref Unsafe.AsRef(in x));
+    }
+
+    [Benchmark(Baseline = true, OperationsPerInvoke = N)]
+    public int LessThan_SignBased()
+    {
+        Int256[] a = _a, b = _b;
+        int acc = 0;
+        for (int i = 0; i < a.Length; i++)
+        {
+            if (LessThanSignBased(in a[i], in b[i])) acc++;
+        }
+        return acc;
+    }
+
+    [Benchmark(OperationsPerInvoke = N)]
+    public int LessThan_TopBit()
+    {
+        Int256[] a = _a, b = _b;
+        int acc = 0;
+        for (int i = 0; i < a.Length; i++)
+        {
+            if (a[i] < b[i]) acc++;
+        }
+        return acc;
+    }
+}
+
+// In-process A/B for Remainder257By64BitsX86Base's fast path, which skips DivRems on zero high
+// limbs. Full is a no-regression guard: both paths take all four DivRems there.
+public enum SumWidth
+{
+    Small,   // sum < 2^65; 1 DivRem on the fast path
+    Mid128,  // full 128-bit sum; 2 DivRems on the fast path
+    Full,    // full 257-bit sum; 4 DivRems on both paths
+}
+
+#pragma warning disable SYSLIB5004 // X86Base.X64.DivRem is [Experimental]; the library already uses it
+[SimpleJob(RuntimeMoniker.Net10_0, launchCount: 6, warmupCount: 3, iterationCount: 10)]
+public class AddModReduce64AB
+{
+    private const int N = 1024;
+    private ulong[] _u0 = null!;
+    private ulong[] _u1 = null!;
+    private ulong[] _u2 = null!;
+    private ulong[] _u3 = null!;
+    private ulong[] _a4 = null!;
+    private ulong[] _d = null!;
+
+    [Params(SumWidth.Small, SumWidth.Mid128, SumWidth.Full)]
+    public SumWidth Width;
+
+    [GlobalSetup]
+    public void Setup()
+    {
+        if (!X86Base.X64.IsSupported)
+        {
+            throw new PlatformNotSupportedException($"{nameof(AddModReduce64AB)} requires x86-64 (X86Base.X64.DivRem).");
+        }
+
+        _u0 = new ulong[N];
+        _u1 = new ulong[N];
+        _u2 = new ulong[N];
+        _u3 = new ulong[N];
+        _a4 = new ulong[N];
+        _d = new ulong[N];
+        Random rnd = new(42);
+        for (int i = 0; i < N; i++)
+        {
+            _d[i] = (ulong)rnd.NextInt64(2, long.MaxValue); // 64-bit modulus, >= 2
+            _u0[i] = (ulong)rnd.NextInt64();
+            switch (Width)
+            {
+                case SumWidth.Small:
+                    _u1[i] = (ulong)(rnd.NextInt64() & 1); // 0 or 1 (carry out of u0)
+                    _u2[i] = 0; _u3[i] = 0; _a4[i] = 0;
+                    break;
+                case SumWidth.Mid128:
+                    _u1[i] = (ulong)rnd.NextInt64() | 0x8000_0000_0000_0000UL; // large high limb
+                    _u2[i] = 0; _u3[i] = 0; _a4[i] = 0;
+                    break;
+                default: // Full
+                    _u1[i] = (ulong)rnd.NextInt64();
+                    _u2[i] = (ulong)rnd.NextInt64();
+                    _u3[i] = (ulong)rnd.NextInt64();
+                    _a4[i] = (ulong)(rnd.NextInt64() & 1);
+                    break;
+            }
+        }
+    }
+
+    // Current: four hardware DivRems, one per limb (matches Remainder257By64BitsX86Base).
+    [Benchmark(Baseline = true, OperationsPerInvoke = N)]
+    public ulong Current()
+    {
+        ulong[] u0 = _u0, u1 = _u1, u2 = _u2, u3 = _u3, a4 = _a4, d = _d;
+        ulong acc = 0;
+        for (int i = 0; i < u0.Length; i++)
+        {
+            ulong dd = d[i];
+            ulong r = X86Base.X64.DivRem(u3[i], a4[i], dd).Remainder;
+            r = X86Base.X64.DivRem(u2[i], r, dd).Remainder;
+            r = X86Base.X64.DivRem(u1[i], r, dd).Remainder;
+            r = X86Base.X64.DivRem(u0[i], r, dd).Remainder;
+            acc ^= r;
+        }
+        return acc;
+    }
+
+    // Fast path: skip the wasted divides when the sum fits in <=128 bits.
+    [Benchmark(OperationsPerInvoke = N)]
+    public ulong FastPath()
+    {
+        ulong[] u0 = _u0, u1 = _u1, u2 = _u2, u3 = _u3, a4 = _a4, d = _d;
+        ulong acc = 0;
+        for (int i = 0; i < u0.Length; i++)
+        {
+            ulong dd = d[i];
+            ulong hu1 = u1[i], hu0 = u0[i];
+            ulong r;
+            if ((u2[i] | u3[i] | a4[i]) == 0)
+            {
+                if (hu1 < dd)
+                {
+                    r = X86Base.X64.DivRem(hu0, hu1, dd).Remainder; // (hu1:hu0) % d in one DIV
+                }
+                else
+                {
+                    ulong rr = X86Base.X64.DivRem(hu1, 0UL, dd).Remainder; // hu1 % d
+                    r = X86Base.X64.DivRem(hu0, rr, dd).Remainder;
+                }
+            }
+            else
+            {
+                r = X86Base.X64.DivRem(u3[i], a4[i], dd).Remainder;
+                r = X86Base.X64.DivRem(u2[i], r, dd).Remainder;
+                r = X86Base.X64.DivRem(hu1, r, dd).Remainder;
+                r = X86Base.X64.DivRem(hu0, r, dd).Remainder;
+            }
+            acc ^= r;
+        }
+        return acc;
+    }
+}
+#pragma warning restore SYSLIB5004
 
 public readonly record struct DoubleUInt256(UInt256 A, UInt256 B)
 {

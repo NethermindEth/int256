@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 
 using System;
+using System.Collections.Generic;
 using System.Numerics;
 using FluentAssertions;
 using NUnit.Framework;
@@ -84,5 +85,47 @@ public class Int256Tests : UInt256TestsTemplate<Int256>
             convertedValue.Should().BeEquivalentTo(expected);
         }
         catch (Exception e) when (e.GetType() == expectedException) { }
+    }
+
+    public static IEnumerable<(BigInteger, BigInteger)> CompareBoundaryCases
+    {
+        get
+        {
+            BigInteger min = -(BigInteger.One << 255);
+            BigInteger[] values = [min, min + 1, -2, -1, 0, 1, 2, TestNumbers.Int256Max];
+            foreach (BigInteger a in values)
+            {
+                foreach (BigInteger b in values)
+                {
+                    yield return (a, b);
+                }
+            }
+        }
+    }
+
+    [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.SignedTestCases))]
+    [TestCaseSource(nameof(CompareBoundaryCases))]
+    public void Compare_operators_match_BigInteger((BigInteger A, BigInteger B) test)
+    {
+        Int256 a = new(test.A);
+        Int256 b = new(test.B);
+
+        (a < b).Should().Be(test.A < test.B);
+        (a > b).Should().Be(test.A > test.B);
+        Math.Sign(a.CompareTo(b)).Should().Be(Math.Sign(test.A.CompareTo(test.B)));
+    }
+
+    [Test]
+    public void Is_zero_and_is_one_signed()
+    {
+        Int256.Zero.IsZero.Should().BeTrue();
+        Int256.One.IsZero.Should().BeFalse();
+        Int256.MinusOne.IsZero.Should().BeFalse();
+        new Int256(-(BigInteger.One << 255)).IsZero.Should().BeFalse();
+
+        Int256.One.IsOne.Should().BeTrue();
+        Int256.Zero.IsOne.Should().BeFalse();
+        Int256.MinusOne.IsOne.Should().BeFalse();
+        Int256.Max.IsOne.Should().BeFalse();
     }
 }
