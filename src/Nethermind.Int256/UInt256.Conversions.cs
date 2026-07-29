@@ -60,13 +60,11 @@ public readonly partial struct UInt256
     /// zeroed, matching the <see cref="PaddedBytes(int)"/> array overload.
     /// </summary>
     /// <param name="target">The destination span; fully overwritten.</param>
+    [SkipLocalsInit]
     public void PaddedBytes(Span<byte> target)
     {
         int n = target.Length;
 
-        // Produce the full 32-byte big-endian form once using block writes, then copy the low
-        // min(32, n) bytes into the right-aligned tail of the target. This avoids the per-byte
-        // limb-indexer + variable-shift loop the previous implementation used.
         Span<byte> be = stackalloc byte[32];
         BinaryPrimitives.WriteUInt64BigEndian(be.Slice(0, 8), u3);
         BinaryPrimitives.WriteUInt64BigEndian(be.Slice(8, 8), u2);
@@ -74,8 +72,6 @@ public readonly partial struct UInt256
         BinaryPrimitives.WriteUInt64BigEndian(be.Slice(24, 8), u0);
 
         int copy = Math.Min(32, n);
-        // Zero any leading bytes beyond the 32-byte word for parity with the array overload (the
-        // array overload's bytes are already zero, so the JIT elides this there).
         if (n > copy)
         {
             target.Slice(0, n - copy).Clear();
