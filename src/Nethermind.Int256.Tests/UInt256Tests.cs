@@ -2,10 +2,14 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Numerics;
+using System.Runtime.Intrinsics;
 using FluentAssertions;
 using NUnit.Framework;
+using Arm = System.Runtime.Intrinsics.Arm;
+using x64 = System.Runtime.Intrinsics.X86;
 
 namespace Nethermind.Int256.Test;
 
@@ -914,6 +918,39 @@ public class UInt256Tests : UInt256TestsTemplate<UInt256>
             (uint256a >= b).Should().Be(test.A >= b);
             (uint256a == b).Should().Be(test.A == b);
         }
+    }
+
+    [Test]
+    public void GetHashCode_FastPathMaintainsDistribution()
+    {
+        if (!x64.Aes.IsSupported && !Arm.Aes.IsSupported)
+        {
+            Assert.Ignore("The hardware-accelerated hash path is not available on this CPU.");
+        }
+
+        const int sampleCount = 4096;
+        HashSet<int> hashes = new(sampleCount);
+
+        for (int value = 0; value < sampleCount; value++)
+        {
+            Vector128<byte> second = Vector128.Create((uint)value, 0u, 0u, 0u).AsByte();
+            Vector128<byte> first = AesRound(second);
+            UInt256 input = new(
+                first.AsUInt64().GetElement(0),
+                first.AsUInt64().GetElement(1),
+                second.AsUInt64().GetElement(0),
+                second.AsUInt64().GetElement(1));
+
+            hashes.Add(input.GetHashCode());
+        }
+
+        Assert.That(hashes.Count, Is.GreaterThan(sampleCount - 32),
+            $"fast-path inputs produced {hashes.Count}/{sampleCount} distinct hashes");
+
+        static Vector128<byte> AesRound(Vector128<byte> state)
+            => x64.Aes.IsSupported
+                ? x64.Aes.Encrypt(state, Vector128<byte>.Zero)
+                : Arm.Aes.MixColumns(Arm.Aes.Encrypt(state, Vector128<byte>.Zero));
     }
 
     [NonParallelizable]
