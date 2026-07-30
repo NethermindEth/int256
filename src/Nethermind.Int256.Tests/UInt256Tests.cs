@@ -5,8 +5,11 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Numerics;
+using System.Runtime.Intrinsics;
 using FluentAssertions;
 using NUnit.Framework;
+using Arm = System.Runtime.Intrinsics.Arm;
+using x64 = System.Runtime.Intrinsics.X86;
 
 namespace Nethermind.Int256.Test;
 
@@ -646,6 +649,8 @@ public abstract class UInt256TestsTemplate<T> where T : IInteger<T>
 [Parallelizable(ParallelScope.All)]
 public class UInt256Tests : UInt256TestsTemplate<UInt256>
 {
+    private const int HashDistributionSampleCount = 4096;
+
     public UInt256Tests() : base((BigInteger x) => (UInt256)x, (int x) => (UInt256)x, x => x, TestNumbers.UInt256Max) { }
 
     public static IEnumerable<(UInt256 A, ulong A4, ulong D)> Remainder257By64BitsCases
@@ -678,6 +683,162 @@ public class UInt256Tests : UInt256TestsTemplate<UInt256>
         UInt256.Remainder257By64Bits(in test.A, test.A4, test.D, out UInt256 rem);
 
         ((BigInteger)rem).Should().Be(expected);
+    }
+
+    // PaddedBytes returns the big-endian, right-aligned, left-zero-padded representation of the
+    // value in a byte[n]: when n > 32 the leading bytes are zero, when n < 32 the most-significant
+    // bytes are truncated. These cases pin that behavior across the boundary, exercising the
+    // all-ones top limb (MaxValue), all-zeros (Zero), and a mixed mid-sized value.
+    public static BigInteger[] PaddedBytesValues { get; } =
+    [
+        BigInteger.Zero,
+        BigInteger.Parse("123456789012345678901234567890"),
+        TestNumbers.UInt256Max,
+    ];
+
+    [Test]
+    public void PaddedBytes_Matches_BigEndian_RightAligned(
+        [ValueSource(nameof(PaddedBytesValues))] BigInteger value,
+        [Values(0, 1, 8, 20, 31, 32, 33, 64)] int n)
+    {
+        UInt256 v = (UInt256)value;
+
+        byte[] padded = v.PaddedBytes(n);
+        padded.Length.Should().Be(n);
+
+        // Expected: the low min(32, n) bytes of the 32-byte big-endian form, right-aligned, with
+        // the remaining leading bytes zero.
+        byte[] full = v.ToBigEndian(); // 32-byte big-endian
+        int copy = Math.Min(32, n);
+        byte[] expected = new byte[n];
+        full.AsSpan(32 - copy, copy).CopyTo(expected.AsSpan(n - copy, copy));
+
+        padded.Should().Equal(expected);
+    }
+
+    [Test]
+    public void WritePaddedBytes_ZeroesLeadingBytes_When_Longer_Than_Word()
+    {
+        UInt256 v = (UInt256)0x0102030405060708UL;
+
+        // n > 32: the whole span is written. The leading bytes beyond the 32-byte word are zeroed
+        // (parity with the array overload), and the prior buffer contents are overwritten.
+        Span<byte> target = stackalloc byte[40];
+        target.Fill(0xAA);
+
+        v.WritePaddedBytes(target);
+
+        for (int i = 0; i < 32; i++) target[i].Should().Be(0x00);
+        target[32].Should().Be(0x01);
+        target[39].Should().Be(0x08);
+    }
+
+    [Test]
+    public void WritePaddedBytes_Truncates_And_RightAligns_When_Shorter_Than_Word()
+    {
+        UInt256 v = (UInt256)0x0102030405060708UL;
+
+        // n < 32: only the low n bytes are emitted, right-aligned; the high bytes of the value are
+        // truncated and the whole (pre-filled) buffer is overwritten.
+        Span<byte> target = stackalloc byte[6];
+        target.Fill(0xAA);
+
+        v.WritePaddedBytes(target);
+
+        // Low 6 bytes of the big-endian value: 03 04 05 06 07 08 (the 01 02 are truncated).
+        byte[] expected = { 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 };
+        target.ToArray().Should().Equal(expected);
+    }
+
+    [TestCase(20)]
+    [TestCase(32)]
+    public void WritePaddedBytes_Overwrites_Dirty_Delegated_Widths(int length)
+    {
+        UInt256 v = new(
+            0x191A1B1C1D1E1F20UL,
+            0x1112131415161718UL,
+            0x090A0B0C0D0E0F10UL,
+            0x0102030405060708UL);
+        Span<byte> target = stackalloc byte[length];
+        target.Fill(0xAA);
+
+        v.WritePaddedBytes(target);
+
+        byte[] expected = length == 20
+            ? [0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16,
+               0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F, 0x20]
+            : [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A,
+               0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14,
+               0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E,
+               0x1F, 0x20];
+        target.ToArray().Should().Equal(expected);
+    }
+
+    // The (UInt256)BigInteger cast is allocation-free: it writes the value into a stackalloc
+    // span via BigInteger.TryWriteBytes instead of allocating intermediate byte[] arrays.
+    // These tests pin both the numeric result (right-aligned big-endian, all magnitudes) and
+    // the preserved overflow-throws-for-values-that-do-not-fit-in-256-bits behavior.
+    public static BigInteger[] CastRoundTripValues { get; } =
+    [
+        BigInteger.Zero,
+        BigInteger.One,
+        new BigInteger(ulong.MaxValue),
+        (BigInteger.One << 128) - 1,
+        (BigInteger.One << 200) - 1,
+        BigInteger.One << 255,          // top bit set: BCL would grow to 33 bytes unsigned without the unsigned flag
+        (BigInteger.One << 255) - 1,    // unsigned-encoding boundary just below the top bit
+        TestNumbers.UInt256Max,
+    ];
+
+    [TestCaseSource(nameof(CastRoundTripValues))]
+    public void Cast_From_BigInteger_RoundTrips(BigInteger value)
+    {
+        UInt256 cast = (UInt256)value;
+        cast.Convert(out BigInteger actual);
+        actual.Should().Be(value);
+    }
+
+    [TestCase(256)]   // 2^256: smallest 33-byte value
+    [TestCase(257)]   // 2^257
+    public void Cast_From_BigInteger_Throws_When_Over_256_Bits(int shift)
+    {
+        Action exact = () => { _ = (UInt256)(BigInteger.One << shift); };
+        exact.Should().Throw<ArgumentOutOfRangeException>();
+
+        Action plusOne = () => { _ = (UInt256)((BigInteger.One << shift) + 1); };
+        plusOne.Should().Throw<ArgumentOutOfRangeException>();
+    }
+
+    [Test]
+    public void Cast_From_Negative_BigInteger_Throws()
+    {
+        // BigInteger.GetByteCount(isUnsigned: true) rejects negative values, matching the
+        // legacy ToByteArray(true, true) path which also threw OverflowException.
+        Action act = () => { _ = (UInt256)BigInteger.MinusOne; };
+        act.Should().Throw<OverflowException>();
+    }
+
+    [TestCaseSource(nameof(CastRoundTripValues))]
+    public void ToBytes32_Produces_RightAligned_BigEndian(BigInteger value)
+    {
+        Span<byte> bytes = stackalloc byte[32];
+        value.ToBytes32(bytes, true);
+
+        // The bytes must reconstruct the original value as an unsigned big-endian 256-bit word.
+        BigInteger reconstructed = new(bytes, isUnsigned: true, isBigEndian: true);
+        reconstructed.Should().Be(value);
+    }
+
+    [Test]
+    public void ToBytes32_Clears_Leading_Bytes_Of_Dirty_Target()
+    {
+        Span<byte> bytes = stackalloc byte[32];
+        bytes.Fill(0xAA);
+
+        BigInteger.One.ToBytes32(bytes, true);
+
+        bytes[..31].ToArray().Should().OnlyContain(value => value == 0);
+        bytes[31].Should().Be(1);
     }
 
     [Test]
@@ -716,6 +877,41 @@ public class UInt256Tests : UInt256TestsTemplate<UInt256>
     public virtual void Max_value_is_correct()
     {
         convert(1).MaximalValue.Should().Be(convert(maxValue));
+    }
+
+    [Test]
+    public void Multiply_random_values_match_BigInteger()
+    {
+        Random random = new(0);
+        byte[] operands = new byte[64];
+
+        for (int i = 0; i < 4096; i++)
+        {
+            random.NextBytes(operands);
+            UInt256 x = new(operands.AsSpan(0, 32));
+            UInt256 y = new(operands.AsSpan(32, 32));
+            UInt256 small = new((ulong)i * 0x9E3779B97F4A7C15UL + 1);
+
+            AssertResult(in x, in y);
+            AssertResult(in x, in small);
+            AssertResult(in small, in y);
+        }
+
+        static void AssertResult(in UInt256 x, in UInt256 y)
+        {
+            BigInteger expected = (BigInteger)x * (BigInteger)y % TestNumbers.TwoTo256;
+
+            UInt256.Multiply(in x, in y, out UInt256 result);
+            ((BigInteger)result).Should().Be(expected);
+
+            UInt256 left = x;
+            left.Multiply(in y, out left);
+            ((BigInteger)left).Should().Be(expected);
+
+            UInt256 right = y;
+            x.Multiply(in right, out right);
+            ((BigInteger)right).Should().Be(expected);
+        }
     }
 
     [Test]
@@ -949,6 +1145,113 @@ public class UInt256Tests : UInt256TestsTemplate<UInt256>
         }
     }
 
+    [Test]
+    public void GetHashCode_FastPathMaintainsDistribution()
+    {
+        if (!x64.Aes.IsSupported && !Arm.Aes.IsSupported)
+        {
+            Assert.Ignore("The hardware-accelerated hash path is not available on this CPU.");
+        }
+
+        AssertHashCodesAreDistributed(value =>
+        {
+            Vector128<byte> second = Vector128.Create((uint)value, 0u, 0u, 0u).AsByte();
+            Vector128<byte> first = AesRound(second);
+            UInt256 input = new(
+                first.AsUInt64().GetElement(0),
+                first.AsUInt64().GetElement(1),
+                second.AsUInt64().GetElement(0),
+                second.AsUInt64().GetElement(1));
+
+            return input.GetHashCode();
+        }, "fast path");
+
+        static Vector128<byte> AesRound(Vector128<byte> state)
+            => x64.Aes.IsSupported
+                ? x64.Aes.Encrypt(state, Vector128<byte>.Zero)
+                : Arm.Aes.MixColumns(Arm.Aes.Encrypt(state, Vector128<byte>.Zero));
+    }
+
+    [TestCase(0u)]
+    [TestCase(1u)]
+    [TestCase(0xDEADBEEFu)]
+    public void GetHashCode_DeterministicFallbackMaintainsDistribution(uint seed)
+    {
+        AssertHashCodesAreDistributed(value =>
+        {
+            ulong first = (uint)value;
+            ulong third = SolveCrcInput(BitOperations.Crc32C(0u, first));
+            return new UInt256(first, 0, third, 0).GetCrcHashCode(seed);
+        }, $"deterministic fallback for seed {seed}");
+    }
+
+    [TestCase(0L)]
+    [TestCase(1L)]
+    [TestCase(0x00000000DEADBEEFL)]
+    public void GetHashCode_RandomizedFallbackMaintainsDistribution(long seed)
+        => AssertHashCodesAreDistributed(
+            value => new UInt256(0, 0, 0, (uint)value).GetXxHashCode(seed),
+            $"randomized fallback for seed {seed}");
+
+    private static void AssertHashCodesAreDistributed(Func<int, int> getHash, string context)
+    {
+        HashSet<int> hashes = new(HashDistributionSampleCount);
+        for (int value = 0; value < HashDistributionSampleCount; value++)
+        {
+            hashes.Add(getHash(value));
+        }
+
+        Assert.That(hashes.Count, Is.GreaterThan(HashDistributionSampleCount - 32),
+            $"{context} produced {hashes.Count}/{HashDistributionSampleCount} distinct hashes");
+    }
+
+    private static ulong SolveCrcInput(uint target)
+    {
+        Span<uint> pivotBasis = stackalloc uint[32];
+        Span<ulong> pivotSource = stackalloc ulong[32];
+        pivotBasis.Clear();
+        ulong dependentInput = 0;
+
+        for (int i = 0; i < 64; i++)
+        {
+            uint basis = BitOperations.Crc32C(0u, 1UL << i);
+            ulong source = 1UL << i;
+            while (basis != 0)
+            {
+                int column = BitOperations.TrailingZeroCount(basis);
+                if (pivotBasis[column] == 0)
+                {
+                    pivotBasis[column] = basis;
+                    pivotSource[column] = source;
+                    break;
+                }
+
+                basis ^= pivotBasis[column];
+                source ^= pivotSource[column];
+            }
+
+            if (basis == 0 && dependentInput == 0)
+            {
+                dependentInput = source;
+            }
+        }
+
+        if (target == 0)
+        {
+            return dependentInput;
+        }
+
+        ulong input = 0;
+        while (target != 0)
+        {
+            int column = BitOperations.TrailingZeroCount(target);
+            target ^= pivotBasis[column];
+            input ^= pivotSource[column];
+        }
+
+        return input;
+    }
+
     [NonParallelizable]
     [TestCase(false)]
     [TestCase(true)]
@@ -957,5 +1260,90 @@ public class UInt256Tests : UInt256TestsTemplate<UInt256>
         AppContext.SetSwitch("Nethermind.Int256.UseHashCodeRandomizer", useHashCodeRandomizer);
 
         Assert.That(UInt256.UseHashCodeRandomizer, Is.EqualTo(useHashCodeRandomizer));
+    }
+
+    // Magnitudes spanning the full 256-bit range, including the top-bit-set and all-ones cases, used
+    // to exercise the vectorized ToBigEndian(Span<byte>) write path against an independent oracle.
+    public static BigInteger[] ToBigEndianValues { get; } =
+    [
+        BigInteger.Zero,
+        BigInteger.One,
+        new BigInteger(ulong.MaxValue),
+        (BigInteger.One << 64),
+        (BigInteger.One << 128) - 1,
+        (BigInteger.One << 200) - 1,
+        BigInteger.One << 255,          // top bit set
+        (BigInteger.One << 255) - 1,
+        TestNumbers.UInt256Max,
+    ];
+
+    // ToBigEndian(Span<byte>) of length 32 writes the value as an unsigned big-endian 256-bit word.
+    // Pins the vectorized 32-byte path against an independent BigInteger oracle across all magnitudes
+    // and verifies the whole buffer is overwritten (pre-filled with 0xAA).
+    [TestCaseSource(nameof(ToBigEndianValues))]
+    public void ToBigEndian_Span32_Matches_BigInteger(BigInteger value)
+    {
+        UInt256 v = (UInt256)value;
+
+        Span<byte> target = stackalloc byte[32];
+        target.Fill(0xAA);
+        v.ToBigEndian(target);
+
+        Span<byte> expected = stackalloc byte[32];
+        int byteCount = value.GetByteCount(isUnsigned: true);
+        value.TryWriteBytes(expected.Slice(32 - byteCount), out _, isUnsigned: true, isBigEndian: true);
+        target.ToArray().Should().Equal(expected.ToArray());
+    }
+
+    // The 20-byte (address) overload writes the low 20 bytes of the 32-byte big-endian form.
+    [TestCaseSource(nameof(ToBigEndianValues))]
+    public void ToBigEndian_Span20_Matches_Low20Bytes(BigInteger value)
+    {
+        UInt256 v = (UInt256)value;
+
+        Span<byte> full = stackalloc byte[32];
+        v.ToBigEndian(full);
+
+        Span<byte> target = stackalloc byte[20];
+        target.Fill(0xAA);
+        v.ToBigEndian(target);
+
+        target.ToArray().Should().Equal(full.Slice(12, 20).ToArray());
+    }
+
+    // The vectorized path must use an unaligned store: serialization targets are not guaranteed to be
+    // 32-byte aligned. Writing into a deliberately misaligned slice must still produce the correct
+    // bytes and must not disturb the neighbouring bytes.
+    [TestCaseSource(nameof(ToBigEndianValues))]
+    public void ToBigEndian_Span32_Unaligned_Target(BigInteger value)
+    {
+        UInt256 v = (UInt256)value;
+
+        byte[] backing = new byte[40];
+        backing.AsSpan().Fill(0xCC);
+        Span<byte> target = backing.AsSpan(3, 32); // offset 3 => unaligned
+        v.ToBigEndian(target);
+
+        BigInteger reconstructed = new(target, isUnsigned: true, isBigEndian: true);
+        reconstructed.Should().Be(value);
+
+        backing.AsSpan(0, 3).ToArray().Should().Equal(new byte[] { 0xCC, 0xCC, 0xCC });
+        backing.AsSpan(35, 5).ToArray().Should().Equal(new byte[] { 0xCC, 0xCC, 0xCC, 0xCC, 0xCC });
+    }
+
+    // ToBigEndian only handles lengths 32 and 20; any other length is a no-op (matching prior
+    // behavior). Pins that contract so the vectorized 32-byte branch does not change it.
+    [TestCase(16)]
+    [TestCase(31)]
+    [TestCase(33)]
+    public void ToBigEndian_Span_OtherLengths_AreNoOp(int length)
+    {
+        UInt256 v = UInt256.MaxValue;
+
+        byte[] target = new byte[length];
+        target.AsSpan().Fill(0xAA);
+        v.ToBigEndian(target);
+
+        target.Should().OnlyContain(b => b == 0xAA);
     }
 }
