@@ -105,10 +105,35 @@ public readonly partial struct UInt256
     {
         if (target.Length == 32)
         {
-            BinaryPrimitives.WriteUInt64BigEndian(target.Slice(0, 8), u3);
-            BinaryPrimitives.WriteUInt64BigEndian(target.Slice(8, 8), u2);
-            BinaryPrimitives.WriteUInt64BigEndian(target.Slice(16, 8), u1);
-            BinaryPrimitives.WriteUInt64BigEndian(target.Slice(24, 8), u0);
+            if (Avx2.IsSupported)
+            {
+                // Full 32-byte reversal is an involution, so this reuses the shuffle constant of the
+                // big-endian read ctor (UInt256.Ctors.cs).
+                Vector256<byte> data = Unsafe.As<ulong, Vector256<byte>>(ref Unsafe.AsRef(in u0));
+                Vector256<byte> shuffle = Vector256.Create(
+                    0x18191a1b1c1d1e1ful,
+                    0x1011121314151617ul,
+                    0x08090a0b0c0d0e0ful,
+                    0x0001020304050607ul).AsByte();
+                if (Avx512Vbmi.VL.IsSupported)
+                {
+                    Vector256<byte> convert = Avx512Vbmi.VL.PermuteVar32x8(data, shuffle);
+                    Unsafe.WriteUnaligned(ref MemoryMarshal.GetReference(target), convert);
+                }
+                else
+                {
+                    Vector256<byte> convert = Avx2.Shuffle(data, shuffle);
+                    Vector256<ulong> permute = Avx2.Permute4x64(convert.AsUInt64(), 0b_01_00_11_10);
+                    Unsafe.WriteUnaligned(ref MemoryMarshal.GetReference(target), permute);
+                }
+            }
+            else
+            {
+                BinaryPrimitives.WriteUInt64BigEndian(target.Slice(0, 8), u3);
+                BinaryPrimitives.WriteUInt64BigEndian(target.Slice(8, 8), u2);
+                BinaryPrimitives.WriteUInt64BigEndian(target.Slice(16, 8), u1);
+                BinaryPrimitives.WriteUInt64BigEndian(target.Slice(24, 8), u0);
+            }
         }
         else if (target.Length == 20)
         {
