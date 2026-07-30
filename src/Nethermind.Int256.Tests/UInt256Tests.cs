@@ -647,7 +647,7 @@ public abstract class UInt256TestsTemplate<T> where T : IInteger<T>
 }
 
 [Parallelizable(ParallelScope.All)]
-public class UInt256Tests : UInt256TestsTemplate<UInt256>
+public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
 {
     private const int HashDistributionSampleCount = 4096;
 
@@ -1052,14 +1052,6 @@ public class UInt256Tests : UInt256TestsTemplate<UInt256>
         }, $"deterministic fallback for seed {seed}");
     }
 
-    [TestCase(0L)]
-    [TestCase(1L)]
-    [TestCase(0x00000000DEADBEEFL)]
-    public void GetHashCode_RandomizedFallbackMaintainsDistribution(long seed)
-        => AssertHashCodesAreDistributed(
-            value => new UInt256(0, 0, 0, (uint)value).GetXxHashCode(seed),
-            $"randomized fallback for seed {seed}");
-
     private static void AssertHashCodesAreDistributed(Func<int, int> getHash, string context)
     {
         HashSet<int> hashes = new(HashDistributionSampleCount);
@@ -1119,13 +1111,4 @@ public class UInt256Tests : UInt256TestsTemplate<UInt256>
         return input;
     }
 
-    [NonParallelizable]
-    [TestCase(false)]
-    [TestCase(true)]
-    public void Shoud_respect_appcontext_switch(bool useHashCodeRandomizer)
-    {
-        AppContext.SetSwitch("Nethermind.Int256.UseHashCodeRandomizer", useHashCodeRandomizer);
-
-        Assert.That(UInt256.UseHashCodeRandomizer, Is.EqualTo(useHashCodeRandomizer));
-    }
 }
