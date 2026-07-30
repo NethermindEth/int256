@@ -844,6 +844,58 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
     }
 
     [Test]
+    public void MultiplyMod_by_max_value_matches_BigInteger()
+    {
+        Random random = new(0);
+        byte[] operands = new byte[64];
+        UInt256[] boundaryValues =
+        [
+            default,
+            UInt256.One,
+            new UInt256(2),
+            new UInt256(ulong.MaxValue),
+            new UInt256(0, 1),
+            new UInt256(0, 0, 1),
+            UInt256.MaxValue - 1,
+            UInt256.MaxValue,
+        ];
+
+        foreach (UInt256 x in boundaryValues)
+        {
+            foreach (UInt256 y in boundaryValues)
+            {
+                AssertResult(in x, in y);
+            }
+        }
+
+        for (int i = 0; i < 4096; i++)
+        {
+            random.NextBytes(operands);
+            AssertResult(new UInt256(operands.AsSpan(0, 32)), new UInt256(operands.AsSpan(32, 32)));
+        }
+
+        static void AssertResult(in UInt256 x, in UInt256 y)
+        {
+            BigInteger expected = (BigInteger)x * (BigInteger)y % TestNumbers.UInt256Max;
+
+            UInt256.MultiplyMod(in x, in y, in UInt256.MaxValue, out UInt256 result);
+            ((BigInteger)result).Should().Be(expected);
+
+            UInt256 left = x;
+            UInt256 modulus = UInt256.MaxValue;
+            left.MultiplyMod(in y, in modulus, out left);
+            ((BigInteger)left).Should().Be(expected);
+
+            UInt256 right = y;
+            x.MultiplyMod(in right, in modulus, out right);
+            ((BigInteger)right).Should().Be(expected);
+
+            x.MultiplyMod(in y, in modulus, out modulus);
+            ((BigInteger)modulus).Should().Be(expected);
+        }
+    }
+
+    [Test]
     public void Multiply_random_values_match_BigInteger()
     {
         Random random = new(0);
