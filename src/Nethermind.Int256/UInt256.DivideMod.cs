@@ -316,11 +316,19 @@ public readonly partial struct UInt256
     [SkipLocalsInit]
     public static void MultiplyMod(in UInt256 x, in UInt256 y, in UInt256 m, out UInt256 res)
     {
-        // Single scalar test classifies the modulus; m >= 2^128 cannot be 0 or 1,
+        // Scalar tests classify the modulus; m >= 2^128 cannot be 0 or 1,
         // so the hot wide path skips the throw/one gates entirely.
         if ((m.u2 | m.u3) == 0)
         {
-            MulModByLe128Bits(in x, in y, in m, out res);
+            if (m.u1 == 0)
+            {
+                if (m.u0 == 0) ThrowDivideByZeroException();
+                // MulModBy64Bits handles mod == 1 and trivial x/y internally.
+                MulModBy64Bits(in x, in y, m.u0, out res);
+                return;
+            }
+
+            MulModBy65To128Bits(in x, in y, in m, out res);
             return;
         }
 
@@ -355,12 +363,12 @@ public readonly partial struct UInt256
 
     [SkipLocalsInit]
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void MulModByLe128Bits(in UInt256 x, in UInt256 y, in UInt256 m, out UInt256 res)
+    private static void MulModBy65To128Bits(in UInt256 x, in UInt256 y, in UInt256 m, out UInt256 res)
     {
-        Debug.Assert((m.u2 | m.u3) == 0);
+        Debug.Assert((m.u2 | m.u3) == 0 && m.u1 != 0);
 
-        if (m.u0 == 0 && m.u1 == 0) ThrowDivideByZeroException();
-        if (m.IsOne || x.IsZero || y.IsZero)
+        // m >= 2^64 here, so it cannot be 0 or 1.
+        if (x.IsZero || y.IsZero)
         {
             res = default;
             return;
@@ -369,12 +377,6 @@ public readonly partial struct UInt256
         // Trivial no-mul cases first.
         if (y.IsOne) { Mod(in x, in m, out res); return; }
         if (x.IsOne) { Mod(in y, in m, out res); return; }
-
-        if (m.u1 == 0)
-        {
-            MulModBy64Bits(in x, in y, m.u0, out res);
-            return;
-        }
 
         // Hybrid: if both operands are > 128-bit, avoid two 256->128 reductions.
         if (((x.u2 | x.u3) != 0) && ((y.u2 | y.u3) != 0))
