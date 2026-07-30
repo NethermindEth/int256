@@ -819,6 +819,29 @@ public class IsZeroOne
     }
 }
 
+[MemoryDiagnoser]
+[SimpleJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 5)]
+public class BigIntegerToUInt256
+{
+    public static BigInteger[] Values { get; } =
+    [
+        BigInteger.Zero,
+        new BigInteger(ulong.MaxValue),
+        new BigInteger(ulong.MaxValue) << 64 | new BigInteger(ulong.MaxValue),
+        (BigInteger.One << 192) - 1,
+        (BigInteger.One << 256) - 1,
+    ];
+
+    [ParamsSource(nameof(Values))]
+    public BigInteger Value;
+
+    [Benchmark]
+    public UInt256 Cast_UInt256()
+    {
+        return (UInt256)Value;
+    }
+}
+
 public abstract class ParseUnsignedBenchmarkBase
 {
     public static string[] HexValues { get; } =
