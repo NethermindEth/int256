@@ -931,6 +931,37 @@ public class ParseDecimalUnsigned : ParseUnsignedBenchmarkBase
     }
 }
 
+[MemoryDiagnoser]
+[SimpleJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 5)]
+[NoIntrinsicsJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 5)]
+public class PaddedBytesUnsigned
+{
+    public static UInt256 Value { get; } = UInt256.MaxValue;
+
+    // Common pad widths: 20 = address, 32 = EVM word, 33/64 = left-padded wider forms.
+    [Params(20, 32, 33, 64)]
+    public int N;
+
+    // Mirrors PaddedBytes(int) before this change so the benchmark is a direct in-process A/B.
+    [Benchmark(Baseline = true)]
+    public byte[] PaddedBytes_Previous()
+    {
+        byte[] b = new byte[N];
+        for (int i = 0; i < 32 && i < N; i++)
+        {
+            b[N - 1 - i] = (byte)(Value[i / 8] >> (8 * (i % 8)));
+        }
+
+        return b;
+    }
+
+    [Benchmark]
+    public byte[] PaddedBytes_UInt256()
+    {
+        return Value.PaddedBytes(N);
+    }
+}
+
 // In-process A/B for the Int256 signed-comparison preamble: master's Sign-based classification
 // (replicated below via the public surface) vs operator<'s top-bit test.
 public enum SignedCmpCase
