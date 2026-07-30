@@ -2098,12 +2098,12 @@ public readonly partial struct UInt256
             return;
         }
 
-        Multiply256To512BitLarge(x, y, out low, out high);
+        Multiply256To512BitLarge(in x, in y, out low, out high);
     }
 
     [SkipLocalsInit]
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void Multiply256To512BitLarge(UInt256 x, UInt256 y, out UInt256 low, out UInt256 high)
+    private static void Multiply256To512BitLarge(in UInt256 x, in UInt256 y, out UInt256 low, out UInt256 high)
     {
         // Copy inputs up front - this breaks aliasing with out params so we can store early.
         ulong x0 = x.u0, x1 = x.u1, x2 = x.u2, x3 = x.u3;

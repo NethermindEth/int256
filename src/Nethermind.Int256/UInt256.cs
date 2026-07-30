@@ -1525,15 +1525,14 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
 
     [SkipLocalsInit]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private unsafe static ulong Multiply64(ulong a, ulong b, out ulong low)
+    private static ulong Multiply64(ulong a, ulong b, out ulong low)
     {
         if (Bmi2.X64.IsSupported)
         {
-            // Two multiplies ends up being faster as it doesn't force spill to stack.
-            ulong lowLocal;
-            ulong high = Bmi2.X64.MultiplyNoFlags(a, b, &lowLocal);
-            low = lowLocal;
-            return high;
+            // Two multiplies are faster here because the high-only overload
+            // lets the JIT keep both results in registers.
+            low = a * b;
+            return Bmi2.X64.MultiplyNoFlags(a, b);
         }
         else if (ArmBase.Arm64.IsSupported)
         {
