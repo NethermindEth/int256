@@ -316,8 +316,59 @@ public readonly partial struct UInt256
     [SkipLocalsInit]
     public static void MultiplyMod(in UInt256 x, in UInt256 y, in UInt256 m, out UInt256 res)
     {
-        if (m.IsZero) ThrowDivideByZeroException();
-        if (m.IsOne || x.IsZero || y.IsZero)
+        // Scalar tests classify the modulus; m >= 2^128 cannot be 0 or 1,
+        // so the hot wide path skips the throw/one gates entirely.
+        if ((m.u2 | m.u3) == 0)
+        {
+            if (m.u1 == 0)
+            {
+                if (m.u0 == 0) ThrowDivideByZeroException();
+                // MulModBy64Bits handles mod == 1 and trivial x/y internally.
+                MulModBy64Bits(in x, in y, m.u0, out res);
+                return;
+            }
+
+            MulModBy65To128Bits(in x, in y, in m, out res);
+            return;
+        }
+
+        // Trivial no-mul cases (cheap relative to the full multiply + reduction).
+        if (x.IsZero || y.IsZero)
+        {
+            res = default;
+            return;
+        }
+        if (y.IsOne) { Mod(in x, in m, out res); return; }
+        if (x.IsOne) { Mod(in y, in m, out res); return; }
+
+        Multiply256To512Bit(in x, in y, out UInt256 lo, out UInt256 hi);
+
+        // Scalar test: an IsZero vector load here would span the four scalar
+        // stores just written by the multiply and defeat store-forwarding.
+        if ((hi.u0 | hi.u1 | hi.u2 | hi.u3) == 0)
+        {
+            Mod(in lo, in m, out res);
+            return;
+        }
+
+        if (m.u3 != 0)
+        {
+            Remainder512By256Bits(in lo, in hi, in m, out res);
+        }
+        else
+        {
+            Remainder512By192Bits(in lo, in hi, in m, out res);
+        }
+    }
+
+    [SkipLocalsInit]
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void MulModBy65To128Bits(in UInt256 x, in UInt256 y, in UInt256 m, out UInt256 res)
+    {
+        Debug.Assert((m.u2 | m.u3) == 0 && m.u1 != 0);
+
+        // m >= 2^64 here, so it cannot be 0 or 1.
+        if (x.IsZero || y.IsZero)
         {
             res = default;
             return;
@@ -327,36 +378,15 @@ public readonly partial struct UInt256
         if (y.IsOne) { Mod(in x, in m, out res); return; }
         if (x.IsOne) { Mod(in y, in m, out res); return; }
 
-        // Modulus-size dispatch first - keeps all the tiny-mod magic.
-        if (m.IsUint64)
+        // Hybrid: if both operands are > 128-bit, avoid two 256->128 reductions.
+        if (((x.u2 | x.u3) != 0) && ((y.u2 | y.u3) != 0))
         {
-            MulModBy64Bits(in x, in y, m.u0, out res);
+            Multiply256To512BitLarge(in x, in y, out UInt256 lo2, out UInt256 hi2);
+            Remainder512By128Bits(in lo2, in hi2, in m, out res); // dLen will be 2
             return;
         }
 
-        if ((m.u2 | m.u3) == 0)
-        {
-            // Hybrid: if both operands are > 128-bit, avoid two 256->128 reductions.
-            if (((x.u2 | x.u3) != 0) && ((y.u2 | y.u3) != 0))
-            {
-                Multiply256To512Bit(in x, in y, out UInt256 lo2, out UInt256 hi2);
-                Remainder512By128Bits(in lo2, in hi2, in m, out res); // dLen will be 2
-                return;
-            }
-
-            MulModBy128Bits(in x, in y, m.u0, m.u1, out res);
-            return;
-        }
-
-        Multiply256To512Bit(in x, in y, out UInt256 lo, out UInt256 hi);
-
-        if (hi.IsZero)
-        {
-            Mod(in lo, in m, out res);
-            return;
-        }
-
-        Remainder512By256Bits(in lo, in hi, in m, out res);
+        MulModBy128Bits(in x, in y, m.u0, m.u1, out res);
     }
 
     /// <summary>
@@ -1377,7 +1407,7 @@ public readonly partial struct UInt256
             // p3 = hi11 + c2  (fits, since overall product is 256-bit)
             p3 = hi11 + c2;
         }
-        
+
         [SkipLocalsInit]
         static void Remainder128By128Bits(ulong u0, ulong u1, ulong d0, ulong d1, out ulong r0, out ulong r1)
         {
@@ -1566,7 +1596,13 @@ public readonly partial struct UInt256
         ref ulong un0 = ref unBuf.w0;
 
         // dLen is fixed at 2 here.
-        URemKnuth2(ref un0, uLen - 2, nd0, nd1);
+        int m = uLen - 2;
+        ulong reciprocal = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(nd1);
+        for (int j = m; j >= 0; j--)
+        {
+            ref ulong uJ = ref Unsafe.Add(ref un0, j);
+            KnuthStep(ref uJ, ref Unsafe.Add(ref uJ, 1), ref Unsafe.Add(ref uJ, 2), nd0, nd1, reciprocal);
+        }
 
         // Denormalise remainder from un[0..1].
         if (sh == 0)
@@ -1585,43 +1621,239 @@ public readonly partial struct UInt256
     }
 
     [SkipLocalsInit]
+    private static void Remainder512By192Bits(in UInt256 lo, in UInt256 hi, in UInt256 d, out UInt256 rem)
+    {
+        Debug.Assert(d.u3 == 0 && d.u2 != 0);
+        Debug.Assert(!hi.IsZero);
+
+        Unsafe.SkipInit(out rem);
+        ulong d0 = d.u0, d1 = d.u1, d2 = d.u2;
+
+        int shift = BitOperations.LeadingZeroCount(d2);
+
+        ulong u4 = hi.u0, u5 = hi.u1, u6 = hi.u2, u7 = hi.u3;
+        int uLen = u7 != 0 ? 8 : (u6 != 0 ? 7 : (u5 != 0 ? 6 : 5));
+
+        Unsafe.SkipInit(out ULong9 unBuf);
+        ulong nd0, nd1, nd2;
+
+        if (shift == 0)
+        {
+            unBuf.w0 = lo.u0; unBuf.w1 = lo.u1; unBuf.w2 = lo.u2; unBuf.w3 = lo.u3;
+            unBuf.w4 = u4; unBuf.w5 = u5; unBuf.w6 = u6; unBuf.w7 = u7;
+            unBuf.w8 = 0;
+            nd0 = d0; nd1 = d1; nd2 = d2;
+        }
+        else
+        {
+            ulong u0 = lo.u0, u1n = lo.u1, u2n = lo.u2, u3n = lo.u3;
+            int rshift = 64 - shift;
+            unBuf.w8 = u7 >> rshift;
+            unBuf.w7 = (u7 << shift) | (u6 >> rshift);
+            unBuf.w6 = (u6 << shift) | (u5 >> rshift);
+            unBuf.w5 = (u5 << shift) | (u4 >> rshift);
+            unBuf.w4 = (u4 << shift) | (u3n >> rshift);
+            unBuf.w3 = (u3n << shift) | (u2n >> rshift);
+            unBuf.w2 = (u2n << shift) | (u1n >> rshift);
+            unBuf.w1 = (u1n << shift) | (u0 >> rshift);
+            unBuf.w0 = u0 << shift;
+            nd0 = d0 << shift;
+            nd1 = (d1 << shift) | (d0 >> rshift);
+            nd2 = (d2 << shift) | (d1 >> rshift);
+        }
+
+        ref ulong un0 = ref unBuf.w0;
+        int m = uLen - 3;
+        ulong reciprocal = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(nd2);
+
+        for (int j = m; j >= 0; j--)
+        {
+            ref ulong uJ = ref Unsafe.Add(ref un0, j);
+
+            ulong u8 = Unsafe.Add(ref uJ, 3);
+            ulong u9 = Unsafe.Add(ref uJ, 2);
+            ulong u10 = Unsafe.Add(ref uJ, 1);
+
+            ulong qhat;
+            if (X86Base.X64.IsSupported)
+            {
+                if (u8 >= nd2)
+                {
+                    // Saturated quotient digit - rare; no usable rhat identity.
+                    qhat = EstimateQhat(u8, u9, u10, nd2, nd1, reciprocal);
+                    goto FullSubMul;
+                }
+
+                // Inline estimate: div + Knuth correction, keeping the exact identity
+                // rhat == (u8:u9) - qhat*nd2 (each qhat-- adds nd2 back into rhat).
+                (qhat, ulong rhat) = X86Base.X64.DivRem(u9, u8, nd2);
+
+                ulong ph = Multiply64(qhat, nd1, out ulong pl);
+                while (ph > rhat || (ph == rhat && pl > u10))
+                {
+                    qhat--;
+
+                    ulong prev = rhat;
+                    rhat += nd2;
+                    // rhat >= b: correction test cannot hold and the identity no
+                    // longer fits 64 bits - take the full 3-product subtraction.
+                    if (rhat < prev) goto FullSubMul;
+
+                    ph -= (pl < nd1) ? 1UL : 0UL;
+                    pl -= nd1;
+                }
+
+                // Subtract qhat*(nd1:nd0) from limbs 0..1; limb 2 needs no product:
+                // (u8:u9) - qhat*nd2 - borrow1 == rhat - borrow1 by the identity above.
+                ulong v0 = uJ;
+                ulong hi0 = Multiply64(nd0, qhat, out ulong lo0);
+                uJ = v0 - lo0;
+                ulong borrow1 = hi0 + (lo0 > v0 ? 1UL : 0UL);
+
+                ref ulong x1 = ref Unsafe.Add(ref uJ, 1);
+                ulong v1 = x1;
+                ulong hi1 = Multiply64(nd1, qhat, out ulong lo1);
+                ulong t1 = v1 - borrow1;
+                x1 = t1 - lo1;
+                borrow1 = hi1 + (borrow1 > v1 ? 1UL : 0UL) + (lo1 > t1 ? 1UL : 0UL);
+
+                Unsafe.Add(ref uJ, 2) = rhat - borrow1;
+
+                // Limb 3 is never read again (the window slides down), so it is not stored.
+                if (borrow1 > rhat)
+                {
+                    // qhat was one too large (probability ~2^-64): add the divisor back.
+                    // AddTo3 updates limbs 0..2 in place; the carry out belongs to limb 3.
+                    AddTo3(ref uJ, nd0, nd1, nd2);
+                }
+
+                continue;
+            }
+
+            qhat = EstimateQhat(u8, u9, u10, nd2, nd1, reciprocal);
+
+        FullSubMul:
+            ulong borrow = SubMulTo3(ref uJ, nd0, nd1, nd2, qhat);
+
+            if (u8 < borrow)
+            {
+                AddTo3(ref uJ, nd0, nd1, nd2);
+            }
+        }
+
+        [SkipLocalsInit]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static ulong SubMulTo3(ref ulong x0, ulong y0, ulong y1, ulong y2, ulong mul)
+        {
+            ref ulong x1 = ref Unsafe.Add(ref x0, 1);
+            ref ulong x2 = ref Unsafe.Add(ref x0, 2);
+
+            // Limb 0: x0 -= y0 * mul
+            ulong ph0 = Multiply64(y0, mul, out ulong pl0);
+            ulong v0 = x0;
+            x0 = v0 - pl0;
+            ulong borrow = ph0 + (v0 < pl0 ? 1UL : 0UL);
+
+            // Limb 1: x1 -= (y1 * mul) + borrow
+            ulong ph1 = Multiply64(y1, mul, out ulong pl1);
+            ulong v1 = x1;
+            ulong sum1 = pl1 + borrow;
+            ulong c1 = sum1 < borrow ? 1UL : 0UL;  // addition overflow
+            x1 = v1 - sum1;
+            borrow = ph1 + c1 + (v1 < sum1 ? 1UL : 0UL);
+
+            // Limb 2: x2 -= (y2 * mul) + borrow
+            ulong ph2 = Multiply64(y2, mul, out ulong pl2);
+            ulong v2 = x2;
+            ulong sum2 = pl2 + borrow;
+            ulong c2 = sum2 < borrow ? 1UL : 0UL;
+            x2 = v2 - sum2;
+            borrow = ph2 + c2 + (v2 < sum2 ? 1UL : 0UL);
+
+            return borrow;
+        }
+
+        [SkipLocalsInit]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static ulong AddTo3(ref ulong x0, ulong y0, ulong y1, ulong y2)
+        {
+            ulong a = x0;
+            ulong b = Unsafe.Add(ref x0, 1);
+            ulong c = Unsafe.Add(ref x0, 2);
+
+            ulong s0 = a + y0;
+            ulong c0 = s0 < a ? 1UL : 0UL;
+
+            ulong t1 = b + y1;
+            ulong s1 = t1 + c0;
+            ulong c1 = (t1 < b ? 1UL : 0UL) | (s1 < c0 ? 1UL : 0UL);
+
+            ulong t2 = c + y2;
+            ulong s2 = t2 + c1;
+            ulong c2 = (t2 < c ? 1UL : 0UL) | (s2 < c1 ? 1UL : 0UL);
+
+            x0 = s0;
+            Unsafe.Add(ref x0, 1) = s1;
+            Unsafe.Add(ref x0, 2) = s2;
+
+            return c2;
+        }
+
+        ulong rw0 = unBuf.w0, rw1 = unBuf.w1, rw2 = unBuf.w2;
+
+        if (shift == 0)
+        {
+            Unsafe.AsRef(in rem.u0) = rw0;
+            Unsafe.AsRef(in rem.u1) = rw1;
+            Unsafe.AsRef(in rem.u2) = rw2;
+            Unsafe.AsRef(in rem.u3) = 0;
+        }
+        else
+        {
+            int rshift = 64 - shift;
+            Unsafe.AsRef(in rem.u0) = (rw0 >> shift) | (rw1 << rshift);
+            Unsafe.AsRef(in rem.u1) = (rw1 >> shift) | (rw2 << rshift);
+            Unsafe.AsRef(in rem.u2) = rw2 >> shift;
+            Unsafe.AsRef(in rem.u3) = 0;
+        }
+    }
+
+    [SkipLocalsInit]
     private static void Remainder512By256Bits(in UInt256 lo, in UInt256 hi, in UInt256 d, out UInt256 rem)
     {
+        Debug.Assert(d.u3 != 0);
+        Debug.Assert(!hi.IsZero);
+
+        Unsafe.SkipInit(out rem);
         ulong d0 = d.u0, d1 = d.u1, d2 = d.u2, d3 = d.u3;
 
-        // Divisor length (1..4) and normalisation shift.
-        int dLen;
-        int shift;
-        if (d3 != 0) { dLen = 4; shift = BitOperations.LeadingZeroCount(d3); }
-        else if (d2 != 0) { dLen = 3; shift = BitOperations.LeadingZeroCount(d2); }
-        else if (d1 != 0) { dLen = 2; shift = BitOperations.LeadingZeroCount(d1); }
-        else { dLen = 1; shift = BitOperations.LeadingZeroCount(d0); }
+        // d.u3 != 0 guarantees a 4-limb divisor; shift on the top limb.
+        int shift = BitOperations.LeadingZeroCount(d3);
 
-        // Numerator limbs (u0 is least significant).
-        ulong u0 = lo.u0, u1n = lo.u1, u2n = lo.u2, u3n = lo.u3;
+        // Load hi limbs first; lo limbs are deferred to inside each branch to avoid
+        // intermediate register spills when registers are exhausted.
         ulong u4 = hi.u0, u5 = hi.u1, u6 = hi.u2, u7 = hi.u3;
 
         // In the slow path hi != 0, so uLen is always 5..8.
         int uLen = u7 != 0 ? 8 : (u6 != 0 ? 7 : (u5 != 0 ? 6 : 5));
 
-        // Normalise numerator into 9 limbs (always fully assigned - safe with SkipLocalsInit).
         Unsafe.SkipInit(out ULong9 unBuf);
-
-        // Normalise divisor digits too (compute all 4, slice by dLen logically).
-        ulong nd0, nd1, nd2v, nd3v;
+        ulong nd0, nd1, nd2, nd3;
 
         if (shift == 0)
         {
-            // un[0..7] = u[0..7], un[8] = 0
-            unBuf.w0 = u0; unBuf.w1 = u1n; unBuf.w2 = u2n; unBuf.w3 = u3n;
+            // Read lo directly from the in-parameter pointer into unBuf — no intermediate locals.
+            unBuf.w0 = lo.u0; unBuf.w1 = lo.u1; unBuf.w2 = lo.u2; unBuf.w3 = lo.u3;
             unBuf.w4 = u4; unBuf.w5 = u5; unBuf.w6 = u6; unBuf.w7 = u7;
             unBuf.w8 = 0;
 
-            nd0 = d0; nd1 = d1; nd2v = d2; nd3v = d3;
+            nd0 = d0; nd1 = d1; nd2 = d2; nd3 = d3;
         }
         else
         {
-            int rshift = 64 - shift; // 1..63
+            // Load lo into locals only here — needed for shift computation.
+            ulong u0 = lo.u0, u1n = lo.u1, u2n = lo.u2, u3n = lo.u3;
+            int rshift = 64 - shift;
 
             unBuf.w8 = u7 >> rshift;
             unBuf.w7 = (u7 << shift) | (u6 >> rshift);
@@ -1635,94 +1867,190 @@ public readonly partial struct UInt256
 
             nd0 = d0 << shift;
             nd1 = (d1 << shift) | (d0 >> rshift);
-            nd2v = (d2 << shift) | (d1 >> rshift);
-            nd3v = (d3 << shift) | (d2 >> rshift);
+            nd2 = (d2 << shift) | (d1 >> rshift);
+            nd3 = (d3 << shift) | (d2 >> rshift);
         }
 
         ref ulong un0 = ref unBuf.w0;
 
-        // Divide (remainder only). m = uLen - dLen, loop j = m..0.
-        int mQ = uLen - dLen;
+        // Always 4-limb divisor (d.u3 != 0).
+        int m = uLen - 4;
+        ulong reciprocal = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(nd3);
 
-        switch (dLen)
+        for (int j = m; j >= 0; j--)
         {
-            case 1:
+            ref ulong uJ = ref Unsafe.Add(ref un0, j);
+
+            ulong u8 = Unsafe.Add(ref uJ, 4);
+            ulong u9 = Unsafe.Add(ref uJ, 3);
+            ulong u10 = Unsafe.Add(ref uJ, 2);
+
+            ulong qhat;
+            if (X86Base.X64.IsSupported)
+            {
+                if (u8 >= nd3)
                 {
-                    ulong dn = nd0; // normalised 1-limb divisor (MSB set unless original d was 0).
-                    ulong reciprocal = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(dn);
-
-                    // Long division by 1 word across the significant window only.
-                    ulong r = Unsafe.Add(ref un0, uLen); // un[uLen] is the top carry limb (0 if shift == 0).
-                    for (int j = uLen - 1; j >= 0; j--)
-                    {
-                        if (X86Base.X64.IsSupported)
-                        {
-                            (_, r) = X86Base.X64.DivRem(Unsafe.Add(ref un0, j), r, dn);
-                        }
-                        else
-                        {
-                            _ = UDivRem2By1(r, reciprocal, dn, Unsafe.Add(ref un0, j), out r);
-                        }
-                    }
-
-                    if (shift != 0)
-                        r >>= shift;
-
-                    rem = new UInt256(r, 0, 0, 0);
-                    return;
+                    // Saturated quotient digit - rare; no usable rhat identity.
+                    qhat = EstimateQhat(u8, u9, u10, nd3, nd2, reciprocal);
+                    goto FullSubMul;
                 }
 
-            case 2:
-                URemKnuth2(ref un0, mQ, nd0, nd1);
-                break;
+                // Inline estimate: div + Knuth correction, keeping the exact identity
+                // rhat == (u8:u9) - qhat*nd3 (each qhat-- adds nd3 back into rhat).
+                (qhat, ulong rhat) = X86Base.X64.DivRem(u9, u8, nd3);
 
-            case 3:
-                URemKnuth3(ref un0, mQ, nd0, nd1, nd2v);
-                break;
+                ulong ph = Multiply64(qhat, nd2, out ulong pl);
+                while (ph > rhat || (ph == rhat && pl > u10))
+                {
+                    qhat--;
 
-            default: // 4
-                URemKnuth4(ref un0, mQ, nd0, nd1, nd2v, nd3v);
-                break;
+                    ulong prev = rhat;
+                    rhat += nd3;
+                    // rhat >= b: correction test cannot hold and the identity no
+                    // longer fits 64 bits - take the full 4-product subtraction.
+                    if (rhat < prev) goto FullSubMul;
+
+                    ph -= (pl < nd2) ? 1UL : 0UL;
+                    pl -= nd2;
+                }
+
+                // Subtract qhat*(nd2:nd1:nd0) from limbs 0..2; limb 3 needs no product:
+                // (u8:u9) - qhat*nd3 - borrow2 == rhat - borrow2 by the identity above.
+                ulong v0 = uJ;
+                ulong hi0 = Multiply64(nd0, qhat, out ulong lo0);
+                uJ = v0 - lo0;
+                ulong borrow2 = hi0 + (lo0 > v0 ? 1UL : 0UL);
+
+                ref ulong x1 = ref Unsafe.Add(ref uJ, 1);
+                ulong v1 = x1;
+                ulong hi1 = Multiply64(nd1, qhat, out ulong lo1);
+                ulong t1 = v1 - borrow2;
+                x1 = t1 - lo1;
+                borrow2 = hi1 + (borrow2 > v1 ? 1UL : 0UL) + (lo1 > t1 ? 1UL : 0UL);
+
+                ref ulong x2 = ref Unsafe.Add(ref uJ, 2);
+                ulong v2 = x2;
+                ulong hi2 = Multiply64(nd2, qhat, out ulong lo2);
+                ulong t2 = v2 - borrow2;
+                x2 = t2 - lo2;
+                borrow2 = hi2 + (borrow2 > v2 ? 1UL : 0UL) + (lo2 > t2 ? 1UL : 0UL);
+
+                Unsafe.Add(ref uJ, 3) = rhat - borrow2;
+
+                // Limb 4 is never read again (the window slides down), so it is not stored.
+                if (borrow2 > rhat)
+                {
+                    // qhat was one too large (probability ~2^-64): add the divisor back.
+                    // AddTo4 updates limbs 0..3 in place; the carry out belongs to limb 4.
+                    AddTo4(ref uJ, nd0, nd1, nd2, nd3);
+                }
+
+                continue;
+            }
+
+            qhat = EstimateQhat(u8, u9, u10, nd3, nd2, reciprocal);
+
+        FullSubMul:
+            ulong borrow = SubMulTo4(ref uJ, nd0, nd1, nd2, nd3, qhat);
+
+            if (u8 < borrow)
+            {
+                AddTo4(ref uJ, nd0, nd1, nd2, nd3);
+            }
         }
 
-        // Denormalise remainder from un[0..dLen-1].
+        [SkipLocalsInit]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static ulong SubMulTo4(ref ulong x0, ulong y0, ulong y1, ulong y2, ulong y3, ulong mul)
+        {
+            // Limb 0 - no incoming borrow
+            ulong v0 = x0;
+            ulong hi0 = Multiply64(y0, mul, out ulong lo0);
+            ulong r0 = v0 - lo0;
+            x0 = r0;
+            ulong borrow = hi0 + (lo0 > v0 ? 1UL : 0UL);
+
+            // Limb 1
+            ref ulong x1 = ref Unsafe.Add(ref x0, 1);
+            ulong v1 = x1;
+            ulong hi1 = Multiply64(y1, mul, out ulong lo1);
+            ulong t1 = v1 - borrow;
+            ulong r1 = t1 - lo1;
+            x1 = r1;
+            borrow = hi1 + (borrow > v1 ? 1UL : 0UL) + (lo1 > t1 ? 1UL : 0UL);
+
+            // Limb 2
+            ref ulong x2 = ref Unsafe.Add(ref x0, 2);
+            ulong v2 = x2;
+            ulong hi2 = Multiply64(y2, mul, out ulong lo2);
+            ulong t2 = v2 - borrow;
+            ulong r2 = t2 - lo2;
+            x2 = r2;
+            borrow = hi2 + (borrow > v2 ? 1UL : 0UL) + (lo2 > t2 ? 1UL : 0UL);
+
+            // Limb 3
+            ref ulong x3 = ref Unsafe.Add(ref x0, 3);
+            ulong v3 = x3;
+            ulong hi3 = Multiply64(y3, mul, out ulong lo3);
+            ulong t3 = v3 - borrow;
+            ulong r3 = t3 - lo3;
+            x3 = r3;
+            return hi3 + (borrow > v3 ? 1UL : 0UL) + (lo3 > t3 ? 1UL : 0UL);
+        }
+
+        [SkipLocalsInit]
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static ulong AddTo4(ref ulong x0, ulong y0, ulong y1, ulong y2, ulong y3)
+        {
+            ulong a0 = x0;
+            ulong a1 = Unsafe.Add(ref x0, 1);
+            ulong a2 = Unsafe.Add(ref x0, 2);
+            ulong a3 = Unsafe.Add(ref x0, 3);
+
+            // Limb 0 - no carry in
+            ulong s0 = a0 + y0;
+            ulong c = s0 < a0 ? 1UL : 0UL;
+
+            // Limb 1
+            ulong t1 = a1 + y1;
+            ulong s1 = t1 + c;
+            c = (t1 < a1 ? 1UL : 0UL) | (s1 < c ? 1UL : 0UL);
+
+            // Limb 2
+            ulong t2 = a2 + y2;
+            ulong s2 = t2 + c;
+            c = (t2 < a2 ? 1UL : 0UL) | (s2 < c ? 1UL : 0UL);
+
+            // Limb 3
+            ulong t3 = a3 + y3;
+            ulong s3 = t3 + c;
+            c = (t3 < a3 ? 1UL : 0UL) | (s3 < c ? 1UL : 0UL);
+
+            x0 = s0;
+            Unsafe.Add(ref x0, 1) = s1;
+            Unsafe.Add(ref x0, 2) = s2;
+            Unsafe.Add(ref x0, 3) = s3;
+
+            return c;
+        }
+
+        // Denormalise remainder from un[0..3].
+        ulong rw0 = unBuf.w0, rw1 = unBuf.w1, rw2 = unBuf.w2, rw3 = unBuf.w3;
+
         if (shift == 0)
         {
-            rem = dLen switch
-            {
-                2 => new UInt256(unBuf.w0, unBuf.w1, 0, 0),
-                3 => new UInt256(unBuf.w0, unBuf.w1, unBuf.w2, 0),
-                _ => new UInt256(unBuf.w0, unBuf.w1, unBuf.w2, unBuf.w3),
-            };
-            return;
+            Unsafe.AsRef(in rem.u0) = rw0;
+            Unsafe.AsRef(in rem.u1) = rw1;
+            Unsafe.AsRef(in rem.u2) = rw2;
+            Unsafe.AsRef(in rem.u3) = rw3;
         }
         else
         {
             int rshift = 64 - shift;
-
-            if (dLen == 2)
-            {
-                ulong r0 = (unBuf.w0 >> shift) | (unBuf.w1 << rshift);
-                ulong r1 = (unBuf.w1 >> shift);
-                rem = new UInt256(r0, r1, 0, 0);
-                return;
-            }
-
-            if (dLen == 3)
-            {
-                ulong r0 = (unBuf.w0 >> shift) | (unBuf.w1 << rshift);
-                ulong r1 = (unBuf.w1 >> shift) | (unBuf.w2 << rshift);
-                ulong r2 = (unBuf.w2 >> shift);
-                rem = new UInt256(r0, r1, r2, 0);
-                return;
-            }
-
-            // dLen == 4
-            ulong rr0 = (unBuf.w0 >> shift) | (unBuf.w1 << rshift);
-            ulong rr1 = (unBuf.w1 >> shift) | (unBuf.w2 << rshift);
-            ulong rr2 = (unBuf.w2 >> shift) | (unBuf.w3 << rshift);
-            ulong rr3 = (unBuf.w3 >> shift);
-            rem = new UInt256(rr0, rr1, rr2, rr3);
+            Unsafe.AsRef(in rem.u0) = (rw0 >> shift) | (rw1 << rshift);
+            Unsafe.AsRef(in rem.u1) = (rw1 >> shift) | (rw2 << rshift);
+            Unsafe.AsRef(in rem.u2) = (rw2 >> shift) | (rw3 << rshift);
+            Unsafe.AsRef(in rem.u3) = rw3 >> shift;
         }
     }
 
@@ -1736,10 +2064,41 @@ public readonly partial struct UInt256
     private static void KnuthStep(ref ulong u0, ref ulong u1, ref ulong u2, ulong d0, ulong d1, ulong reciprocal)
     {
         ulong oldU2 = u2;
-        ulong qhat = X86Base.X64.IsSupported
-            ? EstimateQhatEstX86Base(u2, u1, d1)
-            : EstimateQhatEst(u2, u1, d1, reciprocal);
+        ulong qhat;
+        if (X86Base.X64.IsSupported)
+        {
+            if (oldU2 >= d1)
+            {
+                // Quotient digit saturates at b - 1 - rare; no usable rhat identity.
+                qhat = ulong.MaxValue;
+                goto FullSubMul;
+            }
 
+            // DivRem returns rhat == (u2:u1) - qhat*d1 exactly, so the d1 product in
+            // the subtraction is redundant: limb 1 becomes rhat - borrow directly.
+            (qhat, ulong rhat) = X86Base.X64.DivRem(u1, oldU2, d1);
+
+            ulong v0 = u0;
+            ulong hi0 = Multiply64(d0, qhat, out ulong lo0);
+            u0 = v0 - lo0;
+            ulong b0 = hi0 + (lo0 > v0 ? 1UL : 0UL);
+            u1 = rhat - b0;
+
+            if (b0 <= rhat)
+            {
+                u2 = 0;
+                return;
+            }
+
+            // qhat overshot against the full divisor: limb 2 is -1, add back (rare).
+            u2 = ulong.MaxValue;
+            CorrectStep(ref u0, ref u1, ref u2, d0, d1);
+            return;
+        }
+
+        qhat = EstimateQhatEst(oldU2, u1, d1, reciprocal);
+
+    FullSubMul:
         ulong borrow = SubMulTo2(ref u0, ref u1, d0, d1, qhat);
         u2 = oldU2 - borrow;
 
@@ -1754,19 +2113,6 @@ public readonly partial struct UInt256
         {
             // Quotient digit saturates at b - 1. No correction needed (rhat would be >= b).
             return u2 >= dh ? ulong.MaxValue : UDivRem2By1(u2, reciprocal, dh, u1, out _);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static ulong EstimateQhatEstX86Base(ulong u2, ulong u1, ulong dh)
-        {
-            if (u2 >= dh)
-            {
-                // Quotient digit saturates at b - 1. No correction needed (rhat would be >= b).
-                return ulong.MaxValue;
-            }
-
-            (ulong qhat, _) = X86Base.X64.DivRem(u1, u2, dh);
-            return qhat;
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
@@ -1833,207 +2179,12 @@ public readonly partial struct UInt256
         }
     }
 
-    [SkipLocalsInit]
-    private static void URemKnuth2(ref ulong un0, int m, ulong d0, ulong d1)
-    {
-        ulong reciprocal = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(d1);
-        for (int j = m; j >= 0; j--)
-        {
-            ref ulong uJ = ref Unsafe.Add(ref un0, j);
-            KnuthStep(ref uJ, ref Unsafe.Add(ref uJ, 1), ref Unsafe.Add(ref uJ, 2), d0, d1, reciprocal);
-        }
-    }
-
-    [SkipLocalsInit]
-    private static void URemKnuth3(ref ulong un0, int m, ulong d0, ulong d1, ulong d2)
-    {
-        ulong reciprocal = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(d2);
-
-        for (int j = m; j >= 0; j--)
-        {
-            ref ulong uJ = ref Unsafe.Add(ref un0, j);
-
-            ulong u2 = Unsafe.Add(ref uJ, 3);
-            ulong u1 = Unsafe.Add(ref uJ, 2);
-            ulong u0 = Unsafe.Add(ref uJ, 1);
-
-            ulong qhat = EstimateQhat(u2, u1, u0, d2, d1, reciprocal);
-
-            ulong borrow = SubMulTo3(ref uJ, d0, d1, d2, qhat);
-            ulong newU2 = u2 - borrow;
-            Unsafe.Add(ref uJ, 3) = newU2;
-
-            if (u2 < borrow)
-            {
-                newU2 += AddTo3(ref uJ, d0, d1, d2);
-                Unsafe.Add(ref uJ, 3) = newU2;
-            }
-        }
-
-        [SkipLocalsInit]
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static ulong SubMulTo3(ref ulong x0, ulong y0, ulong y1, ulong y2, ulong mul)
-        {
-            ref ulong x1 = ref Unsafe.Add(ref x0, 1);
-            ref ulong x2 = ref Unsafe.Add(ref x0, 2);
-
-            // Limb 0: x0 -= y0 * mul
-            ulong ph0 = Multiply64(y0, mul, out ulong pl0);
-            ulong v0 = x0;
-            x0 = v0 - pl0;
-            ulong borrow = ph0 + (v0 < pl0 ? 1UL : 0UL);
-
-            // Limb 1: x1 -= (y1 * mul) + borrow
-            ulong ph1 = Multiply64(y1, mul, out ulong pl1);
-            ulong v1 = x1;
-            ulong sum1 = pl1 + borrow;
-            ulong c1 = sum1 < borrow ? 1UL : 0UL;  // addition overflow
-            x1 = v1 - sum1;
-            borrow = ph1 + c1 + (v1 < sum1 ? 1UL : 0UL);
-
-            // Limb 2: x2 -= (y2 * mul) + borrow
-            ulong ph2 = Multiply64(y2, mul, out ulong pl2);
-            ulong v2 = x2;
-            ulong sum2 = pl2 + borrow;
-            ulong c2 = sum2 < borrow ? 1UL : 0UL;
-            x2 = v2 - sum2;
-            borrow = ph2 + c2 + (v2 < sum2 ? 1UL : 0UL);
-
-            return borrow;
-        }
-
-        [SkipLocalsInit]
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static ulong AddTo3(ref ulong x0, ulong y0, ulong y1, ulong y2)
-        {
-            ulong a = x0;
-            ulong b = Unsafe.Add(ref x0, 1);
-            ulong c = Unsafe.Add(ref x0, 2);
-
-            ulong s0 = a + y0;
-            ulong c0 = s0 < a ? 1UL : 0UL;
-
-            ulong t1 = b + y1;
-            ulong s1 = t1 + c0;
-            ulong c1 = (t1 < b ? 1UL : 0UL) | (s1 < c0 ? 1UL : 0UL);
-
-            ulong t2 = c + y2;
-            ulong s2 = t2 + c1;
-            ulong c2 = (t2 < c ? 1UL : 0UL) | (s2 < c1 ? 1UL : 0UL);
-
-            x0 = s0;
-            Unsafe.Add(ref x0, 1) = s1;
-            Unsafe.Add(ref x0, 2) = s2;
-
-            return c2;
-        }
-    }
-
-    [SkipLocalsInit]
-    private static void URemKnuth4(ref ulong un0, int m, ulong d0, ulong d1, ulong d2, ulong d3)
-    {
-        ulong reciprocal = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(d3);
-
-        for (int j = m; j >= 0; j--)
-        {
-            ref ulong uJ = ref Unsafe.Add(ref un0, j);
-
-            ulong u2 = Unsafe.Add(ref uJ, 4);
-            ulong u1 = Unsafe.Add(ref uJ, 3);
-            ulong u0 = Unsafe.Add(ref uJ, 2);
-
-            ulong qhat = EstimateQhat(u2, u1, u0, d3, d2, reciprocal);
-
-            ulong borrow = SubMulTo4(ref uJ, d0, d1, d2, d3, qhat);
-            ulong newU2 = u2 - borrow;
-            Unsafe.Add(ref uJ, 4) = newU2;
-
-            if (u2 < borrow)
-            {
-                newU2 += AddTo4(ref uJ, d0, d1, d2, d3);
-                Unsafe.Add(ref uJ, 4) = newU2;
-            }
-        }
-
-        [SkipLocalsInit]
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static ulong SubMulTo4(ref ulong x0, ulong y0, ulong y1, ulong y2, ulong y3, ulong mul)
-        {
-            // Limb 0 - no incoming borrow
-            ulong v0 = x0;
-            ulong hi0 = Multiply64(y0, mul, out ulong lo0);
-            ulong r0 = v0 - lo0;
-            x0 = r0;
-            ulong borrow = hi0 + (lo0 > v0 ? 1UL : 0UL);
-
-            // Limb 1
-            ref ulong x1 = ref Unsafe.Add(ref x0, 1);
-            ulong v1 = x1;
-            ulong hi1 = Multiply64(y1, mul, out ulong lo1);
-            ulong t1 = v1 - borrow;
-            ulong r1 = t1 - lo1;
-            x1 = r1;
-            borrow = hi1 + (borrow > v1 ? 1UL : 0UL) + (lo1 > t1 ? 1UL : 0UL);
-
-            // Limb 2
-            ref ulong x2 = ref Unsafe.Add(ref x0, 2);
-            ulong v2 = x2;
-            ulong hi2 = Multiply64(y2, mul, out ulong lo2);
-            ulong t2 = v2 - borrow;
-            ulong r2 = t2 - lo2;
-            x2 = r2;
-            borrow = hi2 + (borrow > v2 ? 1UL : 0UL) + (lo2 > t2 ? 1UL : 0UL);
-
-            // Limb 3
-            ref ulong x3 = ref Unsafe.Add(ref x0, 3);
-            ulong v3 = x3;
-            ulong hi3 = Multiply64(y3, mul, out ulong lo3);
-            ulong t3 = v3 - borrow;
-            ulong r3 = t3 - lo3;
-            x3 = r3;
-            return hi3 + (borrow > v3 ? 1UL : 0UL) + (lo3 > t3 ? 1UL : 0UL);
-        }
-
-        [SkipLocalsInit]
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static ulong AddTo4(ref ulong x0, ulong y0, ulong y1, ulong y2, ulong y3)
-        {
-            ulong a0 = x0;
-            ulong a1 = Unsafe.Add(ref x0, 1);
-            ulong a2 = Unsafe.Add(ref x0, 2);
-            ulong a3 = Unsafe.Add(ref x0, 3);
-
-            // Limb 0 - no carry in
-            ulong s0 = a0 + y0;
-            ulong c = s0 < a0 ? 1UL : 0UL;
-
-            // Limb 1
-            ulong t1 = a1 + y1;
-            ulong s1 = t1 + c;
-            c = (t1 < a1 ? 1UL : 0UL) | (s1 < c ? 1UL : 0UL);
-
-            // Limb 2
-            ulong t2 = a2 + y2;
-            ulong s2 = t2 + c;
-            c = (t2 < a2 ? 1UL : 0UL) | (s2 < c ? 1UL : 0UL);
-
-            // Limb 3
-            ulong t3 = a3 + y3;
-            ulong s3 = t3 + c;
-            c = (t3 < a3 ? 1UL : 0UL) | (s3 < c ? 1UL : 0UL);
-
-            x0 = s0;
-            Unsafe.Add(ref x0, 1) = s1;
-            Unsafe.Add(ref x0, 2) = s2;
-            Unsafe.Add(ref x0, 3) = s3;
-
-            return c;
-        }
-    }
-
     // ----------------- Correct qhat estimation (Knuth correction loop) -----------------
+    // De-inlined: the hardware div instruction dominates EstimateQhat's latency (~35-90 cycles),
+    // so call overhead (~5 cycles) is negligible, while removing it from the caller saves ~297 bytes
+    // of inlined code and reduces register pressure in the SubMulTo4 hot loop.
     [SkipLocalsInit]
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(MethodImplOptions.NoInlining)]
     private static ulong EstimateQhat(ulong u2, ulong u1, ulong u0, ulong dh, ulong dl, ulong reciprocal)
     {
         // qhat = min((u2:b + u1) / dh, b - 1)
@@ -2103,12 +2254,12 @@ public readonly partial struct UInt256
             return;
         }
 
-        Multiply256To512BitLarge(x, y, out low, out high);
+        Multiply256To512BitLarge(in x, in y, out low, out high);
     }
 
     [SkipLocalsInit]
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void Multiply256To512BitLarge(UInt256 x, UInt256 y, out UInt256 low, out UInt256 high)
+    private static void Multiply256To512BitLarge(in UInt256 x, in UInt256 y, out UInt256 low, out UInt256 high)
     {
         // Copy inputs up front - this breaks aliasing with out params so we can store early.
         ulong x0 = x.u0, x1 = x.u1, x2 = x.u2, x3 = x.u3;
