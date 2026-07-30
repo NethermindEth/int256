@@ -50,7 +50,7 @@ public readonly partial struct UInt256
     {
         byte[] b = new byte[n];
         // For n > 32 the leading bytes are already zero, so write only the right-aligned tail.
-        PaddedBytes(n > 32 ? b.AsSpan(n - 32) : b.AsSpan());
+        WritePaddedBytes(n > 32 ? b.AsSpan(n - 32) : b.AsSpan());
         return b;
     }
 
@@ -62,7 +62,7 @@ public readonly partial struct UInt256
     /// </summary>
     /// <param name="target">The destination span; fully overwritten.</param>
     [SkipLocalsInit]
-    public void PaddedBytes(Span<byte> target)
+    public void WritePaddedBytes(Span<byte> target)
     {
         int n = target.Length;
         if (n is 32 or 20)
