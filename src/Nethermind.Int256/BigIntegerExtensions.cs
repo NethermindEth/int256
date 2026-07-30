@@ -21,8 +21,8 @@ public static class BigIntegerExtensions
     /// right-aligned (left-zero-padded) unsigned representation.
     /// </summary>
     /// <remarks>
-    /// Allocation-free for values that fit in 32 bytes. Larger values fall back to the legacy
-    /// allocating path, which throws (preserving historical behaviour).
+    /// Allocation-free for values that fit in 32 bytes. Larger values throw, preserving
+    /// historical behaviour.
     /// </remarks>
     /// <param name="value">The value to serialize.</param>
     /// <param name="target">The destination span; must be exactly 32 bytes long.</param>
@@ -44,22 +44,17 @@ public static class BigIntegerExtensions
         }
 
         int byteCount = value.GetByteCount(isUnsigned: true);
-        if (byteCount <= 32)
+        if (byteCount > 32)
         {
-            target.Slice(0, 32 - byteCount).Clear();
-            bool written = value.TryWriteBytes(target.Slice(32 - byteCount), out _, isUnsigned: true, isBigEndian: true);
-            Debug.Assert(written);
-            return;
+            throw new ArgumentOutOfRangeException(nameof(value), "Value does not fit in 256 bits.");
         }
 
-        ReadOnlySpan<byte> bytes = value.ToByteArray(true, true);
-        if (bytes.Length > 32)
-        {
-            bytes.Slice(bytes.Length - 32, bytes.Length).CopyTo(target);
-        }
-        else
-        {
-            bytes.CopyTo(target.Slice(32 - bytes.Length, bytes.Length));
-        }
+        target.Slice(0, 32 - byteCount).Clear();
+        bool written = value.TryWriteBytes(
+            target.Slice(32 - byteCount),
+            out int bytesWritten,
+            isUnsigned: true,
+            isBigEndian: true);
+        Debug.Assert(written && bytesWritten == byteCount);
     }
 }

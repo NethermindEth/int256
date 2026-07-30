@@ -685,7 +685,7 @@ public class UInt256Tests : UInt256TestsTemplate<UInt256>
     [Test]
     public void Cast_From_Negative_BigInteger_Throws()
     {
-        // BigInteger.TryWriteBytes(isUnsigned: true) rejects negative values, matching the
+        // BigInteger.GetByteCount(isUnsigned: true) rejects negative values, matching the
         // legacy ToByteArray(true, true) path which also threw OverflowException.
         Action act = () => { _ = (UInt256)BigInteger.MinusOne; };
         act.Should().Throw<OverflowException>();
@@ -700,6 +700,18 @@ public class UInt256Tests : UInt256TestsTemplate<UInt256>
         // The bytes must reconstruct the original value as an unsigned big-endian 256-bit word.
         BigInteger reconstructed = new(bytes, isUnsigned: true, isBigEndian: true);
         reconstructed.Should().Be(value);
+    }
+
+    [Test]
+    public void ToBytes32_Clears_Leading_Bytes_Of_Dirty_Target()
+    {
+        Span<byte> bytes = stackalloc byte[32];
+        bytes.Fill(0xAA);
+
+        BigInteger.One.ToBytes32(bytes, true);
+
+        bytes[..31].ToArray().Should().OnlyContain(value => value == 0);
+        bytes[31].Should().Be(1);
     }
 
     [Test]

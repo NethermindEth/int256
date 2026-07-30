@@ -616,7 +616,7 @@ public class IsZeroOne
 }
 
 [MemoryDiagnoser]
-[SimpleJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 5, invocationCount: 256)]
+[SimpleJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 5)]
 public class BigIntegerToUInt256
 {
     public static BigInteger[] Values { get; } =
@@ -635,29 +635,6 @@ public class BigIntegerToUInt256
     public UInt256 Cast_UInt256()
     {
         return (UInt256)Value;
-    }
-}
-
-[MemoryDiagnoser]
-[SimpleJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 5, invocationCount: 256)]
-public class DecimalParseAllocation
-{
-    // Parsing routes its BigInteger-style fallback through the (UInt256)BigInteger cast,
-    // so this also exercises the cast allocation on a realistic public-API path.
-    public static string[] Values { get; } =
-    [
-        "0",
-        "18446744073709551615",
-        "115792089237316195423570985008687907853269984665640564039457584007913129639935",
-    ];
-
-    [ParamsSource(nameof(Values))]
-    public string Value { get; set; } = null!;
-
-    [Benchmark]
-    public UInt256 Parse_UInt256()
-    {
-        return UInt256.Parse(Value);
     }
 }
 
