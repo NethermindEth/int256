@@ -653,6 +653,38 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
 
     public UInt256Tests() : base((BigInteger x) => (UInt256)x, (int x) => (UInt256)x, x => x, TestNumbers.UInt256Max) { }
 
+    public static IEnumerable<(UInt256 A, ulong A4, ulong D)> Remainder257By64BitsCases
+    {
+        get
+        {
+            // Single-limb sums: below and above the modulus.
+            yield return (new UInt256(5, 0, 0, 0), 0, 7);
+            yield return (new UInt256(ulong.MaxValue, 0, 0, 0), 0, 7);
+            yield return (new UInt256(ulong.MaxValue, 0, 0, 0), 0, ulong.MaxValue);
+            // 128-bit sums: carry-only u1, large u1 below/above d, both s == 0 (d MSB set) and s > 0.
+            yield return (new UInt256(3, 1, 0, 0), 0, 10);
+            yield return (new UInt256(ulong.MaxValue, ulong.MaxValue, 0, 0), 0, 3);
+            yield return (new UInt256(ulong.MaxValue, ulong.MaxValue, 0, 0), 0, ulong.MaxValue);
+            yield return (new UInt256(1, 2, 0, 0), 0, 0x8000_0000_0000_0001UL);
+            yield return (new UInt256(0x1234_5678_9abc_def0UL, 0xfedc_ba98_7654_3210UL, 0, 0), 0, 0xdead_beef_cafe_babeUL);
+            // Full-width sums, including the 257th bit.
+            yield return (new UInt256(ulong.MaxValue, ulong.MaxValue, ulong.MaxValue, ulong.MaxValue), 1, 7);
+            yield return (new UInt256(1, 0, 0, ulong.MaxValue), 0, 0x8000_0000_0000_0000UL);
+            yield return (new UInt256(0, 0, 1, 0), 0, 2);
+        }
+    }
+
+    [TestCaseSource(nameof(Remainder257By64BitsCases))]
+    public void Remainder257By64Bits_Matches_BigInteger((UInt256 A, ulong A4, ulong D) test)
+    {
+        BigInteger dividend = ((BigInteger)test.A4 << 256) + (BigInteger)test.A;
+        BigInteger expected = dividend % test.D;
+
+        UInt256.Remainder257By64Bits(in test.A, test.A4, test.D, out UInt256 rem);
+
+        ((BigInteger)rem).Should().Be(expected);
+    }
+
     // The (UInt256)BigInteger cast is allocation-free: it writes the value into a stackalloc
     // span via BigInteger.TryWriteBytes instead of allocating intermediate byte[] arrays.
     // These tests pin both the numeric result (right-aligned big-endian, all magnitudes) and
