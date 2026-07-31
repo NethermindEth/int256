@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/Solution Items/" Id="8ec462fd-d22e-90a8-e5ce-7e832ba40c5d">
     <File Path="Directory.Build.props" />
+    <File Path="Directory.Build.targets" />
     <File Path="Directory.Packages.props" />
   </Folder>
   <Project Path="Nethermind.Int256.Benchmark/Nethermind.Int256.Benchmark.csproj" />

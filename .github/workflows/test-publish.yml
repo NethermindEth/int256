@@ -10,7 +10,7 @@ on:
     inputs:
       publish:
         description: Publish to NuGet
-        default: None
+        default: 'No'
         type: choice
         options:
           - 'No'
@@ -67,21 +67,27 @@ jobs:
             build-config: release
             intrinsics: NoHWIntrinsics
             avx2: NoAvx2
+          - os: ubuntu-latest
+            build-config: release
+            intrinsics: NoHWIntrinsics
+            avx2: NoAvx2
+            variant: zkevm
             
     env:
       DOTNET_EnableAVX2: ${{ matrix.avx2 == 'NoAvx2' && '0' || '1' }}
       DOTNET_EnableHWIntrinsic: ${{ matrix.intrinsics == 'NoHWIntrinsics' && '0' || '1' }}
+      ENABLE_ZKEVM: ${{ matrix.variant == 'zkevm' && 'true' || 'false' }}
       
     steps:
       - name: Check out repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Set up .NET
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v6
 
       - name: Test
         working-directory: src/Nethermind.Int256.Tests
-        run: dotnet test -c ${{ matrix.build-config }}
+        run: dotnet test -c ${{ matrix.build-config }} -p:EnableZkEvm=${{ env.ENABLE_ZKEVM }}
 
   publish:
     name: Publish
@@ -90,10 +96,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Set up .NET
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v6
 
       - name: Publish
         env:
@@ -102,6 +108,18 @@ jobs:
           NUGET_API_KEY: ${{ github.event.inputs.publish == 'Staging' && secrets.NUGETTEST_API_KEY || secrets.NUGET_API_KEY }}
         working-directory: src
         run: |
-          dotnet pack ./Nethermind.Int256 -c release
-          dotnet nuget push ./artifacts/package/release/*.nupkg -k $NUGET_API_KEY \
-            -s ${{ github.event.inputs.publish == 'Staging' && 'https://apiint.nugettest.org/v3/index.json' || 'https://api.nuget.org/v3/index.json' }}
+          set -euo pipefail
+          dotnet pack ./Nethermind.Int256/Nethermind.Int256.csproj -c release
+          nupkg=$(ls ./artifacts/package/release/*.nupkg | head -1)
+          snupkg=$(ls ./artifacts/package/release/*.snupkg | head -1)
+          echo "Verifying $nupkg and $snupkg"
+          for f in impl/std/net10.0/Nethermind.Int256.dll impl/zkevm/net10.0/Nethermind.Int256.dll; do
+            unzip -l "$nupkg" | grep -qF "$f" || { echo "::error::missing $f in $(basename "$nupkg")"; exit 1; }
+          done
+          for f in impl/std/net10.0/Nethermind.Int256.pdb impl/zkevm/net10.0/Nethermind.Int256.pdb; do
+            unzip -l "$snupkg" | grep -qF "$f" || { echo "::error::missing $f in $(basename "$snupkg")"; exit 1; }
+          done
+          for package in "$nupkg" "$snupkg"; do
+            dotnet nuget push "$package" -k "$NUGET_API_KEY" \
+              -s ${{ github.event.inputs.publish == 'Staging' && 'https://apiint.nugettest.org/v3/index.json' || 'https://api.nuget.org/v3/index.json' }}
+          done
