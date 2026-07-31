@@ -2,12 +2,15 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 
 using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using System.Runtime.Intrinsics;
 using System.Runtime.Intrinsics.X86;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Configs;
@@ -819,6 +822,29 @@ public class IsZeroOne
     }
 }
 
+[MemoryDiagnoser]
+[SimpleJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 5)]
+public class BigIntegerToUInt256
+{
+    public static BigInteger[] Values { get; } =
+    [
+        BigInteger.Zero,
+        new BigInteger(ulong.MaxValue),
+        new BigInteger(ulong.MaxValue) << 64 | new BigInteger(ulong.MaxValue),
+        (BigInteger.One << 192) - 1,
+        (BigInteger.One << 256) - 1,
+    ];
+
+    [ParamsSource(nameof(Values))]
+    public BigInteger Value;
+
+    [Benchmark]
+    public UInt256 Cast_UInt256()
+    {
+        return (UInt256)Value;
+    }
+}
+
 public abstract class ParseUnsignedBenchmarkBase
 {
     public static string[] HexValues { get; } =
@@ -905,6 +931,108 @@ public class ParseDecimalUnsigned : ParseUnsignedBenchmarkBase
     public bool TryParse_UInt256()
     {
         return UInt256.TryParse(Value, out _);
+    }
+}
+
+// End-to-end AddMod with a 64-bit modulus across sum widths. Under the no-intrinsics job
+// X86Base is unavailable, so AddMod takes the portable Remainder257By64Bits path; the default
+// job takes the untouched x86 path and serves as a control.
+public enum ModSumWidth
+{
+    Small,    // x, y < m < 2^63 => sum fits one limb
+    CarryU1,  // x, y < m with the modulus MSB set => sum has u1 == 1
+    Mid128,   // sum is a full 128-bit value
+    Full,     // full-width operands, small modulus
+}
+
+[SimpleJob(RuntimeMoniker.Net10_0, launchCount: 3, warmupCount: 3, iterationCount: 10)]
+[NoIntrinsicsJob(RuntimeMoniker.Net10_0, launchCount: 3, warmupCount: 3, iterationCount: 10)]
+public class AddModByUInt64Modulus
+{
+    private const int N = 1024;
+    private UInt256[] _x = null!;
+    private UInt256[] _y = null!;
+    private UInt256[] _m = null!;
+
+    [Params(ModSumWidth.Small, ModSumWidth.CarryU1, ModSumWidth.Mid128, ModSumWidth.Full)]
+    public ModSumWidth Width;
+
+    [GlobalSetup]
+    public void Setup()
+    {
+        _x = new UInt256[N];
+        _y = new UInt256[N];
+        _m = new UInt256[N];
+        Random rnd = new(42);
+        for (int i = 0; i < N; i++)
+        {
+            ulong m = (ulong)rnd.NextInt64(2, long.MaxValue);
+            switch (Width)
+            {
+                case ModSumWidth.Small:
+                    _x[i] = (ulong)rnd.NextInt64() % m;
+                    _y[i] = (ulong)rnd.NextInt64() % m;
+                    break;
+                case ModSumWidth.CarryU1:
+                    m = 0x8000_0000_0000_0001UL | (ulong)rnd.NextInt64();
+                    _x[i] = m - 1;
+                    _y[i] = m - 1;
+                    break;
+                case ModSumWidth.Mid128:
+                    _x[i] = new UInt256((ulong)rnd.NextInt64(), (ulong)rnd.NextInt64() >> 1, 0, 0);
+                    _y[i] = new UInt256((ulong)rnd.NextInt64(), (ulong)rnd.NextInt64() >> 1, 0, 0);
+                    break;
+                default:
+                    _x[i] = new UInt256((ulong)rnd.NextInt64(), (ulong)rnd.NextInt64(), (ulong)rnd.NextInt64(), (ulong)rnd.NextInt64());
+                    _y[i] = new UInt256((ulong)rnd.NextInt64(), (ulong)rnd.NextInt64(), (ulong)rnd.NextInt64(), (ulong)rnd.NextInt64());
+                    break;
+            }
+            _m[i] = m;
+        }
+    }
+
+    [Benchmark(OperationsPerInvoke = N)]
+    public ulong AddMod_UInt64Modulus()
+    {
+        UInt256[] x = _x, y = _y, m = _m;
+        ulong acc = 0;
+        for (int i = 0; i < x.Length; i++)
+        {
+            UInt256.AddMod(in x[i], in y[i], in m[i], out UInt256 res);
+            acc ^= (ulong)res;
+        }
+        return acc;
+    }
+}
+
+[MemoryDiagnoser]
+[SimpleJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 5)]
+[NoIntrinsicsJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 5)]
+public class PaddedBytesUnsigned
+{
+    public static UInt256 Value { get; } = UInt256.MaxValue;
+
+    // Common pad widths: 20 = address, 32 = EVM word, 33/64 = left-padded wider forms.
+    [Params(20, 32, 33, 64)]
+    public int N;
+
+    // Mirrors PaddedBytes(int) before this change so the benchmark is a direct in-process A/B.
+    [Benchmark(Baseline = true)]
+    public byte[] PaddedBytes_Previous()
+    {
+        byte[] b = new byte[N];
+        for (int i = 0; i < 32 && i < N; i++)
+        {
+            b[N - 1 - i] = (byte)(Value[i / 8] >> (8 * (i % 8)));
+        }
+
+        return b;
+    }
+
+    [Benchmark]
+    public byte[] PaddedBytes_UInt256()
+    {
+        return Value.PaddedBytes(N);
     }
 }
 
@@ -1113,6 +1241,94 @@ public class AddModReduce64AB
     }
 }
 #pragma warning restore SYSLIB5004
+
+// In-process A/B for the 32-byte ToBigEndian write path (MSTORE-style serialization, RLP/RPC/trie).
+// The current implementation writes four BSWAPped 64-bit limbs (ScalarWriteBe); the proposed one
+// reinterprets the value as a Vector256<byte> and reverses all 32 bytes with a single shuffle/permute
+// (mirroring the already-vectorized big-endian READ ctor), storing the result with WriteUnaligned.
+// Both strategies are replicated inline here and measured in the SAME process so the A/B ratio is
+// robust to cross-run variance. Results escape into the _dst field buffer so the writes are not
+// elided; _dst is re-read into the accumulator to anchor the store. Default job = AVX2 on this host.
+[SimpleJob(RuntimeMoniker.Net10_0, launchCount: 6, warmupCount: 3, iterationCount: 10)]
+public class ToBigEndianAB
+{
+    private const int N = 1024;
+    private UInt256[] _src = null!;
+    private byte[] _dst = null!;
+
+    [GlobalSetup]
+    public void Setup()
+    {
+        if (!Avx2.IsSupported)
+        {
+            throw new PlatformNotSupportedException($"{nameof(ToBigEndianAB)} requires AVX2.");
+        }
+
+        _src = new UInt256[N];
+        _dst = new byte[32];
+        Random rnd = new(42);
+        for (int i = 0; i < N; i++)
+        {
+            _src[i] = new UInt256(
+                (ulong)rnd.NextInt64(),
+                (ulong)rnd.NextInt64(),
+                (ulong)rnd.NextInt64(),
+                (ulong)rnd.NextInt64());
+        }
+    }
+
+    // Current implementation: four big-endian 64-bit stores (BSWAP + mov).
+    [Benchmark(Baseline = true, OperationsPerInvoke = N)]
+    public byte ScalarWriteBe()
+    {
+        UInt256[] src = _src;
+        Span<byte> dst = _dst;
+        byte acc = 0;
+        for (int i = 0; i < src.Length; i++)
+        {
+            ref readonly UInt256 v = ref src[i];
+            BinaryPrimitives.WriteUInt64BigEndian(dst.Slice(0, 8), v.u3);
+            BinaryPrimitives.WriteUInt64BigEndian(dst.Slice(8, 8), v.u2);
+            BinaryPrimitives.WriteUInt64BigEndian(dst.Slice(16, 8), v.u1);
+            BinaryPrimitives.WriteUInt64BigEndian(dst.Slice(24, 8), v.u0);
+            acc ^= dst[0];
+        }
+        return acc;
+    }
+
+    // Proposed implementation: full 32-byte reverse via one shuffle (AVX2) or permute (AVX-512 VBMI),
+    // then an unaligned 256-bit store. The byte-reverse permutation is an involution, so the same
+    // shuffle constant the big-endian read ctor uses also performs the big-endian write.
+    [Benchmark(OperationsPerInvoke = N)]
+    public byte VectorWriteBe()
+    {
+        UInt256[] src = _src;
+        Span<byte> dst = _dst;
+        ref byte dst0 = ref MemoryMarshal.GetReference(dst);
+        Vector256<byte> shuffle = Vector256.Create(
+            0x18191a1b1c1d1e1ful,
+            0x1011121314151617ul,
+            0x08090a0b0c0d0e0ful,
+            0x0001020304050607ul).AsByte();
+        byte acc = 0;
+        for (int i = 0; i < src.Length; i++)
+        {
+            Vector256<byte> data = Unsafe.As<UInt256, Vector256<byte>>(ref Unsafe.AsRef(in src[i]));
+            if (Avx512Vbmi.VL.IsSupported)
+            {
+                Unsafe.WriteUnaligned(ref dst0, Avx512Vbmi.VL.PermuteVar32x8(data, shuffle));
+            }
+            else
+            {
+                Vector256<byte> convert = Avx2.Shuffle(data, shuffle);
+                Vector256<ulong> permute = Avx2.Permute4x64(convert.AsUInt64(), 0b_01_00_11_10);
+                Unsafe.WriteUnaligned(ref dst0, permute);
+            }
+            acc ^= dst[0];
+        }
+        return acc;
+    }
+}
 
 public readonly record struct DoubleUInt256(UInt256 A, UInt256 B)
 {
