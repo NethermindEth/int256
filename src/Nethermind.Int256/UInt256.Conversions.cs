@@ -39,16 +39,52 @@ public readonly partial struct UInt256
     public ushort ToUInt16(IFormatProvider? provider) => System.Convert.ToUInt16(ToDecimal(provider), provider);
     public uint ToUInt32(IFormatProvider? provider) => System.Convert.ToUInt32(ToDecimal(provider), provider);
     public ulong ToUInt64(IFormatProvider? provider) => System.Convert.ToUInt64(ToDecimal(provider), provider);
+    /// <summary>
+    /// Returns a new <paramref name="n"/>-byte array holding the big-endian, right-aligned,
+    /// left-zero-padded representation of this value. When <paramref name="n"/> is shorter than 32
+    /// the most-significant bytes are truncated; when it is longer the extra leading bytes are zero.
+    /// </summary>
+    /// <param name="n">The length of the returned array, in bytes.</param>
+    /// <returns>A freshly allocated <paramref name="n"/>-byte big-endian representation.</returns>
     public byte[] PaddedBytes(int n)
     {
         byte[] b = new byte[n];
+        // For n > 32 the leading bytes are already zero, so write only the right-aligned tail.
+        WritePaddedBytes(n > 32 ? b.AsSpan(n - 32) : b.AsSpan());
+        return b;
+    }
 
-        for (int i = 0; i < 32 && i < n; i++)
+    /// <summary>
+    /// Writes the big-endian, right-aligned, left-zero-padded representation of this value into
+    /// <paramref name="target"/>, filling the entire span. When the target is shorter than 32 bytes
+    /// the most-significant bytes are truncated; when it is longer the extra leading bytes are
+    /// zeroed, matching the <see cref="PaddedBytes(int)"/> array overload.
+    /// </summary>
+    /// <param name="target">The destination span; fully overwritten.</param>
+    [SkipLocalsInit]
+    public void WritePaddedBytes(Span<byte> target)
+    {
+        int n = target.Length;
+        if (n is 32 or 20)
         {
-            b[n - 1 - i] = (byte)(this[i / 8] >> (8 * (i % 8)));
+            // ToBigEndian writes these widths directly, skipping the staging buffer and copy.
+            ToBigEndian(target);
+            return;
         }
 
-        return b;
+        Span<byte> be = stackalloc byte[32];
+        BinaryPrimitives.WriteUInt64BigEndian(be.Slice(0, 8), u3);
+        BinaryPrimitives.WriteUInt64BigEndian(be.Slice(8, 8), u2);
+        BinaryPrimitives.WriteUInt64BigEndian(be.Slice(16, 8), u1);
+        BinaryPrimitives.WriteUInt64BigEndian(be.Slice(24, 8), u0);
+
+        int copy = Math.Min(32, n);
+        if (n > copy)
+        {
+            target.Slice(0, n - copy).Clear();
+        }
+
+        be.Slice(32 - copy, copy).CopyTo(target.Slice(n - copy, copy));
     }
 
     public byte[] ToBigEndian()
@@ -69,10 +105,35 @@ public readonly partial struct UInt256
     {
         if (target.Length == 32)
         {
-            BinaryPrimitives.WriteUInt64BigEndian(target.Slice(0, 8), u3);
-            BinaryPrimitives.WriteUInt64BigEndian(target.Slice(8, 8), u2);
-            BinaryPrimitives.WriteUInt64BigEndian(target.Slice(16, 8), u1);
-            BinaryPrimitives.WriteUInt64BigEndian(target.Slice(24, 8), u0);
+            if (Avx2.IsSupported)
+            {
+                // Full 32-byte reversal is an involution, so this reuses the shuffle constant of the
+                // big-endian read ctor (UInt256.Ctors.cs).
+                Vector256<byte> data = Unsafe.As<ulong, Vector256<byte>>(ref Unsafe.AsRef(in u0));
+                Vector256<byte> shuffle = Vector256.Create(
+                    0x18191a1b1c1d1e1ful,
+                    0x1011121314151617ul,
+                    0x08090a0b0c0d0e0ful,
+                    0x0001020304050607ul).AsByte();
+                if (Avx512Vbmi.VL.IsSupported)
+                {
+                    Vector256<byte> convert = Avx512Vbmi.VL.PermuteVar32x8(data, shuffle);
+                    Unsafe.WriteUnaligned(ref MemoryMarshal.GetReference(target), convert);
+                }
+                else
+                {
+                    Vector256<byte> convert = Avx2.Shuffle(data, shuffle);
+                    Vector256<ulong> permute = Avx2.Permute4x64(convert.AsUInt64(), 0b_01_00_11_10);
+                    Unsafe.WriteUnaligned(ref MemoryMarshal.GetReference(target), permute);
+                }
+            }
+            else
+            {
+                BinaryPrimitives.WriteUInt64BigEndian(target.Slice(0, 8), u3);
+                BinaryPrimitives.WriteUInt64BigEndian(target.Slice(8, 8), u2);
+                BinaryPrimitives.WriteUInt64BigEndian(target.Slice(16, 8), u1);
+                BinaryPrimitives.WriteUInt64BigEndian(target.Slice(24, 8), u0);
+            }
         }
         else if (target.Length == 20)
         {
@@ -111,37 +172,266 @@ public readonly partial struct UInt256
     public static bool TryParse(string value, out UInt256 result) => TryParse(value.AsSpan(), out result);
 
     public static bool TryParse(ReadOnlySpan<char> value, out UInt256 result) => value.StartsWith("0x", StringComparison.OrdinalIgnoreCase)
-        ? TryParse(value.Slice(2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out result)
-        : TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out result);
+        ? TryParseHex(value[2..], out result)
+        : TryParseDecimal(value, out result);
 
     public static bool TryParse(string value, NumberStyles style, IFormatProvider provider, out UInt256 result) => TryParse(value.AsSpan(), style, provider, out result);
 
     public static bool TryParse(in ReadOnlySpan<char> value, NumberStyles style, IFormatProvider provider, out UInt256 result)
     {
-        BigInteger a;
-        bool bigParsedProperly;
-        if ((style & NumberStyles.HexNumber) == NumberStyles.HexNumber && value[0] != 0)
+        if (style == NumberStyles.HexNumber)
         {
-            Span<char> fixedHexValue = stackalloc char[value.Length + 1];
-            fixedHexValue[0] = '0';
-            value.CopyTo(fixedHexValue.Slice(1));
-            bigParsedProperly = BigInteger.TryParse(fixedHexValue, style, provider, out a);
-        }
-        else
-        {
-            Span<char> fixedHexValue = stackalloc char[value.Length];
-            value.CopyTo(fixedHexValue);
-            bigParsedProperly = BigInteger.TryParse(fixedHexValue, style, provider, out a);
+            return TryParseHex(TrimWhiteSpace(value), out result);
         }
 
-        if (!bigParsedProperly)
+        NumberFormatInfo numberFormatInfo = NumberFormatInfo.GetInstance(provider);
+        if (style == NumberStyles.Integer &&
+            numberFormatInfo.PositiveSign == "+" &&
+            numberFormatInfo.NegativeSign == "-")
+        {
+            return TryParseDecimal(value, out result);
+        }
+
+        return TryParseViaBigInteger(value, style, provider, out result);
+    }
+
+    private static bool TryParseHex(ReadOnlySpan<char> value, out UInt256 result)
+    {
+        value = TrimWhiteSpace(value);
+
+        int start = 0;
+        while (start < value.Length && value[start] == '0')
+        {
+            start++;
+        }
+
+        int digitCount = value.Length - start;
+        if (digitCount == 0)
+        {
+            result = Zero;
+            return value.Length != 0;
+        }
+
+        if (digitCount > 64)
         {
             result = Zero;
             return false;
         }
 
+        int end = value.Length;
+        if (!TryParseHexChunk(value, ref end, start, out ulong u0) ||
+            !TryParseHexChunk(value, ref end, start, out ulong u1) ||
+            !TryParseHexChunk(value, ref end, start, out ulong u2) ||
+            !TryParseHexChunk(value, ref end, start, out ulong u3))
+        {
+            result = Zero;
+            return false;
+        }
 
-        result = (UInt256)a;
+        result = Create(u0, u1, u2, u3);
         return true;
+    }
+
+    private static bool TryParseDecimal(ReadOnlySpan<char> value, out UInt256 result)
+    {
+        value = TrimWhiteSpace(value);
+        if (value.Length == 0)
+        {
+            result = Zero;
+            return false;
+        }
+
+        int index = 0;
+        if (value[0] == '+')
+        {
+            index = 1;
+        }
+        else if (value[0] == '-')
+        {
+            result = Zero;
+            return false;
+        }
+
+        if (index == value.Length)
+        {
+            result = Zero;
+            return false;
+        }
+
+        while (index < value.Length && value[index] == '0')
+        {
+            index++;
+        }
+
+        if (index == value.Length)
+        {
+            result = Zero;
+            return true;
+        }
+
+        int digitCount = value.Length - index;
+        if (digitCount > 78)
+        {
+            result = Zero;
+            return false;
+        }
+
+        const int DecimalChunkDigitCount = 19;
+        const ulong DecimalChunkBase = 10_000_000_000_000_000_000UL;
+
+        int firstChunkDigitCount = digitCount % DecimalChunkDigitCount;
+        if (firstChunkDigitCount == 0)
+        {
+            firstChunkDigitCount = DecimalChunkDigitCount;
+        }
+
+        if (!TryParseDecimalChunk(value, index, firstChunkDigitCount, out ulong chunk))
+        {
+            result = Zero;
+            return false;
+        }
+
+        UInt256 parsed = Create(chunk, 0, 0, 0);
+        index += firstChunkDigitCount;
+
+        while (index < value.Length)
+        {
+            if (!TryParseDecimalChunk(value, index, DecimalChunkDigitCount, out chunk) ||
+                !TryMultiplyByUInt64AndAdd(in parsed, DecimalChunkBase, chunk, out parsed))
+            {
+                result = Zero;
+                return false;
+            }
+
+            index += DecimalChunkDigitCount;
+        }
+
+        result = parsed;
+        return true;
+    }
+
+    private static bool TryParseHexChunk(ReadOnlySpan<char> value, ref int end, int start, out ulong chunk)
+    {
+        chunk = 0;
+        if (end <= start)
+        {
+            return true;
+        }
+
+        int chunkStart = Math.Max(start, end - 16);
+        bool parsed = ulong.TryParse(
+            value.Slice(chunkStart, end - chunkStart),
+            NumberStyles.HexNumber,
+            CultureInfo.InvariantCulture,
+            out chunk);
+        end = chunkStart;
+        return parsed;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool TryParseDecimalChunk(ReadOnlySpan<char> value, int start, int length, out ulong chunk)
+    {
+        chunk = 0;
+        for (int i = start; i < start + length; i++)
+        {
+            uint digit = (uint)(value[i] - '0');
+            if (digit > 9)
+            {
+                return false;
+            }
+
+            chunk = chunk * 10 + digit;
+        }
+
+        return true;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool TryMultiplyByUInt64AndAdd(in UInt256 value, ulong multiplier, ulong addend, out UInt256 result)
+    {
+        ulong high = Multiply64(value.u0, multiplier, out ulong u0);
+        if (!AddToLow(addend, ref u0, ref high))
+        {
+            result = Zero;
+            return false;
+        }
+
+        ulong carry = high;
+        high = Multiply64(value.u1, multiplier, out ulong u1);
+        if (!AddToLow(carry, ref u1, ref high))
+        {
+            result = Zero;
+            return false;
+        }
+
+        carry = high;
+        high = Multiply64(value.u2, multiplier, out ulong u2);
+        if (!AddToLow(carry, ref u2, ref high))
+        {
+            result = Zero;
+            return false;
+        }
+
+        carry = high;
+        high = Multiply64(value.u3, multiplier, out ulong u3);
+        if (!AddToLow(carry, ref u3, ref high) || high != 0)
+        {
+            result = Zero;
+            return false;
+        }
+
+        result = Create(u0, u1, u2, u3);
+        return true;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool AddToLow(ulong value, ref ulong low, ref ulong high)
+    {
+        ulong previous = low;
+        low += value;
+        if (low >= previous)
+        {
+            return true;
+        }
+
+        high++;
+        return high != 0;
+    }
+
+    private static bool TryParseViaBigInteger(ReadOnlySpan<char> value, NumberStyles style, IFormatProvider provider, out UInt256 result)
+    {
+        if (!BigInteger.TryParse(value, style, provider, out BigInteger parsed) || parsed.Sign < 0)
+        {
+            result = Zero;
+            return false;
+        }
+
+        try
+        {
+            result = (UInt256)parsed;
+            return true;
+        }
+        catch (Exception e) when (e is ArgumentException or OverflowException or IndexOutOfRangeException)
+        {
+            result = Zero;
+            return false;
+        }
+    }
+
+    private static ReadOnlySpan<char> TrimWhiteSpace(ReadOnlySpan<char> value)
+    {
+        int start = 0;
+        while (start < value.Length && char.IsWhiteSpace(value[start]))
+        {
+            start++;
+        }
+
+        int end = value.Length - 1;
+        while (end >= start && char.IsWhiteSpace(value[end]))
+        {
+            end--;
+        }
+
+        return value.Slice(start, end - start + 1);
     }
 }
