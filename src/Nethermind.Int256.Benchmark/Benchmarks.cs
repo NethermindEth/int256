@@ -934,6 +934,77 @@ public class ParseDecimalUnsigned : ParseUnsignedBenchmarkBase
     }
 }
 
+// End-to-end AddMod with a 64-bit modulus across sum widths. Under the no-intrinsics job
+// X86Base is unavailable, so AddMod takes the portable Remainder257By64Bits path; the default
+// job takes the untouched x86 path and serves as a control.
+public enum ModSumWidth
+{
+    Small,    // x, y < m < 2^63 => sum fits one limb
+    CarryU1,  // x, y < m with the modulus MSB set => sum has u1 == 1
+    Mid128,   // sum is a full 128-bit value
+    Full,     // full-width operands, small modulus
+}
+
+[SimpleJob(RuntimeMoniker.Net10_0, launchCount: 3, warmupCount: 3, iterationCount: 10)]
+[NoIntrinsicsJob(RuntimeMoniker.Net10_0, launchCount: 3, warmupCount: 3, iterationCount: 10)]
+public class AddModByUInt64Modulus
+{
+    private const int N = 1024;
+    private UInt256[] _x = null!;
+    private UInt256[] _y = null!;
+    private UInt256[] _m = null!;
+
+    [Params(ModSumWidth.Small, ModSumWidth.CarryU1, ModSumWidth.Mid128, ModSumWidth.Full)]
+    public ModSumWidth Width;
+
+    [GlobalSetup]
+    public void Setup()
+    {
+        _x = new UInt256[N];
+        _y = new UInt256[N];
+        _m = new UInt256[N];
+        Random rnd = new(42);
+        for (int i = 0; i < N; i++)
+        {
+            ulong m = (ulong)rnd.NextInt64(2, long.MaxValue);
+            switch (Width)
+            {
+                case ModSumWidth.Small:
+                    _x[i] = (ulong)rnd.NextInt64() % m;
+                    _y[i] = (ulong)rnd.NextInt64() % m;
+                    break;
+                case ModSumWidth.CarryU1:
+                    m = 0x8000_0000_0000_0001UL | (ulong)rnd.NextInt64();
+                    _x[i] = m - 1;
+                    _y[i] = m - 1;
+                    break;
+                case ModSumWidth.Mid128:
+                    _x[i] = new UInt256((ulong)rnd.NextInt64(), (ulong)rnd.NextInt64() >> 1, 0, 0);
+                    _y[i] = new UInt256((ulong)rnd.NextInt64(), (ulong)rnd.NextInt64() >> 1, 0, 0);
+                    break;
+                default:
+                    _x[i] = new UInt256((ulong)rnd.NextInt64(), (ulong)rnd.NextInt64(), (ulong)rnd.NextInt64(), (ulong)rnd.NextInt64());
+                    _y[i] = new UInt256((ulong)rnd.NextInt64(), (ulong)rnd.NextInt64(), (ulong)rnd.NextInt64(), (ulong)rnd.NextInt64());
+                    break;
+            }
+            _m[i] = m;
+        }
+    }
+
+    [Benchmark(OperationsPerInvoke = N)]
+    public ulong AddMod_UInt64Modulus()
+    {
+        UInt256[] x = _x, y = _y, m = _m;
+        ulong acc = 0;
+        for (int i = 0; i < x.Length; i++)
+        {
+            UInt256.AddMod(in x[i], in y[i], in m[i], out UInt256 res);
+            acc ^= (ulong)res;
+        }
+        return acc;
+    }
+}
+
 [MemoryDiagnoser]
 [SimpleJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 5)]
 [NoIntrinsicsJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 5)]
