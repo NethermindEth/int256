@@ -662,6 +662,8 @@ public class UInt256Tests : UInt256TestsTemplate<UInt256>
             yield return (new UInt256(ulong.MaxValue, 0, 0, 0), 0, 7);
             yield return (new UInt256(ulong.MaxValue, 0, 0, 0), 0, ulong.MaxValue);
             // 128-bit sums: carry-only u1, large u1 below/above d, both s == 0 (d MSB set) and s > 0.
+            yield return (new UInt256(ulong.MaxValue, ulong.MaxValue, 0, 0), 0, 1);
+            yield return (new UInt256(ulong.MaxValue, ulong.MaxValue, 0, 0), 0, 2);
             yield return (new UInt256(3, 1, 0, 0), 0, 10);
             yield return (new UInt256(ulong.MaxValue, ulong.MaxValue, 0, 0), 0, 3);
             yield return (new UInt256(ulong.MaxValue, ulong.MaxValue, 0, 0), 0, ulong.MaxValue);

@@ -939,9 +939,10 @@ public class ParseDecimalUnsigned : ParseUnsignedBenchmarkBase
 // job takes the untouched x86 path and serves as a control.
 public enum ModSumWidth
 {
-    Small,   // x, y < m => sum fits one limb
-    Mid128,  // sum is a full 128-bit value
-    Full,    // full-width operands, small modulus
+    Small,    // x, y < m < 2^63 => sum fits one limb
+    CarryU1,  // x, y < m with the modulus MSB set => sum has u1 == 1
+    Mid128,   // sum is a full 128-bit value
+    Full,     // full-width operands, small modulus
 }
 
 [SimpleJob(RuntimeMoniker.Net10_0, launchCount: 3, warmupCount: 3, iterationCount: 10)]
@@ -953,7 +954,7 @@ public class AddModByUInt64Modulus
     private UInt256[] _y = null!;
     private UInt256[] _m = null!;
 
-    [Params(ModSumWidth.Small, ModSumWidth.Mid128, ModSumWidth.Full)]
+    [Params(ModSumWidth.Small, ModSumWidth.CarryU1, ModSumWidth.Mid128, ModSumWidth.Full)]
     public ModSumWidth Width;
 
     [GlobalSetup]
@@ -966,12 +967,16 @@ public class AddModByUInt64Modulus
         for (int i = 0; i < N; i++)
         {
             ulong m = (ulong)rnd.NextInt64(2, long.MaxValue);
-            _m[i] = m;
             switch (Width)
             {
                 case ModSumWidth.Small:
                     _x[i] = (ulong)rnd.NextInt64() % m;
                     _y[i] = (ulong)rnd.NextInt64() % m;
+                    break;
+                case ModSumWidth.CarryU1:
+                    m = 0x8000_0000_0000_0001UL | (ulong)rnd.NextInt64();
+                    _x[i] = m - 1;
+                    _y[i] = m - 1;
                     break;
                 case ModSumWidth.Mid128:
                     _x[i] = new UInt256((ulong)rnd.NextInt64(), (ulong)rnd.NextInt64() >> 1, 0, 0);
@@ -982,6 +987,7 @@ public class AddModByUInt64Modulus
                     _y[i] = new UInt256((ulong)rnd.NextInt64(), (ulong)rnd.NextInt64(), (ulong)rnd.NextInt64(), (ulong)rnd.NextInt64());
                     break;
             }
+            _m[i] = m;
         }
     }
 
