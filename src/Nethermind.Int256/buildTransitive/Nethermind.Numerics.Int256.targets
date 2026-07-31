@@ -1,0 +1,19 @@
+<Project>
+
+  <!-- zkEVM is a build feature, not a runtime identifier, so select by EnableZkEvm. -->
+
+  <PropertyGroup>
+    <_Int256Variant Condition="'$(EnableZkEvm)' == 'true'">zkevm</_Int256Variant>
+    <_Int256Variant Condition="'$(_Int256Variant)' == ''">std</_Int256Variant>
+    <_Int256Assembly>$([MSBuild]::NormalizePath('$(MSBuildThisFileDirectory)', '..', 'impl', '$(_Int256Variant)', 'net10.0', 'Nethermind.Int256.dll'))</_Int256Assembly>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Use the full path because both variants have the same assembly identity. -->
+    <Reference Include="$(_Int256Assembly)">
+      <Private>true</Private>
+      <NuGetPackageId>Nethermind.Numerics.Int256</NuGetPackageId>
+    </Reference>
+  </ItemGroup>
+
+</Project>

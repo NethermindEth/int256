@@ -19,6 +19,15 @@
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
 
+  <!-- Package both implementations outside lib/; buildTransitive selects one for consumers. -->
+  <PropertyGroup>
+    <BuildOutputTargetFolder>impl/std</BuildOutputTargetFolder>
+    <NoPackageAnalysis>true</NoPackageAnalysis>
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+    <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);_AddInt256Variants</TargetsForTfmSpecificContentInPackage>
+    <TargetsForTfmSpecificDebugSymbolsInPackage>$(TargetsForTfmSpecificDebugSymbolsInPackage);_AddInt256Symbols</TargetsForTfmSpecificDebugSymbolsInPackage>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.SourceLink.GitHub">
       <PrivateAssets>all</PrivateAssets>
@@ -28,7 +37,50 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="../../README.md" Pack="true" PackagePath="/" />
+    <!-- Keep both variants on the same build/version properties without adding a dependency. -->
+    <ProjectReference Include="Nethermind.Int256.ZkEvm.csproj"
+                      ReferenceOutputAssembly="false"
+                      AdditionalProperties="EnableZkEvm=true"
+                      PrivateAssets="all" />
   </ItemGroup>
+
+  <ItemGroup>
+    <None Include="../../README.md" Pack="true" PackagePath="/" />
+    <None Include="buildTransitive/Nethermind.Numerics.Int256.targets" Pack="true" PackagePath="buildTransitive/Nethermind.Numerics.Int256.targets" />
+  </ItemGroup>
+
+  <!-- The primary project output must remain the standard variant while packing. -->
+  <Target Name="_GuardPackVariant" Condition="'$(EnableZkEvm)' == 'true'">
+    <Error Text="Do not pack with -p:EnableZkEvm=true. 'dotnet pack' builds both the std and zkEVM variants; run it without the flag." />
+  </Target>
+
+  <Target Name="_GetZkEvmVariantPath" DependsOnTargets="_GuardPackVariant">
+    <MSBuild Projects="Nethermind.Int256.ZkEvm.csproj"
+             Targets="GetTargetPath"
+             Properties="Configuration=$(Configuration);EnableZkEvm=true">
+      <Output TaskParameter="TargetOutputs" ItemName="_ZkEvmTargetPath" />
+    </MSBuild>
+    <PropertyGroup>
+      <_ZkEvmDll>@(_ZkEvmTargetPath)</_ZkEvmDll>
+      <_ZkEvmPdb>$([System.IO.Path]::ChangeExtension('$(_ZkEvmDll)', '.pdb'))</_ZkEvmPdb>
+    </PropertyGroup>
+  </Target>
+
+  <Target Name="_AddInt256Variants" DependsOnTargets="_GetZkEvmVariantPath">
+    <ItemGroup>
+      <TfmSpecificPackageFile Include="$(_ZkEvmDll)">
+        <PackagePath>impl/zkevm/net10.0/$(TargetFileName)</PackagePath>
+      </TfmSpecificPackageFile>
+    </ItemGroup>
+  </Target>
+
+  <Target Name="_AddInt256Symbols" DependsOnTargets="_GetZkEvmVariantPath">
+    <ItemGroup>
+      <TfmSpecificDebugSymbolsFile Include="$(_ZkEvmPdb)" Condition="Exists('$(_ZkEvmPdb)')">
+        <TargetPath>/impl/zkevm/net10.0/$(TargetName).pdb</TargetPath>
+        <TargetFramework>$(TargetFramework)</TargetFramework>
+      </TfmSpecificDebugSymbolsFile>
+    </ItemGroup>
+  </Target>
 
 </Project>
