@@ -119,7 +119,5 @@ jobs:
           for f in impl/std/net10.0/Nethermind.Int256.pdb impl/zkevm/net10.0/Nethermind.Int256.pdb; do
             unzip -l "$snupkg" | grep -qF "$f" || { echo "::error::missing $f in $(basename "$snupkg")"; exit 1; }
           done
-          for package in "$nupkg" "$snupkg"; do
-            dotnet nuget push "$package" -k "$NUGET_API_KEY" \
-              -s ${{ github.event.inputs.publish == 'Staging' && 'https://apiint.nugettest.org/v3/index.json' || 'https://api.nuget.org/v3/index.json' }}
-          done
+          dotnet nuget push "$nupkg" -k "$NUGET_API_KEY" \
+            -s ${{ github.event.inputs.publish == 'Staging' && 'https://apiint.nugettest.org/v3/index.json' || 'https://api.nuget.org/v3/index.json' }}
