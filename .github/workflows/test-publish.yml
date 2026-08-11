@@ -36,7 +36,7 @@ jobs:
             build-config: debug
             intrinsics: HWIntrinsics
             avx2: NoAvx2
-          
+
           - os: windows-latest
             build-config: release
             intrinsics: NoHWIntrinsics
@@ -72,12 +72,12 @@ jobs:
             intrinsics: NoHWIntrinsics
             avx2: NoAvx2
             variant: zkevm
-            
+
     env:
       DOTNET_EnableAVX2: ${{ matrix.avx2 == 'NoAvx2' && '0' || '1' }}
       DOTNET_EnableHWIntrinsic: ${{ matrix.intrinsics == 'NoHWIntrinsics' && '0' || '1' }}
       ENABLE_ZKEVM: ${{ matrix.variant == 'zkevm' && 'true' || 'false' }}
-      
+
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -94,12 +94,25 @@ jobs:
     needs: test
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.publish != 'No' || github.event_name == 'release'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      NUGET_HOST: ${{ github.event.inputs.publish == 'Staging' && 'https://int.nugettest.org' || 'https://www.nuget.org' }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
 
       - name: Set up .NET
         uses: actions/setup-dotnet@v6
+
+      - name: NuGet login
+        uses: nuget/login@v1
+        id: login
+        with:
+          user: ${{ secrets.NUGET_USER }}
+          audience: ${{ env.NUGET_HOST }}
+          token-service-url: ${{ env.NUGET_HOST }}/api/v2/token
 
       - name: Publish
         env:
@@ -119,5 +132,5 @@ jobs:
           for f in impl/std/net10.0/Nethermind.Int256.pdb impl/zkevm/net10.0/Nethermind.Int256.pdb; do
             unzip -l "$snupkg" | grep -qF "$f" || { echo "::error::missing $f in $(basename "$snupkg")"; exit 1; }
           done
-          dotnet nuget push "$nupkg" -k "$NUGET_API_KEY" \
-            -s ${{ github.event.inputs.publish == 'Staging' && 'https://apiint.nugettest.org/v3/index.json' || 'https://api.nuget.org/v3/index.json' }}
+          dotnet nuget push "$nupkg" \
+            -k "${{ steps.login.outputs.NUGET_API_KEY }}" -s ${{ env.NUGET_HOST }}/api/v2/package
