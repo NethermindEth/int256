@@ -38,9 +38,11 @@ jobs:
 
       - name: Run benchmarks
         working-directory: src/Nethermind.Int256.Benchmark
+        env:
+          BDN_FILTER: ${{ inputs.filter }}
         run: >-
           dotnet run -c release --
-          --filter '${{ inputs.filter }}'
+          --filter "$BDN_FILTER"
           --job short
           --memory
           --exporters GitHub
