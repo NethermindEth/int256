@@ -6,6 +6,7 @@ using System.Buffers.Binary;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
+using System.Runtime.Intrinsics.Arm;
 using System.Runtime.Intrinsics.X86;
 
 namespace Nethermind.Int256;
@@ -79,6 +80,20 @@ public readonly partial struct UInt256
                         Vector256<ulong> permute = Avx2.Permute4x64(Unsafe.As<Vector256<byte>, Vector256<ulong>>(ref convert), 0b_01_00_11_10);
                         Unsafe.As<ulong, Vector256<ulong>>(ref u0) = permute;
                     }
+                }
+                else if (AdvSimd.Arm64.IsSupported)
+                {
+                    Unsafe.SkipInit(out u0);
+                    Unsafe.SkipInit(out u1);
+                    Unsafe.SkipInit(out u2);
+                    Unsafe.SkipInit(out u3);
+                    // Full 32-byte reversal: REV64 reverses bytes within each 64-bit lane, EXT #8
+                    // swaps the lanes, and the two 16-byte halves swap places (u0:u1 <- high half).
+                    ref byte src = ref MemoryMarshal.GetReference(bytes);
+                    Vector128<ulong> reversedLower = AdvSimd.ReverseElement8(Vector128.LoadUnsafe(ref src).AsUInt64());
+                    Vector128<ulong> reversedUpper = AdvSimd.ReverseElement8(Vector128.LoadUnsafe(ref src, 16).AsUInt64());
+                    Unsafe.As<ulong, Vector128<ulong>>(ref u0) = AdvSimd.ExtractVector128(reversedUpper, reversedUpper, 1);
+                    Unsafe.As<ulong, Vector128<ulong>>(ref u2) = AdvSimd.ExtractVector128(reversedLower, reversedLower, 1);
                 }
                 else
                 {
