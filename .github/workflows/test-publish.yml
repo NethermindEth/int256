@@ -73,6 +73,17 @@ jobs:
             avx2: NoAvx2
             variant: zkevm
 
+          # linux-arm64: validates the AdvSimd paths on the production ARM target
+          # (the AVX2/AVX-512 env toggles are no-ops there).
+          - os: ubuntu-24.04-arm
+            build-config: release
+            intrinsics: HWIntrinsics
+            avx2: NoAvx2
+          - os: ubuntu-24.04-arm
+            build-config: release
+            intrinsics: NoHWIntrinsics
+            avx2: NoAvx2
+
     env:
       DOTNET_EnableAVX2: ${{ matrix.avx2 == 'NoAvx2' && '0' || '1' }}
       DOTNET_EnableHWIntrinsic: ${{ matrix.intrinsics == 'NoHWIntrinsics' && '0' || '1' }}

@@ -8,6 +8,7 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
+using System.Runtime.Intrinsics.Arm;
 using System.Runtime.Intrinsics.X86;
 
 namespace Nethermind.Int256;
@@ -126,6 +127,15 @@ public readonly partial struct UInt256
                     Vector256<ulong> permute = Avx2.Permute4x64(convert.AsUInt64(), 0b_01_00_11_10);
                     Unsafe.WriteUnaligned(ref MemoryMarshal.GetReference(target), permute);
                 }
+            }
+            else if (AdvSimd.Arm64.IsSupported)
+            {
+                // Mirror of the big-endian read ctor: REV64 + EXT #8 per half, halves stored swapped.
+                Vector128<ulong> reversedLower = AdvSimd.ReverseElement8(Unsafe.As<ulong, Vector128<ulong>>(ref Unsafe.AsRef(in u0)));
+                Vector128<ulong> reversedUpper = AdvSimd.ReverseElement8(Unsafe.As<ulong, Vector128<ulong>>(ref Unsafe.AsRef(in u2)));
+                ref byte dst = ref MemoryMarshal.GetReference(target);
+                AdvSimd.ExtractVector128(reversedUpper, reversedUpper, 1).AsByte().StoreUnsafe(ref dst);
+                AdvSimd.ExtractVector128(reversedLower, reversedLower, 1).AsByte().StoreUnsafe(ref dst, 16);
             }
             else
             {
