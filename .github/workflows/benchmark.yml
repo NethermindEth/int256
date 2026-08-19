@@ -1,6 +1,10 @@
 name: Benchmark
 
 on:
+  # Temporary: lets the workflow run before it lands on main (workflow_dispatch
+  # only resolves workflows present on the default branch). Remove before merge.
+  push:
+    branches: [perf/arm-simd-parity]
   workflow_dispatch:
     inputs:
       runner:
@@ -24,11 +28,12 @@ jobs:
   benchmark:
     name: Benchmark (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: ${{ inputs.max-minutes }}
+    # Inputs are empty on push events; fall back to the dispatch defaults.
+    timeout-minutes: ${{ inputs.max-minutes || 10 }}
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(inputs.runner == 'both' && '["ubuntu-latest","ubuntu-24.04-arm"]' || format('["{0}"]', inputs.runner)) }}
+        os: ${{ fromJSON((inputs.runner || 'both') == 'both' && '["ubuntu-latest","ubuntu-24.04-arm"]' || format('["{0}"]', inputs.runner)) }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -39,7 +44,7 @@ jobs:
       - name: Run benchmarks
         working-directory: src/Nethermind.Int256.Benchmark
         env:
-          BDN_FILTER: ${{ inputs.filter }}
+          BDN_FILTER: ${{ inputs.filter || '*ByteSwapBench*' }}
         run: >-
           dotnet run -c release --
           --filter "$BDN_FILTER"
