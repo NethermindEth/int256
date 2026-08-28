@@ -284,6 +284,125 @@ public class ArithmeticPathAB
 
 }
 
+public enum AddOverflowCase
+{
+    Distribution,
+    Small64,
+    Small64Carry,
+    Mid128,
+    Full,
+    Mixed,
+}
+
+[SimpleJob(RuntimeMoniker.Net10_0, launchCount: 6, warmupCount: 3, iterationCount: 10)]
+[NoIntrinsicsJob(RuntimeMoniker.Net10_0, launchCount: 6, warmupCount: 3, iterationCount: 10)]
+public class AddOverflowDispatchAB
+{
+    private const int N = 4096;
+    private const int DistributionSmallCount = 3604;
+
+    private UInt256[] _a = null!;
+    private UInt256[] _b = null!;
+
+    [Params(AddOverflowCase.Distribution, AddOverflowCase.Small64, AddOverflowCase.Small64Carry,
+        AddOverflowCase.Mid128, AddOverflowCase.Full, AddOverflowCase.Mixed)]
+    public AddOverflowCase Case;
+
+    [GlobalSetup]
+    public void Setup()
+    {
+        _a = new UInt256[N];
+        _b = new UInt256[N];
+        Random random = new(0xADD0_497);
+
+        for (int i = 0; i < N; i++)
+        {
+            (UInt256 a, UInt256 b) = Case switch
+            {
+                AddOverflowCase.Distribution => DistributionPair(i, random),
+                AddOverflowCase.Small64 => Small64Pair(random),
+                AddOverflowCase.Small64Carry => (new UInt256(ulong.MaxValue), new UInt256((ulong)i + 1)),
+                AddOverflowCase.Mid128 => Mid128Pair(random),
+                AddOverflowCase.Full => FullPair(random),
+                _ => MixedPair(i, random),
+            };
+            _a[i] = a;
+            _b[i] = b;
+        }
+    }
+
+    [Benchmark(Baseline = true, OperationsPerInvoke = N)]
+    public ulong Add_CurrentDispatch()
+    {
+        UInt256[] a = _a, b = _b;
+        ulong accumulator = 0;
+        for (int i = 0; i < a.Length; i++)
+        {
+            bool overflow = AddCurrentDispatch(in a[i], in b[i], out UInt256 result);
+            accumulator ^= result.u0 ^ result.u1 ^ result.u2 ^ result.u3;
+            accumulator ^= overflow ? 1UL : 0UL;
+        }
+
+        return accumulator;
+    }
+
+    [Benchmark(OperationsPerInvoke = N)]
+    public ulong Add_GatedDispatch()
+    {
+        UInt256[] a = _a, b = _b;
+        ulong accumulator = 0;
+        for (int i = 0; i < a.Length; i++)
+        {
+            bool overflow = UInt256.AddOverflow(in a[i], in b[i], out UInt256 result);
+            accumulator ^= result.u0 ^ result.u1 ^ result.u2 ^ result.u3;
+            accumulator ^= overflow ? 1UL : 0UL;
+        }
+
+        return accumulator;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool AddCurrentDispatch(in UInt256 a, in UInt256 b, out UInt256 result)
+    {
+        if (!Avx2.IsSupported && !Vector256.IsHardwareAccelerated)
+        {
+            return UInt256.AddScalar(in a, in b, out result);
+        }
+
+        if (Avx2.IsSupported)
+        {
+            return UInt256.AddAvx2(in a, in b, out result);
+        }
+
+        throw new PlatformNotSupportedException($"{nameof(AddOverflowDispatchAB)} requires AVX2 on the default hardware job.");
+    }
+
+    private static (UInt256 A, UInt256 B) DistributionPair(int index, Random random)
+        => index < DistributionSmallCount
+            ? Small64Pair(random)
+            : (index % 3) switch
+            {
+                0 => Mid128Pair(random),
+                1 => FullPair(random),
+                _ => (new UInt256((ulong)random.NextInt64(), (ulong)random.NextInt64()),
+                    new UInt256((ulong)random.NextInt64(), (ulong)random.NextInt64(), 1)),
+            };
+
+    private static (UInt256 A, UInt256 B) MixedPair(int index, Random random)
+        => (index & 1) == 0 ? Small64Pair(random) : Mid128Pair(random);
+
+    private static (UInt256 A, UInt256 B) Small64Pair(Random random)
+        => (new UInt256((ulong)random.NextInt64()), new UInt256((ulong)random.NextInt64()));
+
+    private static (UInt256 A, UInt256 B) Mid128Pair(Random random)
+        => (new UInt256((ulong)random.NextInt64(), (ulong)random.NextInt64() | 1),
+            new UInt256((ulong)random.NextInt64(), (ulong)random.NextInt64() | 1));
+
+    private static (UInt256 A, UInt256 B) FullPair(Random random)
+        => (new UInt256((ulong)random.NextInt64(), (ulong)random.NextInt64(), (ulong)random.NextInt64(), (ulong)random.NextInt64() | 1),
+            new UInt256((ulong)random.NextInt64(), (ulong)random.NextInt64(), (ulong)random.NextInt64(), (ulong)random.NextInt64() | 1));
+}
+
 // LessThan A/B across operand relationships: DifferHigh (scalar exits after one compare),
 // DifferLow and Equal (scalar walks all four limbs).
 public enum LtCase

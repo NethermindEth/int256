@@ -99,6 +99,11 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
             return AddScalar(in a, in b, out res);
         }
 
+        if ((a.u1 | a.u2 | a.u3 | b.u1 | b.u2 | b.u3) == 0)
+        {
+            return AddScalarSmall(in a, in b, out res);
+        }
+
         return Avx2.IsSupported ?
             AddAvx2(in a, in b, out res) :
             AddVector256(in a, in b, out res);
@@ -130,6 +135,23 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         AddWithCarry(a.u3, b.u3, ref c, out ulong r3);
         res = new UInt256(r0, r1, r2, r3);
         return c != 0;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool AddScalarSmall(in UInt256 a, in UInt256 b, out UInt256 res)
+    {
+        ulong a0 = a.u0;
+        ulong u0 = a0 + b.u0;
+
+        // Assignment to res after reading a and b in case either input aliases the output.
+        res = default;
+        Unsafe.AsRef(in res.u0) = u0;
+        if (u0 < a0)
+        {
+            Unsafe.AsRef(in res.u1) = 1;
+        }
+
+        return false;
     }
 
     internal static bool AddAvx2(in UInt256 a, in UInt256 b, out UInt256 res)
