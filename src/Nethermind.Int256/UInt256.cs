@@ -848,6 +848,12 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
 
     public static void Lsh(in UInt256 x, int n, out UInt256 res)
     {
+        if (X86Base.X64.IsSupported)
+        {
+            LshX86(in x, n, out res);
+            return;
+        }
+
         if ((n % 64) == 0)
         {
             switch (n)
@@ -934,6 +940,12 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
 
     public static void Rsh(in UInt256 x, int n, out UInt256 res)
     {
+        if (X86Base.X64.IsSupported)
+        {
+            RshX86(in x, n, out res);
+            return;
+        }
+
         // n % 64 == 0
         if ((n & 0x3f) == 0)
         {
@@ -1015,6 +1027,148 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         z0 = NativeRsh(res.u0, n) | a;
 
         res = new UInt256(z0, z1, z2, z3);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void LshX86(in UInt256 x, int n, out UInt256 res)
+    {
+        if ((n & 63) == 0)
+        {
+            switch (n)
+            {
+                case 0:
+                    res = x;
+                    return;
+                case 64:
+                    x.Lsh64(out res);
+                    return;
+                case 128:
+                    x.Lsh128(out res);
+                    return;
+                case 192:
+                    x.Lsh192(out res);
+                    return;
+                default:
+                    res = Zero;
+                    return;
+            }
+        }
+
+        int wordShift;
+        if (n < 0)
+        {
+            // Preserve the existing behavior for negative counts: negative multiples of 64
+            // returned zero, while all other negative counts behaved as a shift by n & 63.
+            n &= 63;
+            if (n == 0)
+            {
+                res = Zero;
+                return;
+            }
+            wordShift = 0;
+        }
+        else
+        {
+            if (n >= 256)
+            {
+                res = Zero;
+                return;
+            }
+            wordShift = n >> 6;
+        }
+
+        int bitShift = n & 63;
+        int inverseShift = 64 - bitShift;
+        res = wordShift switch
+        {
+            0 => new UInt256(
+                x.u0 << bitShift,
+                (x.u1 << bitShift) | (x.u0 >> inverseShift),
+                (x.u2 << bitShift) | (x.u1 >> inverseShift),
+                (x.u3 << bitShift) | (x.u2 >> inverseShift)),
+            1 => new UInt256(
+                0,
+                x.u0 << bitShift,
+                (x.u1 << bitShift) | (x.u0 >> inverseShift),
+                (x.u2 << bitShift) | (x.u1 >> inverseShift)),
+            2 => new UInt256(
+                0,
+                0,
+                x.u0 << bitShift,
+                (x.u1 << bitShift) | (x.u0 >> inverseShift)),
+            _ => new UInt256(0, 0, 0, x.u0 << bitShift),
+        };
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void RshX86(in UInt256 x, int n, out UInt256 res)
+    {
+        if ((n & 63) == 0)
+        {
+            switch (n)
+            {
+                case 0:
+                    res = x;
+                    return;
+                case 64:
+                    x.Rsh64(out res);
+                    return;
+                case 128:
+                    x.Rsh128(out res);
+                    return;
+                case 192:
+                    x.Rsh192(out res);
+                    return;
+                default:
+                    res = Zero;
+                    return;
+            }
+        }
+
+        int wordShift;
+        if (n < 0)
+        {
+            // Preserve the existing behavior for negative counts: negative multiples of 64
+            // returned zero, while all other negative counts behaved as a shift by n & 63.
+            n &= 63;
+            if (n == 0)
+            {
+                res = Zero;
+                return;
+            }
+            wordShift = 0;
+        }
+        else
+        {
+            if (n >= 256)
+            {
+                res = Zero;
+                return;
+            }
+            wordShift = n >> 6;
+        }
+
+        int bitShift = n & 63;
+        int inverseShift = 64 - bitShift;
+        res = wordShift switch
+        {
+            0 => new UInt256(
+                (x.u0 >> bitShift) | (x.u1 << inverseShift),
+                (x.u1 >> bitShift) | (x.u2 << inverseShift),
+                (x.u2 >> bitShift) | (x.u3 << inverseShift),
+                x.u3 >> bitShift),
+            1 => new UInt256(
+                (x.u1 >> bitShift) | (x.u2 << inverseShift),
+                (x.u2 >> bitShift) | (x.u3 << inverseShift),
+                x.u3 >> bitShift,
+                0),
+            2 => new UInt256(
+                (x.u2 >> bitShift) | (x.u3 << inverseShift),
+                x.u3 >> bitShift,
+                0,
+                0),
+            _ => new UInt256(x.u3 >> bitShift, 0, 0, 0),
+        };
     }
 
     public void RightShift(int n, out UInt256 res) => Rsh(this, n, out res);
