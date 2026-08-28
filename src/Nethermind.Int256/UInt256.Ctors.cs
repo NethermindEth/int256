@@ -34,21 +34,10 @@ public readonly partial struct UInt256
 
     public UInt256(ulong u0 = 0, ulong u1 = 0, ulong u2 = 0, ulong u3 = 0)
     {
-        if (Vector256.IsHardwareAccelerated)
-        {
-            Unsafe.SkipInit(out this.u0);
-            Unsafe.SkipInit(out this.u1);
-            Unsafe.SkipInit(out this.u2);
-            Unsafe.SkipInit(out this.u3);
-            Unsafe.As<ulong, Vector256<ulong>>(ref this.u0) = Vector256.Create(u0, u1, u2, u3);
-        }
-        else
-        {
-            this.u0 = u0;
-            this.u1 = u1;
-            this.u2 = u2;
-            this.u3 = u3;
-        }
+        this.u0 = u0;
+        this.u1 = u1;
+        this.u2 = u2;
+        this.u3 = u3;
     }
 
     public UInt256(in ReadOnlySpan<byte> bytes, bool isBigEndian = false)
