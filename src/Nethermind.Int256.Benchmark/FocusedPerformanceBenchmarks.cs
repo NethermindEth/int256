@@ -63,9 +63,9 @@ public class WideDivideModBenchmark
 
             int shift = shape switch
             {
-                WideDivideShape.Limb1PowerOfTwo => 64 + (i & 1),
-                WideDivideShape.Limb2PowerOfTwo => 128 + (i & 1),
-                WideDivideShape.Limb3PowerOfTwo => 192 + (i & 1),
+                WideDivideShape.Limb1PowerOfTwo => 64 + (i & 63),
+                WideDivideShape.Limb2PowerOfTwo => 128 + (i & 63),
+                WideDivideShape.Limb3PowerOfTwo => 192 + (i & 63),
                 WideDivideShape.NonPowerOfTwo => (i % 3) switch
                 {
                     0 => 127,
