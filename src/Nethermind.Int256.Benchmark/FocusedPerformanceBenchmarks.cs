@@ -15,7 +15,7 @@ public enum WideDivideShape
     Limb2PowerOfTwo,
     Limb3PowerOfTwo,
     NonPowerOfTwo,
-    Weighted,
+    CorpusWeighted,
 }
 
 /// <summary>
@@ -43,7 +43,7 @@ public class WideDivideModBenchmark
         WideDivideShape.Limb2PowerOfTwo,
         WideDivideShape.Limb3PowerOfTwo,
         WideDivideShape.NonPowerOfTwo,
-        WideDivideShape.Weighted)]
+        WideDivideShape.CorpusWeighted)]
     public WideDivideShape Shape { get; set; }
 
     [GlobalSetup]
@@ -57,16 +57,21 @@ public class WideDivideModBenchmark
         Random random = new(0x44495632);
         for (int i = 0; i < BatchSize; i++)
         {
-            WideDivideShape shape = Shape == WideDivideShape.Weighted
-                ? (WideDivideShape)(i % 4)
+            WideDivideShape shape = Shape == WideDivideShape.CorpusWeighted
+                ? CorpusWeightedShape(i)
                 : Shape;
 
             int shift = shape switch
             {
-                WideDivideShape.Limb1PowerOfTwo => 65,
-                WideDivideShape.Limb2PowerOfTwo => 129,
-                WideDivideShape.Limb3PowerOfTwo => 193,
-                WideDivideShape.NonPowerOfTwo => 129,
+                WideDivideShape.Limb1PowerOfTwo => 64 + (i & 1),
+                WideDivideShape.Limb2PowerOfTwo => 128 + (i & 1),
+                WideDivideShape.Limb3PowerOfTwo => 192 + (i & 1),
+                WideDivideShape.NonPowerOfTwo => (i % 3) switch
+                {
+                    0 => 127,
+                    1 => 191,
+                    _ => 255,
+                },
                 _ => throw new ArgumentOutOfRangeException(),
             };
 
@@ -143,32 +148,6 @@ public class WideDivideModBenchmark
         return checksum;
     }
 
-    [Benchmark(OperationsPerInvoke = BatchSize)]
-    public ulong DivideAndMod_CurrentPath()
-    {
-        ulong checksum = 0;
-        for (int i = 0; i < BatchSize; i++)
-        {
-            _current(in _values[i], in _divisors[i], out UInt256 quotient, out UInt256 remainder);
-            checksum ^= Fold(quotient) ^ Fold(remainder);
-        }
-
-        return checksum;
-    }
-
-    [Benchmark(OperationsPerInvoke = BatchSize)]
-    public ulong DivideAndMod_LegacyPath()
-    {
-        ulong checksum = 0;
-        for (int i = 0; i < BatchSize; i++)
-        {
-            Legacy(in _values[i], in _divisors[i], out UInt256 quotient, out UInt256 remainder);
-            checksum ^= Fold(quotient) ^ Fold(remainder);
-        }
-
-        return checksum;
-    }
-
     private static DivideDelegate Bind(string name)
         => (DivideDelegate)typeof(UInt256)
             .GetMethod(name, BindingFlags.NonPublic | BindingFlags.Static)!
@@ -190,6 +169,21 @@ public class WideDivideModBenchmark
         }
     }
 
+    private static WideDivideShape CorpusWeightedShape(int index)
+    {
+        // 717/1024 = 70.02% power-of-two hits, with the remainder covering
+        // non-power-of-two 128-, 192-, and 256-bit divisors.
+        int slot = (index * 37) & (BatchSize - 1);
+        return slot < 717
+            ? (slot % 6) switch
+            {
+                0 or 1 => WideDivideShape.Limb1PowerOfTwo,
+                2 or 3 => WideDivideShape.Limb2PowerOfTwo,
+                _ => WideDivideShape.Limb3PowerOfTwo,
+            }
+            : WideDivideShape.NonPowerOfTwo;
+    }
+
     private static UInt256 PowerOfTwo(int shift)
     {
         int limb = shift >> 6;
@@ -204,7 +198,15 @@ public class WideDivideModBenchmark
     }
 
     private static UInt256 RandomValueAbove(Random random, in UInt256 divisor)
-        => new(NextUInt64(random), NextUInt64(random), NextUInt64(random), NextUInt64(random) | divisor.u3 | 1UL);
+    {
+        ulong u3 = NextUInt64(random) | divisor.u3 | 1UL;
+        if (u3 <= divisor.u3)
+        {
+            u3 = divisor.u3 + 1;
+        }
+
+        return new UInt256(NextUInt64(random), NextUInt64(random), NextUInt64(random), u3);
+    }
 
     private static ulong NextUInt64(Random random)
         => (ulong)random.NextInt64() ^ ((ulong)random.NextInt64() << 32);
