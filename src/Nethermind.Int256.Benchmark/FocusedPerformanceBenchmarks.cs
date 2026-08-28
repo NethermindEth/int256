@@ -34,6 +34,7 @@ public class WideDivideModBenchmark
     private readonly UInt256[] _values = new UInt256[BatchSize];
     private readonly UInt256[] _divisors = new UInt256[BatchSize];
     private DivideDelegate _current = null!;
+    private DivideDelegate _legacy128X86 = null!;
     private DivideDelegate _legacy128 = null!;
     private DivideDelegate _legacy192 = null!;
     private DivideDelegate _legacy256 = null!;
@@ -50,6 +51,7 @@ public class WideDivideModBenchmark
     public void Setup()
     {
         _current = Bind("DivideImpl");
+        _legacy128X86 = Bind("DivideBy128BitsX86Base");
         _legacy128 = Bind("DivideBy128Bits");
         _legacy192 = Bind("DivideBy192Bits");
         _legacy256 = Bind("DivideBy256Bits");
@@ -165,7 +167,14 @@ public class WideDivideModBenchmark
         }
         else
         {
-            _legacy128(in value, in divisor, out quotient, out remainder);
+            if (System.Runtime.Intrinsics.X86.X86Base.X64.IsSupported)
+            {
+                _legacy128X86(in value, in divisor, out quotient, out remainder);
+            }
+            else
+            {
+                _legacy128(in value, in divisor, out quotient, out remainder);
+            }
         }
     }
 
