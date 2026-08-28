@@ -9,6 +9,21 @@ namespace Nethermind.Int256.Test;
 public partial class UInt256Tests
 {
     [Test]
+    public void CompareTo_Uses_the_first_differing_limb()
+    {
+        UInt256 common = new(0x0123_4567_89AB_CDEFUL, 0x1111_2222_3333_4444UL, 0x5555_6666_7777_8888UL, 0x9999_AAAA_BBBB_CCCCUL);
+
+        AssertCompare(new UInt256(common.u0, common.u1, common.u2, common.u3 - 1), common, -1);
+        AssertCompare(common, new UInt256(common.u0, common.u1, common.u2, common.u3 - 1), 1);
+        AssertCompare(new UInt256(common.u0, common.u1, common.u2 - 1, common.u3), common, -1);
+        AssertCompare(common, new UInt256(common.u0, common.u1, common.u2 - 1, common.u3), 1);
+        AssertCompare(new UInt256(common.u0, common.u1 - 1, common.u2, common.u3), common, -1);
+        AssertCompare(common, new UInt256(common.u0, common.u1 - 1, common.u2, common.u3), 1);
+        AssertCompare(new UInt256(common.u0 - 1, common.u1, common.u2, common.u3), common, -1);
+        AssertCompare(common, new UInt256(common.u0 - 1, common.u1, common.u2, common.u3), 1);
+    }
+
+    [Test]
     public void CompareTo_Matches_BigInteger()
     {
         UInt256[] values =
@@ -43,5 +58,12 @@ public partial class UInt256Tests
                 Assert.That(Math.Sign(a.CompareTo((object)b)), Is.EqualTo(expected));
             }
         }
+    }
+
+    private static void AssertCompare(UInt256 a, UInt256 b, int expected)
+    {
+        Assert.That(a.CompareTo(in b), Is.EqualTo(expected));
+        Assert.That(a.CompareTo(b), Is.EqualTo(expected));
+        Assert.That(a.CompareTo((object)b), Is.EqualTo(expected));
     }
 }
