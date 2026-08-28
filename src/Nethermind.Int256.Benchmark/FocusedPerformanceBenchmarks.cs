@@ -26,7 +26,7 @@ public enum NarrowMultiplyShape
 [HideColumns("Job", "RatioSD", "Error")]
 [SimpleJob(RuntimeMoniker.Net10_0, launchCount: 3, warmupCount: 3, iterationCount: 10)]
 [NoIntrinsicsJob(RuntimeMoniker.Net10_0, launchCount: 3, warmupCount: 3, iterationCount: 10)]
-public class NarrowMultiplyModBenchmark
+public class NarrowMultiplyDispatchBenchmark
 {
     private delegate void MultiplyDelegate(in UInt256 x, in UInt256 y, out UInt256 low, out UInt256 high);
 
