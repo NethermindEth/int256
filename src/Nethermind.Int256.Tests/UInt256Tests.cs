@@ -653,6 +653,67 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
 
     public UInt256Tests() : base((BigInteger x) => (UInt256)x, (int x) => (UInt256)x, x => x, TestNumbers.UInt256Max) { }
 
+    public static IEnumerable<(UInt256 A, ulong B)> SubtractByUInt64Cases =>
+    [
+        (new UInt256(0, 0, 0, 0), 0),
+        (new UInt256(1, 0, 0, 0), 1),
+        (new UInt256(0, 1, 0, 0), 1),
+        (new UInt256(0, 0, 1, 0), 1),
+        (new UInt256(0, 0, 0, 1), 1),
+        (new UInt256(0, 0, 0, 0), 1),
+        (new UInt256(ulong.MaxValue, ulong.MaxValue, ulong.MaxValue, ulong.MaxValue), ulong.MaxValue),
+    ];
+
+    [TestCaseSource(nameof(SubtractByUInt64Cases))]
+    public void SubtractUnderflow_right_uint64_values_preserve_result_underflow_and_aliases((UInt256 A, ulong B) test)
+    {
+        AssertSubtractUnderflow(test.A, new UInt256(test.B));
+    }
+
+    [Test]
+    public void SubtractUnderflow_random_full_left_and_uint64_right_match_BigInteger_oracle_and_aliases()
+    {
+        Random random = new(0x5AB7_497);
+
+        for (int i = 0; i < 4096; i++)
+        {
+            UInt256 a = new UInt256(
+                RandomSubtractOperand(random),
+                RandomSubtractOperand(random),
+                RandomSubtractOperand(random),
+                RandomSubtractOperand(random));
+            AssertSubtractUnderflow(a, new UInt256(RandomSubtractOperand(random)));
+        }
+    }
+
+    private static ulong RandomSubtractOperand(Random random)
+        => ((ulong)random.NextInt64() << 1) | (uint)random.Next(2);
+
+    private static void AssertSubtractUnderflow(UInt256 a, UInt256 b)
+    {
+        BigInteger difference = (BigInteger)a - (BigInteger)b;
+        BigInteger expectedResult = difference % TestNumbers.TwoTo256;
+        if (expectedResult.Sign < 0)
+        {
+            expectedResult += TestNumbers.TwoTo256;
+        }
+        bool expectedUnderflow = difference.Sign < 0;
+
+        bool underflow = UInt256.SubtractUnderflow(in a, in b, out UInt256 result);
+        ((BigInteger)result).Should().Be(expectedResult);
+        underflow.Should().Be(expectedUnderflow);
+
+        UInt256 aliasedA = a;
+        underflow = UInt256.SubtractUnderflow(in aliasedA, in b, out aliasedA);
+        ((BigInteger)aliasedA).Should().Be(expectedResult);
+        underflow.Should().Be(expectedUnderflow);
+
+        UInt256 aliasedB = b;
+        underflow = UInt256.SubtractUnderflow(in a, in aliasedB, out aliasedB);
+        ((BigInteger)aliasedB).Should().Be(expectedResult);
+        underflow.Should().Be(expectedUnderflow);
+    }
+
     public static IEnumerable<(UInt256 A, ulong A4, ulong D)> Remainder257By64BitsCases
     {
         get

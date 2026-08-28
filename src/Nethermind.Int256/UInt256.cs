@@ -327,6 +327,11 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         }
         else
         {
+            if (b.u1 == 0 && b.u2 == 0 && b.u3 == 0)
+            {
+                return SubtractByUInt64(in a, b.u0, out res);
+            }
+
             ulong borrow = 0ul;
             SubtractWithBorrow(a.u0, b.u0, ref borrow, out ulong res0);
             SubtractWithBorrow(a.u1, b.u1, ref borrow, out ulong res1);
@@ -335,6 +340,56 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
             res = new UInt256(res0, res1, res2, res3);
             return borrow != 0;
         }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool SubtractByUInt64(in UInt256 a, ulong b0, out UInt256 res)
+    {
+        ulong a0 = a.u0;
+        ulong result0 = a0 - b0;
+        if (a0 >= b0)
+        {
+            res = a;
+            Unsafe.AsRef(in res.u0) = result0;
+            return false;
+        }
+
+        ulong a1 = a.u1;
+        if (a1 != 0)
+        {
+            res = a;
+            Unsafe.AsRef(in res.u0) = result0;
+            Unsafe.AsRef(in res.u1) = a1 - 1;
+            return false;
+        }
+
+        ulong a2 = a.u2;
+        if (a2 != 0)
+        {
+            res = a;
+            Unsafe.AsRef(in res.u0) = result0;
+            Unsafe.AsRef(in res.u1) = ulong.MaxValue;
+            Unsafe.AsRef(in res.u2) = a2 - 1;
+            return false;
+        }
+
+        ulong a3 = a.u3;
+        if (a3 != 0)
+        {
+            res = a;
+            Unsafe.AsRef(in res.u0) = result0;
+            Unsafe.AsRef(in res.u1) = ulong.MaxValue;
+            Unsafe.AsRef(in res.u2) = ulong.MaxValue;
+            Unsafe.AsRef(in res.u3) = a3 - 1;
+            return false;
+        }
+
+        res = default;
+        Unsafe.AsRef(in res.u0) = result0;
+        Unsafe.AsRef(in res.u1) = ulong.MaxValue;
+        Unsafe.AsRef(in res.u2) = ulong.MaxValue;
+        Unsafe.AsRef(in res.u3) = ulong.MaxValue;
+        return true;
     }
 
     public void Subtract(in UInt256 b, out UInt256 res) => Subtract(this, b, out res);
