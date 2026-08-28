@@ -2291,7 +2291,172 @@ public readonly partial struct UInt256
             return;
         }
 
+        if ((x.u3 | y.u3) == 0)
+        {
+            if (x.u2 == 0 && y.u2 == 0)
+            {
+                if (x.u1 == 0)
+                {
+                    Multiply1x2(in x, in y, out low, out high);
+                    return;
+                }
+                if (y.u1 == 0)
+                {
+                    Multiply1x2(in y, in x, out low, out high);
+                    return;
+                }
+
+                Multiply2x2(in x, in y, out low, out high);
+                return;
+            }
+
+            if (x.u2 != 0 && y.u2 == 0 && y.u1 != 0)
+            {
+                Multiply3x2(in x, in y, out low, out high);
+                return;
+            }
+            if (x.u2 != 0 && y.u2 == 0 && y.u1 == 0)
+            {
+                Multiply3x1(in x, in y, out low, out high);
+                return;
+            }
+            if (x.u2 == 0 && y.u2 != 0 && x.u1 != 0)
+            {
+                Multiply3x2(in y, in x, out low, out high);
+                return;
+            }
+            if (x.u2 == 0 && y.u2 != 0 && x.u1 == 0)
+            {
+                Multiply3x1(in y, in x, out low, out high);
+                return;
+            }
+        }
+
         Multiply256To512BitLarge(in x, in y, out low, out high);
+    }
+
+    [SkipLocalsInit]
+    private static void Multiply1x2(in UInt256 x, in UInt256 y, out UInt256 low, out UInt256 high)
+    {
+        ulong x0 = x.u0;
+        ulong y0 = y.u0;
+        ulong y1 = y.u1;
+
+        ulong carry = Multiply64(x0, y0, out ulong p0);
+        ulong p2 = Multiply64(x0, y1, out ulong p1);
+        ulong p1WithCarry = p1 + carry;
+        p2 += p1WithCarry < p1 ? 1UL : 0UL;
+
+        low = default;
+        Unsafe.AsRef(in low.u0) = p0;
+        Unsafe.AsRef(in low.u1) = p1WithCarry;
+        Unsafe.AsRef(in low.u2) = p2;
+        high = default;
+    }
+
+    [SkipLocalsInit]
+    private static void Multiply2x2(in UInt256 x, in UInt256 y, out UInt256 low, out UInt256 high)
+    {
+        ulong x0 = x.u0;
+        ulong x1 = x.u1;
+        ulong y0 = y.u0;
+        ulong y1 = y.u1;
+
+        ulong h00 = Multiply64(x0, y0, out ulong p0);
+        ulong h01 = Multiply64(x0, y1, out ulong l01);
+        ulong h10 = Multiply64(x1, y0, out ulong l10);
+        ulong h11 = Multiply64(x1, y1, out ulong l11);
+
+        ulong carry = 0;
+        ulong p1 = AddAndCountCarry(h00, l01, ref carry);
+        p1 = AddAndCountCarry(p1, l10, ref carry);
+
+        ulong p2 = carry;
+        carry = 0;
+        p2 = AddAndCountCarry(p2, h01, ref carry);
+        p2 = AddAndCountCarry(p2, h10, ref carry);
+        p2 = AddAndCountCarry(p2, l11, ref carry);
+        ulong p3 = h11 + carry;
+
+        low = default;
+        Unsafe.AsRef(in low.u0) = p0;
+        Unsafe.AsRef(in low.u1) = p1;
+        Unsafe.AsRef(in low.u2) = p2;
+        Unsafe.AsRef(in low.u3) = p3;
+        high = default;
+    }
+
+    [SkipLocalsInit]
+    private static void Multiply3x2(in UInt256 x, in UInt256 y, out UInt256 low, out UInt256 high)
+    {
+        ulong x0 = x.u0;
+        ulong x1 = x.u1;
+        ulong x2 = x.u2;
+        ulong y0 = y.u0;
+        ulong y1 = y.u1;
+
+        ulong carryLo = Multiply64(x0, y0, out ulong p0);
+        ulong carryHi = 0;
+
+        ulong a0 = carryLo, a1 = carryHi, a2 = 0;
+        MultiplyAddCarry(ref a0, ref a1, ref a2, x0, y1);
+        MultiplyAddCarry(ref a0, ref a1, ref a2, x1, y0);
+        ulong p1 = a0;
+        carryLo = a1;
+        carryHi = a2;
+
+        a0 = carryLo;
+        a1 = carryHi;
+        a2 = 0;
+        MultiplyAddCarry(ref a0, ref a1, ref a2, x1, y1);
+        MultiplyAddCarry(ref a0, ref a1, ref a2, x2, y0);
+        ulong p2 = a0;
+        carryLo = a1;
+        carryHi = a2;
+
+        a0 = carryLo;
+        a1 = carryHi;
+        a2 = 0;
+        MultiplyAddCarry(ref a0, ref a1, ref a2, x2, y1);
+        ulong p3 = a0;
+        ulong p4 = a1;
+        ulong p5 = a2;
+
+        low = default;
+        Unsafe.AsRef(in low.u0) = p0;
+        Unsafe.AsRef(in low.u1) = p1;
+        Unsafe.AsRef(in low.u2) = p2;
+        Unsafe.AsRef(in low.u3) = p3;
+        high = default;
+        Unsafe.AsRef(in high.u0) = p4;
+        Unsafe.AsRef(in high.u1) = p5;
+    }
+
+    [SkipLocalsInit]
+    private static void Multiply3x1(in UInt256 x, in UInt256 y, out UInt256 low, out UInt256 high)
+    {
+        ulong x0 = x.u0;
+        ulong x1 = x.u1;
+        ulong x2 = x.u2;
+        ulong y0 = y.u0;
+
+        ulong carry = Multiply64(x0, y0, out ulong p0);
+        ulong p1High = Multiply64(x1, y0, out ulong p1);
+        ulong p1Carry = 0;
+        p1 = AddAndCountCarry(p1, carry, ref p1Carry);
+
+        ulong p2High = Multiply64(x2, y0, out ulong p2);
+        ulong p2Carry = 0;
+        p2 = AddAndCountCarry(p2, p1High, ref p2Carry);
+        p2 = AddAndCountCarry(p2, p1Carry, ref p2Carry);
+        ulong p3 = p2High + p2Carry;
+
+        low = default;
+        Unsafe.AsRef(in low.u0) = p0;
+        Unsafe.AsRef(in low.u1) = p1;
+        Unsafe.AsRef(in low.u2) = p2;
+        Unsafe.AsRef(in low.u3) = p3;
+        high = default;
     }
 
     [SkipLocalsInit]
