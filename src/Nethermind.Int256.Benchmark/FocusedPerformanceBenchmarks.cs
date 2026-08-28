@@ -77,6 +77,16 @@ public class NarrowMultiplyModBenchmark
             _left[i] = RandomValue(random, leftWidth);
             _right[i] = RandomValue(random, rightWidth);
         }
+
+        for (int i = 0; i < BatchSize; i++)
+        {
+            _current(in _left[i], in _right[i], out UInt256 currentLow, out UInt256 currentHigh);
+            _large(in _left[i], in _right[i], out UInt256 largeLow, out UInt256 largeHigh);
+            if (!currentLow.Equals(largeLow) || !currentHigh.Equals(largeHigh))
+            {
+                throw new InvalidOperationException($"Product mismatch at index {i} for {Shape}.");
+            }
+        }
     }
 
     [Benchmark(Baseline = true, OperationsPerInvoke = BatchSize)]
