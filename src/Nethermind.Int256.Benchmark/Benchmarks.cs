@@ -8,6 +8,7 @@ using System.Collections.Immutable;
 using System.Globalization;
 using System.Linq;
 using System.Numerics;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
@@ -288,14 +289,11 @@ public enum AddOverflowCase
 {
     Distribution,
     Small64,
-    Small64Carry,
-    Mid128,
     Full,
-    Mixed,
 }
 
-[SimpleJob(RuntimeMoniker.Net10_0, launchCount: 6, warmupCount: 3, iterationCount: 10)]
-[NoIntrinsicsJob(RuntimeMoniker.Net10_0, launchCount: 6, warmupCount: 3, iterationCount: 10)]
+[SimpleJob(RuntimeMoniker.Net10_0, launchCount: 3, warmupCount: 3, iterationCount: 10)]
+[NoIntrinsicsJob(RuntimeMoniker.Net10_0, launchCount: 3, warmupCount: 3, iterationCount: 10)]
 public class AddOverflowDispatchAB
 {
     private const int N = 4096;
@@ -303,14 +301,23 @@ public class AddOverflowDispatchAB
 
     private UInt256[] _a = null!;
     private UInt256[] _b = null!;
+    private AddOverflowDelegate _addVector256 = null!;
 
-    [Params(AddOverflowCase.Distribution, AddOverflowCase.Small64, AddOverflowCase.Small64Carry,
-        AddOverflowCase.Mid128, AddOverflowCase.Full, AddOverflowCase.Mixed)]
+    [Params(AddOverflowCase.Distribution, AddOverflowCase.Small64, AddOverflowCase.Full)]
     public AddOverflowCase Case;
+
+    private delegate bool AddOverflowDelegate(in UInt256 a, in UInt256 b, out UInt256 result);
 
     [GlobalSetup]
     public void Setup()
     {
+        if (!Avx2.IsSupported && Vector256.IsHardwareAccelerated)
+        {
+            _addVector256 = (AddOverflowDelegate)typeof(UInt256)
+                .GetMethod("AddVector256", BindingFlags.NonPublic | BindingFlags.Static)!
+                .CreateDelegate(typeof(AddOverflowDelegate));
+        }
+
         _a = new UInt256[N];
         _b = new UInt256[N];
         Random random = new(0xADD0_497);
@@ -321,10 +328,7 @@ public class AddOverflowDispatchAB
             {
                 AddOverflowCase.Distribution => DistributionPair(i, random),
                 AddOverflowCase.Small64 => Small64Pair(random),
-                AddOverflowCase.Small64Carry => (new UInt256(ulong.MaxValue), new UInt256((ulong)i + 1)),
-                AddOverflowCase.Mid128 => Mid128Pair(random),
                 AddOverflowCase.Full => FullPair(random),
-                _ => MixedPair(i, random),
             };
             _a[i] = a;
             _b[i] = b;
@@ -362,7 +366,7 @@ public class AddOverflowDispatchAB
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool AddCurrentDispatch(in UInt256 a, in UInt256 b, out UInt256 result)
+    private bool AddCurrentDispatch(in UInt256 a, in UInt256 b, out UInt256 result)
     {
         if (!Avx2.IsSupported && !Vector256.IsHardwareAccelerated)
         {
@@ -374,29 +378,16 @@ public class AddOverflowDispatchAB
             return UInt256.AddAvx2(in a, in b, out result);
         }
 
-        throw new PlatformNotSupportedException($"{nameof(AddOverflowDispatchAB)} requires AVX2 on the default hardware job.");
+        return _addVector256(in a, in b, out result);
     }
 
     private static (UInt256 A, UInt256 B) DistributionPair(int index, Random random)
         => index < DistributionSmallCount
             ? Small64Pair(random)
-            : (index % 3) switch
-            {
-                0 => Mid128Pair(random),
-                1 => FullPair(random),
-                _ => (new UInt256((ulong)random.NextInt64(), (ulong)random.NextInt64()),
-                    new UInt256((ulong)random.NextInt64(), (ulong)random.NextInt64(), 1)),
-            };
-
-    private static (UInt256 A, UInt256 B) MixedPair(int index, Random random)
-        => (index & 1) == 0 ? Small64Pair(random) : Mid128Pair(random);
+            : FullPair(random);
 
     private static (UInt256 A, UInt256 B) Small64Pair(Random random)
         => (new UInt256((ulong)random.NextInt64()), new UInt256((ulong)random.NextInt64()));
-
-    private static (UInt256 A, UInt256 B) Mid128Pair(Random random)
-        => (new UInt256((ulong)random.NextInt64(), (ulong)random.NextInt64() | 1),
-            new UInt256((ulong)random.NextInt64(), (ulong)random.NextInt64() | 1));
 
     private static (UInt256 A, UInt256 B) FullPair(Random random)
         => (new UInt256((ulong)random.NextInt64(), (ulong)random.NextInt64(), (ulong)random.NextInt64(), (ulong)random.NextInt64() | 1),
