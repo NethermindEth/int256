@@ -15,8 +15,7 @@ public enum MultiplyModMaxCase
     NarrowModulus,
 }
 
-// This end-to-end benchmark is identical on the candidate and base branches, so branch A/B
-// compares the optimized public path with the legacy implementation on the same inputs.
+// End-to-end coverage exercises the public MultiplyMod path across representative moduli.
 [SimpleJob(RuntimeMoniker.Net10_0, launchCount: 3, warmupCount: 3, iterationCount: 10)]
 [NoIntrinsicsJob(RuntimeMoniker.Net10_0, launchCount: 3, warmupCount: 3, iterationCount: 10)]
 public class MultiplyModMaxTargeted
@@ -70,12 +69,10 @@ public class MultiplyModMaxTargeted
         seed ^ 0xA0761D6478BD642FUL | 1,
         seed ^ 0xE7037ED1A0B428DBUL | 1,
         seed ^ 0x8EBC6AF09C88C6E3UL | 1);
-
 }
 
-// Reduction-only A/B evidence. Both implementations consume the same precomputed product halves;
-// the private legacy reducer is bound once during setup, so delegate dispatch is part of this
-// algorithm-isolation measurement. The end-to-end benchmark above covers public-path integration.
+// Reduction-only comparison isolates reduction from multiplication using precomputed product halves.
+// The private legacy reducer is bound once during setup, so delegate dispatch is part of the measurement.
 [SimpleJob(RuntimeMoniker.Net10_0, launchCount: 3, warmupCount: 3, iterationCount: 10)]
 [NoIntrinsicsJob(RuntimeMoniker.Net10_0, launchCount: 3, warmupCount: 3, iterationCount: 10)]
 public class MultiplyModMaxReductionTargeted
