@@ -2390,7 +2390,11 @@ public readonly partial struct UInt256
         }
         else
         {
-            if (X86Base.X64.IsSupported)
+            if ((y.u0 & (y.u0 - 1)) == 0)
+            {
+                DivideByPowerOfTwo(in x, y.u0, out quotient, out remainder);
+            }
+            else if (X86Base.X64.IsSupported)
             {
                 DivideBy64BitsX86Base(in x, y.u0, out quotient, out remainder);
             }
@@ -2467,6 +2471,26 @@ public readonly partial struct UInt256
         // Unnormalise remainder (single limb)
         ulong r0 = rem >> s;
         remainder = Create(r0, 0, 0, 0);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void DivideByPowerOfTwo(in UInt256 x, ulong divisor, out UInt256 q, out UInt256 remainder)
+    {
+        ulong x0 = x.u0;
+        ulong x1 = x.u1;
+        ulong x2 = x.u2;
+        ulong x3 = x.u3;
+        int shift = BitOperations.TrailingZeroCount(divisor);
+        ulong mask = divisor - 1;
+
+        int inverseShift = 64 - shift;
+        q = Create(
+            (x0 >> shift) | (x1 << inverseShift),
+            (x1 >> shift) | (x2 << inverseShift),
+            (x2 >> shift) | (x3 << inverseShift),
+            x3 >> shift);
+
+        remainder = Create(x0 & mask, 0, 0, 0);
     }
 
     [SkipLocalsInit]
