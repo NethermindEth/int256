@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 
 using System;
+using System.Reflection;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 using Nethermind.Int256;
@@ -19,19 +20,22 @@ public enum NarrowMultiplyShape
 }
 
 /// <summary>
-/// Compares the public modular multiplication path for operand widths handled by
-/// <c>Multiply256To512Bit</c>, including a full-width miss and a mixed workload.
+/// Compares the production 256-to-512-bit multiplication dispatch with its
+/// full-width fallback, including a full-width miss and a mixed workload.
 /// </summary>
 [HideColumns("Job", "RatioSD", "Error")]
 [SimpleJob(RuntimeMoniker.Net10_0, launchCount: 3, warmupCount: 3, iterationCount: 10)]
 [NoIntrinsicsJob(RuntimeMoniker.Net10_0, launchCount: 3, warmupCount: 3, iterationCount: 10)]
 public class NarrowMultiplyModBenchmark
 {
+    private delegate void MultiplyDelegate(in UInt256 x, in UInt256 y, out UInt256 low, out UInt256 high);
+
     private const int BatchSize = 1024;
 
     private readonly UInt256[] _left = new UInt256[BatchSize];
     private readonly UInt256[] _right = new UInt256[BatchSize];
-    private UInt256 _modulus;
+    private MultiplyDelegate _current = null!;
+    private MultiplyDelegate _large = null!;
 
     [Params(
         NarrowMultiplyShape.OneByTwo,
@@ -45,7 +49,13 @@ public class NarrowMultiplyModBenchmark
     [GlobalSetup]
     public void Setup()
     {
-        _modulus = new(ulong.MaxValue - 58, ulong.MaxValue, ulong.MaxValue, ulong.MaxValue);
+        _current = (MultiplyDelegate)typeof(UInt256)
+            .GetMethod("Multiply256To512Bit", BindingFlags.NonPublic | BindingFlags.Static)!
+            .CreateDelegate(typeof(MultiplyDelegate));
+        _large = (MultiplyDelegate)typeof(UInt256)
+            .GetMethod("Multiply256To512BitLarge", BindingFlags.NonPublic | BindingFlags.Static)!
+            .CreateDelegate(typeof(MultiplyDelegate));
+
         Random random = new(0x4D554C54);
 
         for (int i = 0; i < BatchSize; i++)
@@ -69,14 +79,27 @@ public class NarrowMultiplyModBenchmark
         }
     }
 
-    [Benchmark(OperationsPerInvoke = BatchSize)]
-    public ulong MultiplyMod()
+    [Benchmark(Baseline = true, OperationsPerInvoke = BatchSize)]
+    public ulong Multiply_CurrentDispatch()
     {
         ulong checksum = 0;
         for (int i = 0; i < BatchSize; i++)
         {
-            UInt256.MultiplyMod(in _left[i], in _right[i], in _modulus, out UInt256 result);
-            checksum ^= Fold(result);
+            _current(in _left[i], in _right[i], out UInt256 low, out UInt256 high);
+            checksum ^= Fold(low) ^ Fold(high);
+        }
+
+        return checksum;
+    }
+
+    [Benchmark(OperationsPerInvoke = BatchSize)]
+    public ulong Multiply_LargeFallback()
+    {
+        ulong checksum = 0;
+        for (int i = 0; i < BatchSize; i++)
+        {
+            _large(in _left[i], in _right[i], out UInt256 low, out UInt256 high);
+            checksum ^= Fold(low) ^ Fold(high);
         }
 
         return checksum;
