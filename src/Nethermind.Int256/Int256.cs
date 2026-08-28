@@ -70,7 +70,7 @@ public readonly struct Int256 : IEquatable<Int256>, IComparable, IComparable<Int
     public bool IsNegative
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get => Sign < 0;
+        get => unchecked((long)_value.u3) < 0;
     }
 
     public static Int256 operator +(in Int256 a, in Int256 b)
@@ -103,7 +103,7 @@ public readonly struct Int256 : IEquatable<Int256>, IComparable, IComparable<Int
             return;
         }
 
-        if (m.Sign < 0)
+        if (m.IsNegative)
         {
             m.Neg(out mt);
         }
@@ -148,7 +148,7 @@ public readonly struct Int256 : IEquatable<Int256>, IComparable, IComparable<Int
             return;
         }
 
-        if (m.Sign < 0)
+        if (m.IsNegative)
         {
             m.Neg(out mt);
         }
@@ -179,19 +179,19 @@ public readonly struct Int256 : IEquatable<Int256>, IComparable, IComparable<Int
     public static void Multiply(in Int256 a, in Int256 b, out Int256 res)
     {
         Int256 av = a, bv = b;
-        int aSign = a.Sign;
-        int bSign = b.Sign;
-        if (aSign < 0)
+        bool aIsNegative = a.IsNegative;
+        bool bIsNegative = b.IsNegative;
+        if (aIsNegative)
         {
             a.Neg(out av);
         }
-        if (bSign < 0)
+        if (bIsNegative)
         {
             b.Neg(out bv);
         }
         UInt256.Multiply(av._value, bv._value, out UInt256 ures);
         res = new Int256(ures);
-        if ((aSign < 0 && bSign < 0) || (aSign >= 0 && bSign >= 0))
+        if (aIsNegative == bIsNegative)
         {
             return;
         }
@@ -203,17 +203,17 @@ public readonly struct Int256 : IEquatable<Int256>, IComparable, IComparable<Int
     public static void MultiplyMod(in Int256 x, in Int256 y, in Int256 m, out Int256 res)
     {
         var mAbs = m;
-        if (m.Sign < 0)
+        if (m.IsNegative)
         {
             m.Neg(out mAbs);
         }
-        int xSign = x.Sign;
-        int ySign = y.Sign;
-        if ((xSign < 0 && ySign >= 0) || (xSign >= 0 && ySign < 0))
+        bool xIsNegative = x.IsNegative;
+        bool yIsNegative = y.IsNegative;
+        if (xIsNegative != yIsNegative)
         {
             var xAbs = x;
             var yAbs = y;
-            if (xSign < 0)
+            if (xIsNegative)
             {
                 x.Neg(out xAbs);
             }
@@ -229,7 +229,7 @@ public readonly struct Int256 : IEquatable<Int256>, IComparable, IComparable<Int
         {
             var xAbs = x;
             var yAbs = y;
-            if (xSign < 0)
+            if (xIsNegative)
             {
                 x.Neg(out xAbs);
                 y.Neg(out yAbs);
@@ -243,10 +243,12 @@ public readonly struct Int256 : IEquatable<Int256>, IComparable, IComparable<Int
 
     public static void Divide(in Int256 n, in Int256 d, out Int256 res)
     {
+        bool nIsNegative = n.IsNegative;
+        bool dIsNegative = d.IsNegative;
         UInt256 value;
-        if (n.Sign >= 0)
+        if (!nIsNegative)
         {
-            if (d.Sign >= 0)
+            if (!dIsNegative)
             {
                 // pos / pos
                 UInt256.Divide(n._value, d._value, out value);
@@ -265,7 +267,7 @@ public readonly struct Int256 : IEquatable<Int256>, IComparable, IComparable<Int
         }
 
         Neg(n, out Int256 nNeg);
-        if (d.Sign < 0)
+        if (dIsNegative)
         {
             // neg / neg
             Neg(d, out Int256 dNeg);
@@ -283,11 +285,11 @@ public readonly struct Int256 : IEquatable<Int256>, IComparable, IComparable<Int
 
     public static void Exp(in Int256 b, in Int256 e, out Int256 res)
     {
-        if (e.Sign < 0)
+        if (e.IsNegative)
         {
             throw new ArgumentException("exponent must be non-negative");
         }
-        if (b.Sign < 0)
+        if (b.IsNegative)
         {
             b.Neg(out Int256 neg);
             UInt256.Exp(neg._value, e._value, out UInt256 ures);
@@ -312,19 +314,19 @@ public readonly struct Int256 : IEquatable<Int256>, IComparable, IComparable<Int
 
     public static void ExpMod(in Int256 bs, in Int256 exp, in Int256 m, out Int256 res)
     {
-        if (exp < Zero)
+        if (exp.IsNegative)
         {
             throw new ArgumentException("exponent must not be negative");
         }
         Int256 bv = bs;
         bool switchSign = false;
-        if (bs.Sign < 0)
+        if (bs.IsNegative)
         {
             bv.Neg(out bv);
             switchSign = exp._value.Bit(0);
         }
         var mAbs = m;
-        if (mAbs.Sign < 0)
+        if (m.IsNegative)
         {
             mAbs.Neg(out mAbs);
         }
@@ -349,21 +351,21 @@ public readonly struct Int256 : IEquatable<Int256>, IComparable, IComparable<Int
     public static void Mod(in Int256 x, in Int256 y, out Int256 res)
     {
         Int256 xIn = x, yIn = y;
-        int xs = x.Sign;
+        bool xIsNegative = x.IsNegative;
 
         // abs x
-        if (xs == -1)
+        if (xIsNegative)
         {
             Neg(x, out xIn);
         }
         // abs y
-        if (y.Sign == -1)
+        if (y.IsNegative)
         {
             Neg(y, out yIn);
         }
         UInt256.Mod(in xIn._value, in yIn._value, out UInt256 value);
         res = new Int256(value);
-        if (xs == -1)
+        if (xIsNegative)
         {
             Neg(res, out res);
         }
@@ -425,7 +427,7 @@ public readonly struct Int256 : IEquatable<Int256>, IComparable, IComparable<Int
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void Rsh(in Int256 x, int n, out Int256 res)
     {
-        if (x.Sign >= 0)
+        if (!x.IsNegative)
         {
             x._value.RightShift(n, out UInt256 ures);
             res = new Int256(ures);
