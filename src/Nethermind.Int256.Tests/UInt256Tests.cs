@@ -653,6 +653,88 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
 
     public UInt256Tests() : base((BigInteger x) => (UInt256)x, (int x) => (UInt256)x, x => x, TestNumbers.UInt256Max) { }
 
+    [Test]
+    public void DivideAndMod_PowerOfTwoDivisors_MatchBigInteger()
+    {
+        UInt256[] boundaryValues =
+        [
+            UInt256.Zero,
+            UInt256.One,
+            new UInt256(ulong.MaxValue),
+            new UInt256(0, 1),
+            new UInt256(0, 0, 1),
+            UInt256.MaxValue - 1,
+            UInt256.MaxValue,
+        ];
+
+        for (int shift = 0; shift < 256; shift++)
+        {
+            UInt256 divisorValue = PowerOfTwo(shift);
+
+            foreach (UInt256 value in boundaryValues)
+            {
+                AssertResult(in value, in divisorValue);
+            }
+
+            UInt256 divisorMinusOne = divisorValue - UInt256.One;
+            UInt256 divisorPlusOne = divisorValue + UInt256.One;
+            AssertResult(in divisorMinusOne, in divisorValue);
+            AssertResult(in divisorPlusOne, in divisorValue);
+        }
+
+        Random random = new(0xD1B1DE);
+        byte[] bytes = new byte[32];
+        for (int i = 0; i < 4096; i++)
+        {
+            random.NextBytes(bytes);
+            UInt256 value = new(bytes);
+            UInt256 divisorValue = PowerOfTwo(random.Next(256));
+            AssertResult(in value, in divisorValue);
+        }
+
+        static UInt256 PowerOfTwo(int shift)
+        {
+            int limb = shift >> 6;
+            ulong value = 1UL << (shift & 63);
+            return limb switch
+            {
+                0 => new UInt256(value),
+                1 => new UInt256(0, value),
+                2 => new UInt256(0, 0, value),
+                _ => new UInt256(0, 0, 0, value),
+            };
+        }
+
+        static void AssertResult(in UInt256 value, in UInt256 divisor)
+        {
+            BigInteger dividendBigInteger = (BigInteger)value;
+            BigInteger divisorBigInteger = (BigInteger)divisor;
+            BigInteger expectedQuotient = dividendBigInteger / divisorBigInteger;
+            BigInteger expectedRemainder = dividendBigInteger % divisorBigInteger;
+
+            value.Divide(in divisor, out UInt256 quotient);
+            value.Mod(in divisor, out UInt256 remainder);
+            ((BigInteger)quotient).Should().Be(expectedQuotient);
+            ((BigInteger)remainder).Should().Be(expectedRemainder);
+
+            UInt256 aliasedValue = value;
+            aliasedValue.Divide(in divisor, out aliasedValue);
+            ((BigInteger)aliasedValue).Should().Be(expectedQuotient);
+
+            aliasedValue = value;
+            aliasedValue.Mod(in divisor, out aliasedValue);
+            ((BigInteger)aliasedValue).Should().Be(expectedRemainder);
+
+            UInt256 aliasedDivisor = divisor;
+            value.Divide(in aliasedDivisor, out aliasedDivisor);
+            ((BigInteger)aliasedDivisor).Should().Be(expectedQuotient);
+
+            aliasedDivisor = divisor;
+            value.Mod(in aliasedDivisor, out aliasedDivisor);
+            ((BigInteger)aliasedDivisor).Should().Be(expectedRemainder);
+        }
+    }
+
     public static IEnumerable<(UInt256 A, ulong A4, ulong D)> Remainder257By64BitsCases
     {
         get

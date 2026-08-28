@@ -2371,15 +2371,33 @@ public readonly partial struct UInt256
     {
         if (y.u3 != 0)
         {
-            DivideBy256Bits(in x, in y, out quotient, out remainder);
+            if ((y.u0 | y.u1 | y.u2) == 0 && (y.u3 & (y.u3 - 1)) == 0)
+            {
+                DivideByPowerOfTwoWide(in x, 192 + BitOperations.TrailingZeroCount(y.u3), out quotient, out remainder);
+            }
+            else
+            {
+                DivideBy256Bits(in x, in y, out quotient, out remainder);
+            }
         }
         else if (y.u2 != 0)
         {
-            DivideBy192Bits(in x, in y, out quotient, out remainder);
+            if ((y.u0 | y.u1) == 0 && (y.u2 & (y.u2 - 1)) == 0)
+            {
+                DivideByPowerOfTwoWide(in x, 128 + BitOperations.TrailingZeroCount(y.u2), out quotient, out remainder);
+            }
+            else
+            {
+                DivideBy192Bits(in x, in y, out quotient, out remainder);
+            }
         }
         else if (y.u1 != 0)
         {
-            if (X86Base.X64.IsSupported)
+            if (y.u0 == 0 && (y.u1 & (y.u1 - 1)) == 0)
+            {
+                DivideByPowerOfTwoWide(in x, 64 + BitOperations.TrailingZeroCount(y.u1), out quotient, out remainder);
+            }
+            else if (X86Base.X64.IsSupported)
             {
                 DivideBy128BitsX86Base(in x, in y, out quotient, out remainder);
             }
@@ -2397,6 +2415,63 @@ public readonly partial struct UInt256
             else
             {
                 DivideBy64Bits(in x, y.u0, out quotient, out remainder);
+            }
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void DivideByPowerOfTwoWide(in UInt256 x, int shift, out UInt256 q, out UInt256 remainder)
+    {
+        ulong x0 = x.u0;
+        ulong x1 = x.u1;
+        ulong x2 = x.u2;
+        ulong x3 = x.u3;
+        int limbShift = shift >> 6;
+        int bitShift = shift & 63;
+
+        if (limbShift == 1)
+        {
+            if (bitShift == 0)
+            {
+                q = Create(x1, x2, x3, 0);
+                remainder = Create(x0, 0, 0, 0);
+            }
+            else
+            {
+                int inverseShift = 64 - bitShift;
+                ulong mask = (1UL << bitShift) - 1;
+                q = Create((x1 >> bitShift) | (x2 << inverseShift), (x2 >> bitShift) | (x3 << inverseShift), x3 >> bitShift, 0);
+                remainder = Create(x0, x1 & mask, 0, 0);
+            }
+        }
+        else if (limbShift == 2)
+        {
+            if (bitShift == 0)
+            {
+                q = Create(x2, x3, 0, 0);
+                remainder = Create(x0, x1, 0, 0);
+            }
+            else
+            {
+                int inverseShift = 64 - bitShift;
+                ulong mask = (1UL << bitShift) - 1;
+                q = Create((x2 >> bitShift) | (x3 << inverseShift), x3 >> bitShift, 0, 0);
+                remainder = Create(x0, x1, x2 & mask, 0);
+            }
+        }
+        else
+        {
+            if (bitShift == 0)
+            {
+                q = Create(x3, 0, 0, 0);
+                remainder = Create(x0, x1, x2, 0);
+            }
+            else
+            {
+                int inverseShift = 64 - bitShift;
+                ulong mask = (1UL << bitShift) - 1;
+                q = Create(x3 >> bitShift, 0, 0, 0);
+                remainder = Create(x0, x1, x2, x3 & mask);
             }
         }
     }
