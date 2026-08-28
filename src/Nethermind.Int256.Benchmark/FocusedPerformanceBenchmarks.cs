@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 
 using System;
+using System.Reflection;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 using Nethermind.Int256;
@@ -26,10 +27,16 @@ public enum WideDivideShape
 [NoIntrinsicsJob(RuntimeMoniker.Net10_0, launchCount: 3, warmupCount: 3, iterationCount: 10)]
 public class WideDivideModBenchmark
 {
+    private delegate void DivideDelegate(in UInt256 x, in UInt256 y, out UInt256 quotient, out UInt256 remainder);
+
     private const int BatchSize = 1024;
 
     private readonly UInt256[] _values = new UInt256[BatchSize];
     private readonly UInt256[] _divisors = new UInt256[BatchSize];
+    private DivideDelegate _current = null!;
+    private DivideDelegate _legacy128 = null!;
+    private DivideDelegate _legacy192 = null!;
+    private DivideDelegate _legacy256 = null!;
 
     [Params(
         WideDivideShape.Limb1PowerOfTwo,
@@ -42,6 +49,11 @@ public class WideDivideModBenchmark
     [GlobalSetup]
     public void Setup()
     {
+        _current = Bind("DivideImpl");
+        _legacy128 = Bind("DivideBy128Bits");
+        _legacy192 = Bind("DivideBy192Bits");
+        _legacy256 = Bind("DivideBy256Bits");
+
         Random random = new(0x44495632);
         for (int i = 0; i < BatchSize; i++)
         {
@@ -64,18 +76,18 @@ public class WideDivideModBenchmark
                 divisor = new UInt256(divisor.u0 + 3, divisor.u1, divisor.u2, divisor.u3);
             }
 
-            _values[i] = RandomValue(random);
+            _values[i] = RandomValueAbove(random, divisor);
             _divisors[i] = divisor;
         }
     }
 
-    [Benchmark(OperationsPerInvoke = BatchSize)]
-    public ulong Divide()
+    [Benchmark(Baseline = true, OperationsPerInvoke = BatchSize)]
+    public ulong Divide_CurrentPath()
     {
         ulong checksum = 0;
         for (int i = 0; i < BatchSize; i++)
         {
-            UInt256.Divide(in _values[i], in _divisors[i], out UInt256 quotient);
+            _current(in _values[i], in _divisors[i], out UInt256 quotient, out _);
             checksum ^= Fold(quotient);
         }
 
@@ -83,12 +95,25 @@ public class WideDivideModBenchmark
     }
 
     [Benchmark(OperationsPerInvoke = BatchSize)]
-    public ulong Mod()
+    public ulong Divide_LegacyPath()
     {
         ulong checksum = 0;
         for (int i = 0; i < BatchSize; i++)
         {
-            UInt256.Mod(in _values[i], in _divisors[i], out UInt256 remainder);
+            Legacy(in _values[i], in _divisors[i], out UInt256 quotient, out _);
+            checksum ^= Fold(quotient);
+        }
+
+        return checksum;
+    }
+
+    [Benchmark(OperationsPerInvoke = BatchSize)]
+    public ulong Mod_CurrentPath()
+    {
+        ulong checksum = 0;
+        for (int i = 0; i < BatchSize; i++)
+        {
+            _current(in _values[i], in _divisors[i], out _, out UInt256 remainder);
             checksum ^= Fold(remainder);
         }
 
@@ -96,17 +121,63 @@ public class WideDivideModBenchmark
     }
 
     [Benchmark(OperationsPerInvoke = BatchSize)]
-    public ulong DivideAndMod()
+    public ulong Mod_LegacyPath()
     {
         ulong checksum = 0;
         for (int i = 0; i < BatchSize; i++)
         {
-            UInt256.Divide(in _values[i], in _divisors[i], out UInt256 quotient);
-            UInt256.Mod(in _values[i], in _divisors[i], out UInt256 remainder);
+            Legacy(in _values[i], in _divisors[i], out _, out UInt256 remainder);
+            checksum ^= Fold(remainder);
+        }
+
+        return checksum;
+    }
+
+    [Benchmark(OperationsPerInvoke = BatchSize)]
+    public ulong DivideAndMod_CurrentPath()
+    {
+        ulong checksum = 0;
+        for (int i = 0; i < BatchSize; i++)
+        {
+            _current(in _values[i], in _divisors[i], out UInt256 quotient, out UInt256 remainder);
             checksum ^= Fold(quotient) ^ Fold(remainder);
         }
 
         return checksum;
+    }
+
+    [Benchmark(OperationsPerInvoke = BatchSize)]
+    public ulong DivideAndMod_LegacyPath()
+    {
+        ulong checksum = 0;
+        for (int i = 0; i < BatchSize; i++)
+        {
+            Legacy(in _values[i], in _divisors[i], out UInt256 quotient, out UInt256 remainder);
+            checksum ^= Fold(quotient) ^ Fold(remainder);
+        }
+
+        return checksum;
+    }
+
+    private static DivideDelegate Bind(string name)
+        => (DivideDelegate)typeof(UInt256)
+            .GetMethod(name, BindingFlags.NonPublic | BindingFlags.Static)!
+            .CreateDelegate(typeof(DivideDelegate));
+
+    private void Legacy(in UInt256 value, in UInt256 divisor, out UInt256 quotient, out UInt256 remainder)
+    {
+        if (divisor.u3 != 0)
+        {
+            _legacy256(in value, in divisor, out quotient, out remainder);
+        }
+        else if (divisor.u2 != 0)
+        {
+            _legacy192(in value, in divisor, out quotient, out remainder);
+        }
+        else
+        {
+            _legacy128(in value, in divisor, out quotient, out remainder);
+        }
     }
 
     private static UInt256 PowerOfTwo(int shift)
@@ -122,8 +193,8 @@ public class WideDivideModBenchmark
         };
     }
 
-    private static UInt256 RandomValue(Random random)
-        => new(NextUInt64(random), NextUInt64(random), NextUInt64(random), NextUInt64(random));
+    private static UInt256 RandomValueAbove(Random random, in UInt256 divisor)
+        => new(NextUInt64(random), NextUInt64(random), NextUInt64(random), NextUInt64(random) | divisor.u3 | 1UL);
 
     private static ulong NextUInt64(Random random)
         => (ulong)random.NextInt64() ^ ((ulong)random.NextInt64() << 32);
