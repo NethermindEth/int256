@@ -219,21 +219,5 @@ public readonly partial struct UInt256
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static UInt256 Create(ulong u0, ulong u1, ulong u2, ulong u3)
-    {
-        if (Vector256.IsHardwareAccelerated)
-        {
-            Vector256<ulong> v = Vector256.Create(u0, u1, u2, u3);
-            return Unsafe.As<Vector256<ulong>, UInt256>(ref v);
-        }
-        else
-        {
-            Unsafe.SkipInit(out UInt256 r);
-            ref ulong p = ref Unsafe.As<UInt256, ulong>(ref r);
-            p = u0;
-            Unsafe.Add(ref p, 1) = u1;
-            Unsafe.Add(ref p, 2) = u2;
-            Unsafe.Add(ref p, 3) = u3;
-            return r;
-        }
-    }
+        => new(u0, u1, u2, u3);
 }
