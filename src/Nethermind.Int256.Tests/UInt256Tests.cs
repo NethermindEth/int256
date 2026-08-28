@@ -965,6 +965,14 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
             UInt256.MultiplyOverflow(in x, in y, out UInt256 overflowLow).Should().Be(expectedHigh != 0);
             ((BigInteger)overflowLow).Should().Be(expectedLow);
 
+            UInt256 leftAlias = x;
+            UInt256.MultiplyOverflow(in leftAlias, in y, out leftAlias).Should().Be(expectedHigh != 0);
+            ((BigInteger)leftAlias).Should().Be(expectedLow);
+
+            UInt256 rightAlias = y;
+            UInt256.MultiplyOverflow(in x, in rightAlias, out rightAlias).Should().Be(expectedHigh != 0);
+            ((BigInteger)rightAlias).Should().Be(expectedLow);
+
             UInt256 modulus = new(0xffff_ffff_ffff_fff1UL, 0x0123_4567_89ab_cdefUL, 0xfedc_ba98_7654_3210UL, 0x8000_0000_0000_0001UL);
             UInt256.MultiplyMod(in x, in y, in modulus, out UInt256 modularProduct);
             ((BigInteger)modularProduct).Should().Be(product % (BigInteger)modulus);

@@ -16,12 +16,20 @@ public enum NarrowMultiplyShape
     ThreeByOne,
     ThreeByTwo,
     FullWidth,
-    Weighted,
+    OneByThree,
+    TwoByOne,
+    TwoByThree,
+    OneByFour,
+    TwoByFour,
+    ThreeByThree,
+    ThreeByFour,
+    FourByThree,
+    CorpusWeighted,
 }
 
 /// <summary>
 /// Compares the production 256-to-512-bit multiplication dispatch with its
-/// full-width fallback, including a full-width miss and a mixed workload.
+/// full-width fallback, including a full-width miss and a conservative corpus-weighted workload.
 /// </summary>
 [HideColumns("Job", "RatioSD", "Error")]
 [SimpleJob(RuntimeMoniker.Net10_0, launchCount: 3, warmupCount: 3, iterationCount: 10)]
@@ -43,7 +51,7 @@ public class NarrowMultiplyDispatchBenchmark
         NarrowMultiplyShape.ThreeByOne,
         NarrowMultiplyShape.ThreeByTwo,
         NarrowMultiplyShape.FullWidth,
-        NarrowMultiplyShape.Weighted)]
+        NarrowMultiplyShape.CorpusWeighted)]
     public NarrowMultiplyShape Shape { get; set; }
 
     [GlobalSetup]
@@ -60,8 +68,8 @@ public class NarrowMultiplyDispatchBenchmark
 
         for (int i = 0; i < BatchSize; i++)
         {
-            NarrowMultiplyShape shape = Shape == NarrowMultiplyShape.Weighted
-                ? (NarrowMultiplyShape)(i % 4)
+            NarrowMultiplyShape shape = Shape == NarrowMultiplyShape.CorpusWeighted
+                ? CorpusWeightedShape(i)
                 : Shape;
 
             (int leftWidth, int rightWidth) = shape switch
@@ -70,6 +78,14 @@ public class NarrowMultiplyDispatchBenchmark
                 NarrowMultiplyShape.TwoByTwo => (2, 2),
                 NarrowMultiplyShape.ThreeByOne => (3, 1),
                 NarrowMultiplyShape.ThreeByTwo => (3, 2),
+                NarrowMultiplyShape.OneByThree => (1, 3),
+                NarrowMultiplyShape.TwoByOne => (2, 1),
+                NarrowMultiplyShape.TwoByThree => (2, 3),
+                NarrowMultiplyShape.OneByFour => (1, 4),
+                NarrowMultiplyShape.TwoByFour => (2, 4),
+                NarrowMultiplyShape.ThreeByThree => (3, 3),
+                NarrowMultiplyShape.ThreeByFour => (3, 4),
+                NarrowMultiplyShape.FourByThree => (4, 3),
                 NarrowMultiplyShape.FullWidth => (4, 4),
                 _ => throw new ArgumentOutOfRangeException(),
             };
@@ -100,6 +116,37 @@ public class NarrowMultiplyDispatchBenchmark
         }
 
         return checksum;
+    }
+
+    private static NarrowMultiplyShape CorpusWeightedShape(int index)
+    {
+        // 220/1024 = 21.484% candidate hits, matching the measured 329,233/1,532,234
+        // supported shapes for wide-modulus MultiplyMod calls. The hit submix follows
+        // the measured shape distribution; misses retain the dominant wide operands.
+        int hitSlot = (index * 37) & (BatchSize - 1);
+        if (hitSlot < 220)
+        {
+            return hitSlot switch
+            {
+                < 20 => NarrowMultiplyShape.OneByTwo,
+                20 => NarrowMultiplyShape.TwoByOne,
+                < 192 => NarrowMultiplyShape.TwoByTwo,
+                192 => NarrowMultiplyShape.ThreeByOne,
+                193 => NarrowMultiplyShape.OneByThree,
+                194 => NarrowMultiplyShape.ThreeByTwo,
+                _ => NarrowMultiplyShape.TwoByThree,
+            };
+        }
+
+        return (hitSlot - 220) switch
+        {
+            < 367 => NarrowMultiplyShape.FullWidth,
+            < 647 => NarrowMultiplyShape.TwoByFour,
+            < 775 => NarrowMultiplyShape.OneByFour,
+            < 785 => NarrowMultiplyShape.ThreeByThree,
+            < 795 => NarrowMultiplyShape.ThreeByFour,
+            _ => NarrowMultiplyShape.FourByThree,
+        };
     }
 
     [Benchmark(OperationsPerInvoke = BatchSize)]
