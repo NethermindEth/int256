@@ -654,7 +654,7 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
     public UInt256Tests() : base((BigInteger x) => (UInt256)x, (int x) => (UInt256)x, x => x, TestNumbers.UInt256Max) { }
 
     [Test]
-    public void DivideAndMod_PowerOfTwoDivisors_MatchBigInteger()
+    public void DivideAndMod_SingleLimbPowerOfTwoDivisors_MatchBigInteger()
     {
         UInt256[] boundaryValues =
         [
