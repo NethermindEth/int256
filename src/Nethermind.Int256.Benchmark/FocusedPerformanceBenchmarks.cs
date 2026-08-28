@@ -79,6 +79,16 @@ public class WideDivideModBenchmark
             _values[i] = RandomValueAbove(random, divisor);
             _divisors[i] = divisor;
         }
+
+        for (int i = 0; i < BatchSize; i++)
+        {
+            _current(in _values[i], in _divisors[i], out UInt256 currentQuotient, out UInt256 currentRemainder);
+            Legacy(in _values[i], in _divisors[i], out UInt256 legacyQuotient, out UInt256 legacyRemainder);
+            if (!currentQuotient.Equals(legacyQuotient) || !currentRemainder.Equals(legacyRemainder))
+            {
+                throw new InvalidOperationException($"Division mismatch at index {i} for {Shape}.");
+            }
+        }
     }
 
     [Benchmark(Baseline = true, OperationsPerInvoke = BatchSize)]
