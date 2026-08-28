@@ -297,7 +297,7 @@ public enum AddOverflowCase
 public class AddOverflowDispatchAB
 {
     private const int N = 4096;
-    private const int DistributionSmallCount = 3604;
+    private const int DistributionSmallCount = 3604; // 3604/4096 approximates measured 173,674,474/197,390,360 = 87.985%.
 
     private UInt256[] _a = null!;
     private UInt256[] _b = null!;
@@ -329,6 +329,7 @@ public class AddOverflowDispatchAB
                 AddOverflowCase.Distribution => DistributionPair(i, random),
                 AddOverflowCase.Small64 => Small64Pair(random),
                 AddOverflowCase.Full => FullPair(random),
+                _ => throw new ArgumentOutOfRangeException(),
             };
             _a[i] = a;
             _b[i] = b;
