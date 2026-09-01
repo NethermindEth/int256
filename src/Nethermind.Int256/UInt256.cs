@@ -323,19 +323,12 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
             return SubtractScalarUInt64(in a, b0, out res);
         }
 
-        ulong a0 = a.u0, a1 = a.u1, a2 = a.u2, a3 = a.u3;
-        ulong b1 = b.u1, b2 = b.u2, b3 = b.u3;
-
-        // Borrow out of a limb is (a < b) | ((a == b) & borrowIn); the compares are off the carry chain
-        ulong r0 = a0 - b0;
-        ulong borrow = a0 < b0 ? 1UL : 0UL;
-        ulong r1 = a1 - b1 - borrow;
-        borrow = (a1 < b1 ? 1UL : 0UL) | (borrow & (a1 == b1 ? 1UL : 0UL));
-        ulong r2 = a2 - b2 - borrow;
-        borrow = (a2 < b2 ? 1UL : 0UL) | (borrow & (a2 == b2 ? 1UL : 0UL));
-        ulong r3 = a3 - b3 - borrow;
-        borrow = (a3 < b3 ? 1UL : 0UL) | (borrow & (a3 == b3 ? 1UL : 0UL));
-
+        // Loads stay next to their use: the one-limb path above shares this method's prolog
+        ulong borrow = 0;
+        SubtractWithBorrow(a.u0, b0, ref borrow, out ulong r0);
+        SubtractWithBorrow(a.u1, b.u1, ref borrow, out ulong r1);
+        SubtractWithBorrow(a.u2, b.u2, ref borrow, out ulong r2);
+        SubtractWithBorrow(a.u3, b.u3, ref borrow, out ulong r3);
         StoreLimbs(out res, r0, r1, r2, r3);
         return borrow != 0;
     }
@@ -380,6 +373,14 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         Unsafe.AsRef(in res.u1) = r1;
         Unsafe.AsRef(in res.u2) = r2;
         Unsafe.AsRef(in res.u3) = r3;
+    }
+
+    // Borrow out is (a < b) | ((a == b) & borrowIn); both compares are off the carry chain
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void SubtractWithBorrow(ulong a, ulong b, ref ulong borrow, out ulong res)
+    {
+        res = a - b - borrow;
+        borrow = (a < b ? 1UL : 0UL) | (borrow & (a == b ? 1UL : 0UL));
     }
 
     public void Subtract(in UInt256 b, out UInt256 res) => Subtract(this, b, out res);
