@@ -2278,8 +2278,8 @@ public readonly partial struct UInt256
 
     // Dispatch on the narrower operand alone: an n x 4 product still needs only n*4
     // multiplies, so requiring both operands to be narrow leaves the common n x 4 shapes
-    // on the full-width path. Nothing is hoisted across a branch and every helper takes
-    // four arguments, so this needs no frame and each call stays a tail-jump on win-x64.
+    // on the full-width path. Every helper takes four arguments so none of them spills an
+    // operand to the stack on win-x64, and inlining keeps the 64x64 case in the caller.
     [SkipLocalsInit]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void Multiply256To512Bit(in UInt256 x, in UInt256 y, out UInt256 low, out UInt256 high)
@@ -2296,8 +2296,8 @@ public readonly partial struct UInt256
                         // Fast multiply for numbers less than 2^64 (18,446,744,073,709,551,615)
                         ulong highUL = Multiply64(x.u0, y.u0, out ulong lowUL);
                         // Assignment to high, low after multiply in case either is used as input for x or y (by ref aliasing)
-                        Store4(out high, 0, 0, 0, 0);
                         Store4(out low, lowUL, highUL, 0, 0);
+                        Store4(out high, 0, 0, 0, 0);
                         return;
                     }
 
@@ -2342,6 +2342,8 @@ public readonly partial struct UInt256
 
     // Scalar stores: callers read the result back a limb at a time, so a 32-byte zeroing
     // store partially overwritten by limb stores would block store-to-load forwarding.
+    // Every helper stores high after low, so a caller that passes one variable for both
+    // gets the same half whichever helper the width dispatch picked.
     [SkipLocalsInit]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void Store4(out UInt256 value, ulong v0, ulong v1, ulong v2, ulong v3)
@@ -2359,7 +2361,7 @@ public readonly partial struct UInt256
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void Multiply64By128(in UInt256 x, in UInt256 y, out UInt256 low, out UInt256 high)
     {
-        // Copy inputs up front - this breaks aliasing with out params so we can store early.
+        // Copy inputs up front - an out param may be the same storage as an input.
         ulong x0 = x.u0;
         ulong y0 = y.u0, y1 = y.u1;
 
@@ -2369,8 +2371,8 @@ public readonly partial struct UInt256
         // high(x0*y1) <= 2^64 - 2, so the carry-in cannot overflow it.
         p2 += p1 < carry ? 1UL : 0UL;
 
-        Store4(out high, 0, 0, 0, 0);
         Store4(out low, p0, p1, p2, 0);
+        Store4(out high, 0, 0, 0, 0);
     }
 
     // 128 x 128 -> 256 bits.
@@ -2378,7 +2380,7 @@ public readonly partial struct UInt256
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void Multiply128By128(in UInt256 x, in UInt256 y, out UInt256 low, out UInt256 high)
     {
-        // Copy inputs up front - this breaks aliasing with out params so we can store early.
+        // Copy inputs up front - an out param may be the same storage as an input.
         ulong x0 = x.u0, x1 = x.u1;
         ulong y0 = y.u0, y1 = y.u1;
 
@@ -2398,8 +2400,8 @@ public readonly partial struct UInt256
         p2 = AddAndCountCarry(p2, h10, ref carry);
         p2 = AddAndCountCarry(p2, l11, ref carry);
 
-        Store4(out high, 0, 0, 0, 0);
         Store4(out low, p0, p1, p2, h11 + carry);
+        Store4(out high, 0, 0, 0, 0);
     }
 
     // 256 x 64 -> 320 bits. y contributes one limb.
@@ -2446,7 +2448,7 @@ public readonly partial struct UInt256
         Unsafe.SkipInit(out low);
         ref ulong p = ref Unsafe.As<UInt256, ulong>(ref low);
 
-        // Row 0: x * y0 -> t0..t4
+        // Row 0: x * y0. Limb 0 is final at once; limbs 1..4 stay in t1..t4.
         ulong carry = Multiply64(x0, y0, out ulong lo);
         p = lo;
 
@@ -2462,7 +2464,7 @@ public readonly partial struct UInt256
         ulong t3 = lo + carry;
         ulong t4 = hi + (t3 < carry ? 1UL : 0UL);
 
-        // Row 1: t1..t5 += x * y1. Every step keeps t[i] + x[i]*y1 + carry <= 2^128 - 1,
+        // Row 1: limbs 1..5 += x * y1. Every step keeps t[i] + x[i]*y1 + carry <= 2^128 - 1,
         // so the running carry stays one limb wide.
         hi = Multiply64(x0, y1, out lo);
         ulong s = t1 + lo;
