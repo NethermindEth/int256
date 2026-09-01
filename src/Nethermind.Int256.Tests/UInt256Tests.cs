@@ -724,6 +724,54 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
         }
     }
 
+    // The benchmark-only subtraction variants must agree with the oracle on every limb pattern.
+    [Test]
+    public void SubtractVariants_limb_patterns_match_BigInteger_oracle()
+    {
+        ulong[] limbs = [0, 1, 1UL << 63, ulong.MaxValue];
+        List<UInt256> values = new();
+        foreach (ulong u0 in limbs)
+        {
+            foreach (ulong u1 in limbs)
+            {
+                foreach (ulong u2 in limbs)
+                {
+                    foreach (ulong u3 in limbs)
+                    {
+                        values.Add(new UInt256(u0, u1, u2, u3));
+                    }
+                }
+            }
+        }
+
+        foreach (UInt256 a in values)
+        {
+            foreach (UInt256 b in values)
+            {
+                BigInteger difference = (BigInteger)a - (BigInteger)b;
+                BigInteger expected = difference.Sign < 0 ? difference + TestNumbers.TwoTo256 : difference;
+                bool expectedUnderflow = difference.Sign < 0;
+
+                Check(UInt256.SubtractScalarChain(in a, in b, out UInt256 r), r, "chain");
+                Check(UInt256.SubtractScalar(in a, in b, out r), r, "ladder");
+                Check(UInt256.SubtractHybrid(in a, in b, out r), r, "hybrid");
+                if (Arm.AdvSimd.IsSupported || x64.Sse42.IsSupported)
+                {
+                    Check(UInt256.SubtractVector128(in a, in b, out r), r, "vector128");
+                    Check(UInt256.SubtractHybridVectorStore(in a, in b, out r), r, "hybrid vector store");
+                }
+
+                void Check(bool underflow, UInt256 result, string variant)
+                {
+                    if ((BigInteger)result != expected || underflow != expectedUnderflow)
+                    {
+                        Assert.Fail($"{variant}: {a} - {b} gave {result} underflow={underflow}, expected {expected} underflow={expectedUnderflow}");
+                    }
+                }
+            }
+        }
+    }
+
     [Test]
     public void SubtractUnderflow_random_full_left_and_uint64_right_match_BigInteger_oracle_and_aliases()
     {

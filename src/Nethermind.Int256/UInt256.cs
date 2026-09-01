@@ -314,8 +314,54 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         return SubtractScalar(in a, in b, out res);
     }
 
+    // Same speculation as the 256-bit path on two 128-bit halves; 16-byte stores forward to the NEON readers.
+    // Requires AdvSimd or SSE4.2; measured through SubtractShapesBench, not yet dispatched to.
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool SubtractScalar(in UInt256 a, in UInt256 b, out UInt256 res)
+    internal static bool SubtractVector128(in UInt256 a, in UInt256 b, out UInt256 res)
+    {
+        ref Vector128<ulong> aRef = ref Unsafe.As<UInt256, Vector128<ulong>>(ref Unsafe.AsRef(in a));
+        ref Vector128<ulong> bRef = ref Unsafe.As<UInt256, Vector128<ulong>>(ref Unsafe.AsRef(in b));
+        Vector128<ulong> aLo = aRef;
+        Vector128<ulong> aHi = Unsafe.Add(ref aRef, 1);
+        Vector128<ulong> bLo = bRef;
+        Vector128<ulong> bHi = Unsafe.Add(ref bRef, 1);
+
+        Vector128<ulong> resultLo = aLo - bLo;
+        Vector128<ulong> resultHi = aHi - bHi;
+        Vector128<ulong> borrowLo = Vector128.LessThan(aLo, bLo);
+        Vector128<ulong> borrowHi = Vector128.LessThan(aHi, bHi);
+
+        // Lane i receives the borrow of lane i-1: [0, lo0] and [lo1, hi0]
+        Vector128<ulong> borrowInLo;
+        Vector128<ulong> borrowInHi;
+        if (AdvSimd.IsSupported)
+        {
+            borrowInLo = AdvSimd.ExtractVector128(borrowLo, Vector128<ulong>.Zero, 1);
+            borrowInHi = AdvSimd.ExtractVector128(borrowHi, borrowLo, 1);
+        }
+        else
+        {
+            borrowInLo = Sse2.ShiftLeftLogical128BitLane(borrowLo, 8);
+            borrowInHi = Ssse3.AlignRight(borrowHi.AsByte(), borrowLo.AsByte(), 8).AsUInt64();
+        }
+
+        // A zero limb that receives a borrow must pass it on; a and b are still intact for the scalar chain
+        Vector128<ulong> propagate = (Vector128.Equals(resultLo, Vector128<ulong>.Zero) & borrowInLo)
+                                   | (Vector128.Equals(resultHi, Vector128<ulong>.Zero) & borrowInHi);
+        if (!Vector128.EqualsAll(propagate, Vector128<ulong>.Zero))
+        {
+            return SubtractScalar(in a, in b, out res);
+        }
+
+        Unsafe.SkipInit(out res);
+        ref Vector128<ulong> resRef = ref Unsafe.As<UInt256, Vector128<ulong>>(ref res);
+        resRef = resultLo + borrowInLo;
+        Unsafe.Add(ref resRef, 1) = resultHi + borrowInHi;
+        return borrowHi.GetElement(1) != 0;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static bool SubtractScalar(in UInt256 a, in UInt256 b, out UInt256 res)
     {
         ulong b0 = b.u0;
         if ((b.u1 | b.u2 | b.u3) == 0)
@@ -326,6 +372,87 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         // Loads stay next to their use: the one-limb path above shares this method's prolog
         ulong borrow = 0;
         SubtractWithBorrow(a.u0, b0, ref borrow, out ulong r0);
+        SubtractWithBorrow(a.u1, b.u1, ref borrow, out ulong r1);
+        SubtractWithBorrow(a.u2, b.u2, ref borrow, out ulong r2);
+        SubtractWithBorrow(a.u3, b.u3, ref borrow, out ulong r3);
+        StoreLimbs(out res, r0, r1, r2, r3);
+        return borrow != 0;
+    }
+
+    // Measurement variants for SubtractShapesBench on the CI runners: one-limb ladder in front of the
+    // 128-bit path, and the pre-ladder scalar chain that origin/main runs on non-AVX2 hardware.
+    internal static bool SubtractHybrid(in UInt256 a, in UInt256 b, out UInt256 res)
+    {
+        if ((b.u1 | b.u2 | b.u3) == 0)
+        {
+            return SubtractScalarUInt64(in a, b.u0, out res);
+        }
+        if (AdvSimd.IsSupported || Sse42.IsSupported)
+        {
+            return SubtractVector128(in a, in b, out res);
+        }
+        return SubtractScalar(in a, in b, out res);
+    }
+
+    // Ladder with 16-byte stores in front of the 128-bit path: one lane insert instead of four scalar stores
+    internal static bool SubtractHybridVectorStore(in UInt256 a, in UInt256 b, out UInt256 res)
+    {
+        if ((b.u1 | b.u2 | b.u3) == 0)
+        {
+            return SubtractOneLimbVector128(in a, b.u0, out res);
+        }
+        return SubtractVector128(in a, in b, out res);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool SubtractOneLimbVector128(in UInt256 a, ulong b0, out UInt256 res)
+    {
+        ref Vector128<ulong> aRef = ref Unsafe.As<UInt256, Vector128<ulong>>(ref Unsafe.AsRef(in a));
+        Vector128<ulong> aLo = aRef;
+        Vector128<ulong> aHi = Unsafe.Add(ref aRef, 1);
+        ulong a0 = a.u0;
+        ulong r0 = a0 - b0;
+        if (a0 >= b0)
+        {
+            StoreHalves(out res, aLo.WithElement(0, r0), aHi);
+            return false;
+        }
+        ulong a1 = a.u1;
+        if (a1 != 0)
+        {
+            StoreHalves(out res, Vector128.Create(r0, a1 - 1), aHi);
+            return false;
+        }
+        ulong a2 = a.u2;
+        ulong a3 = a.u3;
+        if (a2 != 0)
+        {
+            StoreHalves(out res, Vector128.Create(r0, ulong.MaxValue), Vector128.Create(a2 - 1, a3));
+            return false;
+        }
+        if (a3 != 0)
+        {
+            StoreHalves(out res, Vector128.Create(r0, ulong.MaxValue), Vector128.Create(ulong.MaxValue, a3 - 1));
+            return false;
+        }
+
+        StoreHalves(out res, Vector128.Create(r0, ulong.MaxValue), Vector128<ulong>.AllBitsSet);
+        return true;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void StoreHalves(out UInt256 res, Vector128<ulong> lo, Vector128<ulong> hi)
+    {
+        Unsafe.SkipInit(out res);
+        ref Vector128<ulong> resRef = ref Unsafe.As<UInt256, Vector128<ulong>>(ref res);
+        resRef = lo;
+        Unsafe.Add(ref resRef, 1) = hi;
+    }
+
+    internal static bool SubtractScalarChain(in UInt256 a, in UInt256 b, out UInt256 res)
+    {
+        ulong borrow = 0;
+        SubtractWithBorrow(a.u0, b.u0, ref borrow, out ulong r0);
         SubtractWithBorrow(a.u1, b.u1, ref borrow, out ulong r1);
         SubtractWithBorrow(a.u2, b.u2, ref borrow, out ulong r2);
         SubtractWithBorrow(a.u3, b.u3, ref borrow, out ulong r3);
