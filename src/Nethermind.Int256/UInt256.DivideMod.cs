@@ -2276,92 +2276,113 @@ public readonly partial struct UInt256
         return qhat;
     }
 
+    // Dispatch on the narrower operand alone: an n x 4 product still needs only n*4
+    // multiplies, so requiring both operands to be narrow leaves the common n x 4 shapes
+    // on the full-width path. Nothing is hoisted across a branch and every helper takes
+    // four arguments, so this needs no frame and each call stays a tail-jump on win-x64.
     [SkipLocalsInit]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void Multiply256To512Bit(in UInt256 x, in UInt256 y, out UInt256 low, out UInt256 high)
     {
-        if (x.IsUint64 && y.IsUint64)
+        if ((x.u2 | x.u3) == 0)
         {
-            // Fast multiply for numbers less than 2^64 (18,446,744,073,709,551,615)
-            ulong highUL = Multiply64(x.u0, y.u0, out ulong lowUL);
-            // Assignment to high, low after multiply in case either is used as input for x or y (by ref aliasing)
-            high = default;
-            low = default;
-            Unsafe.AsRef(in low.u0) = lowUL;
-            Unsafe.AsRef(in low.u1) = highUL;
+            if ((y.u2 | y.u3) == 0)
+            {
+                // Both operands are at most 128 bits, so the product is at most 256 bits.
+                if (x.u1 == 0)
+                {
+                    if (y.u1 == 0)
+                    {
+                        // Fast multiply for numbers less than 2^64 (18,446,744,073,709,551,615)
+                        ulong highUL = Multiply64(x.u0, y.u0, out ulong lowUL);
+                        // Assignment to high, low after multiply in case either is used as input for x or y (by ref aliasing)
+                        Store4(out high, 0, 0, 0, 0);
+                        Store4(out low, lowUL, highUL, 0, 0);
+                        return;
+                    }
+
+                    Multiply64By128(in x, in y, out low, out high);
+                    return;
+                }
+
+                if (y.u1 == 0)
+                {
+                    Multiply64By128(in y, in x, out low, out high);
+                    return;
+                }
+
+                Multiply128By128(in x, in y, out low, out high);
+                return;
+            }
+
+            if (x.u1 == 0)
+            {
+                MultiplyWideBy64(in y, in x, out low, out high);
+                return;
+            }
+
+            MultiplyWideBy128(in y, in x, out low, out high);
             return;
         }
 
-        if ((x.u3 | y.u3) == 0)
+        if ((y.u2 | y.u3) == 0)
         {
-            if (x.u2 == 0 && y.u2 == 0)
+            if (y.u1 == 0)
             {
-                if (x.u1 == 0)
-                {
-                    Multiply1x2(in x, in y, out low, out high);
-                    return;
-                }
-                if (y.u1 == 0)
-                {
-                    Multiply1x2(in y, in x, out low, out high);
-                    return;
-                }
-
-                Multiply2x2(in x, in y, out low, out high);
+                MultiplyWideBy64(in x, in y, out low, out high);
                 return;
             }
 
-            if (x.u2 != 0 && y.u2 == 0 && y.u1 != 0)
-            {
-                Multiply3x2(in x, in y, out low, out high);
-                return;
-            }
-            if (x.u2 != 0 && y.u2 == 0 && y.u1 == 0)
-            {
-                Multiply3x1(in x, in y, out low, out high);
-                return;
-            }
-            if (x.u2 == 0 && y.u2 != 0 && x.u1 != 0)
-            {
-                Multiply3x2(in y, in x, out low, out high);
-                return;
-            }
-            if (x.u2 == 0 && y.u2 != 0 && x.u1 == 0)
-            {
-                Multiply3x1(in y, in x, out low, out high);
-                return;
-            }
+            MultiplyWideBy128(in x, in y, out low, out high);
+            return;
         }
 
         Multiply256To512BitLarge(in x, in y, out low, out high);
     }
 
+    // Scalar stores: callers read the result back a limb at a time, so a 32-byte zeroing
+    // store partially overwritten by limb stores would block store-to-load forwarding.
     [SkipLocalsInit]
-    private static void Multiply1x2(in UInt256 x, in UInt256 y, out UInt256 low, out UInt256 high)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void Store4(out UInt256 value, ulong v0, ulong v1, ulong v2, ulong v3)
     {
+        Unsafe.SkipInit(out value);
+        ref ulong p = ref Unsafe.As<UInt256, ulong>(ref value);
+        p = v0;
+        Unsafe.Add(ref p, 1) = v1;
+        Unsafe.Add(ref p, 2) = v2;
+        Unsafe.Add(ref p, 3) = v3;
+    }
+
+    // 64 x 128 -> 192 bits. x contributes one limb, y two.
+    [SkipLocalsInit]
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void Multiply64By128(in UInt256 x, in UInt256 y, out UInt256 low, out UInt256 high)
+    {
+        // Copy inputs up front - this breaks aliasing with out params so we can store early.
         ulong x0 = x.u0;
-        ulong y0 = y.u0;
-        ulong y1 = y.u1;
+        ulong y0 = y.u0, y1 = y.u1;
 
         ulong carry = Multiply64(x0, y0, out ulong p0);
         ulong p2 = Multiply64(x0, y1, out ulong p1);
-        ulong p1WithCarry = p1 + carry;
-        p2 += p1WithCarry < p1 ? 1UL : 0UL;
+        p1 += carry;
+        // high(x0*y1) <= 2^64 - 2, so the carry-in cannot overflow it.
+        p2 += p1 < carry ? 1UL : 0UL;
 
-        low = default;
-        Unsafe.AsRef(in low.u0) = p0;
-        Unsafe.AsRef(in low.u1) = p1WithCarry;
-        Unsafe.AsRef(in low.u2) = p2;
-        high = default;
+        Store4(out high, 0, 0, 0, 0);
+        Store4(out low, p0, p1, p2, 0);
     }
 
+    // 128 x 128 -> 256 bits.
     [SkipLocalsInit]
-    private static void Multiply2x2(in UInt256 x, in UInt256 y, out UInt256 low, out UInt256 high)
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void Multiply128By128(in UInt256 x, in UInt256 y, out UInt256 low, out UInt256 high)
     {
-        ulong x0 = x.u0;
-        ulong x1 = x.u1;
-        ulong y0 = y.u0;
-        ulong y1 = y.u1;
+        // Copy inputs up front - this breaks aliasing with out params so we can store early.
+        ulong x0 = x.u0, x1 = x.u1;
+        ulong y0 = y.u0, y1 = y.u1;
 
+        // Product scanning; measured faster than the row form at this width.
         ulong h00 = Multiply64(x0, y0, out ulong p0);
         ulong h01 = Multiply64(x0, y1, out ulong l01);
         ulong h10 = Multiply64(x1, y0, out ulong l10);
@@ -2376,87 +2397,102 @@ public readonly partial struct UInt256
         p2 = AddAndCountCarry(p2, h01, ref carry);
         p2 = AddAndCountCarry(p2, h10, ref carry);
         p2 = AddAndCountCarry(p2, l11, ref carry);
-        ulong p3 = h11 + carry;
 
-        low = default;
-        Unsafe.AsRef(in low.u0) = p0;
-        Unsafe.AsRef(in low.u1) = p1;
-        Unsafe.AsRef(in low.u2) = p2;
-        Unsafe.AsRef(in low.u3) = p3;
-        high = default;
+        Store4(out high, 0, 0, 0, 0);
+        Store4(out low, p0, p1, p2, h11 + carry);
     }
 
+    // 256 x 64 -> 320 bits. y contributes one limb.
     [SkipLocalsInit]
-    private static void Multiply3x2(in UInt256 x, in UInt256 y, out UInt256 low, out UInt256 high)
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void MultiplyWideBy64(in UInt256 x, in UInt256 y, out UInt256 low, out UInt256 high)
     {
-        ulong x0 = x.u0;
-        ulong x1 = x.u1;
-        ulong x2 = x.u2;
+        // Copy inputs up front - this breaks aliasing with out params so we can store early.
+        ulong x0 = x.u0, x1 = x.u1, x2 = x.u2, x3 = x.u3;
         ulong y0 = y.u0;
-        ulong y1 = y.u1;
 
-        ulong carryLo = Multiply64(x0, y0, out ulong p0);
-        ulong carryHi = 0;
+        Unsafe.SkipInit(out low);
+        ref ulong p = ref Unsafe.As<UInt256, ulong>(ref low);
 
-        ulong a0 = carryLo, a1 = carryHi, a2 = 0;
-        MultiplyAddCarry(ref a0, ref a1, ref a2, x0, y1);
-        MultiplyAddCarry(ref a0, ref a1, ref a2, x1, y0);
-        ulong p1 = a0;
-        carryLo = a1;
-        carryHi = a2;
+        ulong carry = Multiply64(x0, y0, out ulong lo);
+        p = lo;
 
-        a0 = carryLo;
-        a1 = carryHi;
-        a2 = 0;
-        MultiplyAddCarry(ref a0, ref a1, ref a2, x1, y1);
-        MultiplyAddCarry(ref a0, ref a1, ref a2, x2, y0);
-        ulong p2 = a0;
-        carryLo = a1;
-        carryHi = a2;
+        // high(x[i]*y0) <= 2^64 - 2, so the carry-out cannot overflow it.
+        ulong hi = Multiply64(x1, y0, out lo);
+        ulong s = lo + carry;
+        Unsafe.Add(ref p, 1) = s;
+        carry = hi + (s < carry ? 1UL : 0UL);
 
-        a0 = carryLo;
-        a1 = carryHi;
-        a2 = 0;
-        MultiplyAddCarry(ref a0, ref a1, ref a2, x2, y1);
-        ulong p3 = a0;
-        ulong p4 = a1;
-        ulong p5 = a2;
+        hi = Multiply64(x2, y0, out lo);
+        s = lo + carry;
+        Unsafe.Add(ref p, 2) = s;
+        carry = hi + (s < carry ? 1UL : 0UL);
 
-        low = default;
-        Unsafe.AsRef(in low.u0) = p0;
-        Unsafe.AsRef(in low.u1) = p1;
-        Unsafe.AsRef(in low.u2) = p2;
-        Unsafe.AsRef(in low.u3) = p3;
-        high = default;
-        Unsafe.AsRef(in high.u0) = p4;
-        Unsafe.AsRef(in high.u1) = p5;
+        hi = Multiply64(x3, y0, out lo);
+        s = lo + carry;
+        Unsafe.Add(ref p, 3) = s;
+        Store4(out high, hi + (s < carry ? 1UL : 0UL), 0, 0, 0);
     }
 
+    // 256 x 128 -> 384 bits. y contributes two limbs.
     [SkipLocalsInit]
-    private static void Multiply3x1(in UInt256 x, in UInt256 y, out UInt256 low, out UInt256 high)
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void MultiplyWideBy128(in UInt256 x, in UInt256 y, out UInt256 low, out UInt256 high)
     {
-        ulong x0 = x.u0;
-        ulong x1 = x.u1;
-        ulong x2 = x.u2;
-        ulong y0 = y.u0;
+        // Copy inputs up front - this breaks aliasing with out params so we can store early.
+        ulong x0 = x.u0, x1 = x.u1, x2 = x.u2, x3 = x.u3;
+        ulong y0 = y.u0, y1 = y.u1;
 
-        ulong carry = Multiply64(x0, y0, out ulong p0);
-        ulong p1High = Multiply64(x1, y0, out ulong p1);
-        ulong p1Carry = 0;
-        p1 = AddAndCountCarry(p1, carry, ref p1Carry);
+        Unsafe.SkipInit(out low);
+        ref ulong p = ref Unsafe.As<UInt256, ulong>(ref low);
 
-        ulong p2High = Multiply64(x2, y0, out ulong p2);
-        ulong p2Carry = 0;
-        p2 = AddAndCountCarry(p2, p1High, ref p2Carry);
-        p2 = AddAndCountCarry(p2, p1Carry, ref p2Carry);
-        ulong p3 = p2High + p2Carry;
+        // Row 0: x * y0 -> t0..t4
+        ulong carry = Multiply64(x0, y0, out ulong lo);
+        p = lo;
 
-        low = default;
-        Unsafe.AsRef(in low.u0) = p0;
-        Unsafe.AsRef(in low.u1) = p1;
-        Unsafe.AsRef(in low.u2) = p2;
-        Unsafe.AsRef(in low.u3) = p3;
-        high = default;
+        ulong hi = Multiply64(x1, y0, out lo);
+        ulong t1 = lo + carry;
+        carry = hi + (t1 < carry ? 1UL : 0UL);
+
+        hi = Multiply64(x2, y0, out lo);
+        ulong t2 = lo + carry;
+        carry = hi + (t2 < carry ? 1UL : 0UL);
+
+        hi = Multiply64(x3, y0, out lo);
+        ulong t3 = lo + carry;
+        ulong t4 = hi + (t3 < carry ? 1UL : 0UL);
+
+        // Row 1: t1..t5 += x * y1. Every step keeps t[i] + x[i]*y1 + carry <= 2^128 - 1,
+        // so the running carry stays one limb wide.
+        hi = Multiply64(x0, y1, out lo);
+        ulong s = t1 + lo;
+        ulong k = s < lo ? 1UL : 0UL;
+        Unsafe.Add(ref p, 1) = s;
+        carry = hi + k;
+
+        hi = Multiply64(x1, y1, out lo);
+        s = t2 + lo;
+        k = s < lo ? 1UL : 0UL;
+        s += carry;
+        k += s < carry ? 1UL : 0UL;
+        Unsafe.Add(ref p, 2) = s;
+        carry = hi + k;
+
+        hi = Multiply64(x2, y1, out lo);
+        s = t3 + lo;
+        k = s < lo ? 1UL : 0UL;
+        s += carry;
+        k += s < carry ? 1UL : 0UL;
+        Unsafe.Add(ref p, 3) = s;
+        carry = hi + k;
+
+        hi = Multiply64(x3, y1, out lo);
+        s = t4 + lo;
+        k = s < lo ? 1UL : 0UL;
+        s += carry;
+        k += s < carry ? 1UL : 0UL;
+
+        Store4(out high, s, hi + k, 0, 0);
     }
 
     [SkipLocalsInit]
