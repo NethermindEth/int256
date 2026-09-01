@@ -176,33 +176,90 @@ public class MultiplyWidthTests
     }
 
     /// <summary>
-    /// Saturated operands drive every carry chain to its bound. The narrow helpers accumulate with
-    /// a single-limb carry, justified by t[i] + x[i]*y + carry never exceeding 2^128 - 1; if that
-    /// bound were wrong these are the products that expose it.
+    /// Carry stress at bit boundaries rather than limb boundaries. The width generator only makes
+    /// limb-aligned patterns, so these products sit outside it. Offsets cluster around every limb
+    /// edge, which is where a carry has to cross from one accumulator step to the next: the helpers
+    /// accumulate with a one-limb carry, justified by t[i] + x[i]*y + carry never exceeding
+    /// 2^128 - 1, and a wrong bound would show up here first.
     /// </summary>
     [Test]
-    public void Saturated_operands_carry_correctly_at_every_width()
+    public void Products_at_bit_boundaries_carry_correctly()
     {
-        for (int xWidth = 1; xWidth <= 4; xWidth++)
+        int[] offsets = [1, 2, 31, 32, 33, 63, 64, 65, 95, 127, 128, 129, 191, 192, 193, 223, 255, 256];
+
+        foreach (int a in offsets)
         {
-            for (int yWidth = 1; yWidth <= 4; yWidth++)
+            foreach (int b in offsets)
             {
-                UInt256 x = AllOnes(xWidth);
-                UInt256 y = AllOnes(yWidth);
+                // All-ones of a bits times all-ones of b bits: the longest possible carry ripple.
+                BigInteger onesA = (BigInteger.One << a) - 1;
+                BigInteger onesB = (BigInteger.One << b) - 1;
+                AssertProduct((UInt256)onesA, (UInt256)onesB, onesA * onesB, $"(2^{a}-1)*(2^{b}-1)");
 
-                Dispatch(in x, in y, out UInt256 low, out UInt256 high);
-
-                // (2^64a - 1)(2^64b - 1), computed independently of the limb code.
-                BigInteger expected = ((BigInteger.One << (64 * xWidth)) - 1) * ((BigInteger.One << (64 * yWidth)) - 1);
-                Assert.That(Product(in low, in high), Is.EqualTo(expected), $"{xWidth}x{yWidth} saturated");
+                // A single bit at each offset: no ripple, but every limb position in turn.
+                if (a < 256 && b < 256)
+                {
+                    AssertProduct((UInt256)(BigInteger.One << a), (UInt256)(BigInteger.One << b),
+                        BigInteger.One << (a + b), $"2^{a}*2^{b}");
+                }
             }
         }
 
-        static UInt256 AllOnes(int width) => new(
-            ulong.MaxValue,
-            width > 1 ? ulong.MaxValue : 0,
-            width > 2 ? ulong.MaxValue : 0,
-            width > 3 ? ulong.MaxValue : 0);
+        static void AssertProduct(UInt256 x, UInt256 y, BigInteger expected, string what)
+        {
+            UInt256 low = Stale, high = Stale;
+            Dispatch(in x, in y, out low, out high);
+            BigInteger actual = Product(in low, in high);
+            if (actual != expected)
+            {
+                Assert.Fail($"{what}: expected {expected:x}, actual {actual:x}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Zero is a live operand - the EVM multiplies by it - and the width generator deliberately
+    /// excludes it, since a zero top limb would silently retest a narrower shape. The deleted
+    /// predecessor of this fixture covered zero through one boundary pair; this covers it against
+    /// every width, aliased and not, with a stale output that must be fully cleared.
+    /// </summary>
+    [Test]
+    public void Zero_operand_gives_a_zero_product_and_no_overflow()
+    {
+        UInt256 zero = default;
+
+        for (int width = 1; width <= 4; width++)
+        {
+            foreach (UInt256 v in ValuesOfWidth(width))
+            {
+                Check(in zero, in v);
+                Check(in v, in zero);
+            }
+        }
+
+        Check(in zero, in zero);
+
+        static void Check(in UInt256 x, in UInt256 y)
+        {
+            UInt256 low = Stale, high = Stale;
+            Dispatch(in x, in y, out low, out high);
+            if (!low.IsZero || !high.IsZero)
+            {
+                Assert.Fail($"{Show(in x)} * {Show(in y)} left {Show(in high)} {Show(in low)}, expected zero");
+            }
+
+            if (UInt256.MultiplyOverflow(in x, in y, out UInt256 res) || !res.IsZero)
+            {
+                Assert.Fail($"MultiplyOverflow({Show(in x)}, {Show(in y)}) reported overflow or a non-zero product");
+            }
+
+            // Aliased: a stale high half here would surface as a spurious overflow.
+            UInt256 aliased = x;
+            if (UInt256.MultiplyOverflow(in aliased, in y, out aliased) || !aliased.IsZero)
+            {
+                Assert.Fail($"aliased MultiplyOverflow({Show(in x)}, {Show(in y)}) reported overflow or a non-zero product");
+            }
+        }
     }
 
     /// <summary>
@@ -210,6 +267,12 @@ public class MultiplyWidthTests
     /// caller may pass the same storage for an input and an output. Hoisting a store above a read
     /// breaks this and nothing else notices.
     /// </summary>
+    /// <remarks>
+    /// Only the MultiplyOverflow assertions reach the width helpers, and only through the low
+    /// output - that is the only aliasing the public surface can produce, since MultiplyMod hands
+    /// the multiply two fresh locals. The MultiplyMod assertions below cover the reduction path
+    /// instead, which is worth having but is not what this test is named for.
+    /// </remarks>
     [TestCaseSource(nameof(WidthPairs))]
     public void Output_may_alias_either_input(int xWidth, int yWidth)
     {
@@ -303,7 +366,7 @@ public class MultiplyWidthTests
     [Test]
     public void MultiplyOverflow_is_exact_at_the_boundary()
     {
-        // Either side of the boundary by one bit: (2^255 - 1) * 2 fits, 2^255 * 2 does not.
+        // One bit either side of 2^256: (2^255 - 1) * 2 fits, 2^255 * 2 does not.
         UInt256 justUnder = (One << 255) - One;
         UInt256 two = new(2);
 
@@ -370,6 +433,10 @@ public class MultiplyWidthTests
 
                 UInt256 xJunk = WithJunkAbove(in x, xLimbs, junk);
                 UInt256 yJunk = WithJunkAbove(in y, yLimbs, junk);
+                // A helper that reads all four limbs of an operand has no out-of-domain limb on
+                // that side, so only the other side proves anything. Fail if neither does.
+                Assert.That(xJunk.Equals(x) && yJunk.Equals(y), Is.False,
+                    $"{name} has no out-of-domain limb on either side; this case cannot fail");
                 UInt256 junkLow = Stale, junkHigh = Stale;
                 helper(in xJunk, in yJunk, out junkLow, out junkHigh);
 

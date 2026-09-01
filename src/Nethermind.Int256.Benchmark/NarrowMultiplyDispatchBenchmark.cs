@@ -24,6 +24,8 @@ public enum NarrowMultiplyShape
     TwoByFour,
     ThreeByThree,
     ThreeByFour,
+    FourByOne,
+    FourByTwo,
     FourByThree,
     CorpusWeighted,
 }
@@ -46,11 +48,14 @@ public class NarrowMultiplyDispatchBenchmark
     private MultiplyDelegate _current = null!;
     private MultiplyDelegate _large = null!;
 
-    // Every shape the dispatcher branches on, including the ones it deliberately does not
-    // specialise: a Params list that omits 1x4/2x4 cannot show what the miss path costs.
+    // All sixteen width pairs, including the ones the dispatcher deliberately does not
+    // specialise. Two reasons to keep both argument orders: a Params list that omits 1x4/2x4
+    // cannot show what the miss path costs, and the swapped pairs (1x4 against 4x1) take
+    // different branches, so a regression confined to one of them would go unseen.
     [Params(
         NarrowMultiplyShape.OneByOne,
         NarrowMultiplyShape.OneByTwo,
+        NarrowMultiplyShape.TwoByOne,
         NarrowMultiplyShape.TwoByTwo,
         NarrowMultiplyShape.OneByThree,
         NarrowMultiplyShape.ThreeByOne,
@@ -58,8 +63,11 @@ public class NarrowMultiplyDispatchBenchmark
         NarrowMultiplyShape.ThreeByTwo,
         NarrowMultiplyShape.ThreeByThree,
         NarrowMultiplyShape.OneByFour,
+        NarrowMultiplyShape.FourByOne,
         NarrowMultiplyShape.TwoByFour,
+        NarrowMultiplyShape.FourByTwo,
         NarrowMultiplyShape.ThreeByFour,
+        NarrowMultiplyShape.FourByThree,
         NarrowMultiplyShape.FullWidth,
         NarrowMultiplyShape.CorpusWeighted)]
     public NarrowMultiplyShape Shape { get; set; }
@@ -96,6 +104,8 @@ public class NarrowMultiplyDispatchBenchmark
                 NarrowMultiplyShape.TwoByFour => (2, 4),
                 NarrowMultiplyShape.ThreeByThree => (3, 3),
                 NarrowMultiplyShape.ThreeByFour => (3, 4),
+                NarrowMultiplyShape.FourByOne => (4, 1),
+                NarrowMultiplyShape.FourByTwo => (4, 2),
                 NarrowMultiplyShape.FourByThree => (4, 3),
                 NarrowMultiplyShape.FullWidth => (4, 4),
                 _ => throw new ArgumentOutOfRangeException(),
