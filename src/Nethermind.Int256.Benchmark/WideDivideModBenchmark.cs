@@ -11,6 +11,7 @@ namespace Nethermind.Int256.Benchmark;
 
 public enum WideDivideShape
 {
+    Limb0PowerOfTwo,
     Limb1PowerOfTwo,
     Limb2PowerOfTwo,
     Limb3PowerOfTwo,
@@ -28,6 +29,7 @@ public enum WideDivideShape
 public class WideDivideModBenchmark
 {
     private delegate void DivideDelegate(in UInt256 x, in UInt256 y, out UInt256 quotient, out UInt256 remainder);
+    private delegate void Divide64Delegate(in UInt256 x, ulong y, out UInt256 quotient, out UInt256 remainder);
     private delegate void OperationDelegate(in UInt256 x, in UInt256 y, out UInt256 result);
 
     private const int BatchSize = 1024;
@@ -36,12 +38,15 @@ public class WideDivideModBenchmark
     private readonly UInt256[] _divisors = new UInt256[BatchSize];
     private OperationDelegate _currentDivide = null!;
     private OperationDelegate _currentMod = null!;
+    private Divide64Delegate _legacy64X86 = null!;
+    private Divide64Delegate _legacy64 = null!;
     private DivideDelegate _legacy128X86 = null!;
     private DivideDelegate _legacy128 = null!;
     private DivideDelegate _legacy192 = null!;
     private DivideDelegate _legacy256 = null!;
 
     [Params(
+        WideDivideShape.Limb0PowerOfTwo,
         WideDivideShape.Limb1PowerOfTwo,
         WideDivideShape.Limb2PowerOfTwo,
         WideDivideShape.Limb3PowerOfTwo,
@@ -54,6 +59,8 @@ public class WideDivideModBenchmark
     {
         _currentDivide = BindOperation("DivideFull");
         _currentMod = BindOperation("ModFull");
+        _legacy64X86 = BindDivide64("DivideBy64BitsX86Base");
+        _legacy64 = BindDivide64("DivideBy64Bits");
         _legacy128X86 = BindDivide("DivideBy128BitsX86Base");
         _legacy128 = BindDivide("DivideBy128Bits");
         _legacy192 = BindDivide("DivideBy192Bits");
@@ -68,6 +75,7 @@ public class WideDivideModBenchmark
 
             int shift = shape switch
             {
+                WideDivideShape.Limb0PowerOfTwo => 1 + (i % 63),
                 WideDivideShape.Limb1PowerOfTwo => 64 + (i & 63),
                 WideDivideShape.Limb2PowerOfTwo => 128 + (i & 63),
                 WideDivideShape.Limb3PowerOfTwo => 192 + (i & 63),
@@ -154,6 +162,11 @@ public class WideDivideModBenchmark
         return checksum;
     }
 
+    private static Divide64Delegate BindDivide64(string name)
+        => (Divide64Delegate)typeof(UInt256)
+            .GetMethod(name, BindingFlags.NonPublic | BindingFlags.Static)!
+            .CreateDelegate(typeof(Divide64Delegate));
+
     private static DivideDelegate BindDivide(string name)
         => (DivideDelegate)typeof(UInt256)
             .GetMethod(name, BindingFlags.NonPublic | BindingFlags.Static)!
@@ -174,7 +187,7 @@ public class WideDivideModBenchmark
         {
             _legacy192(in value, in divisor, out quotient, out remainder);
         }
-        else
+        else if (divisor.u1 != 0)
         {
             if (System.Runtime.Intrinsics.X86.X86Base.X64.IsSupported)
             {
@@ -185,18 +198,32 @@ public class WideDivideModBenchmark
                 _legacy128(in value, in divisor, out quotient, out remainder);
             }
         }
+        else
+        {
+            if (System.Runtime.Intrinsics.X86.X86Base.X64.IsSupported)
+            {
+                _legacy64X86(in value, divisor.u0, out quotient, out remainder);
+            }
+            else
+            {
+                _legacy64(in value, divisor.u0, out quotient, out remainder);
+            }
+        }
     }
 
     private static WideDivideShape CorpusWeightedShape(int index)
     {
         // 717/1024 = 70.02% power-of-two hits, with the remainder covering
-        // non-power-of-two 128-, 192-, and 256-bit divisors.
+        // non-power-of-two 128-, 192-, and 256-bit divisors. The hit submix spreads evenly over all
+        // four divisor widths; no instrumentation backs the split, but excluding single-limb
+        // divisors hid the largest gap, so uniform is the more defensible default.
         int slot = (index * 37) & (BatchSize - 1);
         return slot < 717
-            ? (slot % 6) switch
+            ? (slot % 4) switch
             {
-                0 or 1 => WideDivideShape.Limb1PowerOfTwo,
-                2 or 3 => WideDivideShape.Limb2PowerOfTwo,
+                0 => WideDivideShape.Limb0PowerOfTwo,
+                1 => WideDivideShape.Limb1PowerOfTwo,
+                2 => WideDivideShape.Limb2PowerOfTwo,
                 _ => WideDivideShape.Limb3PowerOfTwo,
             }
             : WideDivideShape.NonPowerOfTwo;
@@ -208,6 +235,7 @@ public class WideDivideModBenchmark
         ulong value = 1UL << (shift & 63);
         return limb switch
         {
+            0 => new UInt256(value),
             1 => new UInt256(0, value),
             2 => new UInt256(0, 0, value),
             3 => new UInt256(0, 0, 0, value),
