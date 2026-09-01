@@ -3,6 +3,7 @@
 
 using System;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
@@ -144,7 +145,19 @@ public class MultiplyModMaxReductionTargeted
         bool carry = UInt256.AddOverflow(in lo, in hi, out result);
         if (carry)
         {
-            UInt256.Add(in result, in UInt256.One, out result);
+            ref ulong limb = ref Unsafe.AsRef(in result.u0);
+            if (++limb == 0)
+            {
+                limb = ref Unsafe.AsRef(in result.u1);
+                if (++limb == 0)
+                {
+                    limb = ref Unsafe.AsRef(in result.u2);
+                    if (++limb == 0)
+                    {
+                        Unsafe.AsRef(in result.u3)++;
+                    }
+                }
+            }
         }
 
         if (result.u3 == ulong.MaxValue && (result.u0 & result.u1 & result.u2) == ulong.MaxValue)

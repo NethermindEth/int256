@@ -357,7 +357,19 @@ public readonly partial struct UInt256
             bool carry = AddOverflow(in lo, in hi, out res);
             if (carry)
             {
-                Add(in res, in One, out res);
+                ref ulong limb = ref Unsafe.AsRef(in res.u0);
+                if (++limb == 0)
+                {
+                    limb = ref Unsafe.AsRef(in res.u1);
+                    if (++limb == 0)
+                    {
+                        limb = ref Unsafe.AsRef(in res.u2);
+                        if (++limb == 0)
+                        {
+                            Unsafe.AsRef(in res.u3)++;
+                        }
+                    }
+                }
             }
 
             if (res.u3 == ulong.MaxValue && (res.u0 & res.u1 & res.u2) == ulong.MaxValue)

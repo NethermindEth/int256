@@ -667,6 +667,10 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
             new UInt256(0, 1),
             new UInt256(0, 0, 1),
             UInt256.MaxValue - 1,
+            // Their squares force the end-around carry through one, two, and three result limbs.
+            UInt256.MaxValue - new UInt256(1UL << 32),
+            UInt256.MaxValue - new UInt256(0, 1),
+            UInt256.MaxValue - new UInt256(0, 1UL << 32),
             UInt256.MaxValue,
         ];
 
