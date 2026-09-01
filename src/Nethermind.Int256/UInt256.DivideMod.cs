@@ -502,6 +502,17 @@ public readonly partial struct UInt256
                 return;
             }
         }
+        else
+        {
+            // Single-limb divisor. The wrapper returned already for y == 0 and y == 1, so y >= 2
+            // and the shift count is never zero. Otherwise this is four dependent hardware divs.
+            ulong y0 = y.u0;
+            if ((y0 & (y0 - 1)) == 0)
+            {
+                DivideByPowerOfTwo64(in x, BitOperations.TrailingZeroCount(y0), out res);
+                return;
+            }
+        }
 
         DivideImpl(in x, in y, out res, out _);
     }
@@ -1233,6 +1244,16 @@ public readonly partial struct UInt256
             if ((y.u0 | (y1 & (y1 - 1))) == 0)
             {
                 ModByPowerOfTwo128(in x, y1 - 1, out res);
+                return;
+            }
+        }
+        else
+        {
+            // Single-limb divisor; the wrapper returned already for y == 0 and y == 1, so y >= 2.
+            ulong y0 = y.u0;
+            if ((y0 & (y0 - 1)) == 0)
+            {
+                ModByPowerOfTwo64(in x, y0 - 1, out res);
                 return;
             }
         }
@@ -2688,6 +2709,24 @@ public readonly partial struct UInt256
         }
     }
 
+    // bitShift is 1..63 here, so unlike the wider helpers there is no whole-limb case to branch on.
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void DivideByPowerOfTwo64(in UInt256 x, int bitShift, out UInt256 q)
+    {
+        // At zero, inverseShift would be 64, which C# masks back to 0 and silently corrupts every limb.
+        Debug.Assert(bitShift is >= 1 and <= 63, "divisor must be 2^1..2^63; the wrapper returns for y <= 1");
+        ulong x0 = x.u0;
+        ulong x1 = x.u1;
+        ulong x2 = x.u2;
+        ulong x3 = x.u3;
+        int inverseShift = 64 - bitShift;
+        Unsafe.SkipInit(out q);
+        Unsafe.AsRef(in q.u0) = (x0 >> bitShift) | (x1 << inverseShift);
+        Unsafe.AsRef(in q.u1) = (x1 >> bitShift) | (x2 << inverseShift);
+        Unsafe.AsRef(in q.u2) = (x2 >> bitShift) | (x3 << inverseShift);
+        Unsafe.AsRef(in q.u3) = x3 >> bitShift;
+    }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void DivideByPowerOfTwo128(in UInt256 x, int bitShift, out UInt256 q)
     {
@@ -2745,6 +2784,19 @@ public readonly partial struct UInt256
         Unsafe.AsRef(in q.u1) = 0;
         Unsafe.AsRef(in q.u2) = 0;
         Unsafe.AsRef(in q.u3) = 0;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void ModByPowerOfTwo64(in UInt256 x, ulong mask, out UInt256 remainder)
+    {
+        // mask == 0 would mean y == 1, which the wrapper already returned for.
+        Debug.Assert(mask != 0, "divisor must be 2^1..2^63; the wrapper returns for y <= 1");
+        ulong x0 = x.u0;
+        Unsafe.SkipInit(out remainder);
+        Unsafe.AsRef(in remainder.u0) = x0 & mask;
+        Unsafe.AsRef(in remainder.u1) = 0;
+        Unsafe.AsRef(in remainder.u2) = 0;
+        Unsafe.AsRef(in remainder.u3) = 0;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
