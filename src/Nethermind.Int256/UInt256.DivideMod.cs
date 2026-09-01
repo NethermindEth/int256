@@ -475,9 +475,17 @@ public readonly partial struct UInt256
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void DivideFull(in UInt256 x, in UInt256 y, out UInt256 res)
     {
-        if (y.u3 != 0)
+        ulong y3 = y.u3;
+        // Reached only when x > y, so y >= 2^255 gives 2y >= 2^256 > x and the quotient is exactly 1.
+        // One test replaces normalization, a div, the qhat correction and four products.
+        if ((long)y3 < 0)
         {
-            ulong y3 = y.u3;
+            Store4(out res, 1, 0, 0, 0);
+            return;
+        }
+
+        if (y3 != 0)
+        {
             if ((y.u0 | y.u1 | y.u2 | (y3 & (y3 - 1))) == 0)
             {
                 DivideByPowerOfTwo256(in x, BitOperations.TrailingZeroCount(y3), out res);
@@ -1220,12 +1228,20 @@ public readonly partial struct UInt256
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void ModFull(in UInt256 x, in UInt256 y, out UInt256 res)
     {
-        if (y.u3 != 0)
+        ulong y3 = y.u3;
+        if (y3 != 0)
         {
-            ulong y3 = y.u3;
             if ((y.u0 | y.u1 | y.u2 | (y3 & (y3 - 1))) == 0)
             {
                 ModByPowerOfTwo256(in x, y3 - 1, out res);
+                return;
+            }
+
+            // Reached only when x > y, so y >= 2^255 gives 2y >= 2^256 > x: the quotient is 1 and
+            // the remainder is the plain difference, which cannot borrow out of limb 3.
+            if ((long)y3 < 0)
+            {
+                SubtractExact(in x, in y, out res);
                 return;
             }
         }
@@ -2707,6 +2723,19 @@ public readonly partial struct UInt256
                 DivideBy64Bits(in x, y.u0, out quotient, out remainder);
             }
         }
+    }
+
+    // x - y where the caller has established x > y, so the final borrow is always zero.
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void SubtractExact(in UInt256 x, in UInt256 y, out UInt256 res)
+    {
+        ulong borrow = 0;
+        ulong r0 = Sub(x.u0, y.u0, ref borrow);
+        ulong r1 = Sub(x.u1, y.u1, ref borrow);
+        ulong r2 = Sub(x.u2, y.u2, ref borrow);
+        ulong r3 = Sub(x.u3, y.u3, ref borrow);
+        Debug.Assert(borrow == 0, "callers must establish x > y before subtracting");
+        Store4(out res, r0, r1, r2, r3);
     }
 
     // bitShift is 1..63 here, so unlike the wider helpers there is no whole-limb case to branch on.
