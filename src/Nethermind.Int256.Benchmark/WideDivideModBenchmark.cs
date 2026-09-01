@@ -28,12 +28,14 @@ public enum WideDivideShape
 public class WideDivideModBenchmark
 {
     private delegate void DivideDelegate(in UInt256 x, in UInt256 y, out UInt256 quotient, out UInt256 remainder);
+    private delegate void OperationDelegate(in UInt256 x, in UInt256 y, out UInt256 result);
 
     private const int BatchSize = 1024;
 
     private readonly UInt256[] _values = new UInt256[BatchSize];
     private readonly UInt256[] _divisors = new UInt256[BatchSize];
-    private DivideDelegate _current = null!;
+    private OperationDelegate _currentDivide = null!;
+    private OperationDelegate _currentMod = null!;
     private DivideDelegate _legacy128X86 = null!;
     private DivideDelegate _legacy128 = null!;
     private DivideDelegate _legacy192 = null!;
@@ -50,11 +52,12 @@ public class WideDivideModBenchmark
     [GlobalSetup]
     public void Setup()
     {
-        _current = Bind("DivideImpl");
-        _legacy128X86 = Bind("DivideBy128BitsX86Base");
-        _legacy128 = Bind("DivideBy128Bits");
-        _legacy192 = Bind("DivideBy192Bits");
-        _legacy256 = Bind("DivideBy256Bits");
+        _currentDivide = BindOperation("DivideFull");
+        _currentMod = BindOperation("ModFull");
+        _legacy128X86 = BindDivide("DivideBy128BitsX86Base");
+        _legacy128 = BindDivide("DivideBy128Bits");
+        _legacy192 = BindDivide("DivideBy192Bits");
+        _legacy256 = BindDivide("DivideBy256Bits");
 
         Random random = new(0x44495632);
         for (int i = 0; i < BatchSize; i++)
@@ -89,7 +92,8 @@ public class WideDivideModBenchmark
 
         for (int i = 0; i < BatchSize; i++)
         {
-            _current(in _values[i], in _divisors[i], out UInt256 currentQuotient, out UInt256 currentRemainder);
+            _currentDivide(in _values[i], in _divisors[i], out UInt256 currentQuotient);
+            _currentMod(in _values[i], in _divisors[i], out UInt256 currentRemainder);
             Legacy(in _values[i], in _divisors[i], out UInt256 legacyQuotient, out UInt256 legacyRemainder);
             if (!currentQuotient.Equals(legacyQuotient) || !currentRemainder.Equals(legacyRemainder))
             {
@@ -104,7 +108,7 @@ public class WideDivideModBenchmark
         ulong checksum = 0;
         for (int i = 0; i < BatchSize; i++)
         {
-            _current(in _values[i], in _divisors[i], out UInt256 quotient, out _);
+            _currentDivide(in _values[i], in _divisors[i], out UInt256 quotient);
             checksum ^= Fold(quotient);
         }
 
@@ -130,7 +134,7 @@ public class WideDivideModBenchmark
         ulong checksum = 0;
         for (int i = 0; i < BatchSize; i++)
         {
-            _current(in _values[i], in _divisors[i], out _, out UInt256 remainder);
+            _currentMod(in _values[i], in _divisors[i], out UInt256 remainder);
             checksum ^= Fold(remainder);
         }
 
@@ -150,10 +154,15 @@ public class WideDivideModBenchmark
         return checksum;
     }
 
-    private static DivideDelegate Bind(string name)
+    private static DivideDelegate BindDivide(string name)
         => (DivideDelegate)typeof(UInt256)
             .GetMethod(name, BindingFlags.NonPublic | BindingFlags.Static)!
             .CreateDelegate(typeof(DivideDelegate));
+
+    private static OperationDelegate BindOperation(string name)
+        => (OperationDelegate)typeof(UInt256)
+            .GetMethod(name, BindingFlags.NonPublic | BindingFlags.Static)!
+            .CreateDelegate(typeof(OperationDelegate));
 
     private void Legacy(in UInt256 value, in UInt256 divisor, out UInt256 quotient, out UInt256 remainder)
     {

@@ -442,15 +442,39 @@ public readonly partial struct UInt256
     }
 
     [SkipLocalsInit]
-    // Slow path is isolated so the wrapper can tailcall it and avoid stack temps like "out _ remainder".
+    // Keep full-width division isolated from the wrapper's inexpensive compare-only exits.
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void DivideFull(in UInt256 x, in UInt256 y, out UInt256 res)
     {
-        // Full 256-bit division. We discard the remainder via out _.
-        // Keeping this in a separate method prevents the wrapper from needing
-        // a 32-byte stack slot for the remainder, which would otherwise force
-        // a larger frame and extra stores even on fast exits.
-        DivideImpl(x, y, out res, out _);
+        if (y.u3 != 0)
+        {
+            ulong y3 = y.u3;
+            if ((y.u0 | y.u1 | y.u2 | (y3 & (y3 - 1))) == 0)
+            {
+                DivideByPowerOfTwo256(in x, BitOperations.TrailingZeroCount(y3), out res);
+                return;
+            }
+        }
+        else if (y.u2 != 0)
+        {
+            ulong y2 = y.u2;
+            if ((y.u0 | y.u1 | (y2 & (y2 - 1))) == 0)
+            {
+                DivideByPowerOfTwo192(in x, BitOperations.TrailingZeroCount(y2), out res);
+                return;
+            }
+        }
+        else if (y.u1 != 0)
+        {
+            ulong y1 = y.u1;
+            if ((y.u0 | (y1 & (y1 - 1))) == 0)
+            {
+                DivideByPowerOfTwo128(in x, BitOperations.TrailingZeroCount(y1), out res);
+                return;
+            }
+        }
+
+        DivideImpl(in x, in y, out res, out _);
     }
 
     [SkipLocalsInit]
@@ -1156,7 +1180,35 @@ public readonly partial struct UInt256
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void ModFull(in UInt256 x, in UInt256 y, out UInt256 res)
     {
-        DivideImpl(x, y, out _, out res);
+        if (y.u3 != 0)
+        {
+            ulong y3 = y.u3;
+            if ((y.u0 | y.u1 | y.u2 | (y3 & (y3 - 1))) == 0)
+            {
+                ModByPowerOfTwo256(in x, y3 - 1, out res);
+                return;
+            }
+        }
+        else if (y.u2 != 0)
+        {
+            ulong y2 = y.u2;
+            if ((y.u0 | y.u1 | (y2 & (y2 - 1))) == 0)
+            {
+                ModByPowerOfTwo192(in x, y2 - 1, out res);
+                return;
+            }
+        }
+        else if (y.u1 != 0)
+        {
+            ulong y1 = y.u1;
+            if ((y.u0 | (y1 & (y1 - 1))) == 0)
+            {
+                ModByPowerOfTwo128(in x, y1 - 1, out res);
+                return;
+            }
+        }
+
+        DivideImpl(in x, in y, out _, out res);
     }
 
     [SkipLocalsInit]
@@ -2364,40 +2416,21 @@ public readonly partial struct UInt256
     // - x != y
     // - x is not uint64-only
     //
-    // This implementation returns quotient only (fastest for Divide()).
-    // If you need remainder too, keep the same core but unnormalise the final u-limbs.
+    // Dispatches to the general division routines, which produce both quotient and remainder.
     [SkipLocalsInit]
     private static void DivideImpl(in UInt256 x, in UInt256 y, out UInt256 quotient, out UInt256 remainder)
     {
         if (y.u3 != 0)
         {
-            if ((y.u0 | y.u1 | y.u2) == 0 && (y.u3 & (y.u3 - 1)) == 0)
-            {
-                DivideByPowerOfTwoWide(in x, 192 + BitOperations.TrailingZeroCount(y.u3), out quotient, out remainder);
-            }
-            else
-            {
-                DivideBy256Bits(in x, in y, out quotient, out remainder);
-            }
+            DivideBy256Bits(in x, in y, out quotient, out remainder);
         }
         else if (y.u2 != 0)
         {
-            if ((y.u0 | y.u1) == 0 && (y.u2 & (y.u2 - 1)) == 0)
-            {
-                DivideByPowerOfTwoWide(in x, 128 + BitOperations.TrailingZeroCount(y.u2), out quotient, out remainder);
-            }
-            else
-            {
-                DivideBy192Bits(in x, in y, out quotient, out remainder);
-            }
+            DivideBy192Bits(in x, in y, out quotient, out remainder);
         }
         else if (y.u1 != 0)
         {
-            if (y.u0 == 0 && (y.u1 & (y.u1 - 1)) == 0)
-            {
-                DivideByPowerOfTwoWide(in x, 64 + BitOperations.TrailingZeroCount(y.u1), out quotient, out remainder);
-            }
-            else if (X86Base.X64.IsSupported)
+            if (X86Base.X64.IsSupported)
             {
                 DivideBy128BitsX86Base(in x, in y, out quotient, out remainder);
             }
@@ -2419,61 +2452,102 @@ public readonly partial struct UInt256
         }
     }
 
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void DivideByPowerOfTwoWide(in UInt256 x, int shift, out UInt256 q, out UInt256 remainder)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void DivideByPowerOfTwo128(in UInt256 x, int bitShift, out UInt256 q)
+    {
+        ulong x1 = x.u1;
+        ulong x2 = x.u2;
+        ulong x3 = x.u3;
+        Unsafe.SkipInit(out q);
+
+        if (bitShift == 0)
+        {
+            Unsafe.AsRef(in q.u0) = x1;
+            Unsafe.AsRef(in q.u1) = x2;
+            Unsafe.AsRef(in q.u2) = x3;
+        }
+        else
+        {
+            int inverseShift = 64 - bitShift;
+            Unsafe.AsRef(in q.u0) = (x1 >> bitShift) | (x2 << inverseShift);
+            Unsafe.AsRef(in q.u1) = (x2 >> bitShift) | (x3 << inverseShift);
+            Unsafe.AsRef(in q.u2) = x3 >> bitShift;
+        }
+
+        Unsafe.AsRef(in q.u3) = 0;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void DivideByPowerOfTwo192(in UInt256 x, int bitShift, out UInt256 q)
+    {
+        ulong x2 = x.u2;
+        ulong x3 = x.u3;
+        Unsafe.SkipInit(out q);
+
+        if (bitShift == 0)
+        {
+            Unsafe.AsRef(in q.u0) = x2;
+            Unsafe.AsRef(in q.u1) = x3;
+        }
+        else
+        {
+            int inverseShift = 64 - bitShift;
+            Unsafe.AsRef(in q.u0) = (x2 >> bitShift) | (x3 << inverseShift);
+            Unsafe.AsRef(in q.u1) = x3 >> bitShift;
+        }
+
+        Unsafe.AsRef(in q.u2) = 0;
+        Unsafe.AsRef(in q.u3) = 0;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void DivideByPowerOfTwo256(in UInt256 x, int bitShift, out UInt256 q)
+    {
+        ulong x3 = x.u3;
+        Unsafe.SkipInit(out q);
+        Unsafe.AsRef(in q.u0) = x3 >> bitShift;
+        Unsafe.AsRef(in q.u1) = 0;
+        Unsafe.AsRef(in q.u2) = 0;
+        Unsafe.AsRef(in q.u3) = 0;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void ModByPowerOfTwo128(in UInt256 x, ulong mask, out UInt256 remainder)
+    {
+        ulong x0 = x.u0;
+        ulong x1 = x.u1;
+        Unsafe.SkipInit(out remainder);
+        Unsafe.AsRef(in remainder.u0) = x0;
+        Unsafe.AsRef(in remainder.u1) = x1 & mask;
+        Unsafe.AsRef(in remainder.u2) = 0;
+        Unsafe.AsRef(in remainder.u3) = 0;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void ModByPowerOfTwo192(in UInt256 x, ulong mask, out UInt256 remainder)
+    {
+        ulong x0 = x.u0;
+        ulong x1 = x.u1;
+        ulong x2 = x.u2;
+        Unsafe.SkipInit(out remainder);
+        Unsafe.AsRef(in remainder.u0) = x0;
+        Unsafe.AsRef(in remainder.u1) = x1;
+        Unsafe.AsRef(in remainder.u2) = x2 & mask;
+        Unsafe.AsRef(in remainder.u3) = 0;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void ModByPowerOfTwo256(in UInt256 x, ulong mask, out UInt256 remainder)
     {
         ulong x0 = x.u0;
         ulong x1 = x.u1;
         ulong x2 = x.u2;
         ulong x3 = x.u3;
-        int limbShift = shift >> 6;
-        int bitShift = shift & 63;
-
-        if (limbShift == 1)
-        {
-            if (bitShift == 0)
-            {
-                q = Create(x1, x2, x3, 0);
-                remainder = Create(x0, 0, 0, 0);
-            }
-            else
-            {
-                int inverseShift = 64 - bitShift;
-                ulong mask = (1UL << bitShift) - 1;
-                q = Create((x1 >> bitShift) | (x2 << inverseShift), (x2 >> bitShift) | (x3 << inverseShift), x3 >> bitShift, 0);
-                remainder = Create(x0, x1 & mask, 0, 0);
-            }
-        }
-        else if (limbShift == 2)
-        {
-            if (bitShift == 0)
-            {
-                q = Create(x2, x3, 0, 0);
-                remainder = Create(x0, x1, 0, 0);
-            }
-            else
-            {
-                int inverseShift = 64 - bitShift;
-                ulong mask = (1UL << bitShift) - 1;
-                q = Create((x2 >> bitShift) | (x3 << inverseShift), x3 >> bitShift, 0, 0);
-                remainder = Create(x0, x1, x2 & mask, 0);
-            }
-        }
-        else
-        {
-            if (bitShift == 0)
-            {
-                q = Create(x3, 0, 0, 0);
-                remainder = Create(x0, x1, x2, 0);
-            }
-            else
-            {
-                int inverseShift = 64 - bitShift;
-                ulong mask = (1UL << bitShift) - 1;
-                q = Create(x3 >> bitShift, 0, 0, 0);
-                remainder = Create(x0, x1, x2, x3 & mask);
-            }
-        }
+        Unsafe.SkipInit(out remainder);
+        Unsafe.AsRef(in remainder.u0) = x0;
+        Unsafe.AsRef(in remainder.u1) = x1;
+        Unsafe.AsRef(in remainder.u2) = x2;
+        Unsafe.AsRef(in remainder.u3) = x3 & mask;
     }
 
     [SkipLocalsInit]
