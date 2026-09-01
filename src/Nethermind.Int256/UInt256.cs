@@ -724,10 +724,13 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
 
     public void Multiply(in UInt256 a, out UInt256 res) => Multiply(this, a, out res);
 
+    [SkipLocalsInit]
     public static bool MultiplyOverflow(in UInt256 x, in UInt256 y, out UInt256 res)
     {
         Multiply256To512Bit(x, y, out res, out UInt256 high);
-        return !high.IsZero;
+        // Scalar test: a vector IsZero load here would span the four scalar limb stores
+        // the multiply just made and defeat store forwarding.
+        return (high.u0 | high.u1 | high.u2 | high.u3) != 0;
     }
 
     public int BitLen =>
