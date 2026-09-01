@@ -11,6 +11,7 @@ namespace Nethermind.Int256.Benchmark;
 
 public enum NarrowMultiplyShape
 {
+    OneByOne,
     OneByTwo,
     TwoByTwo,
     ThreeByOne,
@@ -45,11 +46,20 @@ public class NarrowMultiplyDispatchBenchmark
     private MultiplyDelegate _current = null!;
     private MultiplyDelegate _large = null!;
 
+    // Every shape the dispatcher branches on, including the ones it deliberately does not
+    // specialise: a Params list that omits 1x4/2x4 cannot show what the miss path costs.
     [Params(
+        NarrowMultiplyShape.OneByOne,
         NarrowMultiplyShape.OneByTwo,
         NarrowMultiplyShape.TwoByTwo,
+        NarrowMultiplyShape.OneByThree,
         NarrowMultiplyShape.ThreeByOne,
+        NarrowMultiplyShape.TwoByThree,
         NarrowMultiplyShape.ThreeByTwo,
+        NarrowMultiplyShape.ThreeByThree,
+        NarrowMultiplyShape.OneByFour,
+        NarrowMultiplyShape.TwoByFour,
+        NarrowMultiplyShape.ThreeByFour,
         NarrowMultiplyShape.FullWidth,
         NarrowMultiplyShape.CorpusWeighted)]
     public NarrowMultiplyShape Shape { get; set; }
@@ -74,6 +84,7 @@ public class NarrowMultiplyDispatchBenchmark
 
             (int leftWidth, int rightWidth) = shape switch
             {
+                NarrowMultiplyShape.OneByOne => (1, 1),
                 NarrowMultiplyShape.OneByTwo => (1, 2),
                 NarrowMultiplyShape.TwoByTwo => (2, 2),
                 NarrowMultiplyShape.ThreeByOne => (3, 1),
