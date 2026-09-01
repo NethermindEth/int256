@@ -724,10 +724,13 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
 
     public void Multiply(in UInt256 a, out UInt256 res) => Multiply(this, a, out res);
 
+    [SkipLocalsInit]
     public static bool MultiplyOverflow(in UInt256 x, in UInt256 y, out UInt256 res)
     {
         Multiply256To512Bit(x, y, out res, out UInt256 high);
-        return !high.IsZero;
+        // Scalar test: a vector IsZero load here would span the four scalar limb stores
+        // the multiply just made and defeat store forwarding.
+        return (high.u0 | high.u1 | high.u2 | high.u3) != 0;
     }
 
     public int BitLen =>
@@ -1420,8 +1423,15 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
 
     public int CompareTo(UInt256 b) => CompareTo(in b);
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     [OverloadResolutionPriority(1)]
-    public int CompareTo(in UInt256 b) => this < b ? -1 : Equals(b) ? 0 : 1;
+    public int CompareTo(in UInt256 b)
+    {
+        if (u3 != b.u3) return u3 < b.u3 ? -1 : 1;
+        if (u2 != b.u2) return u2 < b.u2 ? -1 : 1;
+        if (u1 != b.u1) return u1 < b.u1 ? -1 : 1;
+        return u0 == b.u0 ? 0 : u0 < b.u0 ? -1 : 1;
+    }
 
     public override bool Equals(object? obj) => obj is UInt256 other && Equals(other);
 

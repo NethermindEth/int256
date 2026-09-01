@@ -651,7 +651,322 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
 {
     private const int HashDistributionSampleCount = 4096;
 
+    private static readonly BigInteger MaxUInt256Big = (BigInteger.One << 256) - BigInteger.One;
+
     public UInt256Tests() : base((BigInteger x) => (UInt256)x, (int x) => (UInt256)x, x => x, TestNumbers.UInt256Max) { }
+
+    [Test]
+    public void DivideAndMod_PowerOfTwoDivisors_MatchBigInteger()
+    {
+        UInt256[] boundaryValues =
+        [
+            UInt256.Zero,
+            UInt256.One,
+            new UInt256(ulong.MaxValue),
+            new UInt256(0, 1),
+            new UInt256(0, 0, 1),
+            UInt256.MaxValue - 1,
+            UInt256.MaxValue,
+        ];
+
+        for (int shift = 0; shift < 256; shift++)
+        {
+            UInt256 divisorValue = PowerOfTwo(shift);
+
+            foreach (UInt256 value in boundaryValues)
+            {
+                AssertResult(in value, in divisorValue);
+            }
+
+            UInt256 divisorMinusOne = divisorValue - UInt256.One;
+            UInt256 divisorPlusOne = divisorValue + UInt256.One;
+            AssertResult(in divisorMinusOne, in divisorValue);
+            AssertResult(in divisorPlusOne, in divisorValue);
+        }
+
+        Random random = new(0xD1B1DE);
+        byte[] bytes = new byte[32];
+        for (int i = 0; i < 4096; i++)
+        {
+            random.NextBytes(bytes);
+            UInt256 value = new(bytes);
+            UInt256 divisorValue = PowerOfTwo(random.Next(256));
+            AssertResult(in value, in divisorValue);
+        }
+
+        static UInt256 PowerOfTwo(int shift)
+        {
+            int limb = shift >> 6;
+            ulong value = 1UL << (shift & 63);
+            return limb switch
+            {
+                0 => new UInt256(value),
+                1 => new UInt256(0, value),
+                2 => new UInt256(0, 0, value),
+                _ => new UInt256(0, 0, 0, value),
+            };
+        }
+
+        static void AssertResult(in UInt256 value, in UInt256 divisor)
+        {
+            BigInteger dividendBigInteger = (BigInteger)value;
+            BigInteger divisorBigInteger = (BigInteger)divisor;
+            BigInteger expectedQuotient = dividendBigInteger / divisorBigInteger;
+            BigInteger expectedRemainder = dividendBigInteger % divisorBigInteger;
+
+            value.Divide(in divisor, out UInt256 quotient);
+            value.Mod(in divisor, out UInt256 remainder);
+            ((BigInteger)quotient).Should().Be(expectedQuotient);
+            ((BigInteger)remainder).Should().Be(expectedRemainder);
+
+            UInt256 aliasedValue = value;
+            aliasedValue.Divide(in divisor, out aliasedValue);
+            ((BigInteger)aliasedValue).Should().Be(expectedQuotient);
+
+            aliasedValue = value;
+            aliasedValue.Mod(in divisor, out aliasedValue);
+            ((BigInteger)aliasedValue).Should().Be(expectedRemainder);
+
+            UInt256 aliasedDivisor = divisor;
+            value.Divide(in aliasedDivisor, out aliasedDivisor);
+            ((BigInteger)aliasedDivisor).Should().Be(expectedQuotient);
+
+            aliasedDivisor = divisor;
+            value.Mod(in aliasedDivisor, out aliasedDivisor);
+            ((BigInteger)aliasedDivisor).Should().Be(expectedRemainder);
+        }
+    }
+
+    // Divide/Mod by 2^k must agree with Rsh and And, which are separate implementations reached
+    // through different dispatch. A helper that drops or misplaces a limb cannot satisfy both.
+    // Every result is written into a poisoned variable, so a limb the helper never assigns is a
+    // named failure here rather than a stale value that happens to read as zero.
+    [Test]
+    public void DivideAndMod_ByPowerOfTwo_AgreeWithShiftAndMask()
+    {
+        UInt256[] poisons =
+        [
+            new(0xaaaa_aaaa_aaaa_aaaa, 0xaaaa_aaaa_aaaa_aaaa, 0xaaaa_aaaa_aaaa_aaaa, 0xaaaa_aaaa_aaaa_aaaa),
+            new(0x5555_5555_5555_5555, 0x5555_5555_5555_5555, 0x5555_5555_5555_5555, 0x5555_5555_5555_5555),
+        ];
+
+        List<UInt256> dividends =
+        [
+            UInt256.One,
+            new UInt256(ulong.MaxValue),
+            new UInt256(0, 1),
+            new UInt256(0, 0, 1),
+            new UInt256(0, 0, 0, 1),
+            new UInt256(1, 1, 1, 1),
+            UInt256.MaxValue - UInt256.One,
+            UInt256.MaxValue,
+        ];
+        Random random = new(0x5417);
+        byte[] bytes = new byte[32];
+        for (int i = 0; i < 24; i++)
+        {
+            random.NextBytes(bytes);
+            dividends.Add(new UInt256(bytes));
+        }
+
+        for (int k = 0; k < 256; k++)
+        {
+            UInt256 divisor = UInt256.One << k;
+            UInt256 mask = divisor - UInt256.One;
+
+            foreach (UInt256 dividend in dividends)
+            {
+                UInt256.Rsh(in dividend, k, out UInt256 expectedQuotient);
+                UInt256.And(in dividend, in mask, out UInt256 expectedRemainder);
+
+                foreach (UInt256 poison in poisons)
+                {
+                    UInt256 quotient = poison;
+                    UInt256.Divide(in dividend, in divisor, out quotient);
+                    quotient.Should().Be(expectedQuotient, $"{dividend} / 2^{k}");
+
+                    UInt256 remainder = poison;
+                    UInt256.Mod(in dividend, in divisor, out remainder);
+                    remainder.Should().Be(expectedRemainder, $"{dividend} % 2^{k}");
+                }
+            }
+        }
+    }
+
+    // The power-of-two gates must reject near misses. Every other power-of-two test passes an exact
+    // power of two, so a gate that also accepted 2^k-1 or 2^k+1 would shift instead of dividing and
+    // nothing would fail: 2^k-1 has a trailing-zero count of 0, which the narrow helper cannot take.
+    [Test]
+    public void DivideAndMod_NearPowerOfTwoDivisors_StillDivide()
+    {
+        List<UInt256> dividends =
+        [
+            new UInt256(0, 1),
+            new UInt256(0, 0, 0, 1),
+            new UInt256(ulong.MaxValue, 0, ulong.MaxValue, 0),
+            UInt256.MaxValue - UInt256.One,
+            UInt256.MaxValue,
+        ];
+        Random random = new(0x9EA12);
+        byte[] bytes = new byte[32];
+        for (int i = 0; i < 8; i++)
+        {
+            random.NextBytes(bytes);
+            dividends.Add(new UInt256(bytes));
+        }
+
+        for (int k = 1; k < 256; k++)
+        {
+            UInt256 powerOfTwo = UInt256.One << k;
+
+            List<UInt256> divisors =
+            [
+                powerOfTwo - UInt256.One,            // all bits below k set; trailing zeros = 0
+                powerOfTwo | UInt256.One,            // sets a bit in the low limb, which the gates OR in
+            ];
+            if (k >= 2)
+            {
+                divisors.Add(powerOfTwo | (UInt256.One << (k - 1)));  // two adjacent bits
+            }
+            if (k < 255)
+            {
+                divisors.Add(powerOfTwo | (UInt256.One << (k + 1)));  // bit above the candidate
+            }
+
+            // One divisor per limb strictly below the candidate's, so every OR term in every gate
+            // has an input that only that term rejects. Bits at k-1 and k+1 are not enough: for a
+            // candidate in limb 3, neither ever lands alone in limb 1, and dropping just that term
+            // from the gate would otherwise go unnoticed.
+            for (int lowerLimb = 1; lowerLimb < k >> 6; lowerLimb++)
+            {
+                divisors.Add(powerOfTwo | (UInt256.One << (lowerLimb * 64)));
+            }
+
+            foreach (UInt256 divisor in divisors)
+            {
+                BigInteger divisorBig = (BigInteger)divisor;
+
+                foreach (UInt256 dividend in dividends)
+                {
+                    AssertDivMod(in dividend, in divisor);
+                }
+
+                // Quotient-boundary dividends. A gate that wrongly accepts a near miss shifts by the
+                // candidate's bit position instead of dividing, and for a random dividend that answer
+                // is coincidentally correct with probability about 1 - 2^-64. Only dividends straddling
+                // a multiple of the divisor separate the two, so the near-miss divisors above are
+                // worthless without these.
+                // The round-up values zero the dividend's low limbs, which is the only way to make a
+                // borrow cross a limb during x - y. Without them the subtract on the quotient-1 path
+                // is only ever exercised on operands where every limb subtracts cleanly.
+                foreach (BigInteger boundary in (BigInteger[])
+                    [divisorBig + 1, divisorBig * 2, divisorBig * 2 + 1, divisorBig * 3 - 1,
+                     ((divisorBig >> 64) + 1) << 64, ((divisorBig >> 128) + 1) << 128,
+                     ((divisorBig >> 192) + 1) << 192])
+                {
+                    if (boundary <= MaxUInt256Big)
+                    {
+                        UInt256 dividend = (UInt256)boundary;
+                        AssertDivMod(in dividend, in divisor);
+                    }
+                }
+            }
+        }
+
+        static void AssertDivMod(in UInt256 dividend, in UInt256 divisor)
+        {
+            BigInteger dividendBig = (BigInteger)dividend;
+            BigInteger divisorBig = (BigInteger)divisor;
+
+            UInt256.Divide(in dividend, in divisor, out UInt256 quotient);
+            ((BigInteger)quotient).Should().Be(dividendBig / divisorBig, $"{dividendBig} / {divisorBig}");
+
+            UInt256.Mod(in dividend, in divisor, out UInt256 remainder);
+            ((BigInteger)remainder).Should().Be(dividendBig % divisorBig, $"{dividendBig} % {divisorBig}");
+        }
+    }
+
+    [Test]
+    public void MultiplyMod_by_max_value_matches_BigInteger()
+    {
+        Random random = new(0);
+        byte[] operands = new byte[64];
+        UInt256[] boundaryValues =
+        [
+            default,
+            UInt256.One,
+            new UInt256(2),
+            new UInt256(ulong.MaxValue),
+            new UInt256(0, 1),
+            new UInt256(0, 0, 1),
+            UInt256.MaxValue - 1,
+            // Their squares force the end-around carry through one, two, and three result limbs.
+            UInt256.MaxValue - new UInt256(1UL << 32),
+            UInt256.MaxValue - new UInt256(0, 1),
+            UInt256.MaxValue - new UInt256(0, 1UL << 32),
+            UInt256.MaxValue,
+        ];
+
+        foreach (UInt256 x in boundaryValues)
+        {
+            foreach (UInt256 y in boundaryValues)
+            {
+                AssertResult(in x, in y);
+            }
+        }
+
+        for (int i = 0; i < 4096; i++)
+        {
+            random.NextBytes(operands);
+            AssertResult(new UInt256(operands.AsSpan(0, 32)), new UInt256(operands.AsSpan(32, 32)));
+        }
+
+        static void AssertResult(in UInt256 x, in UInt256 y)
+        {
+            BigInteger expected = (BigInteger)x * (BigInteger)y % TestNumbers.UInt256Max;
+
+            UInt256.MultiplyMod(in x, in y, in UInt256.MaxValue, out UInt256 result);
+            ((BigInteger)result).Should().Be(expected);
+
+            UInt256 left = x;
+            UInt256 modulus = UInt256.MaxValue;
+            left.MultiplyMod(in y, in modulus, out left);
+            ((BigInteger)left).Should().Be(expected);
+
+            UInt256 right = y;
+            x.MultiplyMod(in right, in modulus, out right);
+            ((BigInteger)right).Should().Be(expected);
+
+            x.MultiplyMod(in y, in modulus, out modulus);
+            ((BigInteger)modulus).Should().Be(expected);
+        }
+    }
+
+    public static TestCaseData[] UlongConstructorCases { get; } =
+    [
+        new TestCaseData(0UL, 0UL, 0UL, 0UL),
+        new TestCaseData(ulong.MaxValue, 0UL, 0UL, 0UL),
+        new TestCaseData(0UL, ulong.MaxValue, 0UL, 0UL),
+        new TestCaseData(0UL, 0UL, ulong.MaxValue, 0UL),
+        new TestCaseData(0UL, 0UL, 0UL, ulong.MaxValue),
+        new TestCaseData(0x8000_0000_0000_0000UL, 0x0123_4567_89AB_CDEFUL, 0xFEDC_BA98_7654_3210UL, 0x8000_0000_0000_0001UL),
+    ];
+
+    [TestCaseSource(nameof(UlongConstructorCases))]
+    public void UlongConstructor_WritesLimbs_AndRoundTrips(ulong u0, ulong u1, ulong u2, ulong u3)
+    {
+        UInt256 value = new(u0, u1, u2, u3);
+
+        value.u0.Should().Be(u0);
+        value.u1.Should().Be(u1);
+        value.u2.Should().Be(u2);
+        value.u3.Should().Be(u3);
+
+        BigInteger expected = (BigInteger)u0 + ((BigInteger)u1 << 64) + ((BigInteger)u2 << 128) + ((BigInteger)u3 << 192);
+        ((BigInteger)value).Should().Be(expected);
+        new UInt256(value.ToLittleEndian()).Should().Be(value);
+        new UInt256(value.ToBigEndian(), isBigEndian: true).Should().Be(value);
+    }
 
     public static IEnumerable<(UInt256 A, ulong A4, ulong D)> Remainder257By64BitsCases
     {
