@@ -653,6 +653,88 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
 
     public UInt256Tests() : base((BigInteger x) => (UInt256)x, (int x) => (UInt256)x, x => x, TestNumbers.UInt256Max) { }
 
+    [Test]
+    public void MultiplyMod_by_max_value_matches_BigInteger()
+    {
+        Random random = new(0);
+        byte[] operands = new byte[64];
+        UInt256[] boundaryValues =
+        [
+            default,
+            UInt256.One,
+            new UInt256(2),
+            new UInt256(ulong.MaxValue),
+            new UInt256(0, 1),
+            new UInt256(0, 0, 1),
+            UInt256.MaxValue - 1,
+            // Their squares force the end-around carry through one, two, and three result limbs.
+            UInt256.MaxValue - new UInt256(1UL << 32),
+            UInt256.MaxValue - new UInt256(0, 1),
+            UInt256.MaxValue - new UInt256(0, 1UL << 32),
+            UInt256.MaxValue,
+        ];
+
+        foreach (UInt256 x in boundaryValues)
+        {
+            foreach (UInt256 y in boundaryValues)
+            {
+                AssertResult(in x, in y);
+            }
+        }
+
+        for (int i = 0; i < 4096; i++)
+        {
+            random.NextBytes(operands);
+            AssertResult(new UInt256(operands.AsSpan(0, 32)), new UInt256(operands.AsSpan(32, 32)));
+        }
+
+        static void AssertResult(in UInt256 x, in UInt256 y)
+        {
+            BigInteger expected = (BigInteger)x * (BigInteger)y % TestNumbers.UInt256Max;
+
+            UInt256.MultiplyMod(in x, in y, in UInt256.MaxValue, out UInt256 result);
+            ((BigInteger)result).Should().Be(expected);
+
+            UInt256 left = x;
+            UInt256 modulus = UInt256.MaxValue;
+            left.MultiplyMod(in y, in modulus, out left);
+            ((BigInteger)left).Should().Be(expected);
+
+            UInt256 right = y;
+            x.MultiplyMod(in right, in modulus, out right);
+            ((BigInteger)right).Should().Be(expected);
+
+            x.MultiplyMod(in y, in modulus, out modulus);
+            ((BigInteger)modulus).Should().Be(expected);
+        }
+    }
+
+    public static TestCaseData[] UlongConstructorCases { get; } =
+    [
+        new TestCaseData(0UL, 0UL, 0UL, 0UL),
+        new TestCaseData(ulong.MaxValue, 0UL, 0UL, 0UL),
+        new TestCaseData(0UL, ulong.MaxValue, 0UL, 0UL),
+        new TestCaseData(0UL, 0UL, ulong.MaxValue, 0UL),
+        new TestCaseData(0UL, 0UL, 0UL, ulong.MaxValue),
+        new TestCaseData(0x8000_0000_0000_0000UL, 0x0123_4567_89AB_CDEFUL, 0xFEDC_BA98_7654_3210UL, 0x8000_0000_0000_0001UL),
+    ];
+
+    [TestCaseSource(nameof(UlongConstructorCases))]
+    public void UlongConstructor_WritesLimbs_AndRoundTrips(ulong u0, ulong u1, ulong u2, ulong u3)
+    {
+        UInt256 value = new(u0, u1, u2, u3);
+
+        value.u0.Should().Be(u0);
+        value.u1.Should().Be(u1);
+        value.u2.Should().Be(u2);
+        value.u3.Should().Be(u3);
+
+        BigInteger expected = (BigInteger)u0 + ((BigInteger)u1 << 64) + ((BigInteger)u2 << 128) + ((BigInteger)u3 << 192);
+        ((BigInteger)value).Should().Be(expected);
+        new UInt256(value.ToLittleEndian()).Should().Be(value);
+        new UInt256(value.ToBigEndian(), isBigEndian: true).Should().Be(value);
+    }
+
     public static IEnumerable<(UInt256 A, ulong A4, ulong D)> Remainder257By64BitsCases
     {
         get

@@ -351,6 +351,35 @@ public readonly partial struct UInt256
             return;
         }
 
+        if (m.u3 == ulong.MaxValue && (m.u0 & m.u1 & m.u2) == ulong.MaxValue)
+        {
+            // 2^256 is congruent to 1 modulo 2^256 - 1, so fold the high half into the low half.
+            bool carry = AddOverflow(in lo, in hi, out res);
+            if (carry)
+            {
+                ref ulong limb = ref Unsafe.AsRef(in res.u0);
+                if (++limb == 0)
+                {
+                    limb = ref Unsafe.AsRef(in res.u1);
+                    if (++limb == 0)
+                    {
+                        limb = ref Unsafe.AsRef(in res.u2);
+                        if (++limb == 0)
+                        {
+                            Unsafe.AsRef(in res.u3)++;
+                        }
+                    }
+                }
+            }
+
+            if (res.u3 == ulong.MaxValue && (res.u0 & res.u1 & res.u2) == ulong.MaxValue)
+            {
+                res = default;
+            }
+
+            return;
+        }
+
         if (m.u3 != 0)
         {
             Remainder512By256Bits(in lo, in hi, in m, out res);
