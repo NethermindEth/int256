@@ -672,8 +672,6 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
         AssertSubtractUnderflow(test.A, new UInt256(test.B));
     }
 
-<<<<<<< HEAD
-=======
     // The vector path speculates that no zero limb receives a borrow; these operands force the propagation path.
     public static IEnumerable<(UInt256 A, UInt256 B)> SubtractBorrowThroughZeroLimbCases =>
     [
@@ -726,7 +724,6 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
         }
     }
 
->>>>>>> caef700 (test: cover borrow propagation through zero limbs and one-limb subtraction)
     [Test]
     public void SubtractUnderflow_random_full_left_and_uint64_right_match_BigInteger_oracle_and_aliases()
     {
@@ -743,8 +740,6 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
         }
     }
 
-<<<<<<< HEAD
-=======
     [Test]
     public void SubtractUnderflow_random_wide_pairs_match_BigInteger_oracle_and_aliases()
     {
@@ -767,7 +762,6 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
         }
     }
 
->>>>>>> caef700 (test: cover borrow propagation through zero limbs and one-limb subtraction)
     private static ulong RandomSubtractOperand(Random random)
         => ((ulong)random.NextInt64() << 1) | (uint)random.Next(2);
 
@@ -785,12 +779,9 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
         ((BigInteger)result).Should().Be(expectedResult);
         underflow.Should().Be(expectedUnderflow);
 
-<<<<<<< HEAD
-=======
         UInt256.Subtract(in a, in b, out UInt256 plain);
         ((BigInteger)plain).Should().Be(expectedResult);
 
->>>>>>> caef700 (test: cover borrow propagation through zero limbs and one-limb subtraction)
         UInt256 aliasedA = a;
         underflow = UInt256.SubtractUnderflow(in aliasedA, in b, out aliasedA);
         ((BigInteger)aliasedA).Should().Be(expectedResult);
@@ -800,11 +791,8 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
         underflow = UInt256.SubtractUnderflow(in a, in aliasedB, out aliasedB);
         ((BigInteger)aliasedB).Should().Be(expectedResult);
         underflow.Should().Be(expectedUnderflow);
-<<<<<<< HEAD
-=======
     }
 
->>>>>>> caef700 (test: cover borrow propagation through zero limbs and one-limb subtraction)
     [Test]
     public void DivideAndMod_PowerOfTwoDivisors_MatchBigInteger()
     {
