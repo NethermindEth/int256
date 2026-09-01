@@ -651,6 +651,8 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
 {
     private const int HashDistributionSampleCount = 4096;
 
+    private static readonly BigInteger MaxUInt256Big = (BigInteger.One << 256) - BigInteger.One;
+
     public UInt256Tests() : base((BigInteger x) => (UInt256)x, (int x) => (UInt256)x, x => x, TestNumbers.UInt256Max) { }
 
     [Test]
@@ -831,20 +833,51 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
                 divisors.Add(powerOfTwo | (UInt256.One << (k + 1)));  // bit above the candidate
             }
 
+            // One divisor per limb strictly below the candidate's, so every OR term in every gate
+            // has an input that only that term rejects. Bits at k-1 and k+1 are not enough: for a
+            // candidate in limb 3, neither ever lands alone in limb 1, and dropping just that term
+            // from the gate would otherwise go unnoticed.
+            for (int lowerLimb = 1; lowerLimb < k >> 6; lowerLimb++)
+            {
+                divisors.Add(powerOfTwo | (UInt256.One << (lowerLimb * 64)));
+            }
+
             foreach (UInt256 divisor in divisors)
             {
                 BigInteger divisorBig = (BigInteger)divisor;
+
                 foreach (UInt256 dividend in dividends)
                 {
-                    BigInteger dividendBig = (BigInteger)dividend;
+                    AssertDivMod(in dividend, in divisor);
+                }
 
-                    UInt256.Divide(in dividend, in divisor, out UInt256 quotient);
-                    ((BigInteger)quotient).Should().Be(dividendBig / divisorBig, $"{dividendBig} / {divisorBig}");
-
-                    UInt256.Mod(in dividend, in divisor, out UInt256 remainder);
-                    ((BigInteger)remainder).Should().Be(dividendBig % divisorBig, $"{dividendBig} % {divisorBig}");
+                // Quotient-boundary dividends. A gate that wrongly accepts a near miss shifts by the
+                // candidate's bit position instead of dividing, and for a random dividend that answer
+                // is coincidentally correct with probability about 1 - 2^-64. Only dividends straddling
+                // a multiple of the divisor separate the two, so the near-miss divisors above are
+                // worthless without these.
+                foreach (BigInteger boundary in (BigInteger[])
+                    [divisorBig + 1, divisorBig * 2, divisorBig * 2 + 1, divisorBig * 3 - 1])
+                {
+                    if (boundary <= MaxUInt256Big)
+                    {
+                        UInt256 dividend = (UInt256)boundary;
+                        AssertDivMod(in dividend, in divisor);
+                    }
                 }
             }
+        }
+
+        static void AssertDivMod(in UInt256 dividend, in UInt256 divisor)
+        {
+            BigInteger dividendBig = (BigInteger)dividend;
+            BigInteger divisorBig = (BigInteger)divisor;
+
+            UInt256.Divide(in dividend, in divisor, out UInt256 quotient);
+            ((BigInteger)quotient).Should().Be(dividendBig / divisorBig, $"{dividendBig} / {divisorBig}");
+
+            UInt256.Mod(in dividend, in divisor, out UInt256 remainder);
+            ((BigInteger)remainder).Should().Be(dividendBig % divisorBig, $"{dividendBig} % {divisorBig}");
         }
     }
 
