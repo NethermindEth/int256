@@ -856,8 +856,13 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
                 // is coincidentally correct with probability about 1 - 2^-64. Only dividends straddling
                 // a multiple of the divisor separate the two, so the near-miss divisors above are
                 // worthless without these.
+                // The round-up values zero the dividend's low limbs, which is the only way to make a
+                // borrow cross a limb during x - y. Without them the subtract on the quotient-1 path
+                // is only ever exercised on operands where every limb subtracts cleanly.
                 foreach (BigInteger boundary in (BigInteger[])
-                    [divisorBig + 1, divisorBig * 2, divisorBig * 2 + 1, divisorBig * 3 - 1])
+                    [divisorBig + 1, divisorBig * 2, divisorBig * 2 + 1, divisorBig * 3 - 1,
+                     ((divisorBig >> 64) + 1) << 64, ((divisorBig >> 128) + 1) << 128,
+                     ((divisorBig >> 192) + 1) << 192])
                 {
                     if (boundary <= MaxUInt256Big)
                     {

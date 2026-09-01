@@ -203,10 +203,10 @@ public readonly partial struct UInt256
 
         if (x.IsUint64)
         {
-            // If y > x it has already be handled by caller
-            ulong quot = x.u0 / y.u0;
-            ulong rem = x.u0 - (quot * y.u0);
-            res = Create(rem, 0, 0, 0);
+            // If y > x it has already be handled by caller.
+            // One div leaves the remainder in rdx; reconstructing it from the quotient instead put a
+            // dependent imul on the critical path for a value that instruction already produced.
+            res = Create(x.u0 % y.u0, 0, 0, 0);
             return;
         }
 
@@ -2974,25 +2974,19 @@ public readonly partial struct UInt256
         }
 
         ulong vRecip = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(v2n);
-        ulong qhat, rhat, rcarry;
-        if (u4d == v2n)
+        // The saturating u4d == v2n case cannot arise on the first digit: at shift 0 u4d is 0,
+        // otherwise u4d = x.u3 >> (64 - shift) <= 2^63 - 1 while normalised v2n >= 2^63. The divide
+        // is therefore unconditionally safe and needs no guard. The second digit below does need it.
+        Debug.Assert(u4d < v2n, "first quotient digit cannot saturate after normalisation");
+        ulong qhat, rhat;
+        ulong rcarry = 0;
+        if (X86Base.X64.IsSupported)
         {
-            qhat = ulong.MaxValue;
-            ulong sum = u3d + v2n;
-            rcarry = (sum < u3d) ? 1UL : 0UL;
-            rhat = sum;
+            (qhat, rhat) = X86Base.X64.DivRem(u3d, u4d, v2n); // (upper:lower) = (u4d:u3d)
         }
         else
         {
-            if (X86Base.X64.IsSupported)
-            {
-                (qhat, rhat) = X86Base.X64.DivRem(u3d, u4d, v2n); // (upper:lower) = (u4d:u3d)
-            }
-            else
-            {
-                qhat = UDivRem2By1(u4d, vRecip, v2n, u3d, out rhat);
-            }
-            rcarry = 0;
+            qhat = UDivRem2By1(u4d, vRecip, v2n, u3d, out rhat);
         }
 
         if (rcarry == 0)
@@ -3166,25 +3160,18 @@ public readonly partial struct UInt256
         }
 
         ulong vRecip = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(v.u3);
-        ulong qhat, rhat, rcarry;
-        if (u4d == v.u3)
+        // Only one quotient digit here, and it cannot saturate: at shift 0 u4d is 0, otherwise
+        // u4d = x.u3 >> (64 - shift) <= 2^63 - 1 while normalised v.u3 >= 2^63.
+        Debug.Assert(u4d < v.u3, "the single quotient digit cannot saturate after normalisation");
+        ulong qhat, rhat;
+        ulong rcarry = 0;
+        if (X86Base.X64.IsSupported)
         {
-            qhat = ulong.MaxValue;
-            ulong sum = u.u3 + v.u3;
-            rcarry = (sum < u.u3) ? 1UL : 0UL;
-            rhat = sum;
+            (qhat, rhat) = X86Base.X64.DivRem(u.u3, u4d, v.u3); // (upper:lower) = (u4d:u.u3)
         }
         else
         {
-            if (X86Base.X64.IsSupported)
-            {
-                (qhat, rhat) = X86Base.X64.DivRem(u.u3, u4d, v.u3); // (upper:lower) = (u4d:u.u3)
-            }
-            else
-            {
-                qhat = UDivRem2By1(u4d, vRecip, v.u3, u.u3, out rhat);
-            }
-            rcarry = 0;
+            qhat = UDivRem2By1(u4d, vRecip, v.u3, u.u3, out rhat);
         }
 
         if (rcarry == 0)
