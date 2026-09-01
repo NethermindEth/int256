@@ -141,9 +141,17 @@ public class NarrowMultiplyDispatchBenchmark
 
     private static NarrowMultiplyShape CorpusWeightedShape(int index)
     {
-        // 220/1024 = 21.484% candidate hits, matching the measured 329,233/1,532,234
-        // supported shapes for wide-modulus MultiplyMod calls. The hit submix follows
-        // the measured shape distribution; misses retain the dominant wide operands.
+        // 220/1024 = 21.484% of calls were eligible under the original both-operands-narrow
+        // gate, matching the measured 329,233/1,532,234 wide-modulus MultiplyMod calls. Width
+        // dispatch specialises far more of it: 2x4 and 1x4 sit in the block below and are now
+        // handled too, so the current hit rate over this mix is 628/1024 = 61.3%.
+        //
+        // Two caveats on the hit submix, for whoever holds the instrumentation data. The 195..219
+        // slots fall to TwoByThree through the catch-all, giving it 25 of the 220 hit slots while
+        // its mirror ThreeByTwo gets 1 - a 25x asymmetry between the same shape's two operand
+        // orders. The miss submix below instead uses explicit ranges that account for every slot.
+        // If those 25 slots belong elsewhere, any corpus-weighted ratio quoted from this mix
+        // shifts with them.
         int hitSlot = (index * 37) & (BatchSize - 1);
         if (hitSlot < 220)
         {

@@ -2369,10 +2369,12 @@ public readonly partial struct UInt256
         Multiply256To512BitLarge(in x, in y, out low, out high);
     }
 
-    // Scalar stores: callers read the result back a limb at a time, so a 32-byte zeroing
-    // store partially overwritten by limb stores would block store-to-load forwarding.
-    // Every helper stores high after low, so a caller that passes one variable for both
-    // gets the same half whichever helper the width dispatch picked.
+    // Scalar limb stores, matching Multiply256To512BitLarge. This suits the callers that read
+    // the result a limb at a time; it does not suit the max-modulus fold below, which reloads
+    // both halves as 32-byte vectors and cannot forward from four 8-byte stores. That fold is
+    // equally affected by the full-width routine, so the two are consistent rather than right.
+    // Every helper stores high after low, so a caller that passes one variable for both gets
+    // the same half whichever helper the width dispatch picked.
     [SkipLocalsInit]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void Store4(out UInt256 value, ulong v0, ulong v1, ulong v2, ulong v3)
@@ -2413,7 +2415,9 @@ public readonly partial struct UInt256
         ulong x0 = x.u0, x1 = x.u1;
         ulong y0 = y.u0, y1 = y.u1;
 
-        // Product scanning; measured faster than the row form at this width.
+        // Product scanning; measured faster than the row form at this width. The row bound the
+        // other helpers rely on does not apply here: h11 + carry fits because the column
+        // decomposition is exact, and a 128x128 product is below 2^256.
         ulong h00 = Multiply64(x0, y0, out ulong p0);
         ulong h01 = Multiply64(x0, y1, out ulong l01);
         ulong h10 = Multiply64(x1, y0, out ulong l10);

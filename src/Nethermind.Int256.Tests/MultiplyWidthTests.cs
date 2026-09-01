@@ -28,8 +28,17 @@ public class MultiplyWidthTests
         return (ProductDelegate)method.CreateDelegate(typeof(ProductDelegate));
     }
 
-    private static readonly ProductDelegate Dispatch = Resolve("Multiply256To512Bit");
-    private static readonly ProductDelegate FullWidth = Resolve("Multiply256To512BitLarge");
+    private static ProductDelegate Dispatch = null!;
+    private static ProductDelegate FullWidth = null!;
+
+    [OneTimeSetUp]
+    public void ResolveDispatch()
+    {
+        // Not static initialisers: a rename there surfaces as TypeInitializationException on
+        // every test instead of the message Resolve carries.
+        Dispatch = Resolve("Multiply256To512Bit");
+        FullWidth = Resolve("Multiply256To512BitLarge");
+    }
 
     private static BigInteger ToBig(in UInt256 v)
         => v.u0 | ((BigInteger)v.u1 << 64) | ((BigInteger)v.u2 << 128) | ((BigInteger)v.u3 << 192);
@@ -257,6 +266,36 @@ public class MultiplyWidthTests
     }
 
     /// <summary>
+    /// One variable for both outputs. Legal C#, and the only situation the store order affects:
+    /// whichever half is written last survives. No caller does this today, so the point is not
+    /// which half wins but that every helper agrees - otherwise the order is an undocumented
+    /// precondition that changes with the width dispatch. Seeding the inverse of that ordering
+    /// into any one helper passes the rest of this fixture, so this is the assertion that holds it.
+    /// </summary>
+    [TestCaseSource(nameof(WidthPairs))]
+    public void Both_outputs_may_be_the_same_variable(int xWidth, int yWidth)
+    {
+        foreach (UInt256 x in ValuesOfWidth(xWidth))
+        {
+            foreach (UInt256 y in ValuesOfWidth(yWidth))
+            {
+                UInt256 separateLow = Stale, separateHigh = Stale;
+                Dispatch(in x, in y, out separateLow, out separateHigh);
+
+                UInt256 both = Stale;
+                Dispatch(in x, in y, out both, out both);
+
+                if (!both.Equals(separateHigh))
+                {
+                    Assert.Fail($"{xWidth}x{yWidth}: {Show(in x)} * {Show(in y)} with one variable for " +
+                                $"both outputs gave {Show(in both)}; every helper must store high last, " +
+                                $"so it should be {Show(in separateHigh)} (low was {Show(in separateLow)})");
+                }
+            }
+        }
+    }
+
+    /// <summary>
     /// Zero is a live operand - the EVM multiplies by it - and the width generator deliberately
     /// excludes it, since a zero top limb would silently retest a narrower shape. The deleted
     /// predecessor of this fixture covered zero through one boundary pair; this covers it against
@@ -325,8 +364,7 @@ public class MultiplyWidthTests
                 BigInteger truncated = product & TestNumbers.UInt256Max;
                 bool overflows = product > TestNumbers.UInt256Max;
 
-                UInt256 unaliased = x;
-                bool plain = UInt256.MultiplyOverflow(in unaliased, in y, out UInt256 plainResult);
+                bool plain = UInt256.MultiplyOverflow(in x, in y, out UInt256 plainResult);
 
                 UInt256 left = x;
                 bool leftOverflow = UInt256.MultiplyOverflow(in left, in y, out left);
@@ -374,8 +412,8 @@ public class MultiplyWidthTests
                 yield return new TestCaseData(255, 64 * limb + 1, true).SetName($"{{m}}(high limb {limb} set)");
             }
 
-            // 2^255 * 2 - 1 worth of headroom: the largest product that still fits.
-            yield return new TestCaseData(128, 127, false).SetName("{m}(exactly 2^255, no overflow)");
+            // One bit below the boundary, then one bit over it.
+            yield return new TestCaseData(128, 127, false).SetName("{m}(2^255, no overflow)");
             yield return new TestCaseData(128, 128, true).SetName("{m}(exactly 2^256, overflow by one bit)");
             yield return new TestCaseData(0, 255, false).SetName("{m}(1 * 2^255, no overflow)");
         }
