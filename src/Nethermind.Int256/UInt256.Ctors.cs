@@ -34,21 +34,10 @@ public readonly partial struct UInt256
 
     public UInt256(ulong u0 = 0, ulong u1 = 0, ulong u2 = 0, ulong u3 = 0)
     {
-        if (Vector256.IsHardwareAccelerated)
-        {
-            Unsafe.SkipInit(out this.u0);
-            Unsafe.SkipInit(out this.u1);
-            Unsafe.SkipInit(out this.u2);
-            Unsafe.SkipInit(out this.u3);
-            Unsafe.As<ulong, Vector256<ulong>>(ref this.u0) = Vector256.Create(u0, u1, u2, u3);
-        }
-        else
-        {
-            this.u0 = u0;
-            this.u1 = u1;
-            this.u2 = u2;
-            this.u3 = u3;
-        }
+        this.u0 = u0;
+        this.u1 = u1;
+        this.u2 = u2;
+        this.u3 = u3;
     }
 
     public UInt256(in ReadOnlySpan<byte> bytes, bool isBigEndian = false)
@@ -230,21 +219,5 @@ public readonly partial struct UInt256
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static UInt256 Create(ulong u0, ulong u1, ulong u2, ulong u3)
-    {
-        if (Vector256.IsHardwareAccelerated)
-        {
-            Vector256<ulong> v = Vector256.Create(u0, u1, u2, u3);
-            return Unsafe.As<Vector256<ulong>, UInt256>(ref v);
-        }
-        else
-        {
-            Unsafe.SkipInit(out UInt256 r);
-            ref ulong p = ref Unsafe.As<UInt256, ulong>(ref r);
-            p = u0;
-            Unsafe.Add(ref p, 1) = u1;
-            Unsafe.Add(ref p, 2) = u2;
-            Unsafe.Add(ref p, 3) = u3;
-            return r;
-        }
-    }
+        => new(u0, u1, u2, u3);
 }

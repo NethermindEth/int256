@@ -653,6 +653,32 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
 
     public UInt256Tests() : base((BigInteger x) => (UInt256)x, (int x) => (UInt256)x, x => x, TestNumbers.UInt256Max) { }
 
+    public static TestCaseData[] UlongConstructorCases { get; } =
+    [
+        new TestCaseData(0UL, 0UL, 0UL, 0UL),
+        new TestCaseData(ulong.MaxValue, 0UL, 0UL, 0UL),
+        new TestCaseData(0UL, ulong.MaxValue, 0UL, 0UL),
+        new TestCaseData(0UL, 0UL, ulong.MaxValue, 0UL),
+        new TestCaseData(0UL, 0UL, 0UL, ulong.MaxValue),
+        new TestCaseData(0x8000_0000_0000_0000UL, 0x0123_4567_89AB_CDEFUL, 0xFEDC_BA98_7654_3210UL, 0x8000_0000_0000_0001UL),
+    ];
+
+    [TestCaseSource(nameof(UlongConstructorCases))]
+    public void UlongConstructor_WritesLimbs_AndRoundTrips(ulong u0, ulong u1, ulong u2, ulong u3)
+    {
+        UInt256 value = new(u0, u1, u2, u3);
+
+        value.u0.Should().Be(u0);
+        value.u1.Should().Be(u1);
+        value.u2.Should().Be(u2);
+        value.u3.Should().Be(u3);
+
+        BigInteger expected = (BigInteger)u0 + ((BigInteger)u1 << 64) + ((BigInteger)u2 << 128) + ((BigInteger)u3 << 192);
+        ((BigInteger)value).Should().Be(expected);
+        new UInt256(value.ToLittleEndian()).Should().Be(value);
+        new UInt256(value.ToBigEndian(), isBigEndian: true).Should().Be(value);
+    }
+
     public static IEnumerable<(UInt256 A, ulong A4, ulong D)> Remainder257By64BitsCases
     {
         get
