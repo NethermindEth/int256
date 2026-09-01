@@ -47,6 +47,13 @@ public class MultiplyWidthTests
     private static UInt256 Stale => new(
         0xBAAD_F00D_DEAD_BEEFUL, 0xFEED_FACE_CAFE_D00DUL, 0x1234_5678_9ABC_DEF0UL, 0xC0DE_C0DE_C0DE_C0DEUL);
 
+    /// <summary>
+    /// A second starting pattern with no limb in common with <see cref="Stale"/>, so a limb left
+    /// unwritten cannot coincidentally agree between the two runs.
+    /// </summary>
+    private static UInt256 OtherStale => new(
+        0x0F0F_0F0F_0F0F_0F0FUL, 0x5555_5555_5555_5555UL, 0xA5A5_A5A5_A5A5_A5A5UL, 0x7777_7777_7777_7777UL);
+
     // Limb patterns that make carries ripple: saturated limbs, one-off-saturated, and single bits
     // at both ends of a limb. Random limbs almost never drive a carry chain to its bound.
     private static readonly ulong[] Patterns =
@@ -213,6 +220,38 @@ public class MultiplyWidthTests
             if (actual != expected)
             {
                 Assert.Fail($"{what}: expected {expected:x}, actual {actual:x}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Every helper must write all eight result limbs, and this is where that is diagnosable.
+    /// MultiplyOverflow is [SkipLocalsInit], so its high half starts as whatever the stack held:
+    /// a helper that leaves one limb unwritten becomes a spurious overflow rather than a benign
+    /// zero. Rather than accept that failure mode, pin the invariant - run each product from two
+    /// disjoint starting patterns and require the same answer. A forgotten limb makes them differ,
+    /// and names the helper that forgot it.
+    /// </summary>
+    [TestCaseSource(nameof(WidthPairs))]
+    public void Result_does_not_depend_on_prior_output_contents(int xWidth, int yWidth)
+    {
+        foreach (UInt256 x in ValuesOfWidth(xWidth))
+        {
+            foreach (UInt256 y in ValuesOfWidth(yWidth))
+            {
+                UInt256 lowA = Stale, highA = Stale;
+                Dispatch(in x, in y, out lowA, out highA);
+
+                UInt256 lowB = OtherStale, highB = OtherStale;
+                Dispatch(in x, in y, out lowB, out highB);
+
+                if (!lowA.Equals(lowB) || !highA.Equals(highB))
+                {
+                    Assert.Fail($"{xWidth}x{yWidth}: {Show(in x)} * {Show(in y)} depends on what the " +
+                                $"output already held - a result limb is left unwritten; " +
+                                $"from Stale got {Show(in highA)} {Show(in lowA)}, " +
+                                $"from OtherStale got {Show(in highB)} {Show(in lowB)}");
+                }
             }
         }
     }
@@ -423,6 +462,17 @@ public class MultiplyWidthTests
             {
                 UInt256 low = Stale, high = Stale;
                 helper(in x, in y, out low, out high);
+
+                // Same product from a disjoint starting pattern: catches an unwritten result limb
+                // here, at the helper, instead of as a spurious overflow flag in the caller.
+                UInt256 otherLow = OtherStale, otherHigh = OtherStale;
+                helper(in x, in y, out otherLow, out otherHigh);
+                if (!otherLow.Equals(low) || !otherHigh.Equals(high))
+                {
+                    Assert.Fail($"{name} leaves a result limb unwritten: {Show(in x)} * {Show(in y)} " +
+                                $"gave {Show(in high)} {Show(in low)} from one starting pattern and " +
+                                $"{Show(in otherHigh)} {Show(in otherLow)} from another");
+                }
 
                 BigInteger expected = ToBig(in x) * ToBig(in y);
                 BigInteger actual = Product(in low, in high);
