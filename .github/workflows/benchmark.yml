@@ -28,8 +28,9 @@ jobs:
   benchmark:
     name: Benchmark (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    # Inputs are empty on push events; fall back to the dispatch defaults.
-    timeout-minutes: ${{ inputs.max-minutes || 10 }}
+    # Inputs are empty on push events; fall back to the dispatch defaults. `gh workflow run` passes the
+    # number input as a string, and timeout-minutes needs a number, hence fromJSON.
+    timeout-minutes: ${{ fromJSON(inputs.max-minutes || 10) }}
     strategy:
       fail-fast: false
       matrix:
