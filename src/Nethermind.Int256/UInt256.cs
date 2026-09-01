@@ -1291,7 +1291,18 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         }
         else
         {
-            return Math.BigMul(a, b, out low);
+            // No widening multiply instruction on this target (e.g. riscv64). Spelled out rather than
+            // deferred to Math.BigMul, which repeats the same ISA checks and then calls an
+            // out-of-line software fallback that cannot inline into the 256-bit limb loops.
+            uint al = (uint)a, ah = (uint)(a >> 32);
+            uint bl = (uint)b, bh = (uint)(b >> 32);
+
+            ulong mull = (ulong)al * bl;
+            ulong t = (ulong)ah * bl + (mull >> 32);
+            ulong tl = (ulong)al * bh + (uint)t;
+
+            low = (tl << 32) | (uint)mull;
+            return (ulong)ah * bh + (t >> 32) + (tl >> 32);
         }
     }
 
