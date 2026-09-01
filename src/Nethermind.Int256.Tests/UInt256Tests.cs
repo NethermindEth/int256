@@ -735,6 +735,119 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
         }
     }
 
+    // Divide/Mod by 2^k must agree with Rsh and And, which are separate implementations reached
+    // through different dispatch. A helper that drops or misplaces a limb cannot satisfy both.
+    // Every result is written into a poisoned variable, so a limb the helper never assigns is a
+    // named failure here rather than a stale value that happens to read as zero.
+    [Test]
+    public void DivideAndMod_ByPowerOfTwo_AgreeWithShiftAndMask()
+    {
+        UInt256[] poisons =
+        [
+            new(0xaaaa_aaaa_aaaa_aaaa, 0xaaaa_aaaa_aaaa_aaaa, 0xaaaa_aaaa_aaaa_aaaa, 0xaaaa_aaaa_aaaa_aaaa),
+            new(0x5555_5555_5555_5555, 0x5555_5555_5555_5555, 0x5555_5555_5555_5555, 0x5555_5555_5555_5555),
+        ];
+
+        List<UInt256> dividends =
+        [
+            UInt256.One,
+            new UInt256(ulong.MaxValue),
+            new UInt256(0, 1),
+            new UInt256(0, 0, 1),
+            new UInt256(0, 0, 0, 1),
+            new UInt256(1, 1, 1, 1),
+            UInt256.MaxValue - UInt256.One,
+            UInt256.MaxValue,
+        ];
+        Random random = new(0x5417);
+        byte[] bytes = new byte[32];
+        for (int i = 0; i < 24; i++)
+        {
+            random.NextBytes(bytes);
+            dividends.Add(new UInt256(bytes));
+        }
+
+        for (int k = 0; k < 256; k++)
+        {
+            UInt256 divisor = UInt256.One << k;
+            UInt256 mask = divisor - UInt256.One;
+
+            foreach (UInt256 dividend in dividends)
+            {
+                UInt256.Rsh(in dividend, k, out UInt256 expectedQuotient);
+                UInt256.And(in dividend, in mask, out UInt256 expectedRemainder);
+
+                foreach (UInt256 poison in poisons)
+                {
+                    UInt256 quotient = poison;
+                    UInt256.Divide(in dividend, in divisor, out quotient);
+                    quotient.Should().Be(expectedQuotient, $"{dividend} / 2^{k}");
+
+                    UInt256 remainder = poison;
+                    UInt256.Mod(in dividend, in divisor, out remainder);
+                    remainder.Should().Be(expectedRemainder, $"{dividend} % 2^{k}");
+                }
+            }
+        }
+    }
+
+    // The power-of-two gates must reject near misses. Every other power-of-two test passes an exact
+    // power of two, so a gate that also accepted 2^k-1 or 2^k+1 would shift instead of dividing and
+    // nothing would fail: 2^k-1 has a trailing-zero count of 0, which the narrow helper cannot take.
+    [Test]
+    public void DivideAndMod_NearPowerOfTwoDivisors_StillDivide()
+    {
+        List<UInt256> dividends =
+        [
+            new UInt256(0, 1),
+            new UInt256(0, 0, 0, 1),
+            new UInt256(ulong.MaxValue, 0, ulong.MaxValue, 0),
+            UInt256.MaxValue - UInt256.One,
+            UInt256.MaxValue,
+        ];
+        Random random = new(0x9EA12);
+        byte[] bytes = new byte[32];
+        for (int i = 0; i < 8; i++)
+        {
+            random.NextBytes(bytes);
+            dividends.Add(new UInt256(bytes));
+        }
+
+        for (int k = 1; k < 256; k++)
+        {
+            UInt256 powerOfTwo = UInt256.One << k;
+
+            List<UInt256> divisors =
+            [
+                powerOfTwo - UInt256.One,            // all bits below k set; trailing zeros = 0
+                powerOfTwo | UInt256.One,            // sets a bit in the low limb, which the gates OR in
+            ];
+            if (k >= 2)
+            {
+                divisors.Add(powerOfTwo | (UInt256.One << (k - 1)));  // two adjacent bits
+            }
+            if (k < 255)
+            {
+                divisors.Add(powerOfTwo | (UInt256.One << (k + 1)));  // bit above the candidate
+            }
+
+            foreach (UInt256 divisor in divisors)
+            {
+                BigInteger divisorBig = (BigInteger)divisor;
+                foreach (UInt256 dividend in dividends)
+                {
+                    BigInteger dividendBig = (BigInteger)dividend;
+
+                    UInt256.Divide(in dividend, in divisor, out UInt256 quotient);
+                    ((BigInteger)quotient).Should().Be(dividendBig / divisorBig, $"{dividendBig} / {divisorBig}");
+
+                    UInt256.Mod(in dividend, in divisor, out UInt256 remainder);
+                    ((BigInteger)remainder).Should().Be(dividendBig % divisorBig, $"{dividendBig} % {divisorBig}");
+                }
+            }
+        }
+    }
+
     [Test]
     public void MultiplyMod_by_max_value_matches_BigInteger()
     {
