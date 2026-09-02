@@ -593,22 +593,6 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
             MultiplyWidth2(in x, in y, out res);
             return;
         }
-        if (!ArmBase.Arm64.IsSupported && (x2 | x3 | y2 | y3) == 0)
-        {
-            if (x1 == 0)
-            {
-                MultiplyByUInt64Width2(in y, x0, out res);
-                return;
-            }
-            if (y1 == 0)
-            {
-                MultiplyByUInt64Width2(in x, y0, out res);
-                return;
-            }
-
-            MultiplyWidth2(in x, in y, out res);
-            return;
-        }
 
         if ((y1 | y2 | y3) == 0)
         {
