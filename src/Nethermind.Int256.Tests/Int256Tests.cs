@@ -152,6 +152,22 @@ public class Int256Tests : UInt256TestsTemplate<Int256>
         act.Should().Throw<ArgumentException>();
     }
 
+    // 0 - Int256.Min is 2**255, the one difference of two Int256 values that is not
+    // itself an Int256, so the reduction has to happen before the difference wraps.
+    [TestCase("17", "9")]
+    [TestCase("-17", "9")]
+    [TestCase("3", "2")]
+    [TestCase("57896044618658097711785492504343953926634992332820282019728792003956564819967", "1")]
+    public void SubtractMod_ZeroMinusMinValue_DoesNotWrap(string modulus, string expected)
+    {
+        Int256 min = (Int256)TestNumbers.Int256Min;
+
+        Int256.SubtractMod(Int256.Zero, min, (Int256)BigInteger.Parse(modulus), out Int256 res);
+
+        res.Convert(out BigInteger actual);
+        actual.Should().Be(BigInteger.Parse(expected));
+    }
+
     public static (string a, string b)[] SignedComparePairs { get; } =
     [
         ("0", "0"),
