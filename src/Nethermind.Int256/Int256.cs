@@ -19,6 +19,8 @@ public readonly struct Int256 : IEquatable<Int256>, IComparable, IComparable<Int
 
     internal readonly UInt256 _value;
 
+    private const ulong SignBit = 0x8000000000000000ul;
+
     public Int256(ReadOnlySpan<byte> bytes, bool isBigEndian)
     {
         _value = new UInt256(bytes, isBigEndian);
@@ -505,22 +507,30 @@ public readonly struct Int256 : IEquatable<Int256>, IComparable, IComparable<Int
 
     [OverloadResolutionPriority(1)]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public int CompareTo(in Int256 b) => this < b ? -1 : Equals(b) ? 0 : 1;
+    public int CompareTo(in Int256 b)
+    {
+        // Flipping the sign bit turns two's-complement order into unsigned order of the raw words, so
+        // one descending pass answers what a comparison followed by an equality test used to.
+        ulong a3 = _value.u3 ^ SignBit;
+        ulong b3 = b._value.u3 ^ SignBit;
+        if (a3 != b3) return a3 < b3 ? -1 : 1;
+        if (_value.u2 != b._value.u2) return _value.u2 < b._value.u2 ? -1 : 1;
+        if (_value.u1 != b._value.u1) return _value.u1 < b._value.u1 ? -1 : 1;
+        return _value.u0 == b._value.u0 ? 0 : _value.u0 < b._value.u0 ? -1 : 1;
+    }
 
     public static explicit operator UInt256(Int256 z) => z._value;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool operator <(in Int256 z, in Int256 x)
     {
-        // If the sign bits differ, the negative operand is smaller; otherwise two's-complement
-        // order within the same sign class equals unsigned order of the raw bits.
-        bool zNeg = z.IsNegative;
-        if (zNeg != x.IsNegative)
-        {
-            return zNeg;
-        }
-
-        return z._value < x._value;
+        // Sign-bit flip plus one descending pass: same order, no separate sign-class branch.
+        ulong a3 = z._value.u3 ^ SignBit;
+        ulong b3 = x._value.u3 ^ SignBit;
+        if (a3 != b3) return a3 < b3;
+        if (z._value.u2 != x._value.u2) return z._value.u2 < x._value.u2;
+        if (z._value.u1 != x._value.u1) return z._value.u1 < x._value.u1;
+        return z._value.u0 < x._value.u0;
     }
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool operator >(in Int256 z, in Int256 x) => x < z;
