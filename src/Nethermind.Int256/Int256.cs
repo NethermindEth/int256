@@ -107,9 +107,9 @@ public readonly struct Int256 : IEquatable<Int256>, IComparable, IComparable<Int
         {
             m.Neg(out mt);
         }
-        int xSign = x.Sign;
-        int ySign = y.Sign;
-        if (xSign < 0 && ySign < 0)
+        bool xIsNegative = x.IsNegative;
+        bool yIsNegative = y.IsNegative;
+        if (xIsNegative && yIsNegative)
         {
             x.Neg(out Int256 xNeg);
             y.Neg(out Int256 yNeg);
@@ -117,7 +117,7 @@ public readonly struct Int256 : IEquatable<Int256>, IComparable, IComparable<Int
             res = new Int256(ures);
             res.Neg(out res);
         }
-        else if (xSign > 0 && ySign > 0)
+        else if (!xIsNegative && !yIsNegative)
         {
             x._value.AddMod(y._value, mt._value, out UInt256 ures);
             res = new Int256(ures);
@@ -152,16 +152,16 @@ public readonly struct Int256 : IEquatable<Int256>, IComparable, IComparable<Int
         {
             m.Neg(out mt);
         }
-        int xSign = x.Sign;
-        int ySign = y.Sign;
-        if (xSign < 0 && ySign > 0)
+        bool xIsNegative = x.IsNegative;
+        bool yIsNegative = y.IsNegative;
+        if (xIsNegative && !yIsNegative)
         {
             x.Neg(out Int256 xNeg);
             xNeg._value.AddMod(y._value, mt._value, out UInt256 ures);
             res = new Int256(ures);
             res.Neg(out res);
         }
-        else if (xSign > 0 && ySign < 0)
+        else if (!xIsNegative && yIsNegative)
         {
             y.Neg(out Int256 yNeg);
             x._value.AddMod(yNeg._value, mt._value, out UInt256 ures);
@@ -380,7 +380,7 @@ public readonly struct Int256 : IEquatable<Int256>, IComparable, IComparable<Int
     //   Abs(2**256-1) = -1
     public void Abs(out Int256 res)
     {
-        if (Sign >= 0)
+        if (!IsNegative)
         {
             res = this;
         }
@@ -516,7 +516,7 @@ public readonly struct Int256 : IEquatable<Int256>, IComparable, IComparable<Int
 
     public void Convert(out BigInteger big)
     {
-        if (Sign < 0)
+        if (IsNegative)
         {
             Abs(out Int256 res);
             res._value.Convert(out big);
@@ -576,8 +576,8 @@ public readonly struct Int256 : IEquatable<Int256>, IComparable, IComparable<Int
     {
         // If the sign bits differ, the negative operand is smaller; otherwise two's-complement
         // order within the same sign class equals unsigned order of the raw bits.
-        bool zNeg = unchecked((long)z._value.u3) < 0;
-        if (zNeg != (unchecked((long)x._value.u3) < 0))
+        bool zNeg = z.IsNegative;
+        if (zNeg != x.IsNegative)
         {
             return zNeg;
         }
