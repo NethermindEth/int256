@@ -559,10 +559,6 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         {
             MultiplyAvx512F(in x, in y, out res);
         }
-        else if (ArmBase.Arm64.IsSupported)
-        {
-            MultiplyScalarArm64(in x, in y, out res);
-        }
         else
         {
             MultiplyScalar(in x, in y, out res);
@@ -581,7 +577,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         ulong x3 = x.u3;
         ulong y3 = y.u3;
 
-        if ((x2 | x3 | y2 | y3) == 0)
+        if (Bmi2.X64.IsSupported && (x2 | x3 | y2 | y3) == 0)
         {
             if (x1 == 0)
             {
@@ -597,58 +593,22 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
             MultiplyWidth2(in x, in y, out res);
             return;
         }
-
-        if ((y1 | y2 | y3) == 0)
+        if (!ArmBase.Arm64.IsSupported && (x2 | x3 | y2 | y3) == 0)
         {
-            MultiplyByUInt64(in x, y0, out res);
+            if (x1 == 0)
+            {
+                MultiplyByUInt64Width2(in y, x0, out res);
+                return;
+            }
+            if (y1 == 0)
+            {
+                MultiplyByUInt64Width2(in x, y0, out res);
+                return;
+            }
+
+            MultiplyWidth2(in x, in y, out res);
             return;
         }
-        if ((x1 | x2 | x3) == 0)
-        {
-            MultiplyByUInt64(in y, x0, out res);
-            return;
-        }
-
-        ulong h00 = Multiply64(x0, y0, out ulong r0);
-        ulong h01 = Multiply64(x0, y1, out ulong l01);
-        ulong h10 = Multiply64(x1, y0, out ulong l10);
-        ulong h02 = Multiply64(x0, y2, out ulong l02);
-        ulong h11 = Multiply64(x1, y1, out ulong l11);
-        ulong h20 = Multiply64(x2, y0, out ulong l20);
-
-        ulong carry = 0;
-        ulong r1 = AddAndCountCarry(h00, l01, ref carry);
-        r1 = AddAndCountCarry(r1, l10, ref carry);
-
-        ulong r2 = carry;
-        carry = 0;
-        r2 = AddAndCountCarry(r2, h01, ref carry);
-        r2 = AddAndCountCarry(r2, h10, ref carry);
-        r2 = AddAndCountCarry(r2, l02, ref carry);
-        r2 = AddAndCountCarry(r2, l11, ref carry);
-        r2 = AddAndCountCarry(r2, l20, ref carry);
-
-        ulong r3 = carry + h02 + h11 + h20
-            + x0 * y3 + x1 * y2 + x2 * y1 + x3 * y0;
-        Unsafe.SkipInit(out res);
-        ref ulong pr = ref Unsafe.As<UInt256, ulong>(ref res);
-        pr = r0;
-        Unsafe.Add(ref pr, 1) = r1;
-        Unsafe.Add(ref pr, 2) = r2;
-        Unsafe.Add(ref pr, 3) = r3;
-    }
-
-    [SkipLocalsInit]
-    private static void MultiplyScalarArm64(in UInt256 x, in UInt256 y, out UInt256 res)
-    {
-        ulong x0 = x.u0;
-        ulong y0 = y.u0;
-        ulong x1 = x.u1;
-        ulong y1 = y.u1;
-        ulong x2 = x.u2;
-        ulong y2 = y.u2;
-        ulong x3 = x.u3;
-        ulong y3 = y.u3;
 
         if ((y1 | y2 | y3) == 0)
         {
