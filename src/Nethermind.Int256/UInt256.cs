@@ -96,8 +96,8 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     {
         if (Avx2.IsSupported)
         {
-            Vector256<ulong> av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
-            Vector256<ulong> bv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
+            Vector256<ulong> av = Unsafe.BitCast<UInt256, Vector256<ulong>>(a);
+            Vector256<ulong> bv = Unsafe.BitCast<UInt256, Vector256<ulong>>(b);
 
             Vector256<ulong> result = av + bv;
             // All bits set in lanes that carried out (carry out of each 64-bit limb).
@@ -311,8 +311,8 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     {
         if (Avx2.IsSupported)
         {
-            Vector256<ulong> av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
-            Vector256<ulong> bv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
+            Vector256<ulong> av = Unsafe.BitCast<UInt256, Vector256<ulong>>(a);
+            Vector256<ulong> bv = Unsafe.BitCast<UInt256, Vector256<ulong>>(b);
 
             Vector256<ulong> result = av - bv;
             // All bits set in lanes where a < b, and in lanes whose lower neighbour borrowed
@@ -1062,8 +1062,8 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     internal static bool LessThanAvx2(in UInt256 a, in UInt256 b)
     {
         // Load the four 64-bit words into a 256-bit register.
-        Vector256<ulong> vecL = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
-        Vector256<ulong> vecR = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
+        Vector256<ulong> vecL = Unsafe.BitCast<UInt256, Vector256<ulong>>(a);
+        Vector256<ulong> vecR = Unsafe.BitCast<UInt256, Vector256<ulong>>(b);
 
         uint eqMask;
         uint ltMask;
@@ -1098,8 +1098,8 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     private static bool LessThanVector256(in UInt256 a, in UInt256 b)
     {
         // Load the four 64-bit words into a 256-bit register.
-        Vector256<ulong> vecL = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
-        Vector256<ulong> vecR = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
+        Vector256<ulong> vecL = Unsafe.BitCast<UInt256, Vector256<ulong>>(a);
+        Vector256<ulong> vecR = Unsafe.BitCast<UInt256, Vector256<ulong>>(b);
 
         uint eqMask = Vector256.ExtractMostSignificantBits(Vector256.Equals(vecL, vecR));
         uint ltMask = Vector256.ExtractMostSignificantBits(Vector256.LessThan(vecL, vecR));
@@ -1116,9 +1116,9 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool LessThanBothAvx512(in UInt256 x, in UInt256 y, in UInt256 m)
     {
-        Vector256<ulong> vx = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in x));
-        Vector256<ulong> vy = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in y));
-        Vector256<ulong> vm = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in m));
+        Vector256<ulong> vx = Unsafe.BitCast<UInt256, Vector256<ulong>>(x);
+        Vector256<ulong> vy = Unsafe.BitCast<UInt256, Vector256<ulong>>(y);
+        Vector256<ulong> vm = Unsafe.BitCast<UInt256, Vector256<ulong>>(m);
 
         Vector512<ulong> vxy = Vector512.Create(vx, vy);
         Vector512<ulong> vmm = Vector512.Create(vm, vm); // can be improved to vbroadcasti64x4 - see below
@@ -1146,15 +1146,15 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool LessThanBothAvx2(in UInt256 x, in UInt256 y, in UInt256 m)
     {
-        Vector256<ulong> vecM = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in m));
+        Vector256<ulong> vecM = Unsafe.BitCast<UInt256, Vector256<ulong>>(m);
 
         var signFlip = Vector256.Create(0x8000_0000_0000_0000UL);
         var low32Mask = Vector256.Create(0x0000_0000_FFFF_FFFFUL);
 
         Vector256<long> sM = Avx2.Xor(vecM, signFlip).AsInt64();
 
-        Vector256<ulong> vecX2 = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in x));
-        Vector256<ulong> vecY2 = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in y));
+        Vector256<ulong> vecX2 = Unsafe.BitCast<UInt256, Vector256<ulong>>(x);
+        Vector256<ulong> vecY2 = Unsafe.BitCast<UInt256, Vector256<ulong>>(y);
 
         // All compares first (lets the core overlap work before any movemask/LZCNT).
         Vector256<ulong> eqXv = Avx2.CompareEqual(vecX2, vecM);
@@ -1210,17 +1210,17 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool LessThanBothVector256(in UInt256 x, in UInt256 y, in UInt256 m)
     {
-        Vector256<ulong> vecM = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in m));
+        Vector256<ulong> vecM = Unsafe.BitCast<UInt256, Vector256<ulong>>(m);
 
         // x < m
-        Vector256<ulong> vecX = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in x));
+        Vector256<ulong> vecX = Unsafe.BitCast<UInt256, Vector256<ulong>>(x);
         uint eqMaskX = Vector256.ExtractMostSignificantBits(Vector256.Equals(vecX, vecM));
         uint ltMaskX = Vector256.ExtractMostSignificantBits(Vector256.LessThan(vecX, vecM));
         if (!LessThanBothFromEqLt8(eqMaskX, ltMaskX))
             return false;
 
         // y < m
-        Vector256<ulong> vecY = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in y));
+        Vector256<ulong> vecY = Unsafe.BitCast<UInt256, Vector256<ulong>>(y);
         uint eqMaskY = Vector256.ExtractMostSignificantBits(Vector256.Equals(vecY, vecM));
         uint ltMaskY = Vector256.ExtractMostSignificantBits(Vector256.LessThan(vecY, vecM));
         return LessThanBothFromEqLt8(eqMaskY, ltMaskY);

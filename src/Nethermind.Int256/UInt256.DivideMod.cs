@@ -550,8 +550,8 @@ public readonly partial struct UInt256
         }
         else if (Vector256.IsHardwareAccelerated)
         {
-            Vector256<ulong> dV = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in d));
-            Vector256<ulong> sumV = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in sum));
+            Vector256<ulong> dV = Unsafe.BitCast<UInt256, Vector256<ulong>>(d);
+            Vector256<ulong> sumV = Unsafe.BitCast<UInt256, Vector256<ulong>>(sum);
             Vector256<ulong> maskV = Vector256.Create(mask);
 
             Vector256<ulong> resultV = Vector256.ConditionalSelect(dV, sumV, maskV);
@@ -3243,7 +3243,7 @@ public readonly partial struct UInt256
         }
         else
         {
-            Vector256<ulong> x = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in v));
+            Vector256<ulong> x = Unsafe.BitCast<UInt256, Vector256<ulong>>(v);
             Vector128<ulong> cL = Vector128.CreateScalarUnsafe((ulong)(uint)sh);
             Vector128<ulong> cR = Vector128.CreateScalarUnsafe(64uL - (ulong)(uint)sh);
 
@@ -3293,7 +3293,7 @@ public readonly partial struct UInt256
         }
         else
         {
-            Vector256<ulong> x = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in v));
+            Vector256<ulong> x = Unsafe.BitCast<UInt256, Vector256<ulong>>(v);
 
             // right = x >> sh
             Vector128<ulong> cR = Vector128.CreateScalarUnsafe((ulong)sh);
