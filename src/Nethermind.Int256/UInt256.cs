@@ -571,14 +571,16 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     }
 
     [SkipLocalsInit]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void MultiplyByUInt64(in UInt256 x, ulong y, out UInt256 res)
     {
         if (y <= 1)
         {
-            // Written as two stores rather than a conditional expression, which the JIT routes through a stack temp.
+            // Two plain stores: a conditional expression goes through a stack temp, and a block zero of an out
+            // parameter that resolves to a promoted Vector256 local makes .NET 10.0.11 emit vmovq ymm, r64.
             if (y == 0)
             {
-                res = default;
+                StoreProduct(out res, 0, 0, 0, 0);
             }
             else
             {
@@ -607,6 +609,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     }
 
     [SkipLocalsInit]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void MultiplyLimbs2x2(in UInt256 x, in UInt256 y, out UInt256 res)
     {
         ulong x0 = x.u0;
@@ -631,6 +634,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     }
 
     [SkipLocalsInit]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void MultiplyLimbs4x4(in UInt256 x, in UInt256 y, out UInt256 res)
     {
         ulong x0 = x.u0;
