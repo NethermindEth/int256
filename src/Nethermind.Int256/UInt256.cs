@@ -359,8 +359,9 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         Vector128<ulong> borrowInHi;
         if (AdvSimd.IsSupported)
         {
-            borrowInLo = AdvSimd.ExtractVector128(borrowLo, Vector128<ulong>.Zero, 1);
-            borrowInHi = AdvSimd.ExtractVector128(borrowHi, borrowLo, 1);
+            // ext takes its low lanes from the first operand: (second:first) >> 64 bits
+            borrowInLo = AdvSimd.ExtractVector128(Vector128<ulong>.Zero, borrowLo, 1);
+            borrowInHi = AdvSimd.ExtractVector128(borrowLo, borrowHi, 1);
         }
         else
         {
