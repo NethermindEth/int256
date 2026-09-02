@@ -23,6 +23,8 @@ public class AddShapesBench
     private readonly UInt256[] _oneLimbB = new UInt256[N];
     private readonly UInt256[] _oneLimbRightA = new UInt256[N];
     private readonly UInt256[] _oneLimbRightB = new UInt256[N];
+    private readonly UInt256[] _oneLimbLeftA = new UInt256[N];
+    private readonly UInt256[] _oneLimbLeftB = new UInt256[N];
     private readonly UInt256[] _wideA = new UInt256[N];
     private readonly UInt256[] _wideB = new UInt256[N];
     private readonly UInt256[] _cascadeA = new UInt256[N];
@@ -41,6 +43,9 @@ public class AddShapesBench
             // Wide left operand, one-limb right operand, no carry out of the low limb
             _oneLimbRightA[i] = new UInt256(Next(random) >> 1, Next(random), Next(random), Next(random));
             _oneLimbRightB[i] = new UInt256(Next(random) >> 1);
+            // One-limb left operand, wide right operand: the same ladder with the operands swapped
+            _oneLimbLeftA[i] = new UInt256(Next(random) >> 1);
+            _oneLimbLeftB[i] = new UInt256(Next(random) >> 1, Next(random), Next(random), Next(random));
             // Four random limbs each side, no overflow
             _wideA[i] = new UInt256(Next(random), Next(random), Next(random), Next(random) >> 1);
             _wideB[i] = new UInt256(Next(random), Next(random), Next(random), Next(random) >> 1);
@@ -59,6 +64,9 @@ public class AddShapesBench
 
     [Benchmark(OperationsPerInvoke = N)]
     public UInt256 OneLimbRight() => Run(_oneLimbRightA, _oneLimbRightB);
+
+    [Benchmark(OperationsPerInvoke = N)]
+    public UInt256 OneLimbLeft() => Run(_oneLimbLeftA, _oneLimbLeftB);
 
     [Benchmark(OperationsPerInvoke = N)]
     public UInt256 Wide() => Run(_wideA, _wideB);
