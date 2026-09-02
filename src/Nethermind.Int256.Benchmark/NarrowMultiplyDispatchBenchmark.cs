@@ -1,0 +1,217 @@
+// SPDX-FileCopyrightText: 2025 Demerzel Solutions Limited
+// SPDX-License-Identifier: LGPL-3.0-only
+
+using System;
+using System.Reflection;
+using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Jobs;
+using Nethermind.Int256;
+
+namespace Nethermind.Int256.Benchmark;
+
+public enum NarrowMultiplyShape
+{
+    OneByOne,
+    OneByTwo,
+    TwoByTwo,
+    ThreeByOne,
+    ThreeByTwo,
+    FullWidth,
+    OneByThree,
+    TwoByOne,
+    TwoByThree,
+    OneByFour,
+    TwoByFour,
+    ThreeByThree,
+    ThreeByFour,
+    FourByOne,
+    FourByTwo,
+    FourByThree,
+    CorpusWeighted,
+}
+
+/// <summary>
+/// Compares the production 256-to-512-bit multiplication dispatch with its
+/// full-width fallback, including a full-width miss and a conservative corpus-weighted workload.
+/// </summary>
+[HideColumns("Job", "RatioSD", "Error")]
+[SimpleJob(RuntimeMoniker.Net10_0, launchCount: 3, warmupCount: 3, iterationCount: 10)]
+[NoIntrinsicsJob(RuntimeMoniker.Net10_0, launchCount: 3, warmupCount: 3, iterationCount: 10)]
+public class NarrowMultiplyDispatchBenchmark
+{
+    private delegate void MultiplyDelegate(in UInt256 x, in UInt256 y, out UInt256 low, out UInt256 high);
+
+    private const int BatchSize = 1024;
+
+    private readonly UInt256[] _left = new UInt256[BatchSize];
+    private readonly UInt256[] _right = new UInt256[BatchSize];
+    private MultiplyDelegate _current = null!;
+    private MultiplyDelegate _large = null!;
+
+    // All sixteen width pairs, including the ones the dispatcher deliberately does not
+    // specialise. Two reasons to keep both argument orders: a Params list that omits 1x4/2x4
+    // cannot show what the miss path costs, and the swapped pairs (1x4 against 4x1) take
+    // different branches, so a regression confined to one of them would go unseen.
+    [Params(
+        NarrowMultiplyShape.OneByOne,
+        NarrowMultiplyShape.OneByTwo,
+        NarrowMultiplyShape.TwoByOne,
+        NarrowMultiplyShape.TwoByTwo,
+        NarrowMultiplyShape.OneByThree,
+        NarrowMultiplyShape.ThreeByOne,
+        NarrowMultiplyShape.TwoByThree,
+        NarrowMultiplyShape.ThreeByTwo,
+        NarrowMultiplyShape.ThreeByThree,
+        NarrowMultiplyShape.OneByFour,
+        NarrowMultiplyShape.FourByOne,
+        NarrowMultiplyShape.TwoByFour,
+        NarrowMultiplyShape.FourByTwo,
+        NarrowMultiplyShape.ThreeByFour,
+        NarrowMultiplyShape.FourByThree,
+        NarrowMultiplyShape.FullWidth,
+        NarrowMultiplyShape.CorpusWeighted)]
+    public NarrowMultiplyShape Shape { get; set; }
+
+    [GlobalSetup]
+    public void Setup()
+    {
+        _current = (MultiplyDelegate)typeof(UInt256)
+            .GetMethod("Multiply256To512Bit", BindingFlags.NonPublic | BindingFlags.Static)!
+            .CreateDelegate(typeof(MultiplyDelegate));
+        _large = (MultiplyDelegate)typeof(UInt256)
+            .GetMethod("Multiply256To512BitLarge", BindingFlags.NonPublic | BindingFlags.Static)!
+            .CreateDelegate(typeof(MultiplyDelegate));
+
+        Random random = new(0x4D554C54);
+
+        for (int i = 0; i < BatchSize; i++)
+        {
+            NarrowMultiplyShape shape = Shape == NarrowMultiplyShape.CorpusWeighted
+                ? CorpusWeightedShape(i)
+                : Shape;
+
+            (int leftWidth, int rightWidth) = shape switch
+            {
+                NarrowMultiplyShape.OneByOne => (1, 1),
+                NarrowMultiplyShape.OneByTwo => (1, 2),
+                NarrowMultiplyShape.TwoByTwo => (2, 2),
+                NarrowMultiplyShape.ThreeByOne => (3, 1),
+                NarrowMultiplyShape.ThreeByTwo => (3, 2),
+                NarrowMultiplyShape.OneByThree => (1, 3),
+                NarrowMultiplyShape.TwoByOne => (2, 1),
+                NarrowMultiplyShape.TwoByThree => (2, 3),
+                NarrowMultiplyShape.OneByFour => (1, 4),
+                NarrowMultiplyShape.TwoByFour => (2, 4),
+                NarrowMultiplyShape.ThreeByThree => (3, 3),
+                NarrowMultiplyShape.ThreeByFour => (3, 4),
+                NarrowMultiplyShape.FourByOne => (4, 1),
+                NarrowMultiplyShape.FourByTwo => (4, 2),
+                NarrowMultiplyShape.FourByThree => (4, 3),
+                NarrowMultiplyShape.FullWidth => (4, 4),
+                _ => throw new ArgumentOutOfRangeException(),
+            };
+
+            _left[i] = RandomValue(random, leftWidth);
+            _right[i] = RandomValue(random, rightWidth);
+        }
+
+        for (int i = 0; i < BatchSize; i++)
+        {
+            _current(in _left[i], in _right[i], out UInt256 currentLow, out UInt256 currentHigh);
+            _large(in _left[i], in _right[i], out UInt256 largeLow, out UInt256 largeHigh);
+            if (!currentLow.Equals(largeLow) || !currentHigh.Equals(largeHigh))
+            {
+                throw new InvalidOperationException($"Product mismatch at index {i} for {Shape}.");
+            }
+        }
+    }
+
+    [Benchmark(Baseline = true, OperationsPerInvoke = BatchSize)]
+    public ulong Multiply_CurrentDispatch()
+    {
+        ulong checksum = 0;
+        for (int i = 0; i < BatchSize; i++)
+        {
+            _current(in _left[i], in _right[i], out UInt256 low, out UInt256 high);
+            checksum ^= Fold(low) ^ Fold(high);
+        }
+
+        return checksum;
+    }
+
+    private static NarrowMultiplyShape CorpusWeightedShape(int index)
+    {
+        // 220/1024 = 21.484% of calls were eligible under the original both-operands-narrow
+        // gate, matching the measured 329,233/1,532,234 wide-modulus MultiplyMod calls. Width
+        // dispatch specialises far more of it: 2x4 and 1x4 sit in the block below and are now
+        // handled too, so the current hit rate over this mix is 628/1024 = 61.3%.
+        //
+        // Two caveats on the hit submix, for whoever holds the instrumentation data. The 195..219
+        // slots fall to TwoByThree through the catch-all, giving it 25 of the 220 hit slots while
+        // its mirror ThreeByTwo gets 1 - a 25x asymmetry between the same shape's two operand
+        // orders. The miss submix below instead uses explicit ranges that account for every slot.
+        // If those 25 slots belong elsewhere, any corpus-weighted ratio quoted from this mix
+        // shifts with them.
+        int hitSlot = (index * 37) & (BatchSize - 1);
+        if (hitSlot < 220)
+        {
+            return hitSlot switch
+            {
+                < 20 => NarrowMultiplyShape.OneByTwo,
+                20 => NarrowMultiplyShape.TwoByOne,
+                < 192 => NarrowMultiplyShape.TwoByTwo,
+                192 => NarrowMultiplyShape.ThreeByOne,
+                193 => NarrowMultiplyShape.OneByThree,
+                194 => NarrowMultiplyShape.ThreeByTwo,
+                _ => NarrowMultiplyShape.TwoByThree,
+            };
+        }
+
+        return (hitSlot - 220) switch
+        {
+            < 367 => NarrowMultiplyShape.FullWidth,
+            < 647 => NarrowMultiplyShape.TwoByFour,
+            < 775 => NarrowMultiplyShape.OneByFour,
+            < 785 => NarrowMultiplyShape.ThreeByThree,
+            < 795 => NarrowMultiplyShape.ThreeByFour,
+            _ => NarrowMultiplyShape.FourByThree,
+        };
+    }
+
+    [Benchmark(OperationsPerInvoke = BatchSize)]
+    public ulong Multiply_LargeFallback()
+    {
+        ulong checksum = 0;
+        for (int i = 0; i < BatchSize; i++)
+        {
+            _large(in _left[i], in _right[i], out UInt256 low, out UInt256 high);
+            checksum ^= Fold(low) ^ Fold(high);
+        }
+
+        return checksum;
+    }
+
+    private static UInt256 RandomValue(Random random, int width)
+    {
+        ulong u0 = NextUInt64(random);
+        ulong u1 = width > 1 ? NextUInt64(random) : 0;
+        ulong u2 = width > 2 ? NextUInt64(random) : 0;
+        ulong u3 = width > 3 ? NextUInt64(random) : 0;
+
+        switch (width)
+        {
+            case 1 when u0 == 0: u0 = 1; break;
+            case 2 when u1 == 0: u1 = 1; break;
+            case 3 when u2 == 0: u2 = 1; break;
+            case 4 when u3 == 0: u3 = 1; break;
+        }
+
+        return new UInt256(u0, u1, u2, u3);
+    }
+
+    private static ulong NextUInt64(Random random)
+        => (ulong)random.NextInt64() ^ ((ulong)random.NextInt64() << 32);
+
+    private static ulong Fold(in UInt256 value)
+        => value.u0 ^ value.u1 ^ value.u2 ^ value.u3;
+}
