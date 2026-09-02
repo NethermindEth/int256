@@ -143,32 +143,116 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         return AddScalar(in a, in b, out res);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool AddScalar(in UInt256 a, in UInt256 b, out UInt256 res)
     {
-        ulong a0 = a.u0;
         ulong b0 = b.u0;
-        if ((a.u1 | a.u2 | a.u3 | b.u1 | b.u2 | b.u3) == 0)
+        if ((b.u1 | b.u2 | b.u3) == 0)
         {
-            // Fast add for numbers less than 2^64 (18,446,744,073,709,551,615)
-            ulong u0 = a0 + b0;
-            // Assignment to res after in case is used as input for a or b (by ref aliasing)
-            res = default;
-            Unsafe.AsRef(in res.u0) = u0;
-            if (u0 < a0)
-            {
-                Unsafe.AsRef(in res.u1) = 1;
-            }
-            // Never overflows UInt256
+            return AddScalarUInt64(in a, b0, out res);
+        }
+
+        if (AdvSimd.IsSupported || Sse42.IsSupported)
+        {
+            return AddVector128(in a, in b, out res);
+        }
+
+        // Loads stay next to their use: the one-limb path above shares this method's prolog
+        ulong carry = 0;
+        AddWithCarry(a.u0, b0, ref carry, out ulong r0);
+        AddWithCarry(a.u1, b.u1, ref carry, out ulong r1);
+        AddWithCarry(a.u2, b.u2, ref carry, out ulong r2);
+        AddWithCarry(a.u3, b.u3, ref carry, out ulong r3);
+        StoreLimbs(out res, r0, r1, r2, r3);
+        return carry != 0;
+    }
+
+    // Same speculation as the 256-bit path on two 128-bit halves; 16-byte stores forward to the NEON readers
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool AddVector128(in UInt256 a, in UInt256 b, out UInt256 res)
+    {
+        ref Vector128<ulong> aRef = ref Unsafe.As<UInt256, Vector128<ulong>>(ref Unsafe.AsRef(in a));
+        ref Vector128<ulong> bRef = ref Unsafe.As<UInt256, Vector128<ulong>>(ref Unsafe.AsRef(in b));
+        Vector128<ulong> aLo = aRef;
+        Vector128<ulong> aHi = Unsafe.Add(ref aRef, 1);
+        Vector128<ulong> bLo = bRef;
+        Vector128<ulong> bHi = Unsafe.Add(ref bRef, 1);
+
+        Vector128<ulong> resultLo = aLo + bLo;
+        Vector128<ulong> resultHi = aHi + bHi;
+        Vector128<ulong> carryLo = Vector128.LessThan(resultLo, aLo);
+        Vector128<ulong> carryHi = Vector128.LessThan(resultHi, aHi);
+
+        // Lane i receives the carry of lane i-1: [0, lo0] and [lo1, hi0]
+        Vector128<ulong> carryInLo;
+        Vector128<ulong> carryInHi;
+        if (AdvSimd.IsSupported)
+        {
+            // ext takes its low lanes from the first operand: (second:first) >> 64 bits
+            carryInLo = AdvSimd.ExtractVector128(Vector128<ulong>.Zero, carryLo, 1);
+            carryInHi = AdvSimd.ExtractVector128(carryLo, carryHi, 1);
+        }
+        else
+        {
+            carryInLo = Sse2.ShiftLeftLogical128BitLane(carryLo, 8);
+            carryInHi = Ssse3.AlignRight(carryHi.AsByte(), carryLo.AsByte(), 8).AsUInt64();
+        }
+
+        // A full limb that receives a carry wraps to zero and must pass it on; testing the sum keeps the
+        // all-ones constant out of the register set. The fallback stays inline and call-free: with a call here
+        // the JIT parks the vector values in callee-saved registers and the shared prolog pays for it
+        Vector128<ulong> sumLo = resultLo - carryInLo;
+        Vector128<ulong> sumHi = resultHi - carryInHi;
+        Vector128<ulong> propagate = (Vector128.Equals(sumLo, Vector128<ulong>.Zero) & carryInLo)
+                                   | (Vector128.Equals(sumHi, Vector128<ulong>.Zero) & carryInHi);
+        if (!Vector128.EqualsAll(propagate, Vector128<ulong>.Zero))
+        {
+            // Nothing has been stored yet, so a and b are intact even when res aliases one of them
+            ulong carry = 0;
+            AddWithCarry(a.u0, b.u0, ref carry, out ulong r0);
+            AddWithCarry(a.u1, b.u1, ref carry, out ulong r1);
+            AddWithCarry(a.u2, b.u2, ref carry, out ulong r2);
+            AddWithCarry(a.u3, b.u3, ref carry, out ulong r3);
+            StoreLimbs(out res, r0, r1, r2, r3);
+            return carry != 0;
+        }
+
+        Unsafe.SkipInit(out res);
+        ref Vector128<ulong> resRef = ref Unsafe.As<UInt256, Vector128<ulong>>(ref res);
+        resRef = sumLo;
+        Unsafe.Add(ref resRef, 1) = sumHi;
+        return carryHi.GetElement(1) != 0;
+    }
+
+    // Right operand fits in one limb: a carry can only ripple upward through full limbs
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool AddScalarUInt64(in UInt256 a, ulong b0, out UInt256 res)
+    {
+        ulong a0 = a.u0, a1 = a.u1, a2 = a.u2, a3 = a.u3;
+        ulong r0 = a0 + b0;
+        if (r0 >= a0)
+        {
+            StoreLimbs(out res, r0, a1, a2, a3);
+            return false;
+        }
+        if (++a1 != 0)
+        {
+            StoreLimbs(out res, r0, a1, a2, a3);
+            return false;
+        }
+        if (++a2 != 0)
+        {
+            StoreLimbs(out res, r0, 0, a2, a3);
+            return false;
+        }
+        if (++a3 != 0)
+        {
+            StoreLimbs(out res, r0, 0, 0, a3);
             return false;
         }
 
-        ulong c = 0;
-        AddWithCarry(a0, b0, ref c, out ulong r0);
-        AddWithCarry(a.u1, b.u1, ref c, out ulong r1);
-        AddWithCarry(a.u2, b.u2, ref c, out ulong r2);
-        AddWithCarry(a.u3, b.u3, ref c, out ulong r3);
-        res = new UInt256(r0, r1, r2, r3);
-        return c != 0;
+        StoreLimbs(out res, r0, 0, 0, 0);
+        return true;
     }
 
     /// <summary>
