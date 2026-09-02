@@ -178,24 +178,10 @@ public readonly struct Int256 : IEquatable<Int256>, IComparable, IComparable<Int
 
     public static void Multiply(in Int256 a, in Int256 b, out Int256 res)
     {
-        Int256 av = a, bv = b;
-        bool aIsNegative = a.IsNegative;
-        bool bIsNegative = b.IsNegative;
-        if (aIsNegative)
-        {
-            a.Neg(out av);
-        }
-        if (bIsNegative)
-        {
-            b.Neg(out bv);
-        }
-        UInt256.Multiply(av._value, bv._value, out UInt256 ures);
-        res = new Int256(ures);
-        if (aIsNegative == bIsNegative)
-        {
-            return;
-        }
-        res.Neg(out res);
+        // Truncated multiplication is sign-agnostic in two's complement: negation is exact mod 2**256,
+        // so the sign-magnitude round trip cancelled itself and the raw product is already signed.
+        Unsafe.SkipInit(out res);
+        UInt256.Multiply(in a._value, in b._value, out Unsafe.As<Int256, UInt256>(ref res));
     }
 
     public void Multiply(in Int256 a, out Int256 res) => Multiply(this, a, out res);
@@ -289,25 +275,10 @@ public readonly struct Int256 : IEquatable<Int256>, IComparable, IComparable<Int
         {
             throw new ArgumentException("exponent must be non-negative");
         }
-        if (b.IsNegative)
-        {
-            b.Neg(out Int256 neg);
-            UInt256.Exp(neg._value, e._value, out UInt256 ures);
-            if (!e._value.Bit(0))
-            {
-                res = new Int256(ures);
-            }
-            else
-            {
-                res = new Int256(ures);
-                res.Neg(out res);
-            }
-        }
-        else
-        {
-            UInt256.Exp(b._value, e._value, out UInt256 ures);
-            res = new Int256(ures);
-        }
+        // Repeated multiplication inherits multiplication's sign-agnosticism: raising the raw words
+        // gives the signed power mod 2**256, odd exponents of a negative base included.
+        Unsafe.SkipInit(out res);
+        UInt256.Exp(in b._value, in e._value, out Unsafe.As<Int256, UInt256>(ref res));
     }
 
     public void Exp(in Int256 exp, out Int256 res) => Exp(this, exp, out res);
