@@ -1017,7 +1017,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     /// <see cref="Vector256.Create(ulong, ulong, ulong, ulong)"/> fallback is out-of-line calls.
     /// </remarks>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void SetLimbs(out UInt256 res, ulong z0, ulong z1, ulong z2, ulong z3)
+    internal static void SetLimbs(out UInt256 res, ulong z0, ulong z1, ulong z2, ulong z3)
     {
         Unsafe.SkipInit(out res);
         if (Vector256.IsHardwareAccelerated)

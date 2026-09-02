@@ -372,113 +372,80 @@ public readonly struct Int256 : IEquatable<Int256>, IComparable, IComparable<Int
 
     public void LeftShift(int n, out Int256 res) => LeftShift(this, n, out res);
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static long Rsh(long a, int n)
-    {
-        var n1 = n / 2;
-        var n2 = n - n1;
-        return (a >> n1) >> n2;
-    }
-
-    private void Srsh64(out Int256 res)
-    {
-        res = new Int256(new UInt256(_value.u1, _value.u2, _value.u3, ulong.MaxValue));
-    }
-
-    private void Srsh128(out Int256 res)
-    {
-        res = new Int256(new UInt256(_value.u2, _value.u3, ulong.MaxValue, ulong.MaxValue));
-    }
-
-    private void Srsh192(out Int256 res)
-    {
-        res = new Int256(new UInt256(_value.u3, ulong.MaxValue, ulong.MaxValue, ulong.MaxValue));
-    }
-
+    /// <summary>
+    /// Shifts <paramref name="x"/> right by <paramref name="n"/> bits, filling the vacated high bits with
+    /// the sign of <paramref name="x"/> and discarding bits shifted out of bit 0.
+    /// </summary>
+    /// <remarks>
+    /// Counts of 256 or more produce 0 or -1 according to the sign. Negative counts keep the unsigned
+    /// type's behaviour: a negative multiple of 64 produces 0 or -1, any other negative count shifts by
+    /// <c>n &amp; 63</c> with no word shift. <paramref name="res"/> may alias <paramref name="x"/>.
+    /// </remarks>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void Rsh(in Int256 x, int n, out Int256 res)
     {
-        if (!x.IsNegative)
-        {
-            x._value.RightShift(n, out UInt256 ures);
-            res = new Int256(ures);
-            return;
-        }
-        if (n % 64 == 0)
-        {
-            switch (n)
-            {
-                case 0:
-                    res = x;
-                    return;
-                case 64:
-                    x.Srsh64(out res);
-                    return;
-                case 128:
-                    x.Srsh128(out res);
-                    return;
-                case 192:
-                    x.Srsh192(out res);
-                    return;
-                default:
-                    One.Neg(out res);
-                    return;
-            }
-        }
+        // Read every limb up front: res is allowed to alias x.
+        ulong x0 = x._value.u0, x1 = x._value.u1, x2 = x._value.u2, x3 = x._value.u3;
+        // The sign word is what shifts in from above, so one funnel serves both signs and every count.
+        ulong fill = (ulong)(unchecked((long)x3) >> 63);
 
-        ulong z0, z1, z2, z3;
-        ulong a = UInt256.Lsh(ulong.MaxValue, 64 - (n % 64));
-        // Big swaps first
-        if (n > 192)
+        int wordShift = n >> 6;
+        if ((uint)wordShift >= (uint)UInt256.Len)
         {
-            if (n > 256)
+            if (wordShift >= 0 || (n & 63) == 0)
             {
-                One.Neg(out res);
+                SetLimbs(out res, fill, fill, fill, fill);
                 return;
             }
-            x.Srsh192(out res);
-            z1 = res._value.u1;
-            z2 = res._value.u2;
-            z3 = res._value.u3;
-            n -= 192;
-            goto sh192;
+
+            wordShift = 0;
         }
-        else if (n > 128)
+
+        int bitShift = n & 63;
+        int carryShift = 63 - bitShift;
+
+        // (hi << 1) << (63 - bitShift) equals hi << (64 - bitShift) but also yields 0 when
+        // bitShift is 0, so whole-word counts need no separate path.
+        if (wordShift == 0)
         {
-            x.Srsh128(out res);
-            z2 = res._value.u2;
-            z3 = res._value.u3;
-            n -= 128;
-            goto sh128;
+            SetLimbs(out res,
+                (x0 >> bitShift) | ((x1 << 1) << carryShift),
+                (x1 >> bitShift) | ((x2 << 1) << carryShift),
+                (x2 >> bitShift) | ((x3 << 1) << carryShift),
+                (x3 >> bitShift) | ((fill << 1) << carryShift));
         }
-        else if (n > 64)
+        else if (wordShift == 1)
         {
-            x.Srsh64(out res);
-            z3 = res._value.u3;
-            n -= 64;
-            goto sh64;
+            SetLimbs(out res,
+                (x1 >> bitShift) | ((x2 << 1) << carryShift),
+                (x2 >> bitShift) | ((x3 << 1) << carryShift),
+                (x3 >> bitShift) | ((fill << 1) << carryShift),
+                fill);
+        }
+        else if (wordShift == 2)
+        {
+            SetLimbs(out res,
+                (x2 >> bitShift) | ((x3 << 1) << carryShift),
+                (x3 >> bitShift) | ((fill << 1) << carryShift),
+                fill,
+                fill);
         }
         else
         {
-            res = x;
+            SetLimbs(out res,
+                (x3 >> bitShift) | ((fill << 1) << carryShift),
+                fill,
+                fill,
+                fill);
         }
+    }
 
-        // remaining shifts
-        z3 = UInt256.Rsh(res._value.u3, n) | a;
-        a = UInt256.Lsh(res._value.u3, 64 - n);
-
-    sh64:
-        z2 = UInt256.Rsh(res._value.u2, n) | a;
-        a = UInt256.Lsh(res._value.u2, 64 - n);
-
-    sh128:
-        z1 = UInt256.Rsh(res._value.u1, n) | a;
-        a = UInt256.Lsh(res._value.u1, 64 - n);
-
-    sh192:
-        z0 = UInt256.Rsh(res._value.u0, n) | a;
-
-        res = new Int256(new UInt256(z0, z1, z2, z3));
+    /// <summary>Writes a result built from four separate limbs, in one store of the full width.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void SetLimbs(out Int256 res, ulong z0, ulong z1, ulong z2, ulong z3)
+    {
+        Unsafe.SkipInit(out res);
+        UInt256.SetLimbs(out Unsafe.As<Int256, UInt256>(ref res), z0, z1, z2, z3);
     }
 
     public static void RightShift(in Int256 x, int n, out Int256 res) => Rsh(x, n, out res);

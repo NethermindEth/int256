@@ -239,4 +239,35 @@ public class Int256Tests : UInt256TestsTemplate<Int256>
         Int256.MinusOne.IsOne.Should().BeFalse();
         Int256.Max.IsOne.Should().BeFalse();
     }
+
+    [Test]
+    public void Right_shift_of_a_negative_value_shifts_in_the_sign()
+    {
+        // A zero fill agrees with an arithmetic shift on every bit that survives, so it only shows up
+        // in the limbs the shift vacates. Pin those limbs at each word boundary and one bit past one.
+        Int256 x = new Int256(new UInt256(0x0123456789ABCDEFul, 0x1122334455667788ul, 0x99AABBCCDDEEFF00ul, 0xF000000000000001ul));
+        const ulong Ones = ulong.MaxValue;
+
+        x.RightShift(64, out Int256 res);
+        ((UInt256)res).Should().Be(new UInt256(0x1122334455667788ul, 0x99AABBCCDDEEFF00ul, 0xF000000000000001ul, Ones));
+
+        x.RightShift(128, out res);
+        ((UInt256)res).Should().Be(new UInt256(0x99AABBCCDDEEFF00ul, 0xF000000000000001ul, Ones, Ones));
+
+        x.RightShift(192, out res);
+        ((UInt256)res).Should().Be(new UInt256(0xF000000000000001ul, Ones, Ones, Ones));
+
+        x.RightShift(193, out res);
+        ((UInt256)res).Should().Be(new UInt256(0xF800000000000000ul, Ones, Ones, Ones));
+
+        x.RightShift(256, out res);
+        ((UInt256)res).Should().Be(new UInt256(Ones, Ones, Ones, Ones));
+
+        // The same counts on a positive value must vacate to zero, not to the other operand's sign.
+        Int256 p = new Int256(new UInt256(0x0123456789ABCDEFul, 0x1122334455667788ul, 0x99AABBCCDDEEFF00ul, 0x7000000000000001ul));
+        p.RightShift(192, out res);
+        ((UInt256)res).Should().Be(new UInt256(0x7000000000000001ul, 0, 0, 0));
+        p.RightShift(256, out res);
+        ((UInt256)res).Should().Be(UInt256.Zero);
+    }
 }
