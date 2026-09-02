@@ -577,23 +577,6 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         ulong x3 = x.u3;
         ulong y3 = y.u3;
 
-        if (Bmi2.X64.IsSupported && (x2 | x3 | y2 | y3) == 0)
-        {
-            if (x1 == 0)
-            {
-                MultiplyByUInt64Width2(in y, x0, out res);
-                return;
-            }
-            if (y1 == 0)
-            {
-                MultiplyByUInt64Width2(in x, y0, out res);
-                return;
-            }
-
-            MultiplyWidth2(in x, in y, out res);
-            return;
-        }
-
         if ((y1 | y2 | y3) == 0)
         {
             MultiplyByUInt64(in x, y0, out res);
@@ -636,37 +619,6 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
 
     [SkipLocalsInit]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void MultiplyByUInt64Width2(in UInt256 x, ulong y, out UInt256 res)
-    {
-        ulong carry = Multiply64(x.u0, y, out ulong r0);
-        ulong high = Multiply64(x.u1, y, out ulong low);
-        ulong r1 = low + carry;
-        ulong r2 = high + (r1 < low ? 1UL : 0UL);
-        res = new UInt256(r0, r1, r2);
-    }
-
-    [SkipLocalsInit]
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void MultiplyWidth2(in UInt256 x, in UInt256 y, out UInt256 res)
-    {
-        ulong h00 = Multiply64(x.u0, y.u0, out ulong r0);
-        ulong h01 = Multiply64(x.u0, y.u1, out ulong l01);
-        ulong h10 = Multiply64(x.u1, y.u0, out ulong l10);
-        ulong h11 = Multiply64(x.u1, y.u1, out ulong l11);
-
-        ulong carry = 0;
-        ulong r1 = AddAndCountCarry(h00, l01, ref carry);
-        r1 = AddAndCountCarry(r1, l10, ref carry);
-
-        ulong r2 = carry;
-        carry = 0;
-        r2 = AddAndCountCarry(r2, h01, ref carry);
-        r2 = AddAndCountCarry(r2, h10, ref carry);
-        r2 = AddAndCountCarry(r2, l11, ref carry);
-
-        res = new UInt256(r0, r1, r2, h11 + carry);
-    }
-
     private static void MultiplyByUInt64(in UInt256 x, ulong y, out UInt256 res)
     {
         ulong x0 = x.u0;
