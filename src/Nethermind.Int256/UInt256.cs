@@ -549,23 +549,20 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
             MultiplyByUInt64(in y, x0, out res);
             return;
         }
-        if (X86Base.X64.IsSupported)
+        if ((xTop | yTop) == 0)
         {
-            if ((xTop | yTop) == 0)
-            {
-                MultiplyLimbs2x2(in x, in y, out res);
-                return;
-            }
-            if (xTop == 0)
-            {
-                MultiplyLimbs2x4(in x, in y, out res);
-                return;
-            }
-            if (yTop == 0)
-            {
-                MultiplyLimbs2x4(in y, in x, out res);
-                return;
-            }
+            MultiplyLimbs2x2(in x, in y, out res);
+            return;
+        }
+        if (xTop == 0)
+        {
+            MultiplyLimbs2x4(in x, in y, out res);
+            return;
+        }
+        if (yTop == 0)
+        {
+            MultiplyLimbs2x4(in y, in x, out res);
+            return;
         }
         MultiplyLimbs4x4(in x, in y, out res);
     }
