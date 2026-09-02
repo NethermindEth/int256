@@ -1515,6 +1515,49 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
     }
 
     [Test]
+    public void Multiply_each_limb_width_matches_BigInteger()
+    {
+        Random random = new(0x4D554C54);
+
+        for (int xWidth = 1; xWidth <= 4; xWidth++)
+        {
+            for (int yWidth = 1; yWidth <= 4; yWidth++)
+            {
+                for (int i = 0; i < 256; i++)
+                {
+                    UInt256 x = CreateWidth(random, xWidth);
+                    UInt256 y = CreateWidth(random, yWidth);
+                    BigInteger expected = (BigInteger)x * (BigInteger)y % TestNumbers.TwoTo256;
+
+                    UInt256.Multiply(in x, in y, out UInt256 result);
+                    ((BigInteger)result).Should().Be(expected);
+
+                    UInt256 alias = x;
+                    alias.Multiply(in y, out alias);
+                    ((BigInteger)alias).Should().Be(expected);
+                }
+            }
+        }
+
+        static UInt256 CreateWidth(Random random, int width)
+        {
+            ulong u0 = (ulong)random.NextInt64() | 1;
+            ulong u1 = (ulong)random.NextInt64() | 1;
+            ulong u2 = (ulong)random.NextInt64() | 1;
+            ulong u3 = (ulong)random.NextInt64() | 1;
+
+            return width switch
+            {
+                1 => new UInt256(u0),
+                2 => new UInt256(u0, u1),
+                3 => new UInt256(u0, u1, u2),
+                4 => new UInt256(u0, u1, u2, u3),
+                _ => throw new ArgumentOutOfRangeException(nameof(width)),
+            };
+        }
+    }
+
+    [Test]
     public virtual void ToBigEndian_And_Back()
     {
         byte[] bidEndian = convert(1000000000000000000).ToBigEndian();
