@@ -5,6 +5,7 @@ using System;
 using System.Buffers.Binary;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using System.Runtime.Intrinsics;
 
 [assembly: InternalsVisibleTo("Nethermind.Int256.Tests")]
 
@@ -387,15 +388,15 @@ public readonly struct Int256 : IEquatable<Int256>, IComparable, IComparable<Int
     {
         // Read every limb up front: res is allowed to alias x.
         ulong x0 = x._value.u0, x1 = x._value.u1, x2 = x._value.u2, x3 = x._value.u3;
-        // The sign word is what shifts in from above, so one funnel serves both signs and every count.
-        ulong fill = (ulong)(unchecked((long)x3) >> 63);
+        long top = unchecked((long)x3);
 
         int wordShift = n >> 6;
         if ((uint)wordShift >= (uint)UInt256.Len)
         {
             if (wordShift >= 0 || (n & 63) == 0)
             {
-                SetLimbs(out res, fill, fill, fill, fill);
+                ulong saturated = (ulong)(top >> 63);
+                SetLimbs(out res, saturated, saturated, saturated, saturated);
                 return;
             }
 
@@ -405,36 +406,40 @@ public readonly struct Int256 : IEquatable<Int256>, IComparable, IComparable<Int
         int bitShift = n & 63;
         int carryShift = 63 - bitShift;
 
-        // (hi << 1) << (63 - bitShift) equals hi << (64 - bitShift) but also yields 0 when
-        // bitShift is 0, so whole-word counts need no separate path.
+        // Two identities keep this the unsigned funnel with no arithmetic of its own: an arithmetic shift
+        // of the top limb is that limb's funnel step with the sign already shifted in, and
+        // (hi << 1) << (63 - bitShift) equals hi << (64 - bitShift) while still yielding 0 at bitShift 0,
+        // so whole-word counts need no separate path.
         if (wordShift == 0)
         {
             SetLimbs(out res,
                 (x0 >> bitShift) | ((x1 << 1) << carryShift),
                 (x1 >> bitShift) | ((x2 << 1) << carryShift),
                 (x2 >> bitShift) | ((x3 << 1) << carryShift),
-                (x3 >> bitShift) | ((fill << 1) << carryShift));
+                (ulong)(top >> bitShift));
         }
         else if (wordShift == 1)
         {
             SetLimbs(out res,
                 (x1 >> bitShift) | ((x2 << 1) << carryShift),
                 (x2 >> bitShift) | ((x3 << 1) << carryShift),
-                (x3 >> bitShift) | ((fill << 1) << carryShift),
-                fill);
+                (ulong)(top >> bitShift),
+                (ulong)(top >> 63));
         }
         else if (wordShift == 2)
         {
+            ulong fill = (ulong)(top >> 63);
             SetLimbs(out res,
                 (x2 >> bitShift) | ((x3 << 1) << carryShift),
-                (x3 >> bitShift) | ((fill << 1) << carryShift),
+                (ulong)(top >> bitShift),
                 fill,
                 fill);
         }
         else
         {
+            ulong fill = (ulong)(top >> 63);
             SetLimbs(out res,
-                (x3 >> bitShift) | ((fill << 1) << carryShift),
+                (ulong)(top >> bitShift),
                 fill,
                 fill,
                 fill);
