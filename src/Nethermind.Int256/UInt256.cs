@@ -411,6 +411,66 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static bool SubtractVector128NoInline(in UInt256 a, in UInt256 b, out UInt256 res) => SubtractVector128(in a, in b, out res);
 
+    // As SubtractHybrid, but the vector path's rare fallback is the call-free scalar chain inlined, so no vector
+    // value lives across a call and the prolog saves nothing
+    internal static bool SubtractHybridInlineCold(in UInt256 a, in UInt256 b, out UInt256 res)
+    {
+        if ((b.u1 | b.u2 | b.u3) == 0)
+        {
+            return SubtractScalarUInt64(in a, b.u0, out res);
+        }
+        return SubtractVector128InlineCold(in a, in b, out res);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool SubtractVector128InlineCold(in UInt256 a, in UInt256 b, out UInt256 res)
+    {
+        ref Vector128<ulong> aRef = ref Unsafe.As<UInt256, Vector128<ulong>>(ref Unsafe.AsRef(in a));
+        ref Vector128<ulong> bRef = ref Unsafe.As<UInt256, Vector128<ulong>>(ref Unsafe.AsRef(in b));
+        Vector128<ulong> aLo = aRef;
+        Vector128<ulong> aHi = Unsafe.Add(ref aRef, 1);
+        Vector128<ulong> bLo = bRef;
+        Vector128<ulong> bHi = Unsafe.Add(ref bRef, 1);
+
+        Vector128<ulong> resultLo = aLo - bLo;
+        Vector128<ulong> resultHi = aHi - bHi;
+        Vector128<ulong> borrowLo = Vector128.LessThan(aLo, bLo);
+        Vector128<ulong> borrowHi = Vector128.LessThan(aHi, bHi);
+
+        Vector128<ulong> borrowInLo;
+        Vector128<ulong> borrowInHi;
+        if (AdvSimd.IsSupported)
+        {
+            borrowInLo = AdvSimd.ExtractVector128(borrowLo, Vector128<ulong>.Zero, 1);
+            borrowInHi = AdvSimd.ExtractVector128(borrowHi, borrowLo, 1);
+        }
+        else
+        {
+            borrowInLo = Sse2.ShiftLeftLogical128BitLane(borrowLo, 8);
+            borrowInHi = Ssse3.AlignRight(borrowHi.AsByte(), borrowLo.AsByte(), 8).AsUInt64();
+        }
+
+        Vector128<ulong> propagate = (Vector128.Equals(resultLo, Vector128<ulong>.Zero) & borrowInLo)
+                                   | (Vector128.Equals(resultHi, Vector128<ulong>.Zero) & borrowInHi);
+        if (!Vector128.EqualsAll(propagate, Vector128<ulong>.Zero))
+        {
+            // a and b are untouched; the scalar chain reads them from memory
+            ulong borrow = 0;
+            SubtractWithBorrow(a.u0, b.u0, ref borrow, out ulong r0);
+            SubtractWithBorrow(a.u1, b.u1, ref borrow, out ulong r1);
+            SubtractWithBorrow(a.u2, b.u2, ref borrow, out ulong r2);
+            SubtractWithBorrow(a.u3, b.u3, ref borrow, out ulong r3);
+            StoreLimbs(out res, r0, r1, r2, r3);
+            return borrow != 0;
+        }
+
+        Unsafe.SkipInit(out res);
+        ref Vector128<ulong> resRef = ref Unsafe.As<UInt256, Vector128<ulong>>(ref res);
+        resRef = resultLo + borrowInLo;
+        Unsafe.Add(ref resRef, 1) = resultHi + borrowInHi;
+        return borrowHi.GetElement(1) != 0;
+    }
+
     internal static bool SubtractScalarChain(in UInt256 a, in UInt256 b, out UInt256 res)
     {
         ulong borrow = 0;

@@ -759,6 +759,7 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
                 {
                     Check(UInt256.SubtractVector128(in a, in b, out r), r, "vector128");
                     Check(UInt256.SubtractHybridCall(in a, in b, out r), r, "hybrid call");
+                    Check(UInt256.SubtractHybridInlineCold(in a, in b, out r), r, "hybrid inline cold");
                 }
 
                 void Check(bool underflow, UInt256 result, string variant)
