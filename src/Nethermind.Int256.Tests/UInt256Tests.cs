@@ -651,7 +651,605 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
 {
     private const int HashDistributionSampleCount = 4096;
 
+    private static readonly BigInteger MaxUInt256Big = (BigInteger.One << 256) - BigInteger.One;
+
     public UInt256Tests() : base((BigInteger x) => (UInt256)x, (int x) => (UInt256)x, x => x, TestNumbers.UInt256Max) { }
+
+    public static IEnumerable<(UInt256 A, ulong B)> AddByUInt64Cases =>
+    [
+        (new UInt256(0, 0, 0, 0), 0),
+        (new UInt256(1, 2, 3, 4), ulong.MaxValue),
+        (new UInt256(ulong.MaxValue, 0, 0, 0), 1),
+        (new UInt256(ulong.MaxValue, ulong.MaxValue, 0, 0), 1),
+        (new UInt256(ulong.MaxValue, ulong.MaxValue, ulong.MaxValue, 0), 1),
+        (new UInt256(ulong.MaxValue, ulong.MaxValue, ulong.MaxValue, ulong.MaxValue), 1),
+        (new UInt256(ulong.MaxValue, 5, ulong.MaxValue, 7), 1),
+        (new UInt256(ulong.MaxValue, ulong.MaxValue, ulong.MaxValue, ulong.MaxValue), ulong.MaxValue),
+    ];
+
+    [TestCaseSource(nameof(AddByUInt64Cases))]
+    public void AddOverflow_right_uint64_values_preserve_result_overflow_and_aliases((UInt256 A, ulong B) test)
+    {
+        AssertAddOverflow(test.A, new UInt256(test.B));
+        AssertAddOverflow(new UInt256(test.B), test.A);
+    }
+
+    [TestCase(0UL, 0UL)]
+    [TestCase(1UL, 2UL)]
+    [TestCase(ulong.MaxValue, 1UL)]
+    [TestCase(ulong.MaxValue, ulong.MaxValue)]
+    public void AddOverflow_narrow_values_preserve_result_overflow_and_aliases(ulong aValue, ulong bValue)
+    {
+        AssertAddOverflow(new UInt256(aValue), new UInt256(bValue));
+    }
+
+    // The vector path speculates that no full limb receives a carry; these operands force the propagation path.
+    public static IEnumerable<(UInt256 A, UInt256 B)> AddCarryThroughFullLimbCases =>
+    [
+        (new UInt256(ulong.MaxValue, ulong.MaxValue, 0, 0), new UInt256(1, 0, 0, 0)),
+        (new UInt256(ulong.MaxValue, ulong.MaxValue, ulong.MaxValue, 0), new UInt256(1, 0, 0, 0)),
+        (new UInt256(ulong.MaxValue, ulong.MaxValue, ulong.MaxValue, ulong.MaxValue), new UInt256(1, 0, 0, 0)),
+        (new UInt256(0, ulong.MaxValue, ulong.MaxValue, ulong.MaxValue), new UInt256(0, 1, 0, 0)),
+        (new UInt256(0, 0, ulong.MaxValue, ulong.MaxValue), new UInt256(0, 0, 1, 0)),
+        (new UInt256(ulong.MaxValue, ulong.MaxValue, 0, ulong.MaxValue), new UInt256(1, 0, 0, 1)),
+        (new UInt256(ulong.MaxValue, 0, ulong.MaxValue, 0), new UInt256(1, ulong.MaxValue, 0, ulong.MaxValue)),
+        (new UInt256(ulong.MaxValue, ulong.MaxValue, ulong.MaxValue, ulong.MaxValue), new UInt256(ulong.MaxValue, ulong.MaxValue, ulong.MaxValue, ulong.MaxValue)),
+        (new UInt256(1UL << 63, ulong.MaxValue, 1UL << 63, ulong.MaxValue), new UInt256(1UL << 63, 0, 1UL << 63, 0)),
+        (new UInt256(5, ulong.MaxValue, 0, 7), new UInt256(ulong.MaxValue, 0, 0, 7)),
+    ];
+
+    [TestCaseSource(nameof(AddCarryThroughFullLimbCases))]
+    public void AddOverflow_carry_through_full_limbs_matches_BigInteger_oracle_and_aliases((UInt256 A, UInt256 B) test)
+    {
+        AssertAddOverflow(test.A, test.B);
+        AssertAddOverflow(test.B, test.A);
+    }
+
+    // Every limb pattern from {0, 1, 2^63, max} on both sides covers each carry generate and propagate combination.
+    [Test]
+    public void AddOverflow_limb_patterns_match_BigInteger_oracle_and_aliases()
+    {
+        ulong[] limbs = [0, 1, 1UL << 63, ulong.MaxValue];
+        List<UInt256> values = new();
+        foreach (ulong u0 in limbs)
+        {
+            foreach (ulong u1 in limbs)
+            {
+                foreach (ulong u2 in limbs)
+                {
+                    foreach (ulong u3 in limbs)
+                    {
+                        values.Add(new UInt256(u0, u1, u2, u3));
+                    }
+                }
+            }
+        }
+
+        foreach (UInt256 a in values)
+        {
+            foreach (UInt256 b in values)
+            {
+                AssertAddOverflow(a, b);
+            }
+        }
+    }
+
+    [Test]
+    public void AddOverflow_random_uint64_values_match_BigInteger_oracle_and_aliases()
+    {
+        Random random = new(0xADD0_497);
+
+        for (int i = 0; i < 4096; i++)
+        {
+            AssertAddOverflow(new UInt256(RandomUInt64(random)), new UInt256(RandomUInt64(random)));
+        }
+    }
+
+    [Test]
+    public void AddOverflow_random_full_left_and_uint64_right_match_BigInteger_oracle_and_aliases()
+    {
+        Random random = new(0xADD0_498);
+
+        for (int i = 0; i < 4096; i++)
+        {
+            UInt256 a = new UInt256(RandomUInt64(random), RandomUInt64(random), RandomUInt64(random), RandomUInt64(random));
+            UInt256 b = new UInt256(RandomUInt64(random));
+            AssertAddOverflow(a, b);
+            AssertAddOverflow(b, a);
+        }
+    }
+
+    [Test]
+    public void AddOverflow_random_wide_pairs_match_BigInteger_oracle_and_aliases()
+    {
+        Random random = new(0xADD0_499);
+
+        for (int i = 0; i < 4096; i++)
+        {
+            UInt256 a = new UInt256(RandomUInt64(random), RandomUInt64(random), RandomUInt64(random), RandomUInt64(random));
+            UInt256 b = new UInt256(RandomUInt64(random), RandomUInt64(random), RandomUInt64(random), RandomUInt64(random));
+            AssertAddOverflow(a, b);
+        }
+    }
+
+    private static ulong RandomUInt64(Random random)
+        => ((ulong)random.NextInt64() << 1) | (uint)random.Next(2);
+
+    private static void AssertAddOverflow(UInt256 a, UInt256 b)
+    {
+        BigInteger sum = (BigInteger)a + (BigInteger)b;
+        BigInteger expectedResult = sum % TestNumbers.TwoTo256;
+        bool expectedOverflow = sum >= TestNumbers.TwoTo256;
+
+        bool overflow = UInt256.AddOverflow(in a, in b, out UInt256 result);
+        ((BigInteger)result).Should().Be(expectedResult);
+        overflow.Should().Be(expectedOverflow);
+
+        UInt256.Add(in a, in b, out UInt256 plain);
+        ((BigInteger)plain).Should().Be(expectedResult);
+        ((BigInteger)(a + b)).Should().Be(expectedResult);
+
+        UInt256 aliasedA = a;
+        overflow = UInt256.AddOverflow(in aliasedA, in b, out aliasedA);
+        ((BigInteger)aliasedA).Should().Be(expectedResult);
+        overflow.Should().Be(expectedOverflow);
+
+        UInt256 aliasedB = b;
+        overflow = UInt256.AddOverflow(in a, in aliasedB, out aliasedB);
+        ((BigInteger)aliasedB).Should().Be(expectedResult);
+        overflow.Should().Be(expectedOverflow);
+    }
+
+    public static IEnumerable<(UInt256 A, ulong B)> SubtractByUInt64Cases =>
+    [
+        (new UInt256(0, 0, 0, 0), 0),
+        (new UInt256(1, 0, 0, 0), 1),
+        (new UInt256(0, 1, 0, 0), 1),
+        (new UInt256(0, 0, 1, 0), 1),
+        (new UInt256(0, 0, 0, 1), 1),
+        (new UInt256(0, 0, 0, 0), 1),
+        (new UInt256(ulong.MaxValue, ulong.MaxValue, ulong.MaxValue, ulong.MaxValue), ulong.MaxValue),
+    ];
+
+    [TestCaseSource(nameof(SubtractByUInt64Cases))]
+    public void SubtractUnderflow_right_uint64_values_preserve_result_underflow_and_aliases((UInt256 A, ulong B) test)
+    {
+        AssertSubtractUnderflow(test.A, new UInt256(test.B));
+    }
+
+    // The vector path speculates that no zero limb receives a borrow; these operands force the propagation path.
+    public static IEnumerable<(UInt256 A, UInt256 B)> SubtractBorrowThroughZeroLimbCases =>
+    [
+        (new UInt256(0, 1, 0, 0), new UInt256(1, 0, 0, 0)),
+        (new UInt256(0, 0, 1, 0), new UInt256(1, 0, 0, 0)),
+        (new UInt256(0, 0, 0, 1), new UInt256(1, 0, 0, 0)),
+        (new UInt256(0, 0, 0, 1), new UInt256(0, 1, 0, 0)),
+        (new UInt256(0, 0, 0, 1), new UInt256(0, 0, 1, 0)),
+        (new UInt256(0, 0, 0, 0), new UInt256(1, 0, 0, 0)),
+        (new UInt256(5, 0, 0, 7), new UInt256(6, 0, 0, 7)),
+        (new UInt256(5, 0, 0, 7), new UInt256(6, 0, 0, 6)),
+        (new UInt256(0, 0, 0, 1), new UInt256(0, 0, 0, 1)),
+        (new UInt256(0, ulong.MaxValue, 0, 1), new UInt256(1, ulong.MaxValue, 0, 0)),
+        (new UInt256(0, ulong.MaxValue, ulong.MaxValue, 1), new UInt256(1, ulong.MaxValue, ulong.MaxValue, 0)),
+        (new UInt256(1, 0, 0, 0), new UInt256(2, ulong.MaxValue, ulong.MaxValue, ulong.MaxValue)),
+    ];
+
+    [TestCaseSource(nameof(SubtractBorrowThroughZeroLimbCases))]
+    public void SubtractUnderflow_borrow_through_zero_limbs_matches_BigInteger_oracle_and_aliases((UInt256 A, UInt256 B) test)
+    {
+        AssertSubtractUnderflow(test.A, test.B);
+    }
+
+    // Every limb pattern from {0, 1, 2^63, max} on both sides covers each borrow generate and propagate combination.
+    [Test]
+    public void SubtractUnderflow_limb_patterns_match_BigInteger_oracle_and_aliases()
+    {
+        ulong[] limbs = [0, 1, 1UL << 63, ulong.MaxValue];
+        List<UInt256> values = new();
+        foreach (ulong u0 in limbs)
+        {
+            foreach (ulong u1 in limbs)
+            {
+                foreach (ulong u2 in limbs)
+                {
+                    foreach (ulong u3 in limbs)
+                    {
+                        values.Add(new UInt256(u0, u1, u2, u3));
+                    }
+                }
+            }
+        }
+
+        foreach (UInt256 a in values)
+        {
+            foreach (UInt256 b in values)
+            {
+                AssertSubtractUnderflow(a, b);
+            }
+        }
+    }
+
+    [Test]
+    public void SubtractUnderflow_random_full_left_and_uint64_right_match_BigInteger_oracle_and_aliases()
+    {
+        Random random = new(0x5AB7_497);
+
+        for (int i = 0; i < 4096; i++)
+        {
+            UInt256 a = new UInt256(
+                RandomSubtractOperand(random),
+                RandomSubtractOperand(random),
+                RandomSubtractOperand(random),
+                RandomSubtractOperand(random));
+            AssertSubtractUnderflow(a, new UInt256(RandomSubtractOperand(random)));
+        }
+    }
+
+    [Test]
+    public void SubtractUnderflow_random_wide_pairs_match_BigInteger_oracle_and_aliases()
+    {
+        Random random = new(0x5AB7_498);
+
+        for (int i = 0; i < 4096; i++)
+        {
+            UInt256 a = new UInt256(
+                RandomSubtractOperand(random),
+                RandomSubtractOperand(random),
+                RandomSubtractOperand(random),
+                RandomSubtractOperand(random));
+            UInt256 b = new UInt256(
+                RandomSubtractOperand(random),
+                RandomSubtractOperand(random),
+                RandomSubtractOperand(random),
+                RandomSubtractOperand(random));
+            AssertSubtractUnderflow(a, b);
+            AssertSubtractUnderflow(b, a);
+        }
+    }
+
+    private static ulong RandomSubtractOperand(Random random)
+        => ((ulong)random.NextInt64() << 1) | (uint)random.Next(2);
+
+    private static void AssertSubtractUnderflow(UInt256 a, UInt256 b)
+    {
+        BigInteger difference = (BigInteger)a - (BigInteger)b;
+        BigInteger expectedResult = difference % TestNumbers.TwoTo256;
+        if (expectedResult.Sign < 0)
+        {
+            expectedResult += TestNumbers.TwoTo256;
+        }
+        bool expectedUnderflow = difference.Sign < 0;
+
+        bool underflow = UInt256.SubtractUnderflow(in a, in b, out UInt256 result);
+        ((BigInteger)result).Should().Be(expectedResult);
+        underflow.Should().Be(expectedUnderflow);
+
+        UInt256.Subtract(in a, in b, out UInt256 plain);
+        ((BigInteger)plain).Should().Be(expectedResult);
+
+        UInt256 aliasedA = a;
+        underflow = UInt256.SubtractUnderflow(in aliasedA, in b, out aliasedA);
+        ((BigInteger)aliasedA).Should().Be(expectedResult);
+        underflow.Should().Be(expectedUnderflow);
+
+        UInt256 aliasedB = b;
+        underflow = UInt256.SubtractUnderflow(in a, in aliasedB, out aliasedB);
+        ((BigInteger)aliasedB).Should().Be(expectedResult);
+        underflow.Should().Be(expectedUnderflow);
+    }
+
+    [Test]
+    public void DivideAndMod_PowerOfTwoDivisors_MatchBigInteger()
+    {
+        UInt256[] boundaryValues =
+        [
+            UInt256.Zero,
+            UInt256.One,
+            new UInt256(ulong.MaxValue),
+            new UInt256(0, 1),
+            new UInt256(0, 0, 1),
+            UInt256.MaxValue - 1,
+            UInt256.MaxValue,
+        ];
+
+        for (int shift = 0; shift < 256; shift++)
+        {
+            UInt256 divisorValue = PowerOfTwo(shift);
+
+            foreach (UInt256 value in boundaryValues)
+            {
+                AssertResult(in value, in divisorValue);
+            }
+
+            UInt256 divisorMinusOne = divisorValue - UInt256.One;
+            UInt256 divisorPlusOne = divisorValue + UInt256.One;
+            AssertResult(in divisorMinusOne, in divisorValue);
+            AssertResult(in divisorPlusOne, in divisorValue);
+        }
+
+        Random random = new(0xD1B1DE);
+        byte[] bytes = new byte[32];
+        for (int i = 0; i < 4096; i++)
+        {
+            random.NextBytes(bytes);
+            UInt256 value = new(bytes);
+            UInt256 divisorValue = PowerOfTwo(random.Next(256));
+            AssertResult(in value, in divisorValue);
+        }
+
+        static UInt256 PowerOfTwo(int shift)
+        {
+            int limb = shift >> 6;
+            ulong value = 1UL << (shift & 63);
+            return limb switch
+            {
+                0 => new UInt256(value),
+                1 => new UInt256(0, value),
+                2 => new UInt256(0, 0, value),
+                _ => new UInt256(0, 0, 0, value),
+            };
+        }
+
+        static void AssertResult(in UInt256 value, in UInt256 divisor)
+        {
+            BigInteger dividendBigInteger = (BigInteger)value;
+            BigInteger divisorBigInteger = (BigInteger)divisor;
+            BigInteger expectedQuotient = dividendBigInteger / divisorBigInteger;
+            BigInteger expectedRemainder = dividendBigInteger % divisorBigInteger;
+
+            value.Divide(in divisor, out UInt256 quotient);
+            value.Mod(in divisor, out UInt256 remainder);
+            ((BigInteger)quotient).Should().Be(expectedQuotient);
+            ((BigInteger)remainder).Should().Be(expectedRemainder);
+
+            UInt256 aliasedValue = value;
+            aliasedValue.Divide(in divisor, out aliasedValue);
+            ((BigInteger)aliasedValue).Should().Be(expectedQuotient);
+
+            aliasedValue = value;
+            aliasedValue.Mod(in divisor, out aliasedValue);
+            ((BigInteger)aliasedValue).Should().Be(expectedRemainder);
+
+            UInt256 aliasedDivisor = divisor;
+            value.Divide(in aliasedDivisor, out aliasedDivisor);
+            ((BigInteger)aliasedDivisor).Should().Be(expectedQuotient);
+
+            aliasedDivisor = divisor;
+            value.Mod(in aliasedDivisor, out aliasedDivisor);
+            ((BigInteger)aliasedDivisor).Should().Be(expectedRemainder);
+        }
+    }
+
+    // Divide/Mod by 2^k must agree with Rsh and And, which are separate implementations reached
+    // through different dispatch. A helper that drops or misplaces a limb cannot satisfy both.
+    // Every result is written into a poisoned variable, so a limb the helper never assigns is a
+    // named failure here rather than a stale value that happens to read as zero.
+    [Test]
+    public void DivideAndMod_ByPowerOfTwo_AgreeWithShiftAndMask()
+    {
+        UInt256[] poisons =
+        [
+            new(0xaaaa_aaaa_aaaa_aaaa, 0xaaaa_aaaa_aaaa_aaaa, 0xaaaa_aaaa_aaaa_aaaa, 0xaaaa_aaaa_aaaa_aaaa),
+            new(0x5555_5555_5555_5555, 0x5555_5555_5555_5555, 0x5555_5555_5555_5555, 0x5555_5555_5555_5555),
+        ];
+
+        List<UInt256> dividends =
+        [
+            UInt256.One,
+            new UInt256(ulong.MaxValue),
+            new UInt256(0, 1),
+            new UInt256(0, 0, 1),
+            new UInt256(0, 0, 0, 1),
+            new UInt256(1, 1, 1, 1),
+            UInt256.MaxValue - UInt256.One,
+            UInt256.MaxValue,
+        ];
+        Random random = new(0x5417);
+        byte[] bytes = new byte[32];
+        for (int i = 0; i < 24; i++)
+        {
+            random.NextBytes(bytes);
+            dividends.Add(new UInt256(bytes));
+        }
+
+        for (int k = 0; k < 256; k++)
+        {
+            UInt256 divisor = UInt256.One << k;
+            UInt256 mask = divisor - UInt256.One;
+
+            foreach (UInt256 dividend in dividends)
+            {
+                UInt256.Rsh(in dividend, k, out UInt256 expectedQuotient);
+                UInt256.And(in dividend, in mask, out UInt256 expectedRemainder);
+
+                foreach (UInt256 poison in poisons)
+                {
+                    UInt256 quotient = poison;
+                    UInt256.Divide(in dividend, in divisor, out quotient);
+                    quotient.Should().Be(expectedQuotient, $"{dividend} / 2^{k}");
+
+                    UInt256 remainder = poison;
+                    UInt256.Mod(in dividend, in divisor, out remainder);
+                    remainder.Should().Be(expectedRemainder, $"{dividend} % 2^{k}");
+                }
+            }
+        }
+    }
+
+    // The power-of-two gates must reject near misses. Every other power-of-two test passes an exact
+    // power of two, so a gate that also accepted 2^k-1 or 2^k+1 would shift instead of dividing and
+    // nothing would fail: 2^k-1 has a trailing-zero count of 0, which the narrow helper cannot take.
+    [Test]
+    public void DivideAndMod_NearPowerOfTwoDivisors_StillDivide()
+    {
+        List<UInt256> dividends =
+        [
+            new UInt256(0, 1),
+            new UInt256(0, 0, 0, 1),
+            new UInt256(ulong.MaxValue, 0, ulong.MaxValue, 0),
+            UInt256.MaxValue - UInt256.One,
+            UInt256.MaxValue,
+        ];
+        Random random = new(0x9EA12);
+        byte[] bytes = new byte[32];
+        for (int i = 0; i < 8; i++)
+        {
+            random.NextBytes(bytes);
+            dividends.Add(new UInt256(bytes));
+        }
+
+        for (int k = 1; k < 256; k++)
+        {
+            UInt256 powerOfTwo = UInt256.One << k;
+
+            List<UInt256> divisors =
+            [
+                powerOfTwo - UInt256.One,            // all bits below k set; trailing zeros = 0
+                powerOfTwo | UInt256.One,            // sets a bit in the low limb, which the gates OR in
+            ];
+            if (k >= 2)
+            {
+                divisors.Add(powerOfTwo | (UInt256.One << (k - 1)));  // two adjacent bits
+            }
+            if (k < 255)
+            {
+                divisors.Add(powerOfTwo | (UInt256.One << (k + 1)));  // bit above the candidate
+            }
+
+            // One divisor per limb strictly below the candidate's, so every OR term in every gate
+            // has an input that only that term rejects. Bits at k-1 and k+1 are not enough: for a
+            // candidate in limb 3, neither ever lands alone in limb 1, and dropping just that term
+            // from the gate would otherwise go unnoticed.
+            for (int lowerLimb = 1; lowerLimb < k >> 6; lowerLimb++)
+            {
+                divisors.Add(powerOfTwo | (UInt256.One << (lowerLimb * 64)));
+            }
+
+            foreach (UInt256 divisor in divisors)
+            {
+                BigInteger divisorBig = (BigInteger)divisor;
+
+                foreach (UInt256 dividend in dividends)
+                {
+                    AssertDivMod(in dividend, in divisor);
+                }
+
+                // Quotient-boundary dividends. A gate that wrongly accepts a near miss shifts by the
+                // candidate's bit position instead of dividing, and for a random dividend that answer
+                // is coincidentally correct with probability about 1 - 2^-64. Only dividends straddling
+                // a multiple of the divisor separate the two, so the near-miss divisors above are
+                // worthless without these.
+                // The round-up values zero the dividend's low limbs, which is the only way to make a
+                // borrow cross a limb during x - y. Without them the subtract on the quotient-1 path
+                // is only ever exercised on operands where every limb subtracts cleanly.
+                foreach (BigInteger boundary in (BigInteger[])
+                    [divisorBig + 1, divisorBig * 2, divisorBig * 2 + 1, divisorBig * 3 - 1,
+                     ((divisorBig >> 64) + 1) << 64, ((divisorBig >> 128) + 1) << 128,
+                     ((divisorBig >> 192) + 1) << 192])
+                {
+                    if (boundary <= MaxUInt256Big)
+                    {
+                        UInt256 dividend = (UInt256)boundary;
+                        AssertDivMod(in dividend, in divisor);
+                    }
+                }
+            }
+        }
+
+        static void AssertDivMod(in UInt256 dividend, in UInt256 divisor)
+        {
+            BigInteger dividendBig = (BigInteger)dividend;
+            BigInteger divisorBig = (BigInteger)divisor;
+
+            UInt256.Divide(in dividend, in divisor, out UInt256 quotient);
+            ((BigInteger)quotient).Should().Be(dividendBig / divisorBig, $"{dividendBig} / {divisorBig}");
+
+            UInt256.Mod(in dividend, in divisor, out UInt256 remainder);
+            ((BigInteger)remainder).Should().Be(dividendBig % divisorBig, $"{dividendBig} % {divisorBig}");
+        }
+    }
+
+    [Test]
+    public void MultiplyMod_by_max_value_matches_BigInteger()
+    {
+        Random random = new(0);
+        byte[] operands = new byte[64];
+        UInt256[] boundaryValues =
+        [
+            default,
+            UInt256.One,
+            new UInt256(2),
+            new UInt256(ulong.MaxValue),
+            new UInt256(0, 1),
+            new UInt256(0, 0, 1),
+            UInt256.MaxValue - 1,
+            // Their squares force the end-around carry through one, two, and three result limbs.
+            UInt256.MaxValue - new UInt256(1UL << 32),
+            UInt256.MaxValue - new UInt256(0, 1),
+            UInt256.MaxValue - new UInt256(0, 1UL << 32),
+            UInt256.MaxValue,
+        ];
+
+        foreach (UInt256 x in boundaryValues)
+        {
+            foreach (UInt256 y in boundaryValues)
+            {
+                AssertResult(in x, in y);
+            }
+        }
+
+        for (int i = 0; i < 4096; i++)
+        {
+            random.NextBytes(operands);
+            AssertResult(new UInt256(operands.AsSpan(0, 32)), new UInt256(operands.AsSpan(32, 32)));
+        }
+
+        static void AssertResult(in UInt256 x, in UInt256 y)
+        {
+            BigInteger expected = (BigInteger)x * (BigInteger)y % TestNumbers.UInt256Max;
+
+            UInt256.MultiplyMod(in x, in y, in UInt256.MaxValue, out UInt256 result);
+            ((BigInteger)result).Should().Be(expected);
+
+            UInt256 left = x;
+            UInt256 modulus = UInt256.MaxValue;
+            left.MultiplyMod(in y, in modulus, out left);
+            ((BigInteger)left).Should().Be(expected);
+
+            UInt256 right = y;
+            x.MultiplyMod(in right, in modulus, out right);
+            ((BigInteger)right).Should().Be(expected);
+
+            x.MultiplyMod(in y, in modulus, out modulus);
+            ((BigInteger)modulus).Should().Be(expected);
+        }
+    }
+
+    public static TestCaseData[] UlongConstructorCases { get; } =
+    [
+        new TestCaseData(0UL, 0UL, 0UL, 0UL),
+        new TestCaseData(ulong.MaxValue, 0UL, 0UL, 0UL),
+        new TestCaseData(0UL, ulong.MaxValue, 0UL, 0UL),
+        new TestCaseData(0UL, 0UL, ulong.MaxValue, 0UL),
+        new TestCaseData(0UL, 0UL, 0UL, ulong.MaxValue),
+        new TestCaseData(0x8000_0000_0000_0000UL, 0x0123_4567_89AB_CDEFUL, 0xFEDC_BA98_7654_3210UL, 0x8000_0000_0000_0001UL),
+    ];
+
+    [TestCaseSource(nameof(UlongConstructorCases))]
+    public void UlongConstructor_WritesLimbs_AndRoundTrips(ulong u0, ulong u1, ulong u2, ulong u3)
+    {
+        UInt256 value = new(u0, u1, u2, u3);
+
+        value.u0.Should().Be(u0);
+        value.u1.Should().Be(u1);
+        value.u2.Should().Be(u2);
+        value.u3.Should().Be(u3);
+
+        BigInteger expected = (BigInteger)u0 + ((BigInteger)u1 << 64) + ((BigInteger)u2 << 128) + ((BigInteger)u3 << 192);
+        ((BigInteger)value).Should().Be(expected);
+        new UInt256(value.ToLittleEndian()).Should().Be(value);
+        new UInt256(value.ToBigEndian(), isBigEndian: true).Should().Be(value);
+    }
 
     public static IEnumerable<(UInt256 A, ulong A4, ulong D)> Remainder257By64BitsCases
     {
@@ -913,6 +1511,130 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
             UInt256 right = y;
             x.Multiply(in right, out right);
             ((BigInteger)right).Should().Be(expected);
+        }
+    }
+
+    [Test]
+    public void Multiply_each_limb_width_matches_BigInteger()
+    {
+        Random random = new(0x4D554C54);
+
+        for (int xWidth = 1; xWidth <= 4; xWidth++)
+        {
+            for (int yWidth = 1; yWidth <= 4; yWidth++)
+            {
+                for (int i = 0; i < 256; i++)
+                {
+                    UInt256 x = CreateWidth(random, xWidth);
+                    UInt256 y = CreateWidth(random, yWidth);
+                    BigInteger expected = (BigInteger)x * (BigInteger)y % TestNumbers.TwoTo256;
+
+                    UInt256.Multiply(in x, in y, out UInt256 result);
+                    ((BigInteger)result).Should().Be(expected);
+
+                    UInt256 alias = x;
+                    alias.Multiply(in y, out alias);
+                    ((BigInteger)alias).Should().Be(expected);
+                }
+            }
+        }
+
+        static UInt256 CreateWidth(Random random, int width)
+        {
+            ulong u0 = (ulong)random.NextInt64() | 1;
+            ulong u1 = (ulong)random.NextInt64() | 1;
+            ulong u2 = (ulong)random.NextInt64() | 1;
+            ulong u3 = (ulong)random.NextInt64() | 1;
+
+            return width switch
+            {
+                1 => new UInt256(u0),
+                2 => new UInt256(u0, u1),
+                3 => new UInt256(u0, u1, u2),
+                4 => new UInt256(u0, u1, u2, u3),
+                _ => throw new ArgumentOutOfRangeException(nameof(width)),
+            };
+        }
+    }
+
+    // Every dispatch shape (1x1, one-limb ladder on either side, 2x2, 2xN on either side, 4x4) with limbs drawn
+    // from the values that saturate or skip carries: 0, 1, 2, 2^63, 2^64 - 1 and random. Whole-operand zero and
+    // one no longer have a dedicated shortcut, so they must round-trip through every kernel, in both operand
+    // orders and with the result aliased over either input.
+    [Test]
+    public void Multiply_edge_limbs_in_every_width_pair_match_BigInteger()
+    {
+        ulong[] edges = [0UL, 1UL, 2UL, 1UL << 63, ulong.MaxValue, 0x9E3779B97F4A7C15UL];
+        Random random = new(0x4D554C45);
+
+        for (int xWidth = 1; xWidth <= 4; xWidth++)
+        {
+            for (int yWidth = 1; yWidth <= 4; yWidth++)
+            {
+                for (int i = 0; i < 512; i++)
+                {
+                    UInt256 x = CreateEdgeWidth(random, edges, xWidth);
+                    UInt256 y = CreateEdgeWidth(random, edges, yWidth);
+                    AssertMultiply(x, y);
+                    AssertMultiply(y, x);
+                }
+
+                UInt256 xMax = MaxOfWidth(xWidth);
+                UInt256 yMax = MaxOfWidth(yWidth);
+                AssertMultiply(xMax, yMax);
+                AssertMultiply(xMax, UInt256.Zero);
+                AssertMultiply(UInt256.Zero, yMax);
+                AssertMultiply(xMax, UInt256.One);
+                AssertMultiply(UInt256.One, yMax);
+            }
+        }
+
+        static UInt256 CreateEdgeWidth(Random random, ulong[] edges, int width)
+        {
+            ulong Limb(bool top)
+            {
+                ulong v = edges[random.Next(edges.Length)];
+                if (v == 0x9E3779B97F4A7C15UL)
+                {
+                    v = (ulong)random.NextInt64() ^ ((ulong)random.Next(4) << 62);
+                }
+                // The top limb of the requested width stays nonzero so the value really has that width.
+                return top && v == 0 ? 1UL : v;
+            }
+
+            return width switch
+            {
+                1 => new UInt256(Limb(true)),
+                2 => new UInt256(Limb(false), Limb(true)),
+                3 => new UInt256(Limb(false), Limb(false), Limb(true)),
+                _ => new UInt256(Limb(false), Limb(false), Limb(false), Limb(true)),
+            };
+        }
+
+        static UInt256 MaxOfWidth(int width) => width switch
+        {
+            1 => new UInt256(ulong.MaxValue),
+            2 => new UInt256(ulong.MaxValue, ulong.MaxValue),
+            3 => new UInt256(ulong.MaxValue, ulong.MaxValue, ulong.MaxValue),
+            _ => UInt256.MaxValue,
+        };
+
+        static void AssertMultiply(UInt256 x, UInt256 y)
+        {
+            BigInteger expected = (BigInteger)x * (BigInteger)y % TestNumbers.TwoTo256;
+
+            UInt256.Multiply(in x, in y, out UInt256 result);
+            ((BigInteger)result).Should().Be(expected, $"{x} * {y}");
+
+            UInt256 left = x;
+            left.Multiply(in y, out left);
+            ((BigInteger)left).Should().Be(expected, $"{x} * {y} aliased over x");
+
+            UInt256 right = y;
+            x.Multiply(in right, out right);
+            ((BigInteger)right).Should().Be(expected, $"{x} * {y} aliased over y");
+
+            ((BigInteger)(x * y)).Should().Be(expected, $"{x} * {y} via operator");
         }
     }
 
