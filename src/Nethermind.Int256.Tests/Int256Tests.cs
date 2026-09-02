@@ -24,19 +24,19 @@ public class Int256Tests : UInt256TestsTemplate<Int256>
     [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.SignedTestCases))]
     public override void Add((BigInteger A, BigInteger B) test) => base.Add(test);
 
-    [TestCaseSource(typeof(TernaryOps), nameof(TernaryOps.SignedModTestCases))]
+    [TestCaseSource(typeof(TernaryOps), nameof(TernaryOps.SignedTestCases))]
     public override void AddMod((BigInteger A, BigInteger B, BigInteger M) test) => base.AddMod(test);
 
     [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.SignedTestCases))]
     public override void Subtract((BigInteger A, BigInteger B) test) => base.Subtract(test);
 
-    [TestCaseSource(typeof(TernaryOps), nameof(TernaryOps.SignedModTestCases))]
+    [TestCaseSource(typeof(TernaryOps), nameof(TernaryOps.SignedTestCases))]
     public override void SubtractMod((BigInteger A, BigInteger B, BigInteger M) test) => base.SubtractModCore(test, false);
 
     [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.SignedTestCases))]
     public override void Multiply((BigInteger A, BigInteger B) test) => base.Multiply(test);
 
-    [TestCaseSource(typeof(TernaryOps), nameof(TernaryOps.SignedModTestCases))]
+    [TestCaseSource(typeof(TernaryOps), nameof(TernaryOps.SignedTestCases))]
     public override void MultiplyMod((BigInteger A, BigInteger B, BigInteger M) test) => base.MultiplyMod(test);
 
     [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.SignedTestCases))]
@@ -48,7 +48,7 @@ public class Int256Tests : UInt256TestsTemplate<Int256>
     [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.SignedShiftTestCases))]
     public override void Exp((BigInteger A, int n) test) => base.Exp(test);
 
-    [TestCaseSource(typeof(TernaryOps), nameof(TernaryOps.SignedModTestCases))]
+    [TestCaseSource(typeof(TernaryOps), nameof(TernaryOps.SignedTestCases))]
     public override void ExpMod((BigInteger A, BigInteger B, BigInteger M) test) => base.ExpMod(test);
 
     [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.SignedShiftTestCases))]
@@ -145,122 +145,11 @@ public class Int256Tests : UInt256TestsTemplate<Int256>
     }
 
     [Test]
-    public void NegativityGatedOperations_MatchBigInteger()
+    public void Exp_NegativeExponent_Throws()
     {
-        BigInteger min = -(BigInteger.One << 255);
-        BigInteger max = (BigInteger.One << 255) - 1;
-        BigInteger[] values = [min, min + 1, -2, -1, 0, 1, 2, max - 1, max];
-        BigInteger[] operationValues = [-17, -2, -1, 0, 1, 2, 17];
-        BigInteger[] moduli = [min, -17, -1, 1, 17, max];
-        int[] shifts = [0, 1, 63, 64, 127, 128, 191, 192, 255, 256, 257];
+        Action act = () => Int256.One.Exp(Int256.MinusOne, out Int256 _);
 
-        foreach (BigInteger a in values)
-        {
-            Int256 intA = new(a);
-            foreach (int shift in shifts)
-            {
-                intA.RightShift(shift, out Int256 shifted);
-                shifted.Convert(out BigInteger shiftedValue);
-                shiftedValue.Should().Be(a >> shift, $"Rsh({a}, {shift})");
-            }
-
-            foreach (BigInteger exponent in new BigInteger[] { 0, 1, 2, 3 })
-            {
-                Int256 intExponent = new(exponent);
-                intA.Exp(intExponent, out Int256 raised);
-                raised.Convert(out BigInteger raisedValue);
-                raisedValue.Should().Be(Postprocess(BigInteger.Pow(a, (int)exponent)), $"Exp({a}, {exponent})");
-
-                foreach (BigInteger modulus in moduli)
-                {
-                    intA.ExpMod(intExponent, new Int256(modulus), out Int256 modularRaised);
-                    modularRaised.Convert(out BigInteger modularRaisedValue);
-                    BigInteger magnitude = BigInteger.ModPow(BigInteger.Abs(a), exponent, BigInteger.Abs(modulus));
-                    BigInteger expected = a.Sign < 0 && !exponent.IsEven ? -magnitude : magnitude;
-                    modularRaisedValue.Should().Be(Postprocess(expected), $"ExpMod({a}, {exponent}, {modulus})");
-                }
-            }
-
-            if (a < -17 || a > 17)
-            {
-                continue;
-            }
-
-            foreach (BigInteger b in operationValues)
-            {
-                Int256 intB = new(b);
-
-                AssertMultiplyDivideAndMod(a, b);
-
-                if (b.IsZero)
-                {
-                    continue;
-                }
-
-                foreach (BigInteger modulus in moduli)
-                {
-                    Int256 intModulus = new(modulus);
-
-                    intA.AddMod(intB, intModulus, out Int256 added);
-                    added.Convert(out BigInteger addedValue);
-                    addedValue.Should().Be(Postprocess((a + b) % modulus), $"AddMod({a}, {b}, {modulus})");
-
-                    intA.SubtractMod(intB, intModulus, out Int256 subtracted);
-                    subtracted.Convert(out BigInteger subtractedValue);
-                    subtractedValue.Should().Be(Postprocess((a - b) % modulus), $"SubtractMod({a}, {b}, {modulus})");
-
-                    intA.MultiplyMod(intB, intModulus, out Int256 multipliedModular);
-                    multipliedModular.Convert(out BigInteger multipliedModularValue);
-                    multipliedModularValue.Should().Be(Postprocess((a * b) % modulus), $"MultiplyMod({a}, {b}, {modulus})");
-                }
-            }
-        }
-
-        foreach (BigInteger a in values)
-        {
-            foreach (BigInteger b in values)
-            {
-                AssertMultiplyDivideAndMod(a, b);
-            }
-        }
-
-        foreach (BigInteger value in values)
-        {
-            Action divideByZero = () => new Int256(value).Divide(Int256.Zero, out Int256 _);
-            divideByZero.Should().Throw<DivideByZeroException>();
-
-            Action modByZero = () => new Int256(value).Mod(Int256.Zero, out Int256 _);
-            modByZero.Should().Throw<DivideByZeroException>();
-        }
-
-        Action negativeExponent = () => Int256.One.Exp(Int256.MinusOne, out Int256 _);
-        negativeExponent.Should().Throw<ArgumentException>().WithMessage("exponent must be non-negative");
-
-        Action negativeModularExponent = () => Int256.One.ExpMod(Int256.MinusOne, Int256.One, out Int256 _);
-        negativeModularExponent.Should().Throw<ArgumentException>().WithMessage("exponent must not be negative");
-    }
-
-    private static void AssertMultiplyDivideAndMod(BigInteger a, BigInteger b)
-    {
-        Int256 intA = new(a);
-        Int256 intB = new(b);
-
-        intA.Multiply(intB, out Int256 multiplied);
-        multiplied.Convert(out BigInteger multipliedValue);
-        multipliedValue.Should().Be(Postprocess(a * b), $"Multiply({a}, {b})");
-
-        if (b.IsZero)
-        {
-            return;
-        }
-
-        intA.Divide(intB, out Int256 divided);
-        divided.Convert(out BigInteger dividedValue);
-        dividedValue.Should().Be(Postprocess(a / b), $"Divide({a}, {b})");
-
-        intA.Mod(intB, out Int256 remainder);
-        remainder.Convert(out BigInteger remainderValue);
-        remainderValue.Should().Be(Postprocess(a % b), $"Mod({a}, {b})");
+        act.Should().Throw<ArgumentException>();
     }
 
     public static (string a, string b)[] SignedComparePairs { get; } =

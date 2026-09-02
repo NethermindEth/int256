@@ -79,6 +79,7 @@ public static class UnaryOps
         TestNumbers.UInt192Max,
         TestNumbers.Int256Max,
         TestNumbers.Int256Min,
+        TestNumbers.Int256Min + 1,
     }.Concat(RandomSigned(5));
 
     public static IEnumerable<ulong> ULongTestCases =
@@ -94,7 +95,7 @@ public static class UnaryOps
         ulong.MaxValue,
     };
 
-    public static IEnumerable<int> ShiftTestCases => Enumerable.Range(0, 257);
+    public static IEnumerable<int> ShiftTestCases => Enumerable.Range(0, 258);
 
     const int Seed = 0;
 
