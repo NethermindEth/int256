@@ -345,12 +345,13 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
             borrowInHi = Ssse3.AlignRight(borrowHi.AsByte(), borrowLo.AsByte(), 8).AsUInt64();
         }
 
-        // A zero limb that receives a borrow must pass it on; a and b are still intact for the scalar chain
+        // A zero limb that receives a borrow must pass it on; a and b are still intact for the scalar chain.
+        // Out of line, or its stores stop inlining and the prolog saves vector registers on the hot path.
         Vector128<ulong> propagate = (Vector128.Equals(resultLo, Vector128<ulong>.Zero) & borrowInLo)
                                    | (Vector128.Equals(resultHi, Vector128<ulong>.Zero) & borrowInHi);
         if (!Vector128.EqualsAll(propagate, Vector128<ulong>.Zero))
         {
-            return SubtractScalar(in a, in b, out res);
+            return SubtractScalarCold(in a, in b, out res);
         }
 
         Unsafe.SkipInit(out res);
@@ -379,6 +380,9 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         return borrow != 0;
     }
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static bool SubtractScalarCold(in UInt256 a, in UInt256 b, out UInt256 res) => SubtractScalar(in a, in b, out res);
+
     // Measurement variants for SubtractShapesBench on the CI runners: one-limb ladder in front of the
     // 128-bit path, and the pre-ladder scalar chain that origin/main runs on non-AVX2 hardware.
     internal static bool SubtractHybrid(in UInt256 a, in UInt256 b, out UInt256 res)
@@ -394,60 +398,18 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         return SubtractScalar(in a, in b, out res);
     }
 
-    // Ladder with 16-byte stores in front of the 128-bit path: one lane insert instead of four scalar stores
-    internal static bool SubtractHybridVectorStore(in UInt256 a, in UInt256 b, out UInt256 res)
+    // As SubtractHybrid, but the wide path is a call so the one-limb path keeps a minimal prolog
+    internal static bool SubtractHybridCall(in UInt256 a, in UInt256 b, out UInt256 res)
     {
         if ((b.u1 | b.u2 | b.u3) == 0)
         {
-            return SubtractOneLimbVector128(in a, b.u0, out res);
+            return SubtractScalarUInt64(in a, b.u0, out res);
         }
-        return SubtractVector128(in a, in b, out res);
+        return SubtractVector128NoInline(in a, in b, out res);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool SubtractOneLimbVector128(in UInt256 a, ulong b0, out UInt256 res)
-    {
-        ref Vector128<ulong> aRef = ref Unsafe.As<UInt256, Vector128<ulong>>(ref Unsafe.AsRef(in a));
-        Vector128<ulong> aLo = aRef;
-        Vector128<ulong> aHi = Unsafe.Add(ref aRef, 1);
-        ulong a0 = a.u0;
-        ulong r0 = a0 - b0;
-        if (a0 >= b0)
-        {
-            StoreHalves(out res, aLo.WithElement(0, r0), aHi);
-            return false;
-        }
-        ulong a1 = a.u1;
-        if (a1 != 0)
-        {
-            StoreHalves(out res, Vector128.Create(r0, a1 - 1), aHi);
-            return false;
-        }
-        ulong a2 = a.u2;
-        ulong a3 = a.u3;
-        if (a2 != 0)
-        {
-            StoreHalves(out res, Vector128.Create(r0, ulong.MaxValue), Vector128.Create(a2 - 1, a3));
-            return false;
-        }
-        if (a3 != 0)
-        {
-            StoreHalves(out res, Vector128.Create(r0, ulong.MaxValue), Vector128.Create(ulong.MaxValue, a3 - 1));
-            return false;
-        }
-
-        StoreHalves(out res, Vector128.Create(r0, ulong.MaxValue), Vector128<ulong>.AllBitsSet);
-        return true;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void StoreHalves(out UInt256 res, Vector128<ulong> lo, Vector128<ulong> hi)
-    {
-        Unsafe.SkipInit(out res);
-        ref Vector128<ulong> resRef = ref Unsafe.As<UInt256, Vector128<ulong>>(ref res);
-        resRef = lo;
-        Unsafe.Add(ref resRef, 1) = hi;
-    }
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static bool SubtractVector128NoInline(in UInt256 a, in UInt256 b, out UInt256 res) => SubtractVector128(in a, in b, out res);
 
     internal static bool SubtractScalarChain(in UInt256 a, in UInt256 b, out UInt256 res)
     {

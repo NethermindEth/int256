@@ -758,7 +758,7 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
                 if (Arm.AdvSimd.IsSupported || x64.Sse42.IsSupported)
                 {
                     Check(UInt256.SubtractVector128(in a, in b, out r), r, "vector128");
-                    Check(UInt256.SubtractHybridVectorStore(in a, in b, out r), r, "hybrid vector store");
+                    Check(UInt256.SubtractHybridCall(in a, in b, out r), r, "hybrid call");
                 }
 
                 void Check(bool underflow, UInt256 result, string variant)

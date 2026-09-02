@@ -15,8 +15,8 @@ namespace Nethermind.Int256.Benchmark;
 /// <remarks>
 /// Every variant sits behind a NoInlining wrapper so each is exactly one call, as production callers see it.
 /// <c>Chain</c> is the scalar borrow chain that origin/main runs without AVX2, <c>Ladder</c> adds the one-limb
-/// branch ladder, <c>V128</c> is the two-half vector path, <c>Hybrid</c> is the ladder in front of the vector
-/// path and <c>HybridV</c> is the same with 16-byte stores in the ladder.
+/// branch ladder, <c>V128</c> is the two-half vector path and <c>Hybrid</c> is the ladder in front of the vector
+/// path; <c>HybridCall</c> reaches the vector path through a call so the one-limb path keeps a minimal prolog.
 /// </remarks>
 [WarmupCount(3)]
 [IterationCount(10)]
@@ -59,25 +59,25 @@ public class SubtractShapesBench
     [Benchmark(OperationsPerInvoke = N)] public UInt256 OneLimb_Ladder() => Run<LadderSub>(_oneLimbA, _oneLimbB);
     [Benchmark(OperationsPerInvoke = N)] public UInt256 OneLimb_V128() => Run<V128Sub>(_oneLimbA, _oneLimbB);
     [Benchmark(OperationsPerInvoke = N)] public UInt256 OneLimb_Hybrid() => Run<HybridSub>(_oneLimbA, _oneLimbB);
-    [Benchmark(OperationsPerInvoke = N)] public UInt256 OneLimb_HybridV() => Run<HybridVSub>(_oneLimbA, _oneLimbB);
+    [Benchmark(OperationsPerInvoke = N)] public UInt256 OneLimb_HybridCall() => Run<HybridCallSub>(_oneLimbA, _oneLimbB);
 
     [Benchmark(OperationsPerInvoke = N)] public UInt256 Wide_Chain() => Run<ChainSub>(_wideA, _wideB);
     [Benchmark(OperationsPerInvoke = N)] public UInt256 Wide_Ladder() => Run<LadderSub>(_wideA, _wideB);
     [Benchmark(OperationsPerInvoke = N)] public UInt256 Wide_V128() => Run<V128Sub>(_wideA, _wideB);
     [Benchmark(OperationsPerInvoke = N)] public UInt256 Wide_Hybrid() => Run<HybridSub>(_wideA, _wideB);
-    [Benchmark(OperationsPerInvoke = N)] public UInt256 Wide_HybridV() => Run<HybridVSub>(_wideA, _wideB);
+    [Benchmark(OperationsPerInvoke = N)] public UInt256 Wide_HybridCall() => Run<HybridCallSub>(_wideA, _wideB);
 
     [Benchmark(OperationsPerInvoke = N)] public UInt256 ZeroLimbBorrow_Chain() => Run<ChainSub>(_cascadeA, _cascadeB);
     [Benchmark(OperationsPerInvoke = N)] public UInt256 ZeroLimbBorrow_Ladder() => Run<LadderSub>(_cascadeA, _cascadeB);
     [Benchmark(OperationsPerInvoke = N)] public UInt256 ZeroLimbBorrow_V128() => Run<V128Sub>(_cascadeA, _cascadeB);
     [Benchmark(OperationsPerInvoke = N)] public UInt256 ZeroLimbBorrow_Hybrid() => Run<HybridSub>(_cascadeA, _cascadeB);
-    [Benchmark(OperationsPerInvoke = N)] public UInt256 ZeroLimbBorrow_HybridV() => Run<HybridVSub>(_cascadeA, _cascadeB);
+    [Benchmark(OperationsPerInvoke = N)] public UInt256 ZeroLimbBorrow_HybridCall() => Run<HybridCallSub>(_cascadeA, _cascadeB);
 
     [Benchmark(OperationsPerInvoke = N)] public UInt256 DependentChain_Chain() => RunChain<ChainSub>(_chainB);
     [Benchmark(OperationsPerInvoke = N)] public UInt256 DependentChain_Ladder() => RunChain<LadderSub>(_chainB);
     [Benchmark(OperationsPerInvoke = N)] public UInt256 DependentChain_V128() => RunChain<V128Sub>(_chainB);
     [Benchmark(OperationsPerInvoke = N)] public UInt256 DependentChain_Hybrid() => RunChain<HybridSub>(_chainB);
-    [Benchmark(OperationsPerInvoke = N)] public UInt256 DependentChain_HybridV() => RunChain<HybridVSub>(_chainB);
+    [Benchmark(OperationsPerInvoke = N)] public UInt256 DependentChain_HybridCall() => RunChain<HybridCallSub>(_chainB);
 
     private static UInt256 Run<TSub>(UInt256[] a, UInt256[] b) where TSub : struct, ISub
     {
@@ -130,9 +130,9 @@ public class SubtractShapesBench
         public static bool Sub(in UInt256 a, in UInt256 b, out UInt256 res) => UInt256.SubtractHybrid(in a, in b, out res);
     }
 
-    private struct HybridVSub : ISub
+    private struct HybridCallSub : ISub
     {
         [MethodImpl(MethodImplOptions.NoInlining)]
-        public static bool Sub(in UInt256 a, in UInt256 b, out UInt256 res) => UInt256.SubtractHybridVectorStore(in a, in b, out res);
+        public static bool Sub(in UInt256 a, in UInt256 b, out UInt256 res) => UInt256.SubtractHybridCall(in a, in b, out res);
     }
 }
