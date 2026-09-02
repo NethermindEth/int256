@@ -655,6 +655,151 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
 
     public UInt256Tests() : base((BigInteger x) => (UInt256)x, (int x) => (UInt256)x, x => x, TestNumbers.UInt256Max) { }
 
+    public static IEnumerable<(UInt256 A, ulong B)> AddByUInt64Cases =>
+    [
+        (new UInt256(0, 0, 0, 0), 0),
+        (new UInt256(1, 2, 3, 4), ulong.MaxValue),
+        (new UInt256(ulong.MaxValue, 0, 0, 0), 1),
+        (new UInt256(ulong.MaxValue, ulong.MaxValue, 0, 0), 1),
+        (new UInt256(ulong.MaxValue, ulong.MaxValue, ulong.MaxValue, 0), 1),
+        (new UInt256(ulong.MaxValue, ulong.MaxValue, ulong.MaxValue, ulong.MaxValue), 1),
+        (new UInt256(ulong.MaxValue, 5, ulong.MaxValue, 7), 1),
+        (new UInt256(ulong.MaxValue, ulong.MaxValue, ulong.MaxValue, ulong.MaxValue), ulong.MaxValue),
+    ];
+
+    [TestCaseSource(nameof(AddByUInt64Cases))]
+    public void AddOverflow_right_uint64_values_preserve_result_overflow_and_aliases((UInt256 A, ulong B) test)
+    {
+        AssertAddOverflow(test.A, new UInt256(test.B));
+        AssertAddOverflow(new UInt256(test.B), test.A);
+    }
+
+    [TestCase(0UL, 0UL)]
+    [TestCase(1UL, 2UL)]
+    [TestCase(ulong.MaxValue, 1UL)]
+    [TestCase(ulong.MaxValue, ulong.MaxValue)]
+    public void AddOverflow_narrow_values_preserve_result_overflow_and_aliases(ulong aValue, ulong bValue)
+    {
+        AssertAddOverflow(new UInt256(aValue), new UInt256(bValue));
+    }
+
+    // The vector path speculates that no full limb receives a carry; these operands force the propagation path.
+    public static IEnumerable<(UInt256 A, UInt256 B)> AddCarryThroughFullLimbCases =>
+    [
+        (new UInt256(ulong.MaxValue, ulong.MaxValue, 0, 0), new UInt256(1, 0, 0, 0)),
+        (new UInt256(ulong.MaxValue, ulong.MaxValue, ulong.MaxValue, 0), new UInt256(1, 0, 0, 0)),
+        (new UInt256(ulong.MaxValue, ulong.MaxValue, ulong.MaxValue, ulong.MaxValue), new UInt256(1, 0, 0, 0)),
+        (new UInt256(0, ulong.MaxValue, ulong.MaxValue, ulong.MaxValue), new UInt256(0, 1, 0, 0)),
+        (new UInt256(0, 0, ulong.MaxValue, ulong.MaxValue), new UInt256(0, 0, 1, 0)),
+        (new UInt256(ulong.MaxValue, ulong.MaxValue, 0, ulong.MaxValue), new UInt256(1, 0, 0, 1)),
+        (new UInt256(ulong.MaxValue, 0, ulong.MaxValue, 0), new UInt256(1, ulong.MaxValue, 0, ulong.MaxValue)),
+        (new UInt256(ulong.MaxValue, ulong.MaxValue, ulong.MaxValue, ulong.MaxValue), new UInt256(ulong.MaxValue, ulong.MaxValue, ulong.MaxValue, ulong.MaxValue)),
+        (new UInt256(1UL << 63, ulong.MaxValue, 1UL << 63, ulong.MaxValue), new UInt256(1UL << 63, 0, 1UL << 63, 0)),
+        (new UInt256(5, ulong.MaxValue, 0, 7), new UInt256(ulong.MaxValue, 0, 0, 7)),
+    ];
+
+    [TestCaseSource(nameof(AddCarryThroughFullLimbCases))]
+    public void AddOverflow_carry_through_full_limbs_matches_BigInteger_oracle_and_aliases((UInt256 A, UInt256 B) test)
+    {
+        AssertAddOverflow(test.A, test.B);
+        AssertAddOverflow(test.B, test.A);
+    }
+
+    // Every limb pattern from {0, 1, 2^63, max} on both sides covers each carry generate and propagate combination.
+    [Test]
+    public void AddOverflow_limb_patterns_match_BigInteger_oracle_and_aliases()
+    {
+        ulong[] limbs = [0, 1, 1UL << 63, ulong.MaxValue];
+        List<UInt256> values = new();
+        foreach (ulong u0 in limbs)
+        {
+            foreach (ulong u1 in limbs)
+            {
+                foreach (ulong u2 in limbs)
+                {
+                    foreach (ulong u3 in limbs)
+                    {
+                        values.Add(new UInt256(u0, u1, u2, u3));
+                    }
+                }
+            }
+        }
+
+        foreach (UInt256 a in values)
+        {
+            foreach (UInt256 b in values)
+            {
+                AssertAddOverflow(a, b);
+            }
+        }
+    }
+
+    [Test]
+    public void AddOverflow_random_uint64_values_match_BigInteger_oracle_and_aliases()
+    {
+        Random random = new(0xADD0_497);
+
+        for (int i = 0; i < 4096; i++)
+        {
+            AssertAddOverflow(new UInt256(RandomUInt64(random)), new UInt256(RandomUInt64(random)));
+        }
+    }
+
+    [Test]
+    public void AddOverflow_random_full_left_and_uint64_right_match_BigInteger_oracle_and_aliases()
+    {
+        Random random = new(0xADD0_498);
+
+        for (int i = 0; i < 4096; i++)
+        {
+            UInt256 a = new UInt256(RandomUInt64(random), RandomUInt64(random), RandomUInt64(random), RandomUInt64(random));
+            UInt256 b = new UInt256(RandomUInt64(random));
+            AssertAddOverflow(a, b);
+            AssertAddOverflow(b, a);
+        }
+    }
+
+    [Test]
+    public void AddOverflow_random_wide_pairs_match_BigInteger_oracle_and_aliases()
+    {
+        Random random = new(0xADD0_499);
+
+        for (int i = 0; i < 4096; i++)
+        {
+            UInt256 a = new UInt256(RandomUInt64(random), RandomUInt64(random), RandomUInt64(random), RandomUInt64(random));
+            UInt256 b = new UInt256(RandomUInt64(random), RandomUInt64(random), RandomUInt64(random), RandomUInt64(random));
+            AssertAddOverflow(a, b);
+        }
+    }
+
+    private static ulong RandomUInt64(Random random)
+        => ((ulong)random.NextInt64() << 1) | (uint)random.Next(2);
+
+    private static void AssertAddOverflow(UInt256 a, UInt256 b)
+    {
+        BigInteger sum = (BigInteger)a + (BigInteger)b;
+        BigInteger expectedResult = sum % TestNumbers.TwoTo256;
+        bool expectedOverflow = sum >= TestNumbers.TwoTo256;
+
+        bool overflow = UInt256.AddOverflow(in a, in b, out UInt256 result);
+        ((BigInteger)result).Should().Be(expectedResult);
+        overflow.Should().Be(expectedOverflow);
+
+        UInt256.Add(in a, in b, out UInt256 plain);
+        ((BigInteger)plain).Should().Be(expectedResult);
+        ((BigInteger)(a + b)).Should().Be(expectedResult);
+
+        UInt256 aliasedA = a;
+        overflow = UInt256.AddOverflow(in aliasedA, in b, out aliasedA);
+        ((BigInteger)aliasedA).Should().Be(expectedResult);
+        overflow.Should().Be(expectedOverflow);
+
+        UInt256 aliasedB = b;
+        overflow = UInt256.AddOverflow(in a, in aliasedB, out aliasedB);
+        ((BigInteger)aliasedB).Should().Be(expectedResult);
+        overflow.Should().Be(expectedOverflow);
+    }
+
     public static IEnumerable<(UInt256 A, ulong B)> SubtractByUInt64Cases =>
     [
         (new UInt256(0, 0, 0, 0), 0),

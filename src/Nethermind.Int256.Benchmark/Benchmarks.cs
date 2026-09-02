@@ -222,68 +222,6 @@ public class SubtractUnsigned : UnsignedTwoParamBenchmarkBase
     }
 }
 
-// Same-process A/B of the library's internal scalar vs AVX2 Add paths; sub-nanosecond cross-run
-// comparisons are too noisy, the within-run ratio is robust. Full-width operands (u3 != 0) so
-// neither path can short-circuit.
-[SimpleJob(RuntimeMoniker.Net10_0, launchCount: 6, warmupCount: 3, iterationCount: 10)]
-public class ArithmeticPathAB
-{
-    private const int N = 1024;
-    private UInt256[] _a = null!;
-    private UInt256[] _b = null!;
-
-    [GlobalSetup]
-    public void Setup()
-    {
-        if (!Avx2.IsSupported)
-        {
-            throw new PlatformNotSupportedException($"{nameof(ArithmeticPathAB)} requires AVX2.");
-        }
-
-        _a = new UInt256[N];
-        _b = new UInt256[N];
-        Random rnd = new(42);
-        for (int i = 0; i < N; i++)
-        {
-            _a[i] = RandomWide(rnd);
-            _b[i] = RandomWide(rnd);
-        }
-    }
-
-    private static UInt256 RandomWide(Random rnd) => new(
-        (ulong)rnd.NextInt64(),
-        (ulong)rnd.NextInt64(),
-        (ulong)rnd.NextInt64(),
-        (ulong)rnd.NextInt64() | 0x8000_0000_0000_0000UL);
-
-    [Benchmark(Baseline = true, OperationsPerInvoke = N)]
-    public ulong Add_Avx2()
-    {
-        UInt256[] a = _a, b = _b;
-        ulong acc = 0;
-        for (int i = 0; i < a.Length; i++)
-        {
-            UInt256.AddAvx2(in a[i], in b[i], out UInt256 res);
-            acc ^= res.u0;
-        }
-        return acc;
-    }
-
-    [Benchmark(OperationsPerInvoke = N)]
-    public ulong Add_Scalar()
-    {
-        UInt256[] a = _a, b = _b;
-        ulong acc = 0;
-        for (int i = 0; i < a.Length; i++)
-        {
-            UInt256.AddScalar(in a[i], in b[i], out UInt256 res);
-            acc ^= res.u0;
-        }
-        return acc;
-    }
-
-}
-
 // LessThan A/B across operand relationships: DifferHigh (scalar exits after one compare),
 // DifferLow and Equal (scalar walks all four limbs).
 public enum LtCase

@@ -94,128 +94,172 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool AddOverflow(in UInt256 a, in UInt256 b, out UInt256 res)
     {
-        if (!Avx2.IsSupported && !Vector256.IsHardwareAccelerated)
+        if (Avx2.IsSupported)
         {
-            return AddScalar(in a, in b, out res);
-        }
+            Vector256<ulong> av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
+            Vector256<ulong> bv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
 
-        return Avx2.IsSupported ?
-            AddAvx2(in a, in b, out res) :
-            AddVector256(in a, in b, out res);
-    }
-
-    internal static bool AddScalar(in UInt256 a, in UInt256 b, out UInt256 res)
-    {
-        ulong a0 = a.u0;
-        ulong b0 = b.u0;
-        if ((a.u1 | a.u2 | a.u3 | b.u1 | b.u2 | b.u3) == 0)
-        {
-            // Fast add for numbers less than 2^64 (18,446,744,073,709,551,615)
-            ulong u0 = a0 + b0;
-            // Assignment to res after in case is used as input for a or b (by ref aliasing)
-            res = default;
-            Unsafe.AsRef(in res.u0) = u0;
-            if (u0 < a0)
+            Vector256<ulong> result = av + bv;
+            // All bits set in lanes that carried out (carry out of each 64-bit limb).
+            Vector256<ulong> carryMask;
+            Vector256<ulong> carryIn;
+            if (Avx512F.VL.IsSupported)
             {
-                Unsafe.AsRef(in res.u1) = 1;
+                // Sign bit of (a & b) | (~result & (a | b)) is the carry; one ternary-logic op
+                carryMask = Vector256.ShiftRightArithmetic(Avx512F.VL.TernaryLogic(av, bv, result, 0xD4).AsInt64(), 63).AsUInt64();
+                carryIn = Avx512F.VL.AlignRight64(carryMask, Vector256<ulong>.Zero, 3);
             }
-            // Never overflows UInt256
-            return false;
+            else
+            {
+                carryMask = Vector256.LessThan(result, av);
+                carryIn = Avx2.Blend(Avx2.Permute4x64(carryMask, 0b10_01_00_00).AsUInt32(), Vector256<uint>.Zero, 0b0000_0011).AsUInt64();
+            }
+
+            // res may alias a or b, so the cascade path below must only use registers already loaded.
+            // Storing ahead of the branch measured 25% faster on AVX2-only parts for SubtractImpl.
+            Unsafe.SkipInit(out res);
+            Unsafe.As<UInt256, Vector256<ulong>>(ref res) = result - carryIn;
+
+            // A full limb that receives a carry must pass it on; rare, so it resolves through the lookup
+            Vector256<ulong> fullLanes = Vector256.Equals(result, Vector256<ulong>.AllBitsSet);
+            if (!Avx.TestZ(fullLanes, carryIn))
+            {
+                uint carry = (uint)Avx.MoveMask(carryMask.AsDouble());
+                uint cascade = (uint)Avx.MoveMask(fullLanes.AsDouble());
+                // Move carry to next bit and add cascade; carries ripple through consecutive full limbs
+                carry = cascade + 2 * carry;
+                // Keep only the cascades a carry reached
+                cascade ^= carry;
+                cascade &= 0x0f;
+
+                Vector256<ulong> cascadedCarries = Unsafe.Add(ref Unsafe.As<byte, Vector256<ulong>>(ref MemoryMarshal.GetReference(BroadcastLookup)), (nuint)cascade);
+                Unsafe.As<UInt256, Vector256<ulong>>(ref res) = result + cascadedCarries;
+                return (carry & 0b1_0000) != 0;
+            }
+
+            return (Avx.MoveMask(carryMask.AsDouble()) & 0b1000) != 0;
         }
 
-        ulong c = 0;
-        AddWithCarry(a0, b0, ref c, out ulong r0);
-        AddWithCarry(a.u1, b.u1, ref c, out ulong r1);
-        AddWithCarry(a.u2, b.u2, ref c, out ulong r2);
-        AddWithCarry(a.u3, b.u3, ref c, out ulong r3);
-        res = new UInt256(r0, r1, r2, r3);
-        return c != 0;
+        return AddScalar(in a, in b, out res);
     }
 
-    internal static bool AddAvx2(in UInt256 a, in UInt256 b, out UInt256 res)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool AddScalar(in UInt256 a, in UInt256 b, out UInt256 res)
     {
-        Vector256<ulong> av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
-        Vector256<ulong> bv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
-
-        Vector256<ulong> result = Avx2.Add(av, bv);
-        Vector256<ulong> vCarry;
-        if (Avx512F.VL.IsSupported)
+        ulong b0 = b.u0;
+        if ((b.u1 | b.u2 | b.u3) == 0)
         {
-            vCarry = Avx512F.VL.CompareLessThan(result, av);
+            return AddScalarUInt64(in a, b0, out res);
+        }
+
+        // Addition commutes and the EVM puts the small operand on either side of the stack
+        ulong a0 = a.u0;
+        if ((a.u1 | a.u2 | a.u3) == 0)
+        {
+            return AddScalarUInt64(in b, a0, out res);
+        }
+
+        if (AdvSimd.IsSupported || Sse42.IsSupported)
+        {
+            return AddVector128(in a, in b, out res);
+        }
+
+        // Loads stay next to their use: the one-limb paths above share this method's prolog
+        ulong carry = 0;
+        AddWithCarry(a0, b0, ref carry, out ulong r0);
+        AddWithCarry(a.u1, b.u1, ref carry, out ulong r1);
+        AddWithCarry(a.u2, b.u2, ref carry, out ulong r2);
+        AddWithCarry(a.u3, b.u3, ref carry, out ulong r3);
+        StoreLimbs(out res, r0, r1, r2, r3);
+        return carry != 0;
+    }
+
+    // Same speculation as the 256-bit path on two 128-bit halves; 16-byte stores forward to the NEON readers
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool AddVector128(in UInt256 a, in UInt256 b, out UInt256 res)
+    {
+        ref Vector128<ulong> aRef = ref Unsafe.As<UInt256, Vector128<ulong>>(ref Unsafe.AsRef(in a));
+        ref Vector128<ulong> bRef = ref Unsafe.As<UInt256, Vector128<ulong>>(ref Unsafe.AsRef(in b));
+        Vector128<ulong> aLo = aRef;
+        Vector128<ulong> aHi = Unsafe.Add(ref aRef, 1);
+        Vector128<ulong> bLo = bRef;
+        Vector128<ulong> bHi = Unsafe.Add(ref bRef, 1);
+
+        Vector128<ulong> resultLo = aLo + bLo;
+        Vector128<ulong> resultHi = aHi + bHi;
+        Vector128<ulong> carryLo = Vector128.LessThan(resultLo, aLo);
+        Vector128<ulong> carryHi = Vector128.LessThan(resultHi, aHi);
+
+        // Lane i receives the carry of lane i-1: [0, lo0] and [lo1, hi0]
+        Vector128<ulong> carryInLo;
+        Vector128<ulong> carryInHi;
+        if (AdvSimd.IsSupported)
+        {
+            // ext takes its low lanes from the first operand: (second:first) >> 64 bits
+            carryInLo = AdvSimd.ExtractVector128(Vector128<ulong>.Zero, carryLo, 1);
+            carryInHi = AdvSimd.ExtractVector128(carryLo, carryHi, 1);
         }
         else
         {
-            // Work around for missing Vector256.CompareLessThan
-            Vector256<ulong> carryFromBothHighBits = Avx2.And(av, bv);
-            Vector256<ulong> eitherHighBit = Avx2.Or(av, bv);
-            Vector256<ulong> highBitNotInResult = Avx2.AndNot(result, eitherHighBit);
-
-            // Set high bits where carry occurs
-            vCarry = Avx2.Or(carryFromBothHighBits, highBitNotInResult);
+            carryInLo = Sse2.ShiftLeftLogical128BitLane(carryLo, 8);
+            carryInHi = Ssse3.AlignRight(carryHi.AsByte(), carryLo.AsByte(), 8).AsUInt64();
         }
-        // Move carry from Vector space to uint
-        uint carry = (uint)(Avx512DQ.IsSupported ?
-            Avx512DQ.MoveMask(vCarry) :
-            Avx.MoveMask(vCarry.AsDouble()));
 
-        // All bits set will cascade another carry when carry is added to it
-        Vector256<ulong> vCascade = Avx2.CompareEqual(result, Vector256<ulong>.AllBitsSet);
-        // Move cascade from Vector space to uint
-        uint cascade = (uint)(Avx512DQ.IsSupported ?
-            Avx512DQ.MoveMask(vCascade) :
-            Avx.MoveMask(Unsafe.As<Vector256<ulong>, Vector256<double>>(ref vCascade)));
+        // A full limb that receives a carry wraps to zero and must pass it on; testing the sum keeps the
+        // all-ones constant out of the register set. The fallback stays inline and call-free: with a call here
+        // the JIT parks the vector values in callee-saved registers and the shared prolog pays for it
+        Vector128<ulong> sumLo = resultLo - carryInLo;
+        Vector128<ulong> sumHi = resultHi - carryInHi;
+        Vector128<ulong> propagate = (Vector128.Equals(sumLo, Vector128<ulong>.Zero) & carryInLo)
+                                   | (Vector128.Equals(sumHi, Vector128<ulong>.Zero) & carryInHi);
+        if (!Vector128.EqualsAll(propagate, Vector128<ulong>.Zero))
+        {
+            // Nothing has been stored yet, so a and b are intact even when res aliases one of them
+            ulong carry = 0;
+            AddWithCarry(a.u0, b.u0, ref carry, out ulong r0);
+            AddWithCarry(a.u1, b.u1, ref carry, out ulong r1);
+            AddWithCarry(a.u2, b.u2, ref carry, out ulong r2);
+            AddWithCarry(a.u3, b.u3, ref carry, out ulong r3);
+            StoreLimbs(out res, r0, r1, r2, r3);
+            return carry != 0;
+        }
 
-        // Use ints to work out the Vector cross lane cascades
-        // Move carry to next bit and add cascade
-        carry = cascade + 2 * carry; // lea
-        // Remove cascades not affected by carry
-        cascade ^= carry;
-        // Choice of 16 vectors
-        cascade &= 0x0f;
-
-        // Lookup the carries to broadcast to the Vectors
-        Vector256<ulong> cascadedCarries = Unsafe.Add(ref Unsafe.As<byte, Vector256<ulong>>(ref MemoryMarshal.GetReference(BroadcastLookup)), cascade);
-
-        // Mark res as initialized so we can use it as left side of ref assignment
         Unsafe.SkipInit(out res);
-        // Add the cascadedCarries to the result
-        Unsafe.As<UInt256, Vector256<ulong>>(ref res) = Avx2.Add(result, cascadedCarries);
-
-        return (carry & 0b1_0000) != 0;
+        ref Vector128<ulong> resRef = ref Unsafe.As<UInt256, Vector128<ulong>>(ref res);
+        resRef = sumLo;
+        Unsafe.Add(ref resRef, 1) = sumHi;
+        return carryHi.GetElement(1) != 0;
     }
 
-    private static bool AddVector256(in UInt256 a, in UInt256 b, out UInt256 res)
+    // One operand fits in one limb: a carry can only ripple upward through full limbs of the other
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool AddScalarUInt64(in UInt256 a, ulong b0, out UInt256 res)
     {
-        Vector256<ulong> av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
-        Vector256<ulong> bv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
+        ulong a0 = a.u0, a1 = a.u1, a2 = a.u2, a3 = a.u3;
+        ulong r0 = a0 + b0;
+        if (r0 >= a0)
+        {
+            StoreLimbs(out res, r0, a1, a2, a3);
+            return false;
+        }
+        if (++a1 != 0)
+        {
+            StoreLimbs(out res, r0, a1, a2, a3);
+            return false;
+        }
+        if (++a2 != 0)
+        {
+            StoreLimbs(out res, r0, 0, a2, a3);
+            return false;
+        }
+        if (++a3 != 0)
+        {
+            StoreLimbs(out res, r0, 0, 0, a3);
+            return false;
+        }
 
-        Vector256<ulong> result = Vector256.Add(av, bv);
-        Vector256<ulong> vCarry = Vector256.LessThan(result, av);
-
-        uint carry = Vector256.ExtractMostSignificantBits(vCarry);
-
-        // All bits set will cascade another carry when carry is added to it
-        Vector256<ulong> vCascade = Vector256.Equals(result, Vector256<ulong>.AllBitsSet);
-        // Move cascade from Vector space to uint
-        uint cascade = Vector256.ExtractMostSignificantBits(vCascade);
-
-        // Use ints to work out the Vector cross lane cascades
-        // Move carry to next bit and add cascade
-        carry = cascade + 2 * carry; // lea
-        // Remove cascades not affected by carry
-        cascade ^= carry;
-        // Choice of 16 vectors
-        cascade &= 0x0f;
-
-        // Lookup the carries to broadcast to the Vectors
-        Vector256<ulong> cascadedCarries = Unsafe.Add(ref Unsafe.As<byte, Vector256<ulong>>(ref MemoryMarshal.GetReference(BroadcastLookup)), cascade);
-
-        // Mark res as initialized so we can use it as left side of ref assignment
-        Unsafe.SkipInit(out res);
-        // Add the cascadedCarries to the result
-        Unsafe.As<UInt256, Vector256<ulong>>(ref res) = Vector256.Add(result, cascadedCarries);
-
-        return (carry & 0b1_0000) != 0;
+        StoreLimbs(out res, r0, 0, 0, 0);
+        return true;
     }
 
     /// <summary>
@@ -1083,7 +1127,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     /// </summary>
     /// <remarks>
     /// The store width has to match how callers read the value back. Most of this type reads a
-    /// <see cref="UInt256"/> as a single <see cref="Vector256{T}"/> (see <c>AddAvx2</c>,
+    /// <see cref="UInt256"/> as a single <see cref="Vector256{T}"/> (see <c>AddOverflow</c>,
     /// <c>LessThanAvx2</c>, <c>ToBigEndian</c>), and a 32-byte load cannot be store-forwarded from
     /// four 8-byte stores - it waits on L1, costing roughly ten cycles. Assigning through
     /// <see cref="Unsafe.As{TFrom, TTo}"/> keeps this a single <c>vmovdqu</c>; going via the
