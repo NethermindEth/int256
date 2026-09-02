@@ -319,8 +319,7 @@ public readonly struct Int256 : IEquatable<Int256>, IComparable, IComparable<Int
         res = new Int256(ures);
     }
 
-    // Mod sets res to (sign x) * { abs(x) modulus abs(y) }
-    // If y == 0, z is set to 0 (OBS: differs from the big.Int)
+    // Mod sets res to (sign x) * { abs(x) modulus abs(y) }, and throws when y is zero.
     public static void Mod(in Int256 x, in Int256 y, out Int256 res)
     {
         Int256 xIn = x, yIn = y;
