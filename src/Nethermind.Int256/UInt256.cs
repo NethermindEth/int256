@@ -603,12 +603,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         carry = high + (r2 < low ? 1UL : 0UL);
 
         ulong r3 = x3 * y + carry;
-        Unsafe.SkipInit(out res);
-        ref ulong pr = ref Unsafe.As<UInt256, ulong>(ref res);
-        pr = r0;
-        Unsafe.Add(ref pr, 1) = r1;
-        Unsafe.Add(ref pr, 2) = r2;
-        Unsafe.Add(ref pr, 3) = r3;
+        StoreProduct(out res, r0, r1, r2, r3);
     }
 
     [SkipLocalsInit]
@@ -629,7 +624,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         r2 = AddAndCountCarry(r2, h10, ref carry);
         r2 = AddAndCountCarry(r2, l11, ref carry);
 
-        res = new UInt256(r0, r1, r2, h11 + carry);
+        StoreProduct(out res, r0, r1, r2, h11 + carry);
     }
 
     [SkipLocalsInit]
@@ -665,12 +660,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
 
         ulong r3 = carry + h02 + h11 + h20
             + x0 * y3 + x1 * y2 + x2 * y1 + x3 * y0;
-        Unsafe.SkipInit(out res);
-        ref ulong pr = ref Unsafe.As<UInt256, ulong>(ref res);
-        pr = r0;
-        Unsafe.Add(ref pr, 1) = r1;
-        Unsafe.Add(ref pr, 2) = r2;
-        Unsafe.Add(ref pr, 3) = r3;
+        StoreProduct(out res, r0, r1, r2, r3);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
