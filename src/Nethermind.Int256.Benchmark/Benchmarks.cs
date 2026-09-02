@@ -136,7 +136,9 @@ public class UnsignedThreeParamBenchmarkBase : UnsignedBenchmarkBase
 [NoIntrinsicsJob(RuntimeMoniker.Net10_0, launchCount: 1, warmupCount: 3, iterationCount: 5)]
 public class SignedBenchmarkBase
 {
-    public IEnumerable<BigInteger> Values => Enumerable.Concat(new[] { Numbers.Int256Max }, UnaryOps.RandomSigned(1));
+    // RandomSigned(1) is positive, so Int256Min is what keeps the negative branches
+    // of the signed operations inside the measurement.
+    public IEnumerable<BigInteger> Values => Enumerable.Concat(new[] { Numbers.Int256Max, Numbers.Int256Min }, UnaryOps.RandomSigned(1));
 
     public IEnumerable<BigInteger> ValuesPositive => Values.Where(x => x.Sign >= 0);
 
@@ -604,6 +606,22 @@ public class DivideSigned : SignedTwoParamBenchmarkBase
     public Int256 Divide_Int256()
     {
         Int256.Divide(A.Item2, B.Item2, out Int256 res);
+        return res;
+    }
+}
+
+public class ModSigned : SignedTwoParamBenchmarkBase
+{
+    [Benchmark(Baseline = true)]
+    public BigInteger Mod_BigInteger()
+    {
+        return (A.Item1 % B.Item1);
+    }
+
+    [Benchmark]
+    public Int256 Mod_Int256()
+    {
+        Int256.Mod(A.Item2, B.Item2, out Int256 res);
         return res;
     }
 }

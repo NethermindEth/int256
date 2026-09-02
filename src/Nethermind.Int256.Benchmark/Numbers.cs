@@ -16,5 +16,5 @@ public static class Numbers
     public static readonly BigInteger UInt256Max = TwoTo256 - 1;
 
     public static readonly BigInteger Int256Max = (BigInteger.One << 255) - 1;
-    public static readonly BigInteger Int256Min = -Int256Max;
+    public static readonly BigInteger Int256Min = -(BigInteger.One << 255);
 }
