@@ -100,7 +100,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
             Vector256<ulong> bv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
 
             Vector256<ulong> result = av + bv;
-            // All bits set in lanes that carried out, and in lanes whose lower neighbour carried
+            // All bits set in lanes that carried out (carry out of each 64-bit limb).
             Vector256<ulong> carryMask;
             Vector256<ulong> carryIn;
             if (Avx512F.VL.IsSupported)
