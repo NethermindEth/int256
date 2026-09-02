@@ -526,39 +526,114 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void Multiply(in UInt256 x, in UInt256 y, out UInt256 res)
     {
-        if (y.IsZero || x.IsZero)
+        ulong x0 = x.u0;
+        ulong y0 = y.u0;
+        ulong xTop = x.u2 | x.u3;
+        ulong yTop = y.u2 | y.u3;
+        ulong xHigh = x.u1 | xTop;
+        ulong yHigh = y.u1 | yTop;
+        if ((xHigh | yHigh) == 0)
         {
-            res = default;
+            // Zero and one take this path or the one-limb ladder; a dedicated shortcut cost every call two vector tests.
+            ulong high = Multiply64(x0, y0, out ulong low);
+            StoreProduct(out res, low, high, 0, 0);
             return;
         }
-        if (y.IsOne)
+        if (yHigh == 0)
         {
-            res = x;
+            MultiplyByUInt64(in x, y0, out res);
             return;
         }
-        if (x.IsOne)
+        if (xHigh == 0)
         {
-            res = y;
+            MultiplyByUInt64(in y, x0, out res);
             return;
         }
+        if (X86Base.X64.IsSupported && (xTop | yTop) == 0)
+        {
+            MultiplyLimbs2x2(in x, in y, out res);
+            return;
+        }
+        MultiplyLimbs4x4(in x, in y, out res);
+    }
 
-        // If both inputs fit in 64 bits, use a simple multiplication routine.
-        if (x.IsUint64 && y.IsUint64)
+    // A Vector256 reader cannot store-forward from limb stores, so write the result as one 32-byte store where possible.
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void StoreProduct(out UInt256 res, ulong r0, ulong r1, ulong r2, ulong r3)
+    {
+        if (Vector256.IsHardwareAccelerated)
         {
-            // Fast multiply for numbers less than 2^64 (18,446,744,073,709,551,615)
-            ulong high = Multiply64(x.u0, y.u0, out ulong low);
-            // Assignment to res after multiply in case is used as input for x or y (by ref aliasing)
-            res = default;
-            Unsafe.AsRef(in res.u0) = low;
-            Unsafe.AsRef(in res.u1) = high;
+            Unsafe.SkipInit(out res);
+            Unsafe.As<UInt256, Vector256<ulong>>(ref res) = Vector256.Create(r0, r1, r2, r3);
             return;
         }
-
-        MultiplyScalar(in x, in y, out res);
+        StoreLimbs(out res, r0, r1, r2, r3);
     }
 
     [SkipLocalsInit]
-    private static void MultiplyScalar(in UInt256 x, in UInt256 y, out UInt256 res)
+    private static void MultiplyByUInt64(in UInt256 x, ulong y, out UInt256 res)
+    {
+        if (y <= 1)
+        {
+            // Written as two stores rather than a conditional expression, which the JIT routes through a stack temp.
+            if (y == 0)
+            {
+                res = default;
+            }
+            else
+            {
+                res = x;
+            }
+            return;
+        }
+
+        ulong x0 = x.u0;
+        ulong x1 = x.u1;
+        ulong x2 = x.u2;
+        ulong x3 = x.u3;
+
+        // y first: mulx takes its first operand from rdx, and keeping the shared limb there saves a move per product.
+        ulong carry = Multiply64(y, x0, out ulong r0);
+        ulong high = Multiply64(y, x1, out ulong low);
+        ulong r1 = low + carry;
+        carry = high + (r1 < low ? 1UL : 0UL);
+
+        high = Multiply64(y, x2, out low);
+        ulong r2 = low + carry;
+        carry = high + (r2 < low ? 1UL : 0UL);
+
+        ulong r3 = x3 * y + carry;
+        Unsafe.SkipInit(out res);
+        ref ulong pr = ref Unsafe.As<UInt256, ulong>(ref res);
+        pr = r0;
+        Unsafe.Add(ref pr, 1) = r1;
+        Unsafe.Add(ref pr, 2) = r2;
+        Unsafe.Add(ref pr, 3) = r3;
+    }
+
+    [SkipLocalsInit]
+    private static void MultiplyLimbs2x2(in UInt256 x, in UInt256 y, out UInt256 res)
+    {
+        ulong h00 = Multiply64(x.u0, y.u0, out ulong r0);
+        ulong h01 = Multiply64(x.u0, y.u1, out ulong l01);
+        ulong h10 = Multiply64(x.u1, y.u0, out ulong l10);
+        ulong h11 = Multiply64(x.u1, y.u1, out ulong l11);
+
+        ulong carry = 0;
+        ulong r1 = AddAndCountCarry(h00, l01, ref carry);
+        r1 = AddAndCountCarry(r1, l10, ref carry);
+
+        ulong r2 = carry;
+        carry = 0;
+        r2 = AddAndCountCarry(r2, h01, ref carry);
+        r2 = AddAndCountCarry(r2, h10, ref carry);
+        r2 = AddAndCountCarry(r2, l11, ref carry);
+
+        res = new UInt256(r0, r1, r2, h11 + carry);
+    }
+
+    [SkipLocalsInit]
+    private static void MultiplyLimbs4x4(in UInt256 x, in UInt256 y, out UInt256 res)
     {
         ulong x0 = x.u0;
         ulong y0 = y.u0;
@@ -568,34 +643,6 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         ulong y2 = y.u2;
         ulong x3 = x.u3;
         ulong y3 = y.u3;
-
-        if (X86Base.X64.IsSupported && (x2 | x3 | y2 | y3) == 0)
-        {
-            if (x1 == 0)
-            {
-                MultiplyByUInt64Width2(in y, x0, out res);
-                return;
-            }
-            if (y1 == 0)
-            {
-                MultiplyByUInt64Width2(in x, y0, out res);
-                return;
-            }
-
-            MultiplyWidth2(in x, in y, out res);
-            return;
-        }
-
-        if ((y1 | y2 | y3) == 0)
-        {
-            MultiplyByUInt64(in x, y0, out res);
-            return;
-        }
-        if ((x1 | x2 | x3) == 0)
-        {
-            MultiplyByUInt64(in y, x0, out res);
-            return;
-        }
 
         ulong h00 = Multiply64(x0, y0, out ulong r0);
         ulong h01 = Multiply64(x0, y1, out ulong l01);
@@ -618,66 +665,6 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
 
         ulong r3 = carry + h02 + h11 + h20
             + x0 * y3 + x1 * y2 + x2 * y1 + x3 * y0;
-        Unsafe.SkipInit(out res);
-        ref ulong pr = ref Unsafe.As<UInt256, ulong>(ref res);
-        pr = r0;
-        Unsafe.Add(ref pr, 1) = r1;
-        Unsafe.Add(ref pr, 2) = r2;
-        Unsafe.Add(ref pr, 3) = r3;
-    }
-
-    [SkipLocalsInit]
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void MultiplyByUInt64Width2(in UInt256 x, ulong y, out UInt256 res)
-    {
-        ulong carry = Multiply64(x.u0, y, out ulong r0);
-        ulong high = Multiply64(x.u1, y, out ulong low);
-        ulong r1 = low + carry;
-        ulong r2 = high + (r1 < low ? 1UL : 0UL);
-        res = new UInt256(r0, r1, r2);
-    }
-
-    [SkipLocalsInit]
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void MultiplyWidth2(in UInt256 x, in UInt256 y, out UInt256 res)
-    {
-        ulong h00 = Multiply64(x.u0, y.u0, out ulong r0);
-        ulong h01 = Multiply64(x.u0, y.u1, out ulong l01);
-        ulong h10 = Multiply64(x.u1, y.u0, out ulong l10);
-        ulong h11 = Multiply64(x.u1, y.u1, out ulong l11);
-
-        ulong carry = 0;
-        ulong r1 = AddAndCountCarry(h00, l01, ref carry);
-        r1 = AddAndCountCarry(r1, l10, ref carry);
-
-        ulong r2 = carry;
-        carry = 0;
-        r2 = AddAndCountCarry(r2, h01, ref carry);
-        r2 = AddAndCountCarry(r2, h10, ref carry);
-        r2 = AddAndCountCarry(r2, l11, ref carry);
-
-        res = new UInt256(r0, r1, r2, h11 + carry);
-    }
-
-    [SkipLocalsInit]
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void MultiplyByUInt64(in UInt256 x, ulong y, out UInt256 res)
-    {
-        ulong x0 = x.u0;
-        ulong x1 = x.u1;
-        ulong x2 = x.u2;
-        ulong x3 = x.u3;
-
-        ulong carry = Multiply64(x0, y, out ulong r0);
-        ulong high = Multiply64(x1, y, out ulong low);
-        ulong r1 = low + carry;
-        carry = high + (r1 < low ? 1UL : 0UL);
-
-        high = Multiply64(x2, y, out low);
-        ulong r2 = low + carry;
-        carry = high + (r2 < low ? 1UL : 0UL);
-
-        ulong r3 = x3 * y + carry;
         Unsafe.SkipInit(out res);
         ref ulong pr = ref Unsafe.As<UInt256, ulong>(ref res);
         pr = r0;
@@ -834,7 +821,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
 
             if (e.Bit(i))
             {
-                MultiplyScalar(in val, in b, out val);
+                Multiply(in val, in b, out val);
             }
         }
 
