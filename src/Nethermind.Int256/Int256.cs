@@ -22,8 +22,6 @@ public readonly struct Int256 : IEquatable<Int256>, IComparable, IComparable<Int
 
     internal readonly UInt256 _value;
 
-    private const ulong SignBit = 0x8000000000000000ul;
-
     public Int256(ReadOnlySpan<byte> bytes, bool isBigEndian)
     {
         _value = new UInt256(bytes, isBigEndian);
@@ -645,11 +643,11 @@ public readonly struct Int256 : IEquatable<Int256>, IComparable, IComparable<Int
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public int CompareTo(in Int256 b)
     {
-        // Flipping the sign bit turns two's-complement order into unsigned order of the raw words, so
-        // one descending pass answers what a comparison followed by an equality test used to.
-        ulong a3 = _value.u3 ^ SignBit;
-        ulong b3 = b._value.u3 ^ SignBit;
-        if (a3 != b3) return a3 < b3 ? -1 : 1;
+        // The sign lives in the top limb, so comparing that limb signed and the rest unsigned is the
+        // whole of two's-complement order: one descending pass, and no bias to apply first.
+        long top = unchecked((long)_value.u3);
+        long bTop = unchecked((long)b._value.u3);
+        if (top != bTop) return top < bTop ? -1 : 1;
         if (_value.u2 != b._value.u2) return _value.u2 < b._value.u2 ? -1 : 1;
         if (_value.u1 != b._value.u1) return _value.u1 < b._value.u1 ? -1 : 1;
         return _value.u0 == b._value.u0 ? 0 : _value.u0 < b._value.u0 ? -1 : 1;
@@ -660,10 +658,10 @@ public readonly struct Int256 : IEquatable<Int256>, IComparable, IComparable<Int
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool operator <(in Int256 z, in Int256 x)
     {
-        // Sign-bit flip plus one descending pass: same order, no separate sign-class branch.
-        ulong a3 = z._value.u3 ^ SignBit;
-        ulong b3 = x._value.u3 ^ SignBit;
-        if (a3 != b3) return a3 < b3;
+        // Signed on the top limb, unsigned below: one descending pass, no sign-class branch.
+        long top = unchecked((long)z._value.u3);
+        long xTop = unchecked((long)x._value.u3);
+        if (top != xTop) return top < xTop;
         if (z._value.u2 != x._value.u2) return z._value.u2 < x._value.u2;
         if (z._value.u1 != x._value.u1) return z._value.u1 < x._value.u1;
         return z._value.u0 < x._value.u0;
