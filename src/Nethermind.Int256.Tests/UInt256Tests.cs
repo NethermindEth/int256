@@ -1557,6 +1557,87 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
         }
     }
 
+    // Every dispatch shape (1x1, one-limb ladder on either side, 2x2, 2xN on either side, 4x4) with limbs drawn
+    // from the values that saturate or skip carries: 0, 1, 2, 2^63, 2^64 - 1 and random. Whole-operand zero and
+    // one no longer have a dedicated shortcut, so they must round-trip through every kernel, in both operand
+    // orders and with the result aliased over either input.
+    [Test]
+    public void Multiply_edge_limbs_in_every_width_pair_match_BigInteger()
+    {
+        ulong[] edges = [0UL, 1UL, 2UL, 1UL << 63, ulong.MaxValue, 0x9E3779B97F4A7C15UL];
+        Random random = new(0x4D554C45);
+
+        for (int xWidth = 1; xWidth <= 4; xWidth++)
+        {
+            for (int yWidth = 1; yWidth <= 4; yWidth++)
+            {
+                for (int i = 0; i < 512; i++)
+                {
+                    UInt256 x = CreateEdgeWidth(random, edges, xWidth);
+                    UInt256 y = CreateEdgeWidth(random, edges, yWidth);
+                    AssertMultiply(x, y);
+                    AssertMultiply(y, x);
+                }
+
+                UInt256 xMax = MaxOfWidth(xWidth);
+                UInt256 yMax = MaxOfWidth(yWidth);
+                AssertMultiply(xMax, yMax);
+                AssertMultiply(xMax, UInt256.Zero);
+                AssertMultiply(UInt256.Zero, yMax);
+                AssertMultiply(xMax, UInt256.One);
+                AssertMultiply(UInt256.One, yMax);
+            }
+        }
+
+        static UInt256 CreateEdgeWidth(Random random, ulong[] edges, int width)
+        {
+            ulong Limb(bool top)
+            {
+                ulong v = edges[random.Next(edges.Length)];
+                if (v == 0x9E3779B97F4A7C15UL)
+                {
+                    v = (ulong)random.NextInt64() ^ ((ulong)random.Next(4) << 62);
+                }
+                // The top limb of the requested width stays nonzero so the value really has that width.
+                return top && v == 0 ? 1UL : v;
+            }
+
+            return width switch
+            {
+                1 => new UInt256(Limb(true)),
+                2 => new UInt256(Limb(false), Limb(true)),
+                3 => new UInt256(Limb(false), Limb(false), Limb(true)),
+                _ => new UInt256(Limb(false), Limb(false), Limb(false), Limb(true)),
+            };
+        }
+
+        static UInt256 MaxOfWidth(int width) => width switch
+        {
+            1 => new UInt256(ulong.MaxValue),
+            2 => new UInt256(ulong.MaxValue, ulong.MaxValue),
+            3 => new UInt256(ulong.MaxValue, ulong.MaxValue, ulong.MaxValue),
+            _ => UInt256.MaxValue,
+        };
+
+        static void AssertMultiply(UInt256 x, UInt256 y)
+        {
+            BigInteger expected = (BigInteger)x * (BigInteger)y % TestNumbers.TwoTo256;
+
+            UInt256.Multiply(in x, in y, out UInt256 result);
+            ((BigInteger)result).Should().Be(expected, $"{x} * {y}");
+
+            UInt256 left = x;
+            left.Multiply(in y, out left);
+            ((BigInteger)left).Should().Be(expected, $"{x} * {y} aliased over x");
+
+            UInt256 right = y;
+            x.Multiply(in right, out right);
+            ((BigInteger)right).Should().Be(expected, $"{x} * {y} aliased over y");
+
+            ((BigInteger)(x * y)).Should().Be(expected, $"{x} * {y} via operator");
+        }
+    }
+
     [Test]
     public virtual void ToBigEndian_And_Back()
     {
