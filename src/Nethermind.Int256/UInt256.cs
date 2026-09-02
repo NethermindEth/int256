@@ -262,7 +262,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         SubtractImpl(in a, in b, out res);
     }
 
-    // Subtract sets res to the difference a-b
+    // Subtract sets res to the difference a-b and returns true if the operation underflowed
     private static bool SubtractImpl(in UInt256 a, in UInt256 b, out UInt256 res)
     {
         if (Avx2.IsSupported)
@@ -270,57 +270,176 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
             Vector256<ulong> av = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in a));
             Vector256<ulong> bv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in b));
 
-            Vector256<ulong> result = Avx2.Subtract(av, bv);
-            Vector256<ulong> vBorrow;
+            Vector256<ulong> result = av - bv;
+            // All bits set in lanes where a < b, and in lanes whose lower neighbour borrowed
+            Vector256<ulong> borrowMask;
+            Vector256<ulong> borrowIn;
             if (Avx512F.VL.IsSupported)
             {
-                vBorrow = Avx512F.VL.CompareGreaterThan(result, av);
+                // Sign bit of (~a & b) | (~(a ^ b) & result) is the borrow; one ternary-logic op
+                borrowMask = Vector256.ShiftRightArithmetic(Avx512F.VL.TernaryLogic(av, bv, result, 0x8E).AsInt64(), 63).AsUInt64();
+                borrowIn = Avx512F.VL.AlignRight64(borrowMask, Vector256<ulong>.Zero, 3);
             }
             else
             {
-                // Invert top bits as Avx2.CompareGreaterThan is only available for longs, not unsigned
-                Vector256<ulong> signFlip = Vector256.Create(0x8000_0000_0000_0000UL);
-                Vector256<ulong> resultSigned = Avx2.Xor(result, signFlip);
-                Vector256<ulong> avSigned = Avx2.Xor(av, signFlip);
-
-                // Which vectors need to borrow from the next
-                vBorrow = Avx2.CompareGreaterThan(resultSigned.AsInt64(), avSigned.AsInt64()).AsUInt64();
+                borrowMask = Vector256.GreaterThan(result, av);
+                borrowIn = Avx2.Blend(Avx2.Permute4x64(borrowMask, 0b10_01_00_00).AsUInt32(), Vector256<uint>.Zero, 0b0000_0011).AsUInt64();
             }
-            // Move borrow from Vector space to int
-            int borrow = Avx.MoveMask(vBorrow.AsDouble());
 
-            // All zeros will cascade another borrow when borrow is subtracted from it
-            Vector256<ulong> vCascade = Avx2.CompareEqual(result, Vector256<ulong>.Zero);
-            // Move cascade from Vector space to int
-            int cascade = Avx.MoveMask(vCascade.AsDouble());
-
-            // Use ints to work out the Vector cross lane cascades
-            // Move borrow to next bit and add cascade
-            borrow = cascade + 2 * borrow; // lea
-            // Remove cascades not effected by borrow
-            cascade ^= borrow;
-            // Choice of 16 vectors
-            cascade &= 0x0f;
-
-            // Lookup the borrows to broadcast to the Vectors
-            Vector256<ulong> cascadedBorrows = Unsafe.Add(ref Unsafe.As<byte, Vector256<ulong>>(ref MemoryMarshal.GetReference(BroadcastLookup)), cascade);
-
-            // Mark res as initialized so we can use it as left said of ref assignment
+            // res may alias a or b, so the cascade path below must only use registers already loaded.
+            // Storing ahead of the branch measured 25% faster on AVX2-only parts.
             Unsafe.SkipInit(out res);
-            // Subtract the cascadedBorrows from the result
-            Unsafe.As<UInt256, Vector256<ulong>>(ref res) = Avx2.Subtract(result, cascadedBorrows);
-            return (borrow & 0b1_0000) != 0;
+            Unsafe.As<UInt256, Vector256<ulong>>(ref res) = result + borrowIn;
+
+            // A zero limb that receives a borrow must pass it on; rare, so it resolves through the lookup
+            Vector256<ulong> zeroLanes = Vector256.Equals(result, Vector256<ulong>.Zero);
+            if (!Avx.TestZ(zeroLanes, borrowIn))
+            {
+                uint borrow = (uint)Avx.MoveMask(borrowMask.AsDouble());
+                uint cascade = (uint)Avx.MoveMask(zeroLanes.AsDouble());
+                // Move borrow to next bit and add cascade; carries ripple through consecutive zero limbs
+                borrow = cascade + 2 * borrow;
+                // Keep only the cascades a borrow reached
+                cascade ^= borrow;
+                cascade &= 0x0f;
+
+                Vector256<ulong> cascadedBorrows = Unsafe.Add(ref Unsafe.As<byte, Vector256<ulong>>(ref MemoryMarshal.GetReference(BroadcastLookup)), (nuint)cascade);
+                Unsafe.As<UInt256, Vector256<ulong>>(ref res) = result - cascadedBorrows;
+                return (borrow & 0b1_0000) != 0;
+            }
+
+            return (Avx.MoveMask(borrowMask.AsDouble()) & 0b1000) != 0;
+        }
+
+        return SubtractScalar(in a, in b, out res);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool SubtractScalar(in UInt256 a, in UInt256 b, out UInt256 res)
+    {
+        ulong b0 = b.u0;
+        if ((b.u1 | b.u2 | b.u3) == 0)
+        {
+            return SubtractScalarUInt64(in a, b0, out res);
+        }
+
+        if (AdvSimd.IsSupported || Sse42.IsSupported)
+        {
+            return SubtractVector128(in a, in b, out res);
+        }
+
+        // Loads stay next to their use: the one-limb path above shares this method's prolog
+        ulong borrow = 0;
+        SubtractWithBorrow(a.u0, b0, ref borrow, out ulong r0);
+        SubtractWithBorrow(a.u1, b.u1, ref borrow, out ulong r1);
+        SubtractWithBorrow(a.u2, b.u2, ref borrow, out ulong r2);
+        SubtractWithBorrow(a.u3, b.u3, ref borrow, out ulong r3);
+        StoreLimbs(out res, r0, r1, r2, r3);
+        return borrow != 0;
+    }
+
+    // Same speculation as the 256-bit path on two 128-bit halves; 16-byte stores forward to the NEON readers
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool SubtractVector128(in UInt256 a, in UInt256 b, out UInt256 res)
+    {
+        ref Vector128<ulong> aRef = ref Unsafe.As<UInt256, Vector128<ulong>>(ref Unsafe.AsRef(in a));
+        ref Vector128<ulong> bRef = ref Unsafe.As<UInt256, Vector128<ulong>>(ref Unsafe.AsRef(in b));
+        Vector128<ulong> aLo = aRef;
+        Vector128<ulong> aHi = Unsafe.Add(ref aRef, 1);
+        Vector128<ulong> bLo = bRef;
+        Vector128<ulong> bHi = Unsafe.Add(ref bRef, 1);
+
+        Vector128<ulong> resultLo = aLo - bLo;
+        Vector128<ulong> resultHi = aHi - bHi;
+        Vector128<ulong> borrowLo = Vector128.LessThan(aLo, bLo);
+        Vector128<ulong> borrowHi = Vector128.LessThan(aHi, bHi);
+
+        // Lane i receives the borrow of lane i-1: [0, lo0] and [lo1, hi0]
+        Vector128<ulong> borrowInLo;
+        Vector128<ulong> borrowInHi;
+        if (AdvSimd.IsSupported)
+        {
+            // ext takes its low lanes from the first operand: (second:first) >> 64 bits
+            borrowInLo = AdvSimd.ExtractVector128(Vector128<ulong>.Zero, borrowLo, 1);
+            borrowInHi = AdvSimd.ExtractVector128(borrowLo, borrowHi, 1);
         }
         else
         {
-            ulong borrow = 0ul;
-            SubtractWithBorrow(a.u0, b.u0, ref borrow, out ulong res0);
-            SubtractWithBorrow(a.u1, b.u1, ref borrow, out ulong res1);
-            SubtractWithBorrow(a.u2, b.u2, ref borrow, out ulong res2);
-            SubtractWithBorrow(a.u3, b.u3, ref borrow, out ulong res3);
-            res = new UInt256(res0, res1, res2, res3);
+            borrowInLo = Sse2.ShiftLeftLogical128BitLane(borrowLo, 8);
+            borrowInHi = Ssse3.AlignRight(borrowHi.AsByte(), borrowLo.AsByte(), 8).AsUInt64();
+        }
+
+        // A zero limb that receives a borrow must pass it on. The fallback stays inline and call-free: with a
+        // call here the JIT parks the vector values in callee-saved registers and the shared prolog pays for it
+        Vector128<ulong> propagate = (Vector128.Equals(resultLo, Vector128<ulong>.Zero) & borrowInLo)
+                                   | (Vector128.Equals(resultHi, Vector128<ulong>.Zero) & borrowInHi);
+        if (!Vector128.EqualsAll(propagate, Vector128<ulong>.Zero))
+        {
+            // Nothing has been stored yet, so a and b are intact even when res aliases one of them
+            ulong borrow = 0;
+            SubtractWithBorrow(a.u0, b.u0, ref borrow, out ulong r0);
+            SubtractWithBorrow(a.u1, b.u1, ref borrow, out ulong r1);
+            SubtractWithBorrow(a.u2, b.u2, ref borrow, out ulong r2);
+            SubtractWithBorrow(a.u3, b.u3, ref borrow, out ulong r3);
+            StoreLimbs(out res, r0, r1, r2, r3);
             return borrow != 0;
         }
+
+        Unsafe.SkipInit(out res);
+        ref Vector128<ulong> resRef = ref Unsafe.As<UInt256, Vector128<ulong>>(ref res);
+        resRef = resultLo + borrowInLo;
+        Unsafe.Add(ref resRef, 1) = resultHi + borrowInHi;
+        return borrowHi.GetElement(1) != 0;
+    }
+
+    // Right operand fits in one limb: a borrow can only ripple upward through zero limbs
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool SubtractScalarUInt64(in UInt256 a, ulong b0, out UInt256 res)
+    {
+        ulong a0 = a.u0, a1 = a.u1, a2 = a.u2, a3 = a.u3;
+        ulong r0 = a0 - b0;
+        if (a0 >= b0)
+        {
+            StoreLimbs(out res, r0, a1, a2, a3);
+            return false;
+        }
+        if (a1 != 0)
+        {
+            StoreLimbs(out res, r0, a1 - 1, a2, a3);
+            return false;
+        }
+        if (a2 != 0)
+        {
+            StoreLimbs(out res, r0, ulong.MaxValue, a2 - 1, a3);
+            return false;
+        }
+        if (a3 != 0)
+        {
+            StoreLimbs(out res, r0, ulong.MaxValue, ulong.MaxValue, a3 - 1);
+            return false;
+        }
+
+        StoreLimbs(out res, r0, ulong.MaxValue, ulong.MaxValue, ulong.MaxValue);
+        return true;
+    }
+
+    // Inputs are read into locals before this runs, so res may alias either operand
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void StoreLimbs(out UInt256 res, ulong r0, ulong r1, ulong r2, ulong r3)
+    {
+        Unsafe.SkipInit(out res);
+        Unsafe.AsRef(in res.u0) = r0;
+        Unsafe.AsRef(in res.u1) = r1;
+        Unsafe.AsRef(in res.u2) = r2;
+        Unsafe.AsRef(in res.u3) = r3;
+    }
+
+    // Borrow out is (a < b) | ((a == b) & borrowIn); both compares are off the carry chain
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void SubtractWithBorrow(ulong a, ulong b, ref ulong borrow, out ulong res)
+    {
+        res = a - b - borrow;
+        borrow = (a < b ? 1UL : 0UL) | (borrow & (a == b ? 1UL : 0UL));
     }
 
     public void Subtract(in UInt256 b, out UInt256 res) => Subtract(this, b, out res);
@@ -350,14 +469,6 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     public static bool SubtractUnderflow(in UInt256 a, in UInt256 b, out UInt256 res)
     {
         return SubtractImpl(a, b, out res);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void SubtractWithBorrow(ulong a, ulong b, ref ulong borrow, out ulong res)
-    {
-        ulong result = a - b - borrow;
-        borrow = (((~a) & b) | (~(a ^ b)) & result) >> 63;
-        res = result;
     }
 
     /// <summary>

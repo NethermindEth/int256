@@ -655,6 +655,144 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
 
     public UInt256Tests() : base((BigInteger x) => (UInt256)x, (int x) => (UInt256)x, x => x, TestNumbers.UInt256Max) { }
 
+    public static IEnumerable<(UInt256 A, ulong B)> SubtractByUInt64Cases =>
+    [
+        (new UInt256(0, 0, 0, 0), 0),
+        (new UInt256(1, 0, 0, 0), 1),
+        (new UInt256(0, 1, 0, 0), 1),
+        (new UInt256(0, 0, 1, 0), 1),
+        (new UInt256(0, 0, 0, 1), 1),
+        (new UInt256(0, 0, 0, 0), 1),
+        (new UInt256(ulong.MaxValue, ulong.MaxValue, ulong.MaxValue, ulong.MaxValue), ulong.MaxValue),
+    ];
+
+    [TestCaseSource(nameof(SubtractByUInt64Cases))]
+    public void SubtractUnderflow_right_uint64_values_preserve_result_underflow_and_aliases((UInt256 A, ulong B) test)
+    {
+        AssertSubtractUnderflow(test.A, new UInt256(test.B));
+    }
+
+    // The vector path speculates that no zero limb receives a borrow; these operands force the propagation path.
+    public static IEnumerable<(UInt256 A, UInt256 B)> SubtractBorrowThroughZeroLimbCases =>
+    [
+        (new UInt256(0, 1, 0, 0), new UInt256(1, 0, 0, 0)),
+        (new UInt256(0, 0, 1, 0), new UInt256(1, 0, 0, 0)),
+        (new UInt256(0, 0, 0, 1), new UInt256(1, 0, 0, 0)),
+        (new UInt256(0, 0, 0, 1), new UInt256(0, 1, 0, 0)),
+        (new UInt256(0, 0, 0, 1), new UInt256(0, 0, 1, 0)),
+        (new UInt256(0, 0, 0, 0), new UInt256(1, 0, 0, 0)),
+        (new UInt256(5, 0, 0, 7), new UInt256(6, 0, 0, 7)),
+        (new UInt256(5, 0, 0, 7), new UInt256(6, 0, 0, 6)),
+        (new UInt256(0, 0, 0, 1), new UInt256(0, 0, 0, 1)),
+        (new UInt256(0, ulong.MaxValue, 0, 1), new UInt256(1, ulong.MaxValue, 0, 0)),
+        (new UInt256(0, ulong.MaxValue, ulong.MaxValue, 1), new UInt256(1, ulong.MaxValue, ulong.MaxValue, 0)),
+        (new UInt256(1, 0, 0, 0), new UInt256(2, ulong.MaxValue, ulong.MaxValue, ulong.MaxValue)),
+    ];
+
+    [TestCaseSource(nameof(SubtractBorrowThroughZeroLimbCases))]
+    public void SubtractUnderflow_borrow_through_zero_limbs_matches_BigInteger_oracle_and_aliases((UInt256 A, UInt256 B) test)
+    {
+        AssertSubtractUnderflow(test.A, test.B);
+    }
+
+    // Every limb pattern from {0, 1, 2^63, max} on both sides covers each borrow generate and propagate combination.
+    [Test]
+    public void SubtractUnderflow_limb_patterns_match_BigInteger_oracle_and_aliases()
+    {
+        ulong[] limbs = [0, 1, 1UL << 63, ulong.MaxValue];
+        List<UInt256> values = new();
+        foreach (ulong u0 in limbs)
+        {
+            foreach (ulong u1 in limbs)
+            {
+                foreach (ulong u2 in limbs)
+                {
+                    foreach (ulong u3 in limbs)
+                    {
+                        values.Add(new UInt256(u0, u1, u2, u3));
+                    }
+                }
+            }
+        }
+
+        foreach (UInt256 a in values)
+        {
+            foreach (UInt256 b in values)
+            {
+                AssertSubtractUnderflow(a, b);
+            }
+        }
+    }
+
+    [Test]
+    public void SubtractUnderflow_random_full_left_and_uint64_right_match_BigInteger_oracle_and_aliases()
+    {
+        Random random = new(0x5AB7_497);
+
+        for (int i = 0; i < 4096; i++)
+        {
+            UInt256 a = new UInt256(
+                RandomSubtractOperand(random),
+                RandomSubtractOperand(random),
+                RandomSubtractOperand(random),
+                RandomSubtractOperand(random));
+            AssertSubtractUnderflow(a, new UInt256(RandomSubtractOperand(random)));
+        }
+    }
+
+    [Test]
+    public void SubtractUnderflow_random_wide_pairs_match_BigInteger_oracle_and_aliases()
+    {
+        Random random = new(0x5AB7_498);
+
+        for (int i = 0; i < 4096; i++)
+        {
+            UInt256 a = new UInt256(
+                RandomSubtractOperand(random),
+                RandomSubtractOperand(random),
+                RandomSubtractOperand(random),
+                RandomSubtractOperand(random));
+            UInt256 b = new UInt256(
+                RandomSubtractOperand(random),
+                RandomSubtractOperand(random),
+                RandomSubtractOperand(random),
+                RandomSubtractOperand(random));
+            AssertSubtractUnderflow(a, b);
+            AssertSubtractUnderflow(b, a);
+        }
+    }
+
+    private static ulong RandomSubtractOperand(Random random)
+        => ((ulong)random.NextInt64() << 1) | (uint)random.Next(2);
+
+    private static void AssertSubtractUnderflow(UInt256 a, UInt256 b)
+    {
+        BigInteger difference = (BigInteger)a - (BigInteger)b;
+        BigInteger expectedResult = difference % TestNumbers.TwoTo256;
+        if (expectedResult.Sign < 0)
+        {
+            expectedResult += TestNumbers.TwoTo256;
+        }
+        bool expectedUnderflow = difference.Sign < 0;
+
+        bool underflow = UInt256.SubtractUnderflow(in a, in b, out UInt256 result);
+        ((BigInteger)result).Should().Be(expectedResult);
+        underflow.Should().Be(expectedUnderflow);
+
+        UInt256.Subtract(in a, in b, out UInt256 plain);
+        ((BigInteger)plain).Should().Be(expectedResult);
+
+        UInt256 aliasedA = a;
+        underflow = UInt256.SubtractUnderflow(in aliasedA, in b, out aliasedA);
+        ((BigInteger)aliasedA).Should().Be(expectedResult);
+        underflow.Should().Be(expectedUnderflow);
+
+        UInt256 aliasedB = b;
+        underflow = UInt256.SubtractUnderflow(in a, in aliasedB, out aliasedB);
+        ((BigInteger)aliasedB).Should().Be(expectedResult);
+        underflow.Should().Be(expectedUnderflow);
+    }
+
     [Test]
     public void DivideAndMod_PowerOfTwoDivisors_MatchBigInteger()
     {
