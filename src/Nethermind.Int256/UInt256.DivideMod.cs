@@ -535,34 +535,14 @@ public readonly partial struct UInt256
         // diff = sum - m
         ulong borrow = !SubtractUnderflow(in sum, in m, out UInt256 d) ? 0UL : 1UL;
 
-        // Need subtract if (carry == 1) || (sum >= m)
-        // sum >= m <=> borrow == 0
-        ulong needSub = carry | (borrow ^ 1UL);
-        ulong mask = 0UL - needSub;
-
-        if (mask == 0)
-        {
-            res = sum;
-        }
-        else if (mask == ulong.MaxValue)
+        // Need subtract if (carry == 1) || (sum >= m); sum >= m <=> borrow == 0. Both inputs are 0 or 1.
+        if ((carry | (borrow ^ 1UL)) != 0)
         {
             res = d;
         }
-        else if (Vector256.IsHardwareAccelerated)
-        {
-            Vector256<ulong> dV = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in d));
-            Vector256<ulong> sumV = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in sum));
-            Vector256<ulong> maskV = Vector256.Create(mask);
-
-            Vector256<ulong> resultV = Vector256.ConditionalSelect(dV, sumV, maskV);
-
-            Unsafe.SkipInit(out res);
-            Unsafe.As<UInt256, Vector256<ulong>>(ref res) = resultV;
-        }
         else
         {
-            UInt256 mask256 = Create(mask, mask, mask, mask);
-            res = (d & mask256) | (sum & ~mask256);
+            res = sum;
         }
     }
 
@@ -3243,7 +3223,7 @@ public readonly partial struct UInt256
         }
         else
         {
-            Vector256<ulong> x = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in v));
+            Vector256<ulong> x = Unsafe.BitCast<UInt256, Vector256<ulong>>(v);
             Vector128<ulong> cL = Vector128.CreateScalarUnsafe((ulong)(uint)sh);
             Vector128<ulong> cR = Vector128.CreateScalarUnsafe(64uL - (ulong)(uint)sh);
 
@@ -3293,7 +3273,7 @@ public readonly partial struct UInt256
         }
         else
         {
-            Vector256<ulong> x = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in v));
+            Vector256<ulong> x = Unsafe.BitCast<UInt256, Vector256<ulong>>(v);
 
             // right = x >> sh
             Vector128<ulong> cR = Vector128.CreateScalarUnsafe((ulong)sh);

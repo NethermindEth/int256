@@ -381,7 +381,7 @@ public class MultiplyScalarTargeted
     private const int OperationCount = 256;
     private DoubleUInt256[] _values = null!;
 
-    [Params("Full", "OneSmall", "Small", "ProductionMix")]
+    [Params("Full", "OneSmall", "SmallOne", "Small", "OneByTwo", "TwoByOne", "TwoByTwo", "TwoByFour", "FourByTwo", "ProductionMix")]
     public string Shape { get; set; } = null!;
 
     [GlobalSetup]
@@ -395,7 +395,13 @@ public class MultiplyScalarTargeted
             {
                 "Full" => CreateFull(seed),
                 "OneSmall" => CreateOneSmall(seed),
+                "SmallOne" => CreateSmallOne(seed),
                 "Small" => new DoubleUInt256(seed | 2, (seed >> 1) | 2),
+                "OneByTwo" => CreateOneByTwo(seed),
+                "TwoByOne" => CreateTwoByOne(seed),
+                "TwoByTwo" => Create128(seed),
+                "TwoByFour" => CreateTwoByFour(seed),
+                "FourByTwo" => CreateFourByTwo(seed),
                 _ => (i % 100) switch
                 {
                     < 31 => CreateOneSmall(seed),
@@ -426,6 +432,12 @@ public class MultiplyScalarTargeted
     private static DoubleUInt256 Create128(ulong seed) =>
         new(new UInt256(seed, seed ^ 0xA0761D6478BD642FUL), new UInt256(~seed, seed ^ 0xE7037ED1A0B428DBUL));
 
+    private static DoubleUInt256 CreateOneByTwo(ulong seed) =>
+        new((seed | 2), new UInt256(~seed, seed ^ 0xE7037ED1A0B428DBUL));
+
+    private static DoubleUInt256 CreateTwoByOne(ulong seed) =>
+        new(new UInt256(seed, seed ^ 0xA0761D6478BD642FUL), (~seed) | 2);
+
     private static DoubleUInt256 Create192(ulong seed) =>
         new(
             new UInt256(seed, seed ^ 0xA0761D6478BD642FUL, seed ^ 0xE7037ED1A0B428DBUL),
@@ -438,6 +450,15 @@ public class MultiplyScalarTargeted
 
     private static DoubleUInt256 CreateOneSmall(ulong seed) =>
         new(CreateFull(seed).A, (seed >> 1) | 2);
+
+    private static DoubleUInt256 CreateSmallOne(ulong seed) =>
+        new((seed >> 1) | 2, CreateFull(seed).B);
+
+    private static DoubleUInt256 CreateTwoByFour(ulong seed) =>
+        new(Create128(seed).A, CreateFull(seed).B);
+
+    private static DoubleUInt256 CreateFourByTwo(ulong seed) =>
+        new(CreateFull(seed).A, Create128(seed).B);
 }
 
 public class MultiplySigned : SignedTwoParamBenchmarkBase
