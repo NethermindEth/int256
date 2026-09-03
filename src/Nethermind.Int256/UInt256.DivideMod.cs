@@ -1238,8 +1238,12 @@ public readonly partial struct UInt256
                 SubtractExact(in x, in y, out res);
                 return;
             }
+
+            Remainder256By256(in x, in y, out res);
+            return;
         }
-        else if (y.u2 != 0)
+
+        if (y.u2 != 0)
         {
             ulong y2 = y.u2;
             if ((y.u0 | y.u1 | (y2 & (y2 - 1))) == 0)
@@ -1247,8 +1251,12 @@ public readonly partial struct UInt256
                 ModByPowerOfTwo192(in x, y2 - 1, out res);
                 return;
             }
+
+            Remainder256By192(in x, in y, out res);
+            return;
         }
-        else if (y.u1 != 0)
+
+        if (y.u1 != 0)
         {
             ulong y1 = y.u1;
             if ((y.u0 | (y1 & (y1 - 1))) == 0)
@@ -1256,19 +1264,391 @@ public readonly partial struct UInt256
                 ModByPowerOfTwo128(in x, y1 - 1, out res);
                 return;
             }
+
+            Remainder256By128(in x, in y, out res);
+            return;
+        }
+
+        // Single-limb divisor; the wrapper returned already for y == 0 and y == 1, so y >= 2.
+        ulong y0 = y.u0;
+        if ((y0 & (y0 - 1)) == 0)
+        {
+            ModByPowerOfTwo64(in x, y0 - 1, out res);
+            return;
+        }
+
+        Remainder256By64(in x, y0, out res);
+    }
+
+    // The four kernels below answer x % y without ever forming the quotient. Knuth D needs the
+    // quotient digit to produce the remainder, but nothing downstream reads it, so it stays in a
+    // register instead of being assembled into a UInt256 and stored.
+    //
+    // They also keep every intermediate in general registers. Handing normalisation to
+    // ShiftLeftSmall/ShiftRightSmall put the value through a UInt256: four 8-byte stores followed by
+    // one 32-byte load, a width no store-to-load forwarding covers, plus two vmovq crossings for the
+    // shift counts.
+
+    // n == 4. x > y and y < 2^255, so the shift is 1..63 and there is exactly one quotient digit.
+    [SkipLocalsInit]
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void Remainder256By256(in UInt256 x, in UInt256 y, out UInt256 res)
+    {
+        ulong y0 = y.u0, y1 = y.u1, y2 = y.u2, y3 = y.u3;
+        int shift = BitOperations.LeadingZeroCount(y3);
+        // y < 2^255 puts the shift at 1..63, so the carry-in needs no guard against a 64-bit shift.
+        Debug.Assert(shift is >= 1 and <= 63, "ModFull answers y >= 2^255 with a subtract");
+        int carryShift = 64 - shift;
+
+        ulong v0 = y0 << shift;
+        ulong v1 = (y1 << shift) | (y0 >> carryShift);
+        ulong v2 = (y2 << shift) | (y1 >> carryShift);
+        ulong v3 = (y3 << shift) | (y2 >> carryShift);
+
+        ulong x0 = x.u0, x1 = x.u1, x2 = x.u2, x3 = x.u3;
+        ulong u0 = x0 << shift;
+        ulong u1 = (x1 << shift) | (x0 >> carryShift);
+        ulong u2 = (x2 << shift) | (x1 >> carryShift);
+        ulong u3 = (x3 << shift) | (x2 >> carryShift);
+        ulong u4 = x3 >> carryShift;
+
+        // u4 < 2^shift <= 2^63 <= v3, so the divide cannot saturate and needs no guard of its own.
+        Debug.Assert(u4 < v3, "the single quotient digit cannot saturate after normalisation");
+        ulong qhat, rhat;
+        if (X86Base.X64.IsSupported)
+        {
+            (qhat, rhat) = X86Base.X64.DivRem(u3, u4, v3);
         }
         else
         {
-            // Single-limb divisor; the wrapper returned already for y == 0 and y == 1, so y >= 2.
-            ulong y0 = y.u0;
-            if ((y0 & (y0 - 1)) == 0)
+            qhat = UDivRem2By1(u4, Reciprocal2By1(v3), v3, u3, out rhat);
+        }
+
+        qhat = CorrectQhat(qhat, ref rhat, v2, v3, u2);
+
+        if (SubMul4(ref u0, ref u1, ref u2, ref u3, ref u4, v0, v1, v2, v3, qhat) != 0)
+        {
+            AddBack4(ref u0, ref u1, ref u2, ref u3, ref u4, v0, v1, v2, v3);
+        }
+
+        StoreProduct(out res,
+            (u0 >> shift) | (u1 << carryShift),
+            (u1 >> shift) | (u2 << carryShift),
+            (u2 >> shift) | (u3 << carryShift),
+            u3 >> shift);
+    }
+
+    // n == 3, two quotient digits.
+    [SkipLocalsInit]
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void Remainder256By192(in UInt256 x, in UInt256 y, out UInt256 res)
+    {
+        ulong y0 = y.u0, y1 = y.u1, y2 = y.u2;
+        int shift = BitOperations.LeadingZeroCount(y2);
+        ulong x0 = x.u0, x1 = x.u1, x2 = x.u2, x3 = x.u3;
+        ulong v0, v1, v2, u0, u1, u2, u3, u4;
+        if (shift == 0)
+        {
+            v0 = y0; v1 = y1; v2 = y2;
+            u0 = x0; u1 = x1; u2 = x2; u3 = x3; u4 = 0;
+        }
+        else
+        {
+            int carryShift = 64 - shift;
+            v0 = y0 << shift;
+            v1 = (y1 << shift) | (y0 >> carryShift);
+            v2 = (y2 << shift) | (y1 >> carryShift);
+            u0 = x0 << shift;
+            u1 = (x1 << shift) | (x0 >> carryShift);
+            u2 = (x2 << shift) | (x1 >> carryShift);
+            u3 = (x3 << shift) | (x2 >> carryShift);
+            u4 = x3 >> carryShift;
+        }
+
+        ulong recip = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(v2);
+
+        // First digit, from (u4:u3). Same argument as the 4-limb kernel: u4 < 2^shift <= v2.
+        Debug.Assert(u4 < v2, "the first quotient digit cannot saturate after normalisation");
+        ulong qhat, rhat;
+        if (X86Base.X64.IsSupported)
+        {
+            (qhat, rhat) = X86Base.X64.DivRem(u3, u4, v2);
+        }
+        else
+        {
+            qhat = UDivRem2By1(u4, recip, v2, u3, out rhat);
+        }
+
+        qhat = CorrectQhat(qhat, ref rhat, v1, v2, u2);
+
+        if (SubMul3(ref u1, ref u2, ref u3, ref u4, v0, v1, v2, qhat) != 0)
+        {
+            AddBack3(ref u1, ref u2, ref u3, ref u4, v0, v1, v2);
+        }
+
+        // Second digit, from (u3:u2). Here the top limb can equal v2, which the divide cannot take.
+        ulong rcarry;
+        if (u3 == v2)
+        {
+            qhat = ulong.MaxValue;
+            rhat = u2 + v2;
+            rcarry = (rhat < v2) ? 1UL : 0UL;
+        }
+        else
+        {
+            if (X86Base.X64.IsSupported)
             {
-                ModByPowerOfTwo64(in x, y0 - 1, out res);
-                return;
+                (qhat, rhat) = X86Base.X64.DivRem(u2, u3, v2);
+            }
+            else
+            {
+                qhat = UDivRem2By1(u3, recip, v2, u2, out rhat);
+            }
+            rcarry = 0;
+        }
+
+        if (rcarry == 0)
+        {
+            qhat = CorrectQhat(qhat, ref rhat, v1, v2, u1);
+        }
+
+        if (SubMul3(ref u0, ref u1, ref u2, ref u3, v0, v1, v2, qhat) != 0)
+        {
+            AddBack3(ref u0, ref u1, ref u2, ref u3, v0, v1, v2);
+        }
+
+        if (shift == 0)
+        {
+            StoreProduct(out res, u0, u1, u2, 0);
+        }
+        else
+        {
+            int carryShift = 64 - shift;
+            StoreProduct(out res, (u0 >> shift) | (u1 << carryShift), (u1 >> shift) | (u2 << carryShift), u2 >> shift, 0);
+        }
+    }
+
+    // n == 2, three quotient digits. Knuth D collapses here: the 2-by-1 divide already leaves
+    // (rhat:u[j]) as the top of the partial remainder, so each step is one divide, one product and
+    // a two-limb subtract - no multi-limb sub-and-add-back at all.
+    [SkipLocalsInit]
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void Remainder256By128(in UInt256 x, in UInt256 y, out UInt256 res)
+    {
+        ulong y0 = y.u0, y1 = y.u1;
+        int shift = BitOperations.LeadingZeroCount(y1);
+        ulong x0 = x.u0, x1 = x.u1, x2 = x.u2, x3 = x.u3;
+        ulong v0, v1, u0, u1, u2, u3, u4;
+        if (shift == 0)
+        {
+            v0 = y0; v1 = y1;
+            u0 = x0; u1 = x1; u2 = x2; u3 = x3; u4 = 0;
+        }
+        else
+        {
+            int carryShift = 64 - shift;
+            v0 = y0 << shift;
+            v1 = (y1 << shift) | (y0 >> carryShift);
+            u0 = x0 << shift;
+            u1 = (x1 << shift) | (x0 >> carryShift);
+            u2 = (x2 << shift) | (x1 >> carryShift);
+            u3 = (x3 << shift) | (x2 >> carryShift);
+            u4 = x3 >> carryShift;
+        }
+
+        ulong recip = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(v1);
+
+        if (v0 == 0)
+        {
+            // The normalised divisor is v1 * 2^64, so this is a plain 256-by-64 remainder on the top
+            // four limbs with u0 falling straight through.
+            Debug.Assert(u4 < v1);
+            ulong r = u4;
+            _ = DivRem2By1(u3, r, v1, recip, out r);
+            _ = DivRem2By1(u2, r, v1, recip, out r);
+            _ = DivRem2By1(u1, r, v1, recip, out r);
+            StoreDenormalized2(out res, u0, r, shift);
+            return;
+        }
+
+        Debug.Assert(u4 < v1, "the first quotient digit cannot saturate after normalisation");
+        u3 = Remainder128Step(u4, u3, ref u2, v0, v1, recip, guardSaturation: false);
+        u2 = Remainder128Step(u3, u2, ref u1, v0, v1, recip, guardSaturation: true);
+        u1 = Remainder128Step(u2, u1, ref u0, v0, v1, recip, guardSaturation: true);
+
+        StoreDenormalized2(out res, u0, u1, shift);
+    }
+
+    // Undo the normalising shift on a two-limb remainder and store it.
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void StoreDenormalized2(out UInt256 res, ulong r0, ulong r1, int shift)
+    {
+        if (shift == 0)
+        {
+            StoreProduct(out res, r0, r1, 0, 0);
+            return;
+        }
+
+        int carryShift = 64 - shift;
+        StoreProduct(out res, (r0 >> shift) | (r1 << carryShift), r1 >> shift, 0, 0);
+    }
+
+    // n == 1. Hardware div needs no normalisation at all: the running remainder is already below the
+    // divisor, so it can go straight into rdx.
+    [SkipLocalsInit]
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void Remainder256By64(in UInt256 x, ulong d, out UInt256 res)
+    {
+        ulong r;
+        if (X86Base.X64.IsSupported)
+        {
+            r = 0;
+            ulong u3 = x.u3;
+            if (u3 != 0) (_, r) = X86Base.X64.DivRem(u3, r, d);
+            ulong u2 = x.u2;
+            if ((u2 | r) != 0) (_, r) = X86Base.X64.DivRem(u2, r, d);
+            ulong u1 = x.u1;
+            if ((u1 | r) != 0) (_, r) = X86Base.X64.DivRem(u1, r, d);
+            ulong u0 = x.u0;
+            if ((u0 | r) != 0) (_, r) = X86Base.X64.DivRem(u0, r, d);
+        }
+        else
+        {
+            int shift = BitOperations.LeadingZeroCount(d);
+            ulong dn = d << shift;
+            ulong recip = Reciprocal2By1(dn);
+
+            ulong x0 = x.u0, x1 = x.u1, x2 = x.u2, x3 = x.u3;
+            ulong u0, u1, u2, u3;
+            if (shift == 0)
+            {
+                u0 = x0; u1 = x1; u2 = x2; u3 = x3; r = 0;
+            }
+            else
+            {
+                int carryShift = 64 - shift;
+                u0 = x0 << shift;
+                u1 = (x1 << shift) | (x0 >> carryShift);
+                u2 = (x2 << shift) | (x1 >> carryShift);
+                u3 = (x3 << shift) | (x2 >> carryShift);
+                r = x3 >> carryShift;
+            }
+
+            _ = UDivRem2By1(r, recip, dn, u3, out r);
+            _ = UDivRem2By1(r, recip, dn, u2, out r);
+            _ = UDivRem2By1(r, recip, dn, u1, out r);
+            _ = UDivRem2By1(r, recip, dn, u0, out r);
+            r >>= shift;
+        }
+
+        StoreProduct(out res, r, 0, 0, 0);
+    }
+
+    // One Knuth D step against a two-limb divisor: divide (hi:mid) by v1, then take q*v0 off
+    // (rhat:low). Writing the correction as p -= v0 keeps the second product out of the loop.
+    [SkipLocalsInit]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static ulong Remainder128Step(
+        ulong high, ulong mid, ref ulong low, ulong v0, ulong v1, ulong recip, bool guardSaturation)
+    {
+        ulong qhat, rhat;
+        ulong rcarry = 0;
+        if (guardSaturation && high == v1)
+        {
+            qhat = ulong.MaxValue;
+            rhat = mid + v1;
+            rcarry = (rhat < v1) ? 1UL : 0UL;
+        }
+        else
+        {
+            qhat = DivRem2By1(mid, high, v1, recip, out rhat);
+        }
+
+        ulong pHi = Multiply64(qhat, v0, out ulong pLo);
+        ulong lowValue = low;
+
+        if (rcarry == 0 && (pHi > rhat || (pHi == rhat && pLo > lowValue)))
+        {
+            ulong next = pLo - v0;
+            pHi -= (pLo < v0) ? 1UL : 0UL;
+            pLo = next;
+
+            rhat += v1;
+            if (rhat >= v1 && (pHi > rhat || (pHi == rhat && pLo > lowValue)))
+            {
+                next = pLo - v0;
+                pHi -= (pLo < v0) ? 1UL : 0UL;
+                pLo = next;
+                rhat += v1;
             }
         }
 
-        DivideImpl(in x, in y, out _, out res);
+        ulong borrow = (lowValue < pLo) ? 1UL : 0UL;
+        low = lowValue - pLo;
+        return rhat - pHi - borrow;
+    }
+
+    // Knuth D3. qhat overshoots by at most two, and each test is against the next divisor limb;
+    // once rhat carries out of a limb the test can no longer fire, so the loop stops there.
+    [SkipLocalsInit]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static ulong CorrectQhat(ulong qhat, ref ulong rhat, ulong vNext, ulong vTop, ulong uNext)
+    {
+        ulong r = rhat;
+        ulong pHi = Multiply64(qhat, vNext, out ulong pLo);
+        if (pHi > r || (pHi == r && pLo > uNext))
+        {
+            qhat--;
+            // The product moves by one divisor limb, which is cheaper than multiplying again.
+            ulong next = pLo - vNext;
+            pHi -= (pLo < vNext) ? 1UL : 0UL;
+            pLo = next;
+
+            r += vTop;
+            if (r >= vTop && (pHi > r || (pHi == r && pLo > uNext)))
+            {
+                qhat--;
+            }
+        }
+
+        rhat = r;
+        return qhat;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static ulong DivRem2By1(ulong low, ulong high, ulong d, ulong recip, out ulong rem)
+    {
+        if (X86Base.X64.IsSupported)
+        {
+            (ulong q, ulong r) = X86Base.X64.DivRem(low, high, d);
+            rem = r;
+            return q;
+        }
+
+        return UDivRem2By1(high, recip, d, low, out rem);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static ulong SubMul3(ref ulong u0, ref ulong u1, ref ulong u2, ref ulong u3, ulong v0, ulong v1, ulong v2, ulong q)
+    {
+        ulong borrow = 0;
+
+        ulong pHi = Multiply64(q, v0, out ulong pLo);
+        ulong carry = pHi;
+        u0 = Sub(u0, pLo, ref borrow);
+
+        pHi = Multiply64(q, v1, out pLo);
+        ulong sum = pLo + carry;
+        carry = pHi + ((sum < pLo) ? 1UL : 0UL);
+        u1 = Sub(u1, sum, ref borrow);
+
+        pHi = Multiply64(q, v2, out pLo);
+        sum = pLo + carry;
+        carry = pHi + ((sum < pLo) ? 1UL : 0UL);
+        u2 = Sub(u2, sum, ref borrow);
+
+        u3 = Sub(u3, carry, ref borrow);
+        return borrow;
     }
 
     [SkipLocalsInit]
