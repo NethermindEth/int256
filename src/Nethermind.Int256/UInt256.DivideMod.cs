@@ -1366,24 +1366,30 @@ public readonly partial struct UInt256
         }
 
         ulong recip = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(v2);
-
-        // First digit, from (u4:u3). Same argument as the 4-limb kernel: u4 < 2^shift <= v2.
-        Debug.Assert(u4 < v2, "the first quotient digit cannot saturate after normalisation");
         ulong qhat, rhat;
-        if (X86Base.X64.IsSupported)
-        {
-            (qhat, rhat) = X86Base.X64.DivRem(u3, u4, v2);
-        }
-        else
-        {
-            qhat = UDivRem2By1(u4, recip, v2, u3, out rhat);
-        }
 
-        qhat = CorrectQhat(qhat, ref rhat, v1, v2, u2);
-
-        if (SubMul3(ref u1, ref u2, ref u3, ref u4, v0, v1, v2, qhat) != 0)
+        // The quotient has one digit per dividend limb past the divisor. When x stops short of limb
+        // 3 the leading digit is zero - u4 is 0 and u3 is below the normalised v2 - and running it
+        // anyway costs a divide that can only produce zero.
+        if (x3 != 0)
         {
-            AddBack3(ref u1, ref u2, ref u3, ref u4, v0, v1, v2);
+            // First digit, from (u4:u3). Same argument as the 4-limb kernel: u4 < 2^shift <= v2.
+            Debug.Assert(u4 < v2, "the first quotient digit cannot saturate after normalisation");
+            if (X86Base.X64.IsSupported)
+            {
+                (qhat, rhat) = X86Base.X64.DivRem(u3, u4, v2);
+            }
+            else
+            {
+                qhat = UDivRem2By1(u4, recip, v2, u3, out rhat);
+            }
+
+            qhat = CorrectQhat(qhat, ref rhat, v1, v2, u2);
+
+            if (SubMul3(ref u1, ref u2, ref u3, ref u4, v0, v1, v2, qhat) != 0)
+            {
+                AddBack3(ref u1, ref u2, ref u3, ref u4, v0, v1, v2);
+            }
         }
 
         // Second digit, from (u3:u2). Here the top limb can equal v2, which the divide cannot take.
@@ -1471,9 +1477,20 @@ public readonly partial struct UInt256
             return;
         }
 
-        Debug.Assert(u4 < v1, "the first quotient digit cannot saturate after normalisation");
-        u3 = Remainder128Step(u4, u3, ref u2, v0, v1, recip, guardSaturation: false);
-        u2 = Remainder128Step(u3, u2, ref u1, v0, v1, recip, guardSaturation: true);
+        // One step per dividend limb past the divisor. A step whose window is below the normalised
+        // divisor produces a zero digit and leaves the remainder alone, so a dividend that stops
+        // short of limb 3 or limb 2 skips it rather than paying for a divide by zero.
+        if (x3 != 0)
+        {
+            Debug.Assert(u4 < v1, "the first quotient digit cannot saturate after normalisation");
+            u3 = Remainder128Step(u4, u3, ref u2, v0, v1, recip, guardSaturation: false);
+        }
+
+        if ((x3 | x2) != 0)
+        {
+            u2 = Remainder128Step(u3, u2, ref u1, v0, v1, recip, guardSaturation: true);
+        }
+
         u1 = Remainder128Step(u2, u1, ref u0, v0, v1, recip, guardSaturation: true);
 
         StoreDenormalized2(out res, u0, u1, shift);
