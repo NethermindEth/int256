@@ -180,11 +180,11 @@ public readonly partial struct UInt256
     [SkipLocalsInit]
     public static void Mod(in UInt256 x, in UInt256 y, out UInt256 res)
     {
-        ulong y0 = y.u0, y1 = y.u1, y2 = y.u2, y3 = y.u3;
+        ulong y0 = y.u0;
 
         // Zero throws and one leaves no remainder; testing the pair at once keeps two 256-bit
         // vector compares, and the vzeroupper they drag in, off every call.
-        if (((y0 >> 1) | y1 | y2 | y3) == 0)
+        if (((y0 >> 1) | y.u1 | y.u2 | y.u3) == 0)
         {
             if (y0 == 0) ThrowDivideByZeroException();
             res = default;
@@ -193,11 +193,11 @@ public readonly partial struct UInt256
 
         // Descending compare that jumps straight to its answer: asking CompareTo for a three-way int
         // made the JIT compare every limb twice. x == 0 lands in the x < y arm, since y >= 2 by now.
-        if (x.u3 == y3)
+        if (x.u3 == y.u3)
         {
-            if (x.u2 == y2)
+            if (x.u2 == y.u2)
             {
-                if (x.u1 == y1)
+                if (x.u1 == y.u1)
                 {
                     ulong x0 = x.u0;
                     if (x0 <= y0)
@@ -207,11 +207,11 @@ public readonly partial struct UInt256
                         return;
                     }
                 }
-                else if (x.u1 < y1) { res = x; return; }
+                else if (x.u1 < y.u1) { res = x; return; }
             }
-            else if (x.u2 < y2) { res = x; return; }
+            else if (x.u2 < y.u2) { res = x; return; }
         }
-        else if (x.u3 < y3) { res = x; return; }
+        else if (x.u3 < y.u3) { res = x; return; }
 
         // x > y from here.
         if ((x.u1 | x.u2 | x.u3) == 0)
@@ -222,70 +222,7 @@ public readonly partial struct UInt256
             return;
         }
 
-        // Divisor width picks the kernel, and a power of two answers with a mask. As a second method
-        // this cost another call and another read of every divisor limb.
-        if (y3 != 0)
-        {
-            if ((y0 | y1 | y2 | (y3 & (y3 - 1))) == 0)
-            {
-                ModByPowerOfTwo256(in x, y3 - 1, out res);
-                return;
-            }
-
-            // x > y, so y >= 2^255 gives 2y >= 2^256 > x: the quotient is 1 and the remainder is the
-            // plain difference, which cannot borrow out of limb 3.
-            if ((long)y3 < 0)
-            {
-                // Where there is a vector unit, the general subtract loads, subtracts and stores
-                // without ever touching a general register, which beats an inline borrow chain even
-                // through a call. With none, the inline chain is what is left.
-                if (Vector128.IsHardwareAccelerated)
-                {
-                    Subtract(in x, in y, out res);
-                }
-                else
-                {
-                    SubtractExact(in x, in y, out res);
-                }
-                return;
-            }
-
-            Remainder256By256(in x, in y, out res);
-            return;
-        }
-
-        if (y2 != 0)
-        {
-            if ((y0 | y1 | (y2 & (y2 - 1))) == 0)
-            {
-                ModByPowerOfTwo192(in x, y2 - 1, out res);
-                return;
-            }
-
-            Remainder256By192(in x, in y, out res);
-            return;
-        }
-
-        if (y1 != 0)
-        {
-            if ((y0 | (y1 & (y1 - 1))) == 0)
-            {
-                ModByPowerOfTwo128(in x, y1 - 1, out res);
-                return;
-            }
-
-            Remainder256By128(in x, in y, out res);
-            return;
-        }
-
-        // Single-limb divisor, and y >= 2 by the gate at the top.
-        if ((y0 & (y0 - 1)) == 0)
-        {
-            ModByPowerOfTwo64(in x, y0 - 1, out res);
-            return;
-        }
-
-        Remainder256By64(in x, y0, out res);
+        ModFull(x, y, out res);
     }
 
     /// <summary>
@@ -1279,6 +1216,78 @@ public readonly partial struct UInt256
         remainder = ShiftRightSmall(in normRem, normShiftBits);
     }
 
+    // Kept out of Mod: folding the width dispatch into the entry point measured 0.887 on x64 but
+    // 1.043 on a Neoverse N2, where it bought the wide shapes nothing and gave every call Mod's
+    // six-register prologue - a trivial x % y there went from 3.5 to 4.7 ns.
+    [SkipLocalsInit]
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void ModFull(in UInt256 x, in UInt256 y, out UInt256 res)
+    {
+        ulong y0 = y.u0, y1 = y.u1, y2 = y.u2, y3 = y.u3;
+        if (y3 != 0)
+        {
+            if ((y0 | y1 | y2 | (y3 & (y3 - 1))) == 0)
+            {
+                ModByPowerOfTwo256(in x, y3 - 1, out res);
+                return;
+            }
+
+            // x > y, so y >= 2^255 gives 2y >= 2^256 > x: the quotient is 1 and the remainder is the
+            // plain difference, which cannot borrow out of limb 3.
+            if ((long)y3 < 0)
+            {
+                // Where there is a vector unit, the general subtract loads, subtracts and stores
+                // without ever touching a general register, which beats an inline borrow chain even
+                // through a call. With none, the inline chain is what is left.
+                if (Vector128.IsHardwareAccelerated)
+                {
+                    Subtract(in x, in y, out res);
+                }
+                else
+                {
+                    SubtractExact(in x, in y, out res);
+                }
+                return;
+            }
+
+            Remainder256By256(in x, in y, out res);
+            return;
+        }
+
+        if (y2 != 0)
+        {
+            if ((y0 | y1 | (y2 & (y2 - 1))) == 0)
+            {
+                ModByPowerOfTwo192(in x, y2 - 1, out res);
+                return;
+            }
+
+            Remainder256By192(in x, in y, out res);
+            return;
+        }
+
+        if (y1 != 0)
+        {
+            if ((y0 | (y1 & (y1 - 1))) == 0)
+            {
+                ModByPowerOfTwo128(in x, y1 - 1, out res);
+                return;
+            }
+
+            Remainder256By128(in x, in y, out res);
+            return;
+        }
+
+        // Single-limb divisor, and y >= 2 by the gate at the top.
+        if ((y0 & (y0 - 1)) == 0)
+        {
+            ModByPowerOfTwo64(in x, y0 - 1, out res);
+            return;
+        }
+
+        Remainder256By64(in x, y0, out res);
+    }
+
     // The kernels below answer x % y without assembling the quotient, and stay in general registers:
     // normalising through a UInt256 costs four 8-byte stores then one 32-byte load, which cannot forward.
 
@@ -1290,7 +1299,7 @@ public readonly partial struct UInt256
         ulong y0 = y.u0, y1 = y.u1, y2 = y.u2, y3 = y.u3;
         int shift = BitOperations.LeadingZeroCount(y3);
         // y < 2^255 puts the shift at 1..63, so the carry-in needs no guard against a 64-bit shift.
-        Debug.Assert(shift is >= 1 and <= 63, "Mod answers y >= 2^255 with a subtract");
+        Debug.Assert(shift is >= 1 and <= 63, "ModFull answers y >= 2^255 with a subtract");
         int carryShift = 64 - shift;
 
         ulong v0 = y0 << shift;
