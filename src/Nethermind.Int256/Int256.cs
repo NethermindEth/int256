@@ -323,25 +323,25 @@ public readonly struct Int256 : IEquatable<Int256>, IComparable, IComparable<Int
     // Mod sets res to (sign x) * { abs(x) modulus abs(y) }, and throws when y is zero.
     public static void Mod(in Int256 x, in Int256 y, out Int256 res)
     {
-        Int256 xIn = x, yIn = y;
         bool xIsNegative = x.IsNegative;
+        bool yIsNegative = y.IsNegative;
 
-        // abs x
-        if (xIsNegative)
+        // Only the magnitudes divide and the remainder keeps the dividend's sign, but taking absolute
+        // values into locals up front copied both operands - 32 bytes each - even when neither needed
+        // it and both already sat where Mod wants them.
+        if (!(xIsNegative | yIsNegative))
         {
-            Neg(x, out xIn);
+            UInt256.Mod(in x._value, in y._value, out UInt256 positive);
+            res = new Int256(positive);
+            return;
         }
-        // abs y
-        if (y.IsNegative)
-        {
-            Neg(y, out yIn);
-        }
+
+        Int256 xIn = x, yIn = y;
+        if (xIsNegative) Neg(x, out xIn);
+        if (yIsNegative) Neg(y, out yIn);
         UInt256.Mod(in xIn._value, in yIn._value, out UInt256 value);
         res = new Int256(value);
-        if (xIsNegative)
-        {
-            Neg(res, out res);
-        }
+        if (xIsNegative) Neg(res, out res);
     }
 
     public void Mod(in Int256 m, out Int256 res) => Mod(this, m, out res);
