@@ -1324,11 +1324,59 @@ public readonly partial struct UInt256
             qhat = UDivRem2By1(u4, Reciprocal2By1(v3), v3, u3, out rhat);
         }
 
-        qhat = CorrectQhat(qhat, ref rhat, v2, v3, u2);
-
-        if (SubMul4(ref u0, ref u1, ref u2, ref u3, ref u4, v0, v1, v2, v3, qhat) != 0)
+        // The divide has already taken qhat*v3 off the top two limbs and left rhat in their place, so
+        // the window still to reduce is (rhat:u2:u1:u0) and only qhat*(v2:v1:v0) comes off it. D3 has
+        // been carrying qhat*v2 the whole time, which is that subtrahend's top limb.
+        ulong pHi = Multiply64(qhat, v2, out ulong pLo);
+        ulong rcarry = 0;
+        if (pHi > rhat || (pHi == rhat && pLo > u2))
         {
-            AddBack4(ref u0, ref u1, ref u2, ref u3, ref u4, v0, v1, v2, v3);
+            qhat--;
+            ulong stepped = pLo - v2;
+            pHi -= (pLo < v2) ? 1UL : 0UL;
+            pLo = stepped;
+
+            rhat += v3;
+            rcarry = (rhat < v3) ? 1UL : 0UL;
+
+            if (rcarry == 0 && (pHi > rhat || (pHi == rhat && pLo > u2)))
+            {
+                qhat--;
+                stepped = pLo - v2;
+                pHi -= (pLo < v2) ? 1UL : 0UL;
+                pLo = stepped;
+
+                rhat += v3;
+                rcarry = (rhat < v3) ? 1UL : 0UL;
+            }
+        }
+
+        ulong aHi = Multiply64(qhat, v1, out ulong aLo);
+        ulong cHi = Multiply64(qhat, v0, out ulong s0);
+
+        ulong s1 = aLo + cHi;
+        ulong k = (s1 < cHi) ? 1UL : 0UL;
+        ulong s2 = pLo + aHi;
+        ulong k2 = (s2 < aHi) ? 1UL : 0UL;
+        s2 += k;
+        k2 += (s2 < k) ? 1UL : 0UL;
+        ulong s3 = pHi + k2;
+
+        ulong borrow = 0;
+        SubtractWithBorrow(u0, s0, ref borrow, out u0);
+        SubtractWithBorrow(u1, s1, ref borrow, out u1);
+        SubtractWithBorrow(u2, s2, ref borrow, out u2);
+        SubtractWithBorrow(rhat, s3, ref borrow, out u3);
+
+        // A correction that pushed rhat past 2^64 left the limb the borrow lands in; only a borrow
+        // out of a zero one means qhat is still too large.
+        if ((borrow & (rcarry ^ 1)) != 0)
+        {
+            ulong carry = 0;
+            AddWithCarry(u0, v0, ref carry, out u0);
+            AddWithCarry(u1, v1, ref carry, out u1);
+            AddWithCarry(u2, v2, ref carry, out u2);
+            u3 += v3 + carry;
         }
 
         StoreProduct(out res,
@@ -1384,12 +1432,7 @@ public readonly partial struct UInt256
                 qhat = UDivRem2By1(u4, recip, v2, u3, out rhat);
             }
 
-            qhat = CorrectQhat(qhat, ref rhat, v1, v2, u2);
-
-            if (SubMul3(ref u1, ref u2, ref u3, ref u4, v0, v1, v2, qhat) != 0)
-            {
-                AddBack3(ref u1, ref u2, ref u3, ref u4, v0, v1, v2);
-            }
+            u3 = Remainder192Step(qhat, rhat, 0, ref u2, ref u1, v0, v1, v2);
         }
 
         // Second digit, from (u3:u2). Here the top limb can equal v2, which the divide cannot take.
@@ -1413,15 +1456,7 @@ public readonly partial struct UInt256
             rcarry = 0;
         }
 
-        if (rcarry == 0)
-        {
-            qhat = CorrectQhat(qhat, ref rhat, v1, v2, u1);
-        }
-
-        if (SubMul3(ref u0, ref u1, ref u2, ref u3, v0, v1, v2, qhat) != 0)
-        {
-            AddBack3(ref u0, ref u1, ref u2, ref u3, v0, v1, v2);
-        }
+        u2 = Remainder192Step(qhat, rhat, rcarry, ref u1, ref u0, v0, v1, v2);
 
         if (shift == 0)
         {
@@ -1605,31 +1640,57 @@ public readonly partial struct UInt256
         return rhat - pHi - borrow;
     }
 
-    // Knuth D3. qhat overshoots by at most two, and each test is against the next divisor limb;
-    // once rhat carries out of a limb the test can no longer fire, so the loop stops there.
+    // Finish one Knuth D digit against a three-limb divisor. The divide has already taken qhat*v2 off
+    // the top of the window and left rhat there, so only qhat*(v1:v0) remains and the D3 correction's
+    // own product is its top limb - two multiplies for the digit instead of four. Returns the new top.
     [SkipLocalsInit]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static ulong CorrectQhat(ulong qhat, ref ulong rhat, ulong vNext, ulong vTop, ulong uNext)
+    private static ulong Remainder192Step(ulong qhat, ulong rhat, ulong rcarry, ref ulong m1, ref ulong m0, ulong v0, ulong v1, ulong v2)
     {
-        ulong r = rhat;
-        ulong pHi = Multiply64(qhat, vNext, out ulong pLo);
-        if (pHi > r || (pHi == r && pLo > uNext))
+        ulong a1 = m1;
+        ulong pHi = Multiply64(qhat, v1, out ulong pLo);
+        if (rcarry == 0 && (pHi > rhat || (pHi == rhat && pLo > a1)))
         {
             qhat--;
-            // The product moves by one divisor limb, which is cheaper than multiplying again.
-            ulong next = pLo - vNext;
-            pHi -= (pLo < vNext) ? 1UL : 0UL;
-            pLo = next;
+            ulong stepped = pLo - v1;
+            pHi -= (pLo < v1) ? 1UL : 0UL;
+            pLo = stepped;
 
-            r += vTop;
-            if (r >= vTop && (pHi > r || (pHi == r && pLo > uNext)))
+            rhat += v2;
+            rcarry = (rhat < v2) ? 1UL : 0UL;
+
+            if (rcarry == 0 && (pHi > rhat || (pHi == rhat && pLo > a1)))
             {
                 qhat--;
+                stepped = pLo - v1;
+                pHi -= (pLo < v1) ? 1UL : 0UL;
+                pLo = stepped;
+
+                rhat += v2;
+                rcarry = (rhat < v2) ? 1UL : 0UL;
             }
         }
 
-        rhat = r;
-        return qhat;
+        ulong cHi = Multiply64(qhat, v0, out ulong s0);
+        ulong s1 = pLo + cHi;
+        ulong s2 = pHi + ((s1 < cHi) ? 1UL : 0UL);
+
+        ulong borrow = 0;
+        SubtractWithBorrow(m0, s0, ref borrow, out m0);
+        SubtractWithBorrow(a1, s1, ref borrow, out m1);
+        SubtractWithBorrow(rhat, s2, ref borrow, out ulong top);
+
+        // A correction that pushed rhat past 2^64 left the limb the borrow lands in; only a borrow
+        // out of a zero one means qhat is still too large.
+        if ((borrow & (rcarry ^ 1)) != 0)
+        {
+            ulong carry = 0;
+            AddWithCarry(m0, v0, ref carry, out m0);
+            AddWithCarry(m1, v1, ref carry, out m1);
+            top += v2 + carry;
+        }
+
+        return top;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1643,29 +1704,6 @@ public readonly partial struct UInt256
         }
 
         return UDivRem2By1(high, recip, d, low, out rem);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static ulong SubMul3(ref ulong u0, ref ulong u1, ref ulong u2, ref ulong u3, ulong v0, ulong v1, ulong v2, ulong q)
-    {
-        ulong borrow = 0;
-
-        ulong pHi = Multiply64(q, v0, out ulong pLo);
-        ulong carry = pHi;
-        u0 = Sub(u0, pLo, ref borrow);
-
-        pHi = Multiply64(q, v1, out pLo);
-        ulong sum = pLo + carry;
-        carry = pHi + ((sum < pLo) ? 1UL : 0UL);
-        u1 = Sub(u1, sum, ref borrow);
-
-        pHi = Multiply64(q, v2, out pLo);
-        sum = pLo + carry;
-        carry = pHi + ((sum < pLo) ? 1UL : 0UL);
-        u2 = Sub(u2, sum, ref borrow);
-
-        u3 = Sub(u3, carry, ref borrow);
-        return borrow;
     }
 
     [SkipLocalsInit]
