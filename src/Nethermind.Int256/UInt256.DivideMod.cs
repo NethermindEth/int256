@@ -236,7 +236,17 @@ public readonly partial struct UInt256
             // plain difference, which cannot borrow out of limb 3.
             if ((long)y3 < 0)
             {
-                SubtractExact(in x, in y, out res);
+                // Where there is a vector unit, the general subtract loads, subtracts and stores
+                // without ever touching a general register, which beats an inline borrow chain even
+                // through a call. With none, the inline chain is what is left.
+                if (Vector128.IsHardwareAccelerated)
+                {
+                    Subtract(in x, in y, out res);
+                }
+                else
+                {
+                    SubtractExact(in x, in y, out res);
+                }
                 return;
             }
 
