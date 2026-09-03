@@ -1586,10 +1586,12 @@ public readonly partial struct UInt256
                 r = x3 >> carryShift;
             }
 
-            _ = UDivRem2By1(r, recip, dn, u3, out r);
-            _ = UDivRem2By1(r, recip, dn, u2, out r);
-            _ = UDivRem2By1(r, recip, dn, u1, out r);
-            _ = UDivRem2By1(r, recip, dn, u0, out r);
+            // Skip a step whose limb and running remainder are both zero, the same way the hardware
+            // arm does: without it a two-limb dividend pays four reciprocal divides instead of two.
+            if ((r | u3) != 0) _ = UDivRem2By1(r, recip, dn, u3, out r);
+            if ((r | u2) != 0) _ = UDivRem2By1(r, recip, dn, u2, out r);
+            if ((r | u1) != 0) _ = UDivRem2By1(r, recip, dn, u1, out r);
+            if ((r | u0) != 0) _ = UDivRem2By1(r, recip, dn, u0, out r);
             r >>= shift;
         }
 
