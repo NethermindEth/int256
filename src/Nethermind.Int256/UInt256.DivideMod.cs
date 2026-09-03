@@ -180,26 +180,24 @@ public readonly partial struct UInt256
     [SkipLocalsInit]
     public static void Mod(in UInt256 x, in UInt256 y, out UInt256 res)
     {
-        ulong y0 = y.u0;
+        ulong y0 = y.u0, y1 = y.u1, y2 = y.u2, y3 = y.u3;
 
         // Zero throws and one leaves no remainder; testing the pair at once keeps two 256-bit
         // vector compares, and the vzeroupper they drag in, off every call.
-        if (((y0 >> 1) | y.u1 | y.u2 | y.u3) == 0)
+        if (((y0 >> 1) | y1 | y2 | y3) == 0)
         {
             if (y0 == 0) ThrowDivideByZeroException();
             res = default;
             return;
         }
 
-        // Descending compare that jumps straight to its answer. Asking CompareTo for a three-way int
-        // made the JIT compare every limb twice and then re-test the -1/0/1 it had just materialised.
-        // Limbs stay unhoisted so the compare needs no callee-saved register of its own; x == 0 needs
-        // no test either, because y >= 2 here puts it in the x < y arm.
-        if (x.u3 == y.u3)
+        // Descending compare that jumps straight to its answer: asking CompareTo for a three-way int
+        // made the JIT compare every limb twice. x == 0 lands in the x < y arm, since y >= 2 by now.
+        if (x.u3 == y3)
         {
-            if (x.u2 == y.u2)
+            if (x.u2 == y2)
             {
-                if (x.u1 == y.u1)
+                if (x.u1 == y1)
                 {
                     ulong x0 = x.u0;
                     if (x0 <= y0)
@@ -209,11 +207,11 @@ public readonly partial struct UInt256
                         return;
                     }
                 }
-                else if (x.u1 < y.u1) { res = x; return; }
+                else if (x.u1 < y1) { res = x; return; }
             }
-            else if (x.u2 < y.u2) { res = x; return; }
+            else if (x.u2 < y2) { res = x; return; }
         }
-        else if (x.u3 < y.u3) { res = x; return; }
+        else if (x.u3 < y3) { res = x; return; }
 
         // x > y from here.
         if ((x.u1 | x.u2 | x.u3) == 0)
@@ -224,7 +222,60 @@ public readonly partial struct UInt256
             return;
         }
 
-        ModFull(x, y, out res);
+        // Divisor width picks the kernel, and a power of two answers with a mask. As a second method
+        // this cost another call and another read of every divisor limb.
+        if (y3 != 0)
+        {
+            if ((y0 | y1 | y2 | (y3 & (y3 - 1))) == 0)
+            {
+                ModByPowerOfTwo256(in x, y3 - 1, out res);
+                return;
+            }
+
+            // x > y, so y >= 2^255 gives 2y >= 2^256 > x: the quotient is 1 and the remainder is the
+            // plain difference, which cannot borrow out of limb 3.
+            if ((long)y3 < 0)
+            {
+                SubtractExact(in x, in y, out res);
+                return;
+            }
+
+            Remainder256By256(in x, in y, out res);
+            return;
+        }
+
+        if (y2 != 0)
+        {
+            if ((y0 | y1 | (y2 & (y2 - 1))) == 0)
+            {
+                ModByPowerOfTwo192(in x, y2 - 1, out res);
+                return;
+            }
+
+            Remainder256By192(in x, in y, out res);
+            return;
+        }
+
+        if (y1 != 0)
+        {
+            if ((y0 | (y1 & (y1 - 1))) == 0)
+            {
+                ModByPowerOfTwo128(in x, y1 - 1, out res);
+                return;
+            }
+
+            Remainder256By128(in x, in y, out res);
+            return;
+        }
+
+        // Single-limb divisor, and y >= 2 by the gate at the top.
+        if ((y0 & (y0 - 1)) == 0)
+        {
+            ModByPowerOfTwo64(in x, y0 - 1, out res);
+            return;
+        }
+
+        Remainder256By64(in x, y0, out res);
     }
 
     /// <summary>
@@ -1218,76 +1269,8 @@ public readonly partial struct UInt256
         remainder = ShiftRightSmall(in normRem, normShiftBits);
     }
 
-    [SkipLocalsInit]
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ModFull(in UInt256 x, in UInt256 y, out UInt256 res)
-    {
-        ulong y3 = y.u3;
-        if (y3 != 0)
-        {
-            if ((y.u0 | y.u1 | y.u2 | (y3 & (y3 - 1))) == 0)
-            {
-                ModByPowerOfTwo256(in x, y3 - 1, out res);
-                return;
-            }
-
-            // Reached only when x > y, so y >= 2^255 gives 2y >= 2^256 > x: the quotient is 1 and
-            // the remainder is the plain difference, which cannot borrow out of limb 3.
-            if ((long)y3 < 0)
-            {
-                SubtractExact(in x, in y, out res);
-                return;
-            }
-
-            Remainder256By256(in x, in y, out res);
-            return;
-        }
-
-        if (y.u2 != 0)
-        {
-            ulong y2 = y.u2;
-            if ((y.u0 | y.u1 | (y2 & (y2 - 1))) == 0)
-            {
-                ModByPowerOfTwo192(in x, y2 - 1, out res);
-                return;
-            }
-
-            Remainder256By192(in x, in y, out res);
-            return;
-        }
-
-        if (y.u1 != 0)
-        {
-            ulong y1 = y.u1;
-            if ((y.u0 | (y1 & (y1 - 1))) == 0)
-            {
-                ModByPowerOfTwo128(in x, y1 - 1, out res);
-                return;
-            }
-
-            Remainder256By128(in x, in y, out res);
-            return;
-        }
-
-        // Single-limb divisor; the wrapper returned already for y == 0 and y == 1, so y >= 2.
-        ulong y0 = y.u0;
-        if ((y0 & (y0 - 1)) == 0)
-        {
-            ModByPowerOfTwo64(in x, y0 - 1, out res);
-            return;
-        }
-
-        Remainder256By64(in x, y0, out res);
-    }
-
-    // The four kernels below answer x % y without ever forming the quotient. Knuth D needs the
-    // quotient digit to produce the remainder, but nothing downstream reads it, so it stays in a
-    // register instead of being assembled into a UInt256 and stored.
-    //
-    // They also keep every intermediate in general registers. Handing normalisation to
-    // ShiftLeftSmall/ShiftRightSmall put the value through a UInt256: four 8-byte stores followed by
-    // one 32-byte load, a width no store-to-load forwarding covers, plus two vmovq crossings for the
-    // shift counts.
+    // The kernels below answer x % y without assembling the quotient, and stay in general registers:
+    // normalising through a UInt256 costs four 8-byte stores then one 32-byte load, which cannot forward.
 
     // n == 4. x > y and y < 2^255, so the shift is 1..63 and there is exactly one quotient digit.
     [SkipLocalsInit]
@@ -1297,7 +1280,7 @@ public readonly partial struct UInt256
         ulong y0 = y.u0, y1 = y.u1, y2 = y.u2, y3 = y.u3;
         int shift = BitOperations.LeadingZeroCount(y3);
         // y < 2^255 puts the shift at 1..63, so the carry-in needs no guard against a 64-bit shift.
-        Debug.Assert(shift is >= 1 and <= 63, "ModFull answers y >= 2^255 with a subtract");
+        Debug.Assert(shift is >= 1 and <= 63, "Mod answers y >= 2^255 with a subtract");
         int carryShift = 64 - shift;
 
         ulong v0 = y0 << shift;
@@ -1324,9 +1307,8 @@ public readonly partial struct UInt256
             qhat = UDivRem2By1(u4, Reciprocal2By1(v3), v3, u3, out rhat);
         }
 
-        // The divide has already taken qhat*v3 off the top two limbs and left rhat in their place, so
-        // the window still to reduce is (rhat:u2:u1:u0) and only qhat*(v2:v1:v0) comes off it. D3 has
-        // been carrying qhat*v2 the whole time, which is that subtrahend's top limb.
+        // The divide left rhat in place of qhat*v3, so the window is (rhat:u2:u1:u0) and only
+        // qhat*(v2:v1:v0) comes off it - and D3 already carries qhat*v2, that subtrahend's top limb.
         ulong pHi = Multiply64(qhat, v2, out ulong pLo);
         ulong rcarry = 0;
         if (pHi > rhat || (pHi == rhat && pLo > u2))
@@ -1416,9 +1398,8 @@ public readonly partial struct UInt256
         ulong recip = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(v2);
         ulong qhat, rhat;
 
-        // The quotient has one digit per dividend limb past the divisor. When x stops short of limb
-        // 3 the leading digit is zero - u4 is 0 and u3 is below the normalised v2 - and running it
-        // anyway costs a divide that can only produce zero.
+        // One digit per dividend limb past the divisor: a dividend short of limb 3 leaves u4 zero and
+        // u3 below the normalised v2, so the leading digit is a divide that can only produce zero.
         if (x3 != 0)
         {
             // First digit, from (u4:u3). Same argument as the 4-limb kernel: u4 < 2^shift <= v2.
@@ -1469,9 +1450,8 @@ public readonly partial struct UInt256
         }
     }
 
-    // n == 2, three quotient digits. Knuth D collapses here: the 2-by-1 divide already leaves
-    // (rhat:u[j]) as the top of the partial remainder, so each step is one divide, one product and
-    // a two-limb subtract - no multi-limb sub-and-add-back at all.
+    // n == 2. The 2-by-1 divide already leaves the top of the partial remainder in rhat, so a step is
+    // one divide, one product and a two-limb subtract - no multi-limb sub-and-add-back at all.
     [SkipLocalsInit]
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void Remainder256By128(in UInt256 x, in UInt256 y, out UInt256 res)
@@ -1501,8 +1481,7 @@ public readonly partial struct UInt256
 
         if (v0 == 0)
         {
-            // The normalised divisor is v1 * 2^64, so this is a plain 256-by-64 remainder on the top
-            // four limbs with u0 falling straight through.
+            // The normalised divisor is v1 * 2^64: a plain 256-by-64 remainder, u0 falling through.
             Debug.Assert(u4 < v1);
             ulong r = u4;
             _ = DivRem2By1(u3, r, v1, recip, out r);
@@ -1512,9 +1491,8 @@ public readonly partial struct UInt256
             return;
         }
 
-        // One step per dividend limb past the divisor. A step whose window is below the normalised
-        // divisor produces a zero digit and leaves the remainder alone, so a dividend that stops
-        // short of limb 3 or limb 2 skips it rather than paying for a divide by zero.
+        // One step per dividend limb past the divisor: a step whose window is below the normalised
+        // divisor produces a zero digit and leaves the remainder alone, so a short dividend skips it.
         if (x3 != 0)
         {
             Debug.Assert(u4 < v1, "the first quotient digit cannot saturate after normalisation");
@@ -1616,7 +1594,7 @@ public readonly partial struct UInt256
     }
 
     // One Knuth D step against a two-limb divisor: divide (hi:mid) by v1, then take q*v0 off
-    // (rhat:low). Writing the correction as p -= v0 keeps the second product out of the loop.
+    // (rhat:low). Writing the correction as p -= v0 keeps a second product out of it.
     [SkipLocalsInit]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static ulong Remainder128Step(
@@ -1659,9 +1637,8 @@ public readonly partial struct UInt256
         return rhat - pHi - borrow;
     }
 
-    // Finish one Knuth D digit against a three-limb divisor. The divide has already taken qhat*v2 off
-    // the top of the window and left rhat there, so only qhat*(v1:v0) remains and the D3 correction's
-    // own product is its top limb - two multiplies for the digit instead of four. Returns the new top.
+    // Finish one Knuth D digit against a three-limb divisor: the divide left rhat in place of qhat*v2,
+    // so only qhat*(v1:v0) remains and D3's own product is its top limb. Returns the new top limb.
     [SkipLocalsInit]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static ulong Remainder192Step(ulong qhat, ulong rhat, ulong rcarry, ref ulong m1, ref ulong m0, ulong v0, ulong v1, ulong v2)
@@ -1801,7 +1778,7 @@ public readonly partial struct UInt256
         }
 
         // Only the reciprocal form needs a normalised divisor; hardware div takes the modulus as it
-        // stands, so on that path the shift, the shifted copy and the shift back all disappear.
+        // stands, so the shift, the shifted copy and the shift back all disappear there.
         int shift = 0;
         ulong dn = mod;
         ulong reciprocal = 0;
@@ -1857,8 +1834,7 @@ public readonly partial struct UInt256
         ulong r;
         if (X86Base.X64.IsSupported)
         {
-            // Both factors are below the modulus, so their product is below mod^2 and its high limb
-            // below mod: one divide, and no normalisation to undo afterwards.
+            // Both factors are below the modulus, so the product's high limb is too: one divide.
             Debug.Assert(ph < mod, "a product of two reduced values cannot fill the upper limb");
             (_, r) = X86Base.X64.DivRem(pl, ph, mod);
         }

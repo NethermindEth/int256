@@ -58,7 +58,8 @@ public class WideDivideModBenchmark
     public void Setup()
     {
         _currentDivide = BindOperation("DivideFull");
-        _currentMod = BindOperation("ModFull");
+        // Mod dispatches on the divisor width itself now, so the public entry point is the path
+        _currentMod = UInt256.Mod;
         _legacy64X86 = BindDivide64("DivideBy64BitsX86Base");
         _legacy64 = BindDivide64("DivideBy64Bits");
         _legacy128X86 = BindDivide("DivideBy128BitsX86Base");
