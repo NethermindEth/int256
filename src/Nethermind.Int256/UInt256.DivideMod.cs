@@ -180,33 +180,47 @@ public readonly partial struct UInt256
     [SkipLocalsInit]
     public static void Mod(in UInt256 x, in UInt256 y, out UInt256 res)
     {
-        if (y.IsZero) ThrowDivideByZeroException();
-        if (x.IsZero || y.IsOne)
+        ulong y0 = y.u0;
+
+        // Zero throws and one leaves no remainder; testing the pair at once keeps two 256-bit
+        // vector compares, and the vzeroupper they drag in, off every call.
+        if (((y0 >> 1) | y.u1 | y.u2 | y.u3) == 0)
         {
+            if (y0 == 0) ThrowDivideByZeroException();
             res = default;
             return;
         }
 
-        switch (x.CompareTo(y))
+        // Descending compare that jumps straight to its answer. Asking CompareTo for a three-way int
+        // made the JIT compare every limb twice and then re-test the -1/0/1 it had just materialised.
+        // Limbs stay unhoisted so the compare needs no callee-saved register of its own; x == 0 needs
+        // no test either, because y >= 2 here puts it in the x < y arm.
+        if (x.u3 == y.u3)
         {
-            case -1:
-                res = x;
-                return;
-            case 0:
-                res = default;
-                return;
+            if (x.u2 == y.u2)
+            {
+                if (x.u1 == y.u1)
+                {
+                    ulong x0 = x.u0;
+                    if (x0 <= y0)
+                    {
+                        // Two plain stores: a conditional expression here goes through a 32-byte stack temp.
+                        if (x0 == y0) res = default; else res = x;
+                        return;
+                    }
+                }
+                else if (x.u1 < y.u1) { res = x; return; }
+            }
+            else if (x.u2 < y.u2) { res = x; return; }
         }
-        // At this point:
-        // x != 0
-        // y != 0
-        // x > y
+        else if (x.u3 < y.u3) { res = x; return; }
 
-        if (x.IsUint64)
+        // x > y from here.
+        if ((x.u1 | x.u2 | x.u3) == 0)
         {
-            // If y > x it has already be handled by caller.
-            // One div leaves the remainder in rdx; reconstructing it from the quotient instead put a
-            // dependent imul on the critical path for a value that instruction already produced.
-            res = Create(x.u0 % y.u0, 0, 0, 0);
+            // y < x < 2^64, so the divisor is single-limb too. One div leaves the remainder in rdx;
+            // reconstructing it from the quotient would put a dependent imul on the critical path.
+            res = Create(x.u0 % y0, 0, 0, 0);
             return;
         }
 
