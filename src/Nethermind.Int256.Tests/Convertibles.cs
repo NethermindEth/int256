@@ -166,4 +166,43 @@ public class Convertibles
 
         Assert.That(actual(), Is.EqualTo(want));
     }
+
+    private static IEnumerable<BigInteger> ToStringCases()
+    {
+        yield return BigInteger.Zero;
+        yield return BigInteger.One;
+        yield return 9;
+        yield return 10;
+        yield return DecimalChunkValue - 1;
+        yield return DecimalChunkValue;
+        yield return DecimalChunkValue + 1;
+        yield return ulong.MaxValue;
+        yield return (BigInteger)ulong.MaxValue + 1;
+        yield return TestNumbers.TwoTo64;
+        yield return TestNumbers.TwoTo128;
+        yield return TestNumbers.TwoTo192;
+        yield return TestNumbers.UInt128Max;
+        yield return TestNumbers.UInt192Max;
+        yield return TestNumbers.UInt256Max;
+
+        // Every power of ten a 256-bit value can reach, and its neighbours, to catch a chunk boundary.
+        BigInteger power = 1;
+        for (int i = 0; i < 77; i++)
+        {
+            power *= 10;
+            yield return power - 1;
+            yield return power;
+        }
+    }
+
+    private static readonly BigInteger DecimalChunkValue = BigInteger.Pow(10, 19);
+
+    [TestCaseSource(nameof(ToStringCases))]
+    public void ToString_matches_the_BigInteger_rendering(BigInteger value)
+    {
+        // ToString formats from the limbs now; BigInteger is the reference it replaced.
+        UInt256 a = (UInt256)value;
+
+        Assert.That(a.ToString(), Is.EqualTo(value.ToString()));
+    }
 }
