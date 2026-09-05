@@ -1226,7 +1226,60 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         return LessThanBothFromEqLt8(eqMaskY, ltMaskY);
     }
 
-    public override string ToString() => ((BigInteger)this).ToString();
+    /// <summary>The decimal digits of <see cref="MaxValue"/>, and so the widest this can format.</summary>
+    private const int MaxDecimalDigits = 78;
+
+    /// <summary>The largest power of ten a <see cref="ulong"/> holds, so one division yields 19 digits.</summary>
+    private const ulong DecimalChunk = 10_000_000_000_000_000_000;
+
+    private const int DecimalChunkDigits = 19;
+
+    /// <summary>Returns the value in base ten, without a sign or group separators.</summary>
+    /// <remarks>
+    /// Formats from the limbs rather than through <see cref="BigInteger"/>, which allocated and made
+    /// every consumer link System.Runtime.Numerics. Digits come out 19 at a time, so the widest value
+    /// costs four divisions of the 256-bit value plus one of a <see cref="ulong"/>.
+    /// </remarks>
+    public override string ToString()
+    {
+        Span<char> buffer = stackalloc char[MaxDecimalDigits];
+        int position = MaxDecimalDigits;
+        ulong l0 = u0, l1 = u1, l2 = u2, l3 = u3;
+
+        // Interior chunks keep their leading zeros; only the most significant one is trimmed.
+        while ((l1 | l2 | l3) != 0)
+        {
+            ulong chunk = DivideByChunk(ref l0, ref l1, ref l2, ref l3);
+            for (int i = 0; i < DecimalChunkDigits; i++)
+            {
+                buffer[--position] = (char)('0' + (int)(chunk % 10));
+                chunk /= 10;
+            }
+        }
+
+        do
+        {
+            buffer[--position] = (char)('0' + (int)(l0 % 10));
+            l0 /= 10;
+        }
+        while (l0 != 0);
+
+        return new string(buffer[position..]);
+    }
+
+    /// <summary>Divides the limbs by <see cref="DecimalChunk"/> in place and returns the remainder.</summary>
+    private static ulong DivideByChunk(ref ulong l0, ref ulong l1, ref ulong l2, ref ulong l3)
+    {
+        UInt128 acc = l3;
+        l3 = (ulong)(acc / DecimalChunk);
+        acc = ((UInt128)(ulong)(acc % DecimalChunk) << 64) | l2;
+        l2 = (ulong)(acc / DecimalChunk);
+        acc = ((UInt128)(ulong)(acc % DecimalChunk) << 64) | l1;
+        l1 = (ulong)(acc / DecimalChunk);
+        acc = ((UInt128)(ulong)(acc % DecimalChunk) << 64) | l0;
+        l0 = (ulong)(acc / DecimalChunk);
+        return (ulong)(acc % DecimalChunk);
+    }
 
     public int CompareTo(object? obj) => obj is not UInt256 int256 ? throw new InvalidOperationException() : CompareTo(int256);
 

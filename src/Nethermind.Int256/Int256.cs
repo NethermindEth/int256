@@ -18,7 +18,9 @@ public readonly struct Int256 : IEquatable<Int256>, IComparable, IComparable<Int
     public static readonly Int256 Zero = (Int256)0UL;
     public static readonly Int256 One = (Int256)1UL;
     public static readonly Int256 MinusOne = -1L;
-    public static readonly Int256 Max = new Int256(((BigInteger.One << 255) - 1));
+    // 2^255 - 1, as limbs. Building it from BigInteger would make every consumer of this assembly
+    // carry System.Runtime.Numerics, because a static field initializer is always reachable.
+    public static readonly Int256 Max = new(new UInt256(ulong.MaxValue, ulong.MaxValue, ulong.MaxValue, (ulong)long.MaxValue));
 
     internal readonly UInt256 _value;
 
@@ -57,6 +59,16 @@ public readonly struct Int256 : IEquatable<Int256>, IComparable, IComparable<Int
         {
             _value = new UInt256((ulong)n);
         }
+    }
+
+    // Without this, the implicit long conversion binds to Int256(BigInteger), so every long turns
+    // into a heap-allocated BigInteger and the static initializer for MinusOne drags
+    // System.Runtime.Numerics into every consumer. A negative value sign-extends as all-ones limbs.
+    public Int256(long n)
+    {
+        _value = n < 0
+            ? new UInt256(unchecked((ulong)n), ulong.MaxValue, ulong.MaxValue, ulong.MaxValue)
+            : new UInt256((ulong)n);
     }
 
     public static explicit operator Int256(int n) => new Int256(n);

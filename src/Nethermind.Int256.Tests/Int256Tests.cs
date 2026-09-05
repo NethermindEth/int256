@@ -240,6 +240,29 @@ public class Int256Tests : UInt256TestsTemplate<Int256>
         Int256.Max.IsOne.Should().BeFalse();
     }
 
+    [TestCase(0L)]
+    [TestCase(1L)]
+    [TestCase(-1L)]
+    [TestCase(long.MaxValue)]
+    [TestCase(long.MinValue)]
+    public void Long_conversion_agrees_with_the_BigInteger_path(long value)
+    {
+        // long used to convert through Int256(BigInteger); this pins the direct constructor to it.
+        new Int256(value).Should().Be(new Int256((BigInteger)value));
+        ((Int256)value).Should().Be(new Int256((BigInteger)value));
+    }
+
+    [Test]
+    public void Max_is_two_to_the_255_minus_one()
+    {
+        // Max is written as limbs so the static constructor does not reference BigInteger; this pins
+        // those limbs to the value they replaced.
+        Int256 expected = new((BigInteger.One << 255) - 1);
+
+        Int256.Max.Should().Be(expected);
+        ((BigInteger)Int256.Max).Should().Be((BigInteger.One << 255) - 1);
+    }
+
     [Test]
     public void Right_shift_of_a_negative_value_shifts_in_the_sign()
     {
