@@ -185,13 +185,16 @@ public class Convertibles
         yield return TestNumbers.UInt192Max;
         yield return TestNumbers.UInt256Max;
 
-        // Every power of ten a 256-bit value can reach, and its neighbours, to catch a chunk boundary.
+        // Every power of ten a 256-bit value can reach, and both neighbours: all-nines, the carry
+        // itself, and the case where a chunk of interior zeros sits above a non-zero last digit.
+        // 10^77 + 1 is still below MaxValue, which is about 1.16e77.
         BigInteger power = 1;
         for (int i = 0; i < 77; i++)
         {
             power *= 10;
             yield return power - 1;
             yield return power;
+            yield return power + 1;
         }
     }
 
