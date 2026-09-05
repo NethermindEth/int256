@@ -114,4 +114,95 @@ public class Convertibles
             }
         }
     }
+
+    // The integral IConvertible members narrow from ToUInt64 instead of going through decimal, which
+    // used to build a BigInteger. These pin both the in-range values and the overflow boundary.
+    [TestCase(0UL)]
+    [TestCase(1UL)]
+    [TestCase((ulong)byte.MaxValue)]
+    [TestCase((ulong)short.MaxValue)]
+    [TestCase((ulong)ushort.MaxValue)]
+    [TestCase((ulong)int.MaxValue)]
+    [TestCase((ulong)uint.MaxValue)]
+    [TestCase((ulong)long.MaxValue)]
+    [TestCase(ulong.MaxValue)]
+    public void Integral_conversions_agree_with_a_checked_narrowing(ulong value)
+    {
+        IConvertible c = new UInt256(value);
+
+        Assert.That(c.ToUInt64(null), Is.EqualTo(value));
+        AssertNarrowing(() => c.ToByte(null), () => checked((byte)value));
+        AssertNarrowing(() => c.ToSByte(null), () => checked((sbyte)value));
+        AssertNarrowing(() => c.ToInt16(null), () => checked((short)value));
+        AssertNarrowing(() => c.ToUInt16(null), () => checked((ushort)value));
+        AssertNarrowing(() => c.ToInt32(null), () => checked((int)value));
+        AssertNarrowing(() => c.ToUInt32(null), () => checked((uint)value));
+        AssertNarrowing(() => c.ToInt64(null), () => checked((long)value));
+    }
+
+    [Test]
+    public void Integral_conversions_overflow_above_the_low_limb()
+    {
+        IConvertible c = new UInt256(0, 1);
+
+        Assert.Throws<OverflowException>(() => c.ToUInt64(null));
+        Assert.Throws<OverflowException>(() => c.ToInt64(null));
+        Assert.Throws<OverflowException>(() => c.ToInt32(null));
+        Assert.Throws<OverflowException>(() => c.ToUInt16(null));
+    }
+
+    private static void AssertNarrowing<T>(Func<T> actual, Func<T> expected)
+    {
+        T want;
+        try
+        {
+            want = expected();
+        }
+        catch (OverflowException)
+        {
+            Assert.Throws<OverflowException>(() => actual());
+            return;
+        }
+
+        Assert.That(actual(), Is.EqualTo(want));
+    }
+
+    private static IEnumerable<BigInteger> ToStringCases()
+    {
+        yield return BigInteger.Zero;
+        yield return BigInteger.One;
+        yield return 9;
+        yield return 10;
+        yield return DecimalChunkValue - 1;
+        yield return DecimalChunkValue;
+        yield return DecimalChunkValue + 1;
+        yield return ulong.MaxValue;
+        yield return (BigInteger)ulong.MaxValue + 1;
+        yield return TestNumbers.TwoTo64;
+        yield return TestNumbers.TwoTo128;
+        yield return TestNumbers.TwoTo192;
+        yield return TestNumbers.UInt128Max;
+        yield return TestNumbers.UInt192Max;
+        yield return TestNumbers.UInt256Max;
+
+        // Every power of ten a 256-bit value can reach, and its neighbours, to catch a chunk boundary.
+        BigInteger power = 1;
+        for (int i = 0; i < 77; i++)
+        {
+            power *= 10;
+            yield return power - 1;
+            yield return power;
+        }
+    }
+
+    private static readonly BigInteger DecimalChunkValue = BigInteger.Pow(10, 19);
+
+    [TestCaseSource(nameof(ToStringCases))]
+    public void ToString_matches_the_BigInteger_rendering(BigInteger value)
+    {
+        // ToString formats from the limbs now; BigInteger is the reference it replaced.
+        UInt256 a = (UInt256)value;
+
+        Assert.That(a.ToString(), Is.EqualTo(value.ToString()));
+    }
 }
