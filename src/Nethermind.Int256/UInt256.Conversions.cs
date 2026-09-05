@@ -21,15 +21,15 @@ public readonly partial struct UInt256
     }
     public TypeCode GetTypeCode() => TypeCode.Object;
     public bool ToBoolean(IFormatProvider? provider) => !IsZero;
-    public byte ToByte(IFormatProvider? provider) => System.Convert.ToByte(ToDecimal(provider), provider);
+    public byte ToByte(IFormatProvider? provider) => checked((byte)ToUInt64(provider));
     public char ToChar(IFormatProvider? provider) => System.Convert.ToChar(ToDecimal(provider), provider);
     public DateTime ToDateTime(IFormatProvider? provider) => System.Convert.ToDateTime(ToDecimal(provider), provider);
     public decimal ToDecimal(IFormatProvider? provider) => (decimal)this;
     public double ToDouble(IFormatProvider? provider) => (double)this;
-    public short ToInt16(IFormatProvider? provider) => System.Convert.ToInt16(ToDecimal(provider), provider);
-    public int ToInt32(IFormatProvider? provider) => System.Convert.ToInt32(ToDecimal(provider), provider);
-    public long ToInt64(IFormatProvider? provider) => System.Convert.ToInt64(ToDecimal(provider), provider);
-    public sbyte ToSByte(IFormatProvider? provider) => System.Convert.ToSByte(ToDecimal(provider), provider);
+    public short ToInt16(IFormatProvider? provider) => checked((short)ToUInt64(provider));
+    public int ToInt32(IFormatProvider? provider) => checked((int)ToUInt64(provider));
+    public long ToInt64(IFormatProvider? provider) => checked((long)ToUInt64(provider));
+    public sbyte ToSByte(IFormatProvider? provider) => checked((sbyte)ToUInt64(provider));
     public float ToSingle(IFormatProvider? provider) => System.Convert.ToSingle(ToDouble(provider), provider);
     public string ToString(IFormatProvider? provider) => ((BigInteger)this).ToString(provider);
     public object ToType(Type conversionType, IFormatProvider? provider) =>
@@ -37,9 +37,13 @@ public readonly partial struct UInt256
             ? (BigInteger)this
             : System.Convert.ChangeType(ToDecimal(provider), conversionType, provider);
 
-    public ushort ToUInt16(IFormatProvider? provider) => System.Convert.ToUInt16(ToDecimal(provider), provider);
-    public uint ToUInt32(IFormatProvider? provider) => System.Convert.ToUInt32(ToDecimal(provider), provider);
-    public ulong ToUInt64(IFormatProvider? provider) => System.Convert.ToUInt64(ToDecimal(provider), provider);
+    public ushort ToUInt16(IFormatProvider? provider) => checked((ushort)ToUInt64(provider));
+    public uint ToUInt32(IFormatProvider? provider) => checked((uint)ToUInt64(provider));
+
+    // The integral conversions above narrow from here rather than going through decimal, which
+    // would build a BigInteger. A checked cast throws OverflowException, matching System.Convert.
+    public ulong ToUInt64(IFormatProvider? provider) =>
+        (u1 | u2 | u3) == 0 ? u0 : throw new OverflowException();
     /// <summary>
     /// Returns a new <paramref name="n"/>-byte array holding the big-endian, right-aligned,
     /// left-zero-padded representation of this value. When <paramref name="n"/> is shorter than 32
