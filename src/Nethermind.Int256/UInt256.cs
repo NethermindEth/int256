@@ -1314,6 +1314,39 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
 
     public override bool Equals(object? obj) => obj is UInt256 other && Equals(other);
 
+    /// <summary>Replaces the seeds <see cref="GetHashCode"/> hashes with.</summary>
+    /// <param name="seed">The seed for this run. Every seed the hash uses is derived from it.</param>
+    /// <remarks>
+    /// Both builds honour this. It exists for the zkEVM build, which has no entropy source and so hashes
+    /// with compile-time constants until told otherwise: every guest of a given version buckets a given
+    /// key identically for ever, and a colliding key set found offline against the published binary can
+    /// be replayed against every prover, turning constant-time lookups linear. EIP-8025 asks a guest to
+    /// mix a per-payload value - <c>new_payload_request_root</c> - into its hash function, and this is
+    /// where that value goes. The standard build has an entropy source and starts from a seed it draws
+    /// per process, which this replaces rather than perturbs.
+    /// <para>
+    /// Call once, before anything hashes a <see cref="UInt256"/>, and never while a hash-keyed container
+    /// holds entries: re-seeding orphans every one of them. Not synchronised against concurrent hashing.
+    /// </para>
+    /// </remarks>
+    public static partial void SeedHashes(uint seed);
+
+    /// <summary>Spreads a 32-bit seed over 64 bits, so one changed seed bit moves a whole seed word.</summary>
+    /// <remarks>
+    /// splitmix64's finalizer. A bijection, so chaining it derives seeds that are distinct whenever the
+    /// values fed to it are, and no two run seeds can land on the same derived one.
+    /// </remarks>
+    private static ulong Spread(ulong x)
+    {
+        unchecked
+        {
+            x += 0x9E3779B97F4A7C15UL;
+            x = (x ^ (x >> 30)) * 0xBF58476D1CE4E5B9UL;
+            x = (x ^ (x >> 27)) * 0x94D049BB133111EBUL;
+            return x ^ (x >> 31);
+        }
+    }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal readonly int GetCrcHashCode(uint seed)
     {

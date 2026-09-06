@@ -10,10 +10,34 @@ namespace Nethermind.Int256;
 
 public readonly partial struct UInt256
 {
-    // Guest execution requires stable hashes across runs.
-    private static readonly uint _hashSeed = 2098026241U;
-    private static readonly ulong _aesHashSeed0 = 0x1F83D9ABFB41BD6BUL;
-    private static readonly ulong _aesHashSeed1 = 0x5BE0CD19137E2179UL;
+    private const uint DefaultSeed = 2098026241U;
+
+    /// <inheritdoc cref="UInt256.SeedHashes(uint)" />
+    public static partial void SeedHashes(uint seed)
+    {
+        ulong aes0 = Spread(seed);
+
+        RunSeed.Crc = unchecked(seed + 32u);
+        RunSeed.Aes0 = aes0;
+        RunSeed.Aes1 = Spread(aes0);
+    }
+
+    /// <summary>The seeds this run hashes with.</summary>
+    /// <remarks>
+    /// Guest execution has no entropy source, so these start from constants rather than from anything
+    /// drawn at start-up, and stay stable across runs until <see cref="SeedHashes(uint)"/> replaces them.
+    /// A type of their own so that mutating them leaves <see cref="UInt256"/>'s own statics immutable
+    /// after their constructor, which is what lets NativeAOT freeze them. The initializers are constant
+    /// expressions for the same reason.
+    /// </remarks>
+    private static class RunSeed
+    {
+        // The 32-byte input length rides in the CRC seed, so a UInt256 and a shorter key of the same
+        // bytes do not walk the limbs with the same one.
+        internal static uint Crc = unchecked(DefaultSeed + 32u);
+        internal static ulong Aes0 = 0x1F83D9ABFB41BD6BUL;
+        internal static ulong Aes1 = 0x5BE0CD19137E2179UL;
+    }
 
     [SkipLocalsInit]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -23,14 +47,13 @@ public readonly partial struct UInt256
         {
             Vector128<byte> key = Unsafe.As<ulong, Vector128<byte>>(ref Unsafe.AsRef(in u0));
             Vector128<byte> data = Unsafe.As<ulong, Vector128<byte>>(ref Unsafe.AsRef(in u2));
-            key ^= Vector128.Create(_aesHashSeed0, _aesHashSeed1).AsByte();
+            key ^= Vector128.Create(RunSeed.Aes0, RunSeed.Aes1).AsByte();
             Vector128<byte> mixed = HashAesRound(data, key);
             mixed = HashAesRound(mixed, key);
             return FoldHash(MumFold(mixed));
         }
 
-        // Include the 32-byte input length in the deterministic fallback seed.
-        return GetCrcHashCode(unchecked(_hashSeed + 32u));
+        return GetCrcHashCode(RunSeed.Crc);
     }
 
     public bool IsZero

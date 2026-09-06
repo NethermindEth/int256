@@ -16,10 +16,30 @@ namespace Nethermind.Int256;
 
 public readonly partial struct UInt256
 {
-    // Vary the seed between processes to keep hash distribution independent across nodes and restarts.
-    private static readonly ulong _aesHashSeed0 = CreateHashSeed();
-    private static readonly ulong _aesHashSeed1 = CreateHashSeed();
-    private static readonly long _xxHashSeed = unchecked((long)CreateHashSeed());
+    /// <inheritdoc cref="UInt256.SeedHashes(uint)" />
+    public static partial void SeedHashes(uint seed)
+    {
+        ulong aes0 = Spread(seed);
+        ulong aes1 = Spread(aes0);
+
+        RunSeed.Aes0 = aes0;
+        RunSeed.Aes1 = aes1;
+        RunSeed.XxHash = unchecked((long)Spread(aes1));
+    }
+
+    /// <summary>The seeds this run hashes with.</summary>
+    /// <remarks>
+    /// Drawn per process unless <see cref="SeedHashes(uint)"/> replaces them, so that hash collisions
+    /// on one node are not the same ones on another or across a restart and cannot degrade the network
+    /// as a whole. A type of their own so that mutating them leaves <see cref="UInt256"/>'s own statics
+    /// immutable after their constructor.
+    /// </remarks>
+    private static class RunSeed
+    {
+        internal static ulong Aes0 = CreateHashSeed();
+        internal static ulong Aes1 = CreateHashSeed();
+        internal static long XxHash = unchecked((long)CreateHashSeed());
+    }
 
     [SkipLocalsInit]
     private static ulong CreateHashSeed()
@@ -37,13 +57,13 @@ public readonly partial struct UInt256
         {
             Vector128<byte> key = Unsafe.As<ulong, Vector128<byte>>(ref Unsafe.AsRef(in u0));
             Vector128<byte> data = Unsafe.As<ulong, Vector128<byte>>(ref Unsafe.AsRef(in u2));
-            key ^= Vector128.Create(_aesHashSeed0, _aesHashSeed1).AsByte();
+            key ^= Vector128.Create(RunSeed.Aes0, RunSeed.Aes1).AsByte();
             Vector128<byte> mixed = HashAesRound(data, key);
             mixed = HashAesRound(mixed, key);
             return FoldHash(MumFold(mixed));
         }
 
-        return GetXxHashCode(_xxHashSeed);
+        return GetXxHashCode(RunSeed.XxHash);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
