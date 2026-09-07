@@ -1345,8 +1345,8 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         // pairs through MumFold rather than MultiplyFold: the product is commutative, so a bare fold
         // gives a half the same value when its two seed-masked words are exchanged, and MumFold's
         // asymmetric constants are what separate the two positions.
-        ulong a = (ulong)MumFold(u0 ^ seed.u0, u1 ^ seed.u1);
-        ulong b = (ulong)MumFold(u2 ^ seed.u2, u3 ^ seed.u3);
+        ulong a = MumFold(u0 ^ seed.u0, u1 ^ seed.u1);
+        ulong b = MumFold(u2 ^ seed.u2, u3 ^ seed.u3);
         return FoldHash(MumFold(a, b));
     }
 
@@ -1357,28 +1357,37 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
             // Keep the round key outside AESE so state and roundKey have distinct roles in the mixer.
             : Arm.Aes.MixColumns(Arm.Aes.Encrypt(state, Vector128<byte>.Zero)) ^ roundKey;
 
+    private const ulong FirstFactorConstant = 0x9E3779B97F4A7C15UL;
+    private const ulong SecondFactorConstant = 0xBF58476D1CE4E5B9UL;
+    private const ulong ClosingFactorConstant = 0x94D049BB133111EBUL;
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static long MumFold(ulong a, ulong b)
-        => (long)MultiplyFold(a ^ 0x9E3779B97F4A7C15UL, b ^ 0xBF58476D1CE4E5B9UL);
+    private static ulong MumFold(ulong a, ulong b)
+        => MultiplyFold(a ^ FirstFactorConstant, b ^ SecondFactorConstant);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static ulong MultiplyFold(ulong a, ulong b)
     {
         ulong high = Multiply64(a, b, out ulong low);
-        // Carry the factors past the product. `low ^ high` alone is zero whenever either factor is, so a
-        // key matching the seed in one limb would erase the limb multiplied with it: with a known seed -
-        // and the guest's seed is the public payload root - that hands out a colliding set for free.
+        // Carry the factors past the product: `low ^ high` alone is zero whenever either factor is, so a
+        // key hitting a factor's constant would erase the word multiplied with it. The carry leaves the
+        // survivor intact instead, which is what FoldHash's closing fold then has to absorb.
         return low ^ high ^ a ^ b;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static long MumFold(Vector128<byte> mixed)
+    private static ulong MumFold(Vector128<byte> mixed)
         => MumFold(mixed.AsUInt64().GetElement(0), mixed.AsUInt64().GetElement(1));
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static int FoldHash(long hash)
+    private static int FoldHash(ulong mixed)
     {
-        ulong value = (ulong)hash;
+        // Close with a fold against a constant the key cannot reach. A zero factor leaves MultiplyFold
+        // returning its other factor verbatim, so with a known seed - and the guest's seed is the public
+        // payload root - a key can drive all three folds' first factors to zero and reduce the hash to an
+        // invertible function of one limb, whose collisions are then free rather than searched for. The
+        // closing fold is not invertible, so that family costs a 32-bit hash's generic search again.
+        ulong value = MumFold(mixed, ClosingFactorConstant);
         return (int)(value ^ (value >> 32));
     }
 

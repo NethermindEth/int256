@@ -14,6 +14,8 @@ public readonly partial struct UInt256
     public static partial void SeedHashes(in UInt256 seed)
     {
         RunSeed.Multiply = seed;
+        RunSeed.Aes0 = Vector128.Create(seed.u0, seed.u1).AsByte();
+        RunSeed.Aes1 = Vector128.Create(seed.u2, seed.u3).AsByte();
     }
 
     /// <summary>The seeds this run hashes with.</summary>
@@ -27,6 +29,8 @@ public readonly partial struct UInt256
     {
         internal static UInt256 Multiply = new(0x1F83D9ABFB41BD6BUL, 0x5BE0CD19137E2179UL,
             0x6A09E667F3BCC909UL, 0xBB67AE8584CAA73BUL);
+        internal static Vector128<byte> Aes0 = Vector128.Create(Multiply.u0, Multiply.u1).AsByte();
+        internal static Vector128<byte> Aes1 = Vector128.Create(Multiply.u2, Multiply.u3).AsByte();
     }
 
     [SkipLocalsInit]
@@ -37,9 +41,9 @@ public readonly partial struct UInt256
         {
             Vector128<byte> key = Unsafe.As<ulong, Vector128<byte>>(ref Unsafe.AsRef(in u0));
             Vector128<byte> data = Unsafe.As<ulong, Vector128<byte>>(ref Unsafe.AsRef(in u2));
-            key ^= Vector128.Create(RunSeed.Multiply.u0, RunSeed.Multiply.u1).AsByte();
+            key ^= RunSeed.Aes0;
             Vector128<byte> mixed = HashAesRound(data, key);
-            mixed = HashAesRound(mixed, key ^ Vector128.Create(RunSeed.Multiply.u2, RunSeed.Multiply.u3).AsByte());
+            mixed = HashAesRound(mixed, key ^ RunSeed.Aes1);
             return FoldHash(MumFold(mixed));
         }
 
