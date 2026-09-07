@@ -1315,12 +1315,16 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     public override bool Equals(object? obj) => obj is UInt256 other && Equals(other);
 
     /// <summary>Replaces the seeds <see cref="GetHashCode"/> hashes with.</summary>
-    /// <param name="seed">A private, cryptographically random 256-bit number for this run.</param>
+    /// <param name="seed">The full-width 256-bit seed for this run.</param>
     /// <remarks>
-    /// It is important to seed with a cryptographically random number, using all 256 bits, and keep it
-    /// private. Do not use a counter, a zero-padded smaller seed, or a predictable value: weak or known
-    /// seeds allow deliberately colliding inputs. These hash functions are not cryptographic
-    /// authentication functions.
+    /// Prefer fresh, private cryptographic randomness. A seed known before an adversary chooses keys
+    /// allows deliberately colliding inputs. The zkEVM consumer currently uses the public
+    /// <c>new_payload_request_root</c> commitment, so provers and retries share a seed for each payload.
+    /// Independent prover-private randomness is proposed in
+    /// <see href="https://github.com/eth-act/zkevm-standards/issues/41">eth-act/zkevm-standards#41</see>.
+    /// The scalar mixer uses a different 64-bit seed limb for each key limb. The AES rounds use
+    /// separate 128-bit halves of the seed.
+    /// These are not cryptographic authentication functions.
     /// <para>
     /// Both builds replace their previous seeds. The zkEVM build starts from fixed constants because
     /// it has no entropy source; install a seed before processing untrusted keys. The standard build
@@ -1334,22 +1338,10 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     /// </remarks>
     public static partial void SeedHashes(in UInt256 seed);
 
-    /// <summary>Mixes a seed word using SplitMix64.</summary>
-    private static ulong Spread(ulong x)
-    {
-        unchecked
-        {
-            x += 0x9E3779B97F4A7C15UL;
-            x = (x ^ (x >> 30)) * 0xBF58476D1CE4E5B9UL;
-            x = (x ^ (x >> 27)) * 0x94D049BB133111EBUL;
-            return x ^ (x >> 31);
-        }
-    }
-
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal readonly int GetMultiplyHashCode(in UInt256 seed)
     {
-        // Mix the secret into full-width limbs before any information is lost to folding.
+        // Mix each seed limb into its key limb before any information is lost to folding.
         ulong a = MultiplyFold(u0 ^ seed.u0, u1 ^ seed.u1);
         ulong b = MultiplyFold(u2 ^ seed.u2, u3 ^ seed.u3);
         return FoldHash(MumFold(a, b));
@@ -1369,7 +1361,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static ulong MultiplyFold(ulong a, ulong b)
     {
-        ulong high = Math.BigMul(a, b, out ulong low);
+        ulong high = Multiply64(a, b, out ulong low);
         return low ^ high;
     }
 

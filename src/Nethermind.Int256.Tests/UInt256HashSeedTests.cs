@@ -20,16 +20,23 @@ public class UInt256HashSeedTests
     private static readonly UInt256 SecondSeed = new(0x219B4AD604915E33UL, 0x28811B0595AE539EUL,
         0x5D38E6AFF0752500UL, 0xC8AEAC7F08A75C3DUL);
 
-    /// <summary>Checks that each seed limb affects the public hash.</summary>
-    [TestCase(0)]
-    [TestCase(1)]
-    [TestCase(2)]
-    [TestCase(3)]
-    public void SeedHashes_UsesEveryLimb(int limb)
+    public static IEnumerable<TestCaseData> SeedBits()
+    {
+        for (int bit = 0; bit < 256; bit++)
+        {
+            yield return new TestCaseData(bit, false);
+            yield return new TestCaseData(bit, true);
+        }
+    }
+
+    /// <summary>Checks individual bits and paired changes that cancel when the seed halves are XOR-folded.</summary>
+    [TestCaseSource(nameof(SeedBits))]
+    public void SeedHashes_UsesEverySeedBit(int bit, bool paired)
     {
         UInt256.SeedHashes(FirstSeed);
         int before = Sample.GetHashCode();
-        UInt256 changed = WithLimb(FirstSeed, limb, FirstSeed[limb] ^ 0x8000000000000000UL);
+        UInt256 changed = FirstSeed ^ (UInt256.One << bit);
+        if (paired) changed ^= UInt256.One << ((bit + 128) % 256);
         UInt256.SeedHashes(changed);
         Assert.That(Sample.GetHashCode(), Is.Not.EqualTo(before));
     }

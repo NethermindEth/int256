@@ -19,12 +19,9 @@ public readonly partial struct UInt256
     /// <inheritdoc />
     public static partial void SeedHashes(in UInt256 seed)
     {
-        ulong aes0 = Spread(seed.u0 ^ seed.u2);
-        ulong aes1 = Spread(seed.u1 ^ seed.u3);
-
-        RunSeed.Aes0 = aes0;
-        RunSeed.Aes1 = aes1;
-        RunSeed.XxHash = unchecked((long)Spread(aes0 ^ Spread(aes1)));
+        RunSeed.Multiply = seed;
+        RunSeed.Aes0 = Vector128.Create(seed.u0, seed.u1).AsByte();
+        RunSeed.Aes1 = Vector128.Create(seed.u2, seed.u3).AsByte();
     }
 
     /// <summary>The seeds this run hashes with.</summary>
@@ -36,9 +33,9 @@ public readonly partial struct UInt256
     /// </remarks>
     private static class RunSeed
     {
-        internal static ulong Aes0 = CreateHashSeed();
-        internal static ulong Aes1 = CreateHashSeed();
-        internal static long XxHash = unchecked((long)CreateHashSeed());
+        internal static UInt256 Multiply = new(CreateHashSeed(), CreateHashSeed(), CreateHashSeed(), CreateHashSeed());
+        internal static Vector128<byte> Aes0 = Vector128.Create(Multiply.u0, Multiply.u1).AsByte();
+        internal static Vector128<byte> Aes1 = Vector128.Create(Multiply.u2, Multiply.u3).AsByte();
     }
 
     [SkipLocalsInit]
@@ -57,13 +54,13 @@ public readonly partial struct UInt256
         {
             Vector128<byte> key = Unsafe.As<ulong, Vector128<byte>>(ref Unsafe.AsRef(in u0));
             Vector128<byte> data = Unsafe.As<ulong, Vector128<byte>>(ref Unsafe.AsRef(in u2));
-            key ^= Vector128.Create(RunSeed.Aes0, RunSeed.Aes1).AsByte();
+            key ^= RunSeed.Aes0;
             Vector128<byte> mixed = HashAesRound(data, key);
-            mixed = HashAesRound(mixed, key);
+            mixed = HashAesRound(mixed, key ^ RunSeed.Aes1);
             return FoldHash(MumFold(mixed));
         }
 
-        return GetXxHashCode(RunSeed.XxHash);
+        return GetMultiplyHashCode(in RunSeed.Multiply);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
