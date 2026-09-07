@@ -353,6 +353,23 @@ public readonly partial struct UInt256
         if (y.IsOne) { Mod(in x, in m, out res); return; }
         if (x.IsOne) { Mod(in y, in m, out res); return; }
 
+        // ARM's register allocation favors keeping the wide body in this frame.
+        if (ArmBase.Arm64.IsSupported)
+            MultiplyModWideCore(in x, in y, in m, out res);
+        else
+            MultiplyModWide(in x, in y, in m, out res);
+    }
+
+    // Keep the product/reduction frame off the zero, one, and narrow-modulus paths.
+    [SkipLocalsInit]
+    [MethodImpl(MulModWideInlining)]
+    private static void MultiplyModWide(in UInt256 x, in UInt256 y, in UInt256 m, out UInt256 res)
+        => MultiplyModWideCore(in x, in y, in m, out res);
+
+    [SkipLocalsInit]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void MultiplyModWideCore(in UInt256 x, in UInt256 y, in UInt256 m, out UInt256 res)
+    {
         Multiply256To512Bit(in x, in y, out UInt256 lo, out UInt256 hi);
 
         // Scalar test: an IsZero vector load here would span the four scalar
@@ -1789,9 +1806,8 @@ public readonly partial struct UInt256
         if ((mod & (mod - 1)) == 0)
         {
             ulong mask = mod - 1;
-            ulong a = x.u0 & mask;
-            ulong b = y.u0 & mask;
-            ulong prodLo = unchecked(a * b);
+            // Only the low k product bits contribute modulo 2^k.
+            ulong prodLo = unchecked(x.u0 * y.u0);
             res = new UInt256(prodLo & mask, 0, 0, 0);
             return;
         }
@@ -2104,6 +2120,7 @@ public readonly partial struct UInt256
 
 
     [SkipLocalsInit]
+    [MethodImpl(MulMod128Inlining)]
     private static void Remainder512By128Bits(in UInt256 lo, in UInt256 hi, in UInt256 d, out UInt256 rem)
     {
         Debug.Assert((d.u2 | d.u3) == 0);
@@ -2132,6 +2149,7 @@ public readonly partial struct UInt256
             unBuf.w0 = u0; unBuf.w1 = u1; unBuf.w2 = u2; unBuf.w3 = u3;
             unBuf.w4 = u4; unBuf.w5 = u5; unBuf.w6 = u6; unBuf.w7 = u7;
             unBuf.w8 = 0;
+            if (X86Base.X64.IsSupported && Unsafe.Add(ref unBuf.w0, uLen - 1) < d1) uLen--;
 
             nd0 = d0;
             nd1 = d1;
@@ -2158,6 +2176,8 @@ public readonly partial struct UInt256
 
         // dLen is fixed at 2 here.
         int m = uLen - 2;
+        // Keeping uLen unchanged through normalization avoids spills in the reciprocal path.
+        if (!X86Base.X64.IsSupported && sh == 0 && Unsafe.Add(ref un0, uLen - 1) < nd1) m--;
         ulong reciprocal = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(nd1);
         for (int j = m; j >= 0; j--)
         {
@@ -2203,6 +2223,8 @@ public readonly partial struct UInt256
             unBuf.w0 = lo.u0; unBuf.w1 = lo.u1; unBuf.w2 = lo.u2; unBuf.w3 = lo.u3;
             unBuf.w4 = u4; unBuf.w5 = u5; unBuf.w6 = u6; unBuf.w7 = u7;
             unBuf.w8 = 0;
+            // Skip the provably zero leading quotient digit, as in the 256-bit reducer.
+            if (Unsafe.Add(ref unBuf.w0, uLen - 1) < d2) uLen--;
             nd0 = d0; nd1 = d1; nd2 = d2;
         }
         else
@@ -2236,7 +2258,7 @@ public readonly partial struct UInt256
             ulong u10 = Unsafe.Add(ref uJ, 1);
 
             ulong qhat;
-            if (X86Base.X64.IsSupported)
+            // Both hardware and reciprocal division provide the exact remainder.
             {
                 if (u8 >= nd2)
                 {
@@ -2245,9 +2267,17 @@ public readonly partial struct UInt256
                     goto FullSubMul;
                 }
 
-                // Inline estimate: div + Knuth correction, keeping the exact identity
+                // Inline estimate: divide + Knuth correction, keeping the exact identity
                 // rhat == (u8:u9) - qhat*nd2 (each qhat-- adds nd2 back into rhat).
-                (qhat, ulong rhat) = X86Base.X64.DivRem(u9, u8, nd2);
+                ulong rhat;
+                if (X86Base.X64.IsSupported)
+                {
+                    (qhat, rhat) = X86Base.X64.DivRem(u9, u8, nd2);
+                }
+                else
+                {
+                    qhat = UDivRem2By1(u8, reciprocal, nd2, u9, out rhat);
+                }
 
                 ulong ph = Multiply64(qhat, nd1, out ulong pl);
                 while (ph > rhat || (ph == rhat && pl > u10))
@@ -2272,8 +2302,9 @@ public readonly partial struct UInt256
                 ulong borrow1 = hi0 + (lo0 > v0 ? 1UL : 0UL);
 
                 ref ulong x1 = ref Unsafe.Add(ref uJ, 1);
-                ulong v1 = x1;
-                ulong hi1 = Multiply64(nd1, qhat, out ulong lo1);
+                ulong v1 = u10;
+                // Knuth correction maintained ph:pl == qhat * nd1.
+                ulong hi1 = ph, lo1 = pl;
                 ulong t1 = v1 - borrow1;
                 x1 = t1 - lo1;
                 borrow1 = hi1 + (borrow1 > v1 ? 1UL : 0UL) + (lo1 > t1 ? 1UL : 0UL);
@@ -2290,8 +2321,6 @@ public readonly partial struct UInt256
 
                 continue;
             }
-
-            qhat = EstimateQhat(u8, u9, u10, nd2, nd1, reciprocal);
 
         FullSubMul:
             ulong borrow = SubMulTo3(ref uJ, nd0, nd1, nd2, qhat);
@@ -2408,6 +2437,9 @@ public readonly partial struct UInt256
             unBuf.w4 = u4; unBuf.w5 = u5; unBuf.w6 = u6; unBuf.w7 = u7;
             unBuf.w8 = 0;
 
+            // The extra top limb is zero. If the next limb is below d3, the
+            // leading quotient digit is zero and its entire iteration is redundant.
+            if (Unsafe.Add(ref unBuf.w0, uLen - 1) < d3) uLen--;
             nd0 = d0; nd1 = d1; nd2 = d2; nd3 = d3;
         }
         else
@@ -2447,7 +2479,7 @@ public readonly partial struct UInt256
             ulong u10 = Unsafe.Add(ref uJ, 2);
 
             ulong qhat;
-            if (X86Base.X64.IsSupported)
+            // Both hardware and reciprocal division provide the exact remainder.
             {
                 if (u8 >= nd3)
                 {
@@ -2456,9 +2488,17 @@ public readonly partial struct UInt256
                     goto FullSubMul;
                 }
 
-                // Inline estimate: div + Knuth correction, keeping the exact identity
+                // Inline estimate: divide + Knuth correction, keeping the exact identity
                 // rhat == (u8:u9) - qhat*nd3 (each qhat-- adds nd3 back into rhat).
-                (qhat, ulong rhat) = X86Base.X64.DivRem(u9, u8, nd3);
+                ulong rhat;
+                if (X86Base.X64.IsSupported)
+                {
+                    (qhat, rhat) = X86Base.X64.DivRem(u9, u8, nd3);
+                }
+                else
+                {
+                    qhat = UDivRem2By1(u8, reciprocal, nd3, u9, out rhat);
+                }
 
                 ulong ph = Multiply64(qhat, nd2, out ulong pl);
                 while (ph > rhat || (ph == rhat && pl > u10))
@@ -2491,7 +2531,17 @@ public readonly partial struct UInt256
 
                 ref ulong x2 = ref Unsafe.Add(ref uJ, 2);
                 ulong v2 = x2;
-                ulong hi2 = Multiply64(nd2, qhat, out ulong lo2);
+                ulong hi2, lo2;
+                if (Bmi2.X64.IsSupported || ArmBase.Arm64.IsSupported)
+                {
+                    hi2 = Multiply64(nd2, qhat, out lo2);
+                }
+                else
+                {
+                    // Avoid repeating the software widening product maintained by correction.
+                    hi2 = ph;
+                    lo2 = pl;
+                }
                 ulong t2 = v2 - borrow2;
                 x2 = t2 - lo2;
                 borrow2 = hi2 + (borrow2 > v2 ? 1UL : 0UL) + (lo2 > t2 ? 1UL : 0UL);
@@ -2508,8 +2558,6 @@ public readonly partial struct UInt256
 
                 continue;
             }
-
-            qhat = EstimateQhat(u8, u9, u10, nd3, nd2, reciprocal);
 
         FullSubMul:
             ulong borrow = SubMulTo4(ref uJ, nd0, nd1, nd2, nd3, qhat);
@@ -2626,7 +2674,6 @@ public readonly partial struct UInt256
     {
         ulong oldU2 = u2;
         ulong qhat;
-        if (X86Base.X64.IsSupported)
         {
             if (oldU2 >= d1)
             {
@@ -2637,7 +2684,15 @@ public readonly partial struct UInt256
 
             // DivRem returns rhat == (u2:u1) - qhat*d1 exactly, so the d1 product in
             // the subtraction is redundant: limb 1 becomes rhat - borrow directly.
-            (qhat, ulong rhat) = X86Base.X64.DivRem(u1, oldU2, d1);
+            ulong rhat;
+            if (X86Base.X64.IsSupported)
+            {
+                (qhat, rhat) = X86Base.X64.DivRem(u1, oldU2, d1);
+            }
+            else
+            {
+                qhat = UDivRem2By1(oldU2, reciprocal, d1, u1, out rhat);
+            }
 
             ulong v0 = u0;
             ulong hi0 = Multiply64(d0, qhat, out ulong lo0);
@@ -2657,8 +2712,6 @@ public readonly partial struct UInt256
             return;
         }
 
-        qhat = EstimateQhatEst(oldU2, u1, d1, reciprocal);
-
     FullSubMul:
         ulong borrow = SubMulTo2(ref u0, ref u1, d0, d1, qhat);
         u2 = oldU2 - borrow;
@@ -2667,13 +2720,6 @@ public readonly partial struct UInt256
         {
             // Overshoot-by-1 or 2 fix (rare).
             CorrectStep(ref u0, ref u1, ref u2, d0, d1);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static ulong EstimateQhatEst(ulong u2, ulong u1, ulong dh, ulong reciprocal)
-        {
-            // Quotient digit saturates at b - 1. No correction needed (rhat would be >= b).
-            return u2 >= dh ? ulong.MaxValue : UDivRem2By1(u2, reciprocal, dh, u1, out _);
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
@@ -3026,7 +3072,7 @@ public readonly partial struct UInt256
     }
 
     [SkipLocalsInit]
-    [MethodImpl(MethodImplOptions.NoInlining)]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void Multiply256To512BitLarge(in UInt256 x, in UInt256 y, out UInt256 low, out UInt256 high)
     {
         // Copy inputs up front - this breaks aliasing with out params so we can store early.

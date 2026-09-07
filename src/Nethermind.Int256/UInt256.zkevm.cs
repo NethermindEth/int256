@@ -10,6 +10,12 @@ namespace Nethermind.Int256;
 
 public readonly partial struct UInt256
 {
+    // A separate wide-product call increases guest steps and memory traffic.
+    private const MethodImplOptions MulModWideInlining = MethodImplOptions.AggressiveInlining;
+
+    // Forced inlining of this reducer increases guest steps and proof work.
+    private const MethodImplOptions MulMod128Inlining = (MethodImplOptions)0;
+
     // Guest execution requires stable hashes across runs.
     private static readonly uint _hashSeed = 2098026241U;
     private static readonly ulong _aesHashSeed0 = 0x1F83D9ABFB41BD6BUL;
