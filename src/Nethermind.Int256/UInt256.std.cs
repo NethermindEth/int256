@@ -3,9 +3,7 @@
 
 using System;
 using System.Buffers.Binary;
-using System.IO.Hashing;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
 using System.Runtime.Intrinsics.X86;
 using System.Security.Cryptography;
@@ -61,14 +59,6 @@ public readonly partial struct UInt256
         }
 
         return GetMultiplyHashCode(in RunSeed.Multiply);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal readonly int GetXxHashCode(long seed)
-    {
-        ref byte start = ref Unsafe.As<ulong, byte>(ref Unsafe.AsRef(in u0));
-        ulong hash = XxHash3.HashToUInt64(MemoryMarshal.CreateReadOnlySpan(ref start, 32), seed);
-        return FoldHash((long)hash);
     }
 
     // Vector256 paths live in separate helpers to keep the public bodies small enough to inline.
