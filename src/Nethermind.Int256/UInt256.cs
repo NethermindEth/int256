@@ -1319,8 +1319,8 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     /// <remarks>
     /// It is important to seed with a cryptographically random number, using all 256 bits, and keep it
     /// private. Do not use a counter, a zero-padded smaller seed, or a predictable value: weak or known
-    /// seeds allow deliberately colliding inputs. A Keccak output is suitable only when its input
-    /// provides sufficient secret entropy. These hash functions are not cryptographic authentication functions.
+    /// seeds allow deliberately colliding inputs. These hash functions are not cryptographic
+    /// authentication functions.
     /// <para>
     /// Both builds replace their previous seeds. The zkEVM build starts from fixed constants because
     /// it has no entropy source; install a seed before processing untrusted keys. The standard build
@@ -1349,8 +1349,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal readonly int GetMultiplyHashCode(in UInt256 seed)
     {
-        // Mix the secret into full-width limbs before compression; CRC collisions survive changes
-        // to the initial CRC state, even when a nonlinear finalizer follows it.
+        // Mix the secret into full-width limbs before any information is lost to folding.
         ulong a = MultiplyFold(u0 ^ seed.u0, u1 ^ seed.u1);
         ulong b = MultiplyFold(u2 ^ seed.u2, u3 ^ seed.u3);
         return FoldHash(MumFold(a, b));

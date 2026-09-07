@@ -15,7 +15,6 @@ public class UInt256HashSeedTests
     private const int SampleCount = 4096;
     private static readonly UInt256 Sample = new(0xAB, 0xCD, 0xEF, 0x01);
 
-    // Keccak-256("int256-mum-review-test/" || little-endian uint64 index), for indices 0 and 1.
     private static readonly UInt256 FirstSeed = new(0xAC320C7E23EBA0EFUL, 0x2E2473DDDBD55172UL,
         0x0C564BCB0D425343UL, 0x21FAE39C24D6EB90UL);
     private static readonly UInt256 SecondSeed = new(0x219B4AD604915E33UL, 0x28811B0595AE539EUL,
@@ -46,7 +45,7 @@ public class UInt256HashSeedTests
         Assert.That(Sample.GetHashCode(), Is.EqualTo(first));
     }
 
-    /// <summary>Checks sequential inputs and a CRC collision family in each input limb.</summary>
+    /// <summary>Checks sequential and linearly related inputs in each input limb.</summary>
     [TestCase(0, false)]
     [TestCase(1, false)]
     [TestCase(2, false)]
@@ -55,7 +54,7 @@ public class UInt256HashSeedTests
     [TestCase(1, true)]
     [TestCase(2, true)]
     [TestCase(3, true)]
-    public void SeedHashes_DistributesInputs(int limb, bool crcCollisions)
+    public void SeedHashes_DistributesInputs(int limb, bool structuredInputs)
     {
         foreach (UInt256 seed in new[] { FirstSeed, SecondSeed })
         {
@@ -65,10 +64,10 @@ public class UInt256HashSeedTests
             for (int value = 0; value < SampleCount; value++)
             {
                 ulong input = (uint)value;
-                if (crcCollisions)
+                if (structuredInputs)
                 {
                     input = 0;
-                    // Shifted multiples of the CRC32C polynomial collide for every initial CRC state.
+                    // XOR combinations of shifted copies exercise linearly related inputs.
                     for (int bit = 0; bit < 12; bit++)
                         if ((value & (1 << bit)) != 0) input ^= 0x105EC76F1UL << bit;
                 }
