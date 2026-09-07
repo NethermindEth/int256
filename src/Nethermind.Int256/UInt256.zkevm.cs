@@ -10,31 +10,25 @@ namespace Nethermind.Int256;
 
 public readonly partial struct UInt256
 {
-    private const uint DefaultSeed = 2098026241U;
-
-    /// <inheritdoc cref="UInt256.SeedHashes(uint)" />
-    public static partial void SeedHashes(uint seed)
+    /// <inheritdoc />
+    public static partial void SeedHashes(in UInt256 seed)
     {
-        ulong aes0 = Spread(seed);
-
-        RunSeed.Crc = unchecked(seed + 32u);
-        RunSeed.Aes0 = aes0;
-        RunSeed.Aes1 = Spread(aes0);
+        RunSeed.Multiply = seed;
+        RunSeed.Aes0 = Spread(seed.u0 ^ seed.u2);
+        RunSeed.Aes1 = Spread(seed.u1 ^ seed.u3);
     }
 
     /// <summary>The seeds this run hashes with.</summary>
     /// <remarks>
     /// Guest execution has no entropy source, so these start from constants rather than from anything
-    /// drawn at start-up, and stay stable across runs until <see cref="SeedHashes(uint)"/> replaces them.
+    /// drawn at start-up, and stay stable across runs until <see cref="SeedHashes"/> replaces them.
     /// A type of their own so that mutating them leaves <see cref="UInt256"/>'s own statics immutable
-    /// after their constructor, which is what lets NativeAOT freeze them. The initializers are constant
-    /// expressions for the same reason.
+    /// after their constructor, which is what lets NativeAOT freeze them.
     /// </remarks>
     private static class RunSeed
     {
-        // The 32-byte input length rides in the CRC seed, so a UInt256 and a shorter key of the same
-        // bytes do not walk the limbs with the same one.
-        internal static uint Crc = unchecked(DefaultSeed + 32u);
+        internal static UInt256 Multiply = new(0x1F83D9ABFB41BD6BUL, 0x5BE0CD19137E2179UL,
+            0x6A09E667F3BCC909UL, 0xBB67AE8584CAA73BUL);
         internal static ulong Aes0 = 0x1F83D9ABFB41BD6BUL;
         internal static ulong Aes1 = 0x5BE0CD19137E2179UL;
     }
@@ -53,7 +47,7 @@ public readonly partial struct UInt256
             return FoldHash(MumFold(mixed));
         }
 
-        return GetCrcHashCode(RunSeed.Crc);
+        return GetMultiplyHashCode(in RunSeed.Multiply);
     }
 
     public bool IsZero

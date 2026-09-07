@@ -1315,27 +1315,26 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     public override bool Equals(object? obj) => obj is UInt256 other && Equals(other);
 
     /// <summary>Replaces the seeds <see cref="GetHashCode"/> hashes with.</summary>
-    /// <param name="seed">The seed for this run. Every seed the hash uses is derived from it.</param>
+    /// <param name="seed">A private, cryptographically random 256-bit number for this run.</param>
     /// <remarks>
-    /// Both builds honour this. It exists for the zkEVM build, which has no entropy source and so hashes
-    /// with compile-time constants until told otherwise: every guest of a given version buckets a given
-    /// key identically for ever, and a colliding key set found offline against the published binary can
-    /// be replayed against every prover, turning constant-time lookups linear. EIP-8025 asks a guest to
-    /// mix a per-payload value - <c>new_payload_request_root</c> - into its hash function, and this is
-    /// where that value goes. The standard build has an entropy source and starts from a seed it draws
-    /// per process, which this replaces rather than perturbs.
+    /// It is important to seed with a cryptographically random number, using all 256 bits, and keep it
+    /// private. Do not use a counter, a zero-padded smaller seed, or a predictable value: weak or known
+    /// seeds allow deliberately colliding inputs. A Keccak output is suitable only when its input
+    /// provides sufficient secret entropy. These hash functions are not cryptographic authentication functions.
     /// <para>
-    /// Call once, before anything hashes a <see cref="UInt256"/>, and never while a hash-keyed container
-    /// holds entries: re-seeding orphans every one of them. Not synchronised against concurrent hashing.
+    /// Both builds replace their previous seeds. The zkEVM build starts from fixed constants because
+    /// it has no entropy source; install a seed before processing untrusted keys. The standard build
+    /// starts from process-random seeds. Replace the entire seed independently between runs.
+    /// </para>
+    /// <para>
+    /// Install before hashing keys for a run, and never while a hash-keyed container holds entries:
+    /// re-seeding invalidates their stored hashes. This also affects <see cref="Int256"/> hashes.
+    /// Not synchronised against concurrent hashing.
     /// </para>
     /// </remarks>
-    public static partial void SeedHashes(uint seed);
+    public static partial void SeedHashes(in UInt256 seed);
 
-    /// <summary>Spreads a 32-bit seed over 64 bits, so one changed seed bit moves a whole seed word.</summary>
-    /// <remarks>
-    /// splitmix64's finalizer. A bijection, so chaining it derives seeds that are distinct whenever the
-    /// values fed to it are, and no two run seeds can land on the same derived one.
-    /// </remarks>
+    /// <summary>Mixes a seed word using SplitMix64.</summary>
     private static ulong Spread(ulong x)
     {
         unchecked
@@ -1348,13 +1347,13 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal readonly int GetCrcHashCode(uint seed)
+    internal readonly int GetMultiplyHashCode(in UInt256 seed)
     {
-        ulong hash0 = BitOperations.Crc32C(seed, u0);
-        ulong hash1 = BitOperations.Crc32C(seed ^ 0x9E3779B9u, u1);
-        ulong hash2 = BitOperations.Crc32C(seed ^ 0x85EBCA6Bu, u2);
-        ulong hash3 = BitOperations.Crc32C(seed ^ 0xC2B2AE35u, u3);
-        return FoldHash(MumFold(hash0 | (hash1 << 32), hash2 | (hash3 << 32)));
+        // Mix the secret into full-width limbs before compression; CRC collisions survive changes
+        // to the initial CRC state, even when a nonlinear finalizer follows it.
+        ulong a = MultiplyFold(u0 ^ seed.u0, u1 ^ seed.u1);
+        ulong b = MultiplyFold(u2 ^ seed.u2, u3 ^ seed.u3);
+        return FoldHash(MumFold(a, b));
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1366,9 +1365,13 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static long MumFold(ulong a, ulong b)
+        => (long)MultiplyFold(a ^ 0x9E3779B97F4A7C15UL, b ^ 0xBF58476D1CE4E5B9UL);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static ulong MultiplyFold(ulong a, ulong b)
     {
-        ulong low = Math.BigMul(a ^ 0x9E3779B97F4A7C15UL, b ^ 0xBF58476D1CE4E5B9UL, out ulong high);
-        return (long)(low ^ high);
+        ulong high = Math.BigMul(a, b, out ulong low);
+        return low ^ high;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

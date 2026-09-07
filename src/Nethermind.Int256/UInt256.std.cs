@@ -16,20 +16,20 @@ namespace Nethermind.Int256;
 
 public readonly partial struct UInt256
 {
-    /// <inheritdoc cref="UInt256.SeedHashes(uint)" />
-    public static partial void SeedHashes(uint seed)
+    /// <inheritdoc />
+    public static partial void SeedHashes(in UInt256 seed)
     {
-        ulong aes0 = Spread(seed);
-        ulong aes1 = Spread(aes0);
+        ulong aes0 = Spread(seed.u0 ^ seed.u2);
+        ulong aes1 = Spread(seed.u1 ^ seed.u3);
 
         RunSeed.Aes0 = aes0;
         RunSeed.Aes1 = aes1;
-        RunSeed.XxHash = unchecked((long)Spread(aes1));
+        RunSeed.XxHash = unchecked((long)Spread(aes0 ^ Spread(aes1)));
     }
 
     /// <summary>The seeds this run hashes with.</summary>
     /// <remarks>
-    /// Drawn per process unless <see cref="SeedHashes(uint)"/> replaces them, so that hash collisions
+    /// Drawn per process unless <see cref="SeedHashes"/> replaces them, so that hash collisions
     /// on one node are not the same ones on another or across a restart and cannot degrade the network
     /// as a whole. A type of their own so that mutating them leaves <see cref="UInt256"/>'s own statics
     /// immutable after their constructor.
