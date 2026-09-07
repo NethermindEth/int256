@@ -2656,7 +2656,6 @@ public readonly partial struct UInt256
     {
         ulong oldU2 = u2;
         ulong qhat;
-        if (X86Base.X64.IsSupported)
         {
             if (oldU2 >= d1)
             {
@@ -2667,7 +2666,15 @@ public readonly partial struct UInt256
 
             // DivRem returns rhat == (u2:u1) - qhat*d1 exactly, so the d1 product in
             // the subtraction is redundant: limb 1 becomes rhat - borrow directly.
-            (qhat, ulong rhat) = X86Base.X64.DivRem(u1, oldU2, d1);
+            ulong rhat;
+            if (X86Base.X64.IsSupported)
+            {
+                (qhat, rhat) = X86Base.X64.DivRem(u1, oldU2, d1);
+            }
+            else
+            {
+                qhat = UDivRem2By1(oldU2, reciprocal, d1, u1, out rhat);
+            }
 
             ulong v0 = u0;
             ulong hi0 = Multiply64(d0, qhat, out ulong lo0);
@@ -2687,8 +2694,6 @@ public readonly partial struct UInt256
             return;
         }
 
-        qhat = EstimateQhatEst(oldU2, u1, d1, reciprocal);
-
     FullSubMul:
         ulong borrow = SubMulTo2(ref u0, ref u1, d0, d1, qhat);
         u2 = oldU2 - borrow;
@@ -2697,13 +2702,6 @@ public readonly partial struct UInt256
         {
             // Overshoot-by-1 or 2 fix (rare).
             CorrectStep(ref u0, ref u1, ref u2, d0, d1);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static ulong EstimateQhatEst(ulong u2, ulong u1, ulong dh, ulong reciprocal)
-        {
-            // Quotient digit saturates at b - 1. No correction needed (rhat would be >= b).
-            return u2 >= dh ? ulong.MaxValue : UDivRem2By1(u2, reciprocal, dh, u1, out _);
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
