@@ -2240,7 +2240,7 @@ public readonly partial struct UInt256
             ulong u10 = Unsafe.Add(ref uJ, 1);
 
             ulong qhat;
-            if (X86Base.X64.IsSupported)
+            // Both hardware and reciprocal division provide the exact remainder.
             {
                 if (u8 >= nd2)
                 {
@@ -2249,9 +2249,17 @@ public readonly partial struct UInt256
                     goto FullSubMul;
                 }
 
-                // Inline estimate: div + Knuth correction, keeping the exact identity
+                // Inline estimate: divide + Knuth correction, keeping the exact identity
                 // rhat == (u8:u9) - qhat*nd2 (each qhat-- adds nd2 back into rhat).
-                (qhat, ulong rhat) = X86Base.X64.DivRem(u9, u8, nd2);
+                ulong rhat;
+                if (X86Base.X64.IsSupported)
+                {
+                    (qhat, rhat) = X86Base.X64.DivRem(u9, u8, nd2);
+                }
+                else
+                {
+                    qhat = UDivRem2By1(u8, reciprocal, nd2, u9, out rhat);
+                }
 
                 ulong ph = Multiply64(qhat, nd1, out ulong pl);
                 while (ph > rhat || (ph == rhat && pl > u10))
@@ -2295,8 +2303,6 @@ public readonly partial struct UInt256
 
                 continue;
             }
-
-            qhat = EstimateQhat(u8, u9, u10, nd2, nd1, reciprocal);
 
         FullSubMul:
             ulong borrow = SubMulTo3(ref uJ, nd0, nd1, nd2, qhat);
@@ -2455,7 +2461,7 @@ public readonly partial struct UInt256
             ulong u10 = Unsafe.Add(ref uJ, 2);
 
             ulong qhat;
-            if (X86Base.X64.IsSupported)
+            // Both hardware and reciprocal division provide the exact remainder.
             {
                 if (u8 >= nd3)
                 {
@@ -2464,9 +2470,17 @@ public readonly partial struct UInt256
                     goto FullSubMul;
                 }
 
-                // Inline estimate: div + Knuth correction, keeping the exact identity
+                // Inline estimate: divide + Knuth correction, keeping the exact identity
                 // rhat == (u8:u9) - qhat*nd3 (each qhat-- adds nd3 back into rhat).
-                (qhat, ulong rhat) = X86Base.X64.DivRem(u9, u8, nd3);
+                ulong rhat;
+                if (X86Base.X64.IsSupported)
+                {
+                    (qhat, rhat) = X86Base.X64.DivRem(u9, u8, nd3);
+                }
+                else
+                {
+                    qhat = UDivRem2By1(u8, reciprocal, nd3, u9, out rhat);
+                }
 
                 ulong ph = Multiply64(qhat, nd2, out ulong pl);
                 while (ph > rhat || (ph == rhat && pl > u10))
@@ -2516,8 +2530,6 @@ public readonly partial struct UInt256
 
                 continue;
             }
-
-            qhat = EstimateQhat(u8, u9, u10, nd3, nd2, reciprocal);
 
         FullSubMul:
             ulong borrow = SubMulTo4(ref uJ, nd0, nd1, nd2, nd3, qhat);
