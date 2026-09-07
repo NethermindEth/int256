@@ -90,26 +90,60 @@ public class UInt256HashSeedTests
         }
     }
 
-    /// <summary>Checks that replacing the full seed breaks a seed-specific cancellation attack.</summary>
+    /// <summary>Checks that matching the seed in one limb does not erase the limb folded with it.</summary>
+    /// <remarks>
+    /// <c>low ^ high</c> of a widening product is zero whenever either factor is, so a key matching the
+    /// seed in one limb used to collapse every value of that limb's partner onto one hash, and matching
+    /// one limb of each half collapsed every key onto a single value. Reseeding does not answer it: the
+    /// guest's seed is the public payload root, so the set is constructible for the payload in hand.
+    /// <c>MultiplyFold</c> carries its factors past the product to prevent it.
+    /// </remarks>
     [TestCase(0)]
     [TestCase(1)]
     [TestCase(2)]
     [TestCase(3)]
-    public void MultiplyHash_ReseedingBreaksCollisionSet(int cancelledLimb)
+    public void MultiplyHash_MatchingTheSeedDoesNotCancelALimb(int matchedLimb)
     {
-        HashSet<int> before = new(SampleCount);
-        HashSet<int> after = new(SampleCount);
+        HashSet<int> partnerVaries = new(SampleCount);
+        HashSet<int> bothHalvesMatched = new(SampleCount);
         for (int value = 0; value < SampleCount; value++)
         {
-            UInt256 key = WithLimb(default, cancelledLimb, FirstSeed[cancelledLimb]);
-            key = WithLimb(key, cancelledLimb ^ 1, (uint)value);
-            before.Add(key.GetMultiplyHashCode(FirstSeed));
-            after.Add(key.GetMultiplyHashCode(SecondSeed));
+            UInt256 key = WithLimb(default, matchedLimb, FirstSeed[matchedLimb]);
+            partnerVaries.Add(WithLimb(key, matchedLimb ^ 1, (uint)value).GetMultiplyHashCode(FirstSeed));
+
+            // Both halves pinned to the seed, so only the partner limbs carry the key.
+            UInt256 pinned = WithLimb(WithLimb(default, matchedLimb, FirstSeed[matchedLimb]),
+                (matchedLimb + 2) % 4, FirstSeed[(matchedLimb + 2) % 4]);
+            bothHalvesMatched.Add(WithLimb(pinned, matchedLimb ^ 1, (uint)value).GetMultiplyHashCode(FirstSeed));
         }
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(before.Count, Is.EqualTo(1), "constructed collision set");
-            Assert.That(after.Count, Is.GreaterThan(SampleCount - 32), "replacement seed");
+            Assert.That(partnerVaries.Count, Is.GreaterThan(SampleCount - 32), "partner limb");
+            Assert.That(bothHalvesMatched.Count, Is.GreaterThan(SampleCount - 32), "both halves matched");
+        }
+    }
+
+    /// <summary>Checks that a half's two seed-masked words are not interchangeable.</summary>
+    /// <remarks>
+    /// The widening product is commutative, so folding a pair without position-separating constants gave
+    /// a half the same value when its two seed-masked words were exchanged - a colliding pair for every
+    /// key, once the seed is known. The pairs go through <c>MumFold</c>'s asymmetric constants instead.
+    /// </remarks>
+    [TestCase(0)]
+    [TestCase(2)]
+    public void MultiplyHash_ExchangingAHalfsWordsChangesTheHash(int lowLimb)
+    {
+        for (int value = 1; value <= SampleCount; value++)
+        {
+            ulong first = (uint)value;
+            ulong second = ~first;
+            UInt256 key = WithLimb(WithLimb(default, lowLimb, first ^ FirstSeed[lowLimb]),
+                lowLimb + 1, second ^ FirstSeed[lowLimb + 1]);
+            UInt256 exchanged = WithLimb(WithLimb(default, lowLimb, second ^ FirstSeed[lowLimb]),
+                lowLimb + 1, first ^ FirstSeed[lowLimb + 1]);
+
+            Assert.That(key.GetMultiplyHashCode(FirstSeed),
+                Is.Not.EqualTo(exchanged.GetMultiplyHashCode(FirstSeed)), $"value {value}");
         }
     }
 
@@ -119,18 +153,21 @@ public class UInt256HashSeedTests
     {
         foreach (UInt256 value in new[] { UInt256.Zero, UInt256.One, UInt256.MaxValue, Sample, FirstSeed })
         {
-            ulong a = ReferenceFold(value.u0 ^ FirstSeed.u0, value.u1 ^ FirstSeed.u1);
-            ulong b = ReferenceFold(value.u2 ^ FirstSeed.u2, value.u3 ^ FirstSeed.u3);
-            ulong hash = ReferenceFold(a ^ 0x9E3779B97F4A7C15UL, b ^ 0xBF58476D1CE4E5B9UL);
+            ulong a = ReferenceMum(value.u0 ^ FirstSeed.u0, value.u1 ^ FirstSeed.u1);
+            ulong b = ReferenceMum(value.u2 ^ FirstSeed.u2, value.u3 ^ FirstSeed.u3);
+            ulong hash = ReferenceMum(a, b);
             int expected = unchecked((int)(hash ^ (hash >> 32)));
             Assert.That(value.GetMultiplyHashCode(FirstSeed), Is.EqualTo(expected), $"input {value}");
         }
     }
 
+    private static ulong ReferenceMum(ulong a, ulong b)
+        => ReferenceFold(a ^ 0x9E3779B97F4A7C15UL, b ^ 0xBF58476D1CE4E5B9UL);
+
     private static ulong ReferenceFold(ulong a, ulong b)
     {
         BigInteger product = (BigInteger)a * b;
-        return (ulong)(product & ulong.MaxValue) ^ (ulong)(product >> 64);
+        return (ulong)(product & ulong.MaxValue) ^ (ulong)(product >> 64) ^ a ^ b;
     }
 
     private static UInt256 WithLimb(in UInt256 value, int limb, ulong replacement) => new(

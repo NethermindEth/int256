@@ -1341,9 +1341,12 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal readonly int GetMultiplyHashCode(in UInt256 seed)
     {
-        // Mix each seed limb into its key limb before any information is lost to folding.
-        ulong a = MultiplyFold(u0 ^ seed.u0, u1 ^ seed.u1);
-        ulong b = MultiplyFold(u2 ^ seed.u2, u3 ^ seed.u3);
+        // Mix each seed limb into its key limb before any information is lost to folding, and fold the
+        // pairs through MumFold rather than MultiplyFold: the product is commutative, so a bare fold
+        // gives a half the same value when its two seed-masked words are exchanged, and MumFold's
+        // asymmetric constants are what separate the two positions.
+        ulong a = (ulong)MumFold(u0 ^ seed.u0, u1 ^ seed.u1);
+        ulong b = (ulong)MumFold(u2 ^ seed.u2, u3 ^ seed.u3);
         return FoldHash(MumFold(a, b));
     }
 
@@ -1362,7 +1365,10 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     private static ulong MultiplyFold(ulong a, ulong b)
     {
         ulong high = Multiply64(a, b, out ulong low);
-        return low ^ high;
+        // Carry the factors past the product. `low ^ high` alone is zero whenever either factor is, so a
+        // key matching the seed in one limb would erase the limb multiplied with it: with a known seed -
+        // and the guest's seed is the public payload root - that hands out a colliding set for free.
+        return low ^ high ^ a ^ b;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
