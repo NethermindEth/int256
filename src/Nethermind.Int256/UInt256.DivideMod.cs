@@ -2532,7 +2532,7 @@ public readonly partial struct UInt256
                 ref ulong x2 = ref Unsafe.Add(ref uJ, 2);
                 ulong v2 = x2;
                 ulong hi2, lo2;
-                if (X86Base.X64.IsSupported || ArmBase.Arm64.IsSupported)
+                if (Bmi2.X64.IsSupported || ArmBase.Arm64.IsSupported)
                 {
                     hi2 = Multiply64(nd2, qhat, out lo2);
                 }
