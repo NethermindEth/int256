@@ -353,13 +353,22 @@ public readonly partial struct UInt256
         if (y.IsOne) { Mod(in x, in m, out res); return; }
         if (x.IsOne) { Mod(in y, in m, out res); return; }
 
-        MultiplyModWide(in x, in y, in m, out res);
+        // ARM's register allocation favors keeping the wide body in this frame.
+        if (ArmBase.Arm64.IsSupported)
+            MultiplyModWideCore(in x, in y, in m, out res);
+        else
+            MultiplyModWide(in x, in y, in m, out res);
     }
 
     // Keep the product/reduction frame off the zero, one, and narrow-modulus paths.
     [SkipLocalsInit]
     [MethodImpl(MulModWideInlining)]
     private static void MultiplyModWide(in UInt256 x, in UInt256 y, in UInt256 m, out UInt256 res)
+        => MultiplyModWideCore(in x, in y, in m, out res);
+
+    [SkipLocalsInit]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void MultiplyModWideCore(in UInt256 x, in UInt256 y, in UInt256 m, out UInt256 res)
     {
         Multiply256To512Bit(in x, in y, out UInt256 lo, out UInt256 hi);
 
