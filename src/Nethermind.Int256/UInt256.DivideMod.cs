@@ -2132,6 +2132,8 @@ public readonly partial struct UInt256
             unBuf.w0 = u0; unBuf.w1 = u1; unBuf.w2 = u2; unBuf.w3 = u3;
             unBuf.w4 = u4; unBuf.w5 = u5; unBuf.w6 = u6; unBuf.w7 = u7;
             unBuf.w8 = 0;
+            // Skip the provably zero leading quotient digit, as in the 256-bit reducer.
+            if (Unsafe.Add(ref unBuf.w0, uLen - 1) < d1) uLen--;
 
             nd0 = d0;
             nd1 = d1;
@@ -2203,6 +2205,8 @@ public readonly partial struct UInt256
             unBuf.w0 = lo.u0; unBuf.w1 = lo.u1; unBuf.w2 = lo.u2; unBuf.w3 = lo.u3;
             unBuf.w4 = u4; unBuf.w5 = u5; unBuf.w6 = u6; unBuf.w7 = u7;
             unBuf.w8 = 0;
+            // Skip the provably zero leading quotient digit, as in the 256-bit reducer.
+            if (Unsafe.Add(ref unBuf.w0, uLen - 1) < d2) uLen--;
             nd0 = d0; nd1 = d1; nd2 = d2;
         }
         else
