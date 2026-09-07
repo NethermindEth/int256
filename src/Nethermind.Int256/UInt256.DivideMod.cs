@@ -3054,7 +3054,7 @@ public readonly partial struct UInt256
     }
 
     [SkipLocalsInit]
-    [MethodImpl(MethodImplOptions.NoInlining)]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void Multiply256To512BitLarge(in UInt256 x, in UInt256 y, out UInt256 low, out UInt256 high)
     {
         // Copy inputs up front - this breaks aliasing with out params so we can store early.
