@@ -406,7 +406,7 @@ public class ModKernelTests
 
         // A power of two takes the masking path, one less takes a kernel with every low bit set, and
         // the random draw keeps the sweep from only ever seeing those two shapes.
-        for (int i = 0; i < 64; i += 3)
+        for (int i = 0; i < 64; i++)
         {
             Check(1UL << i);
             Check((1UL << i) - 1);

@@ -1789,9 +1789,8 @@ public readonly partial struct UInt256
         if ((mod & (mod - 1)) == 0)
         {
             ulong mask = mod - 1;
-            ulong a = x.u0 & mask;
-            ulong b = y.u0 & mask;
-            ulong prodLo = unchecked(a * b);
+            // Only the low k product bits contribute modulo 2^k.
+            ulong prodLo = unchecked(x.u0 * y.u0);
             res = new UInt256(prodLo & mask, 0, 0, 0);
             return;
         }

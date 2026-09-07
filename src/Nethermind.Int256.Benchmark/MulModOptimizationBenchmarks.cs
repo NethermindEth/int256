@@ -13,7 +13,7 @@ public class MulModOptimizationBenchmarks
     private readonly UInt256[] _right = new UInt256[Count];
     private readonly UInt256[] _moduli = new UInt256[Count];
 
-    [Params("full", "shift", "192", "192shift", "128", "128shift", "64", "max", "narrow")]
+    [Params("full", "shift", "192", "192shift", "128", "128shift", "64", "max", "narrow", "pow64")]
     public string Shape { get; set; } = "full";
 
     [GlobalSetup]
@@ -34,6 +34,7 @@ public class MulModOptimizationBenchmarks
                 "128" => new(Next(), Next() | (1UL << 63), 0, 0),
                 "128shift" => new(Next(), (Next() >> 32) | 1, 0, 0),
                 "64" => new(Next() | 1),
+                "pow64" => new(1UL << (i % 63 + 1)),
                 "max" => UInt256.MaxValue,
                 _ => new(Next(), Next(), Next(), Next() | 1),
             };
