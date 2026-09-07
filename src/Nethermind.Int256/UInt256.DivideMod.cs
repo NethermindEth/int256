@@ -2408,6 +2408,9 @@ public readonly partial struct UInt256
             unBuf.w4 = u4; unBuf.w5 = u5; unBuf.w6 = u6; unBuf.w7 = u7;
             unBuf.w8 = 0;
 
+            // The extra top limb is zero. If the next limb is below d3, the
+            // leading quotient digit is zero and its entire iteration is redundant.
+            if (Unsafe.Add(ref unBuf.w0, uLen - 1) < d3) uLen--;
             nd0 = d0; nd1 = d1; nd2 = d2; nd3 = d3;
         }
         else
