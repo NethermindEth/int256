@@ -2273,7 +2273,8 @@ public readonly partial struct UInt256
 
                 ref ulong x1 = ref Unsafe.Add(ref uJ, 1);
                 ulong v1 = x1;
-                ulong hi1 = Multiply64(nd1, qhat, out ulong lo1);
+                // Knuth correction maintained ph:pl == qhat * nd1.
+                ulong hi1 = ph, lo1 = pl;
                 ulong t1 = v1 - borrow1;
                 x1 = t1 - lo1;
                 borrow1 = hi1 + (borrow1 > v1 ? 1UL : 0UL) + (lo1 > t1 ? 1UL : 0UL);

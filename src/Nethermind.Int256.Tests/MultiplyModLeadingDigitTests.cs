@@ -41,6 +41,31 @@ public class MultiplyModLeadingDigitTests
         }
     }
 
+    [TestCase(192)]
+    [TestCase(256)]
+    public void Constructed_quotients_and_remainders_match_BigInteger(int bits)
+    {
+        Reduce reduce = typeof(UInt256).GetMethod($"Remainder512By{bits}Bits",
+            BindingFlags.NonPublic | BindingFlags.Static)!.CreateDelegate<Reduce>();
+        Random random = new(0x5A17);
+        byte[] bytes = new byte[64];
+        BigInteger mask = (BigInteger.One << 256) - 1;
+        for (int i = 0; i < 4096; i++)
+        {
+            int shift = i % 64;
+            random.NextBytes(bytes);
+            BigInteger d = new BigInteger(bytes, isUnsigned: true) & ((BigInteger.One << (bits - shift)) - 1);
+            d |= BigInteger.One << (bits - shift - 1);
+            random.NextBytes(bytes);
+            BigInteger q = new BigInteger(bytes, isUnsigned: true) & ((BigInteger.One << (512 - bits)) - 1);
+            q |= BigInteger.One << (511 - bits);
+            BigInteger r = i % 3 == 0 ? BigInteger.Zero : i % 3 == 1 ? d - 1 : d / 2;
+            BigInteger dividend = q * d + r;
+            UInt256 lo = FromBig(dividend & mask), hi = FromBig(dividend >> 256), divisor = FromBig(d);
+            reduce(in lo, in hi, in divisor, out UInt256 result);
+            Assert.That(ToBig(result), Is.EqualTo(dividend % d), $"bits={bits}, case={i}");
+        }
+    }
     private static BigInteger ToBig(UInt256 v) => v.u0 | ((BigInteger)v.u1 << 64) | ((BigInteger)v.u2 << 128) | ((BigInteger)v.u3 << 192);
     private static UInt256 FromBig(BigInteger v) => new((ulong)(v & ulong.MaxValue), (ulong)((v >> 64) & ulong.MaxValue),
         (ulong)((v >> 128) & ulong.MaxValue), (ulong)((v >> 192) & ulong.MaxValue));
