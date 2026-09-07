@@ -16,6 +16,9 @@ namespace Nethermind.Int256;
 
 public readonly partial struct UInt256
 {
+    // Keep wide multiplication spills off trivial host paths.
+    private const MethodImplOptions MulModWideInlining = MethodImplOptions.NoInlining;
+
     // Expose the 128-bit reduction loop to its caller in the host JIT.
     private const MethodImplOptions MulMod128Inlining = MethodImplOptions.AggressiveInlining;
 

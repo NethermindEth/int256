@@ -353,6 +353,14 @@ public readonly partial struct UInt256
         if (y.IsOne) { Mod(in x, in m, out res); return; }
         if (x.IsOne) { Mod(in y, in m, out res); return; }
 
+        MultiplyModWide(in x, in y, in m, out res);
+    }
+
+    // Keep the product/reduction frame off the zero, one, and narrow-modulus paths.
+    [SkipLocalsInit]
+    [MethodImpl(MulModWideInlining)]
+    private static void MultiplyModWide(in UInt256 x, in UInt256 y, in UInt256 m, out UInt256 res)
+    {
         Multiply256To512Bit(in x, in y, out UInt256 lo, out UInt256 hi);
 
         // Scalar test: an IsZero vector load here would span the four scalar
