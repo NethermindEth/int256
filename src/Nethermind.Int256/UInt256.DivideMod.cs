@@ -2132,8 +2132,7 @@ public readonly partial struct UInt256
             unBuf.w0 = u0; unBuf.w1 = u1; unBuf.w2 = u2; unBuf.w3 = u3;
             unBuf.w4 = u4; unBuf.w5 = u5; unBuf.w6 = u6; unBuf.w7 = u7;
             unBuf.w8 = 0;
-            // Skip the provably zero leading quotient digit, as in the 256-bit reducer.
-            if (Unsafe.Add(ref unBuf.w0, uLen - 1) < d1) uLen--;
+            if (X86Base.X64.IsSupported && Unsafe.Add(ref unBuf.w0, uLen - 1) < d1) uLen--;
 
             nd0 = d0;
             nd1 = d1;
@@ -2160,6 +2159,8 @@ public readonly partial struct UInt256
 
         // dLen is fixed at 2 here.
         int m = uLen - 2;
+        // Keeping uLen unchanged through normalization avoids spills in the reciprocal path.
+        if (!X86Base.X64.IsSupported && sh == 0 && Unsafe.Add(ref un0, uLen - 1) < nd1) m--;
         ulong reciprocal = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(nd1);
         for (int j = m; j >= 0; j--)
         {
