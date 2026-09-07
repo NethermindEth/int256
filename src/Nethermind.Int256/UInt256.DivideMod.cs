@@ -2284,7 +2284,7 @@ public readonly partial struct UInt256
                 ulong borrow1 = hi0 + (lo0 > v0 ? 1UL : 0UL);
 
                 ref ulong x1 = ref Unsafe.Add(ref uJ, 1);
-                ulong v1 = x1;
+                ulong v1 = u10;
                 // Knuth correction maintained ph:pl == qhat * nd1.
                 ulong hi1 = ph, lo1 = pl;
                 ulong t1 = v1 - borrow1;
