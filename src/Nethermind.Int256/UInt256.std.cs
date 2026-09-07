@@ -16,6 +16,9 @@ namespace Nethermind.Int256;
 
 public readonly partial struct UInt256
 {
+    // Expose the 128-bit reduction loop to its caller in the host JIT.
+    private const MethodImplOptions MulMod128Inlining = MethodImplOptions.AggressiveInlining;
+
     // Vary the seed between processes to keep hash distribution independent across nodes and restarts.
     private static readonly ulong _aesHashSeed0 = CreateHashSeed();
     private static readonly ulong _aesHashSeed1 = CreateHashSeed();

@@ -2103,6 +2103,7 @@ public readonly partial struct UInt256
 
 
     [SkipLocalsInit]
+    [MethodImpl(MulMod128Inlining)]
     private static void Remainder512By128Bits(in UInt256 lo, in UInt256 hi, in UInt256 d, out UInt256 rem)
     {
         Debug.Assert((d.u2 | d.u3) == 0);
