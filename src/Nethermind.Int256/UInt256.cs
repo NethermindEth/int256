@@ -846,6 +846,12 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         r2 = AddAndCountCarry(r2, l02, ref carry);
         ulong h11 = Multiply64(x1, y1, out ulong l11);
         r2 = AddAndCountCarry(r2, l11, ref carry);
+        // A shared upper bit proves the column-three product spills beyond 256 bits.
+        if (((x1 & y2) >> 32) != 0)
+        {
+            Store4(out res, r0, r1, r2, carry + h02 + h11 + x1 * y2);
+            return true;
+        }
         ulong r3 = carry;
         carry = 0;
         r3 = AddAndCountCarry(r3, h02, ref carry);

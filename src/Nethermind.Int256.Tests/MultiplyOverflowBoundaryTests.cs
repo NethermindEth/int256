@@ -12,7 +12,7 @@ public class MultiplyOverflowBoundaryTests
     public void Products_near_width_and_overflow_boundaries_preserve_aliases()
     {
         BigInteger mask = (BigInteger.One << 256) - 1;
-        int[] bits = [0, 1, 31, 32, 63, 64, 65, 95, 127, 128, 129, 191, 192, 193, 255];
+        int[] bits = [0, 1, 31, 32, 63, 64, 65, 95, 96, 127, 128, 129, 159, 160, 161, 191, 192, 193, 255];
         foreach (int bit in bits)
         foreach (int offset in new[] { -1, 0, 1 })
         {
