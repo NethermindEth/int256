@@ -837,7 +837,11 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     [SkipLocalsInit]
     public static void Exp(in UInt256 b, in UInt256 e, out UInt256 result)
     {
-        int bitLen = e.BitLen;
+        // Keep this scan local: FullOpts otherwise leaves a BitLen call on every short path.
+        int bitLen = e.u3 != 0 ? 256 - BitOperations.LeadingZeroCount(e.u3)
+            : e.u2 != 0 ? 192 - BitOperations.LeadingZeroCount(e.u2)
+            : e.u1 != 0 ? 128 - BitOperations.LeadingZeroCount(e.u1)
+            : 64 - BitOperations.LeadingZeroCount(e.u0);
         if (bitLen <= 1)
         {
             result = bitLen == 0 ? One : b;
