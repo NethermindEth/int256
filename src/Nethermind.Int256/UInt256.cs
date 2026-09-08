@@ -919,11 +919,13 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         {
             // The shorter 32-bit prefix and truncated polynomial amortize earlier.
             // Structured bases retain their lower precision-dependent cutoffs.
+            // Earlier exits leave an odd low limb other than +/-1 here.
+            int precision = BitOperations.TrailingZeroCount(b.u0 - 1 + (b.u0 & 2));
+            const int ExpMinStructuredPrecision = 16;
             if (bitLen >= ExpBinomialMinBits
-                || (((b.u0 + 1) & 0xFFFDUL) == 0
-                && bitLen >= 128 - 2 * BitOperations.TrailingZeroCount(b.u0 - 1 + (b.u0 & 2))))
+                || (precision >= ExpMinStructuredPrecision && bitLen >= 128 - 2 * precision))
             {
-                ExpOddLong(b, e, out result);
+                ExpOddLong(b, e, precision, out result);
                 return;
             }
             // Remaining exponents have at most 79 bits, so the density cutoff is 32.

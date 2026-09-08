@@ -17,10 +17,10 @@ namespace Nethermind.Int256;
 
 public readonly partial struct UInt256
 {
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void ExpOddLong(in UInt256 b, in UInt256 e, out UInt256 result)
+    // Keep the binomial helpers and their spills out of the short-exponent frame.
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void ExpOddLong(in UInt256 b, in UInt256 e, int precision, out UInt256 result)
     {
-        int precision = BitOperations.TrailingZeroCount(b.u0 - 1 + (b.u0 & 2));
         if (precision >= ExpFourTermPrecision)
             ExpOddLongPhased(b, e, 64 - precision, out result);
         else if (precision >= 32)

@@ -106,6 +106,8 @@ public class UInt256ExpTests
         {
             BigInteger b = 1 + (BigInteger.One << valuation) + (11 * (BigInteger.One << 64))
                 + (13 * (BigInteger.One << 128)) + (17 * (BigInteger.One << 192));
+            // Mirrors Exp's bitLen > 32 gate and structured cutoff 128 - 2 * precision;
+            // ExpBinomialMinBits (80 in both variants) can select the path earlier.
             int cutoff = Math.Max(33, 128 - 2 * valuation);
             for (int bits = cutoff - 1; bits <= cutoff + 1; ++bits)
                 foreach (BigInteger e in new[] { (BigInteger.One << bits) - 1, (BigInteger.One << (bits - 1)) + 1 })
@@ -182,6 +184,7 @@ public class UInt256ExpTests
                         BigInteger b = 1 + (BigInteger.One << valuation)
                             + (BigInteger.One << 255) + (BigInteger.One << 128);
                         if (sign < 0) b = modulus - b;
+                        // Mirrors ExpOddLong's 32-bit prefix target (ExpOddLong32).
                         int prefix = Math.Max(1, 32 - valuation);
                         BigInteger high = (BigInteger.One << boundary) + offset;
                         BigInteger e = (high << prefix) | ((BigInteger.One << prefix) - 1);
@@ -289,6 +292,8 @@ public class UInt256ExpTests
         {
             UInt256 b = new(1 + (1UL << valuation), ulong.MaxValue, 13, 17);
             UInt256 negative = (UInt256)(modulus - (BigInteger)b);
+            // Mirrors ExpOddLongPhased/ExpOddLongNear32's 64-bit prefix target;
+            // ExpFourTermPrecision selects when each variant uses this prefix.
             int cutoff = 64 - valuation;
             foreach (int top in new[] { 127, 128, 129, 191, 192, 254, 255 })
                 foreach (int delta in new[] { -1, 0, 1 })
