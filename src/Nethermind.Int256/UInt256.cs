@@ -695,6 +695,15 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
             Vector256<ulong> yv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in y));
             r3 = Vector256.Sum(Avx512DQ.VL.MultiplyLow(xv, Avx2.Permute4x64(yv, 0x1B)));
         }
+        else if (Avx2.IsSupported)
+        {
+            Vector256<ulong> xv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in x));
+            Vector256<ulong> yv = Avx2.Permute4x64(Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in y)), 0x1B);
+            Vector256<ulong> cross = Avx2.Add(
+                Avx2.Multiply(xv.AsUInt32(), Avx2.ShiftRightLogical(yv, 32).AsUInt32()),
+                Avx2.Multiply(Avx2.ShiftRightLogical(xv, 32).AsUInt32(), yv.AsUInt32()));
+            r3 = Vector256.Sum(Avx2.Add(Avx2.Multiply(xv.AsUInt32(), yv.AsUInt32()), Avx2.ShiftLeftLogical(cross, 32)));
+        }
         else r3 = x0 * y.u3 + x1 * y2 + x2 * y1 + x.u3 * y0;
 
         ulong h00 = Multiply64(x0, y0, out ulong r0);
