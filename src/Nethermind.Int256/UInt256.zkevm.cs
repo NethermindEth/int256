@@ -21,6 +21,13 @@ public readonly partial struct UInt256
         // Exactly one of b-1 and b+1 has valuation one. Select the other
         // without a branch, so only one trailing-zero count is needed.
         int squares = 64 - BitOperations.TrailingZeroCount(b.u0 - 1 + (b.u0 & 2));
+        // GPU proofs favor truncation when all prefix squares reach 32-bit precision.
+        // Ordinary long prefixes retain their established guest schedule.
+        if (squares <= 32)
+        {
+            ExpOddLongNear32(b, e, squares, out result);
+            return;
+        }
         UInt256 power = b;
         UInt256 value = (e.u0 & 1) != 0 ? b : One;
         ulong bits = e.u0 >> 1;

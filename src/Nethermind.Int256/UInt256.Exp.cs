@@ -64,6 +64,39 @@ public readonly partial struct UInt256
             MultiplyExpNearOne(value, power, out result);
     }
 
+    [SkipLocalsInit]
+    private static void ExpOddLongNear32(in UInt256 b, in UInt256 e, int squares, out UInt256 result)
+    {
+        // Guest-only path: the prefix reaches 32-bit precision immediately.
+        UInt256 power = b;
+        UInt256 value = (e.u0 & 1) != 0 ? b : One;
+        ulong bits = e.u0 >> 1;
+        for (int i = 1; i < squares; ++i)
+        {
+            SquareExpPrefix(power, out power);
+            if ((bits & 1) != 0)
+            {
+                MultiplyExpPrefix(value, power, out value);
+            }
+            bits >>= 1;
+        }
+        SquareExpPrefix(power, out power);
+        int left = 64 - squares;
+        UInt256 high = new((e.u0 >> squares) | (e.u1 << left),
+            (e.u1 >> squares) | (e.u2 << left), (e.u2 >> squares) | (e.u3 << left), e.u3 >> squares);
+        ExpNearOne64(power, high, out power);
+        MultiplyExpNearOne(value, power, out result);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void MultiplyExpPrefix(in UInt256 value, in UInt256 power, out UInt256 result)
+    {
+        if ((uint)power.u0 == 1)
+            MultiplyExpLowOne32(value, power, out result);
+        else
+            MultiplyExpPower(value, power, out result);
+    }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void MultiplyExpLowOne32(in UInt256 x, in UInt256 y, out UInt256 res)
     {
