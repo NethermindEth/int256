@@ -9,6 +9,20 @@ namespace Nethermind.Int256;
 
 public readonly partial struct UInt256
 {
+    private static void ExpNearOne(in UInt256 b, in UInt256 e, out UInt256 result)
+    {
+        // b = +/- (1 + x*2^128). Every term after the linear term in the
+        // binomial expansion vanishes modulo 2^256, so only e's low 128 bits
+        // matter: b^e = (+/-1)^e * (1 + e*x*2^128).
+        ulong sign = b.u0 == 1 ? 0 : ulong.MaxValue;
+        ulong x0 = b.u2 ^ sign;
+        ulong x1 = b.u3 ^ sign;
+        ulong high = Multiply64(e.u0, x0, out ulong low);
+        high += e.u0 * x1 + e.u1 * x0;
+        sign &= 0UL - (e.u0 & 1);
+        result = new UInt256(1 | sign, sign, low ^ sign, high ^ sign);
+    }
+
     [SkipLocalsInit]
     private static void ExpWindow(in UInt256 b, in UInt256 e, int bitLen, out UInt256 result)
     {
@@ -18,11 +32,6 @@ public readonly partial struct UInt256
         Span<UInt256> powers = stackalloc UInt256[16];
         powers[0] = b;
         b.Squared(out UInt256 square);
-        if (square.IsOne)
-        {
-            result = (e.u0 & 1) == 0 ? One : b;
-            return;
-        }
         for (int j = 1; j < (1 << (width - 1)); ++j)
             Multiply(powers[j - 1], square, out powers[j]);
 

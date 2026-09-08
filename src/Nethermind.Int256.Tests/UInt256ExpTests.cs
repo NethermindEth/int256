@@ -61,6 +61,22 @@ public class UInt256ExpTests
     }
 
     [Test]
+    public void BinomialReductionMatchesBigInteger()
+    {
+        Random random = new(42);
+        byte[] bytes = new byte[32];
+        for (int i = 0; i < 1000; ++i)
+        {
+            random.NextBytes(bytes);
+            UInt256 high = new(bytes);
+            random.NextBytes(bytes);
+            UInt256 e = new(bytes);
+            Check(new UInt256(1, 0, high.u2, high.u3), e);
+            Check(new UInt256(ulong.MaxValue, ulong.MaxValue, high.u2, high.u3), e);
+        }
+    }
+
+    [Test]
     public void WideExponentsMatchBigInteger()
     {
         Random random = new(20260908);

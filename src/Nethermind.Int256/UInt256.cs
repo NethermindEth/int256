@@ -876,6 +876,12 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
             }
         }
 
+        else if ((b.u0 == 1 && b.u1 == 0) || (b.u0 & b.u1) == ulong.MaxValue)
+        {
+            ExpNearOne(b, e, out result);
+            return;
+        }
+
         // Precomputation pays for itself for long, sufficiently dense exponents.
         // Keep binary exponentiation for short or sparse inputs.
         if (bitLen > 32 && BitOperations.PopCount(e.u0) + BitOperations.PopCount(e.u1)
