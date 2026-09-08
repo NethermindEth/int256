@@ -927,8 +927,8 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
                 ExpOddLong(b, e, out result);
                 return;
             }
-            if (BitOperations.PopCount(e.u0) + BitOperations.PopCount(e.u1)
-                + BitOperations.PopCount(e.u2) + BitOperations.PopCount(e.u3) > Math.Max(32, bitLen >> 2))
+            // The long path above returned whenever either upper exponent limb was nonzero.
+            if (BitOperations.PopCount(e.u0) + BitOperations.PopCount(e.u1) > Math.Max(32, bitLen >> 2))
             {
                 ExpWindow(b, e, bitLen, out result);
                 return;
