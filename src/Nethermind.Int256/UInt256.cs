@@ -866,6 +866,11 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         // that reaches 256 the entire result is discarded, regardless of ISA.
         if ((b.u0 & 1) == 0)
         {
+            if (b.u0 == 0)
+            {
+                ExpLimbAligned(b, e, bitLen, out result);
+                return;
+            }
             int shift = BitOperations.TrailingZeroCount(b.u0);
             if (bitLen > 8 || (uint)shift * (uint)e.u0 >= 256)
             {

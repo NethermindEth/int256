@@ -44,6 +44,21 @@ public class UInt256ExpTests
     }
 
     [Test]
+    public void LimbAlignedPowersMatchBigInteger()
+    {
+        Random random = new(64);
+        byte[] bytes = new byte[32];
+        for (int i = 0; i < 512; ++i)
+        {
+            random.NextBytes(bytes);
+            UInt256 x = new(bytes);
+            UInt256 b = new(0, i % 8 == 0 ? 0 : x.u1, x.u2, x.u3);
+            for (ulong e = 0; e <= 5; ++e) Check(b, new UInt256(e));
+            Check(b, UInt256.MaxValue);
+        }
+    }
+
+    [Test]
     public void WindowsCrossLimbAndDensityBoundaries()
     {
         UInt256 b = new(3, 5, 7, 11);

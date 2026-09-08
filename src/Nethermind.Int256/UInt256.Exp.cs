@@ -11,6 +11,24 @@ namespace Nethermind.Int256;
 
 public readonly partial struct UInt256
 {
+    private static void ExpLimbAligned(in UInt256 b, in UInt256 e, int bitLen, out UInt256 result)
+    {
+        // b = x*2^64 and e >= 2. Only e=2 or e=3 can survive modulo 2^256.
+        if (bitLen > 2 || b.u1 == 0)
+        {
+            result = default;
+        }
+        else if (e.u0 == 2)
+        {
+            ulong high = Square64(b.u1, out ulong low);
+            result = new UInt256(0, 0, low, high + ((b.u1 * b.u2) << 1));
+        }
+        else
+        {
+            result = new UInt256(0, 0, 0, b.u1 * b.u1 * b.u1);
+        }
+    }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static ulong Square64(ulong x, out ulong low)
     {
