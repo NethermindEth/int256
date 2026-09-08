@@ -896,17 +896,20 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
 
         // Seed with b so we do not need to "include" the always-set top bit via a multiply.
         UInt256 val = b;
-        for (int i = bitLen - 2; i >= 0; --i)
+        int top = bitLen - 2;
+        for (int limb = top >> 6; limb >= 0; --limb)
         {
-            // val = val * val
-            val.Squared(out val);
-
-            // i is known to be in [0, 255]; the public Bit method also handles
-            // out-of-range indices and signed remainder semantics.
-            if ((Unsafe.Add(ref Unsafe.AsRef(in e.u0), i >> 6) & (1UL << i)) != 0)
+            // Cache each limb and advance its next exponent bit into the sign
+            // bit, avoiding an indexed load and variable bit mask per square.
+            int count = (top & 63) + 1;
+            ulong bits = Unsafe.Add(ref Unsafe.AsRef(in e.u0), limb) << (64 - count);
+            do
             {
-                Multiply(in val, in b, out val);
-            }
+                val.Squared(out val);
+                if ((long)bits < 0) Multiply(val, b, out val);
+                bits <<= 1;
+            } while (--count > 0);
+            top = 63;
         }
 
         result = val;
