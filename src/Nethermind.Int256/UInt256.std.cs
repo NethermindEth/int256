@@ -16,7 +16,12 @@ namespace Nethermind.Int256;
 
 public readonly partial struct UInt256
 {
-    private const int ExpWindowMaxWidth = 4;
+    // Native ARM amortizes sixteen entries; software products and x64 favor eight.
+    private static int ExpWindowMaxWidth
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => Arm.ArmBase.Arm64.IsSupported ? 5 : 4;
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void MultiplyExpPower(in UInt256 value, in UInt256 power, out UInt256 result)
