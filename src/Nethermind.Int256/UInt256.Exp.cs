@@ -11,6 +11,44 @@ namespace Nethermind.Int256;
 
 public readonly partial struct UInt256
 {
+    private static void ExpNearOne64(in UInt256 b, in UInt256 e, out UInt256 result)
+    {
+        // b = +/- (1+x*2^64). Only four binomial terms survive modulo 2^256.
+        ulong sign = b.u0 == 1 ? 0 : ulong.MaxValue;
+        ulong x0 = b.u1 ^ sign, x1 = b.u2 ^ sign, x2 = b.u3 ^ sign;
+        ulong e0 = e.u0, e1 = e.u1, e2 = e.u2;
+
+        // e*x modulo 2^192, shifted up one limb in the result.
+        ulong h00 = Multiply64(e0, x0, out ulong r1);
+        ulong h01 = Multiply64(e0, x1, out ulong l01);
+        ulong h10 = Multiply64(e1, x0, out ulong l10);
+        ulong carry = 0;
+        ulong r2 = AddAndCountCarry(h00, l01, ref carry);
+        r2 = AddAndCountCarry(r2, l10, ref carry);
+        ulong r3 = h01 + h10 + carry + e0 * x2 + e1 * x1 + e2 * x0;
+
+        // C(e,2) modulo 2^128. Divide the even factor before multiplying;
+        // its shifted high limb includes bit 128 of e.
+        ulong a0 = (e0 >> 1) | (e1 << 63);
+        ulong a1 = (e1 >> 1) | (e2 << 63);
+        ulong c0 = e0 - ((~e0) & 1);
+        ulong c1 = e1 - (e0 == 0 ? 1UL : 0UL);
+        ulong coefficientHigh = Multiply64(a0, c0, out ulong coefficientLow) + a0 * c1 + a1 * c0;
+        ulong squareHigh = Square64(x0, out ulong squareLow) + ((x0 * x1) << 1);
+        ulong quadraticHigh = Multiply64(coefficientLow, squareLow, out ulong quadraticLow)
+            + coefficientLow * squareHigh + coefficientHigh * squareLow;
+        carry = 0;
+        r2 = AddAndCountCarry(r2, quadraticLow, ref carry);
+        r3 += quadraticHigh + carry;
+
+        // C(e,3) modulo 2^64: after exact division by two, divide by three
+        // using its inverse modulo 2^64. Terms beyond x^3 are discarded.
+        ulong cubic = a0 * c0 * (e0 - 2) * 0xAAAAAAAAAAAAAAABUL;
+        r3 += cubic * squareLow * x0;
+        sign &= 0UL - (e0 & 1);
+        result = new UInt256(1 | sign, r1 ^ sign, r2 ^ sign, r3 ^ sign);
+    }
+
     private static void ExpLimbAligned(in UInt256 b, in UInt256 e, int bitLen, out UInt256 result)
     {
         // b = x*2^64 and e >= 2. Only e=2 or e=3 can survive modulo 2^256.

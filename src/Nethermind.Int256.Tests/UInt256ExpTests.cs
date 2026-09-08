@@ -119,6 +119,31 @@ public class UInt256ExpTests
     }
 
     [Test]
+    public void FourTermBinomialReductionMatchesBigInteger()
+    {
+        Random random = new(65);
+        byte[] bytes = new byte[32];
+        for (int i = 0; i < 512; ++i)
+        {
+            random.NextBytes(bytes);
+            UInt256 x = new(bytes);
+            random.NextBytes(bytes);
+            UInt256 e = new(bytes);
+            Check(new UInt256(1, x.u1, x.u2, x.u3), e);
+            Check(new UInt256(ulong.MaxValue, x.u1, x.u2, x.u3), e);
+        }
+        for (int bit = 1; bit < 256; ++bit)
+            for (int delta = -1; delta <= 1; ++delta)
+            {
+                UInt256 e = (UInt256)((BigInteger.One << bit) + delta);
+                Check(new UInt256(1, 11, 13, 17), e);
+                Check(new UInt256(ulong.MaxValue, 11, 13, 17), e);
+            }
+        for (ulong e = 0; e < 32; ++e)
+            Check(new UInt256(1, 11, 13, 17), new UInt256(e));
+    }
+
+    [Test]
     public void WideExponentsMatchBigInteger()
     {
         Random random = new(20260908);
