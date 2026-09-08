@@ -173,4 +173,25 @@ public class UInt256ExpTests
             Check(UInt256.MaxValue, e);
         }
     }
+
+    [Test]
+    public void LongOddPowersMatchAtEveryBinomialCutoff()
+    {
+        BigInteger modulus = BigInteger.One << 256;
+        for (int valuation = 2; valuation <= 63; ++valuation)
+        {
+            UInt256 b = new(1 + (1UL << valuation), ulong.MaxValue, 13, 17);
+            UInt256 negative = (UInt256)(modulus - (BigInteger)b);
+            int cutoff = 64 - valuation;
+            foreach (int top in new[] { 127, 128, 129, 191, 192, 254, 255 })
+                foreach (int delta in new[] { -1, 0, 1 })
+                {
+                    UInt256 e = (UInt256)((BigInteger.One << top) + (BigInteger.One << cutoff) + delta);
+                    Check(b, e);
+                    Check(negative, e);
+                }
+            Check(b, UInt256.MaxValue);
+            Check(negative, UInt256.MaxValue);
+        }
+    }
 }
