@@ -851,6 +851,11 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
                 result = One;
                 return;
             }
+            if (b.u0 == 10 && bitLen <= 7 && e.u0 < 78)
+            {
+                result = MemoryMarshal.Cast<ulong, UInt256>(PowersOfTen)[(int)e.u0];
+                return;
+            }
         }
 
         // An even base has at least e trailing zero bits in b^e. Once
