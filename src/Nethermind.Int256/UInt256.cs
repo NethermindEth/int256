@@ -776,7 +776,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         ref ulong pr = ref Unsafe.As<UInt256, ulong>(ref result);
 
         // Column 0
-        ulong a0 = Multiply64(x0, x0, out pr);
+        ulong a0 = Square64(x0, out pr);
 
         // Column 1: 2*x0*x1
         ulong a1 = 0;
@@ -791,7 +791,10 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         a1 = a2;
         a2 = 0;
         MultiplyAddCarryDouble(ref a0, ref a1, ref a2, x0, x2);
-        MultiplyAddCarry(ref a0, ref a1, ref a2, x1, x1);
+        ulong high = Square64(x1, out ulong low);
+        ulong carry = 0;
+        a0 = AddAndCountCarry(a0, low, ref carry);
+        a1 += high + carry;
         Unsafe.Add(ref pr, 2) = a0;
 
         // For r3 we only need the low 64 of the incoming carry, which is a1 here.

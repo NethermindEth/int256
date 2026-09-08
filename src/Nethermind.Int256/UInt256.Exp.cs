@@ -2,13 +2,30 @@
 // SPDX-License-Identifier: MIT
 
 using System;
-using System.Runtime.CompilerServices;
 using System.Numerics;
+using System.Runtime.CompilerServices;
+using System.Runtime.Intrinsics.Arm;
+using System.Runtime.Intrinsics.X86;
 
 namespace Nethermind.Int256;
 
 public readonly partial struct UInt256
 {
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static ulong Square64(ulong x, out ulong low)
+    {
+        if (Bmi2.X64.IsSupported || ArmBase.Arm64.IsSupported)
+            return Multiply64(x, x, out low);
+        // Squaring needs only one 32x32 cross product; a generic multiply
+        // computes it twice. Preserve the carry from the low 64-bit sum.
+        ulong lo = (uint)x;
+        ulong hi = x >> 32;
+        ulong diagonal = lo * lo;
+        ulong cross = lo * hi;
+        low = diagonal + (cross << 33);
+        return hi * hi + (cross >> 31) + (low < diagonal ? 1UL : 0UL);
+    }
+
     private static void ExpNearOne(in UInt256 b, in UInt256 e, out UInt256 result)
     {
         // b = +/- (1 + x*2^128). Every term after the linear term in the

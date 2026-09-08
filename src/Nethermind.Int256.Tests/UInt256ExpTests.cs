@@ -61,6 +61,16 @@ public class UInt256ExpTests
     }
 
     [Test]
+    public void SquarePartialProductsAndCarries()
+    {
+        ulong[] values = { 0, 1, 2, 0x7fffffff, 0x80000000, 0xffffffff, 0x100000000,
+            0x100000001, 0x7fffffffffffffff, 0x8000000000000000, ulong.MaxValue - 1, ulong.MaxValue };
+        foreach (ulong x in values)
+            foreach (ulong y in values)
+                Check(new UInt256(x, y, x, y), new UInt256(2));
+    }
+
+    [Test]
     public void BinomialReductionMatchesBigInteger()
     {
         Random random = new(42);
