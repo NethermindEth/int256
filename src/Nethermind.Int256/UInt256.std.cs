@@ -16,6 +16,16 @@ namespace Nethermind.Int256;
 
 public readonly partial struct UInt256
 {
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void MultiplyExpPower(in UInt256 value, in UInt256 power, out UInt256 result)
+    {
+        // Avoid repeated general width dispatch in the long-exponent loop.
+        if ((power.u1 | power.u2 | power.u3) == 0)
+            MultiplyByUInt64(value, power.u0, out result);
+        else
+            MultiplyLimbs4x4(value, power, out result);
+    }
+
     // Keep wide multiplication spills off trivial host paths.
     private const MethodImplOptions MulModWideInlining = MethodImplOptions.NoInlining;
 

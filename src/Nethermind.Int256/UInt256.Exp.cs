@@ -29,7 +29,7 @@ public readonly partial struct UInt256
             power.Squared(out power);
             if ((bits & 1) != 0)
             {
-                Multiply(value, power, out value);
+                MultiplyExpPower(value, power, out value);
             }
             bits >>= 1;
         }

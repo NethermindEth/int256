@@ -10,6 +10,11 @@ namespace Nethermind.Int256;
 
 public readonly partial struct UInt256
 {
+    // General width dispatch produces fewer guest steps and memory operations.
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void MultiplyExpPower(in UInt256 value, in UInt256 power, out UInt256 result)
+        => Multiply(value, power, out result);
+
     // A separate wide-product call increases guest steps and memory traffic.
     private const MethodImplOptions MulModWideInlining = MethodImplOptions.AggressiveInlining;
 
