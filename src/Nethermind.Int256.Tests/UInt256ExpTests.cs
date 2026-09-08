@@ -99,6 +99,21 @@ public class UInt256ExpTests
     }
 
     [Test]
+    public void LongPowersCoverIndependentLimbCarries()
+    {
+        Random random = new(20260909);
+        byte[] bytes = new byte[32];
+        for (int i = 0; i < 2048; ++i)
+        {
+            random.NextBytes(bytes);
+            UInt256 b = new(bytes);
+            b = new UInt256(b.u0 | 1, b.u1, b.u2, b.u3);
+            Check(b, new UInt256(ulong.MaxValue)); // Window helper.
+            Check(b, new UInt256(1, 0, 1)); // Long binomial helper.
+        }
+    }
+
+    [Test]
     public void BothInputsAndOutputCanAlias()
     {
         UInt256[] values = { UInt256.Zero, UInt256.One, new(2), new(3), new(10),

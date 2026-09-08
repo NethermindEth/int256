@@ -10,6 +10,26 @@ namespace Nethermind.Int256;
 
 public readonly partial struct UInt256
 {
+    [SkipLocalsInit]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void SquareExpLong(in UInt256 value, out UInt256 result)
+    {
+        ulong x0 = value.u0, x1 = value.u1, x2 = value.u2, x3 = value.u3;
+        ulong h00 = Square64(x0, out ulong r0);
+        ulong h11 = Square64(x1, out ulong l11);
+        ulong h01 = Multiply64(x0, x1, out ulong l01);
+        ulong h02 = Multiply64(x0, x2, out ulong l02);
+
+        // Sum cross products before doubling: carry propagation happens once.
+        ulong cross = h01 + l02;
+        ulong upper = h02 + (cross < h01 ? 1UL : 0UL) + x0 * x3 + x1 * x2;
+        ulong r1 = h00 + (l01 << 1);
+        ulong carry = 0;
+        ulong r2 = AddAndCountCarry(l11, (cross << 1) | (l01 >> 63), ref carry);
+        r2 = AddAndCountCarry(r2, r1 < h00 ? 1UL : 0UL, ref carry);
+        result = new UInt256(r0, r1, r2, h11 + (upper << 1) + (cross >> 63) + carry);
+    }
+
     // Base ten first removes three guest steps from each table lookup.
     private const bool ExpPreferDecimalLookup = true;
 

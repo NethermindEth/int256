@@ -26,14 +26,14 @@ public readonly partial struct UInt256
         ulong bits = e.u0 >> 1;
         for (int i = 1; i < squares; ++i)
         {
-            power.Squared(out power);
+            SquareExpLong(power, out power);
             if ((bits & 1) != 0)
             {
                 MultiplyExpPower(value, power, out value);
             }
             bits >>= 1;
         }
-        power.Squared(out power);
+        SquareExpLong(power, out power);
         int left = 64 - squares;
         UInt256 high = new((e.u0 >> squares) | (e.u1 << left),
             (e.u1 >> squares) | (e.u2 << left), (e.u2 >> squares) | (e.u3 << left), e.u3 >> squares);
@@ -134,7 +134,7 @@ public readonly partial struct UInt256
         int width = bitLen <= 64 ? 4 : ExpWindowMaxWidth;
         Span<UInt256> powers = stackalloc UInt256[1 << (ExpWindowMaxWidth - 1)];
         powers[0] = b;
-        b.Squared(out UInt256 square);
+        SquareExpLong(b, out UInt256 square);
         for (int j = 1; j < (1 << (width - 1)); ++j)
             Multiply(powers[j - 1], square, out powers[j]);
 
@@ -143,7 +143,7 @@ public readonly partial struct UInt256
         {
             if ((Unsafe.Add(ref Unsafe.AsRef(in e.u0), i >> 6) & (1UL << i)) == 0)
             {
-                val.Squared(out val);
+                SquareExpLong(val, out val);
                 --i;
                 continue;
             }
@@ -167,7 +167,7 @@ public readonly partial struct UInt256
             }
             for (int j = i; j >= low; --j)
             {
-                val.Squared(out val);
+                SquareExpLong(val, out val);
             }
             // Preserve cheap narrow table factors (e.g. base 3), but avoid the
             // general product's remaining width dispatch inside the hot loop.

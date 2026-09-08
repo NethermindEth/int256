@@ -16,7 +16,11 @@ namespace Nethermind.Int256;
 
 public readonly partial struct UInt256
 {
-    // Reordering this dispatch did not improve mixed decimals on native ARM.
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void SquareExpLong(in UInt256 value, out UInt256 result)
+        => value.Squared(out result);
+
+    // Keep established host dispatch; short-path timings depend on ordering.
     private const bool ExpPreferDecimalLookup = false;
 
     // Native ARM amortizes sixteen entries; software products and x64 favor eight.
