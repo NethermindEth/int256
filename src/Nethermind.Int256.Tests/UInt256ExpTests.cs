@@ -67,7 +67,24 @@ public class UInt256ExpTests
             0x100000001, 0x7fffffffffffffff, 0x8000000000000000, ulong.MaxValue - 1, ulong.MaxValue };
         foreach (ulong x in values)
             foreach (ulong y in values)
+            {
                 Check(new UInt256(x, y, x, y), new UInt256(2));
+                Check(new UInt256(x, y, x, y), new UInt256(3));
+            }
+    }
+
+    [Test]
+    public void BothInputsAndOutputCanAlias()
+    {
+        UInt256[] values = { UInt256.Zero, UInt256.One, new(2), new(3), new(10),
+            UInt256.MaxValue, new(1, 0, 13, 17), new(3, 5, 7, 11) };
+        foreach (UInt256 value in values)
+        {
+            UInt256 expected = (UInt256)BigInteger.ModPow((BigInteger)value, (BigInteger)value, BigInteger.One << 256);
+            UInt256 actual = value;
+            UInt256.Exp(actual, actual, out actual);
+            Assert.That(actual, Is.EqualTo(expected));
+        }
     }
 
     [Test]
