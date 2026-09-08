@@ -146,6 +146,31 @@ public class UInt256ExpTests
     }
 
     [Test]
+    public void LongPowersCross32BitPrecisionAndCarryBoundaries()
+    {
+        BigInteger modulus = BigInteger.One << 256;
+        UInt256[] exponents = { UInt256.MaxValue, new(0, 0, 0, 1UL << 63),
+            new(1, 0, 0, 1UL << 63), new(ulong.MaxValue, uint.MaxValue), new(2, 0, 1) };
+        ulong[] limbs = { 0, 1, uint.MaxValue, 1UL << 32, 1UL << 63, ulong.MaxValue };
+        foreach (uint q in new uint[] { 0, 1, 0x7fffffff, 0x80000000, uint.MaxValue })
+            foreach (ulong limb in limbs)
+                foreach (UInt256 e in exponents)
+                {
+                    UInt256 b = new(1 | ((ulong)q << 32), limb, ~limb, limb);
+                    Check(b, e);
+                    Check((UInt256)(modulus - (BigInteger)b), e);
+                }
+        for (int valuation = 2; valuation < 64; ++valuation)
+            foreach (UInt256 e in exponents)
+            {
+                BigInteger b = 1 + (BigInteger.One << valuation) + (11 * (BigInteger.One << 64))
+                    + (13 * (BigInteger.One << 128)) + (17 * (BigInteger.One << 192));
+                Check((UInt256)b, e);
+                Check((UInt256)(modulus - b), e);
+            }
+    }
+
+    [Test]
     public void BothInputsAndOutputCanAlias()
     {
         UInt256[] values = { UInt256.Zero, UInt256.One, new(2), new(3), new(10),
