@@ -16,6 +16,10 @@ namespace Nethermind.Int256;
 
 public readonly partial struct UInt256
 {
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void ExpOddLong(in UInt256 b, in UInt256 e, out UInt256 result)
+        => ExpOddLongPhased(b, e, out result);
+
     // Hardware widening products make the 124-bit cutoff profitable even for
     // narrow dense bases. Software products retain their cheaper window path.
     private static bool ExpPreferNarrowBinomial

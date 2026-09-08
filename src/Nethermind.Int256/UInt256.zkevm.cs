@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Demerzel Solutions Limited
 // SPDX-License-Identifier: MIT
 
+using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.Intrinsics;
 using Arm = System.Runtime.Intrinsics.Arm;
@@ -10,6 +11,36 @@ namespace Nethermind.Int256;
 
 public readonly partial struct UInt256
 {
+    [SkipLocalsInit]
+    private static void ExpOddLong(in UInt256 b, in UInt256 e, out UInt256 result)
+    {
+        // For odd b, b^2 = 1 mod 8. Each further square adds at least
+        // one zero bit to b^(2^k)-1, hence b^(2^62) = 1 mod 2^64.
+        // More precisely v2(b^(2^k)-1) = v2(b-1)+v2(b+1)+k-1.
+        // The caller handles low limbs +/-1, leaving a cutoff in [1,62].
+        // Exactly one of b-1 and b+1 has valuation one. Select the other
+        // without a branch, so only one trailing-zero count is needed.
+        int squares = 64 - BitOperations.TrailingZeroCount(b.u0 - 1 + (b.u0 & 2));
+        UInt256 power = b;
+        UInt256 value = (e.u0 & 1) != 0 ? b : One;
+        ulong bits = e.u0 >> 1;
+        for (int i = 1; i < squares; ++i)
+        {
+            SquareExpLong(power, out power);
+            if ((bits & 1) != 0)
+            {
+                MultiplyExpPower(value, power, out value);
+            }
+            bits >>= 1;
+        }
+        SquareExpLong(power, out power);
+        int left = 64 - squares;
+        UInt256 high = new((e.u0 >> squares) | (e.u1 << left),
+            (e.u1 >> squares) | (e.u2 << left), (e.u2 >> squares) | (e.u3 << left), e.u3 >> squares);
+        ExpNearOne64(power, high, out power);
+        Multiply(value, power, out result);
+    }
+
     private const bool ExpPreferNarrowBinomial = true;
 
     [SkipLocalsInit]

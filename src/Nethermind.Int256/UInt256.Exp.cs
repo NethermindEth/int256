@@ -12,7 +12,7 @@ namespace Nethermind.Int256;
 public readonly partial struct UInt256
 {
     [SkipLocalsInit]
-    private static void ExpOddLong(in UInt256 b, in UInt256 e, out UInt256 result)
+    private static void ExpOddLongPhased(in UInt256 b, in UInt256 e, out UInt256 result)
     {
         // For odd b, b^2 = 1 mod 8. Each further square adds at least
         // one zero bit to b^(2^k)-1, hence b^(2^62) = 1 mod 2^64.
@@ -24,21 +24,140 @@ public readonly partial struct UInt256
         UInt256 power = b;
         UInt256 value = (e.u0 & 1) != 0 ? b : One;
         ulong bits = e.u0 >> 1;
-        for (int i = 1; i < squares; ++i)
+        int i = 1;
+        if (!(Bmi2.X64.IsSupported || ArmBase.Arm64.IsSupported))
         {
-            SquareExpLong(power, out power);
-            if ((bits & 1) != 0)
+            // After j >= 1 squares the precision is t+j, where t=64-squares.
+            // Split at 32 bits so the second phase needs no precision test.
+            int stop = Math.Min(squares, Math.Max(2, squares - 31));
+            for (; i < stop; ++i)
             {
-                MultiplyExpPower(value, power, out value);
+                SquareExpLong(power, out power);
+                if ((bits & 1) != 0) MultiplyExpPower(value, power, out value);
+                bits >>= 1;
             }
-            bits >>= 1;
+            for (; i < squares; ++i)
+            {
+                SquareExpLowOne32(power, out power);
+                if ((bits & 1) != 0) MultiplyExpLowOne32(value, power, out value);
+                bits >>= 1;
+            }
         }
-        SquareExpLong(power, out power);
+        else
+        {
+            for (; i < squares; ++i)
+            {
+                SquareExpLong(power, out power);
+                if ((bits & 1) != 0) MultiplyExpPower(value, power, out value);
+                bits >>= 1;
+            }
+        }
+        SquareExpPrefix(power, out power);
         int left = 64 - squares;
         UInt256 high = new((e.u0 >> squares) | (e.u1 << left),
             (e.u1 >> squares) | (e.u2 << left), (e.u2 >> squares) | (e.u3 << left), e.u3 >> squares);
         ExpNearOne64(power, high, out power);
-        Multiply(value, power, out result);
+        // NEON's existing final product avoids a sparse-power scheduling regression.
+        if (ArmBase.Arm64.IsSupported)
+            Multiply(value, power, out result);
+        else
+            MultiplyExpNearOne(value, power, out result);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void MultiplyExpLowOne32(in UInt256 x, in UInt256 y, out UInt256 res)
+    {
+        // Repeated odd squares eventually make y = 1 + q*2^32 (mod 2^64).
+        // Software products by that limb need two 32x32 products instead of four.
+        // Hardware widening multiplication keeps the established kernel.
+        ulong q = y.u0 >> 32;
+        ulong x0 = x.u0, x1 = x.u1, x2 = x.u2;
+        ulong y1 = y.u1, y2 = y.u2;
+        ulong r3 = x0 * y.u3 + x1 * y2 + x2 * y1 + x.u3 + ((q * (uint)x.u3) << 32);
+        ulong h00 = MultiplyLowOne32(q, x0, out ulong r0);
+        ulong h01 = Multiply64(x0, y1, out ulong l01);
+        ulong h10 = MultiplyLowOne32(q, x1, out ulong l10);
+        ulong carry = 0;
+        ulong r1 = AddAndCountCarry(h00, l01, ref carry);
+        r1 = AddAndCountCarry(r1, l10, ref carry);
+        ulong r2 = carry;
+        carry = 0;
+        r2 = AddAndCountCarry(r2, h01, ref carry);
+        r2 = AddAndCountCarry(r2, h10, ref carry);
+        ulong h02 = Multiply64(x0, y2, out ulong l02);
+        r2 = AddAndCountCarry(r2, l02, ref carry);
+        r3 += h02;
+        ulong h11 = Multiply64(x1, y1, out ulong l11);
+        r2 = AddAndCountCarry(r2, l11, ref carry);
+        r3 += h11;
+        ulong h20 = MultiplyLowOne32(q, x2, out ulong l20);
+        r2 = AddAndCountCarry(r2, l20, ref carry);
+        r3 += h20 + carry;
+        StoreProduct(out res, r0, r1, r2, r3);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void MultiplyExpNearOne(in UInt256 value, in UInt256 power, out UInt256 result)
+    {
+        if (value.IsUint64)
+        {
+            MultiplyByUInt64(power, value.u0, out result);
+            return;
+        }
+        // power.u0 is one. Products by that limb are just additions.
+        ulong h01 = Multiply64(value.u0, power.u1, out ulong l01);
+        ulong h02 = Multiply64(value.u0, power.u2, out ulong l02);
+        ulong h11 = Multiply64(value.u1, power.u1, out ulong l11);
+        ulong r1 = value.u1 + l01;
+        ulong carry = 0;
+        ulong r2 = AddAndCountCarry(value.u2, h01, ref carry);
+        r2 = AddAndCountCarry(r2, l02, ref carry);
+        r2 = AddAndCountCarry(r2, l11, ref carry);
+        r2 = AddAndCountCarry(r2, r1 < value.u1 ? 1UL : 0UL, ref carry);
+        ulong r3 = value.u3 + h02 + h11 + carry
+            + value.u0 * power.u3 + value.u1 * power.u2 + value.u2 * power.u1;
+        StoreProduct(out result, value.u0, r1, r2, r3);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void SquareExpPrefix(in UInt256 value, out UInt256 result)
+    {
+        if (Bmi2.X64.IsSupported || ArmBase.Arm64.IsSupported || (uint)value.u0 != 1)
+        {
+            SquareExpLong(value, out result);
+            return;
+        }
+        SquareExpLowOne32(value, out result);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void SquareExpLowOne32(in UInt256 value, out UInt256 result)
+    {
+        ulong q = value.u0 >> 32;
+        // (1 + q*2^32)^2 has low limb 1 + q*2^33 and high limb
+        // q^2 + (q >> 31). No general low-limb square is needed.
+        ulong r0 = 1 | (q << 33);
+        ulong h00 = q * q + (q >> 31);
+        ulong h11 = Square64(value.u1, out ulong l11);
+        ulong h01 = MultiplyLowOne32(q, value.u1, out ulong l01);
+        ulong h02 = MultiplyLowOne32(q, value.u2, out ulong l02);
+        ulong cross = h01 + l02;
+        ulong upper = h02 + (cross < h01 ? 1UL : 0UL)
+            + value.u3 + ((q * (uint)value.u3) << 32) + value.u1 * value.u2;
+        ulong r1 = h00 + (l01 << 1);
+        ulong carry = 0;
+        ulong r2 = AddAndCountCarry(l11, (cross << 1) | (l01 >> 63), ref carry);
+        r2 = AddAndCountCarry(r2, r1 < h00 ? 1UL : 0UL, ref carry);
+        result = new UInt256(r0, r1, r2, h11 + (upper << 1) + (cross >> 63) + carry);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static ulong MultiplyLowOne32(ulong q, ulong value, out ulong low)
+    {
+        // Multiply value by 1 + q*2^32; callers bound q to 32 bits.
+        ulong p0 = q * (uint)value;
+        low = value + (p0 << 32);
+        return (p0 >> 32) + q * (value >> 32) + (low < value ? 1UL : 0UL);
     }
 
     private static void ExpNearOne64(in UInt256 b, in UInt256 e, out UInt256 result)
