@@ -16,6 +16,9 @@ namespace Nethermind.Int256;
 
 public readonly partial struct UInt256
 {
+    // Reordering this dispatch did not improve mixed decimals on native ARM.
+    private const bool ExpPreferDecimalLookup = false;
+
     // Native ARM amortizes sixteen entries; software products and x64 favor eight.
     private static int ExpWindowMaxWidth
     {

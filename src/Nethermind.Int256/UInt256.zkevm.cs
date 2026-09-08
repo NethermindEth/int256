@@ -10,6 +10,9 @@ namespace Nethermind.Int256;
 
 public readonly partial struct UInt256
 {
+    // Base ten first removes three guest steps from each table lookup.
+    private const bool ExpPreferDecimalLookup = true;
+
     private const int ExpWindowMaxWidth = 5;
 
     // General width dispatch produces fewer guest steps and memory operations.

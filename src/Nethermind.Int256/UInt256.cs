@@ -849,6 +849,12 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         }
         if (b.IsUint64)
         {
+            // The build-time choice leaves exactly one lookup in either binary.
+            if (ExpPreferDecimalLookup && b.u0 == 10 && bitLen <= 7 && e.u0 < 78)
+            {
+                result = MemoryMarshal.Cast<ulong, UInt256>(PowersOfTen)[(int)e.u0];
+                return;
+            }
             if (b.u0 == 0)
             {
                 result = default;
@@ -859,7 +865,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
                 result = One;
                 return;
             }
-            if (b.u0 == 10 && bitLen <= 7 && e.u0 < 78)
+            if (!ExpPreferDecimalLookup && b.u0 == 10 && bitLen <= 7 && e.u0 < 78)
             {
                 result = MemoryMarshal.Cast<ulong, UInt256>(PowersOfTen)[(int)e.u0];
                 return;
