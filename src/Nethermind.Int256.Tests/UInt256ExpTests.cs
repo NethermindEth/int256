@@ -44,6 +44,23 @@ public class UInt256ExpTests
     }
 
     [Test]
+    public void WindowsCrossLimbAndDensityBoundaries()
+    {
+        UInt256 b = new(3, 5, 7, 11);
+        for (int bits = 1; bits <= 256; ++bits)
+        {
+            BigInteger top = BigInteger.One << (bits - 1);
+            Check(b, (UInt256)((top << 1) - 1));
+            Check(b, (UInt256)(top | uint.MaxValue));
+        }
+        foreach (BigInteger b1 in new[] { (BigInteger.One << 255) + 1, (BigInteger.One << 255) - 1 })
+        {
+            Check((UInt256)b1, UInt256.MaxValue);
+            Check((UInt256)b1, (UInt256)((BigInteger.One << 256) - 2));
+        }
+    }
+
+    [Test]
     public void WideExponentsMatchBigInteger()
     {
         Random random = new(20260908);

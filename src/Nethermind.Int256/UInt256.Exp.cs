@@ -2,11 +2,67 @@
 // SPDX-License-Identifier: MIT
 
 using System;
+using System.Runtime.CompilerServices;
+using System.Numerics;
 
 namespace Nethermind.Int256;
 
 public readonly partial struct UInt256
 {
+    [SkipLocalsInit]
+    private static void ExpWindow(in UInt256 b, in UInt256 e, int bitLen, out UInt256 result)
+    {
+        // Odd powers suffice for sliding windows. Smaller exponents amortize
+        // eight entries better; long exponents benefit from sixteen entries.
+        int width = bitLen <= 64 ? 4 : 5;
+        Span<UInt256> powers = stackalloc UInt256[16];
+        powers[0] = b;
+        b.Squared(out UInt256 square);
+        if (square.IsOne)
+        {
+            result = (e.u0 & 1) == 0 ? One : b;
+            return;
+        }
+        for (int j = 1; j < (1 << (width - 1)); ++j)
+            Multiply(powers[j - 1], square, out powers[j]);
+
+        UInt256 val = One;
+        for (int i = bitLen - 1; i >= 0;)
+        {
+            if (!e.Bit(i))
+            {
+                val.Squared(out val);
+                --i;
+                continue;
+            }
+            int low = Math.Max(i - width + 1, 0);
+            int shift = low & 63;
+            // low <= bitLen - width (unless clamped to zero), so a window
+            // crossing a limb boundary always has a next limb within e.
+            ulong word = Unsafe.Add(ref Unsafe.AsRef(in e.u0), low >> 6) >> shift;
+            if (shift > 64 - width)
+                word |= Unsafe.Add(ref Unsafe.AsRef(in e.u0), (low >> 6) + 1) << (64 - shift);
+            uint window = (uint)word & ((1u << (i - low + 1)) - 1);
+            int trailing = BitOperations.TrailingZeroCount(window);
+            low += trailing;
+            window >>= trailing;
+            if (i == bitLen - 1)
+            {
+                // Seed from the leading window: no squaring or multiplying one.
+                val = powers[(int)(window >> 1)];
+                i = low - 1;
+                continue;
+            }
+            for (int j = i; j >= low; --j)
+            {
+                val.Squared(out val);
+            }
+            Multiply(val, powers[(int)(window >> 1)], out val);
+            i = low - 1;
+        }
+        result = val;
+    }
+
     // Little-endian limbs of every power of ten that fits in 256 bits.
     // A constant span is embedded data, with no array allocation or static constructor.
     private static ReadOnlySpan<ulong> PowersOfTen =>
