@@ -831,6 +831,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         a2 += c1 + extra;
     }
 
+    [SkipLocalsInit]
     public static void Exp(in UInt256 b, in UInt256 e, out UInt256 result)
     {
         int bitLen = e.BitLen;
@@ -841,12 +842,12 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         }
         if (b.IsUint64)
         {
-            if (b.IsZero)
+            if (b.u0 == 0)
             {
                 result = default;
                 return;
             }
-            if (b.IsOne)
+            if (b.u0 == 1)
             {
                 result = One;
                 return;
@@ -885,7 +886,9 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
             // val = val * val
             val.Squared(out val);
 
-            if (e.Bit(i))
+            // i is known to be in [0, 255]; the public Bit method also handles
+            // out-of-range indices and signed remainder semantics.
+            if ((Unsafe.Add(ref Unsafe.AsRef(in e.u0), i >> 6) & (1UL << i)) != 0)
             {
                 Multiply(in val, in b, out val);
             }

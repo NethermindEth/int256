@@ -29,7 +29,7 @@ public readonly partial struct UInt256
         UInt256 val = One;
         for (int i = bitLen - 1; i >= 0;)
         {
-            if (!e.Bit(i))
+            if ((Unsafe.Add(ref Unsafe.AsRef(in e.u0), i >> 6) & (1UL << i)) == 0)
             {
                 val.Squared(out val);
                 --i;
