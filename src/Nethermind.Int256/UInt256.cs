@@ -776,7 +776,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         ref ulong pr = ref Unsafe.As<UInt256, ulong>(ref result);
 
         // Column 0
-        ulong a0 = Multiply64(x0, x0, out pr);
+        ulong a0 = Square64(x0, out pr);
 
         // Column 1: 2*x0*x1
         ulong a1 = 0;
@@ -791,7 +791,10 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         a1 = a2;
         a2 = 0;
         MultiplyAddCarryDouble(ref a0, ref a1, ref a2, x0, x2);
-        MultiplyAddCarry(ref a0, ref a1, ref a2, x1, x1);
+        ulong high = Square64(x1, out ulong low);
+        ulong carry = 0;
+        a0 = AddAndCountCarry(a0, low, ref carry);
+        a1 += high + carry;
         Unsafe.Add(ref pr, 2) = a0;
 
         // For r3 we only need the low 64 of the incoming carry, which is a1 here.
@@ -831,39 +834,124 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         a2 += c1 + extra;
     }
 
+    [SkipLocalsInit]
     public static void Exp(in UInt256 b, in UInt256 e, out UInt256 result)
     {
-        int bitLen = e.BitLen;
-        if (bitLen == 0)
+        // Keep this scan local: FullOpts otherwise leaves a BitLen call on every short path.
+        int bitLen = e.u3 != 0 ? 256 - BitOperations.LeadingZeroCount(e.u3)
+            : e.u2 != 0 ? 192 - BitOperations.LeadingZeroCount(e.u2)
+            : e.u1 != 0 ? 128 - BitOperations.LeadingZeroCount(e.u1)
+            : 64 - BitOperations.LeadingZeroCount(e.u0);
+        if (bitLen <= 1)
         {
-            result = One;
+            result = bitLen == 0 ? One : b;
             return;
         }
         if (b.IsUint64)
         {
-            if (b.IsZero)
+            // The build-time choice leaves exactly one lookup in either binary.
+            if (ExpPreferDecimalLookup && b.u0 == 10 && bitLen <= 7 && e.u0 < 78)
+            {
+                result = MemoryMarshal.Cast<ulong, UInt256>(PowersOfTen)[(int)e.u0];
+                return;
+            }
+            if (b.u0 == 0)
             {
                 result = default;
                 return;
             }
-            if (b.IsOne)
+            if (b.u0 == 1)
             {
                 result = One;
+                return;
+            }
+            if (!ExpPreferDecimalLookup && b.u0 == 10 && bitLen <= 7 && e.u0 < 78)
+            {
+                result = MemoryMarshal.Cast<ulong, UInt256>(PowersOfTen)[(int)e.u0];
+                return;
+            }
+        }
+
+        // An even base has at least e trailing zero bits in b^e. Once
+        // that reaches 256 the entire result is discarded, regardless of ISA.
+        if ((b.u0 & 1) == 0)
+        {
+            if (b.u0 == 0)
+            {
+                ExpLimbAligned(b, e, bitLen, out result);
+                return;
+            }
+            int shift = BitOperations.TrailingZeroCount(b.u0);
+            if (bitLen > 8 || (uint)shift * (uint)e.u0 >= 256)
+            {
+                result = default;
+                return;
+            }
+            if (b.IsUint64 && BitOperations.IsPow2(b.u0))
+            {
+                Lsh(One, shift * (int)e.u0, out result);
+                return;
+            }
+        }
+        else if ((b.u0 == 1 && b.u1 == 0) || (b.u0 & b.u1) == ulong.MaxValue)
+        {
+            ExpNearOne(b, e, out result);
+            return;
+        }
+
+        if (bitLen == 2)
+        {
+            // Squares and cubes do not need exponent-limb loop setup.
+            b.Squared(out UInt256 small);
+            if ((e.u0 & 1) != 0) Multiply(small, b, out small);
+            result = small;
+            return;
+        }
+        else if (bitLen > 3 && (b.u0 == 1 || b.u0 == ulong.MaxValue))
+        {
+            ExpNearOne64(b, e, out result);
+            return;
+        }
+
+        // Precomputation pays for itself for sufficiently dense exponents.
+        // Keep binary exponentiation for short or sparse inputs.
+        if (bitLen > 32)
+        {
+            // The shorter 32-bit prefix and truncated polynomial amortize earlier.
+            // Structured bases retain their lower precision-dependent cutoffs.
+            // Earlier exits leave an odd low limb other than +/-1 here.
+            int precision = BitOperations.TrailingZeroCount(b.u0 - 1 + (b.u0 & 2));
+            const int ExpMinStructuredPrecision = 16;
+            if (bitLen >= ExpBinomialMinBits
+                || (precision >= ExpMinStructuredPrecision && bitLen >= 128 - 2 * precision))
+            {
+                ExpOddLong(b, e, precision, out result);
+                return;
+            }
+            // Remaining exponents have at most 79 bits, so the density cutoff is 32.
+            if (BitOperations.PopCount(e.u0) + BitOperations.PopCount(e.u1) > 32)
+            {
+                ExpWindow(b, e, bitLen, out result);
                 return;
             }
         }
 
         // Seed with b so we do not need to "include" the always-set top bit via a multiply.
         UInt256 val = b;
-        for (int i = bitLen - 2; i >= 0; --i)
+        int top = bitLen - 2;
+        for (int limb = top >> 6; limb >= 0; --limb)
         {
-            // val = val * val
-            val.Squared(out val);
-
-            if (e.Bit(i))
+            // Cache each limb and advance its next exponent bit into the sign
+            // bit, avoiding an indexed load and variable bit mask per square.
+            int count = (top & 63) + 1;
+            ulong bits = Unsafe.Add(ref Unsafe.AsRef(in e.u0), limb) << (64 - count);
+            do
             {
-                Multiply(in val, in b, out val);
-            }
+                val.Squared(out val);
+                if ((long)bits < 0) Multiply(val, b, out val);
+                bits <<= 1;
+            } while (--count > 0);
+            top = 63;
         }
 
         result = val;
