@@ -132,6 +132,20 @@ public class UInt256ExpTests
     }
 
     [Test]
+    public void GeneralBinomialCutoffMatchesWidthsAndDensities()
+    {
+        UInt256[] bases = { new(3), new(5), new(7), new(ulong.MaxValue - 2),
+            new(ulong.MaxValue - 2, 1), new(3, 11, 13, 17) };
+        foreach (int bits in new[] { 123, 124, 125, 127, 128, 129 })
+        {
+            BigInteger top = BigInteger.One << (bits - 1);
+            foreach (BigInteger e in new[] { 2 * top - 1, top + 1,
+                top + (BigInteger.One << 31) - 1, top + (BigInteger.One << 32) - 1 })
+                foreach (UInt256 b in bases) Check(b, (UInt256)e);
+        }
+    }
+
+    [Test]
     public void BothInputsAndOutputCanAlias()
     {
         UInt256[] values = { UInt256.Zero, UInt256.One, new(2), new(3), new(10),

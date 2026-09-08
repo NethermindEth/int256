@@ -10,6 +10,8 @@ namespace Nethermind.Int256;
 
 public readonly partial struct UInt256
 {
+    private const bool ExpPreferNarrowBinomial = true;
+
     [SkipLocalsInit]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void SquareExpLong(in UInt256 value, out UInt256 result)
