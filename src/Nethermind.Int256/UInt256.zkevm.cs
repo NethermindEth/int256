@@ -10,6 +10,8 @@ namespace Nethermind.Int256;
 
 public readonly partial struct UInt256
 {
+    private const int ExpWindowMaxWidth = 5;
+
     // General width dispatch produces fewer guest steps and memory operations.
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void MultiplyExpPower(in UInt256 value, in UInt256 power, out UInt256 result)

@@ -129,10 +129,10 @@ public readonly partial struct UInt256
     [SkipLocalsInit]
     private static void ExpWindow(in UInt256 b, in UInt256 e, int bitLen, out UInt256 result)
     {
-        // Odd powers suffice for sliding windows. Smaller exponents amortize
-        // eight entries better; long exponents benefit from sixteen entries.
-        int width = bitLen <= 64 ? 4 : 5;
-        Span<UInt256> powers = stackalloc UInt256[16];
+        // The caller routes exponents above 128 bits through binomial reduction.
+        // Host code favors eight entries; the guest amortizes sixteen better.
+        int width = bitLen <= 64 ? 4 : ExpWindowMaxWidth;
+        Span<UInt256> powers = stackalloc UInt256[1 << (ExpWindowMaxWidth - 1)];
         powers[0] = b;
         b.Squared(out UInt256 square);
         for (int j = 1; j < (1 << (width - 1)); ++j)
