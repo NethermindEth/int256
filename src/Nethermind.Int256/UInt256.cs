@@ -688,7 +688,14 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         ulong y2 = y.u2;
 
         // The top limb only needs low halves; taking them first retires x3 and y3 before the carry columns start.
-        ulong r3 = x0 * y.u3 + x1 * y2 + x2 * y1 + x.u3 * y0;
+        ulong r3;
+        if (Avx512DQ.VL.IsSupported)
+        {
+            Vector256<ulong> xv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in x));
+            Vector256<ulong> yv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in y));
+            r3 = Vector256.Sum(Avx512DQ.VL.MultiplyLow(xv, Avx2.Permute4x64(yv, 0x1B)));
+        }
+        else r3 = x0 * y.u3 + x1 * y2 + x2 * y1 + x.u3 * y0;
 
         ulong h00 = Multiply64(x0, y0, out ulong r0);
         ulong h01 = Multiply64(x0, y1, out ulong l01);
