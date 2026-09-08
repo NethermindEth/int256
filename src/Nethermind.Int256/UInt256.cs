@@ -835,9 +835,9 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     public static void Exp(in UInt256 b, in UInt256 e, out UInt256 result)
     {
         int bitLen = e.BitLen;
-        if (bitLen == 0)
+        if (bitLen <= 1)
         {
-            result = One;
+            result = bitLen == 0 ? One : b;
             return;
         }
         if (b.IsUint64)
@@ -863,9 +863,15 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         // that reaches 256 the entire result is discarded, regardless of ISA.
         if ((b.u0 & 1) == 0)
         {
-            if (bitLen > 8 || (uint)BitOperations.TrailingZeroCount(b.u0) * (uint)e.u0 >= 256)
+            int shift = BitOperations.TrailingZeroCount(b.u0);
+            if (bitLen > 8 || (uint)shift * (uint)e.u0 >= 256)
             {
                 result = default;
+                return;
+            }
+            if (b.IsUint64 && BitOperations.IsPow2(b.u0))
+            {
+                Lsh(One, shift * (int)e.u0, out result);
                 return;
             }
         }
