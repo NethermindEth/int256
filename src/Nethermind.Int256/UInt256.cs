@@ -853,6 +853,17 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
             }
         }
 
+        // An even base has at least e trailing zero bits in b^e. Once
+        // that reaches 256 the entire result is discarded, regardless of ISA.
+        if ((b.u0 & 1) == 0)
+        {
+            if (bitLen > 8 || (uint)BitOperations.TrailingZeroCount(b.u0) * (uint)e.u0 >= 256)
+            {
+                result = default;
+                return;
+            }
+        }
+
         // Seed with b so we do not need to "include" the always-set top bit via a multiply.
         UInt256 val = b;
         for (int i = bitLen - 2; i >= 0; --i)
