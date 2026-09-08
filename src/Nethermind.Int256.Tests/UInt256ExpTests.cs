@@ -171,6 +171,27 @@ public class UInt256ExpTests
     }
 
     [Test]
+    public void EightTermBinomialCarriesSurviveExactDivision()
+    {
+        BigInteger modulus = BigInteger.One << 256;
+        foreach (int valuation in new[] { 2, 16, 30, 31, 32, 33, 42, 43, 47, 48, 51, 52, 55, 56 })
+            foreach (int sign in new[] { -1, 1 })
+                foreach (int boundary in new[] { 64, 128, 192 })
+                    for (int offset = -1; offset <= 7; ++offset)
+                    {
+                        BigInteger b = 1 + (BigInteger.One << valuation)
+                            + (BigInteger.One << 255) + (BigInteger.One << 128);
+                        if (sign < 0) b = modulus - b;
+                        int prefix = Math.Max(1, 32 - valuation);
+                        BigInteger high = (BigInteger.One << boundary) + offset;
+                        BigInteger e = (high << prefix) | ((BigInteger.One << prefix) - 1);
+                        // Keep a long exponent even when the coefficient boundary is low.
+                        e |= BigInteger.One << 255;
+                        Check((UInt256)b, (UInt256)e);
+                    }
+    }
+
+    [Test]
     public void BothInputsAndOutputCanAlias()
     {
         UInt256[] values = { UInt256.Zero, UInt256.One, new(2), new(3), new(10),
