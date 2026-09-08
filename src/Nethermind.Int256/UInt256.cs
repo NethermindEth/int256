@@ -878,10 +878,18 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
                 return;
             }
         }
-
         else if ((b.u0 == 1 && b.u1 == 0) || (b.u0 & b.u1) == ulong.MaxValue)
         {
             ExpNearOne(b, e, out result);
+            return;
+        }
+
+        if (bitLen == 2)
+        {
+            // Squares and cubes do not need exponent-limb loop setup.
+            b.Squared(out UInt256 small);
+            if ((e.u0 & 1) != 0) Multiply(small, b, out small);
+            result = small;
             return;
         }
 
