@@ -917,30 +917,19 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         // Keep binary exponentiation for short or sparse inputs.
         if (bitLen > 32)
         {
-            // Even bases with long exponents already returned zero above.
-            // For b = +/-1 mod 2^16, reach 1 mod 2^64 in k <= 48 squares.
-            // Binomial reduction pays once the exponent spans at least 2*k bits.
-            // The mask admits low residues 1 and -1 without two comparisons.
-            // Ordinary odd bases need at most 62 squares, giving the 124-bit cutoff.
-            // Narrow dense bases using software products retain the window below.
-            if (bitLen > 128 || (bitLen >= 124 && (ExpPreferNarrowBinomial || !b.IsUint64))
+            // The shorter 32-bit prefix and truncated polynomial amortize earlier.
+            // Structured bases retain their lower precision-dependent cutoffs.
+            if (bitLen >= ExpBinomialMinBits
                 || (((b.u0 + 1) & 0xFFFDUL) == 0
                 && bitLen >= 128 - 2 * BitOperations.TrailingZeroCount(b.u0 - 1 + (b.u0 & 2))))
             {
                 ExpOddLong(b, e, out result);
                 return;
             }
-            // The long path above returned whenever either upper exponent limb was nonzero.
-            if (BitOperations.PopCount(e.u0) + BitOperations.PopCount(e.u1) > Math.Max(32, bitLen >> 2))
+            // Remaining exponents have at most 79 bits, so the density cutoff is 32.
+            if (BitOperations.PopCount(e.u0) + BitOperations.PopCount(e.u1) > 32)
             {
                 ExpWindow(b, e, bitLen, out result);
-                return;
-            }
-            if (bitLen >= 124)
-            {
-                // Software products favor windows for narrow dense bases, but
-                // sparse powers still benefit from halving the square count.
-                ExpOddLong(b, e, out result);
                 return;
             }
         }

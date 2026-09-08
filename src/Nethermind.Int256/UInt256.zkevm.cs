@@ -23,7 +23,7 @@ public readonly partial struct UInt256
             ExpOddLong32(b, e, 32 - precision, out result);
     }
 
-    private const bool ExpPreferNarrowBinomial = true;
+    private const int ExpBinomialMinBits = 80;
 
     [SkipLocalsInit]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

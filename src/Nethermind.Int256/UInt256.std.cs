@@ -29,13 +29,7 @@ public readonly partial struct UInt256
             ExpOddLong32(b, e, 32 - precision, out result);
     }
 
-    // Hardware widening products make the 124-bit cutoff profitable even for
-    // narrow dense bases. Software products retain their cheaper window path.
-    private static bool ExpPreferNarrowBinomial
-    {
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get => Bmi2.X64.IsSupported || Arm.ArmBase.Arm64.IsSupported;
-    }
+    private const int ExpBinomialMinBits = 80;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void SquareExpLong(in UInt256 value, out UInt256 result)
