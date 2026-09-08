@@ -807,6 +807,11 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool MultiplyOverflowByUInt64(in UInt256 x, ulong y, out UInt256 res)
     {
+        if (!Bmi2.X64.IsSupported && !ArmBase.Arm64.IsSupported && x.u3 == 0)
+        {
+            MultiplyByUInt64(in x, y, out res);
+            return false;
+        }
         ulong carry = Multiply64(y, x.u0, out ulong r0);
         ulong high = Multiply64(y, x.u1, out ulong low);
         ulong r1 = low + carry;
