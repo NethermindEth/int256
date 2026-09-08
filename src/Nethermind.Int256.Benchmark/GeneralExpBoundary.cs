@@ -15,7 +15,7 @@ namespace Nethermind.Int256.Benchmark;
 [IterationCount(5)]
 public class GeneralExpBoundary
 {
-    [Params(123, 124, 128)] public int Bits { get; set; }
+    [Params(79, 80, 95, 96, 112, 123, 128)] public int Bits { get; set; }
     [Params(false, true)] public bool Dense { get; set; }
     [Params(false, true)] public bool NarrowBase { get; set; }
     private UInt256 _base;

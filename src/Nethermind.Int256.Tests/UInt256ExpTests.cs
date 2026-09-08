@@ -192,6 +192,20 @@ public class UInt256ExpTests
     }
 
     [Test]
+    public void GeneralBinomialCutoffCrossesExponentAndBaseWidths()
+    {
+        UInt256[] bases = { new(3), new(ulong.MaxValue - 2), new(3, 1), new(3, 11, 13, 17), new(6, 11, 13, 17) };
+        for (int bits = 60; bits <= 129; ++bits)
+        {
+            BigInteger top = BigInteger.One << (bits - 1);
+            BigInteger mask = (top << 1) - 1;
+            foreach (BigInteger exponent in new[] { top, top + 1, mask, mask - 1,
+                top | (BigInteger.Parse("12297829382473034410") & mask) })
+                foreach (UInt256 b in bases) Check(b, (UInt256)exponent);
+        }
+    }
+
+    [Test]
     public void BothInputsAndOutputCanAlias()
     {
         UInt256[] values = { UInt256.Zero, UInt256.One, new(2), new(3), new(10),
