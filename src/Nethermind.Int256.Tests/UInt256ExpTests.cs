@@ -76,6 +76,16 @@ public class UInt256ExpTests
     }
 
     [Test]
+    public void WindowFactorsCrossProductWidthBoundaries()
+    {
+        foreach (int bit in new[] { 2, 4, 8, 16, 32, 63, 64, 65, 127, 128, 129, 191, 192, 255 })
+            foreach (int delta in new[] { -1, 1 })
+                foreach (int exponentBits in new[] { 33, 63, 64, 65, 127, 128, 129, 255, 256 })
+                    Check((UInt256)((BigInteger.One << bit) + delta),
+                        (UInt256)((BigInteger.One << exponentBits) - 1));
+    }
+
+    [Test]
     public void SquarePartialProductsAndCarries()
     {
         ulong[] values = { 0, 1, 2, 0x7fffffff, 0x80000000, 0xffffffff, 0x100000000,
