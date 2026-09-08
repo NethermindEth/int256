@@ -11,8 +11,16 @@ namespace Nethermind.Int256;
 
 public readonly partial struct UInt256
 {
+    // Hardware x64 reaches the crossover sooner; ARM and software products
+    // amortize the six-term polynomial over a shorter remaining prefix.
+    private static int ExpFourTermPrecision
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => Bmi2.X64.IsSupported ? 52 : 56;
+    }
+
     [SkipLocalsInit]
-    private static void ExpOddLongPhased(in UInt256 b, in UInt256 e, out UInt256 result)
+    private static void ExpOddLongPhased(in UInt256 b, in UInt256 e, int squares, out UInt256 result)
     {
         // For odd b, b^2 = 1 mod 8. Each further square adds at least
         // one zero bit to b^(2^k)-1, hence b^(2^62) = 1 mod 2^64.
@@ -20,7 +28,6 @@ public readonly partial struct UInt256
         // The caller handles low limbs +/-1, leaving a cutoff in [1,62].
         // Exactly one of b-1 and b+1 has valuation one. Select the other
         // without a branch, so only one trailing-zero count is needed.
-        int squares = 64 - BitOperations.TrailingZeroCount(b.u0 - 1 + (b.u0 & 2));
         UInt256 power = b;
         UInt256 value = (e.u0 & 1) != 0 ? b : One;
         ulong bits = e.u0 >> 1;
@@ -62,6 +69,145 @@ public readonly partial struct UInt256
             Multiply(value, power, out result);
         else
             MultiplyExpNearOne(value, power, out result);
+    }
+
+    [SkipLocalsInit]
+    private static void ExpOddLong32(in UInt256 b, in UInt256 e, int squares, out UInt256 result)
+    {
+        UInt256 power = b;
+        UInt256 value = (e.u0 & 1) != 0 ? b : One;
+        ulong bits = e.u0 >> 1;
+        for (int i = 1; i < squares; ++i)
+        {
+            SquareExpLong(power, out power);
+            if ((bits & 1) != 0) MultiplyExpPower(value, power, out value);
+            bits >>= 1;
+        }
+        SquareExpLong(power, out power);
+        int left = 64 - squares;
+        UInt256 high = new((e.u0 >> squares) | (e.u1 << left), (e.u1 >> squares) | (e.u2 << left), (e.u2 >> squares) | (e.u3 << left), e.u3 >> squares);
+        ExpNearOne32(power, high, out power);
+        Multiply(value, power, out result);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void ExpNearOne32Signed(in UInt256 b, in UInt256 e, bool sixTerms, out UInt256 result)
+    {
+        // No squaring prefix is needed when the base already has 32-bit precision.
+        // For negative bases, only the bits above bit 31 enter the polynomial.
+        ulong sign = 0UL - ((b.u0 >> 1) & 1);
+        UInt256 positive = CreateExpLimbs(b.u0 ^ sign, b.u1 ^ sign, b.u2 ^ sign, b.u3 ^ sign);
+        UInt256 value;
+        if (sixTerms) ExpNearOne43(positive, e, out value);
+        else ExpNearOne32(positive, e, out value);
+        sign &= 0UL - (e.u0 & 1);
+        result = CreateExpLimbs((value.u0 ^ sign) + (sign & 1), value.u1 ^ sign, value.u2 ^ sign, value.u3 ^ sign);
+    }
+
+    private static void ExpNearOne43(in UInt256 b, in UInt256 e, out UInt256 result)
+    {
+        // Existing 43-bit precision leaves only six terms. Use the same
+        // guarded recurrence, retaining 256-43*k bits in term k.
+        UInt256 x = CreateExpLimbs((b.u0 >> 43) | (b.u1 << 21), (b.u1 >> 43) | (b.u2 << 21), (b.u2 >> 43) | (b.u3 << 21), b.u3 >> 43);
+        UInt256 factor = e;
+        Multiply(x, factor, out UInt256 term);
+        UInt256 sum = One + CreateExpLimbs((term.u0 << 43), (term.u1 << 43) | (term.u0 >> 21), (term.u2 << 43) | (term.u1 >> 21), (term.u3 << 43) | (term.u2 >> 21));
+        factor = CreateExpLimbs(e.u0 - 1UL, e.u1 - (e.u0 < 1 ? 1UL : 0UL), e.u2 - (e.u0 < 1 && e.u1 == 0 ? 1UL : 0UL), e.u3 - (e.u0 < 1 && e.u1 == 0 && e.u2 == 0 ? 1UL : 0UL));
+        MultiplyExpTruncated(term, factor, 3, out term);
+        term = CreateExpLimbs((term.u0 >> 1) | (term.u1 << 63), (term.u1 >> 1) | (term.u2 << 63), (term.u2 >> 1) | (term.u3 << 63), term.u3 >> 1);
+        MultiplyExpTruncated(term, x, 3, out term);
+        sum += CreateExpLimbs(0, (term.u0 << 22), (term.u1 << 22) | (term.u0 >> 42), (term.u2 << 22) | (term.u1 >> 42));
+        factor = CreateExpLimbs(e.u0 - 2UL, e.u1 - (e.u0 < 2 ? 1UL : 0UL), e.u2 - (e.u0 < 2 && e.u1 == 0 ? 1UL : 0UL), e.u3 - (e.u0 < 2 && e.u1 == 0 && e.u2 == 0 ? 1UL : 0UL));
+        MultiplyExpTruncated(term, factor, 2, out term);
+        MultiplyExpTruncated(term, CreateExpLimbs(0xAAAAAAAAAAAAAAABUL, 0xAAAAAAAAAAAAAAAAUL, 0xAAAAAAAAAAAAAAAAUL, 0xAAAAAAAAAAAAAAAAUL), 2, out term);
+        MultiplyExpTruncated(term, x, 2, out term);
+        sum += CreateExpLimbs(0, 0, (term.u0 << 1), (term.u1 << 1) | (term.u0 >> 63));
+        factor = CreateExpLimbs(e.u0 - 3UL, e.u1 - (e.u0 < 3 ? 1UL : 0UL), e.u2 - (e.u0 < 3 && e.u1 == 0 ? 1UL : 0UL), e.u3 - (e.u0 < 3 && e.u1 == 0 && e.u2 == 0 ? 1UL : 0UL));
+        MultiplyExpTruncated(term, factor, 2, out term);
+        term = CreateExpLimbs((term.u0 >> 2) | (term.u1 << 62), (term.u1 >> 2) | (term.u2 << 62), (term.u2 >> 2) | (term.u3 << 62), term.u3 >> 2);
+        MultiplyExpTruncated(term, x, 2, out term);
+        sum += CreateExpLimbs(0, 0, (term.u0 << 44), (term.u1 << 44) | (term.u0 >> 20));
+        factor = CreateExpLimbs(e.u0 - 4UL, e.u1 - (e.u0 < 4 ? 1UL : 0UL), e.u2 - (e.u0 < 4 && e.u1 == 0 ? 1UL : 0UL), e.u3 - (e.u0 < 4 && e.u1 == 0 && e.u2 == 0 ? 1UL : 0UL));
+        MultiplyExpTruncated(term, factor, 1, out term);
+        MultiplyExpTruncated(term, CreateExpLimbs(0xCCCCCCCCCCCCCCCDUL, 0xCCCCCCCCCCCCCCCCUL, 0xCCCCCCCCCCCCCCCCUL, 0xCCCCCCCCCCCCCCCCUL), 1, out term);
+        MultiplyExpTruncated(term, x, 1, out term);
+        sum += CreateExpLimbs(0, 0, 0, (term.u0 << 23));
+        result = sum;
+    }
+
+    private static void ExpNearOne32(in UInt256 b, in UInt256 e, out UInt256 result)
+    {
+        // b = 1 + x*2^32. Terms k >= 8 vanish modulo 2^256.
+        // Keep S_k = C(e,k)*x^k and add S_k << (32*k). The recurrence
+        // S_k = S_(k-1)*(e-k+1)/k*x uses exact division by powers of two
+        // and modular inverses for odd divisors. Before each right shift,
+        // retain its guard bits; each preceding term has 32 extra bits,
+        // more than the at-most-two bits consumed by these divisions.
+        // The caller guarantees e >= 7 and supplies the upper bits of
+        // a base normalized to +1 mod 2^32; the low 32 bits are discarded.
+        // Fixed limb stores avoid constructor/shift calls in this large body.
+        UInt256 x = CreateExpLimbs((b.u0 >> 32) | (b.u1 << 32), (b.u1 >> 32) | (b.u2 << 32), (b.u2 >> 32) | (b.u3 << 32), b.u3 >> 32);
+        UInt256 factor = e;
+        Multiply(x, factor, out UInt256 term);
+        UInt256 sum = One + CreateExpLimbs((term.u0 << 32), (term.u1 << 32) | (term.u0 >> 32), (term.u2 << 32) | (term.u1 >> 32), (term.u3 << 32) | (term.u2 >> 32));
+        factor = CreateExpLimbs(e.u0 - 1UL, e.u1 - (e.u0 < 1 ? 1UL : 0UL), e.u2 - (e.u0 < 1 && e.u1 == 0 ? 1UL : 0UL), e.u3 - (e.u0 < 1 && e.u1 == 0 && e.u2 == 0 ? 1UL : 0UL));
+        MultiplyExpTruncated(term, factor, 4, out term);
+        term = CreateExpLimbs((term.u0 >> 1) | (term.u1 << 63), (term.u1 >> 1) | (term.u2 << 63), (term.u2 >> 1) | (term.u3 << 63), term.u3 >> 1);
+        MultiplyExpTruncated(term, x, 3, out term);
+        sum += CreateExpLimbs(0, term.u0, term.u1, term.u2);
+        factor = CreateExpLimbs(e.u0 - 2UL, e.u1 - (e.u0 < 2 ? 1UL : 0UL), e.u2 - (e.u0 < 2 && e.u1 == 0 ? 1UL : 0UL), e.u3 - (e.u0 < 2 && e.u1 == 0 && e.u2 == 0 ? 1UL : 0UL));
+        MultiplyExpTruncated(term, factor, 3, out term);
+        MultiplyExpTruncated(term, CreateExpLimbs(0xAAAAAAAAAAAAAAABUL, 0xAAAAAAAAAAAAAAAAUL, 0xAAAAAAAAAAAAAAAAUL, 0xAAAAAAAAAAAAAAAAUL), 3, out term);
+        MultiplyExpTruncated(term, x, 3, out term);
+        sum += CreateExpLimbs(0, (term.u0 << 32), (term.u1 << 32) | (term.u0 >> 32), (term.u2 << 32) | (term.u1 >> 32));
+        factor = CreateExpLimbs(e.u0 - 3UL, e.u1 - (e.u0 < 3 ? 1UL : 0UL), e.u2 - (e.u0 < 3 && e.u1 == 0 ? 1UL : 0UL), e.u3 - (e.u0 < 3 && e.u1 == 0 && e.u2 == 0 ? 1UL : 0UL));
+        MultiplyExpTruncated(term, factor, 3, out term);
+        term = CreateExpLimbs((term.u0 >> 2) | (term.u1 << 62), (term.u1 >> 2) | (term.u2 << 62), (term.u2 >> 2) | (term.u3 << 62), term.u3 >> 2);
+        MultiplyExpTruncated(term, x, 2, out term);
+        sum += CreateExpLimbs(0, 0, term.u0, term.u1);
+        factor = CreateExpLimbs(e.u0 - 4UL, e.u1 - (e.u0 < 4 ? 1UL : 0UL), e.u2 - (e.u0 < 4 && e.u1 == 0 ? 1UL : 0UL), e.u3 - (e.u0 < 4 && e.u1 == 0 && e.u2 == 0 ? 1UL : 0UL));
+        MultiplyExpTruncated(term, factor, 2, out term);
+        MultiplyExpTruncated(term, CreateExpLimbs(0xCCCCCCCCCCCCCCCDUL, 0xCCCCCCCCCCCCCCCCUL, 0xCCCCCCCCCCCCCCCCUL, 0xCCCCCCCCCCCCCCCCUL), 2, out term);
+        MultiplyExpTruncated(term, x, 2, out term);
+        sum += CreateExpLimbs(0, 0, (term.u0 << 32), (term.u1 << 32) | (term.u0 >> 32));
+        factor = CreateExpLimbs(e.u0 - 5UL, e.u1 - (e.u0 < 5 ? 1UL : 0UL), e.u2 - (e.u0 < 5 && e.u1 == 0 ? 1UL : 0UL), e.u3 - (e.u0 < 5 && e.u1 == 0 && e.u2 == 0 ? 1UL : 0UL));
+        MultiplyExpTruncated(term, factor, 2, out term);
+        term = CreateExpLimbs((term.u0 >> 1) | (term.u1 << 63), (term.u1 >> 1) | (term.u2 << 63), (term.u2 >> 1) | (term.u3 << 63), term.u3 >> 1);
+        MultiplyExpTruncated(term, CreateExpLimbs(0xAAAAAAAAAAAAAAABUL, 0xAAAAAAAAAAAAAAAAUL, 0xAAAAAAAAAAAAAAAAUL, 0xAAAAAAAAAAAAAAAAUL), 1, out term);
+        MultiplyExpTruncated(term, x, 1, out term);
+        sum += CreateExpLimbs(0, 0, 0, term.u0);
+        factor = CreateExpLimbs(e.u0 - 6UL, e.u1 - (e.u0 < 6 ? 1UL : 0UL), e.u2 - (e.u0 < 6 && e.u1 == 0 ? 1UL : 0UL), e.u3 - (e.u0 < 6 && e.u1 == 0 && e.u2 == 0 ? 1UL : 0UL));
+        MultiplyExpTruncated(term, factor, 1, out term);
+        MultiplyExpTruncated(term, CreateExpLimbs(0x6DB6DB6DB6DB6DB7UL, 0xB6DB6DB6DB6DB6DBUL, 0xDB6DB6DB6DB6DB6DUL, 0x6DB6DB6DB6DB6DB6UL), 1, out term);
+        MultiplyExpTruncated(term, x, 1, out term);
+        sum += CreateExpLimbs(0, 0, 0, (term.u0 << 32));
+        result = sum;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void MultiplyExpTruncated(in UInt256 x, in UInt256 y, int limbs, out UInt256 result)
+    {
+        if (limbs == 4) { Multiply(x, y, out result); return; }
+        if (limbs == 1) { result = CreateExpLimbs(x.u0 * y.u0); return; }
+        ulong h00 = Multiply64(x.u0, y.u0, out ulong r0);
+        if (limbs == 2)
+        {
+            result = CreateExpLimbs(r0, h00 + x.u0 * y.u1 + x.u1 * y.u0);
+            return;
+        }
+        ulong h01 = Multiply64(x.u0, y.u1, out ulong l01);
+        ulong h10 = Multiply64(x.u1, y.u0, out ulong l10);
+        ulong carry = 0;
+        ulong r1 = AddAndCountCarry(h00, l01, ref carry);
+        r1 = AddAndCountCarry(r1, l10, ref carry);
+        result = CreateExpLimbs(r0, r1, h01 + h10 + carry + x.u0 * y.u2 + x.u1 * y.u1 + x.u2 * y.u0);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static UInt256 CreateExpLimbs(ulong a, ulong b = 0, ulong c = 0, ulong d = 0)
+    {
+        StoreLimbs(out UInt256 result, a, b, c, d);
+        return result;
     }
 
     [SkipLocalsInit]

@@ -4,6 +4,7 @@
 using System;
 using System.Buffers.Binary;
 using System.IO.Hashing;
+using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
@@ -18,7 +19,15 @@ public readonly partial struct UInt256
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void ExpOddLong(in UInt256 b, in UInt256 e, out UInt256 result)
-        => ExpOddLongPhased(b, e, out result);
+    {
+        int precision = BitOperations.TrailingZeroCount(b.u0 - 1 + (b.u0 & 2));
+        if (precision >= ExpFourTermPrecision)
+            ExpOddLongPhased(b, e, 64 - precision, out result);
+        else if (precision >= 32)
+            ExpNearOne32Signed(b, e, precision >= 43, out result);
+        else
+            ExpOddLong32(b, e, 32 - precision, out result);
+    }
 
     // Hardware widening products make the 124-bit cutoff profitable even for
     // narrow dense bases. Software products retain their cheaper window path.
