@@ -99,6 +99,24 @@ public class UInt256ExpTests
     }
 
     [Test]
+    public void AdaptiveBinomialCutoffsPreserveSignsAndAliases()
+    {
+        BigInteger modulus = BigInteger.One << 256;
+        for (int valuation = 15; valuation <= 63; ++valuation)
+        {
+            BigInteger b = 1 + (BigInteger.One << valuation) + (11 * (BigInteger.One << 64))
+                + (13 * (BigInteger.One << 128)) + (17 * (BigInteger.One << 192));
+            int cutoff = Math.Max(33, 128 - 2 * valuation);
+            for (int bits = cutoff - 1; bits <= cutoff + 1; ++bits)
+                foreach (BigInteger e in new[] { (BigInteger.One << bits) - 1, (BigInteger.One << (bits - 1)) + 1 })
+                {
+                    Check((UInt256)b, (UInt256)e);
+                    Check((UInt256)(modulus - b), (UInt256)e);
+                }
+        }
+    }
+
+    [Test]
     public void LongPowersCoverIndependentLimbCarries()
     {
         Random random = new(20260909);

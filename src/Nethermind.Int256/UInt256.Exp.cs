@@ -129,7 +129,7 @@ public readonly partial struct UInt256
     [SkipLocalsInit]
     private static void ExpWindow(in UInt256 b, in UInt256 e, int bitLen, out UInt256 result)
     {
-        // The caller routes exponents above 128 bits through binomial reduction.
+        // The caller routes long and suitable structured powers through binomial reduction.
         // Host code favors eight entries; the guest amortizes sixteen better.
         int width = bitLen <= 64 ? 4 : ExpWindowMaxWidth;
         Span<UInt256> powers = stackalloc UInt256[1 << (ExpWindowMaxWidth - 1)];

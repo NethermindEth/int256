@@ -918,7 +918,11 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         if (bitLen > 32)
         {
             // Even bases with long exponents already returned zero above.
-            if (bitLen > 128)
+            // For b = +/-1 mod 2^16, reach 1 mod 2^64 in k <= 48 squares.
+            // Binomial reduction pays once the exponent spans at least 2*k bits.
+            // The mask admits low residues 1 and -1 without two comparisons.
+            if (bitLen > 128 || (((b.u0 + 1) & 0xFFFDUL) == 0
+                && bitLen >= 128 - 2 * BitOperations.TrailingZeroCount(b.u0 - 1 + (b.u0 & 2))))
             {
                 ExpOddLong(b, e, out result);
                 return;
