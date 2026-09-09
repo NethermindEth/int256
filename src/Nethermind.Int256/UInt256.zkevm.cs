@@ -130,5 +130,5 @@ public readonly partial struct UInt256
     [OverloadResolutionPriority(1)]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Equals(in UInt256 other)
-        => ((u0 ^ other.u0) | (u1 ^ other.u1) | (u2 ^ other.u2) | (u3 ^ other.u3)) == 0;
+        => u0 == other.u0 && u1 == other.u1 && u2 == other.u2 && u3 == other.u3;
 }
