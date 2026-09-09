@@ -59,6 +59,12 @@ jobs:
             build-config: release
             intrinsics: HWIntrinsics
             avx2: Avx2
+          # Exercise AVX2 partial products even when the runner also supports AVX-512.
+          - os: ubuntu-latest
+            build-config: release
+            intrinsics: HWIntrinsics
+            avx2: Avx2
+            avx512: NoAvx512
           - os: ubuntu-latest
             build-config: release
             intrinsics: HWIntrinsics
@@ -85,6 +91,7 @@ jobs:
             avx2: NoAvx2
 
     env:
+      DOTNET_EnableAVX512: ${{ matrix.avx512 == 'NoAvx512' && '0' || '1' }}
       DOTNET_EnableAVX2: ${{ matrix.avx2 == 'NoAvx2' && '0' || '1' }}
       DOTNET_EnableHWIntrinsic: ${{ matrix.intrinsics == 'NoHWIntrinsics' && '0' || '1' }}
       ENABLE_ZKEVM: ${{ matrix.variant == 'zkevm' && 'true' || 'false' }}

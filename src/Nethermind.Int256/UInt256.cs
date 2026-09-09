@@ -773,10 +773,10 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
             if ((x.u1 | y.u1) == 0)
             {
                 ulong high = Multiply64(x.u0, y.u0, out ulong low);
-                Store4(out res, low, high, 0, 0);
+                StoreProduct(out res, low, high, 0, 0);
             }
-            else if (x.u1 == 0) MultiplyLimbs1x2(in y, x.u0, out res);
-            else if (y.u1 == 0) MultiplyLimbs1x2(in x, y.u0, out res);
+            else if (x.u1 == 0) MultiplyLimbs2x1(in y, x.u0, out res);
+            else if (y.u1 == 0) MultiplyLimbs2x1(in x, y.u0, out res);
             else MultiplyLimbs2x2(in x, in y, out res);
             return false;
         }
@@ -804,12 +804,12 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
 
     [SkipLocalsInit]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void MultiplyLimbs1x2(in UInt256 x, ulong y, out UInt256 res)
+    private static void MultiplyLimbs2x1(in UInt256 x, ulong y, out UInt256 res)
     {
         ulong carry = Multiply64(y, x.u0, out ulong r0);
         ulong high = Multiply64(y, x.u1, out ulong low);
         ulong r1 = low + carry;
-        Store4(out res, r0, r1, high + (r1 < low ? 1UL : 0UL), 0);
+        StoreProduct(out res, r0, r1, high + (r1 < low ? 1UL : 0UL), 0);
     }
 
     [SkipLocalsInit]
@@ -831,7 +831,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         high = Multiply64(y, x.u3, out low);
         ulong r3 = low + carry;
         bool overflow = high != 0 || r3 < low;
-        Store4(out res, r0, r1, r2, r3);
+        StoreProduct(out res, r0, r1, r2, r3);
         return overflow;
     }
 
@@ -855,10 +855,11 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         r2 = AddAndCountCarry(r2, l02, ref carry);
         ulong h11 = Multiply64(x1, y1, out ulong l11);
         r2 = AddAndCountCarry(r2, l11, ref carry);
-        // A shared upper bit proves the column-three product spills beyond 256 bits.
+        // A shared bit i >= 32 gives x >= 2^(i+64) and y >= 2^(i+128),
+        // hence x*y >= 2^(2*i+192) >= 2^256; no exact high product is needed.
         if (((x1 & y2) >> 32) != 0)
         {
-            Store4(out res, r0, r1, r2, carry + h02 + h11 + x1 * y2);
+            StoreProduct(out res, r0, r1, r2, carry + h02 + h11 + x1 * y2);
             return true;
         }
         ulong r3 = carry;
@@ -867,7 +868,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         r3 = AddAndCountCarry(r3, h11, ref carry);
         ulong h12 = Multiply64(x1, y2, out ulong l12);
         r3 = AddAndCountCarry(r3, l12, ref carry);
-        Store4(out res, r0, r1, r2, r3);
+        StoreProduct(out res, r0, r1, r2, r3);
         return (h12 | carry) != 0;
     }
 
