@@ -1400,24 +1400,9 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         Vector512<ulong> vxy = Vector512.Create(vx, vy);
         Vector512<ulong> vmm = Vector512.Create(vm, vm); // can be improved to vbroadcasti64x4 - see below
 
-        uint eq8 = (uint)Avx512DQ.MoveMask(Avx512F.CompareEqual(vxy, vmm)) & 0xFFu;
-        uint lt8 = (uint)Avx512DQ.MoveMask(Avx512F.CompareLessThan(vxy, vmm)) & 0xFFu;
-
-        // d has 1s where lanes differ, in both nibbles
-        uint d = (eq8 ^ 0xFFu);
-
-        // saturate within each nibble (no cross-nibble bleed)
-        d |= (d >> 1) & 0x77u;
-        d |= (d >> 2) & 0x33u;
-
-        // isolate the top mismatch bit in each nibble
-        uint msb = d & ~((d >> 1) & 0x77u);
-
-        // pick lt at that mismatch bit (still per nibble)
-        uint chosen = lt8 & msb;
-
-        // low nibble -> x, high nibble -> y
-        return ((chosen & 0x0Fu) != 0) & ((chosen & 0xF0u) != 0);
+        uint lt8 = (uint)Avx512DQ.MoveMask(Avx512F.CompareLessThan(vxy, vmm));
+        uint gt8 = (uint)Avx512DQ.MoveMask(Avx512F.CompareGreaterThan(vxy, vmm));
+        return ((lt8 & 0xFu) > (gt8 & 0xFu)) & ((lt8 >> 4) > (gt8 >> 4));
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
