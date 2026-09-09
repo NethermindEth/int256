@@ -14,6 +14,44 @@ namespace Nethermind.Int256;
 
 public readonly partial struct UInt256
 {
+    // Keep the binomial helpers and their spills out of the short-exponent frame.
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void ExpOddLong(in UInt256 b, in UInt256 e, int precision, out UInt256 result)
+    {
+        if (precision >= ExpFourTermPrecision)
+            ExpOddLongPhased(b, e, 64 - precision, out result);
+        else if (precision >= 32)
+            ExpNearOne32Signed(b, e, precision >= 43, out result);
+        else
+            ExpOddLong32(b, e, 32 - precision, out result);
+    }
+
+    private const int ExpBinomialMinBits = 80;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void SquareExpLong(in UInt256 value, out UInt256 result)
+        => value.Squared(out result);
+
+    // Keep established host dispatch; short-path timings depend on ordering.
+    private const bool ExpPreferDecimalLookup = false;
+
+    // Native ARM amortizes sixteen entries; software products and x64 favor eight.
+    private static int ExpWindowMaxWidth
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => Arm.ArmBase.Arm64.IsSupported ? 5 : 4;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void MultiplyExpPower(in UInt256 value, in UInt256 power, out UInt256 result)
+    {
+        // Avoid repeated general width dispatch in the long-exponent loop.
+        if ((power.u1 | power.u2 | power.u3) == 0)
+            MultiplyByUInt64(value, power.u0, out result);
+        else
+            MultiplyLimbs4x4(value, power, out result);
+    }
+
     // Keep wide multiplication spills off trivial host paths.
     private const MethodImplOptions MulModWideInlining = MethodImplOptions.NoInlining;
 
