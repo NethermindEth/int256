@@ -45,7 +45,8 @@ public class UInt256HashSeedTests
         for (int bit = 0; bit < 256; bit++)
         {
             yield return new TestCaseData(bit, false);
-            yield return new TestCaseData(bit, true);
+            // Pairing bit with bit+128 is symmetric, so the upper half repeats the lower half's cases.
+            if (bit < 128) yield return new TestCaseData(bit, true);
         }
     }
 
@@ -70,6 +71,21 @@ public class UInt256HashSeedTests
         UInt256.SeedHashes(SecondSeed);
         UInt256.SeedHashes(FirstSeed);
         Assert.That(Sample.GetHashCode(), Is.EqualTo(first));
+    }
+
+    /// <summary>Checks that <see cref="Int256"/> hashes follow the installed seed.</summary>
+    [Test]
+    public void SeedHashes_AlsoReseedsInt256()
+    {
+        Int256 value = new(Sample);
+        UInt256.SeedHashes(FirstSeed);
+        int first = value.GetHashCode();
+        UInt256.SeedHashes(SecondSeed);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(value.GetHashCode(), Is.Not.EqualTo(first));
+            Assert.That(value.GetHashCode(), Is.EqualTo(Sample.GetHashCode()));
+        }
     }
 
     /// <summary>Checks sequential and linearly related inputs in each input limb.</summary>

@@ -59,33 +59,20 @@ public readonly partial struct UInt256
     private const MethodImplOptions MulMod128Inlining = MethodImplOptions.AggressiveInlining;
 
     /// <inheritdoc />
-    public static partial void SeedHashes(in UInt256 seed)
-    {
-        RunSeed.Multiply = seed;
-        RunSeed.Aes0 = Vector128.Create(seed.u0, seed.u1).AsByte();
-        RunSeed.Aes1 = Vector128.Create(seed.u2, seed.u3).AsByte();
-    }
-
-    /// <summary>The seeds this run hashes with.</summary>
     /// <remarks>
-    /// Drawn per process unless <see cref="SeedHashes"/> replaces them, so that hash collisions
-    /// on one node are not the same ones on another or across a restart and cannot degrade the network
-    /// as a whole. A type of their own so that mutating them leaves <see cref="UInt256"/>'s own statics
-    /// immutable after their constructor.
+    /// Drawn per process, so that hash collisions on one node are not the same ones on another or
+    /// across a restart and cannot degrade the network as a whole.
     /// </remarks>
-    private static class RunSeed
-    {
-        internal static UInt256 Multiply = new(CreateHashSeed(), CreateHashSeed(), CreateHashSeed(), CreateHashSeed());
-        internal static Vector128<byte> Aes0 = Vector128.Create(Multiply.u0, Multiply.u1).AsByte();
-        internal static Vector128<byte> Aes1 = Vector128.Create(Multiply.u2, Multiply.u3).AsByte();
-    }
-
     [SkipLocalsInit]
-    private static ulong CreateHashSeed()
+    private static partial UInt256 CreateInitialSeed()
     {
-        Span<byte> bytes = stackalloc byte[sizeof(ulong)];
+        Span<byte> bytes = stackalloc byte[Len * sizeof(ulong)];
         RandomNumberGenerator.Fill(bytes);
-        return BinaryPrimitives.ReadUInt64LittleEndian(bytes);
+        return new UInt256(
+            BinaryPrimitives.ReadUInt64LittleEndian(bytes),
+            BinaryPrimitives.ReadUInt64LittleEndian(bytes[8..]),
+            BinaryPrimitives.ReadUInt64LittleEndian(bytes[16..]),
+            BinaryPrimitives.ReadUInt64LittleEndian(bytes[24..]));
     }
 
     [SkipLocalsInit]

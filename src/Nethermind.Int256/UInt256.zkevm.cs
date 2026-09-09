@@ -61,27 +61,12 @@ public readonly partial struct UInt256
     private const MethodImplOptions MulMod128Inlining = (MethodImplOptions)0;
 
     /// <inheritdoc />
-    public static partial void SeedHashes(in UInt256 seed)
-    {
-        RunSeed.Multiply = seed;
-        RunSeed.Aes0 = Vector128.Create(seed.u0, seed.u1).AsByte();
-        RunSeed.Aes1 = Vector128.Create(seed.u2, seed.u3).AsByte();
-    }
-
-    /// <summary>The seeds this run hashes with.</summary>
     /// <remarks>
-    /// Guest execution has no entropy source, so these start from constants rather than from anything
-    /// drawn at start-up, and stay stable across runs until <see cref="SeedHashes"/> replaces them.
-    /// A type of their own so that mutating them leaves <see cref="UInt256"/>'s own statics immutable
-    /// after their constructor, which is what lets NativeAOT freeze them.
+    /// Guest execution has no entropy source, so the build starts from constants rather than from
+    /// anything drawn at start-up, and hashes stay stable across runs until a seed is installed.
     /// </remarks>
-    private static class RunSeed
-    {
-        internal static UInt256 Multiply = new(0x1F83D9ABFB41BD6BUL, 0x5BE0CD19137E2179UL,
-            0x6A09E667F3BCC909UL, 0xBB67AE8584CAA73BUL);
-        internal static Vector128<byte> Aes0 = Vector128.Create(Multiply.u0, Multiply.u1).AsByte();
-        internal static Vector128<byte> Aes1 = Vector128.Create(Multiply.u2, Multiply.u3).AsByte();
-    }
+    private static partial UInt256 CreateInitialSeed()
+        => new(0x1F83D9ABFB41BD6BUL, 0x5BE0CD19137E2179UL, 0x6A09E667F3BCC909UL, 0xBB67AE8584CAA73BUL);
 
     [SkipLocalsInit]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -1541,7 +1541,27 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     /// Not synchronised against concurrent hashing.
     /// </para>
     /// </remarks>
-    public static partial void SeedHashes(in UInt256 seed);
+    public static void SeedHashes(in UInt256 seed)
+    {
+        RunSeed.Multiply = seed;
+        RunSeed.Aes0 = Vector128.Create(seed.u0, seed.u1).AsByte();
+        RunSeed.Aes1 = Vector128.Create(seed.u2, seed.u3).AsByte();
+    }
+
+    /// <summary>The seed this build hashes with until <see cref="SeedHashes"/> replaces it.</summary>
+    private static partial UInt256 CreateInitialSeed();
+
+    /// <summary>The seeds this run hashes with.</summary>
+    /// <remarks>
+    /// A type of their own so that replacing them leaves <see cref="UInt256"/>'s own statics immutable
+    /// after their constructor, which is what lets NativeAOT freeze them.
+    /// </remarks>
+    private static class RunSeed
+    {
+        internal static UInt256 Multiply = CreateInitialSeed();
+        internal static Vector128<byte> Aes0 = Vector128.Create(Multiply.u0, Multiply.u1).AsByte();
+        internal static Vector128<byte> Aes1 = Vector128.Create(Multiply.u2, Multiply.u3).AsByte();
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal readonly int GetMultiplyHashCode(in UInt256 seed)
