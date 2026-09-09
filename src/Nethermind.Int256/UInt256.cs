@@ -1476,12 +1476,8 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool LessThanFromPackedMask8(uint mask8)
     {
-        // even bits are eq, odd bits are lt
-        uint mismatchEven = (~mask8) & 0x55u;
-        if (mismatchEven == 0) return false; // all words equal => not less
-
-        int pos = BitOperations.LeadingZeroCount(mismatchEven) ^ 31; // highest mismatching even bit
-        return ((mask8 >> (pos + 1)) & 1u) != 0; // corresponding lt bit
+        // Each base-4 digit is greater=0, equal=1, less=2, with the highest limb first.
+        return mask8 > 0x55u;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
