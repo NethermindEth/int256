@@ -79,6 +79,8 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         {
             PrepareAdd(in a, in b, out res, out Vector256<ulong> result, out Vector256<ulong> carryMask,
                 out Vector256<ulong> carryIn, out Vector256<ulong> fullLanes);
+            // Lane 3 has already wrapped in the speculative store; its carry out is discarded.
+            // Only cascades from lanes 1-2 can still change the wrapped result (unlike AddOverflow).
             if ((Avx.MoveMask((fullLanes & carryIn).AsDouble()) & 0b0110) != 0)
                 FinishAdd(result, carryMask, fullLanes, out res);
             return;
@@ -193,7 +195,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
             return AddScalarUInt64(in b, a0, out res);
         }
 
-        if (AdvSimd.IsSupported || Sse42.IsSupported)
+        if (Sse42.IsSupported)
         {
             return AddVector128(in a, in b, out res, detectOverflow);
         }
@@ -255,6 +257,8 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
 
         Vector128<ulong> propagatedLo = Vector128.Equals(sumLo, Vector128<ulong>.Zero) & carryInLo;
         Vector128<ulong> propagatedHi = Vector128.Equals(sumHi, Vector128<ulong>.Zero) & carryInHi;
+        // Void ARM Add drops propagatedHi[1]: the early store already wrapped limb 3,
+        // and its carry out is discarded. This is the same restriction as the AVX 0b0110 mask.
         Vector128<ulong> propagate = AdvSimd.IsSupported && !detectOverflow
             ? AdvSimd.ExtractVector128(propagatedLo, propagatedHi, 1)
             : propagatedLo | propagatedHi;
@@ -276,7 +280,8 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
                 return carryHi.GetElement(1) != 0;
             }
 
-            // Nothing has been stored yet, so a and b are intact even when res aliases one of them
+            // Only the non-ARM path reaches this fallback: the early store is guarded by AdvSimd.
+            // No non-ARM store has occurred, so a and b remain intact when res aliases either input.
             ulong carry = 0;
             AddWithCarry(a.u0, b.u0, ref carry, out ulong r0);
             AddWithCarry(a.u1, b.u1, ref carry, out ulong r1);
@@ -304,6 +309,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         {
             ulong low = a0 + b0;
             bool overflow = false;
+            // Short-circuit each increment: higher limbs change only while the carry keeps rippling.
             if (low < a0 && ++a1 == 0 && ++a2 == 0) overflow = ++a3 == 0;
             StoreLimbs(out res, low, a1, a2, a3);
             return overflow;
