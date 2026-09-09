@@ -3,6 +3,10 @@
 using System;
 using System.Numerics;
 using System.Reflection;
+using System.Runtime.InteropServices;
+using System.Runtime.Intrinsics;
+using System.Runtime.Intrinsics.Arm;
+using System.Runtime.Intrinsics.X86;
 using NUnit.Framework;
 
 namespace Nethermind.Int256.Test;
@@ -10,6 +14,16 @@ namespace Nethermind.Int256.Test;
 public class ComparisonMaskTests
 {
     private delegate bool CompareBoth(in UInt256 x, in UInt256 y, in UInt256 modulus);
+
+    [OneTimeSetUp]
+    public void Report_instruction_set_coverage()
+    {
+        TestContext.Progress.WriteLine(
+            $"Comparison coverage: {RuntimeInformation.ProcessArchitecture}; " +
+            $"AVX2={Avx2.IsSupported}; AVX512F.VL={Avx512F.VL.IsSupported}; " +
+            $"AVX512DQ={Avx512DQ.IsSupported}; SSE4.1={Sse41.IsSupported}; " +
+            $"AdvSimd={AdvSimd.IsSupported}; Vector256={Vector256.IsHardwareAccelerated}");
+    }
 
     [Test]
     public void Operators_match_all_limb_ordering_patterns()
@@ -22,7 +36,8 @@ public class ComparisonMaskTests
             {
                 int delta = remaining % 3 - 1;
                 remaining /= 3;
-                return delta < 0 ? value - 1 : value + (ulong)delta;
+                // Seeds must admit both neighbours; fail if a future seed would wrap.
+                return checked(delta < 0 ? value - 1 : value + (ulong)delta);
             }
 
             UInt256 left = new(Limb(right.u0), Limb(right.u1), Limb(right.u2), Limb(right.u3));

@@ -1348,6 +1348,8 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         {
             // ge = 15 - lt. The highest differing limb determines the sign of gt - lt.
             // Adding complementary masks lets the JIT fold the bias into one LEA.
+            // Retained separately from the paired lt > gt reduction: their callers generate
+            // different code, and the shared Min/Max path regressed in unification trials.
             uint gt = (uint)Avx512DQ.MoveMask(Avx512F.VL.CompareGreaterThan(vecL, vecR));
             uint ge = (uint)Avx512DQ.MoveMask(Avx512F.VL.CompareGreaterThanOrEqual(vecL, vecR));
             return unchecked((int)(gt + ge - 15u)) < 0;
@@ -1430,14 +1432,17 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool LessThanFromMasks(uint equalMask, uint lessMask)
     {
-        // Carry a less-than bit through equal higher lanes; only four lanes are present.
+        // Preconditions: both masks use only bits 0-3, one bit per ulong lane,
+        // with the most significant limb in bit 3; equal and less bits are disjoint.
+        // Carry a less-than bit through equal higher lanes.
         return (equalMask + (lessMask << 1)) > 0xFu;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool LessThanFromPackedMask8(uint mask8)
     {
-        // Each base-4 digit is greater=0, equal=1, less=2, with the highest limb first.
+        // Each base-4 digit is greater=0, equal=1, less=2.
+        // Limb 3 occupies the highest digit (bits 6-7); limb 0 occupies bits 0-1.
         return mask8 > 0x55u;
     }
 

@@ -119,6 +119,9 @@ public readonly partial struct UInt256
     private static bool LessThanBoth(in UInt256 x, in UInt256 y, in UInt256 m)
         => LessThanScalar(in x, in m) && LessThanScalar(in y, in m);
 
+    // Deliberately keep primitive overloads below Equals(in UInt256) in priority here.
+    // The guest compiler eliminates its temporary; matching priorities added address work
+    // and replaced short-circuit upper-limb checks with more expensive loads in measured callers.
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Equals(uint other)
         => u0 == other && (u1 | u2 | u3) == 0;

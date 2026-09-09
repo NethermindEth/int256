@@ -193,6 +193,8 @@ public readonly partial struct UInt256
             return LessThanAvx2(in a, in b);
         }
 
+        // Retain the portable fallback for future runtimes: current x64 Vector256 support
+        // requires AVX2, and current ARM64 runtimes do not accelerate Vector256.
         if (!Avx2.IsSupported && Vector256.IsHardwareAccelerated)
         {
             return LessThanVector256(in a, in b);
@@ -213,6 +215,7 @@ public readonly partial struct UInt256
             LessThanBothAvx512(in x, in y, in m) :
             Avx2.IsSupported ?
                 LessThanBothAvx2(in x, in y, in m) :
+                // Currently reachable only through direct tests; see the portable fallback above.
                 LessThanBothVector256(in x, in y, in m);
     }
 
@@ -238,6 +241,7 @@ public readonly partial struct UInt256
     private static bool EqualsVector(in UInt256 a, ulong other)
         => (Vector256.CreateScalar(other) ^ Unsafe.BitCast<UInt256, Vector256<ulong>>(a)) == Vector256<ulong>.Zero;
 
+    // SSE4.1 zero tests won here; the NEON candidate regressed dependent callers.
     [OverloadResolutionPriority(1)]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Equals(in UInt256 other)
@@ -264,6 +268,10 @@ public readonly partial struct UInt256
     private bool EqualsScalar(in UInt256 other)
         => ((u0 ^ other.u0) | (u1 ^ other.u1) | (u2 ^ other.u2) | (u3 ^ other.u3)) == 0;
 
+    // Keep direction-specific bodies: swapping operands changes which load the JIT can fold.
+    // The operator wiring keeps its left operand in the second, memory-foldable source.
+    // Integer blends for inclusive predicates and float blends for strict predicates were
+    // selected together in Windows/Linux caller measurements; preserve these codegen shapes.
     // Pack equality into each low dword and the opposite ordering into each high dword.
     // One MoveMask then yields four base-4 digits: favorable=0, equal=1, opposite=2.
     // All-equal is 0x55; biasing by 0x56 includes equality. The mask is at most 0xAA,
@@ -271,7 +279,7 @@ public readonly partial struct UInt256
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool LessThanOrEqual(in UInt256 a, in UInt256 b)
     {
-        if (Avx512F.VL.IsSupported && Avx512DQ.IsSupported)
+        if (Avx512F.VL.IsSupported)
         {
             Vector256<ulong> left = Unsafe.BitCast<UInt256, Vector256<ulong>>(a);
             Vector256<ulong> right = Unsafe.BitCast<UInt256, Vector256<ulong>>(b);
@@ -286,7 +294,7 @@ public readonly partial struct UInt256
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool GreaterThanOrEqual(in UInt256 a, in UInt256 b)
     {
-        if (Avx512F.VL.IsSupported && Avx512DQ.IsSupported)
+        if (Avx512F.VL.IsSupported)
         {
             Vector256<ulong> left = Unsafe.BitCast<UInt256, Vector256<ulong>>(a);
             Vector256<ulong> right = Unsafe.BitCast<UInt256, Vector256<ulong>>(b);
@@ -301,7 +309,7 @@ public readonly partial struct UInt256
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool GreaterThan(in UInt256 a, in UInt256 b)
     {
-        if (Avx512F.VL.IsSupported && Avx512DQ.IsSupported)
+        if (Avx512F.VL.IsSupported)
         {
             Vector256<ulong> left = Unsafe.BitCast<UInt256, Vector256<ulong>>(a);
             Vector256<ulong> right = Unsafe.BitCast<UInt256, Vector256<ulong>>(b);
@@ -317,7 +325,7 @@ public readonly partial struct UInt256
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool LessThanOperator(in UInt256 a, in UInt256 b)
     {
-        if (Avx512F.VL.IsSupported && Avx512DQ.IsSupported)
+        if (Avx512F.VL.IsSupported)
         {
             Vector256<ulong> left = Unsafe.BitCast<UInt256, Vector256<ulong>>(a);
             Vector256<ulong> right = Unsafe.BitCast<UInt256, Vector256<ulong>>(b);
