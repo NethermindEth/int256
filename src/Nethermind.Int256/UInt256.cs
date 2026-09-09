@@ -1346,10 +1346,10 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         uint ltMask;
         if (Avx512F.VL.IsSupported && Avx512DQ.IsSupported)
         {
-            // Best case: AVX-512 compare produces k-mask; MoveMask uses KMOVB.
-            // Avx512DQ.MoveMask is documented as KMOVB r32,k1.
-            eqMask = (uint)Avx512DQ.MoveMask(Avx512F.VL.CompareEqual(vecL, vecR));     // VPCMPUQ + KMOVB
-            ltMask = (uint)Avx512DQ.MoveMask(Avx512F.VL.CompareLessThan(vecL, vecR));  // VPCMPUQ + KMOVB
+            // The highest differing limb dominates all lower mask bits.
+            uint lt = (uint)Avx512DQ.MoveMask(Avx512F.VL.CompareLessThan(vecL, vecR));
+            uint gt = (uint)Avx512DQ.MoveMask(Avx512F.VL.CompareGreaterThan(vecL, vecR));
+            return lt > gt;
         }
         else
         {
