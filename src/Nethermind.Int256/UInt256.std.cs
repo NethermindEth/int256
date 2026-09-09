@@ -193,6 +193,8 @@ public readonly partial struct UInt256
             return LessThanAvx2(in a, in b);
         }
 
+        // Retain the portable fallback for future runtimes: current x64 Vector256 support
+        // requires AVX2, and current ARM64 runtimes do not accelerate Vector256.
         if (!Avx2.IsSupported && Vector256.IsHardwareAccelerated)
         {
             return LessThanVector256(in a, in b);
@@ -213,33 +215,125 @@ public readonly partial struct UInt256
             LessThanBothAvx512(in x, in y, in m) :
             Avx2.IsSupported ?
                 LessThanBothAvx2(in x, in y, in m) :
+                // Currently reachable only through direct tests; see the portable fallback above.
                 LessThanBothVector256(in x, in y, in m);
     }
 
+    [OverloadResolutionPriority(1)]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Equals(uint other)
-        => Vector256.IsHardwareAccelerated ? EqualsVector(in this, other) : u0 == other && IsUint64;
+        => Vector256.IsHardwareAccelerated
+            ? EqualsVector(in this, other)
+            : EqualsScalar(new UInt256(other));
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool EqualsVector(in UInt256 a, uint other)
-        => Unsafe.BitCast<UInt256, Vector256<uint>>(a) == Vector256.CreateScalar(other);
+        => (Vector256.CreateScalar(other) ^ Unsafe.BitCast<UInt256, Vector256<uint>>(a)) == Vector256<uint>.Zero;
 
+    [OverloadResolutionPriority(1)]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Equals(ulong other)
-        => Vector256.IsHardwareAccelerated ? EqualsVector(in this, other) : u0 == other && IsUint64;
+        => Vector256.IsHardwareAccelerated
+            ? EqualsVector(in this, other)
+            : EqualsScalar(new UInt256(other));
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool EqualsVector(in UInt256 a, ulong other)
-        => Unsafe.BitCast<UInt256, Vector256<ulong>>(a) == Vector256.CreateScalar(other);
+        => (Vector256.CreateScalar(other) ^ Unsafe.BitCast<UInt256, Vector256<ulong>>(a)) == Vector256<ulong>.Zero;
 
+    // SSE4.1 zero tests won here; the NEON candidate regressed dependent callers.
     [OverloadResolutionPriority(1)]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Equals(in UInt256 other)
         => Vector256.IsHardwareAccelerated
             ? EqualsVector(in this, in other)
-            : ((u0 ^ other.u0) | (u1 ^ other.u1) | (u2 ^ other.u2) | (u3 ^ other.u3)) == 0;
+            : Sse41.IsSupported
+                ? EqualsVector128(in this, in other)
+                : EqualsScalar(in other);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool EqualsVector(in UInt256 a, in UInt256 b)
         => Unsafe.BitCast<UInt256, Vector256<ulong>>(a) == Unsafe.BitCast<UInt256, Vector256<ulong>>(b);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool EqualsVector128(in UInt256 a, in UInt256 b)
+    {
+        ref Vector128<ulong> av = ref Unsafe.As<UInt256, Vector128<ulong>>(ref Unsafe.AsRef(in a));
+        ref Vector128<ulong> bv = ref Unsafe.As<UInt256, Vector128<ulong>>(ref Unsafe.AsRef(in b));
+        return ((av ^ bv) | (Unsafe.Add(ref av, 1) ^ Unsafe.Add(ref bv, 1))) == Vector128<ulong>.Zero;
+    }
+
+    // This shared limb path lets the scalar JIT eliminate primitive-value temporaries.
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private bool EqualsScalar(in UInt256 other)
+        => ((u0 ^ other.u0) | (u1 ^ other.u1) | (u2 ^ other.u2) | (u3 ^ other.u3)) == 0;
+
+    // Keep direction-specific bodies: swapping operands changes which load the JIT can fold.
+    // The operator wiring keeps its left operand in the second, memory-foldable source.
+    // Integer blends for inclusive predicates and float blends for strict predicates were
+    // selected together in Windows/Linux caller measurements; preserve these codegen shapes.
+    // Pack equality into each low dword and the opposite ordering into each high dword.
+    // One MoveMask then yields four base-4 digits: favorable=0, equal=1, opposite=2.
+    // All-equal is 0x55; biasing by 0x56 includes equality. The mask is at most 0xAA,
+    // so the sign of the biased result determines ordering without overflow ambiguity.
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool LessThanOrEqual(in UInt256 a, in UInt256 b)
+    {
+        if (Avx512F.VL.IsSupported)
+        {
+            Vector256<ulong> left = Unsafe.BitCast<UInt256, Vector256<ulong>>(a);
+            Vector256<ulong> right = Unsafe.BitCast<UInt256, Vector256<ulong>>(b);
+            Vector256<ulong> eq = Avx2.CompareEqual(left, right);
+            Vector256<ulong> cmp = Avx512F.VL.CompareGreaterThan(left, right);
+            uint mask = (uint)Avx.MoveMask(Avx2.Blend(eq.AsInt32(), cmp.AsInt32(), 0xAA).AsSingle());
+            return unchecked((int)(mask - 0x56u)) < 0;
+        }
+        return !LessThan(in b, in a);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool GreaterThanOrEqual(in UInt256 a, in UInt256 b)
+    {
+        if (Avx512F.VL.IsSupported)
+        {
+            Vector256<ulong> left = Unsafe.BitCast<UInt256, Vector256<ulong>>(a);
+            Vector256<ulong> right = Unsafe.BitCast<UInt256, Vector256<ulong>>(b);
+            Vector256<ulong> eq = Avx2.CompareEqual(left, right);
+            Vector256<ulong> cmp = Avx512F.VL.CompareLessThan(left, right);
+            uint mask = (uint)Avx.MoveMask(Avx2.Blend(eq.AsInt32(), cmp.AsInt32(), 0xAA).AsSingle());
+            return unchecked((int)(mask - 0x56u)) < 0;
+        }
+        return !LessThan(in a, in b);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool GreaterThan(in UInt256 a, in UInt256 b)
+    {
+        if (Avx512F.VL.IsSupported)
+        {
+            Vector256<ulong> left = Unsafe.BitCast<UInt256, Vector256<ulong>>(a);
+            Vector256<ulong> right = Unsafe.BitCast<UInt256, Vector256<ulong>>(b);
+            Vector256<ulong> eq = Avx2.CompareEqual(left, right);
+            Vector256<ulong> cmp = Avx512F.VL.CompareLessThan(left, right);
+            uint mask = (uint)Avx.MoveMask(Avx.Blend(eq.AsSingle(), cmp.AsSingle(), 0xAA));
+            return unchecked((int)(mask - 0x55u)) < 0;
+        }
+        return LessThan(in b, in a);
+    }
+
+    // Keep the operator reduction separate from the shared Min/Max comparison path.
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool LessThanOperator(in UInt256 a, in UInt256 b)
+    {
+        if (Avx512F.VL.IsSupported)
+        {
+            Vector256<ulong> left = Unsafe.BitCast<UInt256, Vector256<ulong>>(a);
+            Vector256<ulong> right = Unsafe.BitCast<UInt256, Vector256<ulong>>(b);
+            Vector256<ulong> eq = Avx2.CompareEqual(left, right);
+            Vector256<ulong> cmp = Avx512F.VL.CompareGreaterThan(left, right);
+            uint mask = (uint)Avx.MoveMask(Avx.Blend(eq.AsSingle(), cmp.AsSingle(), 0xAA));
+            return unchecked((int)(mask - 0x55u)) < 0;
+        }
+        return LessThan(in a, in b);
+    }
 }

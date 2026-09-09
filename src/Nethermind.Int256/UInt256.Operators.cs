@@ -12,19 +12,27 @@ public readonly partial struct UInt256
 {
     public static bool operator ==(in UInt256 a, int b) => a.Equals(b);
     public static bool operator ==(int a, in UInt256 b) => b.Equals(a);
+    [OverloadResolutionPriority(1)]
     public static bool operator ==(in UInt256 a, uint b) => a.Equals(b);
+    [OverloadResolutionPriority(1)]
     public static bool operator ==(uint a, in UInt256 b) => b.Equals(a);
     public static bool operator ==(in UInt256 a, long b) => a.Equals(b);
     public static bool operator ==(long a, in UInt256 b) => b.Equals(a);
+    [OverloadResolutionPriority(1)]
     public static bool operator ==(in UInt256 a, ulong b) => a.Equals(b);
+    [OverloadResolutionPriority(1)]
     public static bool operator ==(ulong a, in UInt256 b) => b.Equals(a);
     public static bool operator !=(in UInt256 a, int b) => !a.Equals(b);
     public static bool operator !=(int a, in UInt256 b) => !b.Equals(a);
+    [OverloadResolutionPriority(1)]
     public static bool operator !=(in UInt256 a, uint b) => !a.Equals(b);
+    [OverloadResolutionPriority(1)]
     public static bool operator !=(uint a, in UInt256 b) => !b.Equals(a);
     public static bool operator !=(in UInt256 a, long b) => !a.Equals(b);
     public static bool operator !=(long a, in UInt256 b) => !b.Equals(a);
+    [OverloadResolutionPriority(1)]
     public static bool operator !=(in UInt256 a, ulong b) => !a.Equals(b);
+    [OverloadResolutionPriority(1)]
     public static bool operator !=(ulong a, in UInt256 b) => !b.Equals(a);
     public static explicit operator UInt256(sbyte a) =>
         a < 0 ? throw new ArgumentException($"Expected a positive number and got {a}", nameof(a)) : new UInt256((ulong)a);
@@ -185,7 +193,7 @@ public readonly partial struct UInt256
         return c;
     }
 
-    public static bool operator <(in UInt256 a, in UInt256 b) => LessThan(in a, in b);
+    public static bool operator <(in UInt256 a, in UInt256 b) => GreaterThan(in b, in a);
     public static bool operator <(in UInt256 a, int b) => LessThan(in a, b);
     public static bool operator <(int a, in UInt256 b) => LessThan(a, in b);
     public static bool operator <(in UInt256 a, uint b) => LessThan(in a, b);
@@ -194,7 +202,7 @@ public readonly partial struct UInt256
     public static bool operator <(long a, in UInt256 b) => LessThan(a, in b);
     public static bool operator <(in UInt256 a, ulong b) => LessThan(in a, b);
     public static bool operator <(ulong a, in UInt256 b) => LessThan(a, in b);
-    public static bool operator <=(in UInt256 a, in UInt256 b) => !LessThan(in b, in a);
+    public static bool operator <=(in UInt256 a, in UInt256 b) => GreaterThanOrEqual(in b, in a);
     public static bool operator <=(in UInt256 a, int b) => !LessThan(b, in a);
     public static bool operator <=(int a, in UInt256 b) => !LessThan(in b, a);
     public static bool operator <=(in UInt256 a, uint b) => !LessThan(b, in a);
@@ -203,7 +211,7 @@ public readonly partial struct UInt256
     public static bool operator <=(long a, in UInt256 b) => !LessThan(in b, a);
     public static bool operator <=(in UInt256 a, ulong b) => !LessThan(b, in a);
     public static bool operator <=(ulong a, UInt256 b) => !LessThan(in b, a);
-    public static bool operator >(in UInt256 a, in UInt256 b) => LessThan(in b, in a);
+    public static bool operator >(in UInt256 a, in UInt256 b) => LessThanOperator(in b, in a);
     public static bool operator >(in UInt256 a, int b) => LessThan(b, in a);
     public static bool operator >(int a, in UInt256 b) => LessThan(in b, a);
     public static bool operator >(in UInt256 a, uint b) => LessThan(b, in a);
@@ -212,7 +220,7 @@ public readonly partial struct UInt256
     public static bool operator >(long a, in UInt256 b) => LessThan(in b, a);
     public static bool operator >(in UInt256 a, ulong b) => LessThan(b, in a);
     public static bool operator >(ulong a, in UInt256 b) => LessThan(in b, a);
-    public static bool operator >=(in UInt256 a, in UInt256 b) => !LessThan(in a, in b);
+    public static bool operator >=(in UInt256 a, in UInt256 b) => LessThanOrEqual(in b, in a);
     public static bool operator >=(in UInt256 a, int b) => !LessThan(in a, b);
     public static bool operator >=(int a, in UInt256 b) => !LessThan(a, in b);
     public static bool operator >=(in UInt256 a, uint b) => !LessThan(in a, b);

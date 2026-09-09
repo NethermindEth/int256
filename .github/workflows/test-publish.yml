@@ -107,6 +107,11 @@ jobs:
         working-directory: src/Nethermind.Int256.Tests
         run: dotnet test -c ${{ matrix.build-config }} -p:EnableZkEvm=${{ env.ENABLE_ZKEVM }}
 
+      - name: Report comparison ISA coverage
+        working-directory: src/Nethermind.Int256.Tests
+        # Invoke the built runner directly: dotnet test hides successful-test output.
+        run: dotnet ../artifacts/bin/Nethermind.Int256.Tests/${{ matrix.build-config }}/Nethermind.Int256.Tests.dll --filter FullyQualifiedName~ComparisonMaskTests --output Detailed
+
   publish:
     name: Publish
     needs: test

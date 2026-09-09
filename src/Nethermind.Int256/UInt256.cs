@@ -1346,10 +1346,13 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         uint ltMask;
         if (Avx512F.VL.IsSupported && Avx512DQ.IsSupported)
         {
-            // Best case: AVX-512 compare produces k-mask; MoveMask uses KMOVB.
-            // Avx512DQ.MoveMask is documented as KMOVB r32,k1.
-            eqMask = (uint)Avx512DQ.MoveMask(Avx512F.VL.CompareEqual(vecL, vecR));     // VPCMPUQ + KMOVB
-            ltMask = (uint)Avx512DQ.MoveMask(Avx512F.VL.CompareLessThan(vecL, vecR));  // VPCMPUQ + KMOVB
+            // ge = 15 - lt. The highest differing limb determines the sign of gt - lt.
+            // Adding complementary masks lets the JIT fold the bias into one LEA.
+            // Retained separately from the paired lt > gt reduction: their callers generate
+            // different code, and the shared Min/Max path regressed in unification trials.
+            uint gt = (uint)Avx512DQ.MoveMask(Avx512F.VL.CompareGreaterThan(vecL, vecR));
+            uint ge = (uint)Avx512DQ.MoveMask(Avx512F.VL.CompareGreaterThanOrEqual(vecL, vecR));
+            return unchecked((int)(gt + ge - 15u)) < 0;
         }
         else
         {
@@ -1362,13 +1365,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
             ltMask = (uint)Avx.MoveMask(Avx2.CompareGreaterThan(sR, sL).AsDouble());
         }
 
-        uint diff = eqMask ^ 0xFu;
-        if (diff == 0) return false;
-
-        // Slightly nicer than BitOperations.Log2 here:
-        // diff != 0 and diff <= 0xF => LZCNT in [28..31] => (31 - lzcnt) == (31 ^ lzcnt)
-        int idx = BitOperations.LeadingZeroCount(diff) ^ 31;
-        return ((ltMask >> idx) & 1u) != 0;
+        return LessThanFromMasks(eqMask, ltMask);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1381,13 +1378,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         uint eqMask = Vector256.ExtractMostSignificantBits(Vector256.Equals(vecL, vecR));
         uint ltMask = Vector256.ExtractMostSignificantBits(Vector256.LessThan(vecL, vecR));
 
-        uint diff = eqMask ^ 0xFu;
-        if (diff == 0) return false;
-
-        // Slightly nicer than BitOperations.Log2 here:
-        // diff != 0 and diff <= 0xF => LZCNT in [28..31] => (31 - lzcnt) == (31 ^ lzcnt)
-        int idx = BitOperations.LeadingZeroCount(diff) ^ 31;
-        return ((ltMask >> idx) & 1u) != 0;
+        return LessThanFromMasks(eqMask, ltMask);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1400,24 +1391,9 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         Vector512<ulong> vxy = Vector512.Create(vx, vy);
         Vector512<ulong> vmm = Vector512.Create(vm, vm); // can be improved to vbroadcasti64x4 - see below
 
-        uint eq8 = (uint)Avx512DQ.MoveMask(Avx512F.CompareEqual(vxy, vmm)) & 0xFFu;
-        uint lt8 = (uint)Avx512DQ.MoveMask(Avx512F.CompareLessThan(vxy, vmm)) & 0xFFu;
-
-        // d has 1s where lanes differ, in both nibbles
-        uint d = (eq8 ^ 0xFFu);
-
-        // saturate within each nibble (no cross-nibble bleed)
-        d |= (d >> 1) & 0x77u;
-        d |= (d >> 2) & 0x33u;
-
-        // isolate the top mismatch bit in each nibble
-        uint msb = d & ~((d >> 1) & 0x77u);
-
-        // pick lt at that mismatch bit (still per nibble)
-        uint chosen = lt8 & msb;
-
-        // low nibble -> x, high nibble -> y
-        return ((chosen & 0x0Fu) != 0) & ((chosen & 0xF0u) != 0);
+        uint lt8 = (uint)Avx512DQ.MoveMask(Avx512F.CompareLessThan(vxy, vmm));
+        uint gt8 = (uint)Avx512DQ.MoveMask(Avx512F.CompareGreaterThan(vxy, vmm));
+        return ((lt8 & 0xFu) > (gt8 & 0xFu)) & ((lt8 >> 4) > (gt8 >> 4));
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1454,34 +1430,20 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool LessThanBothFromEqLt8(uint eq8, uint lt8)
+    private static bool LessThanFromMasks(uint equalMask, uint lessMask)
     {
-        // eq8/lt8 are 0..255 (low 8 bits used)
-        uint d = (eq8 ^ 0xFFu);           // mismatch bits (1 where not equal), per nibble
-
-        // saturate within each nibble (prevent bit4 spilling into bit3 etc)
-        d |= (d >> 1) & 0x77u;
-        d |= (d >> 2) & 0x33u;
-
-        // isolate most-significant mismatch bit in each nibble
-        uint msb = d & ~((d >> 1) & 0x77u);
-
-        // pick lt bit at that msb position for each nibble
-        uint chosen = lt8 & msb;
-
-        // low nibble -> x decision, high nibble -> y decision
-        return ((chosen & 0x0Fu) != 0) & ((chosen & 0xF0u) != 0);
+        // Preconditions: both masks use only bits 0-3, one bit per ulong lane,
+        // with the most significant limb in bit 3; equal and less bits are disjoint.
+        // Carry a less-than bit through equal higher lanes.
+        return (equalMask + (lessMask << 1)) > 0xFu;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool LessThanFromPackedMask8(uint mask8)
     {
-        // even bits are eq, odd bits are lt
-        uint mismatchEven = (~mask8) & 0x55u;
-        if (mismatchEven == 0) return false; // all words equal => not less
-
-        int pos = BitOperations.LeadingZeroCount(mismatchEven) ^ 31; // highest mismatching even bit
-        return ((mask8 >> (pos + 1)) & 1u) != 0; // corresponding lt bit
+        // Each base-4 digit is greater=0, equal=1, less=2.
+        // Limb 3 occupies the highest digit (bits 6-7); limb 0 occupies bits 0-1.
+        return mask8 > 0x55u;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1493,14 +1455,14 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         Vector256<ulong> vecX = Unsafe.BitCast<UInt256, Vector256<ulong>>(x);
         uint eqMaskX = Vector256.ExtractMostSignificantBits(Vector256.Equals(vecX, vecM));
         uint ltMaskX = Vector256.ExtractMostSignificantBits(Vector256.LessThan(vecX, vecM));
-        if (!LessThanBothFromEqLt8(eqMaskX, ltMaskX))
+        if (!LessThanFromMasks(eqMaskX, ltMaskX))
             return false;
 
         // y < m
         Vector256<ulong> vecY = Unsafe.BitCast<UInt256, Vector256<ulong>>(y);
         uint eqMaskY = Vector256.ExtractMostSignificantBits(Vector256.Equals(vecY, vecM));
         uint ltMaskY = Vector256.ExtractMostSignificantBits(Vector256.LessThan(vecY, vecM));
-        return LessThanBothFromEqLt8(eqMaskY, ltMaskY);
+        return LessThanFromMasks(eqMaskY, ltMaskY);
     }
 
     /// <summary>The decimal digits of <see cref="MaxValue"/>, and so the widest this can format.</summary>
