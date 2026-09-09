@@ -12,19 +12,27 @@ public readonly partial struct UInt256
 {
     public static bool operator ==(in UInt256 a, int b) => a.Equals(b);
     public static bool operator ==(int a, in UInt256 b) => b.Equals(a);
+    [OverloadResolutionPriority(1)]
     public static bool operator ==(in UInt256 a, uint b) => a.Equals(b);
+    [OverloadResolutionPriority(1)]
     public static bool operator ==(uint a, in UInt256 b) => b.Equals(a);
     public static bool operator ==(in UInt256 a, long b) => a.Equals(b);
     public static bool operator ==(long a, in UInt256 b) => b.Equals(a);
+    [OverloadResolutionPriority(1)]
     public static bool operator ==(in UInt256 a, ulong b) => a.Equals(b);
+    [OverloadResolutionPriority(1)]
     public static bool operator ==(ulong a, in UInt256 b) => b.Equals(a);
     public static bool operator !=(in UInt256 a, int b) => !a.Equals(b);
     public static bool operator !=(int a, in UInt256 b) => !b.Equals(a);
+    [OverloadResolutionPriority(1)]
     public static bool operator !=(in UInt256 a, uint b) => !a.Equals(b);
+    [OverloadResolutionPriority(1)]
     public static bool operator !=(uint a, in UInt256 b) => !b.Equals(a);
     public static bool operator !=(in UInt256 a, long b) => !a.Equals(b);
     public static bool operator !=(long a, in UInt256 b) => !b.Equals(a);
+    [OverloadResolutionPriority(1)]
     public static bool operator !=(in UInt256 a, ulong b) => !a.Equals(b);
+    [OverloadResolutionPriority(1)]
     public static bool operator !=(ulong a, in UInt256 b) => !b.Equals(a);
     public static explicit operator UInt256(sbyte a) =>
         a < 0 ? throw new ArgumentException($"Expected a positive number and got {a}", nameof(a)) : new UInt256((ulong)a);

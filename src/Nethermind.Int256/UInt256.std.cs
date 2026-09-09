@@ -216,30 +216,41 @@ public readonly partial struct UInt256
                 LessThanBothVector256(in x, in y, in m);
     }
 
+    [OverloadResolutionPriority(1)]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Equals(uint other)
-        => Vector256.IsHardwareAccelerated ? EqualsVector(in this, other) : u0 == other && IsUint64;
+        => Vector256.IsHardwareAccelerated
+            ? EqualsVector(in this, other)
+            : EqualsScalar(new UInt256(other));
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool EqualsVector(in UInt256 a, uint other)
-        => Unsafe.BitCast<UInt256, Vector256<uint>>(a) == Vector256.CreateScalar(other);
+        => (Vector256.CreateScalar(other) ^ Unsafe.BitCast<UInt256, Vector256<uint>>(a)) == Vector256<uint>.Zero;
 
+    [OverloadResolutionPriority(1)]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Equals(ulong other)
-        => Vector256.IsHardwareAccelerated ? EqualsVector(in this, other) : u0 == other && IsUint64;
+        => Vector256.IsHardwareAccelerated
+            ? EqualsVector(in this, other)
+            : EqualsScalar(new UInt256(other));
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool EqualsVector(in UInt256 a, ulong other)
-        => Unsafe.BitCast<UInt256, Vector256<ulong>>(a) == Vector256.CreateScalar(other);
+        => (Vector256.CreateScalar(other) ^ Unsafe.BitCast<UInt256, Vector256<ulong>>(a)) == Vector256<ulong>.Zero;
 
     [OverloadResolutionPriority(1)]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Equals(in UInt256 other)
         => Vector256.IsHardwareAccelerated
             ? EqualsVector(in this, in other)
-            : ((u0 ^ other.u0) | (u1 ^ other.u1) | (u2 ^ other.u2) | (u3 ^ other.u3)) == 0;
+            : EqualsScalar(in other);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool EqualsVector(in UInt256 a, in UInt256 b)
         => Unsafe.BitCast<UInt256, Vector256<ulong>>(a) == Unsafe.BitCast<UInt256, Vector256<ulong>>(b);
+
+    // This shared limb path lets the scalar JIT eliminate primitive-value temporaries.
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private bool EqualsScalar(in UInt256 other)
+        => ((u0 ^ other.u0) | (u1 ^ other.u1) | (u2 ^ other.u2) | (u3 ^ other.u3)) == 0;
 }
