@@ -52,6 +52,15 @@ public class AddCarryBoundaryTests
         Assert.That(instanceAlias, Is.EqualTo(expected));
         Int256.Add(new Int256(a), new Int256(b), out Int256 signedResult);
         Assert.That(signedResult, Is.EqualTo(new Int256(expected)));
+        Int256 signedLeft = new(a), signedRight = new(b);
+        Int256.Add(signedLeft, signedRight, out signedLeft);
+        Assert.That(signedLeft, Is.EqualTo(new Int256(expected)));
+        signedLeft = new(a);
+        Int256.Add(signedLeft, signedRight, out signedRight);
+        Assert.That(signedRight, Is.EqualTo(new Int256(expected)));
+        UInt256 rightAlias = b;
+        a.Add(rightAlias, out rightAlias);
+        Assert.That(rightAlias, Is.EqualTo(expected));
         UInt256 incremented = a;
         incremented++;
         Assert.That(incremented, Is.EqualTo((UInt256)(((BigInteger)a + 1) & ((BigInteger.One << 256) - 1))));
@@ -79,6 +88,12 @@ public class AddCarryBoundaryTests
     {
         BigInteger sum = (BigInteger)value * 2;
         UInt256 expected = (UInt256)(sum & ((BigInteger.One << 256) - 1));
+        UInt256 instance = value;
+        instance.Add(instance, out instance);
+        Assert.That(instance, Is.EqualTo(expected));
+        Int256 signed = new(value);
+        Int256.Add(signed, signed, out signed);
+        Assert.That(signed, Is.EqualTo(new Int256(expected)));
         UInt256 result = value;
         UInt256.Add(result, result, out result);
         Assert.That(result, Is.EqualTo(expected));

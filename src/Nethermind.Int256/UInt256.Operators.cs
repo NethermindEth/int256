@@ -59,7 +59,12 @@ public readonly partial struct UInt256
 
     public static UInt256 operator +(in UInt256 a, in UInt256 b)
     {
-        Add(in a, in b, out UInt256 res);
+        UInt256 res;
+        // Keep the baseline AVX2 wrapper route; the overflow flag is discarded.
+        if (Avx2.IsSupported && !Avx512F.VL.IsSupported)
+            AddOverflow(in a, in b, out res);
+        else
+            Add(in a, in b, out res);
         return res;
     }
 
