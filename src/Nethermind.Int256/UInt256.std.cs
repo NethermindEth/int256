@@ -243,11 +243,21 @@ public readonly partial struct UInt256
     public bool Equals(in UInt256 other)
         => Vector256.IsHardwareAccelerated
             ? EqualsVector(in this, in other)
-            : EqualsScalar(in other);
+            : Sse41.IsSupported
+                ? EqualsVector128(in this, in other)
+                : EqualsScalar(in other);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool EqualsVector(in UInt256 a, in UInt256 b)
         => Unsafe.BitCast<UInt256, Vector256<ulong>>(a) == Unsafe.BitCast<UInt256, Vector256<ulong>>(b);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool EqualsVector128(in UInt256 a, in UInt256 b)
+    {
+        ref Vector128<ulong> av = ref Unsafe.As<UInt256, Vector128<ulong>>(ref Unsafe.AsRef(in a));
+        ref Vector128<ulong> bv = ref Unsafe.As<UInt256, Vector128<ulong>>(ref Unsafe.AsRef(in b));
+        return ((av ^ bv) | (Unsafe.Add(ref av, 1) ^ Unsafe.Add(ref bv, 1))) == Vector128<ulong>.Zero;
+    }
 
     // This shared limb path lets the scalar JIT eliminate primitive-value temporaries.
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
