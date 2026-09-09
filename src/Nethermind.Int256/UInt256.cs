@@ -72,8 +72,16 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     /// <param name="a">The first 256-bit addend.</param>
     /// <param name="b">The second 256-bit addend.</param>
     /// <param name="res">On return, contains <c>(a + b) mod 2^256</c>.</param>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void Add(in UInt256 a, in UInt256 b, out UInt256 res)
-        => AddOverflow(in a, in b, out res);
+    {
+        if (AdvSimd.IsSupported)
+        {
+            AddScalar(in a, in b, out res, false);
+            return;
+        }
+        AddOverflow(in a, in b, out res);
+    }
 
     /// <summary>
     /// Adds two <see cref="UInt256"/> values and reports whether the addition overflowed.
@@ -140,12 +148,24 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
             return (Avx.MoveMask(carryMask.AsDouble()) & 0b1000) != 0;
         }
 
-        return AddScalar(in a, in b, out res);
+        return AddScalar(in a, in b, out res, true);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool AddScalar(in UInt256 a, in UInt256 b, out UInt256 res)
+    private static bool AddScalar(in UInt256 a, in UInt256 b, out UInt256 res, bool detectOverflow)
     {
+        if (AdvSimd.IsSupported)
+        {
+            ref readonly UInt256 large = ref a;
+            ulong small = b.u0;
+            if ((b.u1 | b.u2 | b.u3) != 0)
+            {
+                if ((a.u1 | a.u2 | a.u3) != 0) return AddVector128(in a, in b, out res, detectOverflow);
+                large = ref b;
+                small = a.u0;
+            }
+            return AddScalarUInt64(in large, small, out res);
+        }
         ulong b0 = b.u0;
         if ((b.u1 | b.u2 | b.u3) == 0)
         {
@@ -161,7 +181,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
 
         if (AdvSimd.IsSupported || Sse42.IsSupported)
         {
-            return AddVector128(in a, in b, out res);
+            return AddVector128(in a, in b, out res, detectOverflow);
         }
 
         // Loads stay next to their use: the one-limb paths above share this method's prolog
@@ -176,7 +196,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
 
     // Same speculation as the 256-bit path on two 128-bit halves; 16-byte stores forward to the NEON readers
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool AddVector128(in UInt256 a, in UInt256 b, out UInt256 res)
+    private static bool AddVector128(in UInt256 a, in UInt256 b, out UInt256 res, bool detectOverflow)
     {
         ref Vector128<ulong> aRef = ref Unsafe.As<UInt256, Vector128<ulong>>(ref Unsafe.AsRef(in a));
         ref Vector128<ulong> bRef = ref Unsafe.As<UInt256, Vector128<ulong>>(ref Unsafe.AsRef(in b));
@@ -210,10 +230,38 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         // the JIT parks the vector values in callee-saved registers and the shared prolog pays for it
         Vector128<ulong> sumLo = resultLo - carryInLo;
         Vector128<ulong> sumHi = resultHi - carryInHi;
-        Vector128<ulong> propagate = (Vector128.Equals(sumLo, Vector128<ulong>.Zero) & carryInLo)
-                                   | (Vector128.Equals(sumHi, Vector128<ulong>.Zero) & carryInHi);
+        Unsafe.SkipInit(out res);
+        // ARM repairs carries using the loaded vectors, so early stores are safe even with aliased inputs.
+        if (AdvSimd.IsSupported)
+        {
+            ref Vector128<ulong> earlyResult = ref Unsafe.As<UInt256, Vector128<ulong>>(ref res);
+            earlyResult = sumLo;
+            Unsafe.Add(ref earlyResult, 1) = sumHi;
+        }
+
+        Vector128<ulong> propagatedLo = Vector128.Equals(sumLo, Vector128<ulong>.Zero) & carryInLo;
+        Vector128<ulong> propagatedHi = Vector128.Equals(sumHi, Vector128<ulong>.Zero) & carryInHi;
+        Vector128<ulong> propagate = AdvSimd.IsSupported && !detectOverflow
+            ? AdvSimd.ExtractVector128(propagatedLo, propagatedHi, 1)
+            : propagatedLo | propagatedHi;
         if (!Vector128.EqualsAll(propagate, Vector128<ulong>.Zero))
         {
+            if (AdvSimd.IsSupported)
+            {
+                // The low half is complete. Repair the remaining two carry hops in the high half.
+                Vector128<ulong> secondHi = detectOverflow
+                    ? AdvSimd.ExtractVector128(propagatedLo, propagatedHi, 1)
+                    : propagate;
+                Vector128<ulong> fullHi = Vector128.Equals(sumHi, Vector128<ulong>.AllBitsSet);
+                Vector128<ulong> thirdHi = AdvSimd.ExtractVector128(Vector128<ulong>.Zero, fullHi & secondHi, 1);
+                Vector128<ulong> extra = secondHi | thirdHi;
+                carryHi |= propagatedHi | (fullHi & extra);
+                sumHi -= extra;
+                ref Vector128<ulong> resultRef = ref Unsafe.As<UInt256, Vector128<ulong>>(ref res);
+                Unsafe.Add(ref resultRef, 1) = sumHi;
+                return carryHi.GetElement(1) != 0;
+            }
+
             // Nothing has been stored yet, so a and b are intact even when res aliases one of them
             ulong carry = 0;
             AddWithCarry(a.u0, b.u0, ref carry, out ulong r0);
@@ -224,10 +272,12 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
             return carry != 0;
         }
 
-        Unsafe.SkipInit(out res);
-        ref Vector128<ulong> resRef = ref Unsafe.As<UInt256, Vector128<ulong>>(ref res);
-        resRef = sumLo;
-        Unsafe.Add(ref resRef, 1) = sumHi;
+        if (!AdvSimd.IsSupported)
+        {
+            ref Vector128<ulong> resRef = ref Unsafe.As<UInt256, Vector128<ulong>>(ref res);
+            resRef = sumLo;
+            Unsafe.Add(ref resRef, 1) = sumHi;
+        }
         return carryHi.GetElement(1) != 0;
     }
 
@@ -236,6 +286,14 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     private static bool AddScalarUInt64(in UInt256 a, ulong b0, out UInt256 res)
     {
         ulong a0 = a.u0, a1 = a.u1, a2 = a.u2, a3 = a.u3;
+        if (AdvSimd.IsSupported)
+        {
+            ulong low = a0 + b0;
+            bool overflow = false;
+            if (low < a0 && ++a1 == 0 && ++a2 == 0) overflow = ++a3 == 0;
+            StoreLimbs(out res, low, a1, a2, a3);
+            return overflow;
+        }
         ulong r0 = a0 + b0;
         if (r0 >= a0)
         {
