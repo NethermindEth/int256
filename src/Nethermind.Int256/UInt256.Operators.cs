@@ -5,6 +5,7 @@ using System;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Runtime.Intrinsics.X86;
 
 namespace Nethermind.Int256;
 
@@ -64,7 +65,13 @@ public readonly partial struct UInt256
 
     public static UInt256 operator ++(in UInt256 a)
     {
-        Add(in a, 1, out UInt256 res);
+        UInt256 res;
+        // AVX2 can load One directly; constructing 1 needs scalar stores followed by a vector reload.
+        // Keep the literal on other paths so the JIT can fold their narrow-operand dispatch.
+        if (Avx2.IsSupported)
+            Add(in a, in One, out res);
+        else
+            Add(in a, 1, out res);
         return res;
     }
 
