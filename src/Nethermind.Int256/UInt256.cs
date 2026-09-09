@@ -350,7 +350,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     /// </remarks>
     /// <param name="a">The other 256-bit addend.</param>
     /// <param name="res">On return, contains <c>(this + a) mod 2^256</c>.</param>
-    public void Add(in UInt256 a, out UInt256 res) => AddOverflow(this, a, out res);
+    public void Add(in UInt256 a, out UInt256 res) => Add(this, a, out res);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void AddWithCarry(ulong x, ulong y, ref ulong carry, out ulong sum)

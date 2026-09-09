@@ -58,13 +58,13 @@ public readonly partial struct UInt256
 
     public static UInt256 operator +(in UInt256 a, in UInt256 b)
     {
-        AddOverflow(in a, in b, out UInt256 res);
+        Add(in a, in b, out UInt256 res);
         return res;
     }
 
     public static UInt256 operator ++(in UInt256 a)
     {
-        AddOverflow(in a, 1, out UInt256 res);
+        Add(in a, 1, out UInt256 res);
         return res;
     }
 

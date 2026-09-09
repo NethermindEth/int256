@@ -103,7 +103,7 @@ public readonly struct Int256 : IEquatable<Int256>, IComparable, IComparable<Int
 
     public static void Add(in Int256 a, in Int256 b, out Int256 res)
     {
-        UInt256.AddOverflow(a._value, b._value, out UInt256 ures);
+        UInt256.Add(a._value, b._value, out UInt256 ures);
         res = new Int256(ures);
     }
 

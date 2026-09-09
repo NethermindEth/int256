@@ -44,6 +44,19 @@ public class AddCarryBoundaryTests
         UInt256 expected = (UInt256)(sum & ((BigInteger.One << 256) - 1));
         bool expectedOverflow = sum >> 256 != 0;
 
+        Assert.That(a + b, Is.EqualTo(expected));
+        a.Add(b, out UInt256 instanceResult);
+        Assert.That(instanceResult, Is.EqualTo(expected));
+        UInt256 instanceAlias = a;
+        instanceAlias.Add(b, out instanceAlias);
+        Assert.That(instanceAlias, Is.EqualTo(expected));
+        Int256.Add(new Int256(a), new Int256(b), out Int256 signedResult);
+        Assert.That(signedResult, Is.EqualTo(new Int256(expected)));
+        UInt256 incremented = a;
+        incremented++;
+        Assert.That(incremented, Is.EqualTo((UInt256)(((BigInteger)a + 1) & ((BigInteger.One << 256) - 1))));
+
+
         UInt256.Add(a, b, out UInt256 result);
         Assert.That(result, Is.EqualTo(expected));
         UInt256 left = a, right = b;
