@@ -75,12 +75,15 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void Add(in UInt256 a, in UInt256 b, out UInt256 res)
     {
-        if (AdvSimd.IsSupported)
+        if (Avx2.IsSupported)
         {
-            AddScalar(in a, in b, out res, false);
+            PrepareAdd(in a, in b, out res, out Vector256<ulong> result, out Vector256<ulong> carryMask,
+                out Vector256<ulong> carryIn, out Vector256<ulong> fullLanes);
+            if ((Avx.MoveMask((fullLanes & carryIn).AsDouble()) & 0b0110) != 0)
+                FinishAdd(result, carryMask, fullLanes, out res);
             return;
         }
-        AddOverflow(in a, in b, out res);
+        AddScalar(in a, in b, out res, false);
     }
 
     /// <summary>
@@ -104,51 +107,62 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     {
         if (Avx2.IsSupported)
         {
-            Vector256<ulong> av = Unsafe.BitCast<UInt256, Vector256<ulong>>(a);
-            Vector256<ulong> bv = Unsafe.BitCast<UInt256, Vector256<ulong>>(b);
-
-            Vector256<ulong> result = av + bv;
-            // All bits set in lanes that carried out (carry out of each 64-bit limb).
-            Vector256<ulong> carryMask;
-            Vector256<ulong> carryIn;
-            if (Avx512F.VL.IsSupported)
-            {
-                // Sign bit of (a & b) | (~result & (a | b)) is the carry; one ternary-logic op
-                carryMask = Vector256.ShiftRightArithmetic(Avx512F.VL.TernaryLogic(av, bv, result, 0xD4).AsInt64(), 63).AsUInt64();
-                carryIn = Avx512F.VL.AlignRight64(carryMask, Vector256<ulong>.Zero, 3);
-            }
-            else
-            {
-                carryMask = Vector256.LessThan(result, av);
-                carryIn = Avx2.Blend(Avx2.Permute4x64(carryMask, 0b10_01_00_00).AsUInt32(), Vector256<uint>.Zero, 0b0000_0011).AsUInt64();
-            }
-
-            // res may alias a or b, so the cascade path below must only use registers already loaded.
-            // Storing ahead of the branch measured 25% faster on AVX2-only parts for SubtractImpl.
-            Unsafe.SkipInit(out res);
-            Unsafe.As<UInt256, Vector256<ulong>>(ref res) = result - carryIn;
-
-            // A full limb that receives a carry must pass it on; rare, so it resolves through the lookup
-            Vector256<ulong> fullLanes = Vector256.Equals(result, Vector256<ulong>.AllBitsSet);
+            PrepareAdd(in a, in b, out res, out Vector256<ulong> result, out Vector256<ulong> carryMask,
+                out Vector256<ulong> carryIn, out Vector256<ulong> fullLanes);
             if (!Avx.TestZ(fullLanes, carryIn))
-            {
-                uint carry = (uint)Avx.MoveMask(carryMask.AsDouble());
-                uint cascade = (uint)Avx.MoveMask(fullLanes.AsDouble());
-                // Move carry to next bit and add cascade; carries ripple through consecutive full limbs
-                carry = cascade + 2 * carry;
-                // Keep only the cascades a carry reached
-                cascade ^= carry;
-                cascade &= 0x0f;
-
-                Vector256<ulong> cascadedCarries = Unsafe.Add(ref Unsafe.As<byte, Vector256<ulong>>(ref MemoryMarshal.GetReference(BroadcastLookup)), (nuint)cascade);
-                Unsafe.As<UInt256, Vector256<ulong>>(ref res) = result + cascadedCarries;
-                return (carry & 0b1_0000) != 0;
-            }
-
+                return FinishAdd(result, carryMask, fullLanes, out res);
             return (Avx.MoveMask(carryMask.AsDouble()) & 0b1000) != 0;
         }
-
         return AddScalar(in a, in b, out res, true);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void PrepareAdd(in UInt256 a, in UInt256 b, out UInt256 res,
+        out Vector256<ulong> result, out Vector256<ulong> carryMask,
+        out Vector256<ulong> carryIn, out Vector256<ulong> fullLanes)
+    {
+        Vector256<ulong> av = Unsafe.BitCast<UInt256, Vector256<ulong>>(a);
+        Vector256<ulong> bv = Unsafe.BitCast<UInt256, Vector256<ulong>>(b);
+
+        result = av + bv;
+        // All bits set in lanes that carried out (carry out of each 64-bit limb).
+        if (Avx512F.VL.IsSupported)
+        {
+            // Sign bit of (a & b) | (~result & (a | b)) is the carry; one ternary-logic op
+            carryMask = Vector256.ShiftRightArithmetic(Avx512F.VL.TernaryLogic(av, bv, result, 0xD4).AsInt64(), 63).AsUInt64();
+            carryIn = Avx512F.VL.AlignRight64(carryMask, Vector256<ulong>.Zero, 3);
+        }
+        else
+        {
+            carryMask = Vector256.LessThan(result, av);
+            carryIn = Avx2.Blend(Avx2.Permute4x64(carryMask, 0b10_01_00_00).AsUInt32(), Vector256<uint>.Zero, 0b0000_0011).AsUInt64();
+        }
+
+        // res may alias a or b, so the cascade path below must only use registers already loaded.
+        // Storing ahead of the branch measured 25% faster on AVX2-only parts for SubtractImpl.
+        Unsafe.SkipInit(out res);
+        Unsafe.As<UInt256, Vector256<ulong>>(ref res) = result - carryIn;
+
+        // A full limb that receives a carry must pass it on; rare, so it resolves through the lookup
+        fullLanes = Vector256.Equals(result, Vector256<ulong>.AllBitsSet);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool FinishAdd(Vector256<ulong> result, Vector256<ulong> carryMask,
+        Vector256<ulong> fullLanes, out UInt256 res)
+    {
+        Unsafe.SkipInit(out res);
+        uint carry = (uint)Avx.MoveMask(carryMask.AsDouble());
+        uint cascade = (uint)Avx.MoveMask(fullLanes.AsDouble());
+        // Move carry to next bit and add cascade; carries ripple through consecutive full limbs
+        carry = cascade + 2 * carry;
+        // Keep only the cascades a carry reached
+        cascade ^= carry;
+        cascade &= 0x0f;
+
+        Vector256<ulong> cascadedCarries = Unsafe.Add(ref Unsafe.As<byte, Vector256<ulong>>(ref MemoryMarshal.GetReference(BroadcastLookup)), (nuint)cascade);
+        Unsafe.As<UInt256, Vector256<ulong>>(ref res) = result + cascadedCarries;
+        return (carry & 0b1_0000) != 0;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
