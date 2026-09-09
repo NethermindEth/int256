@@ -1574,10 +1574,11 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     private static ulong MultiplyFold(ulong a, ulong b)
     {
         ulong high = Multiply64(a, b, out ulong low);
-        // Carry the factors past the product: `low ^ high` alone is zero whenever either factor is, so a
-        // key hitting a factor's constant would erase the word multiplied with it. The carry leaves the
-        // survivor intact instead, which is what FoldHash's closing fold then has to absorb.
-        return low ^ high ^ a ^ b;
+        // Carry the factors past the product, and add rather than XOR them: `low ^ high` alone is zero
+        // whenever either factor is, while XORing them back cancels when a factor is small - at 1 the
+        // product is the partner itself, so the fold ignored the partner entirely. Addition has no such
+        // value: a fold blind to its partner needs a == 2a + 1, so only -1, which b == 2 rules out.
+        return unchecked((low ^ high) + a + b);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

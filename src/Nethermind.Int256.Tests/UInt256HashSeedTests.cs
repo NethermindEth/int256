@@ -167,6 +167,52 @@ public class UInt256HashSeedTests
         Assert.That(hashes.Count, Is.GreaterThan(SampleCount - 32));
     }
 
+    /// <summary>Checks that no small fold factor lets a limb erase the limb folded with it.</summary>
+    /// <remarks>
+    /// Carrying the factors past the product by XOR cancels when a factor is small: at <c>1</c> the
+    /// product is the partner itself, so the fold returned a constant and every partner collided. The
+    /// neighbours leaked too - this sweep left 609 of 4096 distinct at <c>3</c>. Adding the factors
+    /// instead has no such value, so every case here spreads.
+    /// </remarks>
+    [Test]
+    public void MultiplyHash_NoSmallFoldFactorErasesItsPartner(
+        [Values(0, 1, 2, 3)] int limb,
+        [Values(0UL, 1UL, 2UL, 3UL, 5UL, 9UL, ulong.MaxValue)] ulong factor)
+    {
+        int partner = limb ^ 1;
+        UInt256 pinned = WithLimb(default, limb, FactorValue(limb, factor));
+        HashSet<int> hashes = new(SampleCount);
+        for (int value = 0; value < SampleCount; value++)
+        {
+            hashes.Add(WithLimb(pinned, partner, FirstSeed[partner] ^ ((ulong)(uint)value << 11))
+                .GetMultiplyHashCode(FirstSeed));
+        }
+        Assert.That(hashes.Count, Is.GreaterThan(SampleCount - 32));
+    }
+
+    /// <summary>Checks that an inner fold's output cannot steer the outer fold into erasing a half.</summary>
+    /// <remarks>
+    /// Zeroing a half's first factor leaves the half equal to its second factor, so a known seed picks
+    /// the half's value outright - including the one whose outer factor is <c>1</c>, which made the hash
+    /// constant for every key in the other half. Same chain as
+    /// <see cref="MultiplyHash_ChainingZeroedFoldFactorsDoesNotCollapse"/>, steered one past the
+    /// constant that fold reaches for.
+    /// </remarks>
+    [Test]
+    public void MultiplyHash_SteeringTheOuterFoldDoesNotEraseAHalf()
+    {
+        HashSet<int> hashes = new(SampleCount);
+        for (int value = 0; value < SampleCount; value++)
+        {
+            UInt256 key = new(Cancelling(0),
+                FirstSeed.u1 ^ SecondFactorConstant ^ FirstFactorConstant ^ 1UL,
+                FirstSeed.u2 ^ (ulong)(uint)value,
+                FirstSeed.u3 ^ ~(ulong)(uint)value);
+            hashes.Add(key.GetMultiplyHashCode(FirstSeed));
+        }
+        Assert.That(hashes.Count, Is.GreaterThan(SampleCount - 32));
+    }
+
     /// <summary>Checks that a half's two seed-masked words are not interchangeable.</summary>
     /// <remarks>
     /// The widening product is commutative, so folding a pair without position-separating constants gave
@@ -211,12 +257,15 @@ public class UInt256HashSeedTests
     private static ulong ReferenceFold(ulong a, ulong b)
     {
         BigInteger product = (BigInteger)a * b;
-        return (ulong)(product & ulong.MaxValue) ^ (ulong)(product >> 64) ^ a ^ b;
+        return unchecked(((ulong)(product & ulong.MaxValue) ^ (ulong)(product >> 64)) + a + b);
     }
 
     /// <summary>The limb value that zeroes the factor it is folded as, under <see cref="FirstSeed"/>.</summary>
-    private static ulong Cancelling(int limb)
-        => FirstSeed[limb] ^ (limb % 2 == 0 ? FirstFactorConstant : SecondFactorConstant);
+    private static ulong Cancelling(int limb) => FactorValue(limb, 0);
+
+    /// <summary>The limb value giving the factor it is folded as, under <see cref="FirstSeed"/>.</summary>
+    private static ulong FactorValue(int limb, ulong factor)
+        => FirstSeed[limb] ^ (limb % 2 == 0 ? FirstFactorConstant : SecondFactorConstant) ^ factor;
 
     private static UInt256 WithLimb(in UInt256 value, int limb, ulong replacement) => new(
         limb == 0 ? replacement : value.u0, limb == 1 ? replacement : value.u1,
