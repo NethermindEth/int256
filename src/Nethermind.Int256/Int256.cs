@@ -103,7 +103,12 @@ public readonly struct Int256 : IEquatable<Int256>, IComparable, IComparable<Int
 
     public static void Add(in Int256 a, in Int256 b, out Int256 res)
     {
-        UInt256.AddOverflow(a._value, b._value, out UInt256 ures);
+        UInt256 ures;
+        // Keep the measured AVX2 wrapper route; signed addition still wraps.
+        if (Avx2.IsSupported && !Avx512F.VL.IsSupported)
+            UInt256.AddOverflow(a._value, b._value, out ures);
+        else
+            UInt256.Add(a._value, b._value, out ures);
         res = new Int256(ures);
     }
 
