@@ -264,6 +264,10 @@ public readonly partial struct UInt256
     private bool EqualsScalar(in UInt256 other)
         => ((u0 ^ other.u0) | (u1 ^ other.u1) | (u2 ^ other.u2) | (u3 ^ other.u3)) == 0;
 
+    // Pack equality into each low dword and the opposite ordering into each high dword.
+    // One MoveMask then yields four base-4 digits: favorable=0, equal=1, opposite=2.
+    // All-equal is 0x55; biasing by 0x56 includes equality. The mask is at most 0xAA,
+    // so the sign of the biased result determines ordering without overflow ambiguity.
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool LessThanOrEqual(in UInt256 a, in UInt256 b)
     {
@@ -271,10 +275,10 @@ public readonly partial struct UInt256
         {
             Vector256<ulong> left = Unsafe.BitCast<UInt256, Vector256<ulong>>(a);
             Vector256<ulong> right = Unsafe.BitCast<UInt256, Vector256<ulong>>(b);
-            uint gt = (uint)Avx512DQ.MoveMask(Avx512F.VL.CompareGreaterThan(left, right));
-            uint ge = (uint)Avx512DQ.MoveMask(Avx512F.VL.CompareGreaterThanOrEqual(left, right));
-            // ge = 15 - lt; the extra bias includes equal values.
-            return unchecked((int)(gt + ge - 16u)) < 0;
+            Vector256<ulong> eq = Avx2.CompareEqual(left, right);
+            Vector256<ulong> cmp = Avx512F.VL.CompareGreaterThan(left, right);
+            uint mask = (uint)Avx.MoveMask(Avx2.Blend(eq.AsInt32(), cmp.AsInt32(), 0xAA).AsSingle());
+            return unchecked((int)(mask - 0x56u)) < 0;
         }
         return !LessThan(in b, in a);
     }
@@ -286,10 +290,10 @@ public readonly partial struct UInt256
         {
             Vector256<ulong> left = Unsafe.BitCast<UInt256, Vector256<ulong>>(a);
             Vector256<ulong> right = Unsafe.BitCast<UInt256, Vector256<ulong>>(b);
-            uint lt = (uint)Avx512DQ.MoveMask(Avx512F.VL.CompareLessThan(left, right));
-            uint le = (uint)Avx512DQ.MoveMask(Avx512F.VL.CompareLessThanOrEqual(left, right));
-            // le = 15 - gt; the extra bias includes equal values.
-            return unchecked((int)(lt + le - 16u)) < 0;
+            Vector256<ulong> eq = Avx2.CompareEqual(left, right);
+            Vector256<ulong> cmp = Avx512F.VL.CompareLessThan(left, right);
+            uint mask = (uint)Avx.MoveMask(Avx2.Blend(eq.AsInt32(), cmp.AsInt32(), 0xAA).AsSingle());
+            return unchecked((int)(mask - 0x56u)) < 0;
         }
         return !LessThan(in a, in b);
     }
@@ -301,11 +305,27 @@ public readonly partial struct UInt256
         {
             Vector256<ulong> left = Unsafe.BitCast<UInt256, Vector256<ulong>>(a);
             Vector256<ulong> right = Unsafe.BitCast<UInt256, Vector256<ulong>>(b);
-            uint lt = (uint)Avx512DQ.MoveMask(Avx512F.VL.CompareLessThan(left, right));
-            uint le = (uint)Avx512DQ.MoveMask(Avx512F.VL.CompareLessThanOrEqual(left, right));
-            // le = 15 - gt; the highest differing limb determines the sign.
-            return unchecked((int)(lt + le - 15u)) < 0;
+            Vector256<ulong> eq = Avx2.CompareEqual(left, right);
+            Vector256<ulong> cmp = Avx512F.VL.CompareLessThan(left, right);
+            uint mask = (uint)Avx.MoveMask(Avx.Blend(eq.AsSingle(), cmp.AsSingle(), 0xAA));
+            return unchecked((int)(mask - 0x55u)) < 0;
         }
         return LessThan(in b, in a);
+    }
+
+    // Keep the operator reduction separate from the shared Min/Max comparison path.
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool LessThanOperator(in UInt256 a, in UInt256 b)
+    {
+        if (Avx512F.VL.IsSupported && Avx512DQ.IsSupported)
+        {
+            Vector256<ulong> left = Unsafe.BitCast<UInt256, Vector256<ulong>>(a);
+            Vector256<ulong> right = Unsafe.BitCast<UInt256, Vector256<ulong>>(b);
+            Vector256<ulong> eq = Avx2.CompareEqual(left, right);
+            Vector256<ulong> cmp = Avx512F.VL.CompareGreaterThan(left, right);
+            uint mask = (uint)Avx.MoveMask(Avx.Blend(eq.AsSingle(), cmp.AsSingle(), 0xAA));
+            return unchecked((int)(mask - 0x55u)) < 0;
+        }
+        return LessThan(in a, in b);
     }
 }

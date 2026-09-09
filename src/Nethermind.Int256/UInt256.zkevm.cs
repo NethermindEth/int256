@@ -143,4 +143,8 @@ public readonly partial struct UInt256
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool GreaterThan(in UInt256 a, in UInt256 b)
         => LessThan(in b, in a);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool LessThanOperator(in UInt256 a, in UInt256 b)
+        => LessThan(in a, in b);
 }
