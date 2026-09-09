@@ -10,7 +10,7 @@ using NUnit.Framework;
 namespace Nethermind.Int256.Test;
 
 /// <summary>
-/// Covers the 256x256-to-512-bit product, which dispatches on operand width: a one- or two-limb
+/// Covers truncated, overflow-checked and 256x256-to-512-bit products: a one- or two-limb
 /// operand takes a narrower helper with fewer partial products and a shorter carry chain.
 /// Every expected value here comes from <see cref="BigInteger"/>, never from limb arithmetic,
 /// so a shared mistake in the limb code cannot make a test agree with itself.
@@ -235,11 +235,9 @@ public class MultiplyWidthTests
 
     /// <summary>
     /// Every helper must write all eight result limbs, and this is where that is diagnosable.
-    /// MultiplyOverflow is [SkipLocalsInit], so its high half starts as whatever the stack held:
-    /// a helper that leaves one limb unwritten becomes a spurious overflow rather than a benign
-    /// zero. Rather than accept that failure mode, pin the invariant - run each product from two
-    /// disjoint starting patterns and require the same answer. A forgotten limb makes them differ,
-    /// and names the helper that forgot it.
+    /// Multiply256To512Bit supplies both halves to MultiplyMod, so an unwritten high limb
+    /// corrupts the reduction. Run each product from two disjoint starting patterns and require
+    /// the same answer, making a forgotten limb visible at the multiply helper.
     /// </summary>
     [TestCaseSource(nameof(WidthPairs))]
     public void Result_does_not_depend_on_prior_output_contents(int xWidth, int yWidth)
@@ -331,7 +329,7 @@ public class MultiplyWidthTests
                 Assert.Fail($"MultiplyOverflow({Show(in x)}, {Show(in y)}) reported overflow or a non-zero product");
             }
 
-            // Aliased: a stale high half here would surface as a spurious overflow.
+            // Aliased: all four product limbs must be cleared before the input is lost.
             UInt256 aliased = x;
             if (UInt256.MultiplyOverflow(in aliased, in y, out aliased) || !aliased.IsZero)
             {
@@ -346,10 +344,9 @@ public class MultiplyWidthTests
     /// breaks this and nothing else notices.
     /// </summary>
     /// <remarks>
-    /// Only the MultiplyOverflow assertions reach the width helpers, and only through the low
-    /// output - that is the only aliasing the public surface can produce, since MultiplyMod hands
-    /// the multiply two fresh locals. The MultiplyMod assertions below cover the reduction path
-    /// instead, which is worth having but is not what this test is named for.
+    /// MultiplyOverflow exercises input/output aliasing in the low-product width helpers.
+    /// MultiplyMod hands the full multiply two fresh locals, so its assertions cover aliasing
+    /// in the reduction path instead. Multiply also checks the unaliased truncated product.
     /// </remarks>
     [TestCaseSource(nameof(WidthPairs))]
     public void Output_may_alias_either_input(int xWidth, int yWidth)
@@ -361,20 +358,7 @@ public class MultiplyWidthTests
             foreach (UInt256 y in ValuesOfWidth(yWidth))
             {
                 BigInteger product = ToBig(in x) * ToBig(in y);
-                BigInteger truncated = product & TestNumbers.UInt256Max;
-                bool overflows = product > TestNumbers.UInt256Max;
-
-                bool plain = UInt256.MultiplyOverflow(in x, in y, out UInt256 plainResult);
-
-                UInt256 left = x;
-                bool leftOverflow = UInt256.MultiplyOverflow(in left, in y, out left);
-                Check(ToBig(in left) == truncated && leftOverflow == overflows, "MultiplyOverflow res aliased onto x", in x, in y);
-
-                UInt256 right = y;
-                bool rightOverflow = UInt256.MultiplyOverflow(in x, in right, out right);
-                Check(ToBig(in right) == truncated && rightOverflow == overflows, "MultiplyOverflow res aliased onto y", in x, in y);
-
-                Check(ToBig(in plainResult) == truncated && plain == overflows, "MultiplyOverflow unaliased", in x, in y);
+                CheckProductAliases(in x, in y);
 
                 BigInteger reduced = product % ToBig(in modulus);
 
@@ -391,13 +375,92 @@ public class MultiplyWidthTests
                 Check(ToBig(in modMod) == reduced, "MultiplyMod res aliased onto the modulus", in x, in y);
             }
         }
+    }
 
-        static void Check(bool ok, string what, in UInt256 x, in UInt256 y)
+    public static IEnumerable<TestCaseData> BoundaryPairs
+    {
+        get
         {
-            if (!ok)
+            int[] bits = [0, 1, 31, 32, 63, 64, 65, 95, 96, 127, 128, 129, 159, 160, 161, 191, 192, 193, 255];
+            HashSet<(BigInteger, BigInteger)> seen = [];
+            foreach (int bit in bits)
             {
-                Assert.Fail($"{what} gave the wrong answer for {Show(in x)} * {Show(in y)}");
+                for (int offset = -1; offset <= 1; offset++)
+                {
+                    BigInteger a = (BigInteger.One << bit) + offset;
+                    foreach (int otherBit in bits)
+                    {
+                        for (int otherOffset = -1; otherOffset <= 1; otherOffset++)
+                        {
+                            BigInteger b = (BigInteger.One << otherBit) + otherOffset;
+                            if (seen.Add((a, b))) yield return Pair(a, b);
+                        }
+                    }
+
+                    if (a.IsZero) continue;
+                    for (int delta = -1; delta <= 1; delta++)
+                    {
+                        BigInteger b = BigInteger.Min(TestNumbers.UInt256Max, TestNumbers.UInt256Max / a + delta);
+                        if (b >= 0 && seen.Add((a, b))) yield return Pair(a, b);
+                    }
+                }
             }
+        }
+    }
+
+    private static TestCaseData Pair(BigInteger a, BigInteger b)
+    {
+        UInt256 x = (UInt256)a, y = (UInt256)b;
+        return new TestCaseData(x, y).SetName($"{{m}}({Show(in x)} * {Show(in y)})");
+    }
+
+    [TestCaseSource(nameof(BoundaryPairs))]
+    public void Products_near_width_and_overflow_boundaries_preserve_aliases(UInt256 x, UInt256 y)
+        => CheckProductAliases(in x, in y);
+
+    private static void CheckProductAliases(in UInt256 x, in UInt256 y)
+    {
+        BigInteger product = ToBig(in x) * ToBig(in y);
+        BigInteger truncated = product & TestNumbers.UInt256Max;
+        bool overflows = product > TestNumbers.UInt256Max;
+
+        UInt256 plainResult = Stale;
+        bool plain = UInt256.MultiplyOverflow(in x, in y, out plainResult);
+        Check(ToBig(in plainResult) == truncated, "MultiplyOverflow unaliased product", in x, in y);
+        Check(plain == overflows, "MultiplyOverflow unaliased flag", in x, in y);
+
+        UInt256 otherResult = OtherStale;
+        bool other = UInt256.MultiplyOverflow(in x, in y, out otherResult);
+        Check(ToBig(in otherResult) == truncated, "MultiplyOverflow other seed product", in x, in y);
+        Check(other == overflows, "MultiplyOverflow other seed flag", in x, in y);
+
+        UInt256 left = x;
+        bool leftOverflow = UInt256.MultiplyOverflow(in left, in y, out left);
+        Check(ToBig(in left) == truncated, "MultiplyOverflow res aliased onto x product", in x, in y);
+        Check(leftOverflow == overflows, "MultiplyOverflow res aliased onto x flag", in x, in y);
+
+        UInt256 right = y;
+        bool rightOverflow = UInt256.MultiplyOverflow(in x, in right, out right);
+        Check(ToBig(in right) == truncated, "MultiplyOverflow res aliased onto y product", in x, in y);
+        Check(rightOverflow == overflows, "MultiplyOverflow res aliased onto y flag", in x, in y);
+
+        UInt256.Multiply(in x, in y, out plainResult);
+        Check(ToBig(in plainResult) == truncated, "Multiply product", in x, in y);
+
+        if (x.Equals(y))
+        {
+            UInt256 both = x;
+            bool bothOverflow = UInt256.MultiplyOverflow(in both, in both, out both);
+            Check(ToBig(in both) == truncated, "MultiplyOverflow all three arguments alias product", in x, in y);
+            Check(bothOverflow == overflows, "MultiplyOverflow all three arguments alias flag", in x, in y);
+        }
+    }
+
+    private static void Check(bool ok, string what, in UInt256 x, in UInt256 y)
+    {
+        if (!ok)
+        {
+            Assert.Fail($"{what} gave the wrong answer for {Show(in x)} * {Show(in y)}");
         }
     }
 
@@ -420,9 +483,8 @@ public class MultiplyWidthTests
     }
 
     /// <summary>
-    /// The overflow flag is a scalar test over all four limbs of the high half. Anything that reads
-    /// only some of them - or reads the wrong width - passes on random inputs and fails on a product
-    /// whose only high bit sits in a limb it does not look at.
+    /// Overflow must be detected regardless of where the discarded high bits would land.
+    /// Single-bit products cover each high limb without relying on random carry patterns.
     /// </summary>
     [TestCaseSource(nameof(OverflowLimbCases))]
     public void MultiplyOverflow_reports_every_high_limb(int xShift, int yShift, bool expectedOverflow)
@@ -502,7 +564,7 @@ public class MultiplyWidthTests
                 helper(in x, in y, out low, out high);
 
                 // Same product from a disjoint starting pattern: catches an unwritten result limb
-                // here, at the helper, instead of as a spurious overflow flag in the caller.
+                // here, at the helper, instead of as a wrong modular reduction in the caller.
                 UInt256 otherLow = OtherStale, otherHigh = OtherStale;
                 helper(in x, in y, out otherLow, out otherHigh);
                 if (!otherLow.Equals(low) || !otherHigh.Equals(high))
