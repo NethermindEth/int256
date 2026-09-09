@@ -1346,10 +1346,11 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         uint ltMask;
         if (Avx512F.VL.IsSupported && Avx512DQ.IsSupported)
         {
-            // The highest differing limb dominates all lower mask bits.
-            uint lt = (uint)Avx512DQ.MoveMask(Avx512F.VL.CompareLessThan(vecL, vecR));
+            // ge = 15 - lt. The highest differing limb determines the sign of gt - lt.
+            // Adding complementary masks lets the JIT fold the bias into one LEA.
             uint gt = (uint)Avx512DQ.MoveMask(Avx512F.VL.CompareGreaterThan(vecL, vecR));
-            return lt > gt;
+            uint ge = (uint)Avx512DQ.MoveMask(Avx512F.VL.CompareGreaterThanOrEqual(vecL, vecR));
+            return unchecked((int)(gt + ge - 15u)) < 0;
         }
         else
         {

@@ -131,4 +131,16 @@ public readonly partial struct UInt256
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Equals(in UInt256 other)
         => u0 == other.u0 && u1 == other.u1 && u2 == other.u2 && u3 == other.u3;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool LessThanOrEqual(in UInt256 a, in UInt256 b)
+        => !LessThan(in b, in a);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool GreaterThanOrEqual(in UInt256 a, in UInt256 b)
+        => !LessThan(in a, in b);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool GreaterThan(in UInt256 a, in UInt256 b)
+        => LessThan(in b, in a);
 }
