@@ -411,8 +411,9 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
             }
             else
             {
-                borrowMask = Vector256.GreaterThan(result, av);
-                borrowIn = Avx2.Blend(Avx2.Permute4x64(borrowMask, 0b10_01_00_00).AsUInt32(), Vector256<uint>.Zero, 0b0000_0011).AsUInt64();
+                // Form borrows independently of result to shorten the dependency chain.
+                borrowMask = Vector256.LessThan(av, bv);
+                borrowIn = Avx2.Permute4x64(borrowMask, 0b10_01_00_00) & Vector256.Create(0UL, ulong.MaxValue, ulong.MaxValue, ulong.MaxValue);
             }
 
             // res may alias a or b, so the cascade path below must only use registers already loaded.
