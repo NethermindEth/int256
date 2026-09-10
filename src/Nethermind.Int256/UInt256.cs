@@ -435,7 +435,9 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
 
                 Vector256<ulong> cascadedBorrows = Unsafe.Add(ref Unsafe.As<byte, Vector256<ulong>>(ref MemoryMarshal.GetReference(BroadcastLookup)), (nuint)cascade);
                 Unsafe.As<UInt256, Vector256<ulong>>(ref res) = result - cascadedBorrows;
-                return (borrow & 0b1_0000) != 0;
+                return Bmi1.IsSupported
+                    ? Unsafe.BitCast<byte, bool>((byte)Bmi1.BitFieldExtract(borrow, 4, 1))
+                    : (borrow & 0b1_0000) != 0;
             }
 
             return (Avx.MoveMask(borrowMask.AsDouble()) & 0b1000) != 0;
