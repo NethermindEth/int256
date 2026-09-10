@@ -1,5 +1,9 @@
 <Project>
 
+  <PropertyGroup Condition="'$(EnableZkEvm)' == 'true'">
+    <DefineConstants>$(DefineConstants);ZKEVM</DefineConstants>
+  </PropertyGroup>
+
   <ItemGroup Condition="'$(EnableZkEvm)' == 'true'">
     <Compile Remove="**/*.std.cs" />
     <None Include="**/*.std.cs" />

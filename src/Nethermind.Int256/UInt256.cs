@@ -563,12 +563,21 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         Unsafe.AsRef(in res.u3) = r3;
     }
 
-    // Borrow out is (a < b) | ((a == b) & borrowIn); both compares are off the carry chain
+    // Borrow out is (a < b) | ((a == b) & borrowIn).
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void SubtractWithBorrow(ulong a, ulong b, ref ulong borrow, out ulong res)
     {
+#if ZKEVM
+        // Reusing the intermediate difference reduces guest instructions.
+        ulong incomingBorrow = borrow;
+        ulong difference = a - b;
+        res = difference - incomingBorrow;
+        borrow = (a < b ? 1UL : 0UL) | (difference < incomingBorrow ? 1UL : 0UL);
+#else
+        // Keep both comparisons off the carry chain on native CPUs.
         res = a - b - borrow;
         borrow = (a < b ? 1UL : 0UL) | (borrow & (a == b ? 1UL : 0UL));
+#endif
     }
 
     public void Subtract(in UInt256 b, out UInt256 res) => Subtract(this, b, out res);
