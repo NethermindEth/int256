@@ -422,7 +422,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
             Unsafe.As<UInt256, Vector256<ulong>>(ref res) = result + borrowIn;
 
             // A zero limb that receives a borrow must pass it on; rare, so it resolves through the lookup
-            Vector256<ulong> zeroLanes = Vector256.Equals(result, Vector256<ulong>.Zero);
+            Vector256<ulong> zeroLanes = Vector256.Equals(av, bv);
             if (!Avx.TestZ(zeroLanes, borrowIn))
             {
                 uint borrow = (uint)Avx.MoveMask(borrowMask.AsDouble());
