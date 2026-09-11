@@ -17,6 +17,9 @@ namespace Nethermind.Int256;
 
 public readonly partial struct UInt256
 {
+    private const MethodImplOptions SubtractInlining = (MethodImplOptions)0;
+    private const MethodImplOptions SubtractUnderflowInlining = (MethodImplOptions)0;
+
     // Keep the binomial helpers and their spills out of the short-exponent frame.
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void ExpOddLong(in UInt256 b, in UInt256 e, int precision, out UInt256 result)
@@ -335,5 +338,17 @@ public readonly partial struct UInt256
             return unchecked((int)(mask - 0x55u)) < 0;
         }
         return LessThan(in a, in b);
+    }
+
+    private static partial void SubtractWithBorrow(ulong a, ulong b, ref ulong borrow, out ulong res)
+    {
+        // Keep both comparisons off the carry chain on native CPUs.
+        res = a - b - borrow;
+        borrow = (a < b ? 1UL : 0UL) | (borrow & (a == b ? 1UL : 0UL));
+    }
+
+    public static partial bool SubtractUnderflow(in UInt256 a, in UInt256 b, out UInt256 res)
+    {
+        return SubtractImpl(a, b, out res);
     }
 }

@@ -386,6 +386,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     }
 
     // Subtract sets res to the difference a-b
+    [MethodImpl(SubtractInlining)]
     public static void Subtract(in UInt256 a, in UInt256 b, out UInt256 res)
     {
         SubtractImpl(in a, in b, out res);
@@ -568,20 +569,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
 
     // Borrow out is (a < b) | ((a == b) & borrowIn).
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void SubtractWithBorrow(ulong a, ulong b, ref ulong borrow, out ulong res)
-    {
-#if ZKEVM
-        // Reusing the intermediate difference reduces guest instructions.
-        ulong incomingBorrow = borrow;
-        ulong difference = a - b;
-        res = difference - incomingBorrow;
-        borrow = (a < b ? 1UL : 0UL) | (difference < incomingBorrow ? 1UL : 0UL);
-#else
-        // Keep both comparisons off the carry chain on native CPUs.
-        res = a - b - borrow;
-        borrow = (a < b ? 1UL : 0UL) | (borrow & (a == b ? 1UL : 0UL));
-#endif
-    }
+    private static partial void SubtractWithBorrow(ulong a, ulong b, ref ulong borrow, out ulong res);
 
     public void Subtract(in UInt256 b, out UInt256 res) => Subtract(this, b, out res);
 
@@ -607,43 +595,8 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     public void SubtractMod(in UInt256 a, in UInt256 m, out UInt256 res) => SubtractMod(this, a, m, out res);
 
     // SubtractUnderflow sets res to the difference a-b and returns true if the operation underflowed
-#if ZKEVM
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#endif
-    public static bool SubtractUnderflow(in UInt256 a, in UInt256 b, out UInt256 res)
-    {
-#if ZKEVM
-        ulong b0 = b.u0;
-        if ((b.u1 | b.u2 | b.u3) == 0)
-        {
-            return SubtractScalarUInt64(in a, b0, out res);
-        }
-
-        // The first limb has no incoming borrow.
-        ulong a0 = a.u0;
-        ulong r0 = a0 - b0;
-        ulong borrow = a0 < b0 ? 1UL : 0UL;
-        SubtractWithBorrowSelect(a.u1, b.u1, ref borrow, out ulong r1);
-        SubtractWithBorrowSelect(a.u2, b.u2, ref borrow, out ulong r2);
-        SubtractWithBorrowSelect(a.u3, b.u3, ref borrow, out ulong r3);
-        StoreLimbs(out res, r0, r1, r2, r3);
-        return borrow != 0;
-#else
-        return SubtractImpl(a, b, out res);
-#endif
-    }
-
-#if ZKEVM
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void SubtractWithBorrowSelect(ulong a, ulong b, ref ulong borrow, out ulong res)
-    {
-        ulong incoming = borrow;
-        ulong difference = a - b;
-        res = difference - incoming;
-        // Equal operands propagate the incoming borrow; unequal operands generate their own.
-        borrow = difference == 0 ? incoming : (a < b ? 1UL : 0UL);
-    }
-#endif
+    [MethodImpl(SubtractUnderflowInlining)]
+    public static partial bool SubtractUnderflow(in UInt256 a, in UInt256 b, out UInt256 res);
 
     /// <summary>
     /// Multiplies two 256‑bit unsigned integers (<paramref name="x"/> and <paramref name="y"/>) and
