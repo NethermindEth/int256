@@ -62,10 +62,13 @@ public readonly partial struct UInt256
     // Forced inlining of this reducer increases guest steps and proof work.
     private const MethodImplOptions MulMod128Inlining = (MethodImplOptions)0;
 
-    // Guest execution requires stable hashes across runs.
-    private static readonly uint _hashSeed = 2098026241U;
-    private static readonly ulong _aesHashSeed0 = 0x1F83D9ABFB41BD6BUL;
-    private static readonly ulong _aesHashSeed1 = 0x5BE0CD19137E2179UL;
+    /// <inheritdoc />
+    /// <remarks>
+    /// Guest execution has no entropy source, so the build starts from constants rather than from
+    /// anything drawn at start-up, and hashes stay stable across runs until a seed is installed.
+    /// </remarks>
+    private static partial UInt256 CreateInitialSeed()
+        => new(0x1F83D9ABFB41BD6BUL, 0x5BE0CD19137E2179UL, 0x6A09E667F3BCC909UL, 0xBB67AE8584CAA73BUL);
 
     [SkipLocalsInit]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -75,14 +78,13 @@ public readonly partial struct UInt256
         {
             Vector128<byte> key = Unsafe.As<ulong, Vector128<byte>>(ref Unsafe.AsRef(in u0));
             Vector128<byte> data = Unsafe.As<ulong, Vector128<byte>>(ref Unsafe.AsRef(in u2));
-            key ^= Vector128.Create(_aesHashSeed0, _aesHashSeed1).AsByte();
+            key ^= RunSeed.Aes0;
             Vector128<byte> mixed = HashAesRound(data, key);
-            mixed = HashAesRound(mixed, key);
+            mixed = HashAesRound(mixed, key ^ RunSeed.Aes1);
             return FoldHash(MumFold(mixed));
         }
 
-        // Include the 32-byte input length in the deterministic fallback seed.
-        return GetCrcHashCode(unchecked(_hashSeed + 32u));
+        return GetMultiplyHashCode(in RunSeed.Multiply);
     }
 
     public bool IsZero

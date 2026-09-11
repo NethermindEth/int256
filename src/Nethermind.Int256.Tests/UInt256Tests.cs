@@ -1896,19 +1896,6 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
                 : Arm.Aes.MixColumns(Arm.Aes.Encrypt(state, Vector128<byte>.Zero));
     }
 
-    [TestCase(0u)]
-    [TestCase(1u)]
-    [TestCase(0xDEADBEEFu)]
-    public void GetHashCode_DeterministicFallbackMaintainsDistribution(uint seed)
-    {
-        AssertHashCodesAreDistributed(value =>
-        {
-            ulong first = (uint)value;
-            ulong third = SolveCrcInput(BitOperations.Crc32C(0u, first));
-            return new UInt256(first, 0, third, 0).GetCrcHashCode(seed);
-        }, $"deterministic fallback for seed {seed}");
-    }
-
     private static void AssertHashCodesAreDistributed(Func<int, int> getHash, string context)
     {
         HashSet<int> hashes = new(HashDistributionSampleCount);
@@ -1919,53 +1906,6 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
 
         Assert.That(hashes.Count, Is.GreaterThan(HashDistributionSampleCount - 32),
             $"{context} produced {hashes.Count}/{HashDistributionSampleCount} distinct hashes");
-    }
-
-    private static ulong SolveCrcInput(uint target)
-    {
-        Span<uint> pivotBasis = stackalloc uint[32];
-        Span<ulong> pivotSource = stackalloc ulong[32];
-        pivotBasis.Clear();
-        ulong dependentInput = 0;
-
-        for (int i = 0; i < 64; i++)
-        {
-            uint basis = BitOperations.Crc32C(0u, 1UL << i);
-            ulong source = 1UL << i;
-            while (basis != 0)
-            {
-                int column = BitOperations.TrailingZeroCount(basis);
-                if (pivotBasis[column] == 0)
-                {
-                    pivotBasis[column] = basis;
-                    pivotSource[column] = source;
-                    break;
-                }
-
-                basis ^= pivotBasis[column];
-                source ^= pivotSource[column];
-            }
-
-            if (basis == 0 && dependentInput == 0)
-            {
-                dependentInput = source;
-            }
-        }
-
-        if (target == 0)
-        {
-            return dependentInput;
-        }
-
-        ulong input = 0;
-        while (target != 0)
-        {
-            int column = BitOperations.TrailingZeroCount(target);
-            target ^= pivotBasis[column];
-            input ^= pivotSource[column];
-        }
-
-        return input;
     }
 
     // Magnitudes spanning the full 256-bit range, including the top-bit-set and all-ones cases, used
