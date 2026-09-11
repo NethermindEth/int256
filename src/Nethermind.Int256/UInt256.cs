@@ -386,7 +386,6 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     }
 
     // Subtract sets res to the difference a-b
-    [MethodImpl(SubtractInlining)]
     public static void Subtract(in UInt256 a, in UInt256 b, out UInt256 res)
     {
         SubtractImpl(in a, in b, out res);

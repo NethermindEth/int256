@@ -11,7 +11,6 @@ namespace Nethermind.Int256;
 
 public readonly partial struct UInt256
 {
-    private const MethodImplOptions SubtractInlining = (MethodImplOptions)0;
     private const MethodImplOptions SubtractUnderflowInlining = MethodImplOptions.AggressiveInlining;
 
     [MethodImpl(MethodImplOptions.NoInlining)]

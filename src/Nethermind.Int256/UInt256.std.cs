@@ -17,7 +17,6 @@ namespace Nethermind.Int256;
 
 public readonly partial struct UInt256
 {
-    private const MethodImplOptions SubtractInlining = (MethodImplOptions)0;
     private const MethodImplOptions SubtractUnderflowInlining = (MethodImplOptions)0;
 
     // Keep the binomial helpers and their spills out of the short-exponent frame.
