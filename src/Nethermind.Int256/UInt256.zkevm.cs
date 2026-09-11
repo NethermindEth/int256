@@ -11,6 +11,8 @@ namespace Nethermind.Int256;
 
 public readonly partial struct UInt256
 {
+    private const MethodImplOptions SubtractUnderflowInlining = MethodImplOptions.AggressiveInlining;
+
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void ExpOddLong(in UInt256 b, in UInt256 e, int precision, out UInt256 result)
     {
@@ -150,4 +152,42 @@ public readonly partial struct UInt256
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool LessThanOperator(in UInt256 a, in UInt256 b)
         => LessThan(in a, in b);
+
+    private static partial void SubtractWithBorrow(ulong a, ulong b, ref ulong borrow, out ulong res)
+    {
+        // Reusing the intermediate difference reduces guest instructions.
+        ulong incomingBorrow = borrow;
+        ulong difference = a - b;
+        res = difference - incomingBorrow;
+        borrow = (a < b ? 1UL : 0UL) | (difference < incomingBorrow ? 1UL : 0UL);
+    }
+
+    public static partial bool SubtractUnderflow(in UInt256 a, in UInt256 b, out UInt256 res)
+    {
+        ulong b0 = b.u0;
+        if ((b.u1 | b.u2 | b.u3) == 0)
+        {
+            return SubtractScalarUInt64(in a, b0, out res);
+        }
+
+        // The first limb has no incoming borrow.
+        ulong a0 = a.u0;
+        ulong r0 = a0 - b0;
+        ulong borrow = a0 < b0 ? 1UL : 0UL;
+        SubtractWithBorrowSelect(a.u1, b.u1, ref borrow, out ulong r1);
+        SubtractWithBorrowSelect(a.u2, b.u2, ref borrow, out ulong r2);
+        SubtractWithBorrowSelect(a.u3, b.u3, ref borrow, out ulong r3);
+        StoreLimbs(out res, r0, r1, r2, r3);
+        return borrow != 0;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void SubtractWithBorrowSelect(ulong a, ulong b, ref ulong borrow, out ulong res)
+    {
+        ulong incoming = borrow;
+        ulong difference = a - b;
+        res = difference - incoming;
+        // Equal operands propagate the incoming borrow; unequal operands generate their own.
+        borrow = difference == 0 ? incoming : (a < b ? 1UL : 0UL);
+    }
 }

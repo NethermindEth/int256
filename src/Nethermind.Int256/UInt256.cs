@@ -411,8 +411,9 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
             }
             else
             {
-                borrowMask = Vector256.GreaterThan(result, av);
-                borrowIn = Avx2.Blend(Avx2.Permute4x64(borrowMask, 0b10_01_00_00).AsUInt32(), Vector256<uint>.Zero, 0b0000_0011).AsUInt64();
+                // Form borrows independently of result to shorten the dependency chain.
+                borrowMask = Vector256.LessThan(av, bv);
+                borrowIn = Avx2.Permute4x64(borrowMask, 0b10_01_00_00) & Vector256.Create(0UL, ulong.MaxValue, ulong.MaxValue, ulong.MaxValue);
             }
 
             // res may alias a or b, so the cascade path below must only use registers already loaded.
@@ -421,7 +422,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
             Unsafe.As<UInt256, Vector256<ulong>>(ref res) = result + borrowIn;
 
             // A zero limb that receives a borrow must pass it on; rare, so it resolves through the lookup
-            Vector256<ulong> zeroLanes = Vector256.Equals(result, Vector256<ulong>.Zero);
+            Vector256<ulong> zeroLanes = Vector256.Equals(av, bv);
             if (!Avx.TestZ(zeroLanes, borrowIn))
             {
                 uint borrow = (uint)Avx.MoveMask(borrowMask.AsDouble());
@@ -434,7 +435,9 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
 
                 Vector256<ulong> cascadedBorrows = Unsafe.Add(ref Unsafe.As<byte, Vector256<ulong>>(ref MemoryMarshal.GetReference(BroadcastLookup)), (nuint)cascade);
                 Unsafe.As<UInt256, Vector256<ulong>>(ref res) = result - cascadedBorrows;
-                return (borrow & 0b1_0000) != 0;
+                return Bmi1.IsSupported
+                    ? Unsafe.BitCast<byte, bool>((byte)Bmi1.BitFieldExtract(borrow, 4, 1))
+                    : (borrow & 0b1_0000) != 0;
             }
 
             return (Avx.MoveMask(borrowMask.AsDouble()) & 0b1000) != 0;
@@ -563,13 +566,9 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         Unsafe.AsRef(in res.u3) = r3;
     }
 
-    // Borrow out is (a < b) | ((a == b) & borrowIn); both compares are off the carry chain
+    // Borrow out is (a < b) | ((a == b) & borrowIn).
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void SubtractWithBorrow(ulong a, ulong b, ref ulong borrow, out ulong res)
-    {
-        res = a - b - borrow;
-        borrow = (a < b ? 1UL : 0UL) | (borrow & (a == b ? 1UL : 0UL));
-    }
+    private static partial void SubtractWithBorrow(ulong a, ulong b, ref ulong borrow, out ulong res);
 
     public void Subtract(in UInt256 b, out UInt256 res) => Subtract(this, b, out res);
 
@@ -595,10 +594,8 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     public void SubtractMod(in UInt256 a, in UInt256 m, out UInt256 res) => SubtractMod(this, a, m, out res);
 
     // SubtractUnderflow sets res to the difference a-b and returns true if the operation underflowed
-    public static bool SubtractUnderflow(in UInt256 a, in UInt256 b, out UInt256 res)
-    {
-        return SubtractImpl(a, b, out res);
-    }
+    [MethodImpl(SubtractUnderflowInlining)]
+    public static partial bool SubtractUnderflow(in UInt256 a, in UInt256 b, out UInt256 res);
 
     /// <summary>
     /// Multiplies two 256‑bit unsigned integers (<paramref name="x"/> and <paramref name="y"/>) and
