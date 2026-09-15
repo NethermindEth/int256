@@ -1563,14 +1563,60 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
 
     public override bool Equals(object? obj) => obj is UInt256 other && Equals(other);
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal readonly int GetCrcHashCode(uint seed)
+    /// <summary>Replaces the seeds <see cref="GetHashCode"/> hashes with.</summary>
+    /// <param name="seed">The full-width 256-bit seed for this run.</param>
+    /// <remarks>
+    /// Prefer fresh, private cryptographic randomness. A seed known before an adversary chooses keys
+    /// allows deliberately colliding inputs. The zkEVM consumer currently uses the public
+    /// <c>new_payload_request_root</c> commitment, so provers and retries share a seed for each payload.
+    /// Independent prover-private randomness is proposed in
+    /// <see href="https://github.com/eth-act/zkevm-standards/issues/41">eth-act/zkevm-standards#41</see>.
+    /// The scalar mixer uses a different 64-bit seed limb for each key limb. The AES rounds use
+    /// separate 128-bit halves of the seed.
+    /// These are not cryptographic authentication functions.
+    /// <para>
+    /// Both builds replace their previous seeds. The zkEVM build starts from fixed constants because
+    /// it has no entropy source; install a seed before processing untrusted keys. The standard build
+    /// starts from process-random seeds. Replace the entire seed independently between runs.
+    /// </para>
+    /// <para>
+    /// Install before hashing keys for a run, and never while a hash-keyed container holds entries:
+    /// re-seeding invalidates their stored hashes. This also affects <see cref="Int256"/> hashes.
+    /// Not synchronised against concurrent hashing.
+    /// </para>
+    /// </remarks>
+    public static void SeedHashes(in UInt256 seed)
     {
-        ulong hash0 = BitOperations.Crc32C(seed, u0);
-        ulong hash1 = BitOperations.Crc32C(seed ^ 0x9E3779B9u, u1);
-        ulong hash2 = BitOperations.Crc32C(seed ^ 0x85EBCA6Bu, u2);
-        ulong hash3 = BitOperations.Crc32C(seed ^ 0xC2B2AE35u, u3);
-        return FoldHash(MumFold(hash0 | (hash1 << 32), hash2 | (hash3 << 32)));
+        RunSeed.Multiply = seed;
+        RunSeed.Aes0 = Vector128.Create(seed.u0, seed.u1).AsByte();
+        RunSeed.Aes1 = Vector128.Create(seed.u2, seed.u3).AsByte();
+    }
+
+    /// <summary>The seed this build hashes with until <see cref="SeedHashes"/> replaces it.</summary>
+    private static partial UInt256 CreateInitialSeed();
+
+    /// <summary>The seeds this run hashes with.</summary>
+    /// <remarks>
+    /// A type of their own so that replacing them leaves <see cref="UInt256"/>'s own statics immutable
+    /// after their constructor, which is what lets NativeAOT freeze them.
+    /// </remarks>
+    private static class RunSeed
+    {
+        internal static UInt256 Multiply = CreateInitialSeed();
+        internal static Vector128<byte> Aes0 = Vector128.Create(Multiply.u0, Multiply.u1).AsByte();
+        internal static Vector128<byte> Aes1 = Vector128.Create(Multiply.u2, Multiply.u3).AsByte();
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal readonly int GetMultiplyHashCode(in UInt256 seed)
+    {
+        // Mix each seed limb into its key limb before any information is lost to folding, and fold the
+        // pairs through MumFold rather than MultiplyFold: the product is commutative, so a bare fold
+        // gives a half the same value when its two seed-masked words are exchanged, and MumFold's
+        // asymmetric constants are what separate the two positions.
+        ulong a = MumFold(u0 ^ seed.u0, u1 ^ seed.u1);
+        ulong b = MumFold(u2 ^ seed.u2, u3 ^ seed.u3);
+        return FoldHash(MumFold(a, b));
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1580,21 +1626,38 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
             // Keep the round key outside AESE so state and roundKey have distinct roles in the mixer.
             : Arm.Aes.MixColumns(Arm.Aes.Encrypt(state, Vector128<byte>.Zero)) ^ roundKey;
 
+    private const ulong FirstFactorConstant = 0x9E3779B97F4A7C15UL;
+    private const ulong SecondFactorConstant = 0xBF58476D1CE4E5B9UL;
+    private const ulong ClosingFactorConstant = 0x94D049BB133111EBUL;
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static long MumFold(ulong a, ulong b)
+    private static ulong MumFold(ulong a, ulong b)
+        => MultiplyFold(a ^ FirstFactorConstant, b ^ SecondFactorConstant);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static ulong MultiplyFold(ulong a, ulong b)
     {
-        ulong low = Math.BigMul(a ^ 0x9E3779B97F4A7C15UL, b ^ 0xBF58476D1CE4E5B9UL, out ulong high);
-        return (long)(low ^ high);
+        ulong high = Multiply64(a, b, out ulong low);
+        // Carry the factors past the product, and add rather than XOR them: `low ^ high` alone is zero
+        // whenever either factor is, while XORing them back cancels when a factor is small - at 1 the
+        // product is the partner itself, so the fold ignored the partner entirely. Addition has no such
+        // value: a fold blind to its partner needs a == 2a + 1, so only -1, which b == 2 rules out.
+        return unchecked((low ^ high) + a + b);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static long MumFold(Vector128<byte> mixed)
+    private static ulong MumFold(Vector128<byte> mixed)
         => MumFold(mixed.AsUInt64().GetElement(0), mixed.AsUInt64().GetElement(1));
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static int FoldHash(long hash)
+    private static int FoldHash(ulong mixed)
     {
-        ulong value = (ulong)hash;
+        // Close with a fold against a constant the key cannot reach. A zero factor leaves MultiplyFold
+        // returning its other factor verbatim, so with a known seed - and the guest's seed is the public
+        // payload root - a key can drive all three folds' first factors to zero and reduce the hash to an
+        // invertible function of one limb, whose collisions are then free rather than searched for. The
+        // closing fold is not invertible, so that family costs a 32-bit hash's generic search again.
+        ulong value = MumFold(mixed, ClosingFactorConstant);
         return (int)(value ^ (value >> 32));
     }
 

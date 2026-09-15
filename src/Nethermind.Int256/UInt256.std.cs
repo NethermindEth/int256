@@ -3,10 +3,7 @@
 
 using System;
 using System.Buffers.Binary;
-using System.IO.Hashing;
-using System.Numerics;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
 using System.Runtime.Intrinsics.X86;
 using System.Security.Cryptography;
@@ -63,17 +60,21 @@ public readonly partial struct UInt256
     // Expose the 128-bit reduction loop to its caller in the host JIT.
     private const MethodImplOptions MulMod128Inlining = MethodImplOptions.AggressiveInlining;
 
-    // Vary the seed between processes to keep hash distribution independent across nodes and restarts.
-    private static readonly ulong _aesHashSeed0 = CreateHashSeed();
-    private static readonly ulong _aesHashSeed1 = CreateHashSeed();
-    private static readonly long _xxHashSeed = unchecked((long)CreateHashSeed());
-
+    /// <inheritdoc />
+    /// <remarks>
+    /// Drawn per process, so that hash collisions on one node are not the same ones on another or
+    /// across a restart and cannot degrade the network as a whole.
+    /// </remarks>
     [SkipLocalsInit]
-    private static ulong CreateHashSeed()
+    private static partial UInt256 CreateInitialSeed()
     {
-        Span<byte> bytes = stackalloc byte[sizeof(ulong)];
+        Span<byte> bytes = stackalloc byte[Len * sizeof(ulong)];
         RandomNumberGenerator.Fill(bytes);
-        return BinaryPrimitives.ReadUInt64LittleEndian(bytes);
+        return new UInt256(
+            BinaryPrimitives.ReadUInt64LittleEndian(bytes),
+            BinaryPrimitives.ReadUInt64LittleEndian(bytes[8..]),
+            BinaryPrimitives.ReadUInt64LittleEndian(bytes[16..]),
+            BinaryPrimitives.ReadUInt64LittleEndian(bytes[24..]));
     }
 
     [SkipLocalsInit]
@@ -84,21 +85,13 @@ public readonly partial struct UInt256
         {
             Vector128<byte> key = Unsafe.As<ulong, Vector128<byte>>(ref Unsafe.AsRef(in u0));
             Vector128<byte> data = Unsafe.As<ulong, Vector128<byte>>(ref Unsafe.AsRef(in u2));
-            key ^= Vector128.Create(_aesHashSeed0, _aesHashSeed1).AsByte();
+            key ^= RunSeed.Aes0;
             Vector128<byte> mixed = HashAesRound(data, key);
-            mixed = HashAesRound(mixed, key);
+            mixed = HashAesRound(mixed, key ^ RunSeed.Aes1);
             return FoldHash(MumFold(mixed));
         }
 
-        return GetXxHashCode(_xxHashSeed);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal readonly int GetXxHashCode(long seed)
-    {
-        ref byte start = ref Unsafe.As<ulong, byte>(ref Unsafe.AsRef(in u0));
-        ulong hash = XxHash3.HashToUInt64(MemoryMarshal.CreateReadOnlySpan(ref start, 32), seed);
-        return FoldHash((long)hash);
+        return GetMultiplyHashCode(in RunSeed.Multiply);
     }
 
     // Vector256 paths live in separate helpers to keep the public bodies small enough to inline.
