@@ -242,12 +242,14 @@ public readonly partial struct UInt256
     public static bool operator >=(in UInt256 a, ulong b) => !LessThan(in a, b);
     public static bool operator >=(ulong a, in UInt256 b) => !LessThan(a, in b);
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static UInt256 operator <<(in UInt256 a, int n)
     {
         a.LeftShift(n, out UInt256 res);
         return res;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static UInt256 operator >>(in UInt256 a, int n)
     {
         a.RightShift(n, out UInt256 res);
