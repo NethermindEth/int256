@@ -28,6 +28,14 @@ public class InlineShiftSubtractTests
     // Slot offsets inside a byte buffer, two of them off 8-byte alignment, as an EVM stack slot can be.
     private static readonly int[] SlotOffsets = [0, 1, 8, 13];
 
+    // Counts far outside -300..300: the contract holds for the whole int range, and the ends alone do not pin it
+    // (int.MaxValue is 511 mod 512, so a count wrapped modulo 512 still gives zero there).
+    private static readonly int[] FarCounts =
+    [
+        int.MinValue, int.MinValue + 1, int.MinValue + 64, -1024, -513, -512,
+        511, 512, 513, 1000, 1024, 1 << 20, (1 << 26) + 1, int.MaxValue - 63, int.MaxValue,
+    ];
+
     private static IEnumerable<UInt256> Values()
     {
         yield return UInt256.Zero;
@@ -55,7 +63,7 @@ public class InlineShiftSubtractTests
     {
         foreach (UInt256 value in Values())
         {
-            for (int n = -300; n <= 300; n++)
+            foreach (int n in ShiftCounts())
             {
                 UInt256 left = ExpectedShift(value, n, left: true);
                 UInt256 right = ExpectedShift(value, n, left: false);
@@ -76,7 +84,7 @@ public class InlineShiftSubtractTests
         byte[] buffer = new byte[64];
         foreach (UInt256 value in Values())
         {
-            for (int n = -300; n <= 300; n++)
+            foreach (int n in ShiftCounts())
             {
                 UInt256 left = ExpectedShift(value, n, left: true);
                 UInt256 right = ExpectedShift(value, n, left: false);
@@ -196,6 +204,12 @@ public class InlineShiftSubtractTests
                 if (callee.DeclaringType?.Assembly == typeof(UInt256).Assembly) Walk(callee, $"{path} -> {callee.Name}");
             }
         }
+    }
+
+    private static IEnumerable<int> ShiftCounts()
+    {
+        for (int n = -300; n <= 300; n++) yield return n;
+        foreach (int n in FarCounts) yield return n;
     }
 
     private static UInt256 ExpectedShift(UInt256 value, int n, bool left)
