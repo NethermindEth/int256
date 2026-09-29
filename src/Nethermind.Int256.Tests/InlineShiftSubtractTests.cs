@@ -18,14 +18,14 @@ namespace Nethermind.Int256.Test;
 /// </summary>
 /// <remarks>
 /// The callers below are <see cref="MethodImplOptions.AggressiveOptimization"/>, so they are compiled fully optimised on
-/// first call and the library methods inline into them. A test body runs at Tier0, where nothing inlines, and would
-/// only exercise the out-of-line copies.
+/// first call and the library methods inline into them. A test body starts at Tier0, where nothing inlines, and would
+/// exercise only the out-of-line copies.
 /// </remarks>
 public class InlineShiftSubtractTests
 {
     private static readonly BigInteger Mask = (BigInteger.One << 256) - 1;
 
-    // Unaligned offsets, as a stack slot inside a byte buffer can be.
+    // Slot offsets inside a byte buffer, two of them off 8-byte alignment, as an EVM stack slot can be.
     private static readonly int[] SlotOffsets = [0, 1, 8, 13];
 
     private static IEnumerable<UInt256> Values()
