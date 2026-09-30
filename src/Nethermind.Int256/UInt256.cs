@@ -386,12 +386,17 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     }
 
     // Subtract sets res to the difference a-b
+    // Inlines with no call left on any path, like Add. Left to its size heuristics the JIT keeps SubtractImpl
+    // out of line unless PGO finds the call hot, and RyuJIT does not shrink-wrap: one call left in a hot caller
+    // (an EVM opcode handler) makes it save and restore callee-saved registers on every execution.
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void Subtract(in UInt256 a, in UInt256 b, out UInt256 res)
     {
         SubtractImpl(in a, in b, out res);
     }
 
     // Subtract sets res to the difference a-b and returns true if the operation underflowed
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool SubtractImpl(in UInt256 a, in UInt256 b, out UInt256 res)
     {
         if (Avx2.IsSupported)
@@ -570,6 +575,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static partial void SubtractWithBorrow(ulong a, ulong b, ref ulong borrow, out ulong res);
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Subtract(in UInt256 b, out UInt256 res) => Subtract(this, b, out res);
 
     public static void SubtractMod(in UInt256 a, in UInt256 b, in UInt256 m, out UInt256 res)
@@ -1164,8 +1170,10 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     /// <remarks>
     /// Counts of 256 or more produce zero. Negative counts keep the historic behaviour: a negative
     /// multiple of 64 produces zero, any other negative count shifts by <c>n &amp; 63</c> with no word shift.
-    /// <paramref name="res"/> may alias <paramref name="x"/>.
+    /// <paramref name="res"/> may alias <paramref name="x"/>. Inlines with no call on any path, so a hot
+    /// caller such as an EVM opcode handler stays free of the callee-saved register saves a call brings.
     /// </remarks>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void Lsh(in UInt256 x, int n, out UInt256 res)
     {
         int wordShift = n >> 6;
@@ -1217,6 +1225,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         }
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void LeftShift(int n, out UInt256 res)
     {
         Lsh(this, n, out res);
@@ -1235,8 +1244,9 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     /// <remarks>
     /// Counts of 256 or more produce zero. Negative counts keep the historic behaviour: a negative
     /// multiple of 64 produces zero, any other negative count shifts by <c>n &amp; 63</c> with no word shift.
-    /// <paramref name="res"/> may alias <paramref name="x"/>.
+    /// <paramref name="res"/> may alias <paramref name="x"/>. Inlines with no call on any path, like Lsh.
     /// </remarks>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void Rsh(in UInt256 x, int n, out UInt256 res)
     {
         int wordShift = n >> 6;
@@ -1288,6 +1298,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         }
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void RightShift(int n, out UInt256 res) => Rsh(this, n, out res);
 
     /// <summary>
