@@ -1,0 +1,80 @@
+<Project>
+  <PropertyGroup>
+    <FixtureName>$([System.IO.Path]::GetFileNameWithoutExtension('$(FixtureSource)'))</FixtureName>
+    <KnownFixture Condition="'$(FixtureName)' == 'Baseline'
+               Or '$(FixtureName)' == 'BeforeFieldInit'
+               Or '$(FixtureName)' == 'CarryOr'
+               Or '$(FixtureName)' == 'ExpandedHardware'
+               Or '$(FixtureName)' == 'ExternalHelper'
+               Or '$(FixtureName)' == 'ExtractedHelper'
+               Or '$(FixtureName)' == 'FullyInlined'
+               Or '$(FixtureName)' == 'Renamed'
+               Or '$(FixtureName)' == 'ReversedStore'
+               Or '$(FixtureName)' == 'StraightLine'
+               Or '$(FixtureName)' == 'ThrowingInitializer'
+               Or '$(FixtureName)' == 'Unsupported'
+               Or '$(FixtureName)' == 'WrongAliasing'
+               Or '$(FixtureName)' == 'WrongCarry'">true</KnownFixture>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(FixtureName)' == 'Baseline'
+               Or '$(FixtureName)' == 'BeforeFieldInit'
+               Or '$(FixtureName)' == 'CarryOr'
+               Or '$(FixtureName)' == 'ExternalHelper'
+               Or '$(FixtureName)' == 'ExtractedHelper'
+               Or '$(FixtureName)' == 'ReversedStore'
+               Or '$(FixtureName)' == 'ThrowingInitializer'
+               Or '$(FixtureName)' == 'Unsupported'
+               Or '$(FixtureName)' == 'WrongAliasing'
+               Or '$(FixtureName)' == 'WrongCarry'">
+    <Compile Include="Common/Add/Add.cs" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(FixtureName)' == 'Baseline'
+               Or '$(FixtureName)' == 'BeforeFieldInit'
+               Or '$(FixtureName)' == 'CarryOr'
+               Or '$(FixtureName)' == 'ExpandedHardware'
+               Or '$(FixtureName)' == 'ExternalHelper'
+               Or '$(FixtureName)' == 'ExtractedHelper'
+               Or '$(FixtureName)' == 'ThrowingInitializer'
+               Or '$(FixtureName)' == 'Unsupported'
+               Or '$(FixtureName)' == 'WrongAliasing'
+               Or '$(FixtureName)' == 'WrongCarry'">
+    <Compile Include="Common/Add/AddScalar.cs" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(FixtureName)' == 'Baseline'
+               Or '$(FixtureName)' == 'BeforeFieldInit'
+               Or '$(FixtureName)' == 'CarryOr'
+               Or '$(FixtureName)' == 'ExpandedHardware'
+               Or '$(FixtureName)' == 'ExternalHelper'
+               Or '$(FixtureName)' == 'ExtractedHelper'
+               Or '$(FixtureName)' == 'ThrowingInitializer'
+               Or '$(FixtureName)' == 'Unsupported'
+               Or '$(FixtureName)' == 'WrongCarry'">
+    <Compile Include="Common/Add/AddScalarUInt64.cs" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(FixtureName)' == 'Baseline'
+               Or '$(FixtureName)' == 'ExpandedHardware'
+               Or '$(FixtureName)' == 'ReversedStore'
+               Or '$(FixtureName)' == 'WrongAliasing'">
+    <Compile Include="Common/Add/AddWithCarry.cs" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(FixtureName)' == 'Baseline'
+               Or '$(FixtureName)' == 'BeforeFieldInit'
+               Or '$(FixtureName)' == 'CarryOr'
+               Or '$(FixtureName)' == 'ExpandedHardware'
+               Or '$(FixtureName)' == 'ExternalHelper'
+               Or '$(FixtureName)' == 'ExtractedHelper'
+               Or '$(FixtureName)' == 'ThrowingInitializer'
+               Or '$(FixtureName)' == 'Unsupported'
+               Or '$(FixtureName)' == 'WrongAliasing'
+               Or '$(FixtureName)' == 'WrongCarry'">
+    <Compile Include="Common/Add/StoreLimbs.cs" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(FixtureName)' == 'BeforeFieldInit'
+               Or '$(FixtureName)' == 'ExternalHelper'
+               Or '$(FixtureName)' == 'ThrowingInitializer'">
+    <Compile Include="Common/Add/ExternalCarry.cs" />
+  </ItemGroup>
+  <Target Name="ValidateFixtureSelection" BeforeTargets="CoreCompile" Condition="'$(KnownFixture)' != 'true'">
+    <Error Text="Unknown Add fixture: $(FixtureName)" />
+  </Target>
+</Project>

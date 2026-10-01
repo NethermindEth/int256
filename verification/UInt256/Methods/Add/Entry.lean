@@ -32,6 +32,10 @@ theorem execute_entry_general_words (m : Memory) (left right out frame fuel : Na
       | simp_all only [BitVec.add_comm, add_overflow_right]
         simp [*, store4, sumWords, fin_val_three, carry_head_zero,
           carry_zero, carry_one, BitVec.add_comm, Nat.add_comm, add_overflow_right]
+    | solve
+      | simp [*, store4, sumWords, fin_val_three, carry_tail_zero, carry_head_zero]
+        repeat first | apply writeBytes_congr | intro location
+        simp [*, write]
 
 theorem execute_entry_right_small_words (m : Memory) (left right out frame fuel : Nat) (a b : Limbs)
     (ha : ∀ i : Fin 4, read64 m (.byte (left + 8*i.val)) = some (.i64 (a i)))
@@ -59,6 +63,10 @@ theorem execute_entry_right_small_words (m : Memory) (left right out frame fuel 
       | simp_all only [BitVec.add_comm, add_overflow_right]
         simp [*, store4, sumWords, fin_val_three, carry_head_zero,
           carry_zero, carry_one, BitVec.add_comm, Nat.add_comm, add_overflow_right]
+    | solve
+      | simp [*, store4, sumWords, fin_val_three, carry_tail_zero, carry_head_zero]
+        repeat first | apply writeBytes_congr | intro location
+        simp [*, write]
 
 theorem execute_entry_left_small_words (m : Memory) (left right out frame fuel : Nat) (a b : Limbs)
     (ha : ∀ i : Fin 4, read64 m (.byte (left + 8*i.val)) = some (.i64 (a i)))
@@ -87,6 +95,10 @@ theorem execute_entry_left_small_words (m : Memory) (left right out frame fuel :
       | simp_all only [BitVec.add_comm, add_overflow_right]
         simp [*, store4, sumWords, fin_val_three, carry_head_zero,
           carry_zero, carry_one, BitVec.add_comm, Nat.add_comm, add_overflow_right]
+    | solve
+      | simp [*, store4, sumWords, fin_val_three, carry_tail_zero, carry_head_zero]
+        repeat first | apply writeBytes_congr | intro location
+        simp [*, write]
 
 theorem execute_entry_words (m : Memory) (left right out frame fuel : Nat) (a b : Limbs)
     (ha : ∀ i : Fin 4, read64 m (.byte (left + 8*i.val)) = some (.i64 (a i)))

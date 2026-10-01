@@ -39,6 +39,11 @@ internal static class MetadataValidation
                 if (visited == 1) throw new InvalidDataException("Recursive managed dependency");
                 return;
             }
+            // Only UInt256 initialisation is covered by the calling precondition.
+            // Both explicit and beforefieldinit constructors on other types can
+            // execute code that the method-body interpreter does not model.
+            if (method.DeclaringType != type && method.DeclaringType.Methods.Any(m => m.IsConstructor && m.IsStatic))
+                throw new InvalidDataException($"Unmodelled static initialisation: {method.DeclaringType.FullName}");
             if (!method.IsStatic || !method.HasBody || method.HasGenericParameters ||
                 method.Body.Instructions.Count == 0 || method.Body.ExceptionHandlers.Count != 0 ||
                 (!method.Body.InitLocals && method.Body.Variables.Count != 0) ||

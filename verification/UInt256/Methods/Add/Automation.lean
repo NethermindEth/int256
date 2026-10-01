@@ -34,8 +34,9 @@ partial def collectRuns (expression : Expr) : Array Expr := Id.run do
 -- Contracts are selected by generated signature-candidate identities, never by
 -- a method hash, fixture label, instruction sequence, or variant recognition.
 elab "cil_carry_call" : tactic => withMainContext do
-  unless (← getEnv).contains (Name.mkSimple "Extracted" |>.str "addWithCarryIndex") do
-    throwError "No extracted summary candidate"
+  unless (← getEnv).contains (Name.mkSimple "Extracted" |>.str "addWithCarryIndex") &&
+      (← getEnv).contains (Name.mkSimple "UInt256Proof" |>.str "execute_carry_contract_at") do
+    throwError "No proved summary available"
   let target ← getMainTarget
   let candidates := collectRuns target
   let mut selected : Option Expr := none
@@ -106,8 +107,9 @@ elab "cil_carry_call" : tactic => withMainContext do
   evalTactic (← `(tactic| simp only [Option.bind_some]))
 
 elab "cil_store_call" : tactic => withMainContext do
-  unless (← getEnv).contains (Name.mkSimple "Extracted" |>.str "storeLimbsIndex") do
-    throwError "No extracted summary candidate"
+  unless (← getEnv).contains (Name.mkSimple "Extracted" |>.str "storeLimbsIndex") &&
+      (← getEnv).contains (Name.mkSimple "UInt256Proof" |>.str "execute_store_contract") do
+    throwError "No proved summary available"
   let mut selected : Option Expr := none
   for candidate in collectRuns (← getMainTarget) do
     if candidate.hasLooseBVars then continue

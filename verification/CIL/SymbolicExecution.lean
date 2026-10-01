@@ -17,12 +17,28 @@ def executionBound (program : Program) (method : Nat) : Nat :=
   (program.drop method).foldl (fun total body => total +
     (body.code.filter fun op => match op with | .unsupported _ => false | _ => true).length) 0 + 1
 
--- Optional summaries are elaborated only when the corresponding candidate
--- exists. Skipping one does not establish its behavior; callers use raw steps.
+-- Summary candidates are transactions: failed elaboration, kernel checking,
+-- or admitted proofs leave neither declarations nor simp registrations behind.
+-- Subsequent execution then uses instructions directly.
 open Lean Elab Command in
 elab "if_extracted " name:ident " {" commands:command* "}" : command => do
-  if (← getEnv).contains name.getId then
-    for command in commands do elabCommand command
+  unless (← getEnv).contains name.getId do return
+  let saved ← get
+  try
+    for command in commands do
+      elabCommand (← `(command| set_option Elab.async false in $command))
+    if (← get).messages.hasErrors then
+      throwError "Summary proof failed"
+    let env ← getEnv
+    for (declName, info) in env.constants.toList do
+      if saved.env.contains declName then continue
+      if info.isAxiom || (info.value? true).any Expr.hasSorry then
+        throwError "Summary contains an admitted declaration"
+      if (env.checked.get.find? declName).isNone then
+        throwError "Summary declaration was not kernel checked"
+  catch _ =>
+    set saved
+    logInfo m!"Optional summary candidate {name.getId} was not proved; using raw execution"
 
 -- Execute instructions until execution finishes or a symbolic obligation
 -- prevents further reduction. Facts are ordinary proved hypotheses/lemmas.

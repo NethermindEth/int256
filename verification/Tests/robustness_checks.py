@@ -12,7 +12,7 @@ from common import ROOT, run
 from negative_checks import copy_source
 
 
-FIXTURES = ("Baseline", "CarryOr", "Renamed", "FullyInlined", "StraightLine", "ExtractedHelper", "ExpandedHardware")
+FIXTURES = ("Baseline", "CarryOr", "Renamed", "FullyInlined", "StraightLine", "ExtractedHelper", "ExpandedHardware", "ExternalHelper", "ReversedStore")
 
 
 def instructions(artifact):
@@ -26,9 +26,11 @@ def verify_fixture(name):
         run(["git", "clone", "--shared", "--no-checkout", "--quiet", str(ROOT), str(destination)], ROOT)
         proof = copy_source(destination)
         try:
-            run([sys.executable, str(proof / "verify.py"), "--fixture", name], destination)
+            output = run([sys.executable, str(proof / "verify.py"), "--fixture", name], destination)
         except RuntimeError as error:
             raise RuntimeError(f"Fixture {name} failed; distinguish build/extraction/proof diagnostics above") from error
+        if name == "ReversedStore" and "Optional summary candidate Extracted.storeLimbsIndex was not proved" not in output:
+            raise RuntimeError("Reversed storage fixture did not exercise rejected-summary fallback")
         report = json.loads((proof / "generated/report.json").read_text(encoding="utf-8"))
         if report["status"] != "verified" or report["source"]["kind"] != "fixture":
             raise RuntimeError(f"{name}: wrong verification source or status")

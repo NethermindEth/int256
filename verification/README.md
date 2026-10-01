@@ -36,7 +36,9 @@ UInt256/
 Extractor/                   CLI, metadata validation, reachability, translation,
                              Lean emission and artifact reporting in separate files
 Tests/
-  Fixtures/                  Independent versioned positive/negative Add programs
+  Fixtures/                  Versioned Add fixtures independent of production
+    Common/Add/              Shared methods in partial UInt256 declarations
+    Add/                     Case-specific methods/types and Fixtures.props
   RegressionFixture/         Malformed artifact fixtures
   negative_checks.py         Counterexamples and fail-closed regressions
   robustness_checks.py       Fresh proofs of independent positive fixtures
@@ -100,7 +102,10 @@ alias either or both inputs, including partially overlapping ranges. No arithmet
 edge case is excluded.
 
 UInt256 type initialization is assumed to have completed successfully before the
-call; its static initializer is outside this invocation's CIL scope. The runtime
+call; its static initializer is outside this invocation's CIL scope. Helpers on other
+managed types are accepted only if their declaring types have no static constructor,
+including compiler-generated beforefieldinit constructors. Their initialization
+code is not modelled; extraction rejects such dependencies explicitly. The runtime
 must provide sufficient stack and avoid asynchronous failures. The method's own
 normal termination and absence of interpreter failure are proved under the stated
 calling assumptions.
@@ -172,23 +177,35 @@ Build outputs and Lake's cache are also ignored.
 
 CI runs the same command, followed by `python verification/Tests/negative_checks.py`
 and `python verification/Tests/robustness_checks.py`. The robustness harness checks
-independent, versioned programs in `Tests/Fixtures/Add/` using identical handwritten
+versioned fixture programs independent of production code, using identical handwritten
 Lean sources: a scalar baseline, bitwise-OR carry flags, private-helper renaming,
 complete helper inlining with small-operand dispatch, straight-line OR addition,
-an additional extracted managed helper, and
+an additional extracted managed helper, a helper on another type without a static
+constructor, reversed storage-helper arguments, and
 an excluded hardware branch enlarged beyond the former 512-instruction budget.
 It confirms changed instructions and the intended dependency structure. Production
 Add is verified separately; fixtures are not manufactured by source-string replacement.
 Run a fixture directly with `python verification/verify.py --fixture CarryOr`;
 the report identifies fixture verification explicitly.
 
+Fixture methods shared by multiple cases live in `Tests/Fixtures/Common/Add` as
+partial UInt256 declarations. `Tests/Fixtures/Add/Fixtures.props` explicitly selects
+those files for each named case; each case file contains its distinct methods or
+helper type. The baseline selects only shared methods. Complete inlining,
+straight-line addition and renamed helpers retain standalone implementations.
+The enlarged excluded hardware branch stays unrolled to preserve its instruction
+count. These are versioned fixture sources, independent of production source text.
+
 Negative arithmetic and early-write aliasing fixtures have native counterexamples
 and kernel-checked refutations of the complete public contract, for every fuel.
 Their proofs must fail with a semantic obligation, rather than a resource timeout.
 The regression script also seeds stale extraction and a prior successful report,
 then requires fresh verification to fail and remove that report. Further fixtures
-reject reachable unsupported `mul`, an unresolved helper, a wrong field offset
-and cyclic control flow. Missing fixtures, compilation failures and changed
+reject reachable unsupported `mul`, an unresolved helper, a wrong field offset,
+cyclic control flow, and helper types with unmodelled static initialisation. A native
+witness confirms that the explicit throwing helper constructor raises a type-initialisation
+exception. Lean transaction tests check rollback of failed proofs, admitted proofs,
+axioms and registrations, while retaining successful summaries. Missing fixtures, compilation failures and changed
 fixture structure are maintenance errors. The runner labels fixture-build and
 proof-checking failures separately; negative checks additionally require a kernel
 refutation and a semantic proof obligation, rejecting resource exhaustion.
@@ -211,9 +228,11 @@ or execution support while preserving the independent contract.
 The extractor discovers an acyclic graph of reachable managed dependencies;
 private names, helper counts and decomposition do not determine extraction.
 Optional signature-based summary candidates accelerate proofs, but their behavior
-is re-proved against generated CIL. Without a candidate, execution uses raw steps. A signature candidate with different
-behavior may require adjusting or disabling that summary; candidate selection is
-not a claim that every valid decomposition will verify automatically.
+is re-proved against generated CIL. Without a candidate, execution uses raw steps. Candidates are transactional: synchronous elaboration and kernel checking must
+succeed without admitted proofs or new axioms. Otherwise all attempted declarations,
+registrations and diagnostics are rolled back, and raw execution continues. Call
+automation checks that the proved summary exists. This does not guarantee arbitrary
+algorithm independence.
 The mathematical carry is the high word of the unbounded word sum, under a proved
 incoming-carry invariant of zero or one. Both addition and OR of the two overflow
 flags implement that result under this invariant.

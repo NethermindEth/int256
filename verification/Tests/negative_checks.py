@@ -47,9 +47,13 @@ def build_extract(destination, name):
 
 def require_semantic_rejection(output, module):
     # A kernel-checked model refutation precedes this check. Tactic failures can
-    # phrase the remaining semantic obligation differently; require its goal
-    # and expected execution module rather than a particular tactic message.
-    if module not in output.replace("\\", "/") or "error:" not in output or "⊢" not in output:
+    # phrase the remaining semantic obligation differently. Require a printed
+    # goal or the final simplifier's no-progress diagnostic in the expected
+    # execution module; syntax/import failures alone cannot satisfy this gate.
+    normalized = output.replace("\\", "/")
+    no_progress = re.search(r"^error: " + re.escape(module) +
+                            r":\d+:\d+: `simp` made no progress$", normalized, re.MULTILINE)
+    if module not in normalized or "error:" not in output or not ("⊢" in output or no_progress):
         raise RuntimeError("Mutation failed outside the expected semantic proof obligation")
     if any(limit in output for limit in ("maximum number of heartbeats", "maximum recursion depth",
                                          "deep recursion", "stack overflow")):
@@ -133,7 +137,7 @@ def check_aliasing(lake):
         model_refutation(proof, lake, "if address = 0 then 42 else if address = 8 ∨ address = 32 then 1 else 0",
                          0, 32, 8, 16, 0, 1)
         output = run([lake, "build", "Audit"], proof, succeeds=False)
-        require_semantic_rejection(output, "UInt256/Methods/Add/Helpers.lean")
+        require_semantic_rejection(output, "UInt256/Methods/Add/Entry.lean")
         print("PASS: early output write has a concrete aliasing counterexample and fails the proof")
 
 
@@ -179,14 +183,14 @@ def main():
                          "if address < 8 then 255 else if address = 8 ∨ address = 32 ∨ address = 40 then 1 else 0",
                          0, 32, 64, 72, 2, 3)
         output = run([lake, "build", "Audit"], proof, succeeds=False)
-        require_semantic_rejection(output, "UInt256/Methods/Add/HelperContracts.lean")
+        require_semantic_rejection(output, "UInt256/Methods/Add/Entry.lean")
         print("PASS: compilable wrong arithmetic changes extraction and fails the correctness proof")
         # Seed all three old success artifacts. The public command must consume
         # its new build/extraction, fail on the changed code, and remove the old report.
         for name in ("Extracted.lean", "artifact.json", "report.json"):
             shutil.copy2(VERIFY / "generated" / name, generated / name)
         output = run([sys.executable, str(proof / "verify.py"), "--fixture", "WrongCarry"], destination, succeeds=False)
-        require_semantic_rejection(output, "UInt256/Methods/Add/HelperContracts.lean")
+        require_semantic_rejection(output, "UInt256/Methods/Add/Entry.lean")
         if "Verification failed:" not in output:
             raise RuntimeError("Stale regression did not reach fresh proof checking")
         if (generated / "report.json").exists():
@@ -201,6 +205,35 @@ def main():
         if "Unsupported instruction:" not in output or "mul" not in output:
             raise RuntimeError("Unsupported CIL failed for an unexpected reason")
         print("PASS: reachable unsupported mul rejected explicitly")
+    run([lake, "build", "Tests.SummaryTransactions"], VERIFY)
+    for name in ("ThrowingInitializer", "BeforeFieldInit"):
+        with tempfile.TemporaryDirectory(prefix="int256-initialisation-") as temporary:
+            destination = Path(temporary)
+            proof = copy_source(destination)
+            assembly = build_fixture(destination, name)
+            if name == "ThrowingInitializer":
+                witness = destination / "Witness"
+                witness.mkdir()
+                (witness / "Witness.csproj").write_text(
+                    '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType>'
+                    '<TargetFramework>net10.0</TargetFramework></PropertyGroup><ItemGroup>'
+                    f'<Reference Include="Nethermind.Int256"><HintPath>{assembly.as_posix()}</HintPath>'
+                    '</Reference></ItemGroup></Project>', encoding="utf-8")
+                (witness / "Program.cs").write_text(
+                    'using System;\nusing Nethermind.Int256;\n'
+                    'UInt256 a = new(1, 1, 0, 0), b = new(2, 1, 0, 0);\n'
+                    'try { UInt256.Add(in a, in b, out _); Environment.Exit(1); }\n'
+                    'catch (TypeInitializationException e) when (e.InnerException is InvalidOperationException)\n'
+                    '{ Console.WriteLine("PASS: real execution throws during helper type initialisation"); }\n',
+                    encoding="utf-8")
+                run(["dotnet", "run", "--project", str(witness), "-c", "Release"], destination)
+            output = run(["dotnet", "run", "--project", str(VERIFY / "Extractor"), "-c", "Release", "--",
+                          str(assembly), str(proof / "generated")], ROOT, succeeds=False)
+            if "Unmodelled static initialisation: Nethermind.Int256.ArithmeticHelper" not in output:
+                raise RuntimeError("Initialisation fixture rejected for an unexpected reason")
+            if (proof / "generated/Extracted.lean").exists():
+                raise RuntimeError("Unsafe initialisation produced an extracted program")
+            print(f"PASS: {name} rejected before method-body extraction")
     fixture = VERIFY / "Tests/RegressionFixture"
     run(["dotnet", "build", str(fixture), "-c", "Release",
          "-p:EnforceCodeStyleInBuild=true", "-p:GenerateDocumentationFile=true"], ROOT)
