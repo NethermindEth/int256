@@ -13,6 +13,17 @@ theorem readBytes_congr (m n : Memory)
   | zero => rfl
   | succ count ih => simp [readBytes, h, ih]
 
+theorem read64_congr (m n : Memory)
+    (h : ∀ address, m (.byte address) = n (.byte address)) (base : Nat) :
+    read64 m (.byte base) = read64 n (.byte base) := by
+  simp only [read64, readBytes_congr m n h]
+
+theorem read64_local (m : Memory) (frame index : Nat) :
+    read64 m (.local frame index) = (m (.local frame index)).bind (fun value =>
+      match value with
+      | .i64 word => some (.i64 word)
+      | _ => none) := by rfl
+
 @[simp] theorem readBytes_write_local (m : Memory) (frame index base count : Nat) (v : Value) :
     readBytes (write m (.local frame index) v) base count = readBytes m base count := by
   apply readBytes_congr

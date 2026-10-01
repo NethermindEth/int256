@@ -24,7 +24,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 60
     env:
       DOTNET_EnableHWIntrinsic: '0'
       DOTNET_CLI_TELEMETRY_OPTOUT: '1'
@@ -44,3 +44,5 @@ jobs:
         run: python3 verification/verify.py
       - name: Exercise arithmetic, freshness and extraction regressions
         run: python3 verification/negative_checks.py
+      - name: Verify distinct compiled Add variants with identical proofs
+        run: python3 verification/robustness_checks.py

@@ -12,7 +12,7 @@ internal static class ArtifactReport
         {
             assembly = module.Assembly.Name.FullName,
             sha256 = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(assemblyPath))).ToLowerInvariant(),
-            extractorVersion = "1",
+            extractorVersion = "2",
             buildConfiguration = new { configuration = "Release", targetFramework = "net10.0", variant = "standard", sdk = "10.0.401" },
             layout = new { type.IsExplicitLayout, type.IsBeforeFieldInit, type.PackingSize, type.ClassSize },
             coverage,

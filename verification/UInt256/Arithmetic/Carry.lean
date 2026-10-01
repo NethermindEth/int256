@@ -9,6 +9,13 @@ namespace UInt256Proof
 def carry (x y c : W64) : W64 :=
   (if x + y < x then 1 else 0) + (if x + y + c < x + y then 1 else 0)
 
+-- Overflow can be detected by comparing the wrapped sum to either operand.
+theorem add_overflow_right (x y : W64) : x + y < y ↔ x + y < x := by
+  have hx := x.isLt
+  have hy := y.isLt
+  simp only [BitVec.lt_def, BitVec.toNat_add]
+  omega
+
 @[simp] theorem extend_choice (p : Prop) [Decidable p] :
     (if p then (1 : W32) else 0).signExtend 64 = if p then (1 : W64) else 0 := by
   split <;> rfl
