@@ -1,4 +1,4 @@
-import UInt256.Representation
+import UInt256.RepresentationLemmas
 
 open CIL UInt256Model
 set_option maxRecDepth 8192
@@ -6,8 +6,16 @@ set_option maxHeartbeats 2000000
 
 namespace UInt256Proof
 
-def carry (x y c : W64) : W64 :=
-  (if x + y < x then 1 else 0) + (if x + y + c < x + y then 1 else 0)
+@[irreducible] def carry (x y c : W64) : W64 :=
+  BitVec.ofNat 64 ((x.toNat + y.toNat + c.toNat) / 2^64)
+
+theorem carry_tail_zero (x c : W64) :
+    carry x c (BitVec.ofNat 64 0) = carry x (BitVec.ofNat 64 0) c := by
+  simp [carry]
+
+theorem carry_head_zero (y c : W64) :
+    carry (BitVec.ofNat 64 0) y c = carry y (BitVec.ofNat 64 0) c := by
+  simp [carry]
 
 -- Overflow can be detected by comparing the wrapped sum to either operand.
 theorem add_overflow_right (x y : W64) : x + y < y ↔ x + y < x := by
@@ -17,7 +25,8 @@ theorem add_overflow_right (x y : W64) : x + y < y ↔ x + y < x := by
   omega
 
 @[simp] theorem extend_choice (p : Prop) [Decidable p] :
-    (if p then (1 : W32) else 0).signExtend 64 = if p then (1 : W64) else 0 := by
+    (if p then BitVec.ofNat 32 1 else BitVec.ofNat 32 0).signExtend 64 =
+      if p then BitVec.ofNat 64 1 else BitVec.ofNat 64 0 := by
   split <;> rfl
 theorem carry_nat (x y c : W64) (hc : c.toNat ≤ 1) :
     (x + y + c).toNat + 2^64 *
@@ -31,14 +40,42 @@ theorem carry_nat (x y c : W64) (hc : c.toNat ≤ 1) :
 theorem carry_bound (x y c : W64) (hc : c.toNat ≤ 1) : (carry x y c).toNat ≤ 1 := by
   have hx := x.isLt
   have hy := y.isLt
-  simp only [carry, BitVec.lt_def, BitVec.toNat_add]
-  split <;> split <;> simp <;> omega
+  simp only [carry, BitVec.toNat_ofNat]
+  omega
 
 theorem carry_word_nat (x y c : W64) (hc : c.toNat ≤ 1) :
     (x + y + c).toNat + 2^64 * (carry x y c).toNat = x.toNat + y.toNat + c.toNat := by
+  have hx := x.isLt
+  have hy := y.isLt
+  simp only [carry, BitVec.toNat_ofNat, BitVec.toNat_add]
+  omega
+
+theorem overflow_disjoint (x y c : W64) (hc : c.toNat ≤ 1)
+    (hxy : x + y < x) : ¬ x + y + c < x + y := by
+  have hx := x.isLt
+  have hy := y.isLt
+  simp only [BitVec.lt_def, BitVec.toNat_add] at hxy ⊢
+  omega
+
+theorem carry_expression (x y c : W64) (hc : c.toNat ≤ 1) :
+    (if x + y < x then (1 : W64) else 0) +
+      (if x + y + c < x + y then 1 else 0) = carry x y c := by
   have h := carry_nat x y c hc
-  simp only [carry, BitVec.lt_def, BitVec.toNat_add] at h ⊢
-  split <;> split <;> simp_all <;> omega
+  have hr := (x + y + c).isLt
+  apply BitVec.eq_of_toNat_eq
+  simp only [BitVec.toNat_add, carry, BitVec.toNat_ofNat]
+  by_cases hxy : x + y < x <;> by_cases hrc : x + y + c < x + y
+  all_goals simp only [hxy, hrc, ↓reduceIte] at h ⊢
+  all_goals simp <;> omega
+
+theorem carry_or_expression (x y c : W64) (hc : c.toNat ≤ 1) :
+    (if x + y < x then (1 : W64) else 0) |||
+      (if x + y + c < x + y then 1 else 0) = carry x y c := by
+  rw [← carry_expression x y c hc]
+  by_cases hxy : x + y < x
+  · have hn := overflow_disjoint x y c hc hxy
+    simp [hxy, hn]
+  · by_cases hr : x + y + c < x + y <;> simp [hxy, hr]
 
 theorem congr2 (f : Nat → Nat → Nat) {a b c d : Nat} (h : a = b) (k : c = d) :
     f a c = f b d := by cases h; cases k; rfl
@@ -134,12 +171,25 @@ theorem increment_lt (x : W64) : x + 1 < x ↔ x + 1 = 0 := by
 
 theorem carry_zero (x y : W64) : carry x y (BitVec.ofNat 64 0) =
     if x + y < x then BitVec.ofNat 64 1 else BitVec.ofNat 64 0 := by
-  simp [carry]
+  rw [← carry_expression x y (BitVec.ofNat 64 0) (by decide)]
+  simp
+
+-- Join independently computed overflow flags after CIL conversion to words.
+theorem carry_flags_add (x y c : W64) (hc : c.toNat ≤ 1) :
+    carry x y (BitVec.ofNat 64 0) + carry (x + y) c (BitVec.ofNat 64 0) = carry x y c := by
+  rw [carry_zero, carry_zero]
+  exact carry_expression x y c hc
+
+theorem carry_flags_or (x y c : W64) (hc : c.toNat ≤ 1) :
+    carry x y (BitVec.ofNat 64 0) ||| carry (x + y) c (BitVec.ofNat 64 0) = carry x y c := by
+  rw [carry_zero, carry_zero]
+  exact carry_or_expression x y c hc
 
 theorem carry_one (x : W64) : carry x (BitVec.ofNat 64 0) (BitVec.ofNat 64 1) =
     if x + BitVec.ofNat 64 1 = BitVec.ofNat 64 0 then BitVec.ofNat 64 1 else BitVec.ofNat 64 0 := by
+  rw [← carry_expression x (BitVec.ofNat 64 0) (BitVec.ofNat 64 1) (by decide)]
   have hi : x + BitVec.ofNat 64 1 < x ↔ x + BitVec.ofNat 64 1 = BitVec.ofNat 64 0 := increment_lt x
-  simp [carry, hi]
+  simp [hi]
 
 theorem small_result_sum (a : Limbs) (b : W64) :
     value (smallResult a b) = value a + value (singleLimb b) := by
@@ -160,5 +210,23 @@ theorem small_result_sum (a : Limbs) (b : W64) :
         show (3 : Fin 4).val = 3 from rfl]
   rw [shape] at h
   exact h
+
+-- Implementation-independent four-word decomposition of the modular sum.
+def sumWords (a b : Limbs) : Limbs := fun i =>
+  if i.val = 0 then a 0 + b 0 else
+  if i.val = 1 then a 1 + b 1 + carry (a 0) (b 0) 0 else
+  if i.val = 2 then a 2 + b 2 + carry (a 1) (b 1) (carry (a 0) (b 0) 0) else
+  a 3 + b 3 + carry (a 2) (b 2) (carry (a 1) (b 1) (carry (a 0) (b 0) 0))
+
+theorem sumWords_sum (a b : Limbs) : value (sumWords a b) = value a + value b :=
+  four_limb_sum a b
+
+theorem sumWords_comm (a b : Limbs) : sumWords a b = sumWords b a := by
+  apply representation_injective
+  rw [sumWords_sum, sumWords_sum, BitVec.add_comm]
+
+theorem smallResult_words (a : Limbs) (b : W64) : smallResult a b = sumWords a (singleLimb b) := by
+  apply representation_injective
+  rw [small_result_sum, sumWords_sum]
 
 end UInt256Proof

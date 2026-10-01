@@ -6,6 +6,8 @@ set_option maxHeartbeats 2000000
 
 namespace UInt256Proof
 
+if_extracted Extracted.addScalarUInt64Index {
+
 theorem execute_small_no_carry (m : Memory) (base out frame fuel : Nat) (a : Limbs) (b : W64)
     (hr : ∀ i : Fin 4, read64 m (.byte (base + 8*i.val)) = some (.i64 (a i)))
     (hnc : ¬ a 0 + b < a 0) :
@@ -69,4 +71,6 @@ theorem execute_small_overflow (m : Memory) (base out frame fuel : Nat) (a : Lim
   cil_steps write_local_read_local, hr0, hr1, hr2, hr3, hc, h1, h2, h3
   simp [store4]
   all_goals intro address; rfl
+}
+
 end UInt256Proof

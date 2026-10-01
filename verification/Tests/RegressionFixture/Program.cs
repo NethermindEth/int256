@@ -19,12 +19,16 @@ switch (args[0])
             missing.Parameters.Add(new ParameterDefinition(parameter.ParameterType));
         call.Operand = missing;
         break;
+    case "recursion":
+        MethodDefinition recursive = type.Methods.Single(m => m.Name == "AddWithCarry");
+        recursive.Body.Instructions.Insert(0, Instruction.Create(OpCodes.Call, recursive));
+        break;
     case "layout":
         type.Fields.Single(f => f.Name == "u0").Offset = 1;
         break;
     case "cycle":
-        MethodDefinition entry = type.Methods.Single(m => m.Name == "Add" && m.IsStatic);
-        Instruction branch = entry.Body.Instructions.First(i => i.OpCode == OpCodes.Brfalse || i.OpCode == OpCodes.Brfalse_S);
+        MethodDefinition dispatcher = type.Methods.Single(m => m.Name == "AddScalar");
+        Instruction branch = dispatcher.Body.Instructions.First(i => i.OpCode.FlowControl == FlowControl.Cond_Branch);
         branch.Operand = branch;
         break;
     case "framework":

@@ -5,11 +5,13 @@ open Lean Meta Elab Tactic CIL UInt256Model
 namespace UInt256Proof
 
 elab "cil_scalar_call" : tactic => withMainContext do
+  unless (← getEnv).contains (Name.mkSimple "Extracted" |>.str "addScalarIndex") do
+    throwError "No extracted summary candidate"
   let mut selected : Option Expr := none
   for candidate in collectRuns (← getMainTarget) do
     if candidate.hasLooseBVars then continue
     let args := candidate.getAppArgs
-    if (← isDefEq args[2]! (mkConst ``Extracted.addScalarIndex)) &&
+    if (← isDefEq args[2]! (mkConst (Name.mkSimple "Extracted" |>.str "addScalarIndex"))) &&
         (← isDefEq args[3]! (mkNatLit 0)) then
       selected := some candidate
       break
@@ -31,7 +33,7 @@ elab "cil_scalar_call" : tactic => withMainContext do
   let hb := mkIdent (← mkFreshUserName `scalarBytes)
   evalTactic (← `(tactic|
     obtain ⟨$final:ident, $flag:ident, $hr:ident, $hb:ident⟩ :=
-      execute_scalar_at $memory $left $right $out $frame $fuel _ _
+      execute_scalar_words_at $memory $left $right $out $frame $fuel _ _
         (by intro i; simp_all [initLocals]; all_goals rfl)
         (by intro i; simp_all [initLocals]; all_goals rfl)
         (by simp [cil_code]; all_goals omega)))

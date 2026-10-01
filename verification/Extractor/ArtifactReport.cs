@@ -12,8 +12,9 @@ internal static class ArtifactReport
         {
             assembly = module.Assembly.Name.FullName,
             sha256 = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(assemblyPath))).ToLowerInvariant(),
-            extractorVersion = "2",
-            buildConfiguration = new { configuration = "Release", targetFramework = "net10.0", variant = "standard", sdk = "10.0.401" },
+            extractorVersion = "3",
+            entryIndex = Array.FindIndex(methods, m => m.FullName == MetadataValidation.EntrySignature),
+            buildConfiguration = new { configuration = "Release", targetFramework = "net10.0" },
             layout = new { type.IsExplicitLayout, type.IsBeforeFieldInit, type.PackingSize, type.ClassSize },
             coverage,
             fields = type.Fields.Where(f => !f.IsStatic).Select(f => new { f.Name, type = f.FieldType.FullName, f.Offset }),

@@ -52,4 +52,26 @@ theorem run_of_le (program : Program) (fuel larger method pc : Nat)
   have he : fuel + (larger - fuel) = larger := by omega
   simpa only [he] using run_mono program fuel (larger - fuel) method pc args frame stack memory result h
 
+-- Any two successful finite executions have the same observable result.
+theorem run_result_unique (program : Program) (first second method pc : Nat)
+    (args : List Value) (frame : Nat) (stack : List Value) (memory : Memory)
+    (a b : Memory × List Value)
+    (ha : run program first method pc args frame stack memory = some a)
+    (hb : run program second method pc args frame stack memory = some b) : a = b := by
+  have hmaxa := run_of_le program first (max first second) method pc args frame stack memory a
+    (Nat.le_max_left _ _) ha
+  have hmaxb := run_of_le program second (max first second) method pc args frame stack memory b
+    (Nat.le_max_right _ _) hb
+  exact Option.some.inj (hmaxa.symm.trans hmaxb)
+
+theorem invoke_result_unique (program : Program) (first second method : Nat)
+    (args : List Value) (memory : Memory) (a b : Memory × List Value)
+    (ha : invoke program first method args memory = some a)
+    (hb : invoke program second method args memory = some b) : a = b := by
+  cases hbody : program[method]? with
+  | none => simp [invoke, hbody] at ha
+  | some body =>
+    simp only [invoke, hbody] at ha hb
+    exact run_result_unique _ _ _ _ _ _ _ _ _ _ _ ha hb
+
 end CIL

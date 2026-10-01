@@ -2,7 +2,7 @@
 
 `UInt256Proof.add_correct` proves the unrestricted public method contract for
 the actual Release CIL imported from the assembly. It covers every scalar
-dispatch and carry path, normal void return within fuel 512, the initial inputs'
+dispatch and carry path, normal void return with a proved finite execution bound, the initial inputs'
 sum modulo 2^256, and caller-memory preservation, including arbitrary overlapping
 input/output ranges. `Audit.lean` checks its exact contract type and prints its
 foundational axioms. The fresh-build command below ties that proof to one artifact.
@@ -11,7 +11,7 @@ foundational axioms. The fresh-build command below ties that proof to one artifa
 
 ```text
 CIL/                         Values, memory, instructions, execution, memory lemmas
-  ExecutionLemmas.lean       Monotonicity of successful execution in fuel
+  ExecutionLemmas.lean       Fuel monotonicity and uniqueness of successful results
   SymbolicExecution.lean     Shared instruction stepping and candidate bounds
 UInt256/
   Representation.lean        Mathematical limbs and caller bytes
@@ -35,7 +35,11 @@ UInt256/
     Audit.lean               Exact contract gate and axiom audits
 Extractor/                   CLI, metadata validation, reachability, translation,
                              Lean emission and artifact reporting in separate files
-RegressionFixture/           Malformed artifact fixtures
+Tests/
+  Fixtures/                  Independent versioned positive/negative Add programs
+  RegressionFixture/         Malformed artifact fixtures
+  negative_checks.py         Counterexamples and fail-closed regressions
+  robustness_checks.py       Fresh proofs of independent positive fixtures
 common.py                    Shared process, hashing and source-selection utilities
 manifests/add.json           Selected artifact, method scope and trust assumptions
 generated/                   Ignored extraction, metadata and verification report
@@ -60,7 +64,7 @@ model and extractor only for the CIL it needs, preserving explicit rejection of
 unsupported reachable operations. The current extractor selection and audit runner
 still select Add: configurable method selection, new instruction semantics, loops
 and exception handling are separate extensions. Shared helper execution proofs
-remain bound to this extracted program and its validated method ordering; reusing
+remain bound to this extracted program and its discovered method ordering; reusing
 them with another extraction requires checking that binding.
 
 ## Selected artifact and environment
@@ -103,7 +107,7 @@ calling assumptions.
 
 Caller memory is byte-addressed; UInt64 loads/stores use little-endian bytes.
 Private locals use a disjoint frame/index address space. `UInt256Model.Contract` in `UInt256/Methods/Add/Contract.lean`
-requires normal void return within the explicit interpreter bound and an output
+requires successful normal void return for some finite interpreter fuel and an output
 equal to addition of the **initial** inputs modulo 2^256. Its byte-memory equation
 also specifies that storage outside the 32-byte output range is unchanged.
 It quantifies over arbitrary initial bytes and input/output bases; overlapping
@@ -132,7 +136,8 @@ it does not verify CoreCLR, JIT-generated native code or hardware.
 
 The only reachable external operations are the three false feature queries,
 `Unsafe.SkipInit<UInt256>` (no write), and `Unsafe.AsRef<UInt64>` (reference identity).
-The five managed bodies are imported as instruction data, rather than assigned
+Reachable managed dependencies are discovered from the exact public entry signature
+and imported as instruction data, rather than assigned
 an assumed addition contract. Defining runtime operations does not establish that
 the JIT and hardware implement them faithfully.
 
@@ -165,19 +170,28 @@ explicitly; the input digests identify the source used in that case.
 Never manually edit or commit `generated/`; regenerate it from the build.
 Build outputs and Lake's cache are also ignored.
 
-CI runs the same command, followed by `python verification/negative_checks.py`
-and `python verification/robustness_checks.py`. The robustness harness verifies a
-fresh baseline and three compiled variants with identical handwritten Lean
-sources: comparing carry against the other operand, prefetching high input limbs,
-and inlining small-path stores. Each changes actual instructions in its intended
-method. Fresh verification took about 130–151 seconds per artifact on Windows,
-including compilation and kernel checking; the full harness took about 9.4 minutes.
-The regression script uses temporary copies to break the carry arithmetic, builds
-and imports the changed assembly, runs a concrete incorrect-result witness, and
-requires the original correctness proof to fail. It also seeds stale extraction
-and a prior successful report, then requires the fresh-build gate to fail and
-remove that report. Further fixtures reject a reachable unsupported `mul`, an
-unresolved helper, a wrong field offset and cyclic control flow.
+CI runs the same command, followed by `python verification/Tests/negative_checks.py`
+and `python verification/Tests/robustness_checks.py`. The robustness harness checks
+independent, versioned programs in `Tests/Fixtures/Add/` using identical handwritten
+Lean sources: a scalar baseline, bitwise-OR carry flags, private-helper renaming,
+complete helper inlining with small-operand dispatch, straight-line OR addition,
+an additional extracted managed helper, and
+an excluded hardware branch enlarged beyond the former 512-instruction budget.
+It confirms changed instructions and the intended dependency structure. Production
+Add is verified separately; fixtures are not manufactured by source-string replacement.
+Run a fixture directly with `python verification/verify.py --fixture CarryOr`;
+the report identifies fixture verification explicitly.
+
+Negative arithmetic and early-write aliasing fixtures have native counterexamples
+and kernel-checked refutations of the complete public contract, for every fuel.
+Their proofs must fail with a semantic obligation, rather than a resource timeout.
+The regression script also seeds stale extraction and a prior successful report,
+then requires fresh verification to fail and remove that report. Further fixtures
+reject reachable unsupported `mul`, an unresolved helper, a wrong field offset
+and cyclic control flow. Missing fixtures, compilation failures and changed
+fixture structure are maintenance errors. The runner labels fixture-build and
+proof-checking failures separately; negative checks additionally require a kernel
+refutation and a semantic proof obligation, rejecting resource exhaustion.
 The extractor also validates assembly identity, target-framework and Release
 configuration attributes; fixtures reject a changed framework or configuration.
 
@@ -194,10 +208,21 @@ output from rejected compilation; it cannot pass the final audit or emit success
 When production CIL changes, regenerate first. The demonstrated changes reprove
 with the shared execution procedure; other changes may require arithmetic lemmas
 or execution support while preserving the independent contract.
-The extractor still selects five named helpers in forward call order. New or
-removed helpers, general-path helper inlining, a different carry invariant or
-dispatch order can require proof work. Candidate fuel bounds count later method
-bodies conservatively and must fit the unchanged public bound of 512; this can
-reject implementations whose actual execution would fit a sharper bound.
+The extractor discovers an acyclic graph of reachable managed dependencies;
+private names, helper counts and decomposition do not determine extraction.
+Optional signature-based summary candidates accelerate proofs, but their behavior
+is re-proved against generated CIL. Without a candidate, execution uses raw steps. A signature candidate with different
+behavior may require adjusting or disabling that summary; candidate selection is
+not a claim that every valid decomposition will verify automatically.
+The mathematical carry is the high word of the unbounded word sum, under a proved
+incoming-carry invariant of zero or one. Both addition and OR of the two overflow
+flags implement that result under this invariant.
+
+The public contract resolves the generated entry symbolically and quantifies over
+some successful finite fuel. Execution proofs establish sufficiency of a candidate
+bound derived from reachable supported instructions; excluded hardware code does
+not enlarge it. This is a termination proof, not an assumed budget. Other correct
+algorithms can still require new arithmetic lemmas or execution automation; the
+fixtures establish the listed transformations, not arbitrary implementation freedom.
 Unsupported-feature failures require an explicit semantics extension with proofs,
 or restoring the selected configuration; suppressing them is not an update path.

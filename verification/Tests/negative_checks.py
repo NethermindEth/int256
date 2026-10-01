@@ -7,7 +7,10 @@ import shutil
 import sys
 import tempfile
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 from common import BUILD_DIRECTORIES, ROOT, VERIFY, run, sha
+from verify import source_inputs
 
 
 def copy_source(destination):
@@ -23,10 +26,19 @@ def copy_source(destination):
     return proof
 
 
-def build_extract(destination):
-    project = destination / "src/Nethermind.Int256/Nethermind.Int256.csproj"
-    run(["dotnet", "build", str(project), "-c", "Release"], destination)
-    assembly = destination / "src/artifacts/bin/Nethermind.Int256/release/Nethermind.Int256.dll"
+def build_fixture(destination, name):
+    project = destination / "verification/Tests/Fixtures/Nethermind.Int256.csproj"
+    source = project.parent / "Add" / f"{name}.cs"
+    if not source.is_file():
+        raise RuntimeError(f"Fixture maintenance failure: missing {name}")
+    run(["dotnet", "build", str(project), "-c", "Release",
+         f"-p:FixtureSource={source}", "-p:EnforceCodeStyleInBuild=true",
+         "-p:GenerateDocumentationFile=true"], destination)
+    return project.parent / "bin/Release/net10.0/Nethermind.Int256.dll"
+
+
+def build_extract(destination, name):
+    assembly = build_fixture(destination, name)
     output = destination / "verification/generated"
     result = run(["dotnet", "run", "--project", str(VERIFY / "Extractor"), "-c", "Release", "--",
                   str(assembly), str(output)], ROOT)
@@ -48,29 +60,40 @@ def model_refutation(proof, lake, initial, left, right, out, address, actual, ex
     """Kernel-check a concrete refutation of the unchanged full contract."""
     source = f'''import Extracted
 import UInt256.Methods.Add.Contract
+import CIL.SymbolicExecution
 open CIL UInt256Model
 set_option maxRecDepth 8192
 set_option maxHeartbeats 2000000
 namespace UInt256Proof
 def witnessBytes : Bytes := fun address => {initial}
-def observed := (invoke Extracted.program 512 0
+def observed := (invoke Extracted.program (executionBound Extracted.program Extracted.entryIndex) Extracted.entryIndex
   [.object {left}, .object {right}, .object {out}] (byteMemory witnessBytes)).map
     (fun result => result.1 (.byte {address}))
 theorem model_observed : observed = some (some (.i8 {actual})) := by decide
 theorem model_expected : writeBytes (byteMemory witnessBytes) {out}
     (byteValue witnessBytes {left} + byteValue witnessBytes {right}).toNat 32 (.byte {address}) =
       some (.i8 {expected}) := by decide
-theorem model_not_correct : ¬ Contract Extracted.program witnessBytes {left} {right} {out} := by
-  rintro ⟨final, hr, hm⟩
+theorem model_not_correct : ¬ Contract Extracted.program Extracted.entryIndex witnessBytes {left} {right} {out} := by
+  rintro ⟨fuel, final, hr, hm⟩
   have ho := model_observed
   unfold observed at ho
-  rw [hr] at ho
-  simp only [Option.map_some] at ho
-  have ha : final (.byte {address}) = some (.i8 {actual}) := Option.some.inj ho
-  have he := hm {address}
-  rw [model_expected] at he
-  have different : (some (.i8 {actual}) : Option Value) ≠ some (.i8 {expected}) := by decide
-  exact different (ha.symm.trans he)
+  cases he : invoke Extracted.program (executionBound Extracted.program Extracted.entryIndex)
+      Extracted.entryIndex [.object {left}, .object {right}, .object {out}]
+      (byteMemory witnessBytes) with
+  | none => simp [he] at ho
+  | some result =>
+    have unique := invoke_result_unique Extracted.program fuel
+      (executionBound Extracted.program Extracted.entryIndex) Extracted.entryIndex
+      [.object {left}, .object {right}, .object {out}] (byteMemory witnessBytes)
+      (final, []) result hr he
+    rw [← unique] at he
+    rw [he] at ho
+    simp only [Option.map_some] at ho
+    have ha : final (.byte {address}) = some (.i8 {actual}) := Option.some.inj ho
+    have he := hm {address}
+    rw [model_expected] at he
+    have different : (some (.i8 {actual}) : Option Value) ≠ some (.i8 {expected}) := by decide
+    exact different (ha.symm.trans he)
 #print axioms model_not_correct
 end UInt256Proof
 '''
@@ -91,14 +114,7 @@ def check_aliasing(lake):
     with tempfile.TemporaryDirectory(prefix="int256-aliasing-") as temporary:
         destination = Path(temporary)
         proof = copy_source(destination)
-        source = destination / "src/Nethermind.Int256/UInt256.cs"
-        text = source.read_text(encoding="utf-8-sig")
-        original = "private static bool AddScalarUInt64(in UInt256 a, ulong b0, out UInt256 res)\n    {"
-        if text.count(original) != 1:
-            raise RuntimeError("Aliasing mutation anchor changed; review regression")
-        source.write_text(text.replace(original, original +
-            "\n        Unsafe.SkipInit(out res);\n        Unsafe.AsRef(in res.u0) = 0;"), encoding="utf-8")
-        assembly, _, _ = build_extract(destination)
+        assembly, _, _ = build_extract(destination, "WrongAliasing")
         witness = destination / "Witness"
         witness.mkdir()
         (witness / "Witness.csproj").write_text(
@@ -127,21 +143,21 @@ def main():
     if not lake:
         raise RuntimeError("Lean 4.34.1 / lake must be on PATH")
     baseline = VERIFY / "generated/Extracted.lean"
-    if not baseline.exists():
-        raise RuntimeError("Extract and check the valid baseline before negative checks")
+    report_path = VERIFY / "generated/report.json"
+    if not baseline.exists() or not report_path.exists():
+        raise RuntimeError("Freshly verify production Add before negative checks")
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    if (report.get("status") != "verified" or report.get("source", {}).get("kind") != "production"
+            or report["sourceInputs"] != source_inputs()
+            or report["generatedProgramSha256"] != sha(baseline)
+            or any(sha(VERIFY / name) != digest for name, digest in report["leanSourceSha256"].items())):
+        raise RuntimeError("Production verification report is stale or belongs to a fixture")
     run([lake, "build", "Audit"], VERIFY)
     check_aliasing(lake)
     with tempfile.TemporaryDirectory(prefix="int256-carry-") as temporary:
         destination = Path(temporary)
         proof = copy_source(destination)
-        source = destination / "src/Nethermind.Int256/UInt256.cs"
-        text = source.read_text(encoding="utf-8-sig")
-        original = "carry = (t < x ? 1UL : 0UL) + (r < t ? 1UL : 0UL);"
-        if text.count(original) != 1:
-            raise RuntimeError("Carry mutation anchor changed; review regression")
-        source.write_text(text.replace(original,
-            "carry = (t < x ? 0UL : 0UL) + (r < t ? 1UL : 0UL);"), encoding="utf-8")
-        assembly, generated, _ = build_extract(destination)
+        assembly, generated, _ = build_extract(destination, "WrongCarry")
         if sha(generated / "Extracted.lean") == sha(baseline):
             raise RuntimeError("Mutation did not change imported program")
         witness = destination / "Witness"
@@ -169,7 +185,7 @@ def main():
         # its new build/extraction, fail on the changed code, and remove the old report.
         for name in ("Extracted.lean", "artifact.json", "report.json"):
             shutil.copy2(VERIFY / "generated" / name, generated / name)
-        output = run([sys.executable, str(proof / "verify.py")], destination, succeeds=False)
+        output = run([sys.executable, str(proof / "verify.py"), "--fixture", "WrongCarry"], destination, succeeds=False)
         require_semantic_rejection(output, "UInt256/Methods/Add/HelperContracts.lean")
         if "Verification failed:" not in output:
             raise RuntimeError("Stale regression did not reach fresh proof checking")
@@ -179,29 +195,21 @@ def main():
     with tempfile.TemporaryDirectory(prefix="int256-unsupported-") as temporary:
         destination = Path(temporary)
         copy_source(destination)
-        source = destination / "src/Nethermind.Int256/UInt256.cs"
-        text = source.read_text(encoding="utf-8-sig")
-        original = "ulong t = x + y;"
-        if text.count(original) != 1:
-            raise RuntimeError("Unsupported mutation anchor changed; review regression")
-        source.write_text(text.replace(original, "ulong t = x * y;"), encoding="utf-8")
-        project = destination / "src/Nethermind.Int256/Nethermind.Int256.csproj"
-        run(["dotnet", "build", str(project), "-c", "Release"], destination)
-        assembly = destination / "src/artifacts/bin/Nethermind.Int256/release/Nethermind.Int256.dll"
+        assembly = build_fixture(destination, "Unsupported")
         output = run(["dotnet", "run", "--project", str(VERIFY / "Extractor"), "-c", "Release", "--",
                       str(assembly), str(destination / "verification/generated")], ROOT, succeeds=False)
         if "Unsupported instruction:" not in output or "mul" not in output:
             raise RuntimeError("Unsupported CIL failed for an unexpected reason")
         print("PASS: reachable unsupported mul rejected explicitly")
-    fixture = VERIFY / "RegressionFixture"
+    fixture = VERIFY / "Tests/RegressionFixture"
     run(["dotnet", "build", str(fixture), "-c", "Release",
          "-p:EnforceCodeStyleInBuild=true", "-p:GenerateDocumentationFile=true"], ROOT)
-    run(["dotnet", "build", str(ROOT / "src/Nethermind.Int256/Nethermind.Int256.csproj"),
-         "-c", "Release", "--no-incremental", "-p:EnableZkEvm=false"], ROOT)
-    assembly = ROOT / "src/artifacts/bin/Nethermind.Int256/release/Nethermind.Int256.dll"
     with tempfile.TemporaryDirectory(prefix="int256-metadata-") as temporary:
         destination = Path(temporary)
+        copy_source(destination)
+        assembly = build_fixture(destination, "Baseline")
         for mode, diagnostic in (("unresolved", "MissingAddHelper"),
+                                 ("recursion", "Recursive managed dependency"),
                                  ("layout", "Unsupported field"),
                                  ("cycle", "Malformed or cyclic control flow"),
                                  ("framework", "Unsupported assembly identity"),

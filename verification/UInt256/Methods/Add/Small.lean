@@ -6,6 +6,8 @@ set_option maxHeartbeats 2000000
 
 namespace UInt256Proof
 
+if_extracted Extracted.addScalarUInt64Index {
+
 theorem store4_shape (m : Memory) (out : Nat) (a : Limbs) (b r0 r1 r2 r3 : W64)
     (hs : (fun i : Fin 4 => if i.val = 0 then r0 else if i.val = 1 then r1 else
       if i.val = 2 then r2 else r3) = smallResult a b) :
@@ -77,5 +79,7 @@ theorem execute_small_words_at (m : Memory) (base out frame fuel : Nat) (a : Lim
   change final (.byte address) = writeBytes m out (value (smallResult a b)).toNat 32 (.byte address)
   rw [small_result_sum]
   exact hm address
+
+}
 
 end UInt256Proof

@@ -9,7 +9,9 @@
   "sdk": "10.0.401",
   "nativeWidth": 64,
   "endianness": "little",
-  "environment": { "DOTNET_EnableHWIntrinsic": "0" },
+  "environment": {
+    "DOTNET_EnableHWIntrinsic": "0"
+  },
   "callingAssumptions": [
     "Readable live 32-byte initial input ranges and a writable live 32-byte output range",
     "Input and output ranges may overlap arbitrarily",
@@ -25,7 +27,6 @@
     "Assembly digest identifies an artifact without proving extraction correctness",
     "CoreCLR, JIT and hardware fidelity are not proved"
   ],
-  "managedMethods": ["Add", "AddScalar", "AddScalarUInt64", "AddWithCarry", "StoreLimbs"],
   "runtimeModels": [
     "System.Runtime.Intrinsics.X86.Avx2.get_IsSupported = false",
     "System.Runtime.Intrinsics.Arm.AdvSimd.get_IsSupported = false",
@@ -33,6 +34,18 @@
     "Unsafe.SkipInit<UInt256>: no memory write",
     "Unsafe.AsRef<UInt64>: reference identity"
   ],
-  "excluded": ["zkEVM build", "hardware intrinsics enabled", "instance Add overload", "AddOverflow", "JIT and native machine code"],
-  "approvedAxioms": ["propext", "Classical.choice", "Quot.sound"]
+  "excluded": [
+    "zkEVM build",
+    "hardware intrinsics enabled",
+    "instance Add overload",
+    "AddOverflow",
+    "JIT and native machine code"
+  ],
+  "approvedAxioms": [
+    "propext",
+    "Classical.choice",
+    "Quot.sound"
+  ],
+  "managedDependencies": "Discovered reachable acyclic managed calls from the exact public entry signature",
+  "termination": "Existence of a proved finite sufficient fuel bound; no numerical budget in the public contract"
 }
