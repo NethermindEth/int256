@@ -41,6 +41,15 @@ theorem input_limb_nat (m : Bytes) (base : Nat) (i : Fin 4) :
   change byteNumber m (base + 8 * i.val) 8 < 2^64 at bound
   exact Nat.mod_eq_of_lt bound
 
+-- Normalize the four input loads once for the execution proofs.
+theorem limb_reads (m : Memory) (base : Nat) (a : Limbs)
+    (h : ∀ i : Fin 4, read64 m (.byte (base + 8*i.val)) = some (.i64 (a i))) :
+    read64 m (.byte base) = some (.i64 (a 0)) ∧
+    read64 m (.byte (base + 8)) = some (.i64 (a 1)) ∧
+    read64 m (.byte (base + 16)) = some (.i64 (a 2)) ∧
+    read64 m (.byte (base + 24)) = some (.i64 (a 3)) :=
+  ⟨h 0, h 1, h 2, h 3⟩
+
 theorem read64_initial (m : Bytes) (base : Nat) (i : Fin 4) :
     read64 (byteMemory m) (.byte (base + 8 * i.val)) = some (.i64 (inputLimbs m base i)) := by
   simp [read64, read_initial, inputLimbs]

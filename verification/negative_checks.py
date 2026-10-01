@@ -1,41 +1,20 @@
 """Isolated arithmetic, stale-output and fail-closed extraction regressions."""
 
 from pathlib import Path
-import hashlib
-import os
 import shutil
-import subprocess
 import sys
 import tempfile
 
-ROOT = Path(__file__).resolve().parent.parent
-VERIFY = ROOT / "verification"
-
-
-def run(command, cwd, *, succeeds=True):
-    env = os.environ.copy()
-    env.update(DOTNET_EnableHWIntrinsic="0", DOTNET_CLI_TELEMETRY_OPTOUT="1",
-               DOTNET_SKIP_FIRST_TIME_EXPERIENCE="1", MSBuildEnableWorkloadResolver="false")
-    result = subprocess.run(command, cwd=cwd, env=env, text=True,
-                            encoding="utf-8", errors="replace", stdout=subprocess.PIPE,
-                            stderr=subprocess.STDOUT)
-    print(result.stdout, end="")
-    if succeeds != (result.returncode == 0):
-        raise RuntimeError(f"Unexpected exit {result.returncode}: {command}")
-    return result.stdout
-
-
-def digest(path):
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+from common import BUILD_DIRECTORIES, ROOT, VERIFY, run, sha
 
 
 def copy_source(destination):
     shutil.copytree(ROOT / "src", destination / "src",
-                    ignore=shutil.ignore_patterns("artifacts", "bin", "obj", "TestResults"))
+                    ignore=shutil.ignore_patterns(*BUILD_DIRECTORIES, "TestResults"))
     for name in ("global.json", "README.md", ".editorconfig"):
         shutil.copy2(ROOT / name, destination / name)
     proof = destination / "verification"
-    shutil.copytree(VERIFY, proof, ignore=shutil.ignore_patterns("generated", ".lake", "bin", "obj"))
+    shutil.copytree(VERIFY, proof, ignore=shutil.ignore_patterns(*BUILD_DIRECTORIES))
     workflows = destination / ".github/workflows"
     workflows.mkdir(parents=True)
     shutil.copy2(ROOT / ".github/workflows/verify-uint256.yml", workflows / "verify-uint256.yml")
@@ -72,7 +51,7 @@ def main():
         source.write_text(text.replace(original,
             "carry = (t < x ? 0UL : 0UL) + (r < t ? 1UL : 0UL);"), encoding="utf-8")
         assembly, generated, _ = build_extract(destination)
-        if digest(generated / "Extracted.lean") == digest(baseline):
+        if sha(generated / "Extracted.lean") == sha(baseline):
             raise RuntimeError("Mutation did not change imported program")
         witness = destination / "Witness"
         witness.mkdir()

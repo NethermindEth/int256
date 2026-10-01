@@ -14,18 +14,6 @@ theorem execute_store (m : Memory) (out frame fuel : Nat) (r0 r1 r2 r3 : W64) :
         some (store4 m out r0 r1 r2 r3, []) := by
   rfl
 
-theorem execute_store_result (initial : Bytes) (m : Memory)
-    (h : ∀ address, m (.byte address) = byteMemory initial (.byte address))
-    (out frame fuel : Nat) (r0 r1 r2 r3 : W64) :
-    ∃ final, run Extracted.program (fuel + 40) 4 0
-      [.object out, .i64 r0, .i64 r1, .i64 r2, .i64 r3] frame [] m = some (final, []) ∧
-      ∀ address, final (.byte address) = (writeBytes (byteMemory initial) out
-        (value (fun i => if i.val = 0 then r0 else if i.val = 1 then r1 else
-          if i.val = 2 then r2 else r3)).toNat 32) (.byte address) := by
-  refine ⟨store4 m out r0 r1 r2 r3, execute_store m out frame fuel r0 r1 r2 r3, ?_⟩
-  intro address
-  rw [store4_bytes m (byteMemory initial) h out r0 r1 r2 r3 address, store4_value]
-
 theorem execute_store_at (m : Memory) (out frame fuel : Nat) (r0 r1 r2 r3 : W64)
     (hf : 40 ≤ fuel) :
     run Extracted.program fuel 4 0
@@ -34,24 +22,22 @@ theorem execute_store_at (m : Memory) (out frame fuel : Nat) (r0 r1 r2 r3 : W64)
   have he : fuel = (fuel - 40) + 40 := by omega
   rw [he]
   exact execute_store m out frame (fuel - 40) r0 r1 r2 r3
+-- Expand to ordinary kernel-checked rewriting with explicit branch facts.
+local macro "small_steps" facts:term,* : tactic =>
+  `(tactic| repeat
+      rw [run]
+      simp [step, Extracted.program, Extracted.method2, Extracted.method4, binary,
+        truth, write64, write_local_read_local, show (3 : Fin 4).val = 3 from rfl,
+        initLocals, $[$facts:term],*])
+
 theorem execute_small_no_carry (m : Memory) (base out frame fuel : Nat) (a : Limbs) (b : W64)
     (hr : ∀ i : Fin 4, read64 m (.byte (base + 8*i.val)) = some (.i64 (a i)))
     (hnc : ¬ a 0 + b < a 0) :
     ∃ final, run Extracted.program (fuel + 200) 2 0
       [.object base, .i64 b, .object out] frame [] m = some (final, [.i32 0]) ∧
       ∀ address, final (.byte address) = store4 m out (a 0 + b) (a 1) (a 2) (a 3) (.byte address) := by
-  have hr0 := hr 0
-  have hr1 := hr 1
-  have hr2 := hr 2
-  have hr3 := hr 3
-  simp only [Fin.val_zero, Fin.val_one, Nat.mul_zero, Nat.mul_one, Nat.add_zero] at hr0 hr1
-  change read64 m (.byte (base + 16)) = some (.i64 (a 2)) at hr2
-  change read64 m (.byte (base + 24)) = some (.i64 (a 3)) at hr3
-  repeat
-    rw [run]
-    simp [step, Extracted.program, Extracted.method2, Extracted.method4, binary, truth, write64, write_local_read_local,
-      show (3 : Fin 4).val = 3 from rfl,
-      initLocals, hr0, hr1, hr2, hr3, hnc]
+  obtain ⟨hr0, hr1, hr2, hr3⟩ := limb_reads m base a hr
+  small_steps hr0, hr1, hr2, hr3, hnc
   simp [store4]
 
 theorem execute_small_carry1 (m : Memory) (base out frame fuel : Nat) (a : Limbs) (b : W64)
@@ -60,18 +46,9 @@ theorem execute_small_carry1 (m : Memory) (base out frame fuel : Nat) (a : Limbs
     ∃ final, run Extracted.program (fuel + 200) 2 0
       [.object base, .i64 b, .object out] frame [] m = some (final, [.i32 0]) ∧
       ∀ address, final (.byte address) = store4 m out (a 0 + b) (a 1 + 1) (a 2) (a 3) (.byte address) := by
-  have hr0 := hr 0
-  have hr1 := hr 1
-  have hr2 := hr 2
-  have hr3 := hr 3
-  simp only [Fin.val_zero, Fin.val_one, Nat.mul_zero, Nat.mul_one, Nat.add_zero] at hr0 hr1
-  change read64 m (.byte (base + 16)) = some (.i64 (a 2)) at hr2
-  change read64 m (.byte (base + 24)) = some (.i64 (a 3)) at hr3
+  obtain ⟨hr0, hr1, hr2, hr3⟩ := limb_reads m base a hr
   change a 1 + BitVec.ofNat 64 1 ≠ BitVec.ofNat 64 0 at h1
-  repeat
-    rw [run]
-    simp [step, Extracted.program, Extracted.method2, Extracted.method4, binary, truth, write64, write_local_read_local,
-      show (3 : Fin 4).val = 3 from rfl, initLocals, hr0, hr1, hr2, hr3, hc, h1]
+  small_steps hr0, hr1, hr2, hr3, hc, h1
   simp [store4]
 
 theorem execute_small_carry2 (m : Memory) (base out frame fuel : Nat) (a : Limbs) (b : W64)
@@ -80,20 +57,10 @@ theorem execute_small_carry2 (m : Memory) (base out frame fuel : Nat) (a : Limbs
     ∃ final, run Extracted.program (fuel + 200) 2 0
       [.object base, .i64 b, .object out] frame [] m = some (final, [.i32 0]) ∧
       ∀ address, final (.byte address) = store4 m out (a 0 + b) 0 (a 2 + 1) (a 3) (.byte address) := by
-  have hr0 := hr 0
-  have hr1 := hr 1
-  have hr2 := hr 2
-  have hr3 := hr 3
-  simp only [Fin.val_zero, Fin.val_one, Nat.mul_zero, Nat.mul_one, Nat.add_zero] at hr0 hr1
-  change read64 m (.byte (base + 16)) = some (.i64 (a 2)) at hr2
-  change read64 m (.byte (base + 24)) = some (.i64 (a 3)) at hr3
+  obtain ⟨hr0, hr1, hr2, hr3⟩ := limb_reads m base a hr
   change a 1 + BitVec.ofNat 64 1 = BitVec.ofNat 64 0 at h1
   change a 2 + BitVec.ofNat 64 1 ≠ BitVec.ofNat 64 0 at h2
-  repeat
-    rw [run]
-    simp [step, Extracted.program, Extracted.method2, Extracted.method4, binary, truth, write64,
-      write_local_read_local, show (3 : Fin 4).val = 3 from rfl,
-      initLocals, hr0, hr1, hr2, hr3, hc, h1, h2]
+  small_steps hr0, hr1, hr2, hr3, hc, h1, h2
   simp [store4]
 
 theorem execute_small_carry3 (m : Memory) (base out frame fuel : Nat) (a : Limbs) (b : W64)
@@ -102,21 +69,11 @@ theorem execute_small_carry3 (m : Memory) (base out frame fuel : Nat) (a : Limbs
     ∃ final, run Extracted.program (fuel + 200) 2 0
       [.object base, .i64 b, .object out] frame [] m = some (final, [.i32 0]) ∧
       ∀ address, final (.byte address) = store4 m out (a 0 + b) 0 0 (a 3 + 1) (.byte address) := by
-  have hr0 := hr 0
-  have hr1 := hr 1
-  have hr2 := hr 2
-  have hr3 := hr 3
-  simp only [Fin.val_zero, Fin.val_one, Nat.mul_zero, Nat.mul_one, Nat.add_zero] at hr0 hr1
-  change read64 m (.byte (base + 16)) = some (.i64 (a 2)) at hr2
-  change read64 m (.byte (base + 24)) = some (.i64 (a 3)) at hr3
+  obtain ⟨hr0, hr1, hr2, hr3⟩ := limb_reads m base a hr
   change a 1 + BitVec.ofNat 64 1 = BitVec.ofNat 64 0 at h1
   change a 2 + BitVec.ofNat 64 1 = BitVec.ofNat 64 0 at h2
   change a 3 + BitVec.ofNat 64 1 ≠ BitVec.ofNat 64 0 at h3
-  repeat
-    rw [run]
-    simp [step, Extracted.program, Extracted.method2, Extracted.method4, binary, truth, write64,
-      write_local_read_local, show (3 : Fin 4).val = 3 from rfl,
-      initLocals, hr0, hr1, hr2, hr3, hc, h1, h2, h3]
+  small_steps hr0, hr1, hr2, hr3, hc, h1, h2, h3
   simp [store4]
 
 theorem execute_small_overflow (m : Memory) (base out frame fuel : Nat) (a : Limbs) (b : W64)
@@ -125,21 +82,11 @@ theorem execute_small_overflow (m : Memory) (base out frame fuel : Nat) (a : Lim
     ∃ final, run Extracted.program (fuel + 200) 2 0
       [.object base, .i64 b, .object out] frame [] m = some (final, [.i32 1]) ∧
       ∀ address, final (.byte address) = store4 m out (a 0 + b) 0 0 0 (.byte address) := by
-  have hr0 := hr 0
-  have hr1 := hr 1
-  have hr2 := hr 2
-  have hr3 := hr 3
-  simp only [Fin.val_zero, Fin.val_one, Nat.mul_zero, Nat.mul_one, Nat.add_zero] at hr0 hr1
-  change read64 m (.byte (base + 16)) = some (.i64 (a 2)) at hr2
-  change read64 m (.byte (base + 24)) = some (.i64 (a 3)) at hr3
+  obtain ⟨hr0, hr1, hr2, hr3⟩ := limb_reads m base a hr
   change a 1 + BitVec.ofNat 64 1 = BitVec.ofNat 64 0 at h1
   change a 2 + BitVec.ofNat 64 1 = BitVec.ofNat 64 0 at h2
   change a 3 + BitVec.ofNat 64 1 = BitVec.ofNat 64 0 at h3
-  repeat
-    rw [run]
-    simp [step, Extracted.program, Extracted.method2, Extracted.method4, binary, truth, write64,
-      write_local_read_local, show (3 : Fin 4).val = 3 from rfl,
-      initLocals, hr0, hr1, hr2, hr3, hc, h1, h2, h3]
+  small_steps hr0, hr1, hr2, hr3, hc, h1, h2, h3
   simp [store4]
 theorem execute_carry (m : Memory) (frame fuel : Nat) (ca ra : Address) (x y c : W64)
     (h : m ca = some (.i64 c))

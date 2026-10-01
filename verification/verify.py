@@ -1,42 +1,22 @@
 """Build, extract and kernel-check the selected Add artifact in fresh directories."""
 
-import hashlib
 import json
-import os
 from pathlib import Path
 import re
 import shutil
-import subprocess
 import sys
 import tempfile
 
-ROOT = Path(__file__).resolve().parent.parent
-VERIFY = ROOT / "verification"
+from common import ROOT, VERIFY, run, sha, source_files
+
 OUTPUT = VERIFY / "generated"
-
-
-def run(command, cwd):
-    env = os.environ.copy()
-    env.update(DOTNET_EnableHWIntrinsic="0", DOTNET_CLI_TELEMETRY_OPTOUT="1",
-               DOTNET_SKIP_FIRST_TIME_EXPERIENCE="1", MSBuildEnableWorkloadResolver="false")
-    result = subprocess.run(command, cwd=cwd, env=env, text=True, encoding="utf-8",
-                            errors="replace", stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    print(result.stdout, end="")
-    if result.returncode:
-        raise RuntimeError(f"Exit {result.returncode}: {command}")
-    return result.stdout
-
-
-def sha(path):
-    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def source_inputs():
     paths = [ROOT / "global.json", ROOT / ".editorconfig", ROOT / ".github/workflows/verify-uint256.yml"]
     for directory in (ROOT / "src", VERIFY):
-        paths.extend(p for p in directory.rglob("*") if p.is_file()
-                     and p.suffix in {".cs", ".csproj", ".props", ".targets", ".lean", ".json", ".toml", ".py"}
-                     and not {"artifacts", "bin", "obj", "generated", ".lake"}.intersection(p.relative_to(directory).parts))
+        paths.extend(source_files(directory,
+                     {".cs", ".csproj", ".props", ".targets", ".lean", ".json", ".toml", ".py"}))
     paths.append(VERIFY / "lean-toolchain")
     return {p.relative_to(ROOT).as_posix(): sha(p) for p in sorted(set(paths))}
 
@@ -75,8 +55,7 @@ def main():
         proof = work / "proof"
         proof.mkdir()
         # Copy source modules recursively, never generated programs or compiled caches.
-        lean_sources = sorted(p for p in VERIFY.rglob("*.lean")
-                              if not {"generated", ".lake", "bin", "obj"}.intersection(p.relative_to(VERIFY).parts))
+        lean_sources = sorted(source_files(VERIFY, {".lean"}))
         for source in lean_sources:
             target = proof / source.relative_to(VERIFY)
             target.parent.mkdir(parents=True, exist_ok=True)
