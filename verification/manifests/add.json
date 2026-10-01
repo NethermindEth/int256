@@ -1,0 +1,38 @@
+{
+  "schema": 1,
+  "assembly": "Nethermind.Int256",
+  "type": "Nethermind.Int256.UInt256",
+  "entry": "System.Void Nethermind.Int256.UInt256::Add(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+  "targetFramework": "net10.0",
+  "configuration": "Release",
+  "variant": "standard",
+  "sdk": "10.0.401",
+  "nativeWidth": 64,
+  "endianness": "little",
+  "environment": { "DOTNET_EnableHWIntrinsic": "0" },
+  "callingAssumptions": [
+    "Readable live 32-byte initial input ranges and a writable live 32-byte output range",
+    "Input and output ranges may overlap arbitrarily",
+    "Each base plus 31 fits in the 64-bit native address space",
+    "No concurrent mutation or data race during the call",
+    "UInt256 type initialization has completed successfully before the call",
+    "Sufficient runtime stack and no asynchronous runtime failure"
+  ],
+  "trustAssumptions": [
+    "Lean kernel and accepted foundational axioms",
+    "Mono.Cecil and extractor faithfully translate the freshly built artifact",
+    "The formal CIL and runtime models faithfully describe the selected environment",
+    "Assembly digest identifies an artifact without proving extraction correctness",
+    "CoreCLR, JIT and hardware fidelity are not proved"
+  ],
+  "managedMethods": ["Add", "AddScalar", "AddScalarUInt64", "AddWithCarry", "StoreLimbs"],
+  "runtimeModels": [
+    "System.Runtime.Intrinsics.X86.Avx2.get_IsSupported = false",
+    "System.Runtime.Intrinsics.Arm.AdvSimd.get_IsSupported = false",
+    "System.Runtime.Intrinsics.X86.Sse42.get_IsSupported = false",
+    "Unsafe.SkipInit<UInt256>: no memory write",
+    "Unsafe.AsRef<UInt64>: reference identity"
+  ],
+  "excluded": ["zkEVM build", "hardware intrinsics enabled", "instance Add overload", "AddOverflow", "JIT and native machine code"],
+  "approvedAxioms": ["propext", "Classical.choice", "Quot.sound"]
+}
