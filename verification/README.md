@@ -11,6 +11,8 @@ foundational axioms. The fresh-build command below ties that proof to one artifa
 
 ```text
 CIL/                         Values, memory, instructions, execution, memory lemmas
+  ExecutionLemmas.lean       Monotonicity of successful execution in fuel
+  SymbolicExecution.lean     Shared instruction stepping and candidate bounds
 UInt256/
   Representation.lean        Mathematical limbs and caller bytes
   RepresentationLemmas.lean  Representation and input-load proofs
@@ -18,9 +20,16 @@ UInt256/
   Arithmetic/Carry.lean      Pure arithmetic, independent of extracted CIL
   Methods/Add/
     Contract.lean            Independent public contract
-    Helpers.lean             Extracted StoreLimbs, carry and small-path execution
+    HelperContracts.lean     Observable carry/storage contracts over current CIL
+    Automation.lean          Apply contracts from actual symbolic call arguments
+    Helpers.lean             Direct small-path execution with carry-case facts
     Small.lean               Small-operand execution and result composition
-    Execution.lean           Scalar dispatch and general-path execution
+    SmallAutomation.lean     Small-path call contract automation
+    SmallParents.lean        Scalar small-dispatch execution, separated from math
+    General.lean             General-path four-word execution witness
+    Execution.lean           Scalar arithmetic composition and case dispatch
+    EntryAutomation.lean     Scalar-call contract automation
+    Entry.lean               Public-entry execution
     Correctness.lean         Public wrapper and universal add_correct theorem
     Examples.lean            Supplementary concrete aliased carry check
     Audit.lean               Exact contract gate and axiom audits
@@ -41,8 +50,9 @@ the final correctness module composes execution with the independent contract.
 The runner copies every source module into a fresh proof directory and records
 its digest, excluding generated files and compiled caches.
 The final contract axiom audit includes all of its transitive proof dependencies.
-The small-path stepping abbreviation expands to ordinary rewriting; each carry
-branch still supplies its explicit load and branch facts.
+Shared stepping follows the generated instructions and uses proved call contracts.
+Small-path carry cases supply algorithm facts; caller-private locals and fuel
+offsets are derived by the execution procedure.
 
 For another method, add its contract, execution, correctness and audit modules
 under `UInt256/Methods/`, and a method manifest. Extend the shared instruction
@@ -155,7 +165,13 @@ explicitly; the input digests identify the source used in that case.
 Never manually edit or commit `generated/`; regenerate it from the build.
 Build outputs and Lake's cache are also ignored.
 
-CI runs the same command, followed by `python verification/negative_checks.py`.
+CI runs the same command, followed by `python verification/negative_checks.py`
+and `python verification/robustness_checks.py`. The robustness harness verifies a
+fresh baseline and three compiled variants with identical handwritten Lean
+sources: comparing carry against the other operand, prefetching high input limbs,
+and inlining small-path stores. Each changes actual instructions in its intended
+method. Fresh verification took about 130–151 seconds per artifact on Windows,
+including compilation and kernel checking; the full harness took about 9.4 minutes.
 The regression script uses temporary copies to break the carry arithmetic, builds
 and imports the changed assembly, runs a concrete incorrect-result witness, and
 requires the original correctness proof to fail. It also seeds stale extraction
@@ -175,7 +191,13 @@ compilation and unapproved axioms cause explicit nonzero failures. An axiom such
 as `sorryAx` printed for a failed declaration in a negative test is diagnostic
 output from rejected compilation; it cannot pass the final audit or emit success.
 
-When production CIL changes, regenerate first, inspect changed instructions and adjust the
-execution proof and arithmetic lemmas while preserving the independent contract.
+When production CIL changes, regenerate first. The demonstrated changes reprove
+with the shared execution procedure; other changes may require arithmetic lemmas
+or execution support while preserving the independent contract.
+The extractor still selects five named helpers in forward call order. New or
+removed helpers, general-path helper inlining, a different carry invariant or
+dispatch order can require proof work. Candidate fuel bounds count later method
+bodies conservatively and must fit the unchanged public bound of 512; this can
+reject implementations whose actual execution would fit a sharper bound.
 Unsupported-feature failures require an explicit semantics extension with proofs,
 or restoring the selected configuration; suppressing them is not an update path.
