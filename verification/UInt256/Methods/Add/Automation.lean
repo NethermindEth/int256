@@ -31,16 +31,18 @@ partial def collectRuns (expression : Expr) : Array Expr := Id.run do
   | .mdata _ body | .proj _ _ body => return result ++ collectRuns body
   | _ => return result
 
--- Contracts are selected by validated symbolic method identities, never by
+-- Contracts are selected by generated signature-candidate identities, never by
 -- a method hash, fixture label, instruction sequence, or variant recognition.
 elab "cil_carry_call" : tactic => withMainContext do
+  unless (← getEnv).contains (Name.mkSimple "Extracted" |>.str "addWithCarryIndex") do
+    throwError "No extracted summary candidate"
   let target ← getMainTarget
   let candidates := collectRuns target
   let mut selected : Option Expr := none
   for candidate in candidates do
     if candidate.hasLooseBVars then continue
     let args := candidate.getAppArgs
-    if (← isDefEq args[2]! (mkConst ``Extracted.addWithCarryIndex)) &&
+    if (← isDefEq args[2]! (mkConst (Name.mkSimple "Extracted" |>.str "addWithCarryIndex"))) &&
         (← isDefEq args[3]! (mkNatLit 0)) then
       selected := some candidate
       break
@@ -80,6 +82,7 @@ elab "cil_carry_call" : tactic => withMainContext do
       execute_carry_contract_at $memory $frame $fuel $cslot $rslot $xTerm $yTerm _
         (by simp_all [write, initLocals]; all_goals rfl)
         (by omega)
+        (by repeat first | apply carry_bound | assumption | decide)
         (by simp [cil_code]; all_goals omega)))
   evalTactic (← `(tactic|
     have $hb:ident : ∀ address, $final (.byte address) = $memory (.byte address) := by
@@ -91,7 +94,7 @@ elab "cil_carry_call" : tactic => withMainContext do
         $final (.local $frame index) = $memory (.local $frame index) := by
       intro index hcarry hsum
       apply $hp
-      · intro other; intro h; have := Address.local.inj h; omega
+      · intro other index hlower; intro h; have := Address.local.inj h; omega
       · simpa using hcarry
       · simpa using hsum))
   evalTactic (← `(tactic|
@@ -103,11 +106,13 @@ elab "cil_carry_call" : tactic => withMainContext do
   evalTactic (← `(tactic| simp only [Option.bind_some]))
 
 elab "cil_store_call" : tactic => withMainContext do
+  unless (← getEnv).contains (Name.mkSimple "Extracted" |>.str "storeLimbsIndex") do
+    throwError "No extracted summary candidate"
   let mut selected : Option Expr := none
   for candidate in collectRuns (← getMainTarget) do
     if candidate.hasLooseBVars then continue
     let args := candidate.getAppArgs
-    if (← isDefEq args[2]! (mkConst ``Extracted.storeLimbsIndex)) &&
+    if (← isDefEq args[2]! (mkConst (Name.mkSimple "Extracted" |>.str "storeLimbsIndex"))) &&
         (← isDefEq args[3]! (mkNatLit 0)) then
       selected := some candidate
       break
@@ -138,14 +143,30 @@ elab "cil_store_call" : tactic => withMainContext do
   evalTactic (← `(tactic| rw [$hr:ident]))
   evalTactic (← `(tactic| simp only [Option.bind_some]))
 
+-- Split only a conditional instruction address, never a comparison flag that
+-- can instead be folded into a mathematical carry.
+elab "cil_branch" : tactic => withMainContext do
+  for candidate in collectRuns (← getMainTarget) do
+    if candidate.hasLooseBVars then continue
+    let pc := candidate.getAppArgs[3]!
+    if pc.isAppOfArity ``ite 5 then
+      let condition ← PrettyPrinter.delab pc.getAppArgs[1]!
+      let h := mkIdent (← mkFreshUserName `branchCondition)
+      let hTerm : Term := ⟨h.raw⟩
+      evalTactic (← `(tactic| by_cases $h:ident : $condition <;> simp only [$hTerm:term, ↓reduceIte]))
+      return
+  throwError "No conditional instruction address"
+
 macro "cil_execute" facts:term,+ "with" calls:tacticSeq : tactic =>
-  `(tactic| ((try (simp only [cil_code])); repeat
+  `(tactic| ((try (simp only [cil_code])); repeat'
     first
     | ($calls:tacticSeq)
+    | cil_branch
     | (rw [CIL.run]
        simp [*, cil_code, CIL.step, CIL.binary, CIL.truth, CIL.initLocals, CIL.write64,
-         read64_local, write_local_read_local, fin_val_three, $[$facts:term],*]
-       all_goals try rfl)))
+         read64_local, write_local_read_local, fin_val_three, carry_expression,
+         carry_or_expression, carry_flags_add, carry_flags_or, carry_bound, ← carry_zero, $[$facts:term],*]
+)))
 
 macro "cil_execute" facts:term,+ : tactic =>
   `(tactic| cil_execute $[$facts:term],* with (first | cil_carry_call | cil_store_call))

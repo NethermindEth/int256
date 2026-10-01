@@ -43,6 +43,6 @@ jobs:
       - name: Verify freshly built UInt256
         run: python3 verification/verify.py
       - name: Exercise arithmetic, freshness and extraction regressions
-        run: python3 verification/negative_checks.py
+        run: python3 verification/Tests/negative_checks.py
       - name: Verify distinct compiled Add variants with identical proofs
-        run: python3 verification/robustness_checks.py
+        run: python3 verification/Tests/robustness_checks.py

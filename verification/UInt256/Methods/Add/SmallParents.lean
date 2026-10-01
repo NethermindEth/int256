@@ -6,6 +6,8 @@ set_option maxHeartbeats 2000000
 
 namespace UInt256Proof
 
+if_extracted Extracted.addScalarIndex {
+
 theorem execute_scalar_right_small_words (m : Memory) (left right out frame fuel : Nat)
     (a b : Limbs)
     (ha : ∀ i : Fin 4, read64 m (.byte (left + 8*i.val)) = some (.i64 (a i)))
@@ -42,5 +44,7 @@ theorem execute_scalar_left_small_words (m : Memory) (left right out frame fuel 
   intro location
   simp [*, write]
 
+
+}
 
 end UInt256Proof

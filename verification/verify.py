@@ -1,5 +1,6 @@
 """Build, extract and kernel-check the selected Add artifact in fresh directories."""
 
+import argparse
 import json
 from pathlib import Path
 import re
@@ -10,6 +11,13 @@ import tempfile
 from common import ROOT, VERIFY, run, sha, source_files
 
 OUTPUT = VERIFY / "generated"
+
+
+def run_stage(command, cwd, stage):
+    try:
+        return run(command, cwd)
+    except RuntimeError as error:
+        raise RuntimeError(f"{stage} failure: {error}") from error
 
 
 def source_inputs():
@@ -23,10 +31,17 @@ def source_inputs():
 
 def main():
     sys.stdout.reconfigure(encoding="utf-8")
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--fixture", help="Versioned Add fixture name (without .cs); default verifies production")
+    arguments = parser.parse_args()
     OUTPUT.mkdir(exist_ok=True)
     report_path = OUTPUT / "report.json"
     # Invalidate the prior success before any command that can fail.
     report_path.unlink(missing_ok=True)
+    fixture = VERIFY / "Tests/Fixtures/Add" / f"{arguments.fixture}.cs" if arguments.fixture else None
+    if fixture is not None and (fixture.parent != VERIFY / "Tests/Fixtures/Add" or not fixture.is_file()):
+        raise RuntimeError("Fixture maintenance failure: requested versioned fixture is absent")
+    project = VERIFY / "Tests/Fixtures/Nethermind.Int256.csproj" if fixture else ROOT / "src/Nethermind.Int256/Nethermind.Int256.csproj"
     manifest = json.loads((VERIFY / "manifests/add.json").read_text(encoding="utf-8"))
     inputs = source_inputs()
     sdk = run(["dotnet", "--version"], ROOT).strip()
@@ -41,9 +56,11 @@ def main():
     with tempfile.TemporaryDirectory(prefix="int256-verify-") as temporary:
         work = Path(temporary)
         artifacts = work / "artifacts"
-        run(["dotnet", "build", str(ROOT / "src/Nethermind.Int256/Nethermind.Int256.csproj"),
-             "-c", "Release", "--no-incremental", f"-p:ArtifactsPath={artifacts}",
-             "-p:EnableZkEvm=false"], ROOT)
+        build = ["dotnet", "build", str(project), "-c", "Release", "--no-incremental",
+                 f"-p:ArtifactsPath={artifacts}", "-p:EnableZkEvm=false"]
+        if fixture:
+            build += [f"-p:FixtureSource={fixture}", "-p:EnforceCodeStyleInBuild=true", "-p:GenerateDocumentationFile=true"]
+        run_stage(build, ROOT, "Fixture maintenance/build" if fixture else "Production build")
         assembly = artifacts / "bin/Nethermind.Int256/release/Nethermind.Int256.dll"
         if not assembly.is_file():
             raise RuntimeError("Fresh build did not produce the selected assembly")
@@ -66,9 +83,9 @@ def main():
         run(["dotnet", str(extractor), str(assembly), str(generated)], ROOT)
         artifact = json.loads((generated / "artifact.json").read_text(encoding="utf-8"))
         assembly_hash = sha(assembly)
-        if artifact["sha256"] != assembly_hash or artifact["methods"][0]["signature"] != manifest["entry"]:
+        if artifact["sha256"] != assembly_hash or artifact["methods"][artifact["entryIndex"]]["signature"] != manifest["entry"]:
             raise RuntimeError("Artifact identity mismatch")
-        output = run([lake, "build", "Audit"], proof)
+        output = run_stage([lake, "build", "Audit"], proof, "Proof checking")
         audit = re.findall(r"'UInt256Proof.checked_contract' depends on axioms: \[([^]]*)\]", output)
         if len(audit) != 1:
             raise RuntimeError("Missing or ambiguous final theorem axiom audit")
@@ -83,6 +100,9 @@ def main():
         status = run(["git", "status", "--porcelain"], ROOT).splitlines()
         report = {"status": "verified", "sourceCommit": commit, "sourceStatus": status,
                   "sourceInputs": inputs, "artifact": artifact, "scope": manifest,
+                  "source": {"kind": "fixture" if fixture else "production",
+                             "project": project.relative_to(ROOT).as_posix(),
+                             "fixture": fixture.relative_to(ROOT).as_posix() if fixture else None},
                   "sdk": sdk, "lean": lean, "axioms": axioms,
                   "generatedProgramSha256": sha(generated / "Extracted.lean"),
                   "leanSourceSha256": {p.relative_to(VERIFY).as_posix(): sha(proof / p.relative_to(VERIFY))

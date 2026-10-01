@@ -5,6 +5,8 @@ set_option maxRecDepth 8192
 set_option maxHeartbeats 2000000
 namespace UInt256Proof
 
+if_extracted Extracted.addScalarIndex {
+
 -- Formal execution follows the generated code; arithmetic is proved separately.
 theorem execute_scalar_general_words (m : Memory) (left right out frame fuel : Nat) (a b : Limbs)
     (ha : ∀ i : Fin 4, read64 m (.byte (left + 8*i.val)) = some (.i64 (a i)))
@@ -25,5 +27,7 @@ theorem execute_scalar_general_words (m : Memory) (left right out frame fuel : N
   apply store4_bytes _ _ ?_ _ _ _ _ _ address
   intro location
   simp [*, write]
+
+}
 
 end UInt256Proof
