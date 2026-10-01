@@ -1,0 +1,8 @@
+generated/
+.lake/
+**/bin/
+**/obj/
+*.olean
+*.ilean
+*.c
+*.trace

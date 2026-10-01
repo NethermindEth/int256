@@ -1,0 +1,22 @@
+name = "uint256_verification"
+version = "0.1.0"
+defaultTargets = ["Proof"]
+
+[[lean_lib]]
+name = "Model"
+
+[[lean_lib]]
+name = "Extracted"
+srcDir = "generated"
+
+[[lean_lib]]
+name = "Proof"
+
+[[lean_lib]]
+name = "Audit"
+
+[[lean_lib]]
+name = "CIL"
+
+[[lean_lib]]
+name = "UInt256"

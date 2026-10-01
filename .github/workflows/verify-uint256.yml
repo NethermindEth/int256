@@ -1,0 +1,46 @@
+name: Verify UInt256
+
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'verification/**'
+      - 'global.json'
+      - '.editorconfig'
+      - '.github/workflows/verify-uint256.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'verification/**'
+      - 'global.json'
+      - '.editorconfig'
+      - '.github/workflows/verify-uint256.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      DOTNET_EnableHWIntrinsic: '0'
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.401'
+      - name: Install Lean 4.34.1
+        shell: bash
+        run: |
+          curl --fail --location --retry 3 https://github.com/leanprover/lean4/releases/download/v4.34.1/lean-4.34.1-linux.tar.zst -o "$RUNNER_TEMP/lean.tar.zst"
+          tar --zstd -xf "$RUNNER_TEMP/lean.tar.zst" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/lean-4.34.1-linux/bin" >> "$GITHUB_PATH"
+      - name: Verify freshly built UInt256
+        run: python3 verification/verify.py
+      - name: Exercise arithmetic, freshness and extraction regressions
+        run: python3 verification/negative_checks.py
