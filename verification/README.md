@@ -175,8 +175,25 @@ explicitly; the input digests identify the source used in that case.
 Never manually edit or commit `generated/`; regenerate it from the build.
 Build outputs and Lake's cache are also ignored.
 
-CI runs the same command, followed by `python verification/Tests/negative_checks.py`
-and `python verification/Tests/robustness_checks.py`. The robustness harness checks
+Relevant PRs and pushes to main run only the fresh production proof through
+`python verification/verify.py` in the **Verify UInt256** workflow. For ordinary
+C# edits, it first builds the base and current revisions and compares extracted
+Add CIL, all reachable helpers and validated metadata. Unchanged extraction skips
+the proof, even when other methods in the same source file changed. Verification,
+build configuration or workflow changes always run it, as does a manual production
+run. PRs targeting branches other than main also run a fresh proof. A skip establishes
+unchanged verification inputs relative to main, so main must retain its successful
+production-proof gate. Build or extraction failures fail the check rather than
+count as unchanged. Any accompanying non-C# change conservatively forces a proof.
+The manually triggered **Verify UInt256 proof tests** workflow runs
+`python verification/Tests/negative_checks.py` and
+`python verification/Tests/robustness_checks.py` in separate parallel jobs.
+The regression job first verifies production to establish its fresh baseline.
+Run the full suite after changes to the verifier, extractor, CIL semantics or proof
+automation, and before releases. Ordinary implementation optimisations require the
+fresh production proof; the full fixture matrix need not run for each optimisation.
+
+The robustness harness checks
 versioned fixture programs independent of production code, using identical handwritten
 Lean sources: a scalar baseline, bitwise-OR carry flags, private-helper renaming,
 complete helper inlining with small-operand dispatch, straight-line OR addition,
