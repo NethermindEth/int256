@@ -70,7 +70,7 @@ theorem input_value (m : Bytes) (base : Nat) : value (inputLimbs m base) = byteV
       byteNumber m (base + 24) 8 * 2^192 := by
     rw [h0, h1, h2]
     simp only [Nat.mul_add, ← Nat.mul_assoc]
-    ac_rfl
+    omega
   apply BitVec.eq_of_toNat_eq
   simp only [value, byteValue, input_limb_nat]
   simp only [BitVec.toNat_ofNat,

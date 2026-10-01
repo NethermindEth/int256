@@ -16,28 +16,39 @@ internal static class LeanEmitter
             var instructions = m.Body.Instructions;
             HashSet<Instruction> reachable = Reachability.Analyze(m);
             string symbol = $"method{methodIndex}";
+            string returnsValue = m.ReturnType.FullName == "System.Void" ? "false" : "true";
             lean.Append($"@[cil_code] def {symbol}Index : Nat := {methodIndex}\n");
-            lean.Append($"@[cil_code] def {symbol}Body : Method := {{\n  returnsValue := {(m.ReturnType.FullName == "System.Void" ? "false" : "true")}\n  locals := [");
-            lean.Append(string.Join(", ", m.Body.Variables.Select(v => v.VariableType.FullName switch
+            string locals = string.Join(", ", m.Body.Variables.Select(v => v.VariableType.FullName switch
             {
                 "System.UInt64" => ".i64 0",
                 "System.Boolean" or "System.Int32" => ".i32 0",
                 "Nethermind.Int256.UInt256&" or "System.UInt64&" => ".nullRef",
                 string s when s.StartsWith("System.Runtime.Intrinsics.Vector256`1<", StringComparison.Ordinal) => ".unmodeled",
                 _ => throw new InvalidDataException($"Unsupported local type {v.VariableType.FullName}")
-            })));
-            lean.Append("]\n  code := [\n");
+            }));
+            // Keep the body folded during execution simplification. Its fields
+            // and concrete instruction fetches have separately checked equations.
+            lean.Append($"def {symbol}Body : Method := {{\n  returnsValue := {returnsValue}\n  locals := [{locals}]\n  code := [\n");
             List<string> ops = [];
-            foreach (Instruction i in instructions)
+            List<string> lookups = [];
+            for (int instructionIndex = 0; instructionIndex < instructions.Count; instructionIndex++)
             {
+                Instruction i = instructions[instructionIndex];
                 bool live = reachable.Contains(i);
                 string op;
                 op = live ? InstructionTranslation.Translate(i, m, methods, methodIndex)
                     : $".unsupported {JsonSerializer.Serialize(i.ToString())}";
                 ops.Add($"    {op}, -- IL_{i.Offset:x4}{(live ? "" : " (unreachable in the selected environment)")}");
+                lookups.Add($"@[cil_code ↓] theorem {symbol}Instruction{instructionIndex} : " +
+                    $"{symbol}Body.code[{instructionIndex}]? = some ({op}) := by rfl\n");
             }
             lean.Append(string.Join("\n", ops));
             lean.Append("\n  ] }\n\n");
+            lean.Append($"@[cil_code] theorem {symbol}Locals : {symbol}Body.locals = [{locals}] := by rfl\n");
+            lean.Append($"@[cil_code] theorem {symbol}Returns : {symbol}Body.returnsValue = {returnsValue} := by rfl\n");
+            lean.Append($"@[cil_code] theorem {symbol}Length : {symbol}Body.code.length = {instructions.Count} := by rfl\n");
+            lean.Append(string.Join("", lookups));
+            lean.Append('\n');
             coverage.Add(new { method = m.FullName, reachable = reachable.Select(i => i.Offset).Order().ToArray(),
                 excluded = instructions.Where(i => !reachable.Contains(i)).Select(i => i.Offset).ToArray() });
         }
