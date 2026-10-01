@@ -94,6 +94,14 @@ theorem four_limb_sum (a b : Limbs) :
 
 def singleLimb (b : W64) : Limbs := fun i => if i.val = 0 then b else 0
 
+theorem singleLimb_eq (a : Limbs) (h1 : a 1 = 0) (h2 : a 2 = 0) (h3 : a 3 = 0) :
+    singleLimb (a 0) = a := by
+  funext i
+  rcases i with ⟨i, hi⟩
+  have cases : i = 0 ∨ i = 1 ∨ i = 2 ∨ i = 3 := by omega
+  rcases cases with h | h | h | h
+  all_goals subst i; simp [singleLimb, h1, h2, h3]
+
 def smallResult (a : Limbs) (b : W64) : Limbs := fun i =>
   if i.val = 0 then a 0 + b else
   if i.val = 1 then if a 0 + b < a 0 then a 1 + 1 else a 1 else

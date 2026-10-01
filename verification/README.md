@@ -27,6 +27,7 @@ UInt256/
 Extractor/                   CLI, metadata validation, reachability, translation,
                              Lean emission and artifact reporting in separate files
 RegressionFixture/           Malformed artifact fixtures
+common.py                    Shared process, hashing and source-selection utilities
 manifests/add.json           Selected artifact, method scope and trust assumptions
 generated/                   Ignored extraction, metadata and verification report
 ```
@@ -39,6 +40,9 @@ Reusable CIL, representation, storage and arithmetic modules do not import
 the final correctness module composes execution with the independent contract.
 The runner copies every source module into a fresh proof directory and records
 its digest, excluding generated files and compiled caches.
+The final contract axiom audit includes all of its transitive proof dependencies.
+The small-path stepping abbreviation expands to ordinary rewriting; each carry
+branch still supplies its explicit load and branch facts.
 
 For another method, add its contract, execution, correctness and audit modules
 under `UInt256/Methods/`, and a method manifest. Extend the shared instruction

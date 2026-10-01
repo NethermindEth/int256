@@ -22,13 +22,7 @@ theorem execute_scalar_right_small (m : Memory) (left right out frame fuel : Nat
   have hf : fuel + 82 + 200 = fuel + 282 := by omega
   rw [hf] at he
   simp [Extracted.program, Extracted.method1, child] at he
-  have hr0 := hb 0
-  have hr1 := hb 1
-  have hr2 := hb 2
-  have hr3 := hb 3
-  simp only [Fin.val_zero, Fin.val_one, Nat.mul_zero, Nat.mul_one, Nat.add_zero] at hr0 hr1
-  change read64 m (.byte (right + 16)) = some (.i64 (b 2)) at hr2
-  change read64 m (.byte (right + 24)) = some (.i64 (b 3)) at hr3
+  obtain ⟨hr0, hr1, hr2, hr3⟩ := limb_reads m right b hb
   refine ⟨final, flag, ?_, ?_⟩
   · iterate 18
       rw [run]
@@ -39,12 +33,7 @@ theorem execute_scalar_right_small (m : Memory) (left right out frame fuel : Nat
     simp only [Option.bind_some]
     rw [run]
     simp [step]
-  · have hs : singleLimb (b 0) = b := by
-      funext i
-      rcases i with ⟨i, hi⟩
-      have cases : i = 0 ∨ i = 1 ∨ i = 2 ∨ i = 3 := by omega
-      rcases cases with h | h | h | h
-      all_goals subst i; simp [singleLimb, h1, h2, h3]
+  · have hs := singleLimb_eq b h1 h2 h3
     rw [hs] at hm
     intro address
     rw [hm]
@@ -68,19 +57,8 @@ theorem execute_scalar_left_small (m : Memory) (left right out frame fuel : Nat)
   have hf : fuel + 70 + 200 = fuel + 270 := by omega
   rw [hf] at he
   simp [Extracted.program, Extracted.method1, child] at he
-  have ha0 := ha 0
-  have ha1 := ha 1
-  have ha2 := ha 2
-  have ha3 := ha 3
-  have hb0 := hb 0
-  have hb1 := hb 1
-  have hb2 := hb 2
-  have hb3 := hb 3
-  simp only [Fin.val_zero, Fin.val_one, Nat.mul_zero, Nat.mul_one, Nat.add_zero] at ha0 ha1 hb0 hb1
-  change read64 m (.byte (left+16)) = some (.i64 (a 2)) at ha2
-  change read64 m (.byte (left+24)) = some (.i64 (a 3)) at ha3
-  change read64 m (.byte (right+16)) = some (.i64 (b 2)) at hb2
-  change read64 m (.byte (right+24)) = some (.i64 (b 3)) at hb3
+  obtain ⟨ha0, ha1, ha2, ha3⟩ := limb_reads m left a ha
+  obtain ⟨hb0, hb1, hb2, hb3⟩ := limb_reads m right b hb
   change b 1 ||| b 2 ||| b 3 ≠ BitVec.ofNat 64 0 at hn
   refine ⟨final, flag, ?_, ?_⟩
   · iterate 30
@@ -92,12 +70,7 @@ theorem execute_scalar_left_small (m : Memory) (left right out frame fuel : Nat)
     simp only [Option.bind_some]
     rw [run]
     simp [step]
-  · have hs : singleLimb (a 0) = a := by
-      funext i
-      rcases i with ⟨i, hi⟩
-      have cases : i = 0 ∨ i = 1 ∨ i = 2 ∨ i = 3 := by omega
-      rcases cases with h | h | h | h
-      all_goals subst i; simp [singleLimb, h1, h2, h3]
+  · have hs := singleLimb_eq a h1 h2 h3
     rw [hs, BitVec.add_comm] at hm
     intro address
     rw [hm]
@@ -135,19 +108,8 @@ theorem execute_scalar_general (m : Memory) (left right out frame fuel : Nat) (a
   simp [Extracted.program, Extracted.method1, m2, m1, m0, c2, c1] at he3
   simp [Extracted.program, Extracted.method1, m3, m2, m1, m0, c3, c2, c1] at he4
   simp [Extracted.program, Extracted.method1, m4, m3, m2, m1, m0, c3, c2, c1] at hs
-  have ha0 := ha 0
-  have ha1 := ha 1
-  have ha2 := ha 2
-  have ha3 := ha 3
-  have hb0 := hb 0
-  have hb1 := hb 1
-  have hb2 := hb 2
-  have hb3 := hb 3
-  simp only [Fin.val_zero, Fin.val_one, Nat.mul_zero, Nat.mul_one, Nat.add_zero] at ha0 ha1 hb0 hb1
-  change read64 m (.byte (left+16)) = some (.i64 (a 2)) at ha2
-  change read64 m (.byte (left+24)) = some (.i64 (a 3)) at ha3
-  change read64 m (.byte (right+16)) = some (.i64 (b 2)) at hb2
-  change read64 m (.byte (right+24)) = some (.i64 (b 3)) at hb3
+  obtain ⟨ha0, ha1, ha2, ha3⟩ := limb_reads m left a ha
+  obtain ⟨hb0, hb1, hb2, hb3⟩ := limb_reads m right b hb
   change a 1 ||| a 2 ||| a 3 ≠ BitVec.ofNat 64 0 at hna
   change b 1 ||| b 2 ||| b 3 ≠ BitVec.ofNat 64 0 at hnb
   refine ⟨store4 m4 out (a 0+b 0) (a 1+b 1+c1) (a 2+b 2+c2) (a 3+b 3+c3),
