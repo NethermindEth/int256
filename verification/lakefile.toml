@@ -20,3 +20,6 @@ name = "CIL"
 
 [[lean_lib]]
 name = "UInt256"
+
+[[lean_lib]]
+name = "Tests.SummaryTransactions"

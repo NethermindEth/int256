@@ -6,8 +6,9 @@ open Lean Meta Elab Tactic CIL UInt256Model
 namespace UInt256Proof
 
 elab "cil_small_call" : tactic => withMainContext do
-  unless (← getEnv).contains (Name.mkSimple "Extracted" |>.str "addScalarUInt64Index") do
-    throwError "No extracted summary candidate"
+  unless (← getEnv).contains (Name.mkSimple "Extracted" |>.str "addScalarUInt64Index") &&
+      (← getEnv).contains (Name.mkSimple "UInt256Proof" |>.str "execute_small_words_at") do
+    throwError "No proved summary available"
   let mut selected : Option Expr := none
   for candidate in collectRuns (← getMainTarget) do
     if candidate.hasLooseBVars then continue

@@ -1,13 +1,9 @@
-using System.Runtime.CompilerServices;
-
 namespace Nethermind.Int256;
 
 public readonly partial struct UInt256
 {
     private static bool AddScalarUInt64(in UInt256 a, ulong b0, out UInt256 res)
     {
-        Unsafe.SkipInit(out res);
-        Unsafe.AsRef(in res.u0) = 0;
         ulong a0 = a.u0, a1 = a.u1, a2 = a.u2, a3 = a.u3;
 
         ulong r0 = a0 + b0;
