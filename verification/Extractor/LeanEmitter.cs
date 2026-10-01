@@ -39,8 +39,10 @@ internal static class LeanEmitter
                 op = live ? InstructionTranslation.Translate(i, m, methods, methodIndex)
                     : $".unsupported {JsonSerializer.Serialize(i.ToString())}";
                 ops.Add($"    {op}, -- IL_{i.Offset:x4}{(live ? "" : " (unreachable in the selected environment)")}");
+                // Supply the type before elaborating anonymous constructors.
+                // Otherwise each lookup repeats expensive deferred type inference.
                 lookups.Add($"@[cil_code ↓] theorem {symbol}Instruction{instructionIndex} : " +
-                    $"{symbol}Body.code[{instructionIndex}]? = some ({op}) := by rfl\n");
+                    $"{symbol}Body.code[{instructionIndex}]? = some ({op} : Op) := by rfl\n");
             }
             lean.Append(string.Join("\n", ops));
             lean.Append("\n  ] }\n\n");
