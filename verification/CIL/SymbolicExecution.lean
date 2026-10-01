@@ -46,7 +46,14 @@ elab "if_extracted " name:ident " {" commands:command* "}" : command => do
 -- procedure. Lean's heartbeat/depth limits remain explicit failure limits.
 macro "cil_steps" facts:term,+ : tactic =>
   `(tactic| ((try (simp only [cil_code])); repeat
-    (rw [run]; simp [cil_code, step, binary, truth, write64, initLocals,
+    (rw [run];
+     -- Resolve the method and instruction before unfolding the selected step.
+     -- Otherwise simp explores instruction cases under unresolved bind lambdas.
+     simp only [cil_code, Option.pure_def, Option.bind_eq_bind, Option.bind_some];
+     -- Retain checked rewrite proofs instead of making the kernel repeat large
+     -- definitional reductions when checking the resulting execution proof.
+     simp (config := { implicitDefEqProofs := false })
+      [cil_code, step, binary, truth, write64, initLocals,
       fin_val_three, $[$facts:term],*])))
 
 macro "cil_steps" : tactic => `(tactic| cil_steps Nat.add_zero)

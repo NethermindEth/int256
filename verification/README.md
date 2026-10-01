@@ -175,6 +175,13 @@ explicitly; the input digests identify the source used in that case.
 Never manually edit or commit `generated/`; regenerate it from the build.
 Build outputs and Lake's cache are also ignored.
 
+The extractor emits kernel-checked equations for each instruction lookup and for
+method metadata. Execution tactics resolve the method and instruction first,
+before simplifying the selected instruction. This keeps method bodies folded and
+avoids repeatedly reducing whole instruction lists or expanding cases for an
+unknown instruction. The CIL semantics, byte-memory model and arithmetic contracts
+are unchanged by this proof strategy.
+
 Relevant PRs and pushes to main run only the fresh production proof through
 `python verification/verify.py` in the **Verify UInt256** workflow. For ordinary
 C# edits, it first builds the base and current revisions and compares extracted

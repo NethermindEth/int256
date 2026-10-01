@@ -165,7 +165,11 @@ macro "cil_execute" facts:term,+ "with" calls:tacticSeq : tactic =>
     | ($calls:tacticSeq)
     | cil_branch
     | (rw [CIL.run]
-       simp [*, cil_code, CIL.step, CIL.binary, CIL.truth, CIL.initLocals, CIL.write64,
+       -- Fetch first, then retain rewrite proofs for the selected instruction.
+       -- This avoids both speculative simplification and repeated kernel reduction.
+       simp only [cil_code, Option.pure_def, Option.bind_eq_bind, Option.bind_some]
+       simp (config := { implicitDefEqProofs := false })
+         [*, cil_code, CIL.step, CIL.binary, CIL.truth, CIL.initLocals, CIL.write64,
          read64_local, write_local_read_local, fin_val_three, carry_expression,
          carry_or_expression, carry_flags_add, carry_flags_or, carry_bound, ← carry_zero, $[$facts:term],*]
 )))
