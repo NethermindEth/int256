@@ -18,11 +18,15 @@ def copy_source(destination):
                     ignore=shutil.ignore_patterns(*BUILD_DIRECTORIES, "TestResults"))
     for name in ("global.json", "README.md", ".editorconfig"):
         shutil.copy2(ROOT / name, destination / name)
+    for source in ROOT.iterdir():
+        if source.is_file() and source.suffix.lower() in {".props", ".targets", ".config"}:
+            shutil.copy2(source, destination / source.name)
     proof = destination / "verification"
     shutil.copytree(VERIFY, proof, ignore=shutil.ignore_patterns(*BUILD_DIRECTORIES))
     workflows = destination / ".github/workflows"
     workflows.mkdir(parents=True)
-    shutil.copy2(ROOT / ".github/workflows/verify-uint256.yml", workflows / "verify-uint256.yml")
+    for workflow in (ROOT / ".github/workflows").glob("verify-uint256*.yml"):
+        shutil.copy2(workflow, workflows / workflow.name)
     return proof
 
 

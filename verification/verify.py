@@ -21,7 +21,9 @@ def run_stage(command, cwd, stage):
 
 
 def source_inputs():
-    paths = [ROOT / "global.json", ROOT / ".editorconfig", ROOT / ".github/workflows/verify-uint256.yml"]
+    paths = [ROOT / "global.json", ROOT / ".editorconfig"]
+    paths.extend(p for p in ROOT.iterdir() if p.is_file() and p.suffix.lower() in {".props", ".targets", ".config"})
+    paths.extend((ROOT / ".github/workflows").glob("verify-uint256*.yml"))
     for directory in (ROOT / "src", VERIFY):
         paths.extend(source_files(directory,
                      {".cs", ".csproj", ".props", ".targets", ".lean", ".json", ".toml", ".py"}))

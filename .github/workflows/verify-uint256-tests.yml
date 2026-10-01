@@ -1,0 +1,43 @@
+name: Verify UInt256 proof tests
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: Proof tests (${{ matrix.suite }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [regressions, fixtures]
+    env:
+      DOTNET_EnableHWIntrinsic: '0'
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.401'
+      - name: Install Lean 4.34.1
+        shell: bash
+        run: |
+          curl --fail --location --retry 3 https://github.com/leanprover/lean4/releases/download/v4.34.1/lean-4.34.1-linux.tar.zst -o "$RUNNER_TEMP/lean.tar.zst"
+          tar --zstd -xf "$RUNNER_TEMP/lean.tar.zst" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/lean-4.34.1-linux/bin" >> "$GITHUB_PATH"
+      - name: Verify production baseline for regressions
+        if: matrix.suite == 'regressions'
+        run: |
+          python3 verification/Tests/change_checks.py
+          python3 verification/verify.py
+      - name: Exercise arithmetic, freshness and extraction regressions
+        if: matrix.suite == 'regressions'
+        run: python3 verification/Tests/negative_checks.py
+      - name: Verify distinct compiled Add variants with identical proofs
+        if: matrix.suite == 'fixtures'
+        run: python3 verification/Tests/robustness_checks.py

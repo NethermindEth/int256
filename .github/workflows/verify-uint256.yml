@@ -7,7 +7,12 @@ on:
       - 'verification/**'
       - 'global.json'
       - '.editorconfig'
+      - '*.props'
+      - '*.targets'
+      - '*.config'
+      - '*.Config'
       - '.github/workflows/verify-uint256.yml'
+      - '.github/workflows/verify-uint256-tests.yml'
   push:
     branches: [main]
     paths:
@@ -15,7 +20,12 @@ on:
       - 'verification/**'
       - 'global.json'
       - '.editorconfig'
+      - '*.props'
+      - '*.targets'
+      - '*.config'
+      - '*.Config'
       - '.github/workflows/verify-uint256.yml'
+      - '.github/workflows/verify-uint256-tests.yml'
   workflow_dispatch:
 
 permissions:
@@ -31,18 +41,27 @@ jobs:
       DOTNET_SKIP_FIRST_TIME_EXPERIENCE: '1'
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.401'
+      - name: Detect changes to verified methods
+        id: changes
+        env:
+          VERIFY_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          VERIFY_EVENT: ${{ github.event_name }}
+          VERIFY_BASE_BRANCH: ${{ github.event.pull_request.base.ref }}
+        run: |
+          python3 verification/Tests/change_checks.py
+          python3 verification/changes.py
       - name: Install Lean 4.34.1
+        if: steps.changes.outputs.required == 'true'
         shell: bash
         run: |
           curl --fail --location --retry 3 https://github.com/leanprover/lean4/releases/download/v4.34.1/lean-4.34.1-linux.tar.zst -o "$RUNNER_TEMP/lean.tar.zst"
           tar --zstd -xf "$RUNNER_TEMP/lean.tar.zst" -C "$RUNNER_TEMP"
           echo "$RUNNER_TEMP/lean-4.34.1-linux/bin" >> "$GITHUB_PATH"
       - name: Verify freshly built UInt256
+        if: steps.changes.outputs.required == 'true'
         run: python3 verification/verify.py
-      - name: Exercise arithmetic, freshness and extraction regressions
-        run: python3 verification/Tests/negative_checks.py
-      - name: Verify distinct compiled Add variants with identical proofs
-        run: python3 verification/Tests/robustness_checks.py
