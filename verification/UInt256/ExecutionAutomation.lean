@@ -30,22 +30,28 @@ partial def collectRuns (expression : Expr) : Array Expr := Id.run do
   | .mdata _ body | .proj _ _ body => return result ++ collectRuns body
   | _ => return result
 
-elab "cil_store_call" : tactic => withMainContext do
-  unless (← getEnv).contains (Name.mkSimple "Extracted" |>.str "storeLimbsIndex") &&
-      (← getEnv).contains (Name.mkSimple "UInt256Proof" |>.str "execute_store_contract") do
+-- A signature candidate is usable only after its current body has been proved.
+def provedCall (index summary : Name) (label : String) (arity : Nat) :
+    TacticM (Array Expr × Array Expr) := do
+  unless (← getEnv).contains index && (← getEnv).contains summary do
     throwError "No proved summary available"
-  let mut selected : Option Expr := none
   for candidate in collectRuns (← getMainTarget) do
     if candidate.hasLooseBVars then continue
-    let args := candidate.getAppArgs
-    if (← isDefEq args[2]! (mkConst (Name.mkSimple "Extracted" |>.str "storeLimbsIndex"))) &&
-        (← isDefEq args[3]! (mkNatLit 0)) then
-      selected := some candidate
-      break
-  let some candidate := selected | throwError "No applicable proved storage-helper call"
-  let call := candidate.getAppArgs
-  let values ← listTerms call[4]!
-  unless values.size == 5 do throwError "Storage helper argument count changed"
+    let call := candidate.getAppArgs
+    if (← isDefEq call[2]! (mkConst index)) && (← isDefEq call[3]! (mkNatLit 0)) then
+      let values ← listTerms call[4]!
+      unless values.size == arity do throwError "{label} helper argument count changed"
+      return (call, values)
+  throwError "No applicable proved {label} helper call"
+
+def rewriteHelperRun (hr : Ident) : TacticM Unit := do
+  evalTactic (← `(tactic| simp [cil_code, initLocals] at $hr:ident))
+  evalTactic (← `(tactic| rw [$hr:ident]))
+  evalTactic (← `(tactic| simp only [Option.bind_some]))
+
+elab "cil_store_call" : tactic => withMainContext do
+  let (call, values) ← provedCall `Extracted.storeLimbsIndex
+    `UInt256Proof.execute_store_contract "storage" 5
   let out ← PrettyPrinter.delab (← constructorArg ``CIL.Value.object values[0]!)
   let mut words : Array Term := #[]
   for value in values[1:] do
@@ -65,9 +71,82 @@ elab "cil_store_call" : tactic => withMainContext do
     obtain ⟨$final:ident, $hr:ident, $hb:ident, $hl:ident⟩ :=
       execute_store_contract $memory $frame $fuel $out $r0 $r1 $r2 $r3
         (by simp [cil_code]; all_goals omega)))
-  evalTactic (← `(tactic| simp [cil_code, initLocals] at $hr:ident))
-  evalTactic (← `(tactic| rw [$hr:ident]))
-  evalTactic (← `(tactic| simp only [Option.bind_some]))
+  rewriteHelperRun hr
+
+def wordHelperCall (index summary : Name) (label : String) (bound : Ident)
+    (reads : TSyntax `tactic) : TacticM Unit := do
+  let contract := mkIdent summary
+  let (call, values) ← provedCall index summary label 4
+  let x ← constructorArg ``CIL.Value.i64 values[0]!
+  let y ← constructorArg ``CIL.Value.i64 values[1]!
+  let ca ← constructorArg ``CIL.Value.ref values[2]!
+  let ra ← constructorArg ``CIL.Value.ref values[3]!
+  unless ca.isAppOfArity ``CIL.Address.local 2 && ra.isAppOfArity ``CIL.Address.local 2 do
+    throwError "Word contract requires caller-local references"
+  let caArgs := ca.getAppArgs
+  let raArgs := ra.getAppArgs
+  unless ← isDefEq caArgs[0]! raArgs[0]! do
+    throwError "Word references occupy different caller frames"
+  let memory ← PrettyPrinter.delab call[7]!
+  let frame ← PrettyPrinter.delab caArgs[0]!
+  let fuel ← PrettyPrinter.delab call[1]!
+  let cslot ← PrettyPrinter.delab caArgs[1]!
+  let rslot ← PrettyPrinter.delab raArgs[1]!
+  let xTerm ← PrettyPrinter.delab x
+  let yTerm ← PrettyPrinter.delab y
+  let final := mkIdent (← mkFreshUserName `calleeMemory)
+  let hr := mkIdent (← mkFreshUserName `calleeRun)
+  let hc := mkIdent (← mkFreshUserName `calleeCarry)
+  let hs := mkIdent (← mkFreshUserName `calleeSum)
+  let hp := mkIdent (← mkFreshUserName `calleePreserved)
+  let hb := mkIdent (← mkFreshUserName `calleeBytes)
+  let hl := mkIdent (← mkFreshUserName `calleeLocals)
+  let hread := mkIdent (← mkFreshUserName `calleeReads)
+  evalTactic (← `(tactic|
+    obtain ⟨$final:ident, $hr:ident, $hc:ident, $hs:ident, $hp:ident⟩ :=
+      $contract:ident $memory $frame $fuel $cslot $rslot $xTerm $yTerm _
+        (by $reads:tactic)
+        (by omega)
+        (by repeat first | apply $bound:ident | assumption | decide)
+        (by simp [cil_code]; all_goals omega)))
+  evalTactic (← `(tactic|
+    have $hb:ident : ∀ address, $final (.byte address) = $memory (.byte address) := by
+      intro address
+      apply $hp
+      all_goals simp))
+  evalTactic (← `(tactic|
+    have $hl:ident : ∀ index, index ≠ $cslot → index ≠ $rslot →
+        $final (.local $frame index) = $memory (.local $frame index) := by
+      intro index hcarry hsum
+      apply $hp
+      · intro other index hlower; intro h; have := Address.local.inj h; omega
+      · simpa using hcarry
+      · simpa using hsum))
+  evalTactic (← `(tactic|
+    have $hread:ident : ∀ base, read64 $final (.byte base) = read64 $memory (.byte base) := by
+      intro base
+      exact read64_congr $final $memory $hb base))
+  rewriteHelperRun hr
+
+def smallHelperCall (index summary : Name) (label : String) : TacticM Unit := do
+  let contract := mkIdent summary
+  let (call, values) ← provedCall index summary label 3
+  let base ← PrettyPrinter.delab (← constructorArg ``CIL.Value.object values[0]!)
+  let word ← PrettyPrinter.delab (← constructorArg ``CIL.Value.i64 values[1]!)
+  let out ← PrettyPrinter.delab (← constructorArg ``CIL.Value.object values[2]!)
+  let memory ← PrettyPrinter.delab call[7]!
+  let frame ← PrettyPrinter.delab call[5]!
+  let fuel ← PrettyPrinter.delab call[1]!
+  let final := mkIdent (← mkFreshUserName `smallMemory)
+  let flag := mkIdent (← mkFreshUserName `smallFlag)
+  let hr := mkIdent (← mkFreshUserName `smallRun)
+  let hb := mkIdent (← mkFreshUserName `smallBytes)
+  evalTactic (← `(tactic|
+    obtain ⟨$final:ident, $flag:ident, $hr:ident, $hb:ident⟩ :=
+      $contract:ident $memory $base $out $frame $fuel _ $word
+        (by intro i; simp_all [initLocals]; all_goals rfl)
+        (by simp [cil_code]; all_goals omega)))
+  rewriteHelperRun hr
 
 -- Use memory congruence only when the extracted and specified stored words
 -- already agree. Comparing whole memory functions can hide a wrong arithmetic

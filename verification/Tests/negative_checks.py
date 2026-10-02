@@ -1,126 +1,15 @@
 """Isolated arithmetic, stale-output and fail-closed extraction regressions."""
 
 from pathlib import Path
-import json
-import re
 import shutil
 import sys
 import tempfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from common import BUILD_DIRECTORIES, ROOT, VERIFY, run, sha
-from verify import source_inputs
-
-
-def copy_source(destination):
-    shutil.copytree(ROOT / "src", destination / "src",
-                    ignore=shutil.ignore_patterns(*BUILD_DIRECTORIES, "TestResults"))
-    for name in ("global.json", "README.md", ".editorconfig"):
-        shutil.copy2(ROOT / name, destination / name)
-    for source in ROOT.iterdir():
-        if source.is_file() and source.suffix.lower() in {".props", ".targets", ".config"}:
-            shutil.copy2(source, destination / source.name)
-    proof = destination / "verification"
-    shutil.copytree(VERIFY, proof, ignore=shutil.ignore_patterns(*BUILD_DIRECTORIES))
-    workflows = destination / ".github/workflows"
-    workflows.mkdir(parents=True)
-    for workflow in (ROOT / ".github/workflows").glob("verify-uint256*.yml"):
-        shutil.copy2(workflow, workflows / workflow.name)
-    return proof
-
-
-def build_fixture(destination, name, method="Add"):
-    project = destination / "verification/Tests/Fixtures/Nethermind.Int256.csproj"
-    source = project.parent / method / f"{name}.cs"
-    if not source.is_file():
-        raise RuntimeError(f"Fixture maintenance failure: missing {name}")
-    run(["dotnet", "build", str(project), "-c", "Release",
-         f"-p:FixtureSource={source}", f"-p:FixtureMethod={method}", "-p:EnforceCodeStyleInBuild=true",
-         "-p:GenerateDocumentationFile=true"], destination)
-    return project.parent / "bin/Release/net10.0/Nethermind.Int256.dll"
-
-
-def build_extract(destination, name, method="Add"):
-    assembly = build_fixture(destination, name, method)
-    output = destination / "verification/generated"
-    result = run(["dotnet", "run", "--project", str(VERIFY / "Extractor"), "-c", "Release", "--",
-                  str(assembly), str(output), method], ROOT)
-    return assembly, output, result
-
-
-def require_semantic_rejection(output, module):
-    # A kernel-checked model refutation precedes this check. Tactic failures can
-    # phrase the remaining semantic obligation differently. Require a printed
-    # goal or the final simplifier's no-progress diagnostic in the expected
-    # execution module; syntax/import failures alone cannot satisfy this gate.
-    normalized = output.replace("\\", "/")
-    errors = [block for block in re.split(r"(?=^error: )", normalized, flags=re.MULTILINE)
-              if block.startswith("error: ")]
-    relevant = [block for block in errors if block.startswith(f"error: {module}:")]
-    no_progress = r":\d+:\d+: `simp` made no progress(?:\n|$)"
-    if not any("⊢" in block or re.search(no_progress, block) for block in relevant):
-        raise RuntimeError("Mutation failed outside the expected semantic proof obligation")
-    if any(limit in block for block in errors for limit in
-           ("maximum number of heartbeats", "maximum recursion depth", "maximum number of steps exceeded",
-            "deep recursion", "stack overflow")):
-        raise RuntimeError("Mutation rejection was inconclusive due to exhausted proof resources")
-
-
-def model_refutation(proof, lake, initial, left, right, out, address, actual, expected, method="Add"):
-    """Kernel-check a concrete refutation of the unchanged full contract."""
-    contract = "Contract" if method == "Add" else "SubtractContract"
-    operation = "+" if method == "Add" else "-"
-    source = f'''import Extracted
-import UInt256.Methods.{method}.Contract
-import CIL.SymbolicExecution
-open CIL UInt256Model
-set_option maxRecDepth 8192
-set_option maxHeartbeats 2000000
-namespace UInt256Proof
-def witnessBytes : Bytes := fun address => {initial}
-def observed := (invoke Extracted.program (executionBound Extracted.program Extracted.entryIndex) Extracted.entryIndex
-  [.object {left}, .object {right}, .object {out}] (byteMemory witnessBytes)).map
-    (fun result => result.1 (.byte {address}))
-theorem model_observed : observed = some (some (.i8 {actual})) := by decide
-theorem model_expected : writeBytes (byteMemory witnessBytes) {out}
-    (byteValue witnessBytes {left} {operation} byteValue witnessBytes {right}).toNat 32 (.byte {address}) =
-      some (.i8 {expected}) := by decide
-theorem model_not_correct : ¬ {contract} Extracted.program Extracted.entryIndex witnessBytes {left} {right} {out} := by
-  rintro ⟨fuel, final, hr, hm⟩
-  have ho := model_observed
-  unfold observed at ho
-  cases he : invoke Extracted.program (executionBound Extracted.program Extracted.entryIndex)
-      Extracted.entryIndex [.object {left}, .object {right}, .object {out}]
-      (byteMemory witnessBytes) with
-  | none => simp [he] at ho
-  | some result =>
-    have unique := invoke_result_unique Extracted.program fuel
-      (executionBound Extracted.program Extracted.entryIndex) Extracted.entryIndex
-      [.object {left}, .object {right}, .object {out}] (byteMemory witnessBytes)
-      (final, []) result hr he
-    rw [← unique] at he
-    rw [he] at ho
-    simp only [Option.map_some] at ho
-    have ha : final (.byte {address}) = some (.i8 {actual}) := Option.some.inj ho
-    have he := hm {address}
-    rw [model_expected] at he
-    have different : (some (.i8 {actual}) : Option Value) ≠ some (.i8 {expected}) := by decide
-    exact different (ha.symm.trans he)
-#print axioms model_not_correct
-end UInt256Proof
-'''
-    (proof / "Refutation.lean").write_text(source, encoding="utf-8")
-    with (proof / "lakefile.toml").open("a", encoding="utf-8") as configuration:
-        configuration.write('\n[[lean_lib]]\nname = "Refutation"\n')
-    output = run([lake, "build", "Refutation"], proof)
-    audits = re.findall(r"'UInt256Proof.model_not_correct' depends on axioms: \[([^]]*)\]", output)
-    if len(audits) != 1:
-        raise RuntimeError("Missing kernel refutation axiom audit")
-    permitted = set(json.loads((proof / f"manifests/{method.lower()}.json").read_text(encoding="utf-8"))["approvedAxioms"])
-    if {item.strip() for item in audits[0].split(",") if item.strip()} - permitted:
-        raise RuntimeError("Unapproved axioms in model refutation")
-    print(f"PASS: kernel refutes the full contract at byte {address}: actual {actual}, expected {expected}")
+from common import ROOT, VERIFY, run, sha
+from support import (build_extract, build_fixture, copy_source, model_refutation,
+                     native_witness, require_production_report, require_semantic_rejection)
 
 
 def check_aliasing(lake):
@@ -128,21 +17,12 @@ def check_aliasing(lake):
         destination = Path(temporary)
         proof = copy_source(destination)
         assembly, _, _ = build_extract(destination, "WrongAliasing")
-        witness = destination / "Witness"
-        witness.mkdir()
-        (witness / "Witness.csproj").write_text(
-            '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType>'
-            '<TargetFramework>net10.0</TargetFramework></PropertyGroup><ItemGroup>'
-            f'<Reference Include="Nethermind.Int256"><HintPath>{assembly.as_posix()}</HintPath>'
-            '</Reference></ItemGroup></Project>', encoding="utf-8")
-        (witness / "Program.cs").write_text(
+        native_witness(destination, assembly,
             'using System;\nusing Nethermind.Int256;\n'
             'UInt256 a = new(42, 1, 0, 0), b = new(1, 0, 0, 0);\n'
             'UInt256.Add(in a, in b, out a);\n'
             'Console.WriteLine($"Aliasing witness: limbs {a.u0},{a.u1},{a.u2},{a.u3}; expected 43,1,0,0");\n'
-            'if (a.u0 != 1 || a.u1 != 1 || a.u2 != 0 || a.u3 != 0) Environment.Exit(1);\n',
-            encoding="utf-8")
-        run(["dotnet", "run", "--project", str(witness), "-c", "Release"], destination)
+            'if (a.u0 != 1 || a.u1 != 1 || a.u2 != 0 || a.u3 != 0) Environment.Exit(1);\n')
         model_refutation(proof, lake, "if address = 0 then 42 else if address = 8 ∨ address = 32 then 1 else 0",
                          0, 32, 8, 16, 0, 1)
         output = run([lake, "build", "Audit"], proof, succeeds=False)
@@ -155,16 +35,7 @@ def main():
     lake = shutil.which("lake")
     if not lake:
         raise RuntimeError("Lean 4.34.1 / lake must be on PATH")
-    baseline = VERIFY / "generated/Extracted.lean"
-    report_path = VERIFY / "generated/report.json"
-    if not baseline.exists() or not report_path.exists():
-        raise RuntimeError("Freshly verify production Add before negative checks")
-    report = json.loads(report_path.read_text(encoding="utf-8"))
-    if (report.get("status") != "verified" or report.get("source", {}).get("kind") != "production"
-            or report["sourceInputs"] != source_inputs()
-            or report["generatedProgramSha256"] != sha(baseline)
-            or any(sha(VERIFY / name) != digest for name, digest in report["leanSourceSha256"].items())):
-        raise RuntimeError("Production verification report is stale or belongs to a fixture")
+    baseline = require_production_report()
     run([lake, "build", "Audit"], VERIFY)
     check_aliasing(lake)
     with tempfile.TemporaryDirectory(prefix="int256-carry-") as temporary:
@@ -173,21 +44,12 @@ def main():
         assembly, generated, _ = build_extract(destination, "WrongCarry")
         if sha(generated / "Extracted.lean") == sha(baseline):
             raise RuntimeError("Mutation did not change imported program")
-        witness = destination / "Witness"
-        witness.mkdir()
-        (witness / "Witness.csproj").write_text(
-            '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType>'
-            '<TargetFramework>net10.0</TargetFramework></PropertyGroup><ItemGroup>'
-            f'<Reference Include="Nethermind.Int256"><HintPath>{assembly.as_posix()}</HintPath>'
-            '</Reference></ItemGroup></Project>', encoding="utf-8")
-        (witness / "Program.cs").write_text(
+        native_witness(destination, assembly,
             'using System;\nusing Nethermind.Int256;\n'
             'UInt256 a = new(ulong.MaxValue, 1, 0, 0), b = new(1, 1, 0, 0);\n'
             'UInt256.Add(a, b, out UInt256 r);\n'
             'Console.WriteLine($"Mutation witness: limbs {r.u0},{r.u1},{r.u2},{r.u3}; expected 0,3,0,0");\n'
-            'if (r.u0 != 0 || r.u1 != 2 || r.u2 != 0 || r.u3 != 0) Environment.Exit(1);\n',
-            encoding="utf-8")
-        run(["dotnet", "run", "--project", str(witness), "-c", "Release"], destination)
+            'if (r.u0 != 0 || r.u1 != 2 || r.u2 != 0 || r.u3 != 0) Environment.Exit(1);\n')
         model_refutation(proof, lake,
                          "if address < 8 then 255 else if address = 8 ∨ address = 32 ∨ address = 40 then 1 else 0",
                          0, 32, 64, 72, 2, 3)
@@ -221,21 +83,12 @@ def main():
             proof = copy_source(destination)
             assembly = build_fixture(destination, name)
             if name == "ThrowingInitializer":
-                witness = destination / "Witness"
-                witness.mkdir()
-                (witness / "Witness.csproj").write_text(
-                    '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType>'
-                    '<TargetFramework>net10.0</TargetFramework></PropertyGroup><ItemGroup>'
-                    f'<Reference Include="Nethermind.Int256"><HintPath>{assembly.as_posix()}</HintPath>'
-                    '</Reference></ItemGroup></Project>', encoding="utf-8")
-                (witness / "Program.cs").write_text(
+                native_witness(destination, assembly,
                     'using System;\nusing Nethermind.Int256;\n'
                     'UInt256 a = new(1, 1, 0, 0), b = new(2, 1, 0, 0);\n'
                     'try { UInt256.Add(in a, in b, out _); Environment.Exit(1); }\n'
                     'catch (TypeInitializationException e) when (e.InnerException is InvalidOperationException)\n'
-                    '{ Console.WriteLine("PASS: real execution throws during helper type initialisation"); }\n',
-                    encoding="utf-8")
-                run(["dotnet", "run", "--project", str(witness), "-c", "Release"], destination)
+                    '{ Console.WriteLine("PASS: real execution throws during helper type initialisation"); }\n')
             output = run(["dotnet", "run", "--project", str(VERIFY / "Extractor"), "-c", "Release", "--",
                           str(assembly), str(proof / "generated")], ROOT, succeeds=False)
             if "Unmodelled static initialisation: Nethermind.Int256.ArithmeticHelper" not in output:

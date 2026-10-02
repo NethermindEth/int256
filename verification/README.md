@@ -26,7 +26,7 @@ UInt256/
   RepresentationLemmas.lean  Representation and input-load proofs
   StorageLemmas.lean         Four-limb storage and byte-memory equations
   StorageContracts.lean      Optional storage summary proved against current CIL
-  ExecutionAutomation.lean   Shared call inspection, storage and instruction execution
+  ExecutionAutomation.lean   Shared helper calls, storage and instruction execution
   Arithmetic/Carry.lean      Pure addition arithmetic, independent of extracted CIL
   Arithmetic/Borrow.lean     Pure borrow equations and four-limb wrapping difference
   Methods/Add/
@@ -54,6 +54,7 @@ Tests/
     Common/Subtract/         Shared versioned subtraction components
     Subtract/                Renaming, inlining, alternative borrow and negatives
   RegressionFixture/         Malformed artifact fixtures
+  support.py                 Shared isolation, witnesses and rejection gates
   negative_checks.py         Add counterexamples and fail-closed regressions
   subtract_negative_checks.py  Subtraction contract refutations and stale artifacts
   robustness_checks.py       Fresh proofs of independent positive fixtures
