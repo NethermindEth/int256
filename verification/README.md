@@ -203,6 +203,9 @@ Use `--method`, `--profile`, `--suite` and `--case` to select a smaller run.
 Optional native comparisons record actual capabilities and complete byte maps:
 `python verification/Tests/native_simd_checks.py --output native-results.json`.
 Unavailable profiles are explicitly skipped; native sampling supplements proofs.
+Positive samples include two large operands, vector fast paths, cross-half
+carry/borrow and cascades (including ARM Add's early-store repair), with disjoint,
+exactly aliased and partially overlapping outputs. Results name each sample.
 
 The **Verify UInt256** workflow checks both methods across all seven profiles. For ordinary
 C# edits under `src/`, it compares each method's generated program and validated metadata,
@@ -218,6 +221,35 @@ The manual **Verify UInt256 proof tests** workflow runs both methods' positive a
 negative suites, establishing a fresh production baseline for each regression job.
 Its SIMD matrix covers both methods in every representative profile, and a separate
 job checks complete production coverage composition.
+
+## Measured verification time
+
+On Windows with a Ryzen 9 9950X, SDK 10.0.401 and Lean 4.34.1, the committed
+`3e2b43b` pipeline checked all 14 production families and coverage composition in
+883 seconds without competing builds. Each proof used a fresh directory without
+Lean caches; toolchain dependencies were already installed. The shared DLL and
+extractor builds took 2.7 and 2.4 seconds, paid once. Per-profile times below
+include extraction, fresh kernel checking and setup, excluding those shared builds.
+The measurement retained temporary directories only for subsequent module checks.
+
+| Profile | Add (s) | Subtract (s) |
+|---|---:|---:|
+| scalar | 63.1 | 56.4 |
+| arm64-advsimd | 75.7 | 63.0 |
+| x64-sse42 | 73.8 | 62.4 |
+| x64-avx2 | 63.3 | 60.0 |
+| x64-avx2-bmi1 | 54.6 | 62.4 |
+| x64-avx512 | 53.4 | 57.7 |
+| x64-avx512-bmi1 | 55.9 | 61.4 |
+
+Separate standalone scalar repeats, including assembly/extractor builds, took
+59.5/56.9 seconds for Add/Subtract, versus 49.9/43.2 seconds at `d937469`.
+Earlier original runs took 58.7/53.0 seconds. The expanded model adds fresh-build
+work; these samples show variance and do not establish unchanged pipeline speed.
+With dependencies built, generated lookups took 2.3–3.6 seconds, carry/borrow
+arithmetic 1.0–1.7 seconds, and SIMD execution modules 7.6–17.5 seconds.
+Module timings include process/import overhead and cannot be summed as pipeline
+time. No proof budgets were raised.
 
 ## Trust boundary
 
