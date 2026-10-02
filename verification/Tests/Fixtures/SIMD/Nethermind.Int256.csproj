@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>Nethermind.Int256</AssemblyName>
+    <FixtureCase Condition="'$(FixtureCase)' == ''">Baseline</FixtureCase>
+  </PropertyGroup>
+  <Import Project="Cases.props" />
+  <ItemGroup>
+    <_Fixture Include="@(SimdCase->WithMetadataValue('Identity', '$(FixtureCase)'))" />
+    <Compile Include="Common/*.cs" />
+  </ItemGroup>
+  <PropertyGroup>
+    <DefineConstants>$(DefineConstants);@(_Fixture->'%(Symbol)')</DefineConstants>
+  </PropertyGroup>
+  <Target Name="ValidateFixture" BeforeTargets="CoreCompile" Condition="'@(_Fixture)' == ''">
+    <Error Text="Unknown SIMD fixture: $(FixtureCase)" />
+  </Target>
+</Project>

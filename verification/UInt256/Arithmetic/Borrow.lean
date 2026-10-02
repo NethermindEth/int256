@@ -56,6 +56,20 @@ theorem borrow_initial (x y : W64) :
     borrow x y 0 = if x < y then 1 else 0 := by
   simp [borrow, BitVec.lt_def]
 
+theorem borrow_alternative_or_expression (x y c : W64) (hc : c.toNat ≤ 1) :
+    (if x < y then BitVec.ofNat 64 1 else BitVec.ofNat 64 0) |||
+      (if x - y < c then BitVec.ofNat 64 1 else BitVec.ofNat 64 0) = borrow x y c := by
+  have hdisjoint : ¬ (x < y ∧ x - y < c) := by
+    have hx := x.isLt
+    have hy := y.isLt
+    simp only [BitVec.lt_def, BitVec.toNat_sub]
+    omega
+  rw [← borrow_alternative_expression x y c hc]
+  by_cases hxy : x < y <;> by_cases hxc : x - y < c
+  · exact False.elim (hdisjoint ⟨hxy, hxc⟩)
+  all_goals simp only [hxy, hxc, ↓reduceIte]
+  all_goals rfl
+
 theorem borrow_initial_flag (x y : W64) :
     borrow x y (BitVec.ofNat 64 0) =
       if x < y then BitVec.ofNat 64 1 else BitVec.ofNat 64 0 := by
@@ -75,6 +89,11 @@ theorem borrow_flags_add (x y c : W64) (hc : c.toNat ≤ 1) :
     borrow x y (BitVec.ofNat 64 0) + borrow (x - y) c (BitVec.ofNat 64 0) = borrow x y c := by
   rw [borrow_initial_flag, borrow_initial_flag]
   exact borrow_alternative_expression x y c hc
+
+theorem borrow_flags_alternative_or (x y c : W64) (hc : c.toNat ≤ 1) :
+    borrow x y (BitVec.ofNat 64 0) ||| borrow (x - y) c (BitVec.ofNat 64 0) = borrow x y c := by
+  rw [borrow_initial_flag, borrow_initial_flag]
+  exact borrow_alternative_or_expression x y c hc
 
 theorem borrow_zero_right (x c : W64) (hc : c.toNat ≤ 1) :
     borrow x 0 c = if x = 0 then c else 0 := by

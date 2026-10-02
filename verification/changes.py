@@ -7,7 +7,7 @@ from pathlib import Path
 import sys
 import tempfile
 
-from common import ROOT, VERIFY, run
+from common import PROFILES, ROOT, VERIFY, run
 
 
 def proof_inputs_changed(paths):
@@ -25,7 +25,7 @@ def comparison_artifact(artifact):
     return artifact
 
 
-def extract(source, work, extractor, method="Add"):
+def extract(source, work, extractor, method="Add", profile="scalar"):
     artifacts = work / "artifacts"
     run(["dotnet", "build", str(source / "src/Nethermind.Int256/Nethermind.Int256.csproj"),
          "-c", "Release", "--no-incremental", f"-p:ArtifactsPath={artifacts}",
@@ -33,14 +33,21 @@ def extract(source, work, extractor, method="Add"):
     output = work / "generated"
     run(["dotnet", str(extractor),
          str(artifacts / "bin/Nethermind.Int256/release/Nethermind.Int256.dll"),
-         str(output), method], source)
+         str(output), method, profile], source)
     artifact = json.loads((output / "artifact.json").read_text(encoding="utf-8"))
+    if artifact.get("profile", {}).get("Name") != profile:
+        raise RuntimeError("Change-detection extraction profile mismatch")
+    entry = json.loads((VERIFY / f"manifests/{method.lower()}.json").read_text(encoding="utf-8"))["entry"]
+    if artifact["methods"][artifact["entryIndex"]]["signature"] != entry:
+        raise RuntimeError("Change-detection extraction method mismatch")
     return comparison_artifact(artifact), (output / "Extracted.lean").read_bytes()
 
 
-def needs_proof(base, method="Add"):
+def needs_proof(base, method="Add", profile="scalar"):
     if method not in ("Add", "Subtract"):
         raise ValueError("Unknown verification method")
+    if profile not in PROFILES:
+        raise ValueError("Unknown execution profile")
     if not base or set(base) == {"0"}:
         return True, "No comparison baseline; verifying production"
     paths = run(["git", "diff", "--no-renames", "--name-only", "-z", base, "HEAD"], ROOT).strip("\0").split("\0")
@@ -62,24 +69,25 @@ def needs_proof(base, method="Add"):
         run(["git", "clone", "--shared", "--no-checkout", "--quiet", str(ROOT), str(baseline)], ROOT)
         run(["git", "checkout", "--detach", base], baseline)
         extractor = tools / "bin/Extractor/release/Extractor.dll"
-        before = extract(baseline, work / "before", extractor, method)
-        after = extract(ROOT, work / "after", extractor, method)
+        before = extract(baseline, work / "before", extractor, method, profile)
+        after = extract(ROOT, work / "after", extractor, method, profile)
     if before == after:
-        return False, f"Extracted {method}, reachable helpers and layout are unchanged"
-    return True, f"Extracted {method}, reachable helpers or layout changed"
+        return False, f"Extracted {method}/{profile}, dependencies, layout and static data are unchanged"
+    return True, f"Extracted {method}/{profile}, dependencies, layout or static data changed"
 
 
 def main():
     sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--method", choices=("Add", "Subtract"), default="Add")
-    method = parser.parse_args().method
+    parser.add_argument("--profile", choices=PROFILES, default="scalar")
+    arguments = parser.parse_args()
     if os.environ.get("VERIFY_EVENT") == "workflow_dispatch":
         required, reason = True, "Manual production verification requested"
     elif os.environ.get("VERIFY_EVENT") == "pull_request" and os.environ.get("VERIFY_BASE_BRANCH") != "main":
         required, reason = True, "PR baseline is outside the verified main branch"
     else:
-        required, reason = needs_proof(os.environ.get("VERIFY_BASE", ""), method)
+        required, reason = needs_proof(os.environ.get("VERIFY_BASE", ""), arguments.method, arguments.profile)
     print(reason)
     output = os.environ.get("GITHUB_OUTPUT")
     if output:

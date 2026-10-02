@@ -24,7 +24,7 @@ theorem execute_borrow_contract (m : Memory) (frame fuel cslot rslot : Nat) (x y
   have hf' : frame + 1 ≠ frame := Ne.symm hf
   simp only [cil_code, Nat.add_succ, Nat.add_zero]
   cil_steps write_local_read_local, write, read64, h, hf, hf', hne, Ne.symm hne,
-    borrow_expression, borrow_alternative_expression, hc
+    borrow_expression, borrow_alternative_expression, borrow_alternative_or_expression, hc
   all_goals intro address hchild hca hra
   all_goals simp [hchild, hca, hra]
 

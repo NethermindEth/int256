@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>Nethermind.Int256</AssemblyName>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <FixtureName Condition="'$(FixtureName)' == ''">KnownFeature</FixtureName>
+    <KnownFixture Condition="'$(FixtureName)' == 'KnownFeature'
+                      Or '$(FixtureName)' == 'UnknownFeature'
+                      Or '$(FixtureName)' == 'UnclassifiedFeature'
+                      Or '$(FixtureName)' == 'UnsupportedIntrinsic'
+                      Or '$(FixtureName)' == 'UnsupportedUnsafe'
+                      Or '$(FixtureName)' == 'StaticInitializer'
+                      Or '$(FixtureName)' == 'GenericHelper'
+                      Or '$(FixtureName)' == 'StaticData'">true</KnownFixture>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../Support.cs" />
+    <Compile Include="../Common/Add/StoreLimbs.cs" />
+    <Compile Include="Entry.cs" />
+    <Compile Include="$(FixtureName).cs" />
+  </ItemGroup>
+  <Target Name="ValidateFixtureSelection" BeforeTargets="CoreCompile" Condition="'$(KnownFixture)' != 'true'">
+    <Error Text="Unknown profile fixture: $(FixtureName)" />
+  </Target>
+</Project>

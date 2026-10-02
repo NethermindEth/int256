@@ -24,7 +24,7 @@ theorem execute_scalar_general_words (m : Memory) (left right out frame fuel : N
   change b 1 ||| b 2 ||| b 3 ≠ BitVec.ofNat 64 0 at hnb
   cil_execute ha0, ha1, ha2, ha3, hb0, hb1, hb2, hb3, hna, hnb
   intro address
-  apply store4_bytes _ _ ?_ _ _ _ _ _ address
+  cil_preserved_store
   intro location
   simp [*, write]
 

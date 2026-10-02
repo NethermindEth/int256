@@ -45,11 +45,11 @@ class ChangeChecks(unittest.TestCase):
             self.assertNotEqual(changes.comparison_artifact(baseline), changes.comparison_artifact(changed))
         self.assertIn("token", baseline["methods"][0])
 
-    def decision(self, before, after):
+    def decision(self, before, after, profile="scalar"):
         sdk = '10.0.401'
         with patch.object(changes, "run", side_effect=["src/UInt256.cs\0", sdk, "", "", ""]), \
                 patch.object(changes, "extract", side_effect=[before, after]):
-            return changes.needs_proof("base")[0]
+            return changes.needs_proof("base", profile=profile)[0]
 
     def test_unchanged_extraction_skips_proof(self):
         self.assertFalse(self.decision(({"layout": 32}, b"program"), ({"layout": 32}, b"program")))
@@ -66,11 +66,86 @@ class ChangeChecks(unittest.TestCase):
         with patch.object(changes, "run", side_effect=["src/UInt256.cs\0", '10.0.401', "", "", ""]), \
                 patch.object(changes, "extract", side_effect=[({}, b"same"), ({}, b"same")]) as extract:
             self.assertFalse(changes.needs_proof("base", "Subtract")[0])
-        self.assertTrue(all(call.args[-1] == "Subtract" for call in extract.call_args_list))
+        self.assertTrue(all(call.args[-2:] == ("Subtract", "scalar") for call in extract.call_args_list))
 
     def test_unknown_method_fails_before_skipping(self):
         with self.assertRaises(ValueError):
             changes.needs_proof("", "Unknown")
+
+    def test_unknown_profile_fails_before_skipping(self):
+        with self.assertRaises(ValueError):
+            changes.needs_proof("", profile="unknown")
+
+    def test_each_profile_uses_its_selected_dependency_graph(self):
+        for profile in changes.PROFILES:
+            with self.subTest(profile=profile), \
+                    patch.object(changes, "run", side_effect=["src/UInt256.cs\0", '10.0.401', "", "", ""]), \
+                    patch.object(changes, "extract", side_effect=[({}, b"same"), ({}, b"same")]) as extract:
+                self.assertFalse(changes.needs_proof("base", "Subtract", profile)[0])
+                self.assertTrue(all(call.args[-2:] == ("Subtract", profile) for call in extract.call_args_list))
+
+    def test_profile_static_data_and_intrinsic_metadata_are_compared(self):
+        baseline = {"sha256": "old", "assembly": "version1", "profile": {"Name": "x64-avx2", "Bmi1": False},
+                    "queriedFeatures": ["Avx2"], "staticData": [{"bytes": "0100", "size": 2, "packing": 1}],
+                    "methods": [{"token": 1, "signature": "Add", "instructions": [
+                        {"opcode": "call", "operand": "Avx2::Permute4x64", "scope": "System.Runtime.Intrinsics"},
+                        {"opcode": "ldc.i4", "operand": "144"}]}]}
+        mutations = (
+            lambda value: value["profile"].update(Name="x64-avx512"),
+            lambda value: value["profile"].update(Bmi1=True),
+            lambda value: value["queriedFeatures"].append("Bmi1"),
+            lambda value: value["staticData"][0].update(bytes="0000"),
+            lambda value: value["staticData"][0].update(packing=8),
+            lambda value: value["methods"][0]["instructions"][0].update(operand="Avx2::Blend"),
+            lambda value: value["methods"][0]["instructions"][0].update(scope="Other.Assembly"),
+            lambda value: value["methods"][0]["instructions"][1].update(operand="145"),
+        )
+        for index, mutate in enumerate(mutations):
+            with self.subTest(index=index):
+                changed = copy.deepcopy(baseline)
+                mutate(changed)
+                self.assertNotEqual(changes.comparison_artifact(baseline), changes.comparison_artifact(changed))
+
+    def test_extraction_profile_mismatch_fails_closed(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            work = Path(temporary)
+            generated = work / "generated"
+            generated.mkdir()
+            (generated / "artifact.json").write_text('{"profile":{"Name":"scalar"}}', encoding="utf-8")
+            with patch.object(changes, "run"), self.assertRaisesRegex(RuntimeError, "profile mismatch"):
+                changes.extract(changes.ROOT, work, Path("extractor.dll"), "Add", "x64-avx2")
+
+    def test_extraction_method_mismatch_fails_closed(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            work = Path(temporary)
+            generated = work / "generated"
+            generated.mkdir()
+            (generated / "artifact.json").write_text(
+                '{"profile":{"Name":"scalar"},"entryIndex":0,"methods":[{"signature":"Other"}]}',
+                encoding="utf-8")
+            with patch.object(changes, "run"), self.assertRaisesRegex(RuntimeError, "method mismatch"):
+                changes.extract(changes.ROOT, work, Path("extractor.dll"))
+
+    def test_profile_model_and_aggregate_inputs_force_proof(self):
+        for path in ("verification/CIL/Features.lean", "verification/CIL/ProfileEquivalence.lean",
+                     "verification/Extractor/StaticData.cs", "verification/AggregateAudit.lean"):
+            with self.subTest(path=path):
+                self.assertTrue(changes.proof_inputs_changed([path]))
+
+    def test_cli_passes_selected_profile_to_change_detection(self):
+        with patch.object(sys, "argv", ["changes.py", "--method", "Subtract", "--profile", "x64-avx512-bmi1"]), \
+                patch.dict(os.environ, {"VERIFY_EVENT": "push", "VERIFY_BASE": "base", "GITHUB_OUTPUT": "",
+                                        "GITHUB_STEP_SUMMARY": ""}), \
+                patch.object(changes, "needs_proof", return_value=(True, "Selected profile")) as detect:
+            changes.main()
+        detect.assert_called_once_with("base", "Subtract", "x64-avx512-bmi1")
+
+    def test_cli_rejects_unknown_profile_even_for_manual_dispatch(self):
+        with patch.object(sys, "argv", ["changes.py", "--profile", "unknown"]), \
+                patch.dict(os.environ, {"VERIFY_EVENT": "workflow_dispatch"}), \
+                patch.object(changes, "needs_proof") as detect, self.assertRaises(SystemExit):
+            changes.main()
+        detect.assert_not_called()
 
     def test_missing_base_requires_proof(self):
         self.assertTrue(changes.needs_proof("")[0])

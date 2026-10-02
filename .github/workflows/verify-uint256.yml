@@ -33,11 +33,12 @@ permissions:
 
 jobs:
   verify:
-    name: Production proof (${{ matrix.method }})
+    name: Production proof (${{ matrix.method }}, ${{ matrix.profile }})
     strategy:
       fail-fast: false
       matrix:
         method: [Add, Subtract]
+        profile: [scalar, arm64-advsimd, x64-sse42, x64-avx2, x64-avx2-bmi1, x64-avx512, x64-avx512-bmi1]
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
@@ -59,7 +60,7 @@ jobs:
           VERIFY_BASE_BRANCH: ${{ github.event.pull_request.base.ref }}
         run: |
           python3 verification/Tests/change_checks.py
-          python3 verification/changes.py --method ${{ matrix.method }}
+          python3 verification/changes.py --method ${{ matrix.method }} --profile ${{ matrix.profile }}
       - name: Install Lean 4.34.1
         if: steps.changes.outputs.required == 'true'
         shell: bash
@@ -69,4 +70,4 @@ jobs:
           echo "$RUNNER_TEMP/lean-4.34.1-linux/bin" >> "$GITHUB_PATH"
       - name: Verify freshly built UInt256
         if: steps.changes.outputs.required == 'true'
-        run: python3 verification/verify.py --method ${{ matrix.method }}
+        run: python3 verification/verify.py --method ${{ matrix.method }} --profile ${{ matrix.profile }}

@@ -28,4 +28,16 @@ name = "Tests.SummaryTransactions"
 name = "Tests.SubtractSemantics"
 
 [[lean_lib]]
+name = "Tests.VectorSemantics"
+
+[[lean_lib]]
+name = "Tests.VectorMemory"
+
+[[lean_lib]]
+name = "Tests.ProfileSemantics"
+
+[[lean_lib]]
+name = "Tests.SIMDArithmetic"
+
+[[lean_lib]]
 name = "SubtractAudit"
