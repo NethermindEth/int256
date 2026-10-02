@@ -8,7 +8,9 @@ namespace UInt256Proof.SIMD
 if_extracted Extracted.broadcastLookupData {
 theorem extracted_lookup_valid : LookupValid Extracted.broadcastLookupData := by
   unfold LookupValid
-  decide
+  simp only [readStaticBytes_sequential]
+  -- Check the table once in the kernel, avoiding a second reduction in elaboration.
+  decide +kernel
 }
 
 if_extracted Extracted.broadcastLookupIndex {

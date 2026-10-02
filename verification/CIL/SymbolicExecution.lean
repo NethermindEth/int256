@@ -27,8 +27,8 @@ elab "if_extracted " name:ident " {" commands:command* "}" : command => do
   try
     for command in commands do
       elabCommand (← `(command| set_option Elab.async false in $command))
-    if (← get).messages.hasErrors then
-      throwError "Summary proof failed"
+      if (← get).messages.hasErrors then
+        throwError "Summary proof failed"
     let env ← getEnv
     for (declName, info) in env.constants.toList do
       if saved.env.contains declName then continue
