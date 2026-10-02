@@ -6,8 +6,8 @@ internal enum Feature
 }
 
 // A profile describes runtime-visible capabilities, including runtime disabling.
-// BMI1 is deliberately independent of AVX2. Prerequisites here are those required
-// by reachable operations, rather than assumptions about usual CPU combinations.
+// BMI1 is deliberately independent of AVX2. The x86 prerequisites follow .NET's
+// documented inheritance, not merely combinations found on common processors.
 internal sealed record FeatureProfile(string Name, string Architecture, int NativeWidth,
     bool LittleEndian, bool AdvSimd = false, bool Sse2 = false, bool Ssse3 = false,
     bool Sse42 = false, bool Avx = false, bool Avx2 = false,
@@ -30,7 +30,8 @@ internal sealed record FeatureProfile(string Name, string Architecture, int Nati
             (AdvSimd && Architecture != "arm64") ||
             ((Sse2 || Ssse3 || Sse42 || Avx || Avx2 || Avx512F || Avx512FVL || Bmi1) && Architecture != "x64") ||
             (Ssse3 && !Sse2) || (Sse42 && (!Sse2 || !Ssse3)) ||
-            (Avx2 && !Avx) || (Avx512FVL && !Avx512F))
+            (Avx2 && !Avx) || (Avx512FVL && !Avx512F) ||
+            (Avx && !Sse42) || (Avx512F && !Avx2))
             throw new InvalidDataException($"Invalid execution profile: {Name}");
     }
 
@@ -57,8 +58,12 @@ internal sealed record FeatureProfile(string Name, string Architecture, int Nati
         $"avx := {Bool(Avx)}, avx2 := {Bool(Avx2)}, avx512F := {Bool(Avx512F)}, avx512FVL := {Bool(Avx512FVL)}, bmi1 := {Bool(Bmi1)} }}";
 
     internal Feature[] ClassifiedQueries => Avx2
-        ? [Feature.Avx2, Feature.Avx512FVL, Feature.Bmi1]
-        : AdvSimd ? [Feature.Avx2, Feature.AdvSimd] : [Feature.Avx2, Feature.AdvSimd, Feature.Sse42];
+        ? Avx512FVL
+            ? [Feature.Avx2, Feature.Avx512FVL, Feature.Bmi1, Feature.Avx, Feature.Sse42, Feature.Ssse3, Feature.Sse2, Feature.Avx512F]
+            : [Feature.Avx2, Feature.Avx512FVL, Feature.Bmi1, Feature.Avx, Feature.Sse42, Feature.Ssse3, Feature.Sse2]
+        : AdvSimd ? [Feature.Avx2, Feature.AdvSimd, Feature.Avx512F, Feature.Avx512FVL]
+        : Sse42 ? [Feature.Avx2, Feature.AdvSimd, Feature.Sse42, Feature.Sse2, Feature.Ssse3, Feature.Avx512F, Feature.Avx512FVL]
+        : [Feature.Avx2, Feature.AdvSimd, Feature.Sse42, Feature.Avx512F, Feature.Avx512FVL];
 
     internal static string LeanFeature(Feature feature) =>
         "." + char.ToLowerInvariant(feature.ToString()[0]) + feature.ToString()[1..];

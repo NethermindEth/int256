@@ -21,7 +21,13 @@ switch (args[0])
         break;
     case "recursion":
         MethodDefinition recursive = type.Methods.Single(m => m.Name == "AddWithCarry");
-        recursive.Body.Instructions.Insert(0, Instruction.Create(OpCodes.Call, recursive));
+        ILProcessor recursiveIl = recursive.Body.GetILProcessor();
+        Instruction first = recursive.Body.Instructions[0];
+        // Keep the injected call stack-valid so this tests dependency recursion,
+        // rather than being rejected earlier for missing call arguments.
+        foreach (ParameterDefinition parameter in recursive.Parameters)
+            recursiveIl.InsertBefore(first, Instruction.Create(OpCodes.Ldarg, parameter));
+        recursiveIl.InsertBefore(first, Instruction.Create(OpCodes.Call, recursive));
         break;
     case "layout":
         type.Fields.Single(f => f.Name == "u0").Offset = 1;

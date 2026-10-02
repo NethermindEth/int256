@@ -6,8 +6,11 @@ https://github.com/dotnet/runtime/blob/v10.0.0/docs/design/features/hw-intrinsic
 https://github.com/dotnet/runtime/blob/v10.0.0/docs/design/coreclr/botr/vectors-and-intrinsics.md
 IsSupported is a runtime capability, including OS support and runtime disabling;
 it is not just a CPUID bit. Operation prerequisites are retained explicitly.
-The SSE path requires SSE2 and SSSE3; the AVX path requires AVX independently
-of BMI1. AVX512F.VL operations require AVX512F and VL. -/
+The inherited x86 chain in this model is SSE2 <- SSSE3 <- SSE4.2 <- AVX
+<- AVX2 <- AVX512F. AVX512F.VL additionally requires AVX512F; the reverse
+implication is not valid. BMI1 is independent of this chain.
+https://learn.microsoft.com/dotnet/api/system.runtime.intrinsics.x86.avx512f?view=net-10.0
+https://devblogs.microsoft.com/dotnet/hardware-intrinsics-in-net-core/ -/
 
 namespace CIL
 
@@ -60,7 +63,9 @@ def FeatureProfile.Valid (p : FeatureProfile) : Prop :=
   (p.ssse3 = true → p.sse2 = true) ∧
   (p.sse42 = true → p.sse2 = true ∧ p.ssse3 = true) ∧
   (p.avx2 = true → p.avx = true) ∧
-  (p.avx512FVL = true → p.avx512F = true)
+  (p.avx512FVL = true → p.avx512F = true) ∧
+  (p.avx = true → p.sse42 = true) ∧
+  (p.avx512F = true → p.avx2 = true)
 
 instance (p : FeatureProfile) : Decidable p.Valid := inferInstanceAs (Decidable (_ ∧ _))
 
@@ -68,6 +73,13 @@ instance (p : FeatureProfile) : Decidable p.Valid := inferInstanceAs (Decidable 
   cases f <;> rfl
 
 theorem FeatureProfile.scalar_valid : scalar.Valid := by decide
+
+theorem FeatureProfile.avx512F_implies_avx2 (p : FeatureProfile) (h : p.Valid)
+    (hf : p.avx512F = true) : p.avx2 = true := h.2.2.2.2.2.2.2.2.2 hf
+
+theorem FeatureProfile.avx512FVL_implies_avx2 (p : FeatureProfile) (h : p.Valid)
+    (hvl : p.avx512FVL = true) : p.avx2 = true :=
+  p.avx512F_implies_avx2 h (h.2.2.2.2.2.2.2.1 hvl)
 
 /-- The finite branch distinctions currently queried by production Add/Subtract.
 This classifier supplies feature evidence only, not an arithmetic proof. -/
@@ -120,9 +132,11 @@ inside helpers. BMI1 distinguishes subtraction only; addition can share it.
 Extraction still needs to establish that its actual queried getters belong to
 this list before this classification can justify reuse of an execution proof. -/
 def FeatureClass.queries : FeatureClass → List Feature
-  | .scalar | .sse => [.avx2, .advSimd, .sse42]
-  | .arm64 => [.avx2, .advSimd]
-  | .avx2 _ | .avx512 _ => [.avx2, .avx512FVL, .bmi1]
+  | .scalar => [.avx2, .advSimd, .sse42, .avx512F, .avx512FVL]
+  | .sse => [.avx2, .advSimd, .sse42, .sse2, .ssse3, .avx512F, .avx512FVL]
+  | .arm64 => [.avx2, .advSimd, .avx512F, .avx512FVL]
+  | .avx2 _ => [.avx2, .avx512FVL, .bmi1, .avx, .sse42, .ssse3, .sse2]
+  | .avx512 _ => [.avx2, .avx512FVL, .bmi1, .avx, .sse42, .ssse3, .sse2, .avx512F]
 
 theorem FeatureProfile.classification_total (p : FeatureProfile) :
     p.classify ∈ FeatureClass.all := by
@@ -138,25 +152,26 @@ theorem FeatureClass.representative_valid (c : FeatureClass) : c.representative.
   | avx2 bmi => cases bmi <;> decide
   | avx512 bmi => cases bmi <;> decide
 
-theorem FeatureProfile.classification_queries (p : FeatureProfile) (f : Feature)
+theorem FeatureProfile.classification_queries (p : FeatureProfile) (h : p.Valid) (f : Feature)
     (hf : f ∈ p.classify.queries) :
     p.evaluate f = p.classify.representative.evaluate f := by
+  rcases h with ⟨_, _, _, _, hss, hsse, havx, hvl, havxsse, hfavx⟩
   cases ha : p.avx2 <;> cases hv : p.avx512FVL <;> cases hb : p.bmi1 <;>
     cases hn : p.advSimd <;> cases hs : p.sse42 <;> cases f <;>
-    simp [FeatureProfile.classify, FeatureClass.queries, FeatureClass.representative,
-      FeatureProfile.scalar, FeatureProfile.evaluate, ha, hv, hb, hn, hs] at *
+    simp_all [FeatureProfile.classify, FeatureClass.queries, FeatureClass.representative,
+      FeatureProfile.scalar, FeatureProfile.evaluate]
 
 /-- Explicit prerequisites of ISA-specific calls on each selected family. -/
 def FeatureClass.required : FeatureClass → List Feature
   | .scalar => []
   | .arm64 => [.advSimd]
   | .sse => [.sse2, .ssse3]
-  | .avx2 bmi => [.avx, .avx2] ++ if bmi then [.bmi1] else []
-  | .avx512 bmi => [.avx, .avx2, .avx512F, .avx512FVL] ++ if bmi then [.bmi1] else []
+  | .avx2 bmi => [.sse2, .ssse3, .sse42, .avx, .avx2] ++ if bmi then [.bmi1] else []
+  | .avx512 bmi => [.sse2, .ssse3, .sse42, .avx, .avx2, .avx512F, .avx512FVL] ++ if bmi then [.bmi1] else []
 
 theorem FeatureProfile.classification_required (p : FeatureProfile) (h : p.Valid)
     (f : Feature) (hf : f ∈ p.classify.required) : p.evaluate f = true := by
-  rcases h with ⟨_, _, _, _, hss, hsse, havx, hvl⟩
+  rcases h with ⟨_, _, _, _, hss, hsse, havx, hvl, havxsse, hfavx⟩
   cases ha : p.avx2 <;> cases hv : p.avx512FVL <;> cases hb : p.bmi1 <;>
     cases hn : p.advSimd <;> cases hs : p.sse42 <;> cases f <;>
     simp_all [FeatureProfile.classify, FeatureClass.required, FeatureProfile.evaluate]

@@ -15,7 +15,11 @@ public readonly partial struct UInt256
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void Add(in UInt256 a, in UInt256 b, out UInt256 res)
     {
+        #if FEATURE_EXPRESSIONS
+        if (Avx2.IsSupported & Avx2.IsSupported)
+#else
         if (Avx2.IsSupported)
+#endif
         {
 #if RENAMED
             LoadSum256(in a, in b, out res, out Vector256<ulong> result, out Vector256<ulong> carryMask,
@@ -40,7 +44,11 @@ public readonly partial struct UInt256
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool AddOverflow(in UInt256 a, in UInt256 b, out UInt256 res)
     {
+        #if FEATURE_EXPRESSIONS
+        if (Avx2.IsSupported & Avx2.IsSupported)
+#else
         if (Avx2.IsSupported)
+#endif
         {
 #if RENAMED
             LoadSum256(in a, in b, out res, out Vector256<ulong> result, out Vector256<ulong> carryMask,
@@ -73,7 +81,11 @@ public readonly partial struct UInt256
 
         result = av + bv;
         // All bits set in lanes that carried out (carry out of each 64-bit limb).
+        #if FEATURE_EXPRESSIONS
+        if (Avx512F.VL.IsSupported & Avx.IsSupported)
+#else
         if (Avx512F.VL.IsSupported)
+#endif
         {
             // Sign bit of (a & b) | (~result & (a | b)) is the carry; one ternary-logic op
             #if WRONG_TERNARY
@@ -155,7 +167,11 @@ Vector256<ulong> cascadedCarries = Unsafe.Add(ref Unsafe.As<byte, Vector256<ulon
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool AddScalar(in UInt256 a, in UInt256 b, out UInt256 res, bool detectOverflow)
     {
+        #if FEATURE_EXPRESSIONS
+        if (AdvSimd.IsSupported & AdvSimd.IsSupported)
+#else
         if (AdvSimd.IsSupported)
+#endif
         {
             ref readonly UInt256 large = ref a;
             ulong small = b.u0;
@@ -272,7 +288,11 @@ Vector256<ulong> cascadedCarries = Unsafe.Add(ref Unsafe.As<byte, Vector256<ulon
         // Lane i receives the carry of lane i-1: [0, lo0] and [lo1, hi0]
         Vector128<ulong> carryInLo;
         Vector128<ulong> carryInHi;
+        #if FEATURE_EXPRESSIONS
+        if (AdvSimd.IsSupported & AdvSimd.IsSupported)
+#else
         if (AdvSimd.IsSupported)
+#endif
         {
             // ext takes its low lanes from the first operand: (second:first) >> 64 bits
             carryInLo = AdvSimd.ExtractVector128(Vector128<ulong>.Zero, carryLo, 1);
@@ -303,7 +323,11 @@ carryInHi = Ssse3.AlignRight(carryHi.AsByte(), carryLo.AsByte(), 8).AsUInt64();
         Vector128<ulong> sumHi = resultHi - carryInHi;
         Unsafe.SkipInit(out res);
         // ARM repairs carries using the loaded vectors, so early stores are safe even with aliased inputs.
+        #if FEATURE_EXPRESSIONS
+        if (AdvSimd.IsSupported & AdvSimd.IsSupported)
+#else
         if (AdvSimd.IsSupported)
+#endif
         {
             ref Vector128<ulong> earlyResult = ref Unsafe.As<UInt256, Vector128<ulong>>(ref res);
             earlyResult = sumLo;
@@ -323,7 +347,11 @@ carryInHi = Ssse3.AlignRight(carryHi.AsByte(), carryLo.AsByte(), 8).AsUInt64();
 #endif
         if (!Vector128.EqualsAll(propagate, Vector128<ulong>.Zero))
         {
-            if (AdvSimd.IsSupported)
+            #if FEATURE_EXPRESSIONS
+        if (AdvSimd.IsSupported & AdvSimd.IsSupported)
+#else
+        if (AdvSimd.IsSupported)
+#endif
             {
                 // The low half is complete. Repair the remaining two carry hops in the high half.
                 Vector128<ulong> secondHi = detectOverflow
@@ -399,7 +427,11 @@ sumHi -= extra;
 #endif
     {
         ulong a0 = a.u0, a1 = a.u1, a2 = a.u2, a3 = a.u3;
+        #if FEATURE_EXPRESSIONS
+        if (AdvSimd.IsSupported & AdvSimd.IsSupported)
+#else
         if (AdvSimd.IsSupported)
+#endif
         {
             ulong low = a0 + b0;
             bool overflow = false;
@@ -486,7 +518,11 @@ sumHi -= extra;
     private static bool SubtractImpl(in UInt256 a, in UInt256 b, out UInt256 res)
 #endif
     {
+        #if FEATURE_EXPRESSIONS
+        if (Avx2.IsSupported & Avx2.IsSupported)
+#else
         if (Avx2.IsSupported)
+#endif
         {
             Vector256<ulong> av = Unsafe.BitCast<UInt256, Vector256<ulong>>(a);
             Vector256<ulong> bv = Unsafe.BitCast<UInt256, Vector256<ulong>>(b);
@@ -495,7 +531,11 @@ sumHi -= extra;
             // All bits set in lanes where a < b, and in lanes whose lower neighbour borrowed
             Vector256<ulong> borrowMask;
             Vector256<ulong> borrowIn;
-            if (Avx512F.VL.IsSupported)
+            #if FEATURE_EXPRESSIONS
+        if (Avx512F.VL.IsSupported & Avx.IsSupported)
+#else
+        if (Avx512F.VL.IsSupported)
+#endif
             {
                 // Sign bit of (~a & b) | (~(a ^ b) & result) is the borrow; one ternary-logic op
                 #if WRONG_TERNARY
@@ -668,7 +708,11 @@ SubtractWithBorrow(a.u3, b.u3, ref borrow, out ulong r3);
         // Lane i receives the borrow of lane i-1: [0, lo0] and [lo1, hi0]
         Vector128<ulong> borrowInLo;
         Vector128<ulong> borrowInHi;
+        #if FEATURE_EXPRESSIONS
+        if (AdvSimd.IsSupported & AdvSimd.IsSupported)
+#else
         if (AdvSimd.IsSupported)
+#endif
         {
             // ext takes its low lanes from the first operand: (second:first) >> 64 bits
             borrowInLo = AdvSimd.ExtractVector128(Vector128<ulong>.Zero, borrowLo, 1);

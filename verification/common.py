@@ -10,7 +10,7 @@ VERIFY = ROOT / "verification"
 BUILD_DIRECTORIES = frozenset({"artifacts", "bin", "obj", "generated", ".lake", "__pycache__"})
 PROFILES = ("scalar", "arm64-advsimd", "x64-sse42", "x64-avx2", "x64-avx2-bmi1",
             "x64-avx512", "x64-avx512-bmi1")
-SEMANTICS_VERSION = "cil-simd-1"
+SEMANTICS_VERSION = "cil-simd-2"
 
 
 def expected_profile(name):

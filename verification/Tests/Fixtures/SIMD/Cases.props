@@ -7,6 +7,7 @@
     <SimdCase Include="InlineCarry" Symbol="INLINE_CARRY" Suite="positive" />
     <SimdCase Include="ExtractedHelper" Symbol="EXTRACTED_HELPER" Suite="positive" />
     <SimdCase Include="ReversedStore" Symbol="REVERSED_STORE" Suite="positive" />
+    <SimdCase Include="FeatureExpressions" Symbol="FEATURE_EXPRESSIONS" Suite="positive" />
     <SimdCase Include="WrongAlignment" Symbol="WRONG_ALIGNMENT" Suite="negative" />
     <SimdCase Include="WrongAvxAlignment" Symbol="WRONG_AVX_ALIGNMENT" Suite="negative" />
     <SimdCase Include="WrongBlend" Symbol="WRONG_BLEND" Suite="negative" />

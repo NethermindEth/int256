@@ -13,6 +13,7 @@ Run `python verification/Tests/simd_checks.py`. The default checks both methods 
 | InlineCarry | Expanded scalar carry/borrow operations in the vector fallback | Add SSE; Subtract ARM/SSE |
 | ExtractedHelper | Extracted alignment, propagation or cascade helper | All |
 | ReversedStore | Rejected optional storage summary followed by successful raw execution | ARM, SSE |
+| FeatureExpressions | Compound fixed feature checks, including inherited AVX capability inside AVX-512 paths | All |
 
 Each applicable positive must change its targeted reachable CIL and pass the complete public verifier with identical handwritten proof hashes. Renaming must remove the old private identities. Source-only changes are not counted as regressions.
 

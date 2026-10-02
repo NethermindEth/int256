@@ -37,6 +37,21 @@ kernel-checked execution equivalence transports each full contract to every vali
 profile in its class. Instance overloads, `AddOverflow`, `SubtractUnderflow`,
 the throwing subtraction operator and the zkEVM build are outside this scope.
 
+The represented x86 capabilities obey .NET's inherited support chain:
+`AVX512F -> AVX2 -> AVX -> SSE4.2 -> SSSE3 -> SSE2`. `AVX512F.VL` additionally
+implies `AVX512F`; the reverse implication is not assumed. A stronger enclosing
+guard can therefore justify instructions from an inherited ISA. BMI1 remains
+independent. Runtime feature disabling must leave a valid capability combination.
+
+ISA-specific instructions require availability at execution as well as extraction.
+An unguarded AVX-512 instruction can verify for an AVX-512 profile, but prevents
+complete portable coverage when reachable in a profile without its capability.
+The requirement concerns reachability, not an immediately adjacent source `if`.
+Portable `Vector128/256/512<T>` APIs do not acquire ISA prerequisites:
+`IsHardwareAccelerated` selects performance paths, not API availability. Only
+the exact portable overloads with implemented semantics are currently admitted;
+an unmodelled portable overload needs model support, not an ISA guard.
+
 Real calls must provide live readable 32-byte input ranges and a live writable
 32-byte output range through return. Each base address plus 31 must fit in the
 native address space. Calls require sufficient runtime stack, no concurrent
@@ -117,6 +132,14 @@ stores and connect lane masks/cascades to the existing four-limb arithmetic.
 The AVX lookup is checked against its actual extracted 512-byte RVA data, including
 every indexed lane and index bounds. Immutable static data occupies a separate
 address space; mutable tables and unsupported initialization fail extraction.
+
+Fixed feature expressions may be cached in unaddressed integer locals, negated
+with equality, or combined with Boolean bitwise operations. Forward reachability
+merges differing facts to unknown and retains both unknown branch successors.
+Address-taken locals are never treated as constant. Instructions are not rewritten:
+Lean still executes the emitted feature queries, locals and Boolean operations.
+Unsupported or newly variable feature distinctions still require new coverage
+evidence; the analysis never assumes an unknown condition is false.
 
 Signature-based helper summaries accelerate execution, but each summary is proved
 against the current extracted body. Candidates elaborate and pass kernel checking

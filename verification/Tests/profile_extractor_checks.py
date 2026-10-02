@@ -6,6 +6,7 @@ correctness. Production and semantic-negative proofs remain separate gates.
 
 import json
 from pathlib import Path
+import shutil
 import sys
 import tempfile
 
@@ -79,6 +80,44 @@ def main():
             if selected not in coverage["reachable"]:
                 raise RuntimeError("Reachability disagrees with the fixed execution profile")
         print("PASS: every named profile preserves and consistently evaluates the exact getter")
+
+        # A portable Vector API needs no ISA guard. In contrast, even an
+        # arithmetic identity implemented with an ISA-specific instruction must
+        # be unreachable on every profile that lacks the required capability.
+        for profile in PROFILES:
+            extract(fixture("PortableVector"), "portable", profile)
+            supported = profile.startswith("x64-avx512")
+            extract(fixture("UnguardedAvx512"), "unguarded", profile,
+                    None if supported else "Reachable intrinsic lacks Avx512FVL")
+            extract(fixture("WeakAvx512Guard"), "weak-guard", profile,
+                    "Reachable intrinsic lacks Avx512FVL" if profile.startswith("x64-avx2") else None)
+            extract(fixture("MergedAvx512Guard"), "merged-guard", profile,
+                    None if supported else "Reachable intrinsic lacks Avx512FVL")
+        print("PASS: portable vectors accepted; absent/weak/data-dependent ISA guards rejected")
+
+        lake = shutil.which("lake")
+        if lake is None:
+            raise RuntimeError("Pinned Lean/lake required to check emitted guard/profile certificates")
+        run([lake, "build", "+CIL.ProfileEquivalence:olean", "+CIL.SymbolicExecution:olean"], VERIFY)
+        guarded = fixture("GuardedAvx512")
+        guarded_variants = [("guarded", guarded), ("inherited", fixture("InheritedAvx2Guard"))]
+        for mode in ("guard-cached", "guard-negated", "guard-and"):
+            changed = work / f"{mode}.dll"
+            run(["dotnet", str(metadata), mode, str(guarded), str(changed)], ROOT)
+            if sha(changed) == sha(guarded):
+                raise RuntimeError("Guard fixture did not change the artifact")
+            guarded_variants.append((mode, changed))
+        for label, assembly in guarded_variants:
+            for profile in PROFILES:
+                output, artifact = extract(assembly, label, profile)
+                run([lake, "env", "lean", str(output / "Extracted.lean")], VERIFY)
+                live = {c["method"]: set(c["reachable"]) for c in artifact["coverage"]}
+                calls = [op for method in artifact["methods"] for op in method["instructions"]
+                         if op["Offset"] in live[method["signature"]] and op["opcode"] == "call"
+                         and ("::TernaryLogic(" in str(op["operand"]) or "::Permute4x64(" in str(op["operand"]))]
+                if bool(calls) != profile.startswith("x64-avx512"):
+                    raise RuntimeError("Fixed guard did not select the expected intrinsic path")
+        print("PASS: cached, negated, compound and inherited ISA guards with checked family certificates")
 
         cases = {
             "UnknownFeature": ("scalar", "Unclassified feature getter"),

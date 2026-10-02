@@ -57,7 +57,7 @@ def positive(destination, proof, case, method, profile):
 
 
 def positive_applicable(case, method, profile):
-    if case in ("Baseline", "Renamed", "ExtractedHelper"): return True
+    if case in ("Baseline", "Renamed", "ExtractedHelper", "FeatureExpressions"): return True
     if case == "EquivalentMask": return profile in ("x64-avx2", "x64-avx2-bmi1")
     if case in ("LaneLocals", "ReversedStore"): return profile in FAMILIES[:2]
     if case == "InlineCarry": return profile == "x64-sse42" or (method == "Subtract" and profile == "arm64-advsimd")
@@ -65,6 +65,15 @@ def positive_applicable(case, method, profile):
 
 
 def target_changed(case, method, profile, before, after):
+    if case == "FeatureExpressions":
+        def getters(artifact):
+            live = {c["method"]: set(c["reachable"]) for c in artifact["coverage"]}
+            return sum(op["opcode"] == "call" and "::get_IsSupported()" in str(op["operand"])
+                       for body in artifact["methods"] for op in body["instructions"]
+                       if op["Offset"] in live[body["signature"]])
+        if getters(after) <= getters(before):
+            raise RuntimeError("Feature rewrite did not change reachable feature expressions")
+        return
     if case == "Renamed":
         if cil(before) == cil(after): raise RuntimeError("Renaming did not change a reachable call operand")
         return
