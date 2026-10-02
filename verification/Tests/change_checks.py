@@ -62,6 +62,16 @@ class ChangeChecks(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             self.decision(RuntimeError("unsupported reachable instruction"), ({}, b"program"))
 
+    def test_subtraction_uses_its_own_dependency_graph(self):
+        with patch.object(changes, "run", side_effect=["src/UInt256.cs\0", '10.0.401', "", "", ""]), \
+                patch.object(changes, "extract", side_effect=[({}, b"same"), ({}, b"same")]) as extract:
+            self.assertFalse(changes.needs_proof("base", "Subtract")[0])
+        self.assertTrue(all(call.args[-1] == "Subtract" for call in extract.call_args_list))
+
+    def test_unknown_method_fails_before_skipping(self):
+        with self.assertRaises(ValueError):
+            changes.needs_proof("", "Unknown")
+
     def test_missing_base_requires_proof(self):
         self.assertTrue(changes.needs_proof("")[0])
         self.assertTrue(changes.needs_proof("0" * 40)[0])

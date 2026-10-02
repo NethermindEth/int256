@@ -1,4 +1,4 @@
-"""Build, extract and kernel-check the selected Add artifact in fresh directories."""
+"""Build, extract and kernel-check the selected UInt256 artifact in fresh directories."""
 
 import argparse
 import json
@@ -34,17 +34,20 @@ def source_inputs():
 def main():
     sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--fixture", help="Versioned Add fixture name (without .cs); default verifies production")
+    parser.add_argument("--method", choices=("Add", "Subtract"), default="Add", help="Exact wrapping entry to verify")
+    parser.add_argument("--fixture", help="Versioned fixture name (without .cs); default verifies production")
     arguments = parser.parse_args()
-    OUTPUT.mkdir(exist_ok=True)
-    report_path = OUTPUT / "report.json"
+    output_directory = OUTPUT if arguments.method == "Add" else OUTPUT / "subtract"
+    output_directory.mkdir(parents=True, exist_ok=True)
+    report_path = output_directory / "report.json"
     # Invalidate the prior success before any command that can fail.
     report_path.unlink(missing_ok=True)
-    fixture = VERIFY / "Tests/Fixtures/Add" / f"{arguments.fixture}.cs" if arguments.fixture else None
-    if fixture is not None and (fixture.parent != VERIFY / "Tests/Fixtures/Add" or not fixture.is_file()):
+    fixture_directory = VERIFY / "Tests/Fixtures" / arguments.method
+    fixture = fixture_directory / f"{arguments.fixture}.cs" if arguments.fixture else None
+    if fixture is not None and (fixture.parent != fixture_directory or not fixture.is_file()):
         raise RuntimeError("Fixture maintenance failure: requested versioned fixture is absent")
     project = VERIFY / "Tests/Fixtures/Nethermind.Int256.csproj" if fixture else ROOT / "src/Nethermind.Int256/Nethermind.Int256.csproj"
-    manifest = json.loads((VERIFY / "manifests/add.json").read_text(encoding="utf-8"))
+    manifest = json.loads((VERIFY / f"manifests/{arguments.method.lower()}.json").read_text(encoding="utf-8"))
     inputs = source_inputs()
     sdk = run(["dotnet", "--version"], ROOT).strip()
     if sdk != manifest["sdk"]:
@@ -61,7 +64,7 @@ def main():
         build = ["dotnet", "build", str(project), "-c", "Release", "--no-incremental",
                  f"-p:ArtifactsPath={artifacts}", "-p:EnableZkEvm=false"]
         if fixture:
-            build += [f"-p:FixtureSource={fixture}", "-p:EnforceCodeStyleInBuild=true", "-p:GenerateDocumentationFile=true"]
+            build += [f"-p:FixtureSource={fixture}", f"-p:FixtureMethod={arguments.method}", "-p:EnforceCodeStyleInBuild=true", "-p:GenerateDocumentationFile=true"]
         run_stage(build, ROOT, "Fixture maintenance/build" if fixture else "Production build")
         assembly = artifacts / "bin/Nethermind.Int256/release/Nethermind.Int256.dll"
         if not assembly.is_file():
@@ -82,13 +85,15 @@ def main():
         for name in ("lakefile.toml", "lean-toolchain"):
             shutil.copy2(VERIFY / name, proof / name)
         generated = proof / "generated"
-        run(["dotnet", str(extractor), str(assembly), str(generated)], ROOT)
+        run(["dotnet", str(extractor), str(assembly), str(generated), arguments.method], ROOT)
         artifact = json.loads((generated / "artifact.json").read_text(encoding="utf-8"))
         assembly_hash = sha(assembly)
         if artifact["sha256"] != assembly_hash or artifact["methods"][artifact["entryIndex"]]["signature"] != manifest["entry"]:
             raise RuntimeError("Artifact identity mismatch")
-        output = run_stage([lake, "build", "Audit"], proof, "Proof checking")
-        audit = re.findall(r"'UInt256Proof.checked_contract' depends on axioms: \[([^]]*)\]", output)
+        audit_target = "Audit" if arguments.method == "Add" else "SubtractAudit"
+        theorem = "checked_contract" if arguments.method == "Add" else "checked_subtract_contract"
+        output = run_stage([lake, "build", audit_target], proof, "Proof checking")
+        audit = re.findall(rf"'UInt256Proof.{theorem}' depends on axioms: \[([^]]*)\]", output)
         if len(audit) != 1:
             raise RuntimeError("Missing or ambiguous final theorem axiom audit")
         axioms = [a.strip() for a in audit[0].split(",") if a.strip()]
@@ -106,12 +111,13 @@ def main():
                              "project": project.relative_to(ROOT).as_posix(),
                              "fixture": fixture.relative_to(ROOT).as_posix() if fixture else None},
                   "sdk": sdk, "lean": lean, "axioms": axioms,
+                  "summaryRejections": re.findall(r"Optional summary candidate (\S+) was not proved; using raw execution \(([^)]+)\)", output),
                   "generatedProgramSha256": sha(generated / "Extracted.lean"),
                   "leanSourceSha256": {p.relative_to(VERIFY).as_posix(): sha(proof / p.relative_to(VERIFY))
                                        for p in lean_sources}}
         for name in ("Extracted.lean", "artifact.json"):
-            shutil.copy2(generated / name, OUTPUT / name)
-        temp_report = OUTPUT / "report.json.tmp"
+            shutil.copy2(generated / name, output_directory / name)
+        temp_report = output_directory / "report.json.tmp"
         temp_report.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
         temp_report.replace(report_path)
         print(f"Verified {manifest['entry']} from SHA256 {assembly_hash}")

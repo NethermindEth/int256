@@ -10,7 +10,7 @@ inductive Op where
   | field (index : Fin 4)
   | fieldAddr (index : Fin 4)
   | const32 (word : W32)
-  | convI8 | add | bor | ltu | gtu | eq | load64 | store64 | dup | pop
+  | convI8 | add | sub | band | bor | ltu | gtu | eq | load64 | store64 | dup | pop
   | branch (target : Nat)
   | brzero (target : Nat)
   | brnonzero (target : Nat)

@@ -23,9 +23,11 @@ internal static class Reachability
             if (i.OpCode.Code == Code.Call && i.Operand is MethodReference r && InstructionTranslation.Feature(r))
             {
                 Instruction branch = i.Next ?? throw new InvalidDataException("Missing feature branch");
-                if (branch.OpCode.Code is not (Code.Brfalse or Code.Brfalse_S))
-                    throw new InvalidDataException("Feature must be consumed by immediate brfalse");
-                Instruction disabledTarget = (Instruction)branch.Operand;
+                if (branch.OpCode.Code is not (Code.Brfalse or Code.Brfalse_S or Code.Brtrue or Code.Brtrue_S))
+                    throw new InvalidDataException("Feature must be consumed by an immediate conditional branch");
+                Instruction disabledTarget = branch.OpCode.Code is Code.Brfalse or Code.Brfalse_S
+                    ? (Instruction)branch.Operand
+                    : branch.Next ?? throw new InvalidDataException("Missing disabled feature successor");
                 if (disabledTarget.Offset <= branch.Offset)
                     throw new InvalidDataException("Malformed or cyclic control flow");
                 // Mark this forced branch as covered, but process both successors

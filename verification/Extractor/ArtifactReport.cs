@@ -6,14 +6,14 @@ using Mono.Cecil.Cil;
 internal static class ArtifactReport
 {
     internal static string Write(ModuleDefinition module, TypeDefinition type, MethodDefinition[] methods,
-        List<object> coverage, string assemblyPath, string outputDirectory)
+        List<object> coverage, string assemblyPath, string outputDirectory, string entrySignature = MetadataValidation.EntrySignature)
     {
         var artifact = new
         {
             assembly = module.Assembly.Name.FullName,
             sha256 = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(assemblyPath))).ToLowerInvariant(),
-            extractorVersion = "3",
-            entryIndex = Array.FindIndex(methods, m => m.FullName == MetadataValidation.EntrySignature),
+            extractorVersion = "4",
+            entryIndex = Array.FindIndex(methods, m => m.FullName == entrySignature),
             buildConfiguration = new { configuration = "Release", targetFramework = "net10.0" },
             layout = new { type.IsExplicitLayout, type.IsBeforeFieldInit, type.PackingSize, type.ClassSize },
             coverage,
@@ -31,7 +31,12 @@ internal static class ArtifactReport
                 {
                     i.Offset,
                     opcode = i.OpCode.Name,
-                    scope = i.Operand is MemberReference member ? member.DeclaringType.Scope.ToString() : null,
+                    scope = i.Operand switch
+                    {
+                        TypeReference operandType => operandType.Scope.ToString(),
+                        MemberReference member => member.DeclaringType.Scope.ToString(),
+                        _ => null
+                    },
                     operand = i.Operand switch
                     {
                         null => null,

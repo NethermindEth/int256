@@ -36,9 +36,16 @@ elab "if_extracted " name:ident " {" commands:command* "}" : command => do
         throwError "Summary contains an admitted declaration"
       if (env.checked.get.find? declName).isNone then
         throwError "Summary declaration was not kernel checked"
-  catch _ =>
+  catch exception =>
+    let failed ← get
+    let message := failed.messages.toList.find? fun message => message.severity == .error
+    let detail ← (message.map (·.data) |>.getD exception.toMessageData).toString
+    let resource := ["maximum number of heartbeats", "maximum recursion depth",
+      "maximum number of steps exceeded", "deep recursion", "stack overflow"].any
+        fun marker => (detail.splitOn marker).length > 1
+    let failureClass := if resource then "resource limit" else "proof obligation"
     set saved
-    logInfo m!"Optional summary candidate {name.getId} was not proved; using raw execution"
+    logInfo m!"Optional summary candidate {name.getId} was not proved; using raw execution ({failureClass}):\n{detail}"
 
 -- Execute instructions until execution finishes or a symbolic obligation
 -- prevents further reduction. Facts are ordinary proved hypotheses/lemmas.

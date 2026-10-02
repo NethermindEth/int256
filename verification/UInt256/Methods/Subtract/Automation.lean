@@ -1,15 +1,13 @@
 import UInt256.ExecutionAutomation
-import UInt256.Methods.Add.HelperContracts
+import UInt256.Methods.Subtract.HelperContracts
 
 open Lean Meta Elab Tactic
 open CIL UInt256Model
 namespace UInt256Proof
 
--- Contracts are selected by generated signature-candidate identities, never by
--- a method hash, fixture label, instruction sequence, or variant recognition.
-elab "cil_carry_call" : tactic => withMainContext do
-  unless (← getEnv).contains (Name.mkSimple "Extracted" |>.str "addWithCarryIndex") &&
-      (← getEnv).contains (Name.mkSimple "UInt256Proof" |>.str "execute_carry_contract_at") do
+elab "cil_borrow_call" : tactic => withMainContext do
+  unless (← getEnv).contains (Name.mkSimple "Extracted" |>.str "subtractWithBorrowIndex") &&
+      (← getEnv).contains (Name.mkSimple "UInt256Proof" |>.str "execute_borrow_contract_at") do
     throwError "No proved summary available"
   let target ← getMainTarget
   let candidates := collectRuns target
@@ -17,11 +15,11 @@ elab "cil_carry_call" : tactic => withMainContext do
   for candidate in candidates do
     if candidate.hasLooseBVars then continue
     let args := candidate.getAppArgs
-    if (← isDefEq args[2]! (mkConst (Name.mkSimple "Extracted" |>.str "addWithCarryIndex"))) &&
+    if (← isDefEq args[2]! (mkConst (Name.mkSimple "Extracted" |>.str "subtractWithBorrowIndex"))) &&
         (← isDefEq args[3]! (mkNatLit 0)) then
       selected := some candidate
       break
-  let some candidate := selected | throwError "No applicable proved carry-helper call"
+  let some candidate := selected | throwError "No applicable proved borrow-helper call"
   if candidate.hasLooseBVars then
     throwError "Carry helper call still depends on an unresolved execution binder"
   let call := candidate.getAppArgs
@@ -54,10 +52,10 @@ elab "cil_carry_call" : tactic => withMainContext do
   let hread := mkIdent (← mkFreshUserName `calleeReads)
   evalTactic (← `(tactic|
     obtain ⟨$final:ident, $hr:ident, $hc:ident, $hs:ident, $hp:ident⟩ :=
-      execute_carry_contract_at $memory $frame $fuel $cslot $rslot $xTerm $yTerm _
-        (by simp_all [write, initLocals]; all_goals rfl)
+      execute_borrow_contract_at $memory $frame $fuel $cslot $rslot $xTerm $yTerm _
+        (by simp [*, write, initLocals]; all_goals rfl)
         (by omega)
-        (by repeat first | apply carry_bound | assumption | decide)
+        (by repeat first | apply borrow_bound | assumption | decide)
         (by simp [cil_code]; all_goals omega)))
   evalTactic (← `(tactic|
     have $hb:ident : ∀ address, $final (.byte address) = $memory (.byte address) := by
@@ -67,10 +65,10 @@ elab "cil_carry_call" : tactic => withMainContext do
   evalTactic (← `(tactic|
     have $hl:ident : ∀ index, index ≠ $cslot → index ≠ $rslot →
         $final (.local $frame index) = $memory (.local $frame index) := by
-      intro index hcarry hsum
+      intro index hborrow hsum
       apply $hp
       · intro other index hlower; intro h; have := Address.local.inj h; omega
-      · simpa using hcarry
+      · simpa using hborrow
       · simpa using hsum))
   evalTactic (← `(tactic|
     have $hread:ident : ∀ base, read64 $final (.byte base) = read64 $memory (.byte base) := by
@@ -80,15 +78,8 @@ elab "cil_carry_call" : tactic => withMainContext do
   evalTactic (← `(tactic| rw [$hr:ident]))
   evalTactic (← `(tactic| simp only [Option.bind_some]))
 
-theorem carry_flag_fold (x y : W64) :
-    (if x + y < x then BitVec.ofNat 64 1 else BitVec.ofNat 64 0) =
-      carry x y (BitVec.ofNat 64 0) := (carry_zero x y).symm
-
-macro "cil_execute" facts:term,+ "with" calls:tacticSeq : tactic =>
-  `(tactic| cil_execute_core carry_expression, carry_or_expression, carry_flags_add,
-    carry_flags_or, carry_bound, carry_flag_fold, $[$facts:term],* with $calls:tacticSeq)
-
-macro "cil_execute" facts:term,+ : tactic =>
-  `(tactic| cil_execute $[$facts:term],* with (first | cil_carry_call | cil_store_call))
+macro "cil_subtract_execute" facts:term,+ "with" calls:tacticSeq : tactic =>
+  `(tactic| cil_execute_core borrow_expression, borrow_alternative_expression,
+    borrow_flags_or, borrow_flags_add, borrow_bound, borrow_flag_fold, extend_subtract_choice, $[$facts:term],* with $calls:tacticSeq)
 
 end UInt256Proof
