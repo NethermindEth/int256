@@ -34,6 +34,29 @@ def initial_bytes(a, b):
     return memory.hex()
 
 
+def positive_samples(method):
+    maximum = 2**64 - 1
+    vectors = [
+        ("small-operand", [maximum]*4, [1, 0, 0, 0]),
+        ("vector-fast", [11, 13, 17, 19], [2, 3, 5, 7]),
+    ]
+    if method == "Add":
+        vectors += [
+            ("cross-half", [2, maximum, 5, 7], [3, 1, 1, 2]),
+            # Carry through limbs 1 and 2: ARM repairs its early high-half store;
+            # SSE uses its scalar cascade fallback before storing.
+            ("cascade", [maximum, maximum, maximum, 5], [1, 0, 0, 2]),
+        ]
+    else:
+        vectors += [
+            ("cross-half", [10, 0, 5, 7], [1, 1, 1, 2]),
+            ("cascade", [0, 0, 0, 5], [1, 0, 0, 2]),
+        ]
+    # Exact aliases, partial overlaps with either input, and disjoint output.
+    return [(name, a, b, output) for name, a, b in vectors
+            for output in (0, 8, 64, 72, 128)]
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--profile", choices=PROFILES[1:], action="append")
@@ -64,12 +87,12 @@ def main():
                         assemblies[key] = artifacts / "bin/Nethermind.Int256/release/Nethermind.Int256.dll"
                     assembly = assemblies[key]
                     if case == "Baseline":
-                        samples = [([2**64-1]*4, [1, 0, 0, 0], output, "positive")
-                                   for output in (0, 8, 64, 128)]
+                        samples = [(name, a, b, output, "positive")
+                                   for name, a, b, output in positive_samples(method)]
                     else:
                         a, b, output, (address, actual) = witness(case, method)
-                        samples = [(a, b, output, f"{address}:{actual}")]
-                    for a, b, output, expected in samples:
+                        samples = [(case, a, b, output, f"{address}:{actual}")]
+                    for name, a, b, output, expected in samples:
                         result = subprocess.run(["dotnet", str(driver), str(assembly), method, profile,
                                                  initial_bytes(a, b), str(output), expected],
                                                 cwd=ROOT, env=environment(profile), text=True,
@@ -78,7 +101,7 @@ def main():
                             raise RuntimeError(f"Native {case}/{method}/{profile} failed:\n{result.stdout}\n{result.stderr}")
                         record = json.loads(result.stdout)
                         record.update(case=case, method=method, profile=profile,
-                                      assemblySha256=sha(assembly), witness=expected)
+                                      sample=name, assemblySha256=sha(assembly), witness=expected)
                         records.append(record)
                         if result.returncode == 77:
                             print(f"SKIP: {profile}; actual runtime flags do not match", flush=True)
