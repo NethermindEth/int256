@@ -18,7 +18,7 @@ theorem run_mono (program : Program) (fuel extra method pc : Nat)
       cases hop : body.code[pc]? with
       | none => simp [run, hbody, hop] at h
       | some op =>
-        cases hstep : step op body.returnsValue pc args frame stack memory with
+        cases hstep : step op body.returnsValue pc args frame stack memory body.profile with
         | none => simp [run, hbody, hop, hstep] at h
         | some action =>
           cases action with

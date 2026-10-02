@@ -10,7 +10,8 @@ elab "cil_borrow_call" : tactic => withMainContext do
     "borrow" (mkIdent ``borrow_bound) (← `(tactic| (simp [*, write, initLocals]; all_goals rfl)))
 
 macro "cil_subtract_execute" facts:term,+ "with" calls:tacticSeq : tactic =>
-  `(tactic| cil_execute_core borrow_expression, borrow_alternative_expression,
-    borrow_flags_or, borrow_flags_add, borrow_bound, borrow_flag_fold, extend_subtract_choice, $[$facts:term],* with $calls:tacticSeq)
+  `(tactic| cil_execute_core borrow_expression, borrow_alternative_expression, borrow_alternative_or_expression,
+    borrow_flags_or, borrow_flags_add, borrow_flags_alternative_or, borrow_bound, borrow_flag_fold,
+    extend_subtract_choice, $[$facts:term],* with $calls:tacticSeq)
 
 end UInt256Proof

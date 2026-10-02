@@ -1,5 +1,5 @@
 {
-  "schema": 1,
+  "schema": 2,
   "assembly": "Nethermind.Int256",
   "type": "Nethermind.Int256.UInt256",
   "entry": "System.Void Nethermind.Int256.UInt256::Subtract(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
@@ -10,7 +10,9 @@
   "nativeWidth": 64,
   "endianness": "little",
   "environment": {
-    "DOTNET_EnableHWIntrinsic": "0"
+    "defaultProfile": "scalar",
+    "featureSupport": "Immutable selected FeatureProfile",
+    "supportedDomain": "CIL.FeatureProfile.Valid (64-bit little-endian with explicit architecture and ISA prerequisites)"
   },
   "callingAssumptions": [
     "Readable live 32-byte initial input ranges and a writable live 32-byte output range",
@@ -28,15 +30,13 @@
     "CoreCLR, JIT and hardware fidelity are not proved"
   ],
   "runtimeModels": [
-    "System.Runtime.Intrinsics.X86.Avx2.get_IsSupported = false",
-    "System.Runtime.Intrinsics.Arm.AdvSimd.get_IsSupported = false",
-    "System.Runtime.Intrinsics.X86.Sse42.get_IsSupported = false",
-    "Unsafe.SkipInit<UInt256>: no memory write",
-    "Unsafe.AsRef<UInt64>: reference identity"
+    "IsSupported: fixed queried value from the selected execution profile",
+    "Exact reachable vector/intrinsic overloads: CIL/SIMD and CIL/INTRINSICS.md",
+    "Unsafe operations and spans: byte-addressed caller memory and disjoint private frames",
+    "RVA lookup: immutable bytes extracted from the selected DLL; writes rejected"
   ],
   "excluded": [
     "zkEVM build",
-    "hardware intrinsics enabled",
     "instance Subtract overload",
     "SubtractUnderflow",
     "throwing subtraction operator",

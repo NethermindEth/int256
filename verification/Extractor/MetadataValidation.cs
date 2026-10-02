@@ -6,8 +6,10 @@ internal static class MetadataValidation
     internal const string UInt256Reference = "Nethermind.Int256.UInt256&";
     internal const string EntrySignature = "System.Void Nethermind.Int256.UInt256::Add(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)";
 
-    internal static (TypeDefinition Type, MethodDefinition[] Methods) Validate(ModuleDefinition module, string entrySignature = EntrySignature)
+    internal static (TypeDefinition Type, MethodDefinition[] Methods) Validate(ModuleDefinition module, string entrySignature = EntrySignature, FeatureProfile? selectedProfile = null)
     {
+        FeatureProfile profile = selectedProfile ?? FeatureProfile.Scalar;
+        profile.Validate();
         string? AttributeValue(string name) => module.Assembly.CustomAttributes
             .SingleOrDefault(a => a.AttributeType.FullName == name)?.ConstructorArguments.Single().Value as string;
         if (module.Assembly.Name.Name != "Nethermind.Int256" ||
@@ -15,13 +17,15 @@ internal static class MetadataValidation
             AttributeValue("System.Reflection.AssemblyConfigurationAttribute") != "Release")
             throw new InvalidDataException("Unsupported assembly identity, target framework or build configuration");
         TypeDefinition type = module.GetType("Nethermind.Int256.UInt256") ?? throw new InvalidDataException("UInt256 missing");
-        if (!type.IsExplicitLayout || type.Fields.Count(f => !f.IsStatic) != 4)
+        if (!type.IsValueType || !RuntimeModels.HasRuntimeValueTypeBase(type) || !type.IsExplicitLayout || type.ClassSize is not (-1 or 0 or 32) ||
+            type.Fields.Count(f => !f.IsStatic) != 4)
             throw new InvalidDataException("Unsupported UInt256 layout");
         for (int i = 0; i < 4; i++)
         {
             FieldDefinition f = type.Fields.Single(f => f.Name == $"u{i}");
             if (f.IsStatic || f.FieldType.FullName != "System.UInt64" || f.Offset != i * 8)
                 throw new InvalidDataException($"Unsupported field: {f.FullName}");
+            RuntimeModels.ValidateTypeIdentity(f.FieldType, module);
         }
         MethodDefinition entry = type.Methods.SingleOrDefault(m => m.FullName == entrySignature)
             ?? throw new InvalidDataException("Entry calling signature changed");
@@ -44,16 +48,24 @@ internal static class MetadataValidation
             // execute code that the method-body interpreter does not model.
             if (method.DeclaringType != type && method.DeclaringType.Methods.Any(m => m.IsConstructor && m.IsStatic))
                 throw new InvalidDataException($"Unmodelled static initialisation: {method.DeclaringType.FullName}");
-            if (!method.IsStatic || !method.HasBody || method.HasGenericParameters ||
+            if (!method.IsStatic || !method.HasBody || method.HasGenericParameters || method.DeclaringType.HasGenericParameters ||
                 method.Body.Instructions.Count == 0 || method.Body.ExceptionHandlers.Count != 0 ||
                 (!method.Body.InitLocals && method.Body.Variables.Count != 0) ||
                 !SupportedType(method.ReturnType, returns: true) || method.Parameters.Any(p => !SupportedType(p.ParameterType)))
                 throw new InvalidDataException($"Unsupported method metadata: {method.FullName}");
+            RuntimeModels.ValidateTypeIdentity(method.ReturnType, module);
+            foreach (ParameterDefinition parameter in method.Parameters)
+                RuntimeModels.ValidateTypeIdentity(parameter.ParameterType, module);
+            foreach (VariableDefinition local in method.Body.Variables)
+                RuntimeModels.ValidateTypeIdentity(local.VariableType, module);
             state[method] = 1;
-            foreach (Instruction instruction in Reachability.Analyze(method))
+            foreach (Instruction instruction in Reachability.Analyze(method, profile))
             {
-                if (instruction.OpCode.Code != Code.Call || instruction.Operand is not MethodReference reference ||
-                    InstructionTranslation.RuntimeModel(reference) is not null) continue;
+                if (instruction.OpCode.Code is not (Code.Call or Code.Newobj) || instruction.Operand is not MethodReference reference ||
+                    InstructionTranslation.RuntimeModel(reference, profile) is not null) continue;
+                RuntimeModels.ValidateTypeIdentity(reference.ReturnType, module);
+                foreach (ParameterDefinition parameter in reference.Parameters)
+                    RuntimeModels.ValidateTypeIdentity(parameter.ParameterType, module);
                 MethodDefinition callee = reference.Resolve()
                     ?? throw new InvalidDataException($"Unresolved method: {reference.FullName}");
                 if (callee.Module != module)
@@ -68,7 +80,7 @@ internal static class MetadataValidation
         return (type, reverseOrder.ToArray());
     }
 
-    private static bool SupportedType(TypeReference type, bool returns = false) => type.FullName is
+    private static bool SupportedType(TypeReference type, bool returns = false) => RuntimeModels.SupportedType(type) || type.FullName is
         "System.UInt64" or "System.Boolean" or "System.Int32" ||
         (returns ? type.FullName == "System.Void" : type.FullName is UInt256Reference or "System.UInt64&");
 
@@ -89,6 +101,18 @@ internal static class MetadataValidation
             throw new ArgumentException("Unsupported verification entry signature");
         return (method.ReturnType.FullName, parameters) switch
         {
+            ("System.Boolean", UInt256Reference + "," + UInt256Reference + "," + UInt256Reference + ",System.Boolean") when !subtract &&
+                method.Body.Variables.Any(v => v.VariableType.FullName == "System.Runtime.Intrinsics.Vector128`1<System.UInt64>") => "addVector128",
+            ("System.Boolean", UInt256Reference + "," + UInt256Reference + "," + UInt256Reference) when subtract &&
+                method.Body.Variables.Any(v => v.VariableType.FullName == "System.Runtime.Intrinsics.Vector128`1<System.UInt64>") => "subtractVector128",
+            ("System.Boolean", UInt256Reference + "," + UInt256Reference + "," + UInt256Reference) when subtract &&
+                method.Body.Variables.Any(v => v.VariableType.FullName == "System.Runtime.Intrinsics.Vector256`1<System.UInt64>") => "subtractVector256",
+            ("System.Void", UInt256Reference + "," + UInt256Reference + "," + UInt256Reference + "," +
+                "System.Runtime.Intrinsics.Vector256`1<System.UInt64>&,System.Runtime.Intrinsics.Vector256`1<System.UInt64>&," +
+                "System.Runtime.Intrinsics.Vector256`1<System.UInt64>&,System.Runtime.Intrinsics.Vector256`1<System.UInt64>&") when !subtract => "prepareAdd",
+            ("System.Boolean", "System.Runtime.Intrinsics.Vector256`1<System.UInt64>,System.Runtime.Intrinsics.Vector256`1<System.UInt64>," +
+                "System.Runtime.Intrinsics.Vector256`1<System.UInt64>," + UInt256Reference) when !subtract => "finishAdd",
+            ("System.ReadOnlySpan`1<System.Byte>", "") => "broadcastLookup",
             ("System.Boolean", UInt256Reference + "," + UInt256Reference + "," + UInt256Reference + ",System.Boolean") when !subtract => "addScalar",
             ("System.Boolean", UInt256Reference + ",System.UInt64," + UInt256Reference) => subtract ? "subtractScalarUInt64" : "addScalarUInt64",
             ("System.Void", "System.UInt64,System.UInt64,System.UInt64&,System.UInt64&") => subtract ? "subtractWithBorrow" : "addWithCarry",

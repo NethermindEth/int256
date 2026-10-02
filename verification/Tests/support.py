@@ -60,10 +60,19 @@ def require_semantic_rejection(output, module):
     no_progress = r":\d+:\d+: `simp` made no progress(?:\n|$)"
     if not any("⊢" in block or re.search(no_progress, block) for block in relevant):
         raise RuntimeError("Mutation failed outside the expected semantic proof obligation")
-    if any(limit in block for block in errors for limit in
+    if any(limit in normalized for limit in
            ("maximum number of heartbeats", "maximum recursion depth", "maximum number of steps exceeded",
             "deep recursion", "stack overflow")):
         raise RuntimeError("Mutation rejection was inconclusive due to exhausted proof resources")
+    for block in errors:
+        headline = block.splitlines()[0]
+        if headline == "error: build failed":
+            continue
+        if not block.startswith(f"error: {module}:") or not (
+                "unsolved goals" in headline or "Tactic `introN` failed:" in headline or
+                "Extracted storage operands differ from the required result:" in headline or
+                re.search(no_progress, headline + "\n")):
+            raise RuntimeError("Mutation included an unrelated or maintenance proof failure")
 
 
 def model_refutation(proof, lake, initial, left, right, out, address, actual, expected, method="Add"):

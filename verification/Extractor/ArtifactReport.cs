@@ -6,13 +6,24 @@ using Mono.Cecil.Cil;
 internal static class ArtifactReport
 {
     internal static string Write(ModuleDefinition module, TypeDefinition type, MethodDefinition[] methods,
-        List<object> coverage, string assemblyPath, string outputDirectory, string entrySignature = MetadataValidation.EntrySignature)
+        List<object> coverage, string assemblyPath, string outputDirectory, string entrySignature = MetadataValidation.EntrySignature, FeatureProfile? selectedProfile = null)
     {
+        FeatureProfile profile = selectedProfile ?? FeatureProfile.Scalar;
         var artifact = new
         {
             assembly = module.Assembly.Name.FullName,
             sha256 = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(assemblyPath))).ToLowerInvariant(),
-            extractorVersion = "4",
+            extractorVersion = "5",
+            profile,
+            queriedFeatures = methods.SelectMany(m => Reachability.Analyze(m, profile))
+                .Where(i => i.OpCode.Code == Code.Call && i.Operand is MethodReference r && FeatureProfile.Getter(r) is not null)
+                .Select(i => FeatureProfile.Getter((MethodReference)i.Operand).ToString()).Distinct().Order().ToArray(),
+            staticData = methods.SelectMany(m => Reachability.Analyze(m, profile))
+                .Where(i => i.OpCode.Code == Code.Ldsflda)
+                .Select(i => StaticData.Validate((FieldReference)i.Operand, module)).Distinct()
+                .Select(f => new { signature = f.FullName, scope = f.DeclaringType.Scope.Name,
+                    attributes = f.Attributes.ToString(), size = f.FieldType.Resolve().ClassSize,
+                    packing = f.FieldType.Resolve().PackingSize, bytes = Convert.ToHexString(f.InitialValue).ToLowerInvariant() }),
             entryIndex = Array.FindIndex(methods, m => m.FullName == entrySignature),
             buildConfiguration = new { configuration = "Release", targetFramework = "net10.0" },
             layout = new { type.IsExplicitLayout, type.IsBeforeFieldInit, type.PackingSize, type.ClassSize },

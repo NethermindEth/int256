@@ -56,11 +56,13 @@ macro "cil_steps" facts:term,+ : tactic =>
     (rw [run];
      -- Resolve the method and instruction before unfolding the selected step.
      -- Otherwise simp explores instruction cases under unresolved bind lambdas.
-     simp only [cil_code, Option.pure_def, Option.bind_eq_bind, Option.bind_some];
+     simp only [List.getElem_eq_getElem?_get, cil_code, Option.get_some,
+       Option.pure_def, Option.bind_eq_bind, Option.bind_some];
      -- Retain checked rewrite proofs instead of making the kernel repeat large
      -- definitional reductions when checking the resulting execution proof.
      simp (config := { implicitDefEqProofs := false })
       [cil_code, step, binary, truth, write64, initLocals,
+      FeatureProfile.evaluate, Intrinsic.available,
       fin_val_three, $[$facts:term],*])))
 
 macro "cil_steps" : tactic => `(tactic| cil_steps Nat.add_zero)

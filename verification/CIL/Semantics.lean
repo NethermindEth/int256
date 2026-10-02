@@ -17,12 +17,24 @@ def binary (op : Op) (a b : Value) : Option Value :=
   | .add, .i32 x, .i32 y => some (.i32 (x + y))
   | .sub, .i64 x, .i64 y => some (.i64 (x - y))
   | .sub, .i32 x, .i32 y => some (.i32 (x - y))
+  | .mul, .i64 x, .i64 y => some (.i64 (x * y))
+  | .mul, .i32 x, .i32 y => some (.i32 (x * y))
   | .band, .i64 x, .i64 y => some (.i64 (x &&& y))
   | .band, .i32 x, .i32 y => some (.i32 (x &&& y))
   | .bor, .i64 x, .i64 y => some (.i64 (x ||| y))
   | .bor, .i32 x, .i32 y => some (.i32 (x ||| y))
+  | .bxor, .i64 x, .i64 y => some (.i64 (x ^^^ y))
+  | .bxor, .i32 x, .i32 y => some (.i32 (x ^^^ y))
+  | .shl, .i64 x, .i32 count => some (.i64 (x <<< (count.toNat % 64)))
+  | .shl, .i32 x, .i32 count => some (.i32 (x <<< (count.toNat % 32)))
+  | .shrUn, .i64 x, .i32 count => some (.i64 (x >>> (count.toNat % 64)))
+  | .shrUn, .i32 x, .i32 count => some (.i32 (x >>> (count.toNat % 32)))
+  | .shr, .i64 x, .i32 count => some (.i64 (x.sshiftRight (count.toNat % 64)))
+  | .shr, .i32 x, .i32 count => some (.i32 (x.sshiftRight (count.toNat % 32)))
   | .ltu, .i64 x, .i64 y => some (.i32 (if x < y then 1 else 0))
   | .gtu, .i64 x, .i64 y => some (.i32 (if x > y then 1 else 0))
+  | .ltu, .i32 x, .i32 y => some (.i32 (if x < y then 1 else 0))
+  | .gtu, .i32 x, .i32 y => some (.i32 (if x > y then 1 else 0))
   | .eq, .i64 x, .i64 y => some (.i32 (if x = y then 1 else 0))
   | .eq, .i32 x, .i32 y => some (.i32 (if x = y then 1 else 0))
   | _ , _, _ => none
@@ -33,7 +45,8 @@ inductive Action where
   | returned (result : List Value) (memory : Memory)
 
 def step (op : Op) (returns : Bool) (pc : Nat) (args : List Value) (frame : Nat)
-    (stack : List Value) (memory : Memory) : Option Action := do
+    (stack : List Value) (memory : Memory)
+    (profile : FeatureProfile := FeatureProfile.scalar) : Option Action := do
   match op, stack with
   | .arg i, _ => return .next (pc + 1) ((← args[i]?) :: stack) memory
   | .local i, _ => return .next (pc + 1) ((← memory (.local frame i)) :: stack) memory
@@ -43,8 +56,16 @@ def step (op : Op) (returns : Bool) (pc : Nat) (args : List Value) (frame : Nat)
   | .fieldAddr i, .object id :: rest => return .next (pc + 1) (.ref (.byte (id + 8 * i.val)) :: rest) memory
   | .const32 w, _ => return .next (pc + 1) (.i32 w :: stack) memory
   | .convI8, .i32 w :: rest => return .next (pc + 1) (.i64 (w.signExtend 64) :: rest) memory
+  | .convI4, .i64 w :: rest => return .next (pc + 1) (.i32 (w.setWidth 32) :: rest) memory
+  | .convI4, .i32 w :: rest => return .next (pc + 1) (.i32 w :: rest) memory
+  | .convU1, .i32 w :: rest => return .next (pc + 1) (.i32 ((w.setWidth 8).zeroExtend 32) :: rest) memory
+  | .convU1, .i64 w :: rest => return .next (pc + 1) (.i32 ((w.setWidth 8).zeroExtend 32) :: rest) memory
+  | .convU, .i32 w :: rest => return .next (pc + 1) (.i64 (w.zeroExtend 64) :: rest) memory
+  | .convU, .i64 w :: rest => return .next (pc + 1) (.i64 w :: rest) memory
   | .add, b :: a :: rest | .sub, b :: a :: rest
   | .band, b :: a :: rest | .bor, b :: a :: rest
+  | .mul, b :: a :: rest | .bxor, b :: a :: rest
+  | .shl, b :: a :: rest | .shr, b :: a :: rest | .shrUn, b :: a :: rest
   | .ltu, b :: a :: rest | .gtu, b :: a :: rest | .eq, b :: a :: rest =>
     return .next (pc + 1) ((← binary op a b) :: rest) memory
   | .load64, .ref a :: rest =>
@@ -61,7 +82,15 @@ def step (op : Op) (returns : Bool) (pc : Nat) (args : List Value) (frame : Nat)
   | .bgeu target, .i64 b :: .i64 a :: rest => return .next (if a < b then pc + 1 else target) rest memory
   | .call callee argc, _ =>
     if stack.length < argc then none else return .call callee (stack.take argc).reverse (stack.drop argc) memory
-  | .featureDisabled, _ => return .next (pc + 1) (.i32 0 :: stack) memory
+  | .feature id, _ =>
+    return .next (pc + 1) (.i32 (if profile.evaluate id then 1 else 0) :: stack) memory
+  | .intrinsic operation argc, _ =>
+    if stack.length < argc || !operation.available profile then none else
+      return .next (pc + 1)
+        ((← evalIntrinsic operation (stack.take argc).reverse) :: stack.drop argc) memory
+  | .memory operation, _ =>
+    let (updated, values) ← evalMemory operation stack memory
+    return .next (pc + 1) values updated
   | .skipInit, .object _ :: rest => return .next (pc + 1) rest memory
   | .asRef, .ref a :: rest => return .next (pc + 1) (.ref a :: rest) memory
   | .ret, _ =>
@@ -79,7 +108,7 @@ def run (program : Program) : Nat → Nat → Nat → List Value → Nat → Lis
   | fuel + 1, method, pc, args, frame, stack, memory => do
     let body ← program[method]?
     let op ← body.code[pc]?
-    match ← step op body.returnsValue pc args frame stack memory with
+    match ← step op body.returnsValue pc args frame stack memory body.profile with
     | .next target stack' memory' => run program fuel method target args frame stack' memory'
     | .call callee args' rest memory' =>
       let child ← program[callee]?

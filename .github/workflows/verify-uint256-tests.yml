@@ -7,8 +7,93 @@ permissions:
   contents: read
 
 jobs:
+  coverage:
+    name: Complete Add and Subtract feature coverage
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      DOTNET_EnableHWIntrinsic: '0'
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.401'
+      - name: Install Lean 4.34.1
+        shell: bash
+        run: |
+          curl --fail --location --retry 3 https://github.com/leanprover/lean4/releases/download/v4.34.1/lean-4.34.1-linux.tar.zst -o "$RUNNER_TEMP/lean.tar.zst"
+          tar --zstd -xf "$RUNNER_TEMP/lean.tar.zst" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/lean-4.34.1-linux/bin" >> "$GITHUB_PATH"
+      - name: Verify all full family contracts and compose coverage
+        run: python3 verification/verify_all.py
+      - name: Retain coverage certificates and artifact identities
+        uses: actions/upload-artifact@v6
+        with:
+          name: uint256-complete-coverage
+          path: verification/generated/**/report.json
+      - name: Retain aggregate certificate
+        uses: actions/upload-artifact@v6
+        with:
+          name: uint256-coverage-composition
+          path: verification/generated/coverage.json
+  foundations:
+    name: SIMD model and profile extraction checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      DOTNET_EnableHWIntrinsic: '0'
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.401'
+      - name: Install Lean 4.34.1
+        shell: bash
+        run: |
+          curl --fail --location --retry 3 https://github.com/leanprover/lean4/releases/download/v4.34.1/lean-4.34.1-linux.tar.zst -o "$RUNNER_TEMP/lean.tar.zst"
+          tar --zstd -xf "$RUNNER_TEMP/lean.tar.zst" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/lean-4.34.1-linux/bin" >> "$GITHUB_PATH"
+      - name: Check feature, intrinsic and memory semantics in the kernel
+        run: python3 verification/Tests/foundation_checks.py
+      - name: Check profile selection, exact overloads and static-data extraction
+        run: |
+          python3 verification/Tests/change_checks.py
+          python3 verification/Tests/coverage_checks.py
+          python3 verification/Tests/prepared_checks.py
+          python3 verification/Tests/rejection_checks.py
+          python3 verification/Tests/profile_extractor_checks.py
+  simd:
+    name: SIMD proof tests (${{ matrix.method }}, ${{ matrix.profile }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        method: [Add, Subtract]
+        profile: [arm64-advsimd, x64-sse42, x64-avx2, x64-avx2-bmi1, x64-avx512, x64-avx512-bmi1]
+    env:
+      DOTNET_EnableHWIntrinsic: '0'
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.401'
+      - name: Install Lean 4.34.1
+        shell: bash
+        run: |
+          curl --fail --location --retry 3 https://github.com/leanprover/lean4/releases/download/v4.34.1/lean-4.34.1-linux.tar.zst -o "$RUNNER_TEMP/lean.tar.zst"
+          tar --zstd -xf "$RUNNER_TEMP/lean.tar.zst" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/lean-4.34.1-linux/bin" >> "$GITHUB_PATH"
+      - name: Verify SIMD refactors and independently refuted wrong algorithms
+        run: python3 verification/Tests/simd_checks.py --method ${{ matrix.method }} --profile ${{ matrix.profile }} --suite all
   tests:
-    name: Proof tests (${{ matrix.method }}, ${{ matrix.suite }})
+    name: Scalar proof tests (${{ matrix.method }}, ${{ matrix.suite }})
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     strategy:
@@ -35,7 +120,7 @@ jobs:
         if: matrix.suite == 'regressions'
         run: |
           python3 verification/Tests/change_checks.py
-          python3 verification/verify.py --method ${{ matrix.method }}
+          python3 verification/verify.py --method ${{ matrix.method }} --profile scalar
       - name: Exercise arithmetic, freshness and extraction regressions
         if: matrix.suite == 'regressions'
         run: |

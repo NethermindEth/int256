@@ -1,0 +1,20 @@
+<Project>
+  <ItemGroup>
+    <SimdCase Include="Baseline" Symbol="" Suite="positive" />
+    <SimdCase Include="Renamed" Symbol="RENAMED" Suite="positive" />
+    <SimdCase Include="EquivalentMask" Symbol="EQUIVALENT_MASK" Suite="positive" />
+    <SimdCase Include="LaneLocals" Symbol="LANE_LOCALS" Suite="positive" />
+    <SimdCase Include="InlineCarry" Symbol="INLINE_CARRY" Suite="positive" />
+    <SimdCase Include="ExtractedHelper" Symbol="EXTRACTED_HELPER" Suite="positive" />
+    <SimdCase Include="ReversedStore" Symbol="REVERSED_STORE" Suite="positive" />
+    <SimdCase Include="WrongAlignment" Symbol="WRONG_ALIGNMENT" Suite="negative" />
+    <SimdCase Include="WrongAvxAlignment" Symbol="WRONG_AVX_ALIGNMENT" Suite="negative" />
+    <SimdCase Include="WrongBlend" Symbol="WRONG_BLEND" Suite="negative" />
+    <SimdCase Include="WrongTernary" Symbol="WRONG_TERNARY" Suite="negative" />
+    <SimdCase Include="WrongPredicate" Symbol="WRONG_PREDICATE" Suite="negative" />
+    <SimdCase Include="WrongTable" Symbol="WRONG_TABLE" Suite="negative" />
+    <SimdCase Include="WrongScale" Symbol="WRONG_SCALE" Suite="negative" />
+    <SimdCase Include="EarlyReread" Symbol="EARLY_REREAD" Suite="negative" />
+    <SimdCase Include="WrongTop" Symbol="WRONG_TOP" Suite="negative" />
+  </ItemGroup>
+</Project>

@@ -1,4 +1,4 @@
-import UInt256.Methods.Subtract.SmallAutomation
+import UInt256.Methods.Subtract.SIMDCalls
 
 open CIL UInt256Model
 set_option maxRecDepth 8192
@@ -23,7 +23,8 @@ theorem execute_subtract_entry_general_words (m : Memory) (left right out frame 
   change b 1 ||| b 2 ||| b 3 ≠ BitVec.ofNat 64 0 at hnb
   simp only [differenceWords, Fin.val_zero, Fin.val_one, Fin.val_two, fin_val_three, ↓reduceIte]
   cil_subtract_execute ha0, ha1, ha2, ha3, hb0, hb1, hb2, hb3, hc0, hc1, hc2, hc3,
-    hnb, borrow_expression, borrow_alternative_expression with (first | cil_borrow_call | cil_store_call)
+    hnb, borrow_expression, borrow_alternative_expression, FeatureProfile.evaluate with
+    (first | cil_subtract256_call a b | cil_subtract128_call a b | cil_borrow_call | cil_store_call)
   all_goals intro address
   all_goals first
     | solve | simp (config := { implicitDefEqProofs := false }) [*, store4, BitVec.toNat_sub, Nat.add_mod_mod]
@@ -43,11 +44,17 @@ theorem execute_subtract_entry_small_words (m : Memory) (left right out frame fu
         (smallDifference a (b 0) 2) (smallDifference a (b 0) 3) (.byte address) := by
   obtain ⟨ha0, ha1, ha2, ha3⟩ := limb_reads m left a ha
   obtain ⟨hb0, hb1, hb2, hb3⟩ := limb_reads m right b hb
-  cil_subtract_execute ha0, ha1, ha2, ha3, hb0, hb1, hb2, hb3, h1, h2, h3
-    with (first | cil_subtract_small_call | cil_borrow_call | cil_store_call)
+  have hshape : subtractionSingleLimb (b 0) = b := singleLimb_eq b h1 h2 h3
+  have hsmallWords : smallDifference a (b 0) = differenceWords a b := by
+    rw [small_difference_words, hshape]
+  cil_subtract_execute ha0, ha1, ha2, ha3, hb0, hb1, hb2, hb3, h1, h2, h3,
+    hsmallWords, FeatureProfile.evaluate with
+    (first | cil_subtract256_call a b | cil_subtract128_call a b | cil_subtract_small_call | cil_borrow_call | cil_store_call)
   all_goals intro address
+  all_goals simp only [← hsmallWords]
+  all_goals clear hsmallWords
   all_goals first
-    | solve | simp [*, store4, smallDifference, fin_val_three]
+    | solve | simp [*, store4, smallDifference, differenceWords, fin_val_three]
     | solve
       | cil_preserved_store
         intro location

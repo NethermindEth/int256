@@ -18,9 +18,23 @@ exact public contract types and audit their transitive proof dependencies.
 The [Add](manifests/add.json) and [Subtract](manifests/subtract.json) manifests
 select the standard `Nethermind.Int256.dll`, net10.0, Release, and static
 three-reference void entry signatures. Verification models a 64-bit little-endian
-CoreCLR environment with `DOTNET_EnableHWIntrinsic=0`: Avx2, AdvSimd and Sse42
-support queries are false. Every scalar dispatch and carry/borrow path is covered.
-Hardware-enabled execution, instance overloads, `AddOverflow`, `SubtractUnderflow`,
+CoreCLR environment with fixed runtime feature values. The supported domain is
+`CIL.FeatureProfile.Valid`: it separates ARM/x64 capabilities and requires the
+prerequisites of the reachable operations. Runtime-disabled features are included;
+BMI1 is independent of AVX2. The classifier partitions this domain into seven
+behaviour classes:
+
+| Representative | Selected implementation |
+|---|---|
+| `scalar` | All intrinsics disabled |
+| `arm64-advsimd` | ARM64 AdvSimd |
+| `x64-sse42` | SSE2/SSSE3/SSE4.2 |
+| `x64-avx2`, `x64-avx2-bmi1` | AVX/AVX2, with BMI1 off/on |
+| `x64-avx512`, `x64-avx512-bmi1` | AVX/AVX2/AVX512F.VL, with BMI1 off/on |
+
+Other irrelevant feature values do not require additional algorithm proofs:
+kernel-checked execution equivalence transports each full contract to every valid
+profile in its class. Instance overloads, `AddOverflow`, `SubtractUnderflow`,
 the throwing subtraction operator and the zkEVM build are outside this scope.
 
 Real calls must provide live readable 32-byte input ranges and a live writable
@@ -47,19 +61,33 @@ dependencies. Run from the repository root:
 ```sh
 python verification/verify.py --method Add
 python verification/verify.py --method Subtract
+python verification/verify.py --method Subtract --profile x64-avx2-bmi1
+python verification/verify_all.py
 ```
 
-Add is the default. Each command rebuilds the assembly and extractor, imports
+Add and the scalar profile are the defaults. A selected command rebuilds the assembly and extractor, imports
 that invocation's DLL into an isolated proof directory without generated data or
 compiled caches, and checks the selected theorem and axiom audit. It invalidates
 the previous success report before starting and rechecks source inputs and the
 DLL digest before issuing a new one.
 
+`verify_all.py` builds one fresh production DLL and checks both methods in all
+seven classes, using isolated proof directories. It then audits the total
+classification and composition rules and checks every full family certificate
+before issuing `generated/coverage.json`. The proof host does not need ARM or
+AVX-512 hardware: profiles parameterize the managed execution model. Native
+intrinsic tests are separate checks on suitably capable hosts. `--check-reports` performs the same
+composition using existing reports only if all proof and extraction inputs remain
+current. A failed selected run also invalidates the aggregate report.
+
 Reports live at `verification/generated/report.json` for Add and
 `verification/generated/subtract/report.json` for Subtract, alongside the selected
-`Extracted.lean` and artifact metadata. They record source commit/status and
+`Extracted.lean` and artifact metadata. Other profiles use
+`generated/profiles/<profile>/<method>/`. Reports record source commit/status and
 digests, DLL identity, coverage, toolchains, assumptions, axioms and optional
-summary rejections. A fixture report is explicitly marked and cannot serve as a
+summary rejections, stage timings, exact selected/family certificates and canonical
+profile audits. Shared builds bind source inputs and both assembly/extractor
+digests before extraction and again before issuing reports. A fixture report is explicitly marked and cannot serve as a
 production baseline. Generated files and build caches are ignored; regenerate
 them rather than editing or committing them.
 
@@ -81,6 +109,14 @@ not extraction requirements. It validates assembly identity, framework,
 configuration, layout and reachable instructions, then emits instruction data and
 kernel-checked lookup equations. Execution tactics resolve each lookup before
 simplifying the selected instruction, avoiding repeated expansion of whole bodies.
+
+ISA-specific semantics and reusable instruction lemmas live in `CIL/SIMD/`;
+[the intrinsic mapping](CIL/INTRINSICS.md) records exact overloads and primary
+specifications. SIMD execution proofs retain operand snapshots through early
+stores and connect lane masks/cascades to the existing four-limb arithmetic.
+The AVX lookup is checked against its actual extracted 512-byte RVA data, including
+every indexed lane and index bounds. Immutable static data occupies a separate
+address space; mutable tables and unsupported initialization fail extraction.
 
 Signature-based helper summaries accelerate execution, but each summary is proved
 against the current extracted body. Candidates elaborate and pass kernel checking
@@ -110,7 +146,7 @@ contract, execution proof, correctness theorem and audit gate.
 | `UInt256/ExecutionAutomation.lean` | Shared helper calls and execution automation |
 | `UInt256/Methods/{Add,Subtract}/` | Operation contracts, execution and audits |
 | `Extractor/` | Metadata validation, reachability, translation and Lean emission |
-| `verify.py`, `common.py`, `changes.py` | Fresh verification, shared utilities and CI selection |
+| `verify.py`, `verify_all.py`, `common.py`, `changes.py` | Fresh verification, coverage composition and CI selection |
 | `Tests/` | Versioned fixtures, kernel refutations and regression runners |
 
 Pure semantics, representation, storage lemmas and arithmetic do not import
@@ -125,10 +161,16 @@ from the verification commands above:
 
 ```sh
 python verification/Tests/change_checks.py
+python verification/Tests/coverage_checks.py
+python verification/Tests/foundation_checks.py
+python verification/Tests/profile_extractor_checks.py
+python verification/Tests/prepared_checks.py
+python verification/Tests/rejection_checks.py
 python verification/Tests/negative_checks.py
 python verification/Tests/robustness_checks.py
 python verification/Tests/subtract_negative_checks.py
 python verification/Tests/robustness_checks.py --method Subtract
+python verification/Tests/simd_checks.py
 ```
 
 Positive fixtures are independent versioned C# programs checked with identical
@@ -150,9 +192,22 @@ A direct fixture run, such as `python verification/verify.py --fixture CarryOr`,
 replaces that method's extraction and report; rerun production verification before
 using them as a production baseline.
 
-The **Verify UInt256** workflow checks Add and Subtract separately. For ordinary
+SIMD fixtures cover each algorithm family and both BMI1 choices, with identical
+handwritten proofs and confirmed changes in the targeted reachable CIL. Correct
+variants rename, inline or extract helpers, rearrange locals and replace equivalent
+masks. Wrong alignment, blend/ternary immediates, propagation, table/index scaling
+and overlapping rereads require independent kernel refutations before rejection
+is counted. Mixed syntax/import errors and resource limits fail the test.
+Use `--method`, `--profile`, `--suite` and `--case` to select a smaller run.
+
+Optional native comparisons record actual capabilities and complete byte maps:
+`python verification/Tests/native_simd_checks.py --output native-results.json`.
+Unavailable profiles are explicitly skipped; native sampling supplements proofs.
+
+The **Verify UInt256** workflow checks both methods across all seven profiles. For ordinary
 C# edits under `src/`, it compares each method's generated program and validated metadata,
-including all reachable helpers, against the PR base or previous push. Only DLL identity,
+including reachable helpers, feature queries, exact intrinsics and static data,
+against the PR base or previous push. Only DLL identity,
 assembly version and metadata tokens are ignored. An unchanged comparison may
 skip Lean; build/extraction failures fail the check. Other changes, manual runs
 and PRs targeting branches other than main force fresh proofs.
@@ -161,6 +216,8 @@ and PRs targeting branches other than main force fresh proofs.
 unchanged verification inputs; it does not check the baseline's verification history.
 The manual **Verify UInt256 proof tests** workflow runs both methods' positive and
 negative suites, establishing a fresh production baseline for each regression job.
+Its SIMD matrix covers both methods in every representative profile, and a separate
+job checks complete production coverage composition.
 
 ## Trust boundary
 
@@ -170,10 +227,10 @@ native-computation axioms and custom correctness axioms. A failed negative proof
 may print `sorryAx` diagnostically, but cannot issue a successful report.
 
 The compiler/build system, Mono.Cecil 0.11.6, extractor and fidelity of the formal
-CIL/runtime models remain trusted. SHA-256 identifies an artifact without proving
-extraction correctness. The external operations are modelled as false feature
-queries, `Unsafe.SkipInit<UInt256>` (no write) and `Unsafe.AsRef<UInt64>` (reference
-identity). These proofs concern managed CIL execution; they do not verify CoreCLR,
+CIL/runtime/intrinsic models remain trusted. SHA-256 identifies an artifact without
+proving extraction correctness. Feature queries use the fixed selected profile;
+unsafe and vector operations use the documented executable models. These proofs
+concern managed CIL execution; they do not verify CoreCLR,
 JIT-generated native code or hardware.
 
 Semantic references: [ECMA-335, partitions I–III](https://ecma-international.org/publications-and-standards/standards/ecma-335/),
