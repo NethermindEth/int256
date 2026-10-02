@@ -6,6 +6,22 @@ open CIL CIL.Vector
 
 namespace UInt256Proof.SIMD
 
+/-- Sequential reading avoids repeatedly indexing the original table during
+    kernel reduction. It is used only to check the existing lookup predicate. -/
+def readLookupBytes (bytes : List (BitVec 8)) : Nat → Option Nat
+  | 0 => some 0
+  | count + 1 => do
+    let lo ← bytes.head?
+    let hi ← readLookupBytes bytes.tail count
+    return lo.toNat + 256 * hi
+
+theorem readStaticBytes_sequential (bytes : List (BitVec 8)) (offset count : Nat) :
+    readStaticBytes bytes offset count = readLookupBytes (bytes.drop offset) count := by
+  induction count generalizing offset with
+  | zero => rfl
+  | succ count ih =>
+    simp only [readStaticBytes, readLookupBytes, List.head?_drop, List.tail_drop, ih]
+
 def cascadeVector (index : W32) : V256 :=
   pack256 (if index.getLsbD 0 then 1 else 0)
     (if index.getLsbD 1 then 1 else 0)

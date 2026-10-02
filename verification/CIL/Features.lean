@@ -140,9 +140,11 @@ def FeatureClass.queries : FeatureClass → List Feature
 
 theorem FeatureProfile.classification_total (p : FeatureProfile) :
     p.classify ∈ FeatureClass.all := by
-  cases ha : p.avx2 <;> cases hv : p.avx512FVL <;> cases hb : p.bmi1 <;>
-    cases hn : p.advSimd <;> cases hs : p.sse42 <;>
-    simp [FeatureProfile.classify, FeatureClass.all, ha, hv, hb, hn, hs]
+  cases ha : p.avx2
+  · cases hn : p.advSimd <;> cases hs : p.sse42 <;>
+      simp [FeatureProfile.classify, FeatureClass.all, ha, hn, hs]
+  · cases hv : p.avx512FVL <;> cases hb : p.bmi1 <;>
+      simp [FeatureProfile.classify, FeatureClass.all, ha, hv, hb]
 
 theorem FeatureClass.representative_valid (c : FeatureClass) : c.representative.Valid := by
   cases c with
@@ -156,10 +158,13 @@ theorem FeatureProfile.classification_queries (p : FeatureProfile) (h : p.Valid)
     (hf : f ∈ p.classify.queries) :
     p.evaluate f = p.classify.representative.evaluate f := by
   rcases h with ⟨_, _, _, _, hss, hsse, havx, hvl, havxsse, hfavx⟩
-  cases ha : p.avx2 <;> cases hv : p.avx512FVL <;> cases hb : p.bmi1 <;>
-    cases hn : p.advSimd <;> cases hs : p.sse42 <;> cases f <;>
-    simp_all [FeatureProfile.classify, FeatureClass.queries, FeatureClass.representative,
-      FeatureProfile.scalar, FeatureProfile.evaluate]
+  cases ha : p.avx2
+  · cases hn : p.advSimd <;> cases hs : p.sse42 <;> cases f <;>
+      simp_all [FeatureProfile.classify, FeatureClass.queries, FeatureClass.representative,
+        FeatureProfile.scalar, FeatureProfile.evaluate]
+  · cases hv : p.avx512FVL <;> cases f <;>
+      simp_all [FeatureProfile.classify, FeatureClass.queries, FeatureClass.representative,
+        FeatureProfile.evaluate]
 
 /-- Explicit prerequisites of ISA-specific calls on each selected family. -/
 def FeatureClass.required : FeatureClass → List Feature
@@ -172,8 +177,10 @@ def FeatureClass.required : FeatureClass → List Feature
 theorem FeatureProfile.classification_required (p : FeatureProfile) (h : p.Valid)
     (f : Feature) (hf : f ∈ p.classify.required) : p.evaluate f = true := by
   rcases h with ⟨_, _, _, _, hss, hsse, havx, hvl, havxsse, hfavx⟩
-  cases ha : p.avx2 <;> cases hv : p.avx512FVL <;> cases hb : p.bmi1 <;>
-    cases hn : p.advSimd <;> cases hs : p.sse42 <;> cases f <;>
-    simp_all [FeatureProfile.classify, FeatureClass.required, FeatureProfile.evaluate]
+  cases ha : p.avx2
+  · cases hn : p.advSimd <;> cases hs : p.sse42 <;> cases f <;>
+      simp_all [FeatureProfile.classify, FeatureClass.required, FeatureProfile.evaluate]
+  · cases hv : p.avx512FVL <;> cases hb : p.bmi1 <;> cases f <;>
+      simp_all [FeatureProfile.classify, FeatureClass.required, FeatureProfile.evaluate]
 
 end CIL

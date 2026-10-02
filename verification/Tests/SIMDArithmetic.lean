@@ -22,6 +22,7 @@ example : ¬ LookupValid [] := by
 
 #print axioms packed_cascade
 #print axioms read_lookup
+#print axioms readStaticBytes_sequential
 #print axioms ternary_carry_mask
 #print axioms ternary_borrow_mask
 #print axioms carry_generated_propagated
