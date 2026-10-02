@@ -10,7 +10,7 @@ import time
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from common import ROOT, run
-from negative_checks import copy_source
+from support import copy_source
 
 
 FIXTURES = ("Baseline", "CarryOr", "Renamed", "FullyInlined", "StraightLine", "ExtractedHelper", "ExpandedHardware", "ExternalHelper", "ReversedStore")
