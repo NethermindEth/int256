@@ -14,6 +14,12 @@
                       Or '$(FixtureName)' == 'UnsupportedUnsafe'
                       Or '$(FixtureName)' == 'StaticInitializer'
                       Or '$(FixtureName)' == 'GenericHelper'
+                      Or '$(FixtureName)' == 'PortableVector'
+                      Or '$(FixtureName)' == 'UnguardedAvx512'
+                      Or '$(FixtureName)' == 'WeakAvx512Guard'
+                      Or '$(FixtureName)' == 'InheritedAvx2Guard'
+                      Or '$(FixtureName)' == 'MergedAvx512Guard'
+                      Or '$(FixtureName)' == 'GuardedAvx512'
                       Or '$(FixtureName)' == 'StaticData'">true</KnownFixture>
   </PropertyGroup>
   <ItemGroup>

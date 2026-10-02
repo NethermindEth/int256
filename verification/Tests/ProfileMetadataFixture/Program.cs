@@ -15,6 +15,43 @@ TypeReference Spoof(TypeReference original)
 }
 switch (args[0])
 {
+    case "guard-cached":
+    case "guard-negated":
+    case "guard-and":
+        Instruction guardCall = probe.Body.Instructions.Single(i => i.OpCode == OpCodes.Call &&
+            i.Operand is MethodReference r && r.Name == "get_IsSupported");
+        Instruction guardBranch = guardCall.Next;
+        if (guardBranch.OpCode.Code is not (Code.Brfalse or Code.Brfalse_S or Code.Brtrue or Code.Brtrue_S))
+            throw new InvalidDataException("Guard fixture branch structure changed");
+        ILProcessor il = probe.Body.GetILProcessor();
+        if (args[0] == "guard-cached")
+        {
+            VariableDefinition cached = new(module.TypeSystem.Boolean);
+            probe.Body.Variables.Add(cached);
+            probe.Body.InitLocals = true;
+            il.InsertBefore(guardBranch, Instruction.Create(OpCodes.Stloc, cached));
+            il.InsertBefore(guardBranch, Instruction.Create(OpCodes.Ldloc, cached));
+        }
+        else if (args[0] == "guard-negated")
+        {
+            il.InsertBefore(guardBranch, Instruction.Create(OpCodes.Ldc_I4_0));
+            il.InsertBefore(guardBranch, Instruction.Create(OpCodes.Ceq));
+            guardBranch.OpCode = guardBranch.OpCode.Code is Code.Brfalse or Code.Brfalse_S ? OpCodes.Brtrue : OpCodes.Brfalse;
+        }
+        else
+        {
+            il.InsertBefore(guardBranch, Instruction.Create(OpCodes.Call, (MethodReference)guardCall.Operand));
+            il.InsertBefore(guardBranch, Instruction.Create(OpCodes.And));
+        }
+        // Insertions can move a short branch's target beyond its signed byte range.
+        foreach (Instruction branch in probe.Body.Instructions)
+            branch.OpCode = branch.OpCode.Code switch
+            {
+                Code.Br_S => OpCodes.Br, Code.Brfalse_S => OpCodes.Brfalse, Code.Brtrue_S => OpCodes.Brtrue,
+                _ => branch.OpCode
+            };
+        Console.WriteLine($"Rewrote fixed feature guard: {args[0]}");
+        break;
     case "uint256-base-scope":
         type.BaseType = Spoof(type.BaseType);
         Console.WriteLine("Changed UInt256 ValueType base scope");

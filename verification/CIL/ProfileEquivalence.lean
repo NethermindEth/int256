@@ -170,7 +170,7 @@ theorem Op.classified_profile_agreement (op : Op) (p : FeatureProfile) (hv : p.V
     (h : op.Classified p.classify) : op.ProfileAgreement p.classify.representative p := by
   cases op <;> try trivial
   case feature featureId =>
-    exact (p.classification_queries featureId h).symm
+    exact (p.classification_queries hv featureId h).symm
   case intrinsic operation argc =>
     have hp : operation.available p = true := operation.available_of_required p (by
       intro featureId hf
