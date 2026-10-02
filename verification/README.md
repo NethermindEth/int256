@@ -1,372 +1,181 @@
 # UInt256 wrapping arithmetic verification
 
-`UInt256Proof.add_correct` proves the unrestricted public method contract for
-the actual Release CIL imported from the assembly. It covers every scalar
-dispatch and carry path, normal void return with a proved finite execution bound, the initial inputs'
-sum modulo 2^256, and caller-memory preservation, including arbitrary overlapping
-input/output ranges. `Audit.lean` checks its exact contract type and prints its
-foundational axioms. The fresh-build command below ties that proof to one artifact.
+This project proves the static wrapping `UInt256.Add` and `UInt256.Subtract`
+methods against CIL extracted from a freshly built Release assembly. For arbitrary
+initial inputs, each proof establishes:
 
-`UInt256Proof.subtract_correct` proves wrapping `UInt256.Subtract` against fresh
-Release CIL: initial left minus initial right modulo 2^256, normal void return
-with a proved finite bound, and the same byte-memory preservation and arbitrary
-overlap guarantee. This selects the named static wrapping method, rather than
-`SubtractUnderflow` or the throwing subtraction operator. Every scalar dispatch
-and borrow path is included. Its exact audit gate is
-`UInt256Proof.checked_subtract_contract`.
+- The output is `(left + right) mod 2^256` or `(left - right) mod 2^256`.
+- Execution terminates with a normal void return for a proved finite fuel bound.
+- Bytes outside the 32-byte output range are preserved.
+- Inputs and output may overlap arbitrarily, including partial overlap.
 
-## Project organization
+The theorems are `UInt256Proof.add_correct` and `UInt256Proof.subtract_correct`.
+Their audit gates, `checked_contract` and `checked_subtract_contract`, check the
+exact public contract types and audit their transitive proof dependencies.
 
-```text
-CIL/                         Values, memory, instructions, execution, memory lemmas
-  ExecutionLemmas.lean       Fuel monotonicity and uniqueness of successful results
-  SymbolicExecution.lean     Shared instruction stepping and candidate bounds
-UInt256/
-  Representation.lean        Mathematical limbs and caller bytes
-  RepresentationLemmas.lean  Representation and input-load proofs
-  StorageLemmas.lean         Four-limb storage and byte-memory equations
-  StorageContracts.lean      Optional storage summary proved against current CIL
-  ExecutionAutomation.lean   Shared helper calls, storage and instruction execution
-  Arithmetic/Carry.lean      Pure addition arithmetic, independent of extracted CIL
-  Arithmetic/Borrow.lean     Pure borrow equations and four-limb wrapping difference
-  Methods/Add/
-    Contract.lean            Independent public contract
-    HelperContracts.lean     Observable carry/storage contracts over current CIL
-    Automation.lean          Apply contracts from actual symbolic call arguments
-    Helpers.lean             Direct small-path execution with carry-case facts
-    Small.lean               Small-operand execution and result composition
-    SmallAutomation.lean     Small-path call contract automation
-    SmallParents.lean        Scalar small-dispatch execution, separated from math
-    General.lean             General-path four-word execution witness
-    Execution.lean           Scalar arithmetic composition and case dispatch
-    EntryAutomation.lean     Scalar-call contract automation
-    Entry.lean               Public-entry execution
-    Correctness.lean         Public wrapper and universal add_correct theorem
-    Examples.lean            Supplementary concrete aliased carry check
-    Audit.lean               Exact contract gate and axiom audits
-  Methods/Subtract/          Contract, borrow/small summaries, execution and audit
-Extractor/                   CLI, metadata validation, reachability, translation,
-                             Lean emission and artifact reporting in separate files
-Tests/
-  Fixtures/                  Versioned arithmetic fixtures independent of production
-    Common/Add/              Shared methods in partial UInt256 declarations
-    Add/                     Case-specific methods/types and Fixtures.props
-    Common/Subtract/         Shared versioned subtraction components
-    Subtract/                Renaming, inlining, alternative borrow and negatives
-  RegressionFixture/         Malformed artifact fixtures
-  support.py                 Shared isolation, witnesses and rejection gates
-  negative_checks.py         Add counterexamples and fail-closed regressions
-  subtract_negative_checks.py  Subtraction contract refutations and stale artifacts
-  robustness_checks.py       Fresh proofs of independent positive fixtures
-common.py                    Shared process, hashing and source-selection utilities
-manifests/{add,subtract}.json  Selected entries, scope and trust assumptions
-generated/                   Ignored extraction, metadata and verification report
-```
+## Scope and assumptions
 
-`Model.lean`, `Proof.lean` and `Audit.lean` are thin compatibility imports.
-The proof declaration names remain in `UInt256Proof`; representation and contract
-names live in `UInt256Model`, separate from the `CIL` execution definitions.
-Pure CIL semantics, representation, storage lemmas and arithmetic modules do not import
-`Extracted`. Shared execution summaries and method execution modules import the actual generated instruction data;
-the final correctness module composes execution with the independent contract.
-The runner copies every source module into a fresh proof directory and records
-its digest, excluding generated files and compiled caches.
-The final contract axiom audit includes all of its transitive proof dependencies.
-Shared stepping follows the generated instructions and uses proved call contracts.
-Small-path carry cases supply algorithm facts; caller-private locals and fuel
-offsets are derived by the execution procedure.
+The [Add](manifests/add.json) and [Subtract](manifests/subtract.json) manifests
+select the standard `Nethermind.Int256.dll`, net10.0, Release, and static
+three-reference void entry signatures. Verification models a 64-bit little-endian
+CoreCLR environment with `DOTNET_EnableHWIntrinsic=0`: Avx2, AdvSimd and Sse42
+support queries are false. Every scalar dispatch and carry/borrow path is covered.
+Hardware-enabled execution, instance overloads, `AddOverflow`, `SubtractUnderflow`,
+the throwing subtraction operator and the zkEVM build are outside this scope.
 
-For another method, add its contract, execution, correctness and audit modules
-under `UInt256/Methods/`, and a method manifest. Extend the shared instruction
-model and extractor only for the CIL it needs, preserving explicit rejection of
-unsupported reachable operations. The extractor and audit runner explicitly select Add or Subtract; Add remains
-the default. Loops and exception handling remain unsupported. Shared helper execution proofs
-remain bound to this extracted program and its discovered method ordering; reusing
-them with another extraction requires checking that binding.
+Real calls must provide live readable 32-byte input ranges and a live writable
+32-byte output range through return. Each base address plus 31 must fit in the
+native address space. Calls require sufficient runtime stack, no concurrent
+mutation or data race, and no asynchronous runtime failure. UInt256 type
+initialization must already have completed successfully. Extraction rejects
+helpers on other types with static constructors, including compiler-generated
+`beforefieldinit` constructors, because their initialization is not modelled.
 
-Run each production proof separately from the repository root:
+Caller memory is byte-addressed, with little-endian UInt64 loads and stores;
+private locals occupy a disjoint frame/index address space. The independent
+contracts use the **initial** shared memory for both operands, so overlapping
+ranges do not weaken the arithmetic guarantee. The mathematical value is a
+`BitVec 256` formed from UInt64 fields `u0/u1/u2/u3` at offsets `0/8/16/24`.
+
+## Run verification
+
+Install Python 3, .NET SDK 10.0.401 and Lean 4.34.1, including Lake. Keep `dotnet`
+and `lake` on PATH; versions are pinned in `global.json`, `lean-toolchain` and the
+manifests. The first build needs NuGet access for Mono.Cecil and repository
+dependencies. Run from the repository root:
 
 ```sh
 python verification/verify.py --method Add
 python verification/verify.py --method Subtract
 ```
 
-Both commands rebuild the selected production assembly and extractor, extract
-fresh CIL, and check an isolated proof without previous compiled proof caches.
-Add reports remain at `generated/report.json`; subtraction reports are at
-`generated/subtract/report.json`, alongside their own extracted program and
-artifact metadata. Each records the exact entry, DLL digest, coverage, build
-configuration, source digests, environment assumptions, and transitive axioms.
-A failed run invalidates the selected method's previous report before building.
-Reports also record rejected optional summaries and whether each rejection was
-a proof obligation or a resource limit; raw execution still has to prove the
-full contract. The known positive fixtures require their applicable summaries
-to be proved, while complete inlining has no such candidates and reversed Add
-storage explicitly exercises rejection/fallback.
-For subtraction, `SubtractAudit.lean` is the audit target in the isolated package.
-The package uses the selected program's `Extracted` module; the other method's
-audit is not compiled against that program.
+Add is the default. Each command rebuilds the assembly and extractor, imports
+that invocation's DLL into an isolated proof directory without generated data or
+compiled caches, and checks the selected theorem and axiom audit. It invalidates
+the previous success report before starting and rechecks source inputs and the
+DLL digest before issuing a new one.
 
-Normal CI has separate Add and Subtract jobs. For ordinary C# changes each job
-compares its own extracted entry, reachable dependencies and validated metadata
-with the base revision, skipping only an unchanged graph. Verifier, build and
-workflow changes force both fresh proofs. The manual proof-test workflow runs
-both methods' independent fixture and negative suites.
+Reports live at `verification/generated/report.json` for Add and
+`verification/generated/subtract/report.json` for Subtract, alongside the selected
+`Extracted.lean` and artifact metadata. They record source commit/status and
+digests, DLL identity, coverage, toolchains, assumptions, axioms and optional
+summary rejections. A fixture report is explicitly marked and cannot serve as a
+production baseline. Generated files and build caches are ignored; regenerate
+them rather than editing or committing them.
+
+For local Add proof iteration after extraction:
 
 ```sh
-python verification/Tests/robustness_checks.py --method Subtract
+lake -d verification build Audit
+```
+
+This does not refresh assembly identity or issue a report. Subtract verification
+uses `SubtractAudit` in an isolated package containing the Subtract program as
+`Extracted`; do not run that audit against the root Add extraction.
+
+## How the proof works
+
+The extractor discovers an acyclic graph of reachable managed calls from the
+exact public entry signature. Private helper names, counts and decomposition are
+not extraction requirements. It validates assembly identity, framework,
+configuration, layout and reachable instructions, then emits instruction data and
+kernel-checked lookup equations. Execution tactics resolve each lookup before
+simplifying the selected instruction, avoiding repeated expansion of whole bodies.
+
+Signature-based helper summaries accelerate execution, but each summary is proved
+against the current extracted body. Candidates elaborate and pass kernel checking
+transactionally, without new axioms or admitted proofs. Failure rolls back their
+declarations, registrations and diagnostics; automation uses only proved summaries
+and otherwise executes raw CIL. Carry and borrow contracts propagate an incoming
+flag bound of one. The final correctness proof composes this execution with the
+independent arithmetic and byte-memory contract.
+
+The public contract quantifies over successful finite fuel; the execution proof
+derives a sufficient bound from supported reachable instructions. Excluded hardware
+code does not enlarge it. Unsupported reachable CIL, malformed metadata and cyclic
+dependencies fail explicitly. Invalid execution states, absent memory and exhausted
+fuel return `none`, never success. Loops and exception handling are unsupported;
+excluded hardware instructions also fail if executed.
+
+The fixtures demonstrate specific implementation changes, not arbitrary algorithm
+independence. A different correct implementation can still need new arithmetic
+lemmas or execution support. Adding a verified method requires its own manifest,
+contract, execution proof, correctness theorem and audit gate.
+
+| Location | Purpose |
+|---|---|
+| `CIL/` | Interpreter, memory, execution lemmas and instruction stepping |
+| `UInt256/Representation*`, `Storage*` | Limb/byte representation and storage proofs |
+| `UInt256/Arithmetic/` | Pure carry and borrow arithmetic |
+| `UInt256/ExecutionAutomation.lean` | Shared helper calls and execution automation |
+| `UInt256/Methods/{Add,Subtract}/` | Operation contracts, execution and audits |
+| `Extractor/` | Metadata validation, reachability, translation and Lean emission |
+| `verify.py`, `common.py`, `changes.py` | Fresh verification, shared utilities and CI selection |
+| `Tests/` | Versioned fixtures, kernel refutations and regression runners |
+
+Pure semantics, representation, storage lemmas and arithmetic do not import
+`Extracted`; execution summaries and method proofs do. `Model.lean`, `Proof.lean`
+and `Audit.lean` are compatibility imports.
+
+## Regression tests and CI
+
+Run the full suites after verifier, extractor, CIL semantics or automation changes,
+and before releases. Negative checks require current successful production reports
+from the verification commands above:
+
+```sh
+python verification/Tests/change_checks.py
+python verification/Tests/negative_checks.py
+python verification/Tests/robustness_checks.py
 python verification/Tests/subtract_negative_checks.py
+python verification/Tests/robustness_checks.py --method Subtract
 ```
 
-The subtraction negative command requires a current successful production report.
-Its wrong-borrow and early-write aliasing fixtures have concrete native witnesses
-and kernel-checked refutations of the full public contract for every possible
-successful fuel. Seeded stale success artifacts must not survive either failure.
-Positive fixtures use identical handwritten proofs and must change the compiled
-instructions, including helper renaming, complete inlining, helper extraction,
-and an alternative two-comparison borrow algorithm.
+Positive fixtures are independent versioned C# programs checked with identical
+handwritten proof sources and changed compiled instructions. They cover renaming,
+inlining, helper extraction, alternative carry/borrow logic, external helpers,
+reversed storage arguments and enlarged excluded hardware branches. Applicable
+summaries must prove; complete inlining has no candidates, while reversed Add
+storage deliberately exercises summary rejection and raw fallback.
 
-## Selected artifact and environment
+Negative arithmetic and aliasing fixtures have native witnesses and kernel-checked
+refutations of the full contract for every possible successful fuel. Rejection must
+reach a semantic proof obligation, not a resource limit or maintenance failure.
+Both negative suites check stale artifact/report invalidation. The Add suite also
+covers unsupported instructions, unresolved calls, layout, cycles,
+framework/configuration, static initialization and transactional summary rollback.
+Shared test utilities live in `Tests/support.py`;
+fixture components are explicitly selected by each method's `Fixtures.props`.
+A direct fixture run, such as `python verification/verify.py --fixture CarryOr`,
+replaces that method's extraction and report; rerun production verification before
+using them as a production baseline.
 
-`manifests/add.json` selects the standard `Nethermind.Int256.dll`, net10.0, Release,
-.NET SDK 10.0.401, and the static entry:
+The **Verify UInt256** workflow checks Add and Subtract separately. For ordinary
+C# edits under `src/`, it compares each method's generated program and validated metadata,
+including all reachable helpers, against the PR base or previous push. Only DLL identity,
+assembly version and metadata tokens are ignored. An unchanged comparison may
+skip Lean; build/extraction failures fail the check. Other changes, manual runs
+and PRs targeting branches other than main force fresh proofs.
 
-```
-System.Void Nethermind.Int256.UInt256::Add(
-  Nethermind.Int256.UInt256&,
-  Nethermind.Int256.UInt256&,
-  Nethermind.Int256.UInt256&)
-```
-
-`manifests/subtract.json` selects the same assembly and three-reference void
-signature with the method name `Subtract`. Its scope excludes `SubtractUnderflow`,
-the throwing subtraction operator, the instance overload and hardware-enabled
-execution. The exact small-helper summary retains the underflow condition
-`a.u0 < b` with all three higher input limbs zero; it is kernel-checked against
-the current extracted helper before use. No public underflow-reporting API is
-claimed by this wrapping milestone.
-
-Use a 64-bit little-endian CoreCLR environment with `DOTNET_EnableHWIntrinsic=0`.
-Avx2, AdvSimd and Sse42 support queries are modelled as false. Every scalar branch
-is included. The standard assembly still contains the hardware branches: the
-extractor retains their instructions and marks excluded operations unsupported;
-the interpreter fails if they are executed. Hardware-enabled execution, the
-instance overload, AddOverflow and the zkEVM build are outside this milestone.
-
-UInt256 has explicit UInt64 fields `u0/u1/u2/u3` at offsets `0/8/16/24`.
-The independently defined mathematical value is
-`u0 + 2^64*u1 + 2^128*u2 + 2^192*u3`, as a `BitVec 256`.
-
-## Calling and memory model
-
-Valid real calls provide live readable 32-byte ranges for both initial inputs
-and a live writable 32-byte output range. Those lifetimes extend through return;
-there are no concurrent writes or data races. Each base address plus 31 fits in
-the selected native address space. Input pointers may be equal. The output may
-alias either or both inputs, including partially overlapping ranges. No arithmetic
-edge case is excluded.
-
-UInt256 type initialization is assumed to have completed successfully before the
-call; its static initializer is outside this invocation's CIL scope. Helpers on other
-managed types are accepted only if their declaring types have no static constructor,
-including compiler-generated beforefieldinit constructors. Their initialization
-code is not modelled; extraction rejects such dependencies explicitly. The runtime
-must provide sufficient stack and avoid asynchronous failures. The method's own
-normal termination and absence of interpreter failure are proved under the stated
-calling assumptions.
-
-Caller memory is byte-addressed; UInt64 loads/stores use little-endian bytes.
-Private locals use a disjoint frame/index address space. `UInt256Model.Contract` in `UInt256/Methods/Add/Contract.lean`
-requires successful normal void return for some finite interpreter fuel and an output
-equal to addition of the **initial** inputs modulo 2^256. Its byte-memory equation
-also specifies that storage outside the 32-byte output range is unchanged.
-It quantifies over arbitrary initial bytes and input/output bases; overlapping
-references therefore read a consistent shared initial memory.
-
-Unsupported instructions, invalid stack types, absent memory, invalid method or
-instruction indexes, and exhausted fuel return failure (`none`). They never count
-as successful execution. The current scalar instruction set has no checked
-arithmetic, shifts or exception regions; encountering those in a reachable block
-is an extraction error. `conv.i8` sign-extends an int32, comparisons are unsigned,
-and int32/int64 additions wrap at their actual widths.
+**Main must remain a successfully verified baseline.** The comparison gate checks
+unchanged verification inputs; it does not check the baseline's verification history.
+The manual **Verify UInt256 proof tests** workflow runs both methods' positive and
+negative suites, establishing a fresh production baseline for each regression job.
 
 ## Trust boundary
 
-The Lean kernel checks proof terms. The accepted foundational baseline is
-`propext`, `Quot.sound`, and `Classical.choice`; the final theorem uses this baseline.
-Native-computation axioms, `sorryAx`, custom correctness axioms and
-unchecked computation are not accepted. The proof uses `omega`,
-`decide`, definitional reduction and ordinary rewriting.
+The Lean kernel checks proof terms; the approved foundational axioms are
+`propext`, `Classical.choice` and `Quot.sound`. The final audit rejects `sorryAx`,
+native-computation axioms and custom correctness axioms. A failed negative proof
+may print `sorryAx` diagnostically, but cannot issue a successful report.
 
-The extractor, Mono.Cecil 0.11.6, the SDK compiler/build system, and the relation
-between the assembly and extracted data remain trusted. A SHA-256 digest identifies
-an artifact; it does not prove extraction correctness. CIL-model fidelity also
-remains an assumption. The theorem concerns the model of managed CIL execution;
-it does not verify CoreCLR, JIT-generated native code or hardware.
+The compiler/build system, Mono.Cecil 0.11.6, extractor and fidelity of the formal
+CIL/runtime models remain trusted. SHA-256 identifies an artifact without proving
+extraction correctness. The external operations are modelled as false feature
+queries, `Unsafe.SkipInit<UInt256>` (no write) and `Unsafe.AsRef<UInt64>` (reference
+identity). These proofs concern managed CIL execution; they do not verify CoreCLR,
+JIT-generated native code or hardware.
 
-The only reachable external operations are the three false feature queries,
-`Unsafe.SkipInit<UInt256>` (no write), and `Unsafe.AsRef<UInt64>` (reference identity).
-Reachable managed dependencies are discovered from the exact public entry signature
-and imported as instruction data, rather than assigned
-an assumed addition contract. Defining runtime operations does not establish that
-the JIT and hardware implement them faithfully.
-
-Semantic references: [ECMA-335, partitions I–III](https://ecma-international.org/publications-and-standards/standards/ecma-335/)
-for the evaluation stack, managed pointers and instructions; [.NET Unsafe source](https://github.com/dotnet/runtime/blob/v10.0.0/src/libraries/System.Private.CoreLib/src/System/Runtime/CompilerServices/Unsafe.cs)
-for SkipInit and AsRef; [Lean proof validation](https://lean-lang.org/doc/reference/latest/ValidatingProofs/)
-for axiom and kernel boundaries.
-
-## Reproduce verification
-
-Prerequisites: Python 3, .NET SDK 10.0.401 and Lean 4.34.1 (`lean-toolchain`),
-including Lake, with `dotnet` and `lake` on PATH. The first build needs access to
-NuGet for the pinned Mono.Cecil dependency and existing repository dependencies.
-From the repository root:
-
-```sh
-python verification/verify.py
-```
-
-The command builds the selected Release assembly without incremental reuse,
-extracts that invocation's DLL into a new proof directory, checks the universal
-theorem and its axiom audit, and writes `verification/generated/report.json`
-only after every gate passes. It removes a previous success report before starting
-and rechecks source inputs and the DLL digest before reporting success. The report
-includes the source commit and working-tree status, input digests, assembly digest,
-method identities and CIL coverage, toolchain versions, digests of every Lean source module,
-calling assumptions, runtime models and trust boundary. A dirty tree is recorded
-explicitly; the input digests identify the source used in that case.
-
-Never manually edit or commit `generated/`; regenerate it from the build.
-Build outputs and Lake's cache are also ignored.
-
-The extractor emits kernel-checked equations for each instruction lookup and for
-method metadata. Execution tactics resolve the method and instruction first,
-before simplifying the selected instruction. This keeps method bodies folded and
-avoids repeatedly reducing whole instruction lists or expanding cases for an
-unknown instruction. The CIL semantics, byte-memory model and arithmetic contracts
-are unchanged by this proof strategy.
-
-Relevant PRs and pushes to main run the selected fresh production proofs through
-`python verification/verify.py --method Add` and `--method Subtract` in the
-**Verify UInt256** workflow. For ordinary
-C# edits, it first builds the base and current revisions and compares extracted
-each selected method's CIL, all reachable helpers and validated metadata. Unchanged extraction skips
-the proof, even when other methods in the same source file changed. Verification,
-build configuration or workflow changes always run it, as does a manual production
-run. PRs targeting branches other than main also run a fresh proof. A skip establishes
-unchanged verification inputs relative to main, so main must retain its successful
-production-proof gate. Build or extraction failures fail the check rather than
-count as unchanged. Any accompanying non-C# change conservatively forces a proof.
-The manually triggered **Verify UInt256 proof tests** workflow runs
-`python verification/Tests/negative_checks.py` and
-`python verification/Tests/robustness_checks.py` for Add, and the corresponding
-subtraction commands above, in separate method/suite jobs.
-The regression job first verifies production to establish its fresh baseline.
-Run the full suite after changes to the verifier, extractor, CIL semantics or proof
-automation, and before releases. Ordinary implementation optimisations require the
-fresh production proof; the full fixture matrix need not run for each optimisation.
-
-The robustness harness checks
-versioned fixture programs independent of production code, using identical handwritten
-Lean sources: a scalar baseline, bitwise-OR carry flags, private-helper renaming,
-complete helper inlining with small-operand dispatch, straight-line OR addition,
-an additional extracted managed helper, a helper on another type without a static
-constructor, reversed storage-helper arguments, and
-an excluded hardware branch enlarged beyond the former 512-instruction budget.
-It confirms changed instructions and the intended dependency structure. Production
-methods are verified separately; fixtures are not manufactured by source-string replacement.
-Run a fixture directly with `python verification/verify.py --fixture CarryOr`;
-the report identifies fixture verification explicitly.
-
-Fixture methods shared by multiple cases live in `Tests/Fixtures/Common/Add` as
-partial UInt256 declarations. `Tests/Fixtures/Add/Fixtures.props` explicitly selects
-those files for each named case; each case file contains its distinct methods or
-helper type. The baseline selects only shared methods. Complete inlining,
-straight-line addition and renamed helpers retain standalone implementations.
-The enlarged excluded hardware branch stays unrolled to preserve its instruction
-count. These are versioned fixture sources, independent of production source text.
-
-Negative arithmetic and early-write aliasing fixtures have native counterexamples
-and kernel-checked refutations of the complete public contract, for every fuel.
-Their proofs must fail with a semantic obligation, rather than a resource timeout.
-The regression script also seeds stale extraction and a prior successful report,
-then requires fresh verification to fail and remove that report. Further fixtures
-reject reachable unsupported `mul`, an unresolved helper, a wrong field offset,
-cyclic control flow, and helper types with unmodelled static initialisation. A native
-witness confirms that the explicit throwing helper constructor raises a type-initialisation
-exception. Lean transaction tests check rollback of failed proofs, admitted proofs,
-axioms and registrations, while retaining successful summaries. Missing fixtures, compilation failures and changed
-fixture structure are maintenance errors. The runner labels fixture-build and
-proof-checking failures separately; negative checks additionally require a kernel
-refutation and a semantic proof obligation, rejecting resource exhaustion.
-The extractor also validates assembly identity, target-framework and Release
-configuration attributes; fixtures reject a changed framework or configuration.
-
-All mutations are discarded. The valid `Audit` is checked again at the end.
-Run `verify.py` first to provide the valid report used by the stale-output check.
-For faster local proof iteration after extraction, use `lake -d verification build Audit`;
-this does not refresh the assembly identity or issue a verification report.
-
-Missing toolchains, changed signatures/layouts, unsupported CIL, failed proof
-compilation and unapproved axioms cause explicit nonzero failures. An axiom such
-as `sorryAx` printed for a failed declaration in a negative test is diagnostic
-output from rejected compilation; it cannot pass the final audit or emit success.
-
-When production CIL changes, regenerate first. The demonstrated changes reprove
-with the shared execution procedure; other changes may require arithmetic lemmas
-or execution support while preserving the independent contract.
-The extractor discovers an acyclic graph of reachable managed dependencies;
-private names, helper counts and decomposition do not determine extraction.
-Optional signature-based summary candidates accelerate proofs, but their behavior
-is re-proved against generated CIL. Without a candidate, execution uses raw steps. Candidates are transactional: synchronous elaboration and kernel checking must
-succeed without admitted proofs or new axioms. Otherwise all attempted declarations,
-registrations and diagnostics are rolled back, and raw execution continues. Call
-automation checks that the proved summary exists. This does not guarantee arbitrary
-algorithm independence.
-The mathematical carry is the high word of the unbounded word sum, under a proved
-incoming-carry invariant of zero or one. Both addition and OR of the two overflow
-flags implement that result under this invariant.
-
-The public contract resolves the generated entry symbolically and quantifies over
-some successful finite fuel. Execution proofs establish sufficiency of a candidate
-bound derived from reachable supported instructions; excluded hardware code does
-not enlarge it. This is a termination proof, not an assumed budget. Other correct
-algorithms can still require new arithmetic lemmas or execution automation; the
-fixtures establish the listed transformations, not arbitrary implementation freedom.
-Unsupported-feature failures require an explicit semantics extension with proofs,
-or restoring the selected configuration; suppressing them is not an update path.
-
-
-## Subtraction milestone validation (2026-10-01)
-
-On Windows, Ryzen 9 9950X, .NET SDK 10.0.401 and Lean 4.34.1, sequential fresh
-production runs with no other verification jobs running took 63.48s for Add and
-54.30s for Subtract. Earlier paired runs took 46.99s and 36.76s; these are observed
-runs, not guaranteed savings or no-op cache timings. Each fresh command includes
-Release rebuilding, extraction, isolated uncached proof checking and the final
-axiom audit. Both audits contain only `propext`, `Classical.choice` and `Quot.sound`.
-
-Subtraction forced module rebuilds with dependencies already built:
-
-| Module | Wall time |
-|---|---:|
-| Arithmetic.Borrow | 1.14s |
-| Methods.Subtract.HelperContracts | 2.76s |
-| Methods.Subtract.Small | 4.29s |
-| Methods.Subtract.Entry | 4.94s |
-
-These include Lake/process/import overhead, and are separate from fresh pipeline
-measurements. The module's compiled artifact was removed and a successful `Built`
-result required; cached no-op builds were not measured.
-
-All nine Add and five Subtract positive fixtures passed with identical handwritten
-proof hashes within each suite and changed compiled instructions. Every applicable
-subtraction fixture summary was proved, including the alternative borrow helper's
-private-local preservation. Complete inlining has one managed method and retains
-scalar dispatch. Add's reversed-storage fixture retains its expected rejected
-summary/raw-execution coverage. Both negative suites passed; subtraction witnesses
-and full-contract kernel refutations show wrong borrow at byte 72 (255 versus 254)
-and early-write aliasing at byte 16 (3 versus 6). Seeded stale success artifacts
-cannot certify either changed method. Workflow-selection tests, actionlint, and
-C# analyzer builds with code-style enforcement passed.
+Semantic references: [ECMA-335, partitions I–III](https://ecma-international.org/publications-and-standards/standards/ecma-335/),
+[.NET Unsafe source](https://github.com/dotnet/runtime/blob/v10.0.0/src/libraries/System.Private.CoreLib/src/System/Runtime/CompilerServices/Unsafe.cs),
+and [Lean proof validation](https://lean-lang.org/doc/reference/latest/ValidatingProofs/).
