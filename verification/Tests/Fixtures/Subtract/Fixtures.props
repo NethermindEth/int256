@@ -1,0 +1,30 @@
+<Project>
+  <PropertyGroup>
+    <FixtureName>$([System.IO.Path]::GetFileNameWithoutExtension('$(FixtureSource)'))</FixtureName>
+    <KnownSubtractFixture Condition="'$(FixtureName)' == 'Baseline'
+      Or '$(FixtureName)' == 'BorrowAlternative'
+      Or '$(FixtureName)' == 'ExtractedHelper'
+      Or '$(FixtureName)' == 'Renamed'
+      Or '$(FixtureName)' == 'FullyInlined'
+      Or '$(FixtureName)' == 'WrongBorrow'
+      Or '$(FixtureName)' == 'WrongAliasing'">true</KnownSubtractFixture>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(FixtureName)' == 'Baseline' Or '$(FixtureName)' == 'BorrowAlternative' Or '$(FixtureName)' == 'ExtractedHelper' Or '$(FixtureName)' == 'WrongBorrow'">
+    <Compile Include="Common/Subtract/Subtract.cs" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(FixtureName)' == 'Baseline' Or '$(FixtureName)' == 'BorrowAlternative' Or '$(FixtureName)' == 'ExtractedHelper' Or '$(FixtureName)' == 'WrongBorrow'">
+    <Compile Include="Common/Subtract/SubtractScalar.cs" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(FixtureName)' == 'Baseline' Or '$(FixtureName)' == 'BorrowAlternative' Or '$(FixtureName)' == 'ExtractedHelper' Or '$(FixtureName)' == 'WrongBorrow'">
+    <Compile Include="Common/Subtract/SubtractScalarUInt64.cs" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(FixtureName)' == 'Baseline' Or '$(FixtureName)' == 'WrongAliasing'">
+    <Compile Include="Common/Subtract/SubtractWithBorrow.cs" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(FixtureName)' == 'Baseline' Or '$(FixtureName)' == 'BorrowAlternative' Or '$(FixtureName)' == 'ExtractedHelper' Or '$(FixtureName)' == 'WrongBorrow'">
+    <Compile Include="Common/Subtract/StoreLimbs.cs" />
+  </ItemGroup>
+  <Target Name="ValidateSubtractFixtureSelection" BeforeTargets="CoreCompile" Condition="'$(KnownSubtractFixture)' != 'true'">
+    <Error Text="Unknown Subtract fixture: $(FixtureName)" />
+  </Target>
+</Project>

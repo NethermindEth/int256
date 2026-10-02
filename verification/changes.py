@@ -1,5 +1,6 @@
-"""Select a fresh production proof by comparing the extracted Add dependency graph."""
+"""Select a fresh production proof by comparing the selected extracted dependency graph."""
 
+import argparse
 import json
 import os
 from pathlib import Path
@@ -24,7 +25,7 @@ def comparison_artifact(artifact):
     return artifact
 
 
-def extract(source, work, extractor):
+def extract(source, work, extractor, method="Add"):
     artifacts = work / "artifacts"
     run(["dotnet", "build", str(source / "src/Nethermind.Int256/Nethermind.Int256.csproj"),
          "-c", "Release", "--no-incremental", f"-p:ArtifactsPath={artifacts}",
@@ -32,12 +33,14 @@ def extract(source, work, extractor):
     output = work / "generated"
     run(["dotnet", str(extractor),
          str(artifacts / "bin/Nethermind.Int256/release/Nethermind.Int256.dll"),
-         str(output)], source)
+         str(output), method], source)
     artifact = json.loads((output / "artifact.json").read_text(encoding="utf-8"))
     return comparison_artifact(artifact), (output / "Extracted.lean").read_bytes()
 
 
-def needs_proof(base):
+def needs_proof(base, method="Add"):
+    if method not in ("Add", "Subtract"):
+        raise ValueError("Unknown verification method")
     if not base or set(base) == {"0"}:
         return True, "No comparison baseline; verifying production"
     paths = run(["git", "diff", "--no-renames", "--name-only", "-z", base, "HEAD"], ROOT).strip("\0").split("\0")
@@ -46,7 +49,7 @@ def needs_proof(base):
         return True, "Verification or build inputs changed"
     if not paths:
         return False, "No source changes"
-    manifest = json.loads((VERIFY / "manifests/add.json").read_text(encoding="utf-8"))
+    manifest = json.loads((VERIFY / f"manifests/{method.lower()}.json").read_text(encoding="utf-8"))
     if run(["dotnet", "--version"], ROOT).strip() != manifest["sdk"]:
         raise RuntimeError("Unexpected .NET SDK for change detection")
     with tempfile.TemporaryDirectory(prefix="int256-changes-") as temporary:
@@ -59,21 +62,24 @@ def needs_proof(base):
         run(["git", "clone", "--shared", "--no-checkout", "--quiet", str(ROOT), str(baseline)], ROOT)
         run(["git", "checkout", "--detach", base], baseline)
         extractor = tools / "bin/Extractor/release/Extractor.dll"
-        before = extract(baseline, work / "before", extractor)
-        after = extract(ROOT, work / "after", extractor)
+        before = extract(baseline, work / "before", extractor, method)
+        after = extract(ROOT, work / "after", extractor, method)
     if before == after:
-        return False, "Extracted Add, reachable helpers and layout are unchanged"
-    return True, "Extracted Add, reachable helpers or layout changed"
+        return False, f"Extracted {method}, reachable helpers and layout are unchanged"
+    return True, f"Extracted {method}, reachable helpers or layout changed"
 
 
 def main():
     sys.stdout.reconfigure(encoding="utf-8")
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--method", choices=("Add", "Subtract"), default="Add")
+    method = parser.parse_args().method
     if os.environ.get("VERIFY_EVENT") == "workflow_dispatch":
         required, reason = True, "Manual production verification requested"
     elif os.environ.get("VERIFY_EVENT") == "pull_request" and os.environ.get("VERIFY_BASE_BRANCH") != "main":
         required, reason = True, "PR baseline is outside the verified main branch"
     else:
-        required, reason = needs_proof(os.environ.get("VERIFY_BASE", ""))
+        required, reason = needs_proof(os.environ.get("VERIFY_BASE", ""), method)
     print(reason)
     output = os.environ.get("GITHUB_OUTPUT")
     if output:

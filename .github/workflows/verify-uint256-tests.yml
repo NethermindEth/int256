@@ -8,13 +8,14 @@ permissions:
 
 jobs:
   tests:
-    name: Proof tests (${{ matrix.suite }})
+    name: Proof tests (${{ matrix.method }}, ${{ matrix.suite }})
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
         suite: [regressions, fixtures]
+        method: [Add, Subtract]
     env:
       DOTNET_EnableHWIntrinsic: '0'
       DOTNET_CLI_TELEMETRY_OPTOUT: '1'
@@ -34,10 +35,15 @@ jobs:
         if: matrix.suite == 'regressions'
         run: |
           python3 verification/Tests/change_checks.py
-          python3 verification/verify.py
+          python3 verification/verify.py --method ${{ matrix.method }}
       - name: Exercise arithmetic, freshness and extraction regressions
         if: matrix.suite == 'regressions'
-        run: python3 verification/Tests/negative_checks.py
-      - name: Verify distinct compiled Add variants with identical proofs
+        run: |
+          if [ "${{ matrix.method }}" = "Add" ]; then
+            python3 verification/Tests/negative_checks.py
+          else
+            python3 verification/Tests/subtract_negative_checks.py
+          fi
+      - name: Verify distinct compiled method variants with identical proofs
         if: matrix.suite == 'fixtures'
-        run: python3 verification/Tests/robustness_checks.py
+        run: python3 verification/Tests/robustness_checks.py --method ${{ matrix.method }}

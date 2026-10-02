@@ -15,6 +15,10 @@ def binary (op : Op) (a b : Value) : Option Value :=
   match op, a, b with
   | .add, .i64 x, .i64 y => some (.i64 (x + y))
   | .add, .i32 x, .i32 y => some (.i32 (x + y))
+  | .sub, .i64 x, .i64 y => some (.i64 (x - y))
+  | .sub, .i32 x, .i32 y => some (.i32 (x - y))
+  | .band, .i64 x, .i64 y => some (.i64 (x &&& y))
+  | .band, .i32 x, .i32 y => some (.i32 (x &&& y))
   | .bor, .i64 x, .i64 y => some (.i64 (x ||| y))
   | .bor, .i32 x, .i32 y => some (.i32 (x ||| y))
   | .ltu, .i64 x, .i64 y => some (.i32 (if x < y then 1 else 0))
@@ -39,7 +43,8 @@ def step (op : Op) (returns : Bool) (pc : Nat) (args : List Value) (frame : Nat)
   | .fieldAddr i, .object id :: rest => return .next (pc + 1) (.ref (.byte (id + 8 * i.val)) :: rest) memory
   | .const32 w, _ => return .next (pc + 1) (.i32 w :: stack) memory
   | .convI8, .i32 w :: rest => return .next (pc + 1) (.i64 (w.signExtend 64) :: rest) memory
-  | .add, b :: a :: rest | .bor, b :: a :: rest
+  | .add, b :: a :: rest | .sub, b :: a :: rest
+  | .band, b :: a :: rest | .bor, b :: a :: rest
   | .ltu, b :: a :: rest | .gtu, b :: a :: rest | .eq, b :: a :: rest =>
     return .next (pc + 1) ((← binary op a b) :: rest) memory
   | .load64, .ref a :: rest =>

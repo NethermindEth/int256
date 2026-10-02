@@ -23,3 +23,9 @@ name = "UInt256"
 
 [[lean_lib]]
 name = "Tests.SummaryTransactions"
+
+[[lean_lib]]
+name = "Tests.SubtractSemantics"
+
+[[lean_lib]]
+name = "SubtractAudit"

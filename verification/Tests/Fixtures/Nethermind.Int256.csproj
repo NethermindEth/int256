@@ -7,7 +7,14 @@
     <AssemblyName>Nethermind.Int256</AssemblyName>
     <FixtureSource Condition="'$(FixtureSource)' == ''">Add/Baseline.cs</FixtureSource>
   </PropertyGroup>
-  <Import Project="Add/Fixtures.props" />
+  <PropertyGroup>
+    <FixtureMethod Condition="'$(FixtureMethod)' == ''">Add</FixtureMethod>
+  </PropertyGroup>
+  <Import Project="Add/Fixtures.props" Condition="'$(FixtureMethod)' == 'Add'" />
+  <Import Project="Subtract/Fixtures.props" Condition="'$(FixtureMethod)' == 'Subtract'" />
+  <Target Name="ValidateFixtureMethod" BeforeTargets="CoreCompile" Condition="'$(FixtureMethod)' != 'Add' And '$(FixtureMethod)' != 'Subtract'">
+    <Error Text="Unknown fixture method: $(FixtureMethod)" />
+  </Target>
   <ItemGroup>
     <Compile Include="Support.cs" />
     <Compile Include="$(FixtureSource)" />

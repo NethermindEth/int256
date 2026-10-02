@@ -6,7 +6,7 @@ internal static class MetadataValidation
     internal const string UInt256Reference = "Nethermind.Int256.UInt256&";
     internal const string EntrySignature = "System.Void Nethermind.Int256.UInt256::Add(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)";
 
-    internal static (TypeDefinition Type, MethodDefinition[] Methods) Validate(ModuleDefinition module)
+    internal static (TypeDefinition Type, MethodDefinition[] Methods) Validate(ModuleDefinition module, string entrySignature = EntrySignature)
     {
         string? AttributeValue(string name) => module.Assembly.CustomAttributes
             .SingleOrDefault(a => a.AttributeType.FullName == name)?.ConstructorArguments.Single().Value as string;
@@ -23,7 +23,7 @@ internal static class MetadataValidation
             if (f.IsStatic || f.FieldType.FullName != "System.UInt64" || f.Offset != i * 8)
                 throw new InvalidDataException($"Unsupported field: {f.FullName}");
         }
-        MethodDefinition entry = type.Methods.SingleOrDefault(m => m.FullName == EntrySignature)
+        MethodDefinition entry = type.Methods.SingleOrDefault(m => m.FullName == entrySignature)
             ?? throw new InvalidDataException("Entry calling signature changed");
         if (!entry.IsPublic || !entry.IsStatic || !entry.Parameters[0].IsIn || !entry.Parameters[1].IsIn ||
             !entry.Parameters[2].IsOut) throw new InvalidDataException("Entry calling signature changed");
@@ -74,14 +74,24 @@ internal static class MetadataValidation
 
     // Optional acceleration roles are signature candidates, not assumptions of
     // behavior. Each summary is separately proved against its generated body.
-    internal static string? Role(MethodDefinition method)
+    internal static string SelectedEntry(string name) => name switch
+    {
+        "Add" => EntrySignature,
+        "Subtract" => EntrySignature.Replace("::Add(", "::Subtract(", StringComparison.Ordinal),
+        _ => throw new ArgumentException($"Unsupported verification method: {name}")
+    };
+
+    internal static string? Role(MethodDefinition method, string entrySignature = EntrySignature)
     {
         string parameters = string.Join(",", method.Parameters.Select(p => p.ParameterType.FullName));
+        bool subtract = entrySignature == SelectedEntry("Subtract");
+        if (!subtract && entrySignature != EntrySignature)
+            throw new ArgumentException("Unsupported verification entry signature");
         return (method.ReturnType.FullName, parameters) switch
         {
-            ("System.Boolean", UInt256Reference + "," + UInt256Reference + "," + UInt256Reference + ",System.Boolean") => "addScalar",
-            ("System.Boolean", UInt256Reference + ",System.UInt64," + UInt256Reference) => "addScalarUInt64",
-            ("System.Void", "System.UInt64,System.UInt64,System.UInt64&,System.UInt64&") => "addWithCarry",
+            ("System.Boolean", UInt256Reference + "," + UInt256Reference + "," + UInt256Reference + ",System.Boolean") when !subtract => "addScalar",
+            ("System.Boolean", UInt256Reference + ",System.UInt64," + UInt256Reference) => subtract ? "subtractScalarUInt64" : "addScalarUInt64",
+            ("System.Void", "System.UInt64,System.UInt64,System.UInt64&,System.UInt64&") => subtract ? "subtractWithBorrow" : "addWithCarry",
             ("System.Void", UInt256Reference + ",System.UInt64,System.UInt64,System.UInt64,System.UInt64") => "storeLimbs",
             _ => null
         };

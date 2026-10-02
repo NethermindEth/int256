@@ -30,22 +30,22 @@ def copy_source(destination):
     return proof
 
 
-def build_fixture(destination, name):
+def build_fixture(destination, name, method="Add"):
     project = destination / "verification/Tests/Fixtures/Nethermind.Int256.csproj"
-    source = project.parent / "Add" / f"{name}.cs"
+    source = project.parent / method / f"{name}.cs"
     if not source.is_file():
         raise RuntimeError(f"Fixture maintenance failure: missing {name}")
     run(["dotnet", "build", str(project), "-c", "Release",
-         f"-p:FixtureSource={source}", "-p:EnforceCodeStyleInBuild=true",
+         f"-p:FixtureSource={source}", f"-p:FixtureMethod={method}", "-p:EnforceCodeStyleInBuild=true",
          "-p:GenerateDocumentationFile=true"], destination)
     return project.parent / "bin/Release/net10.0/Nethermind.Int256.dll"
 
 
-def build_extract(destination, name):
-    assembly = build_fixture(destination, name)
+def build_extract(destination, name, method="Add"):
+    assembly = build_fixture(destination, name, method)
     output = destination / "verification/generated"
     result = run(["dotnet", "run", "--project", str(VERIFY / "Extractor"), "-c", "Release", "--",
-                  str(assembly), str(output)], ROOT)
+                  str(assembly), str(output), method], ROOT)
     return assembly, output, result
 
 
@@ -55,19 +55,24 @@ def require_semantic_rejection(output, module):
     # goal or the final simplifier's no-progress diagnostic in the expected
     # execution module; syntax/import failures alone cannot satisfy this gate.
     normalized = output.replace("\\", "/")
-    no_progress = re.search(r"^error: " + re.escape(module) +
-                            r":\d+:\d+: `simp` made no progress$", normalized, re.MULTILINE)
-    if module not in normalized or "error:" not in output or not ("⊢" in output or no_progress):
+    errors = [block for block in re.split(r"(?=^error: )", normalized, flags=re.MULTILINE)
+              if block.startswith("error: ")]
+    relevant = [block for block in errors if block.startswith(f"error: {module}:")]
+    no_progress = r":\d+:\d+: `simp` made no progress(?:\n|$)"
+    if not any("⊢" in block or re.search(no_progress, block) for block in relevant):
         raise RuntimeError("Mutation failed outside the expected semantic proof obligation")
-    if any(limit in output for limit in ("maximum number of heartbeats", "maximum recursion depth",
-                                         "deep recursion", "stack overflow")):
+    if any(limit in block for block in errors for limit in
+           ("maximum number of heartbeats", "maximum recursion depth", "maximum number of steps exceeded",
+            "deep recursion", "stack overflow")):
         raise RuntimeError("Mutation rejection was inconclusive due to exhausted proof resources")
 
 
-def model_refutation(proof, lake, initial, left, right, out, address, actual, expected):
+def model_refutation(proof, lake, initial, left, right, out, address, actual, expected, method="Add"):
     """Kernel-check a concrete refutation of the unchanged full contract."""
+    contract = "Contract" if method == "Add" else "SubtractContract"
+    operation = "+" if method == "Add" else "-"
     source = f'''import Extracted
-import UInt256.Methods.Add.Contract
+import UInt256.Methods.{method}.Contract
 import CIL.SymbolicExecution
 open CIL UInt256Model
 set_option maxRecDepth 8192
@@ -79,9 +84,9 @@ def observed := (invoke Extracted.program (executionBound Extracted.program Extr
     (fun result => result.1 (.byte {address}))
 theorem model_observed : observed = some (some (.i8 {actual})) := by decide
 theorem model_expected : writeBytes (byteMemory witnessBytes) {out}
-    (byteValue witnessBytes {left} + byteValue witnessBytes {right}).toNat 32 (.byte {address}) =
+    (byteValue witnessBytes {left} {operation} byteValue witnessBytes {right}).toNat 32 (.byte {address}) =
       some (.i8 {expected}) := by decide
-theorem model_not_correct : ¬ Contract Extracted.program Extracted.entryIndex witnessBytes {left} {right} {out} := by
+theorem model_not_correct : ¬ {contract} Extracted.program Extracted.entryIndex witnessBytes {left} {right} {out} := by
   rintro ⟨fuel, final, hr, hm⟩
   have ho := model_observed
   unfold observed at ho
@@ -112,7 +117,7 @@ end UInt256Proof
     audits = re.findall(r"'UInt256Proof.model_not_correct' depends on axioms: \[([^]]*)\]", output)
     if len(audits) != 1:
         raise RuntimeError("Missing kernel refutation axiom audit")
-    permitted = set(json.loads((proof / "manifests/add.json").read_text(encoding="utf-8"))["approvedAxioms"])
+    permitted = set(json.loads((proof / f"manifests/{method.lower()}.json").read_text(encoding="utf-8"))["approvedAxioms"])
     if {item.strip() for item in audits[0].split(",") if item.strip()} - permitted:
         raise RuntimeError("Unapproved axioms in model refutation")
     print(f"PASS: kernel refutes the full contract at byte {address}: actual {actual}, expected {expected}")
