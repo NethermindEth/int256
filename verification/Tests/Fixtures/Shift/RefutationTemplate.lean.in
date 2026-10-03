@@ -1,0 +1,48 @@
+import UInt256.Methods.Shift.Storage
+import UInt256.Methods.Shift.Refutation
+open CIL UInt256Model
+set_option maxRecDepth 8192
+set_option maxHeartbeats 2000000
+namespace UInt256Proof.Shift.Witness
+
+def initial : Bytes := fun address => @INITIAL@
+
+def observation := (invoke Extracted.program (executionBound Extracted.program Extracted.entryIndex)
+  Extracted.entryIndex [.object @INPUT@, .i32 (BitVec.ofNat 32 @COUNT@), .object @OUTPUT@]
+    (byteMemory initial)).map fun result => result.fst (.byte @ADDRESS@)
+
+theorem observed : observation = some (some (.i8 (BitVec.ofNat 8 @ACTUAL@))) := by
+  unfold observation
+  simp only [invoke, cil_code, Option.bind_eq_bind, Option.bind_some, initFrame_plain]
+  cil_execute_core read64, readBytes, byteMemory, initial, evalMemory,
+    eval_create256, eval_store256, unsafeAsRef, unsafeAdd, offsetValue with
+      (first | cil_shift_store_call)
+  all_goals simp [*, writeBytes, store4, write]
+  all_goals cil_execute_core read64, readBytes, byteMemory, initial, write, evalMemory,
+    eval_create256, eval_store256, unsafeAsRef, unsafeAdd, offsetValue with
+      (first | cil_shift_store_call)
+  all_goals simp [*, writeBytes, store4, write]
+
+theorem expected : writeBytes (byteMemory initial) @OUTPUT@
+    (result .@DIRECTION@ (byteValue initial @INPUT@) (BitVec.ofNat 32 @COUNT@)).toNat 32 (.byte @ADDRESS@) =
+    some (.i8 (BitVec.ofNat 8 @EXPECTED@)) := by decide
+
+theorem refuted : ¬ Contract .@DIRECTION@ Extracted.program Extracted.entryIndex initial @INPUT@ @OUTPUT@ (BitVec.ofNat 32 @COUNT@) := by
+  have actual := observed
+  unfold observation at actual
+  cases execution : invoke Extracted.program (executionBound Extracted.program Extracted.entryIndex)
+      Extracted.entryIndex [.object @INPUT@, .i32 (BitVec.ofNat 32 @COUNT@), .object @OUTPUT@] (byteMemory initial) with
+  | none =>
+    rw [execution] at actual
+    contradiction
+  | some value =>
+    obtain ⟨memory, returned⟩ := value
+    rw [execution] at actual
+    simp only [Option.map_some, Option.some.injEq] at actual
+    apply contract_refuted Extracted.program Extracted.entryIndex
+      (executionBound Extracted.program Extracted.entryIndex) .@DIRECTION@ initial @INPUT@ @OUTPUT@
+      (BitVec.ofNat 32 @COUNT@) memory returned @ADDRESS@ execution
+    rw [actual, expected]
+    decide
+end UInt256Proof.Shift.Witness
+#print axioms UInt256Proof.Shift.Witness.refuted

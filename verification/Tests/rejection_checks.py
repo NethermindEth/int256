@@ -2,7 +2,7 @@
 
 import unittest
 
-from support import require_semantic_rejection
+from support import require_diagnostic_rejection, require_semantic_rejection
 
 
 MODULE = "UInt256/Methods/Add/Entry.lean"
@@ -10,6 +10,29 @@ GOAL = f"error: {MODULE}:1:1: unsolved goals\n⊢ False\n"
 
 
 class RejectionChecks(unittest.TestCase):
+    def test_family_diagnostic_requires_public_gate_and_exact_module(self):
+        diagnostic = "omega could not prove the goal:"
+        output = f"error: {MODULE}:1:1: {diagnostic}\nProof checking failure: failed\n"
+        require_diagnostic_rejection(output, MODULE, diagnostic)
+        for changed in (output.replace(MODULE, "Other.lean"),
+                        output.replace("Proof checking failure:", "Extraction failure:"),
+                        output + "error: Other.lean:1:1: unknown identifier\n"):
+            with self.subTest(output=changed), self.assertRaises(RuntimeError):
+                require_diagnostic_rejection(changed, MODULE, diagnostic)
+
+    def test_family_diagnostic_rejects_every_resource_marker(self):
+        output = f"error: {MODULE}:1:1: unsolved goals\nProof checking failure: failed\n"
+        for marker in ("maximum number of heartbeats", "maximum recursion depth",
+                       "maximum number of steps exceeded", "deep recursion", "stack overflow",
+                       "out of memory", "allocation failed", "killed", "timed out"):
+            with self.subTest(marker=marker), self.assertRaisesRegex(RuntimeError, "exhausted"):
+                require_diagnostic_rejection(output + marker.upper(), MODULE, "unsolved goals")
+
+    def test_family_diagnostic_does_not_accept_other_tactic_failures(self):
+        output = f"error: {MODULE}:1:1: unknown identifier\nProof checking failure: failed\n"
+        with self.assertRaisesRegex(RuntimeError, "Missing expected"):
+            require_diagnostic_rejection(output, MODULE, "unsolved goals|`simp` made no progress")
+
     def test_expected_goal_and_build_wrapper(self):
         require_semantic_rejection(GOAL + "error: build failed\n", MODULE)
 
@@ -44,9 +67,10 @@ class RejectionChecks(unittest.TestCase):
 
     def test_resource_limit(self):
         for marker in ("maximum number of heartbeats", "maximum recursion depth",
-                       "maximum number of steps exceeded", "deep recursion", "stack overflow"):
+                       "maximum number of steps exceeded", "deep recursion", "stack overflow",
+                       "out of memory", "allocation failed", "killed", "timed out"):
             with self.subTest(marker=marker), self.assertRaisesRegex(RuntimeError, "exhausted"):
-                require_semantic_rejection(GOAL + f"error: {MODULE}:2:1: {marker}\n", MODULE)
+                require_semantic_rejection(GOAL + f"fatal error: {marker.upper()}\n", MODULE)
 
     def test_optional_summary_resource_limit(self):
         with self.assertRaisesRegex(RuntimeError, "exhausted"):

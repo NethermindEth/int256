@@ -1,0 +1,43 @@
+import UInt256.Methods.Shift.Storage
+import UInt256.Methods.Shift.Refutation
+open CIL UInt256Model
+set_option maxRecDepth 8192
+set_option maxHeartbeats 2000000
+namespace UInt256Proof.Shift.Witness
+
+def initial : Bytes := fun address => @INITIAL@
+def observation := (invoke Extracted.program (executionBound Extracted.program Extracted.entryIndex)
+  Extracted.entryIndex [.object @INPUT@, .i32 (BitVec.ofNat 32 @COUNT@)] (byteMemory initial)).map Prod.snd
+
+theorem observed : observation = some [.v256 (BitVec.ofNat 256 @ACTUAL@)] := by
+  unfold observation
+  simp only [invoke, cil_code, Option.bind_eq_bind, Option.bind_some, initFrame]
+  cil_execute_core read64, readBytes, byteMemory, initial, evalMemory,
+    eval_create256, eval_store256, eval_init_home, aggregate_snapshot_after_write,
+    writeAggregate_caller, unsafeAsRef, unsafeAdd, offsetValue with
+      (first | cil_shift_store_home_call)
+  all_goals simp [*, pack, CIL.Vector.pack256]
+
+theorem expected : result .@DIRECTION@ (byteValue initial @INPUT@) (BitVec.ofNat 32 @COUNT@) =
+    BitVec.ofNat 256 @EXPECTED@ := by decide
+
+theorem refuted : ¬ OperatorContract .@DIRECTION@ Extracted.program Extracted.entryIndex initial @INPUT@ (BitVec.ofNat 32 @COUNT@) := by
+  have actual := observed
+  unfold observation at actual
+  cases execution : invoke Extracted.program (executionBound Extracted.program Extracted.entryIndex)
+      Extracted.entryIndex [.object @INPUT@, .i32 (BitVec.ofNat 32 @COUNT@)] (byteMemory initial) with
+  | none =>
+    rw [execution] at actual
+    contradiction
+  | some value =>
+    obtain ⟨memory, returned⟩ := value
+    rw [execution] at actual
+    simp only [Option.map_some, Option.some.injEq] at actual
+    subst returned
+    apply operator_contract_refuted Extracted.program Extracted.entryIndex
+      (executionBound Extracted.program Extracted.entryIndex) .@DIRECTION@ initial @INPUT@
+      (BitVec.ofNat 32 @COUNT@) memory (BitVec.ofNat 256 @ACTUAL@) execution
+    rw [expected]
+    decide
+end UInt256Proof.Shift.Witness
+#print axioms UInt256Proof.Shift.Witness.refuted

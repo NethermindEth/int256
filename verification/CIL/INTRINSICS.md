@@ -56,6 +56,58 @@ value. Branching uses zero/nonzero; no canonical-zero-or-one assumption is
 introduced by the bitcast. The reachable one-bit BMI extraction supplies that
 stronger property separately.
 
+## Expanded operations and struct values
+
+The expanded API set additionally uses the following exact operations. `Single`
+arguments below carry bits; no floating-point arithmetic is modelled.
+
+| Managed overload | Model | Behavior |
+| --- | --- | --- |
+| `Vector128/256<T>.op_Equality` for `uint`, `int`, `ulong` | `vector.equalsAll` | Canonical Boolean for equality of every storage bit. |
+| `Vector128/256<T>.op_OnesComplement` | `vector.bnot` | Invert every storage bit. |
+| `Vector128/256.CreateScalar(uint/ulong)` | `vector.createScalar32/64` | First lane receives the scalar; all upper lanes are zero. |
+| `Vector128/256.Create(ulong)` | `vector.create64` | Broadcast into each UInt64 lane. |
+| `Vector128/256.ExtractMostSignificantBits<ulong>` | `vector.extractMSB64` | Pack the lane sign bits into low UInt32 bits, lane zero first. |
+| `Vector128/256.Sum<ulong>` | `vector.sum64` | Sum lanes modulo 2^64. |
+| `Avx.MoveMask(Vector256<float>)` | `avx.moveMask32` | Pack eight 32-bit lane sign bits. |
+| `Avx.Blend(Vector256<float>, ..., byte)` | `avx.blend32` | Immediate bit `i` selects lane `i` from the second operand. |
+| `Avx2.Blend(Vector256<int>, ..., byte)` | `avx2.blend32` | Same eight-lane bit selection as the UInt32 overload. |
+| `Avx2.Add/CompareEqual(Vector256<ulong>, ...)` | `avx2.add64/eq64` | Four wrapping sums or all-one equality masks; AVX2 availability remains required. |
+| `Avx2.CompareGreaterThan(Vector256<long>, ...)` | `avx2.signedgt64` | Signed lane comparison; true lanes become all-one masks. |
+| `Avx2.Multiply(Vector256<uint>, ...)` | `avx2.multiplyEven32` | Widen products of lanes 0, 2, 4 and 6 into four UInt64 lanes. |
+| `Avx2.ShiftRightLogical/ShiftLeftLogical(Vector256<ulong>, byte)` | `avx2.shr64/shl64` | Shift each lane by the unsigned count; counts ≥64 produce zero. |
+| `Avx512F.VL.CompareLessThan/GreaterThan/GreaterThanOrEqual(Vector256<ulong>, ...)` | `avx512.ltu64/gtu64/geu64` | Unsigned comparisons; true lanes become all-one masks. |
+| `Avx512DQ.MoveMask(Vector256<ulong>)` | `avx512DQ.moveMask64` | Pack four UInt64 sign bits. |
+| `Avx512DQ.VL.MultiplyLow(Vector256<ulong>, ...)` | `avx512DQ.mul64` | Four lane products modulo 2^64. |
+| `Bmi2.X64.MultiplyNoFlags(ulong, ulong)` | `bmi2.multiplyHigh64` | High 64 bits of the unsigned 128-bit product. The managed return differs from the native `_mulx_u64` return convention. |
+| `ArmBase.Arm64.MultiplyHigh(ulong, ulong)` | `armBase64.multiplyHigh64` | Unsigned UMULH high product word. |
+
+Primary managed declarations and implementations are pinned to .NET 10:
+[portable vectors](https://github.com/dotnet/runtime/blob/v10.0.0/src/libraries/System.Private.CoreLib/src/System/Runtime/Intrinsics/Vector256.cs),
+[AVX](https://github.com/dotnet/runtime/blob/v10.0.0/src/libraries/System.Private.CoreLib/src/System/Runtime/Intrinsics/X86/Avx.cs),
+[AVX2](https://github.com/dotnet/runtime/blob/v10.0.0/src/libraries/System.Private.CoreLib/src/System/Runtime/Intrinsics/X86/Avx2.cs),
+[AVX-512 F](https://github.com/dotnet/runtime/blob/v10.0.0/src/libraries/System.Private.CoreLib/src/System/Runtime/Intrinsics/X86/Avx512F.cs),
+[AVX-512 DQ](https://github.com/dotnet/runtime/blob/v10.0.0/src/libraries/System.Private.CoreLib/src/System/Runtime/Intrinsics/X86/Avx512DQ.cs),
+[BMI2](https://github.com/dotnet/runtime/blob/v10.0.0/src/libraries/System.Private.CoreLib/src/System/Runtime/Intrinsics/X86/Bmi2.cs),
+[full-product usage](https://github.com/dotnet/runtime/blob/v10.0.0/src/libraries/System.Private.CoreLib/src/System/Math.cs),
+and [ARM base](https://github.com/dotnet/runtime/blob/v10.0.0/src/libraries/System.Private.CoreLib/src/System/Runtime/Intrinsics/Arm/ArmBase.cs).
+
+`UInt256` values loaded by `ldobj` are 32-byte snapshots; `stobj` stores that
+snapshot. Instance receivers are by-reference argument zero. By-value struct
+arguments and locals have separate private byte homes, so `ldarga`, `ldloca` and
+partial `stfld` updates retain their CIL meanings. `InitLocals=false` creates no
+initialized scalar or aggregate value: reads and calls reject unknown values.
+`initobj` explicitly clears the whole value. Struct `newobj` zeroes its temporary
+before executing the actual extracted constructor and reading the result. This
+allocation rule applies even when the calling method has `InitLocals=false`.
+These rules follow
+[ECMA-335](https://ecma-international.org/wp-content/uploads/ECMA-335_6th_edition_june_2012.pdf),
+I.12.1.6.2, II.13.2 and III.4.13/4.21/4.28/4.29. The CIL result does not establish
+that a JIT preserves those semantics for arbitrary overlapping native addresses.
+The [.NET 10 JIT importer](https://github.com/dotnet/runtime/blob/v10.0.0/src/coreclr/jit/importer.cpp#L8208-L8263)
+explicitly initializes value-type constructor temporaries, or records that the
+initialization will occur in the method prologue.
+
 ## Checks and reusable facts
 
 `VectorLemmas.lean` proves lane packing round trips, bit-preserving casts,
@@ -65,3 +117,7 @@ arithmetic sign masks, and the actual 0xD4/0x8E ternary truth tables.
 full masks, shifts, selectors, ternary operand order and rejected operands.
 All use ordinary kernel-checkable proofs; tests supplement the specification
 mapping and do not establish that mapping by sampling.
+`Tests/ExpansionIntrinsics.lean` checks the expanded overloads, including high
+versus low products, skipped odd lanes, wrapping sums and signed comparisons.
+`Tests/AggregateSemantics.lean` checks copied arguments, reused private homes,
+actual constructor stores and explicit rejection of unknown values.

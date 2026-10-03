@@ -13,6 +13,12 @@ internal static class InstructionTranslation
     {
         int Target() => m.Body.Instructions.IndexOf((Instruction)i.Operand);
         int Local() => ((VariableDefinition)i.Operand).Index;
+        string LocalOp(string op, int index) => m.Body.Variables[index].VariableType.FullName == "Nethermind.Int256.UInt256"
+            ? $".{(op == "local" ? "aggregateLocal" : op == "localAddr" ? "aggregateLocalAddr" : "setAggregateLocal")} {index}"
+            : $".{op} {index}";
+        string Arg(int index) => index >= (m.HasThis ? 1 : 0) &&
+            m.Parameters[index - (m.HasThis ? 1 : 0)].ParameterType.FullName == "Nethermind.Int256.UInt256"
+                ? $".aggregateArg {index}" : $".arg {index}";
         string Field(string op)
         {
             var f = (FieldReference)i.Operand;
@@ -24,7 +30,7 @@ internal static class InstructionTranslation
                 throw new InvalidDataException($"Unsupported field {f.FullName}");
             return $".{op} ⟨{resolved.Name[1] - '0'}, by decide⟩";
         }
-        if (i.OpCode.Code is Code.Ldobj or Code.Stobj && i.Operand is TypeReference operandType)
+        if (i.OpCode.Code is Code.Ldobj or Code.Stobj or Code.Initobj && i.Operand is TypeReference operandType)
             RuntimeModels.ValidateTypeIdentity(operandType, m.Module);
         if (i.OpCode.Code is Code.Call or Code.Newobj)
         {
@@ -32,41 +38,61 @@ internal static class InstructionTranslation
             if (RuntimeModel(r, profile) is string modeled) return modeled;
             MethodDefinition resolved = r.Resolve() ?? throw new InvalidDataException($"Unresolved method: {r.FullName}");
             int index = Array.IndexOf(methods, resolved);
-            if (index > methodIndex) return $".call {index} {resolved.Parameters.Count}";
+            if (index > methodIndex)
+            {
+                if (i.OpCode.Code == Code.Newobj)
+                {
+                    if (!resolved.IsConstructor || resolved.IsStatic || resolved.DeclaringType.FullName != "Nethermind.Int256.UInt256")
+                        throw new InvalidDataException($"Unsupported constructor: {r.FullName}");
+                    return $".newValue {index} {resolved.Parameters.Count}";
+                }
+                return $".call {index} {resolved.Parameters.Count + (resolved.HasThis ? 1 : 0)}";
+            }
             throw new InvalidDataException($"Unsupported or unresolved call: {r.FullName} [{r.DeclaringType.Scope.Name}]");
         }
         return i.OpCode.Code switch
         {
             Code.Ldsflda => $".memory (.staticAddress {StaticData.LeanBytes(StaticData.Validate((FieldReference)i.Operand, m.Module))})",
             Code.Ldobj when ((TypeReference)i.Operand).FullName == "Nethermind.Int256.UInt256" => ".memory .load256",
+            Code.Initobj when ((TypeReference)i.Operand).FullName == "Nethermind.Int256.UInt256" => ".memory .init256",
+            Code.Stobj when ((TypeReference)i.Operand).FullName == "Nethermind.Int256.UInt256" => ".memory .store256",
             Code.Ldobj when ((TypeReference)i.Operand).FullName == "System.Runtime.Intrinsics.Vector128`1<System.UInt64>" => ".memory .load128",
             Code.Ldobj when ((TypeReference)i.Operand).FullName == "System.Runtime.Intrinsics.Vector256`1<System.UInt64>" => ".memory .load256",
             Code.Stobj when ((TypeReference)i.Operand).FullName == "System.Runtime.Intrinsics.Vector128`1<System.UInt64>" => ".memory .store128",
             Code.Stobj when ((TypeReference)i.Operand).FullName == "System.Runtime.Intrinsics.Vector256`1<System.UInt64>" => ".memory .store256",
-            Code.Ldarg_0 => ".arg 0", Code.Ldarg_1 => ".arg 1", Code.Ldarg_2 => ".arg 2", Code.Ldarg_3 => ".arg 3",
-            Code.Ldarg or Code.Ldarg_S => $".arg {((ParameterDefinition)i.Operand).Index}",
-            Code.Ldloc_0 => ".local 0", Code.Ldloc_1 => ".local 1", Code.Ldloc_2 => ".local 2", Code.Ldloc_3 => ".local 3",
-            Code.Ldloc or Code.Ldloc_S => $".local {Local()}",
-            Code.Ldloca or Code.Ldloca_S => $".localAddr {Local()}",
-            Code.Stloc_0 => ".setLocal 0", Code.Stloc_1 => ".setLocal 1", Code.Stloc_2 => ".setLocal 2", Code.Stloc_3 => ".setLocal 3",
-            Code.Stloc or Code.Stloc_S => $".setLocal {Local()}",
-            Code.Ldfld => Field("field"), Code.Ldflda => Field("fieldAddr"),
+            Code.Ldarg_0 => Arg(0), Code.Ldarg_1 => Arg(1), Code.Ldarg_2 => Arg(2), Code.Ldarg_3 => Arg(3),
+            Code.Ldarg or Code.Ldarg_S => Arg(((ParameterDefinition)i.Operand).Index + (m.HasThis ? 1 : 0)),
+            Code.Ldarga or Code.Ldarga_S when ((ParameterDefinition)i.Operand).ParameterType.FullName == "Nethermind.Int256.UInt256" =>
+                $".aggregateArgAddr {((ParameterDefinition)i.Operand).Index + (m.HasThis ? 1 : 0)}",
+            Code.Ldloc_0 => LocalOp("local", 0), Code.Ldloc_1 => LocalOp("local", 1), Code.Ldloc_2 => LocalOp("local", 2), Code.Ldloc_3 => LocalOp("local", 3),
+            Code.Ldloc or Code.Ldloc_S => LocalOp("local", Local()),
+            Code.Ldloca or Code.Ldloca_S => LocalOp("localAddr", Local()),
+            Code.Stloc_0 => LocalOp("setLocal", 0), Code.Stloc_1 => LocalOp("setLocal", 1), Code.Stloc_2 => LocalOp("setLocal", 2), Code.Stloc_3 => LocalOp("setLocal", 3),
+            Code.Stloc or Code.Stloc_S => LocalOp("setLocal", Local()),
+            Code.Ldfld => Field("field"), Code.Ldflda => Field("fieldAddr"), Code.Stfld => Field("setField"),
             Code.Ldc_I4_M1 => ".const32 (BitVec.ofInt 32 (-1))",
             Code.Ldc_I4_0 => ".const32 0", Code.Ldc_I4_1 => ".const32 1",
             Code.Ldc_I4_2 => ".const32 2", Code.Ldc_I4_3 => ".const32 3", Code.Ldc_I4_4 => ".const32 4",
             Code.Ldc_I4_5 => ".const32 5", Code.Ldc_I4_6 => ".const32 6", Code.Ldc_I4_7 => ".const32 7", Code.Ldc_I4_8 => ".const32 8",
             Code.Ldc_I4 or Code.Ldc_I4_S => $".const32 (BitVec.ofInt 32 ({i.Operand}))",
+            Code.Ldc_I8 => $".const64 (BitVec.ofInt 64 ({i.Operand}))",
             Code.Conv_I8 => ".convI8", Code.Conv_U => ".convU", Code.Conv_U1 => ".convU1", Code.Add => ".add",
+            Code.Conv_U4 => ".convU4", Code.Conv_U8 => ".convU8", Code.Not => ".bnot",
             Code.Sub => ".sub",
-            Code.And => ".band", Code.Or => ".bor", Code.Xor => ".bxor", Code.Mul when profile is not null && profile.Name != "scalar" => ".mul",
+            Code.And => ".band", Code.Or => ".bor", Code.Xor => ".bxor", Code.Mul => ".mul",
             Code.Shl => ".shl", Code.Shr => ".shr", Code.Shr_Un => ".shrUn", Code.Conv_I4 => ".convI4",
-            Code.Clt_Un => ".ltu", Code.Cgt_Un => ".gtu", Code.Ceq => ".eq",
+            Code.Clt => ".lt", Code.Clt_Un => ".ltu", Code.Cgt_Un => ".gtu", Code.Ceq => ".eq",
             Code.Ldind_I8 => ".load64", Code.Stind_I8 => ".store64", Code.Dup => ".dup", Code.Pop => ".pop",
             Code.Br or Code.Br_S => $".branch {Target()}",
             Code.Brfalse or Code.Brfalse_S => $".brzero {Target()}",
             Code.Brtrue or Code.Brtrue_S => $".brnonzero {Target()}",
             Code.Blt_Un or Code.Blt_Un_S => $".bltu {Target()}",
             Code.Bge_Un or Code.Bge_Un_S => $".bgeu {Target()}",
+            Code.Bgt_Un or Code.Bgt_Un_S => $".bgtu {Target()}",
+            Code.Bge or Code.Bge_S => $".bge {Target()}",
+            Code.Blt or Code.Blt_S => $".blt {Target()}",
+            Code.Beq or Code.Beq_S => $".beq {Target()}",
+            Code.Bne_Un or Code.Bne_Un_S => $".bne {Target()}",
             Code.Ret => ".ret",
             _ => throw new InvalidDataException($"Unsupported instruction: {i}")
         };

@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "negativeCases": {
+    "ComparisonLowFirst": {
+      "leftBase": 16,
+      "rightBase": 64,
+      "initialBytes": {
+        "24": 1,
+        "64": 1
+      },
+      "expectedResult": 0,
+      "actualResult": 1,
+      "profiles": "all"
+    },
+    "ComparisonSigned": {
+      "leftBase": 16,
+      "rightBase": 64,
+      "initialBytes": {
+        "47": 128
+      },
+      "expectedResult": 0,
+      "actualResult": 1,
+      "profiles": "all"
+    },
+    "ComparisonWrongLane": {
+      "leftBase": 16,
+      "rightBase": 64,
+      "initialBytes": {
+        "24": 1,
+        "64": 1
+      },
+      "expectedResult": 0,
+      "actualResult": 1,
+      "profiles": "vector256Accelerated"
+    }
+  }
+}

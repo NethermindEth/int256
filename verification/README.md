@@ -34,8 +34,16 @@ behaviour classes:
 
 Other irrelevant feature values do not require additional algorithm proofs:
 kernel-checked execution equivalence transports each full contract to every valid
-profile in its class. Instance overloads, `AddOverflow`, `SubtractUnderflow`,
-the throwing subtraction operator and the zkEVM build are outside this scope.
+profile in its class. These two contracts exclude instance overloads, reporting
+APIs, the throwing subtraction operator and the zkEVM build.
+
+Additional operation verification is being implemented for the exact signatures
+in [the API coverage manifest](manifests/api-coverage.json): comparisons, equality,
+bitwise operations, arithmetic flags, shifts and wrapping multiplication. That
+inventory is not a verification certificate. Selected APIs with implemented
+gates use the same runner; missing proofs fail explicitly. Their reports distinguish
+conditional agreement on actual feature queries from a checked contract for every
+valid profile. The expanded suite is not yet complete.
 
 The represented x86 capabilities obey .NET's inherited support chain:
 `AVX512F -> AVX2 -> AVX -> SSE4.2 -> SSSE3 -> SSE2`. `AVX512F.VL` additionally
@@ -77,6 +85,7 @@ dependencies. Run from the repository root:
 python verification/verify.py --method Add
 python verification/verify.py --method Subtract
 python verification/verify.py --method Subtract --profile x64-avx2-bmi1
+python verification/verify.py --method LtUInt256UInt64
 python verification/verify_all.py
 ```
 
@@ -86,7 +95,7 @@ compiled caches, and checks the selected theorem and axiom audit. It invalidates
 the previous success report before starting and rechecks source inputs and the
 DLL digest before issuing a new one.
 
-`verify_all.py` builds one fresh production DLL and checks both methods in all
+`verify_all.py` currently covers Add/Subtract only. It builds one fresh production DLL and checks both methods in all
 seven classes, using isolated proof directories. It then audits the total
 classification and composition rules and checks every full family certificate
 before issuing `generated/coverage.json`. The proof host does not need ARM or

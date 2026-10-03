@@ -1,0 +1,3250 @@
+{
+  "schemaVersion": 1,
+  "build": {
+    "variant": "standard",
+    "configuration": "Release",
+    "targetFramework": "net10.0",
+    "sdk": "10.0.401"
+  },
+  "status": "implementation-in-progress; this inventory is not a verification certificate",
+  "entries": [
+    {
+      "signature": "System.Int32 Nethermind.Int256.UInt256::CompareTo(System.Object)",
+      "family": "Comparison",
+      "selection": "deferred",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "reason": "Object type testing/boxing and exceptional outcomes are outside this selected value-arithmetic milestone.",
+      "callingConvention": {
+        "static": false,
+        "returns": "System.Int32",
+        "parameters": [
+          {
+            "name": "obj",
+            "type": "System.Object",
+            "isIn": false,
+            "isOut": false
+          }
+        ]
+      }
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::Equals(System.Int32)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": false,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "other",
+            "type": "System.Int32",
+            "isIn": false,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "EqualsInt32"
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::Equals(System.Int64)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": false,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "other",
+            "type": "System.Int64",
+            "isIn": false,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "EqualsInt64"
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::Equals(Nethermind.Int256.UInt256)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": false,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "other",
+            "type": "Nethermind.Int256.UInt256",
+            "isIn": false,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "EqualsUInt256Value"
+    },
+    {
+      "signature": "System.Int32 Nethermind.Int256.UInt256::CompareTo(Nethermind.Int256.UInt256)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": false,
+        "returns": "System.Int32",
+        "parameters": [
+          {
+            "name": "b",
+            "type": "Nethermind.Int256.UInt256",
+            "isIn": false,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "CompareToUInt256Value"
+    },
+    {
+      "signature": "System.Int32 Nethermind.Int256.UInt256::CompareTo(Nethermind.Int256.UInt256&)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": false,
+        "returns": "System.Int32",
+        "parameters": [
+          {
+            "name": "b",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "CompareToUInt256Ref",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.Compare.ThreeWayAudit:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Compare.checked_three_way_contract",
+          "UInt256Proof.Compare.checked_three_way_all_profiles_contract"
+        ],
+        "contract": "UInt256Model.Compare.ThreeWayContract: result sign agrees with initial unsigned values; finite return and all caller bytes preserved",
+        "profileCoverage": "all-valid-profiles",
+        "allProfiles": true,
+        "allProfilesTheorem": "UInt256Proof.Compare.checked_three_way_all_profiles_contract",
+        "fixtureGroup": "Compare",
+        "fixtureCases": [
+          "Baseline",
+          "ThreeWayAlternative"
+        ]
+      }
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::Equals(System.Object)",
+      "family": "Comparison",
+      "selection": "deferred",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "reason": "Object type testing/boxing and exceptional outcomes are outside this selected value-arithmetic milestone.",
+      "callingConvention": {
+        "static": false,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "obj",
+            "type": "System.Object",
+            "isIn": false,
+            "isOut": false
+          }
+        ]
+      }
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_Equality(Nethermind.Int256.UInt256&,System.Int32)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "System.Int32",
+            "isIn": false,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "EqUInt256Int32"
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_Equality(System.Int32,Nethermind.Int256.UInt256&)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "System.Int32",
+            "isIn": false,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "EqInt32UInt256"
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_Equality(Nethermind.Int256.UInt256&,System.UInt32)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "System.UInt32",
+            "isIn": false,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "EqUInt256UInt32"
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_Equality(System.UInt32,Nethermind.Int256.UInt256&)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "System.UInt32",
+            "isIn": false,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "EqUInt32UInt256"
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_Equality(Nethermind.Int256.UInt256&,System.Int64)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "System.Int64",
+            "isIn": false,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "EqUInt256Int64"
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_Equality(System.Int64,Nethermind.Int256.UInt256&)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "System.Int64",
+            "isIn": false,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "EqInt64UInt256"
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_Equality(Nethermind.Int256.UInt256&,System.UInt64)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "System.UInt64",
+            "isIn": false,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "EqUInt256UInt64"
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_Equality(System.UInt64,Nethermind.Int256.UInt256&)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "System.UInt64",
+            "isIn": false,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "EqUInt64UInt256"
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_Inequality(Nethermind.Int256.UInt256&,System.Int32)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "System.Int32",
+            "isIn": false,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "NeUInt256Int32"
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_Inequality(System.Int32,Nethermind.Int256.UInt256&)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "System.Int32",
+            "isIn": false,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "NeInt32UInt256"
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_Inequality(Nethermind.Int256.UInt256&,System.UInt32)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "System.UInt32",
+            "isIn": false,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "NeUInt256UInt32"
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_Inequality(System.UInt32,Nethermind.Int256.UInt256&)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "System.UInt32",
+            "isIn": false,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "NeUInt32UInt256"
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_Inequality(Nethermind.Int256.UInt256&,System.Int64)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "System.Int64",
+            "isIn": false,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "NeUInt256Int64"
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_Inequality(System.Int64,Nethermind.Int256.UInt256&)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "System.Int64",
+            "isIn": false,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "NeInt64UInt256"
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_Inequality(Nethermind.Int256.UInt256&,System.UInt64)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "System.UInt64",
+            "isIn": false,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "NeUInt256UInt64"
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_Inequality(System.UInt64,Nethermind.Int256.UInt256&)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "System.UInt64",
+            "isIn": false,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "NeUInt64UInt256"
+    },
+    {
+      "signature": "Nethermind.Int256.UInt256 Nethermind.Int256.UInt256::op_ExclusiveOr(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+      "family": "Bitwise",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "Nethermind.Int256.UInt256",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "OperatorXor"
+    },
+    {
+      "signature": "Nethermind.Int256.UInt256 Nethermind.Int256.UInt256::op_OnesComplement(Nethermind.Int256.UInt256&)",
+      "family": "Bitwise",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "Nethermind.Int256.UInt256",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "OperatorNot"
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_Equality(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "EqUInt256UInt256",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.Equality.EqualAudit:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Equality.checked_equal_contract",
+          "UInt256Proof.Equality.checked_equal_profile_contract"
+        ],
+        "contract": "UInt256Model.Equality.Contract; initial operands, exact result, normal return and caller-byte footprint",
+        "profileCoverage": "program-agreement"
+      }
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_Inequality(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "NeUInt256UInt256",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.Equality.UnequalAudit:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Equality.checked_unequal_contract",
+          "UInt256Proof.Equality.checked_unequal_profile_contract"
+        ],
+        "contract": "UInt256Model.Equality.InequalityContract; initial operands, exact Boolean, normal return and caller-byte preservation",
+        "profileCoverage": "program-agreement"
+      }
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThan(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "LtUInt256UInt256",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.Compare.Audit:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Compare.checked_less_contract",
+          "UInt256Proof.Compare.checked_less_profile_contract"
+        ],
+        "contract": "UInt256Model.Compare.Contract, unsigned Relation.less; initial operands, normal return and caller-byte preservation",
+        "profileCoverage": "program-agreement",
+        "fixtureGroup": "Compare",
+        "fixtureCases": [
+          "Baseline",
+          "ComparisonAlternative",
+          "ComparisonLowFirst",
+          "ComparisonSigned",
+          "ComparisonWrongLane"
+        ]
+      }
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThan(Nethermind.Int256.UInt256&,System.Int32)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "System.Int32",
+            "isIn": false,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "LtUInt256Int32",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_all_profiles_contract"
+        ],
+        "contract": "UInt256Model.Compare.ScalarContract: less, s32, scalarFirst=False; initial operand, exact Boolean and caller-byte preservation",
+        "profileCoverage": "all-valid-profiles",
+        "template": {
+          "kind": "scalar-comparison",
+          "relation": "less",
+          "scalarKind": "s32",
+          "scalarFirst": false
+        },
+        "allProfiles": true,
+        "allProfilesTheorem": "UInt256Proof.Selected.checked_all_profiles_contract"
+      }
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThan(System.Int32,Nethermind.Int256.UInt256&)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "System.Int32",
+            "isIn": false,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "LtInt32UInt256",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_all_profiles_contract"
+        ],
+        "contract": "UInt256Model.Compare.ScalarContract: less, s32, scalarFirst=True; initial operand, exact Boolean and caller-byte preservation",
+        "profileCoverage": "all-valid-profiles",
+        "template": {
+          "kind": "scalar-comparison",
+          "relation": "less",
+          "scalarKind": "s32",
+          "scalarFirst": true
+        },
+        "allProfiles": true,
+        "allProfilesTheorem": "UInt256Proof.Selected.checked_all_profiles_contract"
+      }
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThan(Nethermind.Int256.UInt256&,System.UInt32)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "System.UInt32",
+            "isIn": false,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "LtUInt256UInt32",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_all_profiles_contract"
+        ],
+        "contract": "UInt256Model.Compare.ScalarContract: less, u32, scalarFirst=False; initial operand, exact Boolean and caller-byte preservation",
+        "profileCoverage": "all-valid-profiles",
+        "template": {
+          "kind": "scalar-comparison",
+          "relation": "less",
+          "scalarKind": "u32",
+          "scalarFirst": false
+        },
+        "allProfiles": true,
+        "allProfilesTheorem": "UInt256Proof.Selected.checked_all_profiles_contract"
+      }
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThan(System.UInt32,Nethermind.Int256.UInt256&)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "System.UInt32",
+            "isIn": false,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "LtUInt32UInt256",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_all_profiles_contract"
+        ],
+        "contract": "UInt256Model.Compare.ScalarContract: less, u32, scalarFirst=True; initial operand, exact Boolean and caller-byte preservation",
+        "profileCoverage": "all-valid-profiles",
+        "template": {
+          "kind": "scalar-comparison",
+          "relation": "less",
+          "scalarKind": "u32",
+          "scalarFirst": true
+        },
+        "allProfiles": true,
+        "allProfilesTheorem": "UInt256Proof.Selected.checked_all_profiles_contract"
+      }
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThan(Nethermind.Int256.UInt256&,System.Int64)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "System.Int64",
+            "isIn": false,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "LtUInt256Int64",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_all_profiles_contract"
+        ],
+        "contract": "UInt256Model.Compare.ScalarContract: less, s64, scalarFirst=False; initial operand, exact Boolean and caller-byte preservation",
+        "profileCoverage": "all-valid-profiles",
+        "template": {
+          "kind": "scalar-comparison",
+          "relation": "less",
+          "scalarKind": "s64",
+          "scalarFirst": false
+        },
+        "allProfiles": true,
+        "allProfilesTheorem": "UInt256Proof.Selected.checked_all_profiles_contract"
+      }
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThan(System.Int64,Nethermind.Int256.UInt256&)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "System.Int64",
+            "isIn": false,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "LtInt64UInt256",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_all_profiles_contract"
+        ],
+        "contract": "UInt256Model.Compare.ScalarContract: less, s64, scalarFirst=True; initial operand, exact Boolean and caller-byte preservation",
+        "profileCoverage": "all-valid-profiles",
+        "template": {
+          "kind": "scalar-comparison",
+          "relation": "less",
+          "scalarKind": "s64",
+          "scalarFirst": true
+        },
+        "allProfiles": true,
+        "allProfilesTheorem": "UInt256Proof.Selected.checked_all_profiles_contract"
+      }
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThan(Nethermind.Int256.UInt256&,System.UInt64)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "System.UInt64",
+            "isIn": false,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "LtUInt256UInt64",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_all_profiles_contract"
+        ],
+        "contract": "UInt256Model.Compare.ScalarContract: less, u64, scalarFirst=False; initial operand, exact Boolean and caller-byte preservation",
+        "profileCoverage": "all-valid-profiles",
+        "template": {
+          "kind": "scalar-comparison",
+          "relation": "less",
+          "scalarKind": "u64",
+          "scalarFirst": false
+        },
+        "allProfiles": true,
+        "allProfilesTheorem": "UInt256Proof.Selected.checked_all_profiles_contract"
+      }
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThan(System.UInt64,Nethermind.Int256.UInt256&)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "System.UInt64",
+            "isIn": false,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "LtUInt64UInt256",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_all_profiles_contract"
+        ],
+        "contract": "UInt256Model.Compare.ScalarContract: less, u64, scalarFirst=True; initial operand, exact Boolean and caller-byte preservation",
+        "profileCoverage": "all-valid-profiles",
+        "template": {
+          "kind": "scalar-comparison",
+          "relation": "less",
+          "scalarKind": "u64",
+          "scalarFirst": true
+        },
+        "allProfiles": true,
+        "allProfilesTheorem": "UInt256Proof.Selected.checked_all_profiles_contract"
+      }
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThanOrEqual(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "LeUInt256UInt256",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.Compare.LessEqualAudit:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Compare.checked_less_equal_contract",
+          "UInt256Proof.Compare.checked_less_equal_profile_contract"
+        ],
+        "contract": "UInt256Model.Compare.Contract .lessEqual; initial operands, exact Boolean, normal return and caller-byte preservation",
+        "profileCoverage": "program-agreement"
+      }
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThanOrEqual(Nethermind.Int256.UInt256&,System.Int32)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "System.Int32",
+            "isIn": false,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "LeUInt256Int32",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_all_profiles_contract"
+        ],
+        "contract": "UInt256Model.Compare.ScalarContract: lessEqual, s32, scalarFirst=False; initial operand, exact Boolean and caller-byte preservation",
+        "profileCoverage": "all-valid-profiles",
+        "template": {
+          "kind": "scalar-comparison",
+          "relation": "lessEqual",
+          "scalarKind": "s32",
+          "scalarFirst": false
+        },
+        "allProfiles": true,
+        "allProfilesTheorem": "UInt256Proof.Selected.checked_all_profiles_contract"
+      }
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThanOrEqual(System.Int32,Nethermind.Int256.UInt256&)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "System.Int32",
+            "isIn": false,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "LeInt32UInt256",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_all_profiles_contract"
+        ],
+        "contract": "UInt256Model.Compare.ScalarContract: lessEqual, s32, scalarFirst=True; initial operand, exact Boolean and caller-byte preservation",
+        "profileCoverage": "all-valid-profiles",
+        "template": {
+          "kind": "scalar-comparison",
+          "relation": "lessEqual",
+          "scalarKind": "s32",
+          "scalarFirst": true
+        },
+        "allProfiles": true,
+        "allProfilesTheorem": "UInt256Proof.Selected.checked_all_profiles_contract"
+      }
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThanOrEqual(Nethermind.Int256.UInt256&,System.UInt32)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "System.UInt32",
+            "isIn": false,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "LeUInt256UInt32",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_all_profiles_contract"
+        ],
+        "contract": "UInt256Model.Compare.ScalarContract: lessEqual, u32, scalarFirst=False; initial operand, exact Boolean and caller-byte preservation",
+        "profileCoverage": "all-valid-profiles",
+        "template": {
+          "kind": "scalar-comparison",
+          "relation": "lessEqual",
+          "scalarKind": "u32",
+          "scalarFirst": false
+        },
+        "allProfiles": true,
+        "allProfilesTheorem": "UInt256Proof.Selected.checked_all_profiles_contract"
+      }
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThanOrEqual(System.UInt32,Nethermind.Int256.UInt256&)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "System.UInt32",
+            "isIn": false,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "LeUInt32UInt256",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_all_profiles_contract"
+        ],
+        "contract": "UInt256Model.Compare.ScalarContract: lessEqual, u32, scalarFirst=True; initial operand, exact Boolean and caller-byte preservation",
+        "profileCoverage": "all-valid-profiles",
+        "template": {
+          "kind": "scalar-comparison",
+          "relation": "lessEqual",
+          "scalarKind": "u32",
+          "scalarFirst": true
+        },
+        "allProfiles": true,
+        "allProfilesTheorem": "UInt256Proof.Selected.checked_all_profiles_contract"
+      }
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThanOrEqual(Nethermind.Int256.UInt256&,System.Int64)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "System.Int64",
+            "isIn": false,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "LeUInt256Int64",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_all_profiles_contract"
+        ],
+        "contract": "UInt256Model.Compare.ScalarContract: lessEqual, s64, scalarFirst=False; initial operand, exact Boolean and caller-byte preservation",
+        "profileCoverage": "all-valid-profiles",
+        "template": {
+          "kind": "scalar-comparison",
+          "relation": "lessEqual",
+          "scalarKind": "s64",
+          "scalarFirst": false
+        },
+        "allProfiles": true,
+        "allProfilesTheorem": "UInt256Proof.Selected.checked_all_profiles_contract"
+      }
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThanOrEqual(System.Int64,Nethermind.Int256.UInt256&)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "System.Int64",
+            "isIn": false,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "LeInt64UInt256",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_all_profiles_contract"
+        ],
+        "contract": "UInt256Model.Compare.ScalarContract: lessEqual, s64, scalarFirst=True; initial operand, exact Boolean and caller-byte preservation",
+        "profileCoverage": "all-valid-profiles",
+        "template": {
+          "kind": "scalar-comparison",
+          "relation": "lessEqual",
+          "scalarKind": "s64",
+          "scalarFirst": true
+        },
+        "allProfiles": true,
+        "allProfilesTheorem": "UInt256Proof.Selected.checked_all_profiles_contract"
+      }
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThanOrEqual(Nethermind.Int256.UInt256&,System.UInt64)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "System.UInt64",
+            "isIn": false,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "LeUInt256UInt64",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_all_profiles_contract"
+        ],
+        "contract": "UInt256Model.Compare.ScalarContract: lessEqual, u64, scalarFirst=False; initial operand, exact Boolean and caller-byte preservation",
+        "profileCoverage": "all-valid-profiles",
+        "template": {
+          "kind": "scalar-comparison",
+          "relation": "lessEqual",
+          "scalarKind": "u64",
+          "scalarFirst": false
+        },
+        "allProfiles": true,
+        "allProfilesTheorem": "UInt256Proof.Selected.checked_all_profiles_contract"
+      }
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThanOrEqual(System.UInt64,Nethermind.Int256.UInt256)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "System.UInt64",
+            "isIn": false,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "Nethermind.Int256.UInt256",
+            "isIn": false,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "LeUInt64UInt256"
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThan(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "GtUInt256UInt256",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.Compare.GreaterAudit:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Compare.checked_greater_contract",
+          "UInt256Proof.Compare.checked_greater_profile_contract"
+        ],
+        "contract": "UInt256Model.Compare.Contract .greater; initial operands, exact Boolean, normal return and caller-byte preservation",
+        "profileCoverage": "program-agreement"
+      }
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThan(Nethermind.Int256.UInt256&,System.Int32)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "System.Int32",
+            "isIn": false,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "GtUInt256Int32",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_all_profiles_contract"
+        ],
+        "contract": "UInt256Model.Compare.ScalarContract: greater, s32, scalarFirst=False; initial operand, exact Boolean and caller-byte preservation",
+        "profileCoverage": "all-valid-profiles",
+        "template": {
+          "kind": "scalar-comparison",
+          "relation": "greater",
+          "scalarKind": "s32",
+          "scalarFirst": false
+        },
+        "allProfiles": true,
+        "allProfilesTheorem": "UInt256Proof.Selected.checked_all_profiles_contract"
+      }
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThan(System.Int32,Nethermind.Int256.UInt256&)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "System.Int32",
+            "isIn": false,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "GtInt32UInt256",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_all_profiles_contract"
+        ],
+        "contract": "UInt256Model.Compare.ScalarContract: greater, s32, scalarFirst=True; initial operand, exact Boolean and caller-byte preservation",
+        "profileCoverage": "all-valid-profiles",
+        "template": {
+          "kind": "scalar-comparison",
+          "relation": "greater",
+          "scalarKind": "s32",
+          "scalarFirst": true
+        },
+        "allProfiles": true,
+        "allProfilesTheorem": "UInt256Proof.Selected.checked_all_profiles_contract"
+      }
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThan(Nethermind.Int256.UInt256&,System.UInt32)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "System.UInt32",
+            "isIn": false,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "GtUInt256UInt32",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_all_profiles_contract"
+        ],
+        "contract": "UInt256Model.Compare.ScalarContract: greater, u32, scalarFirst=False; initial operand, exact Boolean and caller-byte preservation",
+        "profileCoverage": "all-valid-profiles",
+        "template": {
+          "kind": "scalar-comparison",
+          "relation": "greater",
+          "scalarKind": "u32",
+          "scalarFirst": false
+        },
+        "allProfiles": true,
+        "allProfilesTheorem": "UInt256Proof.Selected.checked_all_profiles_contract"
+      }
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThan(System.UInt32,Nethermind.Int256.UInt256&)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "System.UInt32",
+            "isIn": false,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "GtUInt32UInt256",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_all_profiles_contract"
+        ],
+        "contract": "UInt256Model.Compare.ScalarContract: greater, u32, scalarFirst=True; initial operand, exact Boolean and caller-byte preservation",
+        "profileCoverage": "all-valid-profiles",
+        "template": {
+          "kind": "scalar-comparison",
+          "relation": "greater",
+          "scalarKind": "u32",
+          "scalarFirst": true
+        },
+        "allProfiles": true,
+        "allProfilesTheorem": "UInt256Proof.Selected.checked_all_profiles_contract"
+      }
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThan(Nethermind.Int256.UInt256&,System.Int64)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "System.Int64",
+            "isIn": false,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "GtUInt256Int64",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_all_profiles_contract"
+        ],
+        "contract": "UInt256Model.Compare.ScalarContract: greater, s64, scalarFirst=False; initial operand, exact Boolean and caller-byte preservation",
+        "profileCoverage": "all-valid-profiles",
+        "template": {
+          "kind": "scalar-comparison",
+          "relation": "greater",
+          "scalarKind": "s64",
+          "scalarFirst": false
+        },
+        "allProfiles": true,
+        "allProfilesTheorem": "UInt256Proof.Selected.checked_all_profiles_contract"
+      }
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThan(System.Int64,Nethermind.Int256.UInt256&)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "System.Int64",
+            "isIn": false,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "GtInt64UInt256",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_all_profiles_contract"
+        ],
+        "contract": "UInt256Model.Compare.ScalarContract: greater, s64, scalarFirst=True; initial operand, exact Boolean and caller-byte preservation",
+        "profileCoverage": "all-valid-profiles",
+        "template": {
+          "kind": "scalar-comparison",
+          "relation": "greater",
+          "scalarKind": "s64",
+          "scalarFirst": true
+        },
+        "allProfiles": true,
+        "allProfilesTheorem": "UInt256Proof.Selected.checked_all_profiles_contract"
+      }
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThan(Nethermind.Int256.UInt256&,System.UInt64)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "System.UInt64",
+            "isIn": false,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "GtUInt256UInt64",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_all_profiles_contract"
+        ],
+        "contract": "UInt256Model.Compare.ScalarContract: greater, u64, scalarFirst=False; initial operand, exact Boolean and caller-byte preservation",
+        "profileCoverage": "all-valid-profiles",
+        "template": {
+          "kind": "scalar-comparison",
+          "relation": "greater",
+          "scalarKind": "u64",
+          "scalarFirst": false
+        },
+        "allProfiles": true,
+        "allProfilesTheorem": "UInt256Proof.Selected.checked_all_profiles_contract"
+      }
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThan(System.UInt64,Nethermind.Int256.UInt256&)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "System.UInt64",
+            "isIn": false,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "GtUInt64UInt256",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_all_profiles_contract"
+        ],
+        "contract": "UInt256Model.Compare.ScalarContract: greater, u64, scalarFirst=True; initial operand, exact Boolean and caller-byte preservation",
+        "profileCoverage": "all-valid-profiles",
+        "template": {
+          "kind": "scalar-comparison",
+          "relation": "greater",
+          "scalarKind": "u64",
+          "scalarFirst": true
+        },
+        "allProfiles": true,
+        "allProfilesTheorem": "UInt256Proof.Selected.checked_all_profiles_contract"
+      }
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThanOrEqual(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "GeUInt256UInt256",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.Compare.GreaterEqualAudit:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Compare.checked_greater_equal_contract",
+          "UInt256Proof.Compare.checked_greater_equal_profile_contract"
+        ],
+        "contract": "UInt256Model.Compare.Contract .greaterEqual; initial operands, exact Boolean, normal return and caller-byte preservation",
+        "profileCoverage": "program-agreement"
+      }
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThanOrEqual(Nethermind.Int256.UInt256&,System.Int32)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "System.Int32",
+            "isIn": false,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "GeUInt256Int32",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_all_profiles_contract"
+        ],
+        "contract": "UInt256Model.Compare.ScalarContract: greaterEqual, s32, scalarFirst=False; initial operand, exact Boolean and caller-byte preservation",
+        "profileCoverage": "all-valid-profiles",
+        "template": {
+          "kind": "scalar-comparison",
+          "relation": "greaterEqual",
+          "scalarKind": "s32",
+          "scalarFirst": false
+        },
+        "allProfiles": true,
+        "allProfilesTheorem": "UInt256Proof.Selected.checked_all_profiles_contract"
+      }
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThanOrEqual(System.Int32,Nethermind.Int256.UInt256&)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "System.Int32",
+            "isIn": false,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "GeInt32UInt256",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_all_profiles_contract"
+        ],
+        "contract": "UInt256Model.Compare.ScalarContract: greaterEqual, s32, scalarFirst=True; initial operand, exact Boolean and caller-byte preservation",
+        "profileCoverage": "all-valid-profiles",
+        "template": {
+          "kind": "scalar-comparison",
+          "relation": "greaterEqual",
+          "scalarKind": "s32",
+          "scalarFirst": true
+        },
+        "allProfiles": true,
+        "allProfilesTheorem": "UInt256Proof.Selected.checked_all_profiles_contract"
+      }
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThanOrEqual(Nethermind.Int256.UInt256&,System.UInt32)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "System.UInt32",
+            "isIn": false,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "GeUInt256UInt32",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_all_profiles_contract"
+        ],
+        "contract": "UInt256Model.Compare.ScalarContract: greaterEqual, u32, scalarFirst=False; initial operand, exact Boolean and caller-byte preservation",
+        "profileCoverage": "all-valid-profiles",
+        "template": {
+          "kind": "scalar-comparison",
+          "relation": "greaterEqual",
+          "scalarKind": "u32",
+          "scalarFirst": false
+        },
+        "allProfiles": true,
+        "allProfilesTheorem": "UInt256Proof.Selected.checked_all_profiles_contract"
+      }
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThanOrEqual(System.UInt32,Nethermind.Int256.UInt256&)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "System.UInt32",
+            "isIn": false,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "GeUInt32UInt256",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_all_profiles_contract"
+        ],
+        "contract": "UInt256Model.Compare.ScalarContract: greaterEqual, u32, scalarFirst=True; initial operand, exact Boolean and caller-byte preservation",
+        "profileCoverage": "all-valid-profiles",
+        "template": {
+          "kind": "scalar-comparison",
+          "relation": "greaterEqual",
+          "scalarKind": "u32",
+          "scalarFirst": true
+        },
+        "allProfiles": true,
+        "allProfilesTheorem": "UInt256Proof.Selected.checked_all_profiles_contract"
+      }
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThanOrEqual(Nethermind.Int256.UInt256&,System.Int64)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "System.Int64",
+            "isIn": false,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "GeUInt256Int64",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_all_profiles_contract"
+        ],
+        "contract": "UInt256Model.Compare.ScalarContract: greaterEqual, s64, scalarFirst=False; initial operand, exact Boolean and caller-byte preservation",
+        "profileCoverage": "all-valid-profiles",
+        "template": {
+          "kind": "scalar-comparison",
+          "relation": "greaterEqual",
+          "scalarKind": "s64",
+          "scalarFirst": false
+        },
+        "allProfiles": true,
+        "allProfilesTheorem": "UInt256Proof.Selected.checked_all_profiles_contract"
+      }
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThanOrEqual(System.Int64,Nethermind.Int256.UInt256&)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "System.Int64",
+            "isIn": false,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "GeInt64UInt256",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_all_profiles_contract"
+        ],
+        "contract": "UInt256Model.Compare.ScalarContract: greaterEqual, s64, scalarFirst=True; initial operand, exact Boolean and caller-byte preservation",
+        "profileCoverage": "all-valid-profiles",
+        "template": {
+          "kind": "scalar-comparison",
+          "relation": "greaterEqual",
+          "scalarKind": "s64",
+          "scalarFirst": true
+        },
+        "allProfiles": true,
+        "allProfilesTheorem": "UInt256Proof.Selected.checked_all_profiles_contract"
+      }
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThanOrEqual(Nethermind.Int256.UInt256&,System.UInt64)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "System.UInt64",
+            "isIn": false,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "GeUInt256UInt64",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_all_profiles_contract"
+        ],
+        "contract": "UInt256Model.Compare.ScalarContract: greaterEqual, u64, scalarFirst=False; initial operand, exact Boolean and caller-byte preservation",
+        "profileCoverage": "all-valid-profiles",
+        "template": {
+          "kind": "scalar-comparison",
+          "relation": "greaterEqual",
+          "scalarKind": "u64",
+          "scalarFirst": false
+        },
+        "allProfiles": true,
+        "allProfilesTheorem": "UInt256Proof.Selected.checked_all_profiles_contract"
+      }
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThanOrEqual(System.UInt64,Nethermind.Int256.UInt256&)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "System.UInt64",
+            "isIn": false,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "GeUInt64UInt256",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_all_profiles_contract"
+        ],
+        "contract": "UInt256Model.Compare.ScalarContract: greaterEqual, u64, scalarFirst=True; initial operand, exact Boolean and caller-byte preservation",
+        "profileCoverage": "all-valid-profiles",
+        "template": {
+          "kind": "scalar-comparison",
+          "relation": "greaterEqual",
+          "scalarKind": "u64",
+          "scalarFirst": true
+        },
+        "allProfiles": true,
+        "allProfilesTheorem": "UInt256Proof.Selected.checked_all_profiles_contract"
+      }
+    },
+    {
+      "signature": "Nethermind.Int256.UInt256 Nethermind.Int256.UInt256::op_BitwiseOr(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+      "family": "Bitwise",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "Nethermind.Int256.UInt256",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "OperatorOr"
+    },
+    {
+      "signature": "Nethermind.Int256.UInt256 Nethermind.Int256.UInt256::op_BitwiseAnd(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+      "family": "Bitwise",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "Nethermind.Int256.UInt256",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "OperatorAnd"
+    },
+    {
+      "signature": "System.Void Nethermind.Int256.UInt256::Not(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+      "family": "Bitwise",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Void",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "res",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": false,
+            "isOut": true
+          }
+        ]
+      },
+      "id": "Not",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.Bitwise.NotAudit:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Bitwise.checked_not_contract",
+          "UInt256Proof.Bitwise.checked_not_profile_contract"
+        ],
+        "contract": "UInt256Model.Bitwise.NotContract; initial operands, exact result, normal return and caller-byte footprint",
+        "profileCoverage": "program-agreement"
+      }
+    },
+    {
+      "signature": "System.Void Nethermind.Int256.UInt256::Or(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+      "family": "Bitwise",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Void",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "res",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": false,
+            "isOut": true
+          }
+        ]
+      },
+      "id": "Or",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract"
+        ],
+        "contract": "UInt256Model.Bitwise.Contract .or: initial operands, finite normal void return, arbitrary overlap and 32-byte output footprint",
+        "profileCoverage": "program-agreement",
+        "template": {
+          "kind": "binary-bitwise",
+          "operation": "or"
+        }
+      }
+    },
+    {
+      "signature": "System.Void Nethermind.Int256.UInt256::And(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+      "family": "Bitwise",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Void",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "res",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": false,
+            "isOut": true
+          }
+        ]
+      },
+      "id": "And",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract"
+        ],
+        "contract": "UInt256Model.Bitwise.Contract .and: initial operands, finite normal void return, arbitrary overlap and 32-byte output footprint",
+        "profileCoverage": "program-agreement",
+        "template": {
+          "kind": "binary-bitwise",
+          "operation": "and"
+        }
+      }
+    },
+    {
+      "signature": "System.Void Nethermind.Int256.UInt256::Xor(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+      "family": "Bitwise",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Void",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "res",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": false,
+            "isOut": true
+          }
+        ]
+      },
+      "id": "Xor",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.Bitwise.XorAudit:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Bitwise.checked_xor_contract",
+          "UInt256Proof.Bitwise.checked_xor_profile_contract"
+        ],
+        "contract": "UInt256Model.Bitwise.Contract .xor; initial operands, exact bitwise result, normal return, arbitrary overlap and caller-byte preservation",
+        "profileCoverage": "program-agreement",
+        "fixtureGroup": "Bitwise",
+        "fixtureCases": [
+          "Baseline",
+          "BitwiseHelper",
+          "BitwiseWrongOperator",
+          "BitwiseEarlyStore"
+        ]
+      }
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::Equals(System.UInt32)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": false,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "other",
+            "type": "System.UInt32",
+            "isIn": false,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "EqualsUInt32"
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::Equals(System.UInt64)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": false,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "other",
+            "type": "System.UInt64",
+            "isIn": false,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "EqualsUInt64"
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::Equals(Nethermind.Int256.UInt256&)",
+      "family": "Comparison",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
+      "callingConvention": {
+        "static": false,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "other",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "EqualsUInt256Ref"
+    },
+    {
+      "signature": "System.Void Nethermind.Int256.UInt256::Multiply(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+      "family": "Multiply",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending exact extracted dependencies and expanded profile enumeration",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Void",
+        "parameters": [
+          {
+            "name": "x",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "y",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "res",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": false,
+            "isOut": true
+          }
+        ]
+      },
+      "id": "Multiply"
+    },
+    {
+      "signature": "System.Void Nethermind.Int256.UInt256::Lsh(Nethermind.Int256.UInt256&,System.Int32,Nethermind.Int256.UInt256&)",
+      "family": "Shift",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending exact extracted dependencies and expanded profile enumeration",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Void",
+        "parameters": [
+          {
+            "name": "x",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "n",
+            "type": "System.Int32",
+            "isIn": false,
+            "isOut": false
+          },
+          {
+            "name": "res",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": false,
+            "isOut": true
+          }
+        ]
+      },
+      "id": "Lsh",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.Shift.LshCorrectness:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Shift.checked_contract",
+          "UInt256Proof.Shift.checked_contract_profile",
+          "UInt256Proof.Shift.checked_contract_storage_profile"
+        ],
+        "contract": "UInt256Proof.Shift.Contract .left: full Int32 count domain, initial operand, finite normal return and exact caller-byte preservation",
+        "profileCoverage": "program-agreement",
+        "familyCoverage": {
+          "kind": "vector256-storage",
+          "theorem": "UInt256Proof.Shift.checked_contract_storage_profile",
+          "representatives": [
+            "scalar",
+            "x64-vector256"
+          ]
+        },
+        "fixtureGroup": "Shift",
+        "fixtureCases": [
+          "Baseline",
+          "LshHelper",
+          "LshWrongLane",
+          "LshWrongCount",
+          "LshEarlyStore"
+        ],
+        "fixtureSources": {
+          "Baseline": "Lsh.cs"
+        }
+      }
+    },
+    {
+      "signature": "System.Void Nethermind.Int256.UInt256::Rsh(Nethermind.Int256.UInt256&,System.Int32,Nethermind.Int256.UInt256&)",
+      "family": "Shift",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending exact extracted dependencies and expanded profile enumeration",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Void",
+        "parameters": [
+          {
+            "name": "x",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "n",
+            "type": "System.Int32",
+            "isIn": false,
+            "isOut": false
+          },
+          {
+            "name": "res",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": false,
+            "isOut": true
+          }
+        ]
+      },
+      "id": "Rsh",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.Shift.RshCorrectness:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Shift.rsh_checked_contract",
+          "UInt256Proof.Shift.rsh_checked_contract_profile",
+          "UInt256Proof.Shift.rsh_checked_contract_storage_profile"
+        ],
+        "contract": "UInt256Proof.Shift.Contract .right: full Int32 count domain, initial operand, finite normal return and exact caller-byte preservation",
+        "profileCoverage": "program-agreement",
+        "familyCoverage": {
+          "kind": "vector256-storage",
+          "theorem": "UInt256Proof.Shift.rsh_checked_contract_storage_profile",
+          "representatives": [
+            "scalar",
+            "x64-vector256"
+          ]
+        },
+        "fixtureGroup": "Shift",
+        "fixtureCases": [
+          "Baseline",
+          "RshWrongDirection"
+        ],
+        "fixtureSources": {
+          "Baseline": "Rsh.cs"
+        }
+      }
+    },
+    {
+      "signature": "Nethermind.Int256.UInt256 Nethermind.Int256.UInt256::op_Multiply(Nethermind.Int256.UInt256&,System.UInt32)",
+      "family": "Multiply",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending exact extracted dependencies and expanded profile enumeration",
+      "callingConvention": {
+        "static": true,
+        "returns": "Nethermind.Int256.UInt256",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "System.UInt32",
+            "isIn": false,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "OperatorMultiplyUInt256UInt32"
+    },
+    {
+      "signature": "Nethermind.Int256.UInt256 Nethermind.Int256.UInt256::op_Multiply(System.UInt32,Nethermind.Int256.UInt256&)",
+      "family": "Multiply",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending exact extracted dependencies and expanded profile enumeration",
+      "callingConvention": {
+        "static": true,
+        "returns": "Nethermind.Int256.UInt256",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "System.UInt32",
+            "isIn": false,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "OperatorMultiplyUInt32UInt256"
+    },
+    {
+      "signature": "Nethermind.Int256.UInt256 Nethermind.Int256.UInt256::op_Multiply(Nethermind.Int256.UInt256&,System.UInt64)",
+      "family": "Multiply",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending exact extracted dependencies and expanded profile enumeration",
+      "callingConvention": {
+        "static": true,
+        "returns": "Nethermind.Int256.UInt256",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "System.UInt64",
+            "isIn": false,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "OperatorMultiplyUInt256UInt64"
+    },
+    {
+      "signature": "Nethermind.Int256.UInt256 Nethermind.Int256.UInt256::op_Multiply(System.UInt64,Nethermind.Int256.UInt256&)",
+      "family": "Multiply",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending exact extracted dependencies and expanded profile enumeration",
+      "callingConvention": {
+        "static": true,
+        "returns": "Nethermind.Int256.UInt256",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "System.UInt64",
+            "isIn": false,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "OperatorMultiplyUInt64UInt256"
+    },
+    {
+      "signature": "Nethermind.Int256.UInt256 Nethermind.Int256.UInt256::op_Multiply(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+      "family": "Multiply",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending exact extracted dependencies and expanded profile enumeration",
+      "callingConvention": {
+        "static": true,
+        "returns": "Nethermind.Int256.UInt256",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "OperatorMultiplyUInt256UInt256"
+    },
+    {
+      "signature": "System.Void Nethermind.Int256.UInt256::Multiply(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+      "family": "Multiply",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending exact extracted dependencies and expanded profile enumeration",
+      "callingConvention": {
+        "static": false,
+        "returns": "System.Void",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "res",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": false,
+            "isOut": true
+          }
+        ]
+      },
+      "id": "MultiplyInstance"
+    },
+    {
+      "signature": "System.Void Nethermind.Int256.UInt256::LeftShift(System.Int32,Nethermind.Int256.UInt256&)",
+      "family": "Shift",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending exact extracted dependencies and expanded profile enumeration",
+      "callingConvention": {
+        "static": false,
+        "returns": "System.Void",
+        "parameters": [
+          {
+            "name": "n",
+            "type": "System.Int32",
+            "isIn": false,
+            "isOut": false
+          },
+          {
+            "name": "res",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": false,
+            "isOut": true
+          }
+        ]
+      },
+      "id": "LeftShift",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.Shift.LshCorrectness:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Shift.checked_contract",
+          "UInt256Proof.Shift.checked_contract_profile",
+          "UInt256Proof.Shift.checked_contract_storage_profile"
+        ],
+        "contract": "UInt256Proof.Shift.Contract .left: full Int32 count domain, initial operand, finite normal return and exact caller-byte preservation",
+        "profileCoverage": "program-agreement",
+        "familyCoverage": {
+          "kind": "vector256-storage",
+          "theorem": "UInt256Proof.Shift.checked_contract_storage_profile",
+          "representatives": [
+            "scalar",
+            "x64-vector256"
+          ]
+        },
+        "fixtureGroup": "Shift",
+        "fixtureCases": [
+          "Baseline",
+          "LshHelper",
+          "LshWrongLane",
+          "LshWrongCount",
+          "LshEarlyStore"
+        ],
+        "fixtureSources": {
+          "Baseline": "Lsh.cs"
+        }
+      }
+    },
+    {
+      "signature": "System.Void Nethermind.Int256.UInt256::RightShift(System.Int32,Nethermind.Int256.UInt256&)",
+      "family": "Shift",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending exact extracted dependencies and expanded profile enumeration",
+      "callingConvention": {
+        "static": false,
+        "returns": "System.Void",
+        "parameters": [
+          {
+            "name": "n",
+            "type": "System.Int32",
+            "isIn": false,
+            "isOut": false
+          },
+          {
+            "name": "res",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": false,
+            "isOut": true
+          }
+        ]
+      },
+      "id": "RightShift",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.Shift.RshCorrectness:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Shift.rsh_checked_contract",
+          "UInt256Proof.Shift.rsh_checked_contract_profile",
+          "UInt256Proof.Shift.rsh_checked_contract_storage_profile"
+        ],
+        "contract": "UInt256Proof.Shift.Contract .right: full Int32 count domain, initial operand, finite normal return and exact caller-byte preservation",
+        "profileCoverage": "program-agreement",
+        "familyCoverage": {
+          "kind": "vector256-storage",
+          "theorem": "UInt256Proof.Shift.rsh_checked_contract_storage_profile",
+          "representatives": [
+            "scalar",
+            "x64-vector256"
+          ]
+        },
+        "fixtureGroup": "Shift",
+        "fixtureCases": [
+          "Baseline",
+          "RshWrongDirection"
+        ],
+        "fixtureSources": {
+          "Baseline": "Rsh.cs"
+        }
+      }
+    },
+    {
+      "signature": "Nethermind.Int256.UInt256 Nethermind.Int256.UInt256::op_LeftShift(Nethermind.Int256.UInt256&,System.Int32)",
+      "family": "Shift",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending exact extracted dependencies and expanded profile enumeration",
+      "callingConvention": {
+        "static": true,
+        "returns": "Nethermind.Int256.UInt256",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "n",
+            "type": "System.Int32",
+            "isIn": false,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "OperatorLsh",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.Shift.OperatorLshCorrectness:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Shift.operator_lsh_checked_contract",
+          "UInt256Proof.Shift.operator_lsh_checked_contract_storage_profile"
+        ],
+        "contract": "UInt256Proof.Shift.OperatorContract .left: full Int32 count domain, initial operand, finite normal return and exact caller-byte preservation",
+        "profileCoverage": "program-agreement",
+        "familyCoverage": {
+          "kind": "vector256-storage",
+          "theorem": "UInt256Proof.Shift.operator_lsh_checked_contract_storage_profile",
+          "representatives": [
+            "scalar",
+            "x64-vector256"
+          ]
+        },
+        "fixtureGroup": "Shift",
+        "fixtureCases": [
+          "Baseline",
+          "LshHelper",
+          "LshWrongLane",
+          "LshWrongCount",
+          "LshEarlyStore"
+        ],
+        "fixtureSources": {
+          "Baseline": "Lsh.cs"
+        }
+      }
+    },
+    {
+      "signature": "Nethermind.Int256.UInt256 Nethermind.Int256.UInt256::op_RightShift(Nethermind.Int256.UInt256&,System.Int32)",
+      "family": "Shift",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "pending exact extracted dependencies and expanded profile enumeration",
+      "callingConvention": {
+        "static": true,
+        "returns": "Nethermind.Int256.UInt256",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "n",
+            "type": "System.Int32",
+            "isIn": false,
+            "isOut": false
+          }
+        ]
+      },
+      "id": "OperatorRsh",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.Shift.OperatorRshCorrectness:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Shift.operator_rsh_checked_contract",
+          "UInt256Proof.Shift.operator_rsh_checked_contract_storage_profile"
+        ],
+        "contract": "UInt256Proof.Shift.OperatorContract .right: full Int32 count domain, initial operand, finite normal return and exact caller-byte preservation",
+        "profileCoverage": "program-agreement",
+        "familyCoverage": {
+          "kind": "vector256-storage",
+          "theorem": "UInt256Proof.Shift.operator_rsh_checked_contract_storage_profile",
+          "representatives": [
+            "scalar",
+            "x64-vector256"
+          ]
+        },
+        "fixtureGroup": "Shift",
+        "fixtureCases": [
+          "Baseline",
+          "RshWrongDirection"
+        ],
+        "fixtureSources": {
+          "Baseline": "Rsh.cs"
+        }
+      }
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::AddOverflow(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+      "family": "Reporting",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "all applicable baseline feature configurations; proof pending",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "res",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": false,
+            "isOut": true
+          }
+        ]
+      },
+      "id": "AddOverflow",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.Reporting.AddAudit:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Reporting.checked_add_contract",
+          "UInt256Proof.Reporting.checked_add_profile_contract"
+        ],
+        "contract": "Reporting.Contract .add; initial operands, exact mathematical overflow flag, wrapping result, normal return and arbitrary overlap",
+        "profileCoverage": "program-agreement",
+        "fixtureGroup": "Reporting",
+        "fixtureCases": [
+          "Baseline",
+          "Renamed",
+          "EquivalentMask",
+          "ExtractedHelper",
+          "ReversedStore",
+          "WrongFlag",
+          "WrongAlignment",
+          "WrongTop",
+          "EarlyReread"
+        ],
+        "fixtureSources": {
+          "Baseline": "Public.cs",
+          "Renamed": "Public.cs",
+          "EquivalentMask": "Public.cs",
+          "ExtractedHelper": "Public.cs",
+          "ReversedStore": "Public.cs",
+          "WrongFlag": "Public.cs",
+          "WrongAlignment": "Public.cs",
+          "WrongTop": "Public.cs",
+          "EarlyReread": "Public.cs"
+        }
+      }
+    },
+    {
+      "signature": "System.Boolean Nethermind.Int256.UInt256::SubtractUnderflow(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+      "family": "Reporting",
+      "selection": "selected",
+      "proofStatus": "not-yet-proved",
+      "featureCoverageStatus": "all applicable baseline feature configurations; proof pending",
+      "callingConvention": {
+        "static": true,
+        "returns": "System.Boolean",
+        "parameters": [
+          {
+            "name": "a",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "b",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": true,
+            "isOut": false
+          },
+          {
+            "name": "res",
+            "type": "Nethermind.Int256.UInt256&",
+            "isIn": false,
+            "isOut": true
+          }
+        ]
+      },
+      "id": "SubtractUnderflow",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.Reporting.SubtractAudit:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Reporting.checked_subtract_contract",
+          "UInt256Proof.Reporting.checked_subtract_profile_contract"
+        ],
+        "contract": "Reporting.Contract .subtract; initial operands, exact mathematical underflow flag, wrapping result, normal return and arbitrary overlap",
+        "profileCoverage": "program-agreement",
+        "fixtureGroup": "Reporting",
+        "fixtureCases": [
+          "Baseline",
+          "Renamed",
+          "EquivalentMask",
+          "ExtractedHelper",
+          "ReversedStore",
+          "WrongFlag",
+          "WrongAlignment",
+          "WrongTop",
+          "EarlyReread"
+        ],
+        "fixtureSources": {
+          "Baseline": "Public.cs",
+          "Renamed": "Public.cs",
+          "EquivalentMask": "Public.cs",
+          "ExtractedHelper": "Public.cs",
+          "ReversedStore": "Public.cs",
+          "WrongFlag": "Public.cs",
+          "WrongAlignment": "Public.cs",
+          "WrongTop": "Public.cs",
+          "EarlyReread": "Public.cs"
+        }
+      }
+    }
+  ],
+  "baseline": [
+    "Add",
+    "Subtract"
+  ],
+  "approvedAxioms": [
+    "propext",
+    "Classical.choice",
+    "Quot.sound"
+  ],
+  "shiftCountContract": {
+    "type": "System.Int32",
+    "domain": "all signed32 values",
+    "ordinary": "0 <= n < 256: left=(A*2^n)%2^256; right=floor(A/2^n)",
+    "nonnegativeOutOfRange": "n>=256: zero",
+    "negative": "n<0 and n%64==0: zero; otherwise shift by (n&63)",
+    "exceptions": "none"
+  },
+  "explicitlyDeferred": [
+    {
+      "entry": "get_IsZero",
+      "reason": "convenience predicate/selector outside explicit equality/relational/bitwise API selection"
+    },
+    {
+      "entry": "get_IsOne",
+      "reason": "convenience predicate/selector outside explicit equality/relational/bitwise API selection"
+    },
+    {
+      "entry": "get_IsUint64",
+      "reason": "convenience predicate/selector outside explicit equality/relational/bitwise API selection"
+    },
+    {
+      "entry": "Min(in UInt256,in UInt256)",
+      "reason": "convenience predicate/selector outside explicit equality/relational/bitwise API selection"
+    },
+    {
+      "entry": "Max(in UInt256,in UInt256)",
+      "reason": "convenience predicate/selector outside explicit equality/relational/bitwise API selection"
+    },
+    {
+      "entry": "Nethermind.Int256.UInt256 Nethermind.Int256.UInt256::op_Subtraction(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+      "reason": "Throwing wrapper is outside wrapping/reporting selection; exceptional outcomes are not claimed verified."
+    },
+    {
+      "entry": "Nethermind.Int256.UInt256 Nethermind.Int256.UInt256::op_Addition(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+      "reason": "Wrapping convenience operator is outside the selected reporting entries and existing static Add baseline."
+    },
+    {
+      "entry": "System.Void Nethermind.Int256.UInt256::Add(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+      "reason": "Instance wrapping Add convenience wrapper is outside selected reporting entries and existing static baseline."
+    },
+    {
+      "entry": "System.Void Nethermind.Int256.UInt256::Subtract(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+      "reason": "Instance wrapping Subtract convenience wrapper is outside selected reporting entries and existing static baseline."
+    },
+    {
+      "entry": "Generic IInteger<UInt256> invocation",
+      "reason": "Selected concrete implementations are covered only after their gates pass; generic interface dispatch is deferred."
+    }
+  ],
+  "notApplicable": {
+    "scalarReportingOverloads": {
+      "publicReportingOverloads": 0,
+      "uint32": "implicit conversion zero extends to256bits",
+      "uint64": "implicit conversion zero extends to256bits",
+      "privateHelpers": [
+        "AddScalarUInt64(in UInt256,ulong,out UInt256)->bool",
+        "SubtractScalarUInt64(in UInt256,ulong,out UInt256)->bool"
+      ],
+      "signedConversions": "int/long conversions are explicit and throw on negative; not unsigned reporting overloads"
+    }
+  },
+  "excludedBuilds": [
+    "zkEVM"
+  ],
+  "excludedOtherArithmetic": [
+    "MultiplyOverflow",
+    "MultiplyMod",
+    "division",
+    "signed Int256"
+  ]
+}

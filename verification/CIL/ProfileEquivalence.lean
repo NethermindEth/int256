@@ -16,6 +16,26 @@ def Op.ProfileAgreement (op : Op) (p q : FeatureProfile) : Prop :=
 def Program.ProfileAgreement (program : Program) (p q : FeatureProfile) : Prop :=
   ∀ body ∈ program, ∀ op ∈ body.code, op.ProfileAgreement p q
 
+/-- A syntactic check for operations whose execution does not observe a profile. -/
+def Op.profileIndependentCheck : Op → Bool
+  | .feature _ => false
+  | .intrinsic (.vector _) _ => true
+  | .intrinsic _ _ => false
+  | _ => true
+
+def Program.profileIndependentCheck (program : Program) : Bool :=
+  program.all fun body => body.code.all Op.profileIndependentCheck
+
+theorem Program.profile_independent_agreement (program : Program)
+    (checked : program.profileIndependentCheck = true) (p q : FeatureProfile) :
+    program.ProfileAgreement p q := by
+  intro body member op instruction
+  have bodyCheck := List.all_eq_true.mp checked body member
+  have instructionCheck := List.all_eq_true.mp bodyCheck op instruction
+  cases op <;> simp [Op.profileIndependentCheck, Op.ProfileAgreement] at *
+  case intrinsic operation _ =>
+    cases operation <;> simp [Intrinsic.available] at *
+
 theorem step_profile_eq (op : Op) (p q : FeatureProfile)
     (h : op.ProfileAgreement p q) (returns : Bool) (pc : Nat) (args : List Value)
     (frame : Nat) (stack : List Value) (memory : Memory) :
@@ -58,14 +78,33 @@ theorem run_reprofile_eq (program : Program) (p q : FeatureProfile)
             cases hc : program[callee]? with
             | none => simp [hc]
             | some child =>
-              simp only [hc, Option.map_some, Option.bind_some]
-              rw [ih callee 0 childArgs (frame + 1) [] (initLocals updated (frame + 1) child.locals)]
+              simp only [hc, Option.map_some, Option.bind_some, initFrame_profile]
+              rw [ih callee 0 childArgs (frame + 1) [] (initFrame updated (frame + 1) child childArgs)]
               cases hr : run (reprofile program q) fuel callee 0 childArgs (frame + 1) []
-                  (initLocals updated (frame + 1) child.locals) with
+                  (initFrame updated (frame + 1) child childArgs) with
               | none => rfl
               | some result =>
                 obtain ⟨final, values⟩ := result
                 simpa only [Option.bind_eq_bind, Option.bind_some] using ih method (pc + 1) args frame (values ++ rest) final
+          | construct callee childArgs rest updated =>
+            cases hc : program[callee]? with
+            | none => simp [hc]
+            | some child =>
+              simp only [hc, Option.map_some, Option.bind_some, initFrame_profile]
+              rw [ih callee 0 childArgs (frame + 1) [] (initFrame updated (frame + 1) child childArgs)]
+              cases hr : run (reprofile program q) fuel callee 0 childArgs (frame + 1) []
+                  (initFrame updated (frame + 1) child childArgs) with
+              | none => rfl
+              | some result =>
+                obtain ⟨final, values⟩ := result
+                cases values with
+                | cons value tail => rfl
+                | nil =>
+                  cases hsnapshot : readAggregate final frame 2 pc with
+                  | none => simp [hsnapshot]
+                  | some value =>
+                    simpa [hsnapshot] using
+                      ih method (pc + 1) args frame (value :: rest) final
 
 theorem invoke_reprofile_eq (program : Program) (p q : FeatureProfile)
     (h : program.ProfileAgreement p q) (fuel method : Nat) (args : List Value) (memory : Memory) :
@@ -74,8 +113,9 @@ theorem invoke_reprofile_eq (program : Program) (p q : FeatureProfile)
   cases hb : program[method]? with
   | none => simp [invoke, hb]
   | some body =>
-    simpa only [invoke, reprofile_lookup, hb, Option.map_some, Option.bind_eq_bind, Option.bind_some] using
-      run_reprofile_eq program p q h fuel method 0 args 0 [] (initLocals memory 0 body.locals)
+    simpa only [invoke, reprofile_lookup, hb, Option.map_some, Option.bind_eq_bind, Option.bind_some,
+      initFrame_profile] using
+      run_reprofile_eq program p q h fuel method 0 args 0 [] (initFrame memory 0 body args)
 
 theorem reprofile_eq_of_uniform (program : Program) (p : FeatureProfile)
     (h : ∀ body ∈ program, body.profile = p) : reprofile program p = program := by
@@ -117,12 +157,17 @@ def Intrinsic.requiredFeatures : Intrinsic → List Feature
   | .avx2 _ => [.avx2]
   | .avx512 _ => [.avx512F, .avx512FVL]
   | .bmi1 _ => [.bmi1]
+  | .bmi2 _ => [.bmi2]
+  | .armBase64 _ => [.armBase64]
+  | .avx512DQ .moveMask64 => [.avx512DQ]
+  | .avx512DQ .mul64 => [.avx512DQ, .avx512DQVL, .avx512F, .avx512FVL]
 
 theorem Intrinsic.available_of_required (operation : Intrinsic) (p : FeatureProfile)
     (h : ∀ featureId ∈ operation.requiredFeatures, p.evaluate featureId = true) :
     operation.available p = true := by
   cases operation <;> simp_all [Intrinsic.requiredFeatures, Intrinsic.available, FeatureProfile.evaluate]
   case sse operation => cases operation <;> simp_all
+  case avx512DQ operation => cases operation <;> simp_all
 
 theorem FeatureClass.representative_classify (family : FeatureClass) :
     family.representative.classify = family := by

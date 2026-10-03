@@ -45,7 +45,7 @@ def provedCall (index summary : Name) (label : String) (arity : Nat) :
   throwError "No applicable proved {label} helper call"
 
 def rewriteHelperRun (hr : Ident) : TacticM Unit := do
-  evalTactic (← `(tactic| simp [cil_code, initLocals] at $hr:ident))
+  evalTactic (← `(tactic| simp [cil_code, initLocals, initFrame] at $hr:ident))
   evalTactic (← `(tactic| rw [$hr:ident]))
   evalTactic (← `(tactic| simp only [Option.bind_some]))
 
@@ -171,15 +171,29 @@ elab "cil_preserved_store" : tactic => withMainContext do
 -- can instead be folded into a mathematical carry.
 elab "cil_branch" : tactic => withMainContext do
   for candidate in collectRuns (← getMainTarget) do
-    if candidate.hasLooseBVars then continue
     let pc := candidate.getAppArgs[3]!
     if pc.isAppOfArity ``ite 5 then
+      if pc.getAppArgs[1]!.hasLooseBVars then continue
       let condition ← PrettyPrinter.delab pc.getAppArgs[1]!
       let h := mkIdent (← mkFreshUserName `branchCondition)
       let hTerm : Term := ⟨h.raw⟩
-      evalTactic (← `(tactic| by_cases $h:ident : $condition <;> simp only [$hTerm:term, ↓reduceIte]))
+      evalTactic (← `(tactic| by_cases $h:ident : $condition <;> simp only [*, $hTerm:term, ↓reduceIte]))
       return
   throwError "No conditional instruction address"
+
+partial def unresolvedStep (expression : Expr) : Bool :=
+  if expression.isAppOfArity ``CIL.step 8 &&
+      !expression.getAppArgs[0]!.getAppFn.isConst then true
+  else match expression with
+  | .app fn arg => unresolvedStep fn || unresolvedStep arg
+  | .lam _ domain body _ | .forallE _ domain body _ => unresolvedStep domain || unresolvedStep body
+  | .letE _ type value body _ => unresolvedStep type || unresolvedStep value || unresolvedStep body
+  | .mdata _ body | .proj _ _ body => unresolvedStep body
+  | _ => false
+
+elab "cil_fetched" : tactic => withMainContext do
+  if unresolvedStep (← getMainTarget) then
+    throwError "Instruction fetch is still symbolic"
 
 macro "cil_execute_core" facts:term,+ "with" calls:tacticSeq : tactic =>
   `(tactic| ((try (simp only [cil_code])); repeat'
@@ -191,8 +205,10 @@ macro "cil_execute_core" facts:term,+ "with" calls:tacticSeq : tactic =>
        -- This avoids both speculative simplification and repeated kernel reduction.
        simp only [List.getElem_eq_getElem?_get, cil_code, Option.get_some,
          Option.pure_def, Option.bind_eq_bind, Option.bind_some]
+       cil_fetched
        simp (config := { implicitDefEqProofs := false })
-         [*, cil_code, CIL.step, CIL.binary, CIL.truth, CIL.initLocals, CIL.write64,
+         [*, cil_code, CIL.step, CIL.binary, CIL.truth, CIL.initLocals, CIL.initFrame, CIL.write64,
+          CIL.Value.initialized,
          CIL.FeatureProfile.evaluate, CIL.Intrinsic.available,
          read64_local, write_local_read_local, fin_val_three, $[$facts:term],*]
 )))

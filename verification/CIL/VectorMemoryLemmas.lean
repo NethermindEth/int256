@@ -58,6 +58,7 @@ theorem writeBytes_overwrite_same (m : Memory) (base old new count : Nat) :
         writeBytes_outside _ _ _ _ _ outside, writeBytes_outside _ _ _ _ _ outside]
   | «local» frame index => simp
   | static bytes offset => simp
+  | home frame kind index offset => simp
 
 theorem readBytes_bound (m : Memory) (base count number : Nat)
     (h : readBytes m base count = some number) : number < 256^count := by
@@ -204,11 +205,11 @@ theorem captured128_survives_store (m : Memory) (base frame index : Nat)
 
 theorem unsafeAdd_byte_nonnegative (size base offset : Nat) :
     unsafeAdd size (offset : Int) (.byte base) = some (.byte (base + size * offset)) := by
-  simp [unsafeAdd, ← Int.natCast_mul, ← Int.natCast_add]
+  exact unsafeAdd_byte_natural size base offset
 
 @[simp] theorem unsafeAdd_byte_one (size base : Nat) :
     unsafeAdd size 1 (.byte base) = some (.byte (base + size)) := by
-  simpa using unsafeAdd_byte_nonnegative size base 1
+  simpa only [Int.natCast_one, Nat.mul_one] using unsafeAdd_byte_nonnegative size base 1
 
 /-- The abstract calculation agrees with native 64-bit pointer arithmetic
     whenever the caller supplies the usual nonwrapping address bounds. -/

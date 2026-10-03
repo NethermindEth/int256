@@ -5,11 +5,125 @@ from pathlib import Path
 import re
 import shutil
 import sys
+import tempfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from common import BUILD_DIRECTORIES, ROOT, VERIFY, run, sha
-from verify import source_inputs
+from common import BUILD_DIRECTORIES, PROFILE_DIRECTORY, PROFILES, ROOT, VERIFY, expected_profile, generated_directory, run, sha, source_files
+from methods import check_calling_convention, method_manifest
+from verify import build_artifact, check_proof_snapshot, source_inputs, theorem_audits
+
+
+def isolated_run(script, arguments, prefix):
+    with tempfile.TemporaryDirectory(prefix=prefix) as temporary:
+        destination = Path(temporary) / "source"
+        run(["git", "clone", "--shared", "--no-checkout", str(ROOT), str(destination)], ROOT)
+        copy_source(destination)
+        target = destination / Path(script).resolve().relative_to(ROOT)
+        run([sys.executable, str(target), "--workspace", *arguments], destination)
+
+
+def require_diagnostic_rejection(output, module, diagnostic):
+    """Use only after an independent full-contract refutation has passed."""
+    normalized = output.replace("\\", "/")
+    reject_resource_failure(normalized)
+    expected = rf"error: {re.escape(module)}:\d+:\d+: (?:{diagnostic})"
+    errors = [line for line in normalized.splitlines() if line.startswith("error: ")]
+    if not any(re.fullmatch(expected, line) for line in errors):
+        raise RuntimeError("Missing expected execution proof rejection")
+    if any(line != "error: build failed" and not re.fullmatch(expected, line) for line in errors):
+        raise RuntimeError("Rejection included an unrelated proof failure")
+    if "Proof checking failure:" not in output:
+        raise RuntimeError("The complete public verifier did not reach its proof gate")
+
+
+def reject_resource_failure(output):
+    if any(marker in output.lower() for marker in (
+            "maximum number of heartbeats", "maximum recursion depth",
+            "maximum number of steps exceeded", "deep recursion", "stack overflow",
+            "out of memory", "allocation failed", "killed", "timed out")):
+        raise RuntimeError("Mutation rejection was inconclusive due to exhausted proof resources")
+
+
+def initial_bytes_expression(witness):
+    initial = "0"
+    for address, value in reversed(list(witness["initialBytes"].items())):
+        initial = f"if address = {int(address)} then {int(value)} else {initial}"
+    return initial
+
+
+def selected_fixture_baseline(method, profile, positive=None):
+    public = [sys.executable, str(VERIFY / "verify.py"), "--method", method, "--profile", profile]
+    report_path = generated_directory(method, profile) / "report.json"
+    run(public, ROOT)
+    production = json.loads(report_path.read_text(encoding="utf-8"))
+    if production["source"]["kind"] != "production" or production["sourceInputs"] != source_inputs():
+        raise RuntimeError("Fresh production prerequisite was not established")
+    run(public + ["--fixture", "Baseline"], ROOT)
+    baseline = json.loads(report_path.read_text(encoding="utf-8"))
+    if baseline["leanSourceSha256"] != production["leanSourceSha256"]:
+        raise RuntimeError("Fixture baseline changed handwritten proofs")
+    if positive:
+        run(public + ["--fixture", positive], ROOT)
+        alternative = json.loads(report_path.read_text(encoding="utf-8"))
+        if alternative["leanSourceSha256"] != baseline["leanSourceSha256"]:
+            raise RuntimeError("Equivalent fixture changed handwritten proofs")
+        if alternative["generatedProgramSha256"] == baseline["generatedProgramSha256"]:
+            raise RuntimeError("Equivalent fixture did not change its actual extracted program")
+    return public, report_path, baseline
+
+
+def template_refutation(proof, lake, template, substitutions, module, theorem, approved, register=False):
+    source = Path(template).read_text(encoding="utf-8")
+    for name, value in substitutions.items():
+        source = source.replace(f"@{name}@", str(value))
+    if re.search(r"@[A-Z_]+@", source):
+        raise RuntimeError("Unresolved refutation template input")
+    (proof / (module.replace(".", "/") + ".lean")).write_text(source, encoding="utf-8")
+    if register:
+        with (proof / "lakefile.toml").open("a", encoding="utf-8") as config:
+            config.write(f'\n[[lean_lib]]\nname = "{module}"\n')
+    output = run([lake, "build", f"+{module}:olean"], proof)
+    theorem_audits(output, [theorem], approved)
+
+
+def mutation_proof(work, project, case, method, profile, baseline, intended=None):
+    """Fresh fixture extraction with identical proofs and a changed target body."""
+    manifest = method_manifest(method)
+    bundle = build_artifact(project, work, method, project.parent / f"{case}.cs", True, case)
+    proof = work / "proof"
+    proof.mkdir()
+    sources = list(source_files(VERIFY, {".lean"}))
+    for source in sources:
+        target = proof / source.relative_to(VERIFY)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, target)
+    for name in ("lakefile.toml", "lean-toolchain"):
+        shutil.copy2(VERIFY / name, proof / name)
+    check_proof_snapshot(proof, [source.relative_to(VERIFY) for source in sources] +
+                         [Path("lakefile.toml"), Path("lean-toolchain")], bundle["sourceInputs"])
+    extracted = proof / "generated"
+    selector = profile if profile in PROFILES else "@" + str(PROFILE_DIRECTORY / f"{profile}.json")
+    run(["dotnet", str(bundle["extractor"]), str(bundle["assembly"]), str(extracted),
+         manifest["entry"], selector, str(VERIFY / "manifests/api-coverage.json")], ROOT)
+    artifact = json.loads((extracted / "artifact.json").read_text(encoding="utf-8"))
+    entry = artifact["methods"][artifact["entryIndex"]]
+    if (entry["signature"] != manifest["entry"] or artifact["profile"] != expected_profile(profile)
+            or artifact["sha256"] != bundle["assemblySha256"]):
+        raise RuntimeError("Mutation extraction identity changed")
+    check_calling_convention(entry, manifest["callingConvention"])
+    signature = intended or manifest["entry"]
+    selected = next(body for body in artifact["methods"] if body["signature"] == signature)
+    original = next(body for body in baseline["artifact"]["methods"] if body["signature"] == signature)
+    if selected["instructions"] == original["instructions"]:
+        raise RuntimeError("Mutation did not change the intended compiled operation")
+    if sha(extracted / "Extracted.lean") == baseline["generatedProgramSha256"]:
+        raise RuntimeError("Mutation did not change the extracted program")
+    hashes = baseline["leanSourceSha256"]
+    if {path.relative_to(proof).as_posix(): sha(path) for path in source_files(proof, {".lean"})
+            if path.relative_to(proof).as_posix() in hashes} != hashes:
+        raise RuntimeError("Mutation changed handwritten proofs")
+    return bundle, proof
 
 
 def copy_source(destination):
@@ -54,16 +168,13 @@ def require_semantic_rejection(output, module):
     # goal or the final simplifier's no-progress diagnostic in the expected
     # execution module; syntax/import failures alone cannot satisfy this gate.
     normalized = output.replace("\\", "/")
+    reject_resource_failure(normalized)
     errors = [block for block in re.split(r"(?=^error: )", normalized, flags=re.MULTILINE)
               if block.startswith("error: ")]
     relevant = [block for block in errors if block.startswith(f"error: {module}:")]
     no_progress = r":\d+:\d+: `simp` made no progress(?:\n|$)"
     if not any("⊢" in block or re.search(no_progress, block) for block in relevant):
         raise RuntimeError("Mutation failed outside the expected semantic proof obligation")
-    if any(limit in normalized for limit in
-           ("maximum number of heartbeats", "maximum recursion depth", "maximum number of steps exceeded",
-            "deep recursion", "stack overflow")):
-        raise RuntimeError("Mutation rejection was inconclusive due to exhausted proof resources")
     for block in errors:
         headline = block.splitlines()[0]
         if headline == "error: build failed":
@@ -122,12 +233,8 @@ end UInt256Proof
     with (proof / "lakefile.toml").open("a", encoding="utf-8") as configuration:
         configuration.write('\n[[lean_lib]]\nname = "Refutation"\n')
     output = run([lake, "build", "Refutation"], proof)
-    audits = re.findall(r"'UInt256Proof.model_not_correct' depends on axioms: \[([^]]*)\]", output)
-    if len(audits) != 1:
-        raise RuntimeError("Missing kernel refutation axiom audit")
     permitted = set(json.loads((proof / f"manifests/{method.lower()}.json").read_text(encoding="utf-8"))["approvedAxioms"])
-    if {item.strip() for item in audits[0].split(",") if item.strip()} - permitted:
-        raise RuntimeError("Unapproved axioms in model refutation")
+    theorem_audits(output, ["UInt256Proof.model_not_correct"], permitted)
     print(f"PASS: kernel refutes the full contract at byte {address}: actual {actual}, expected {expected}")
 
 
@@ -155,4 +262,8 @@ def native_witness(destination, assembly, source):
         f'<Reference Include="Nethermind.Int256"><HintPath>{assembly.as_posix()}</HintPath>'
         '</Reference></ItemGroup></Project>', encoding="utf-8")
     (witness / "Program.cs").write_text(source, encoding="utf-8")
-    run(["dotnet", "run", "--project", str(witness), "-c", "Release"], destination)
+    output = run(["dotnet", "build", str(witness / "Witness.csproj"), "-c", "Release",
+                  "-p:EnforceCodeStyleInBuild=true", "-p:GenerateDocumentationFile=true"], destination)
+    if "IDE0005" in output:
+        raise RuntimeError("Native witness contains unused imports")
+    run(["dotnet", str(witness / "bin/Release/net10.0/Witness.dll")], destination)

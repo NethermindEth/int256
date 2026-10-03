@@ -32,6 +32,9 @@ internal static class ArtifactReport
             methods = methods.Select(m => new
             {
                 signature = m.FullName,
+                isStatic = m.IsStatic,
+                returnType = m.ReturnType.FullName,
+                hasThis = m.HasThis,
                 token = m.MetadataToken.ToInt32(),
                 parameters = m.Parameters.Select(p => new { p.Name, type = p.ParameterType.FullName, p.IsIn, p.IsOut }),
                 m.Body.InitLocals,

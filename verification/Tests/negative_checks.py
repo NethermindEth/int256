@@ -73,9 +73,9 @@ def main():
         assembly = build_fixture(destination, "Unsupported")
         output = run(["dotnet", "run", "--project", str(VERIFY / "Extractor"), "-c", "Release", "--",
                       str(assembly), str(destination / "verification/generated")], ROOT, succeeds=False)
-        if "Unsupported instruction:" not in output or "mul" not in output:
+        if "Unsupported instruction:" not in output or "div.un" not in output:
             raise RuntimeError("Unsupported CIL failed for an unexpected reason")
-        print("PASS: reachable unsupported mul rejected explicitly")
+        print("PASS: reachable unsupported div.un rejected explicitly")
     run([lake, "build", "Tests.SummaryTransactions"], VERIFY)
     for name in ("ThrowingInitializer", "BeforeFieldInit"):
         with tempfile.TemporaryDirectory(prefix="int256-initialisation-") as temporary:

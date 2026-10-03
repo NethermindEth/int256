@@ -1,0 +1,44 @@
+import Extracted
+import UInt256.Methods.Bitwise.Refutation
+import CIL.SymbolicExecution
+open CIL UInt256Model
+set_option maxRecDepth 8192
+set_option maxHeartbeats 2000000
+namespace UInt256Proof.Bitwise.Witness
+def initial : Bytes := fun address => @INITIAL@
+def result := (invoke Extracted.program
+    (executionBound Extracted.program Extracted.entryIndex) Extracted.entryIndex
+    [.object @LEFT@, .object @RIGHT@, .object @OUT@] (byteMemory initial)).map
+      (fun result => (result.2, result.1 (.byte @ADDRESS@)))
+theorem observed : result = some ([], some (.i8 @ACTUAL@)) := by
+  unfold result
+  simp only [invoke, cil_code, Option.bind_eq_bind, Option.bind_some, initFrame_plain,
+    initLocals, List.zipIdx_nil, List.foldl_nil]
+  cil_steps read64,readBytes,byteMemory,initial,unsafeAdd,readAggregate,readHomeBytes,
+    writeHomeBytes,writeAggregate,clearHome,evalMemory,write256,writeBytes,write
+  refine ⟨_, [], ⟨rfl,rfl⟩, rfl, ?_⟩
+  simp [write]
+theorem expected : (writeBytes (byteMemory initial) @OUT@
+    (UInt256Model.Bitwise.applyBinary .xor (byteValue initial @LEFT@)
+      (byteValue initial @RIGHT@)).toNat 32) (.byte @ADDRESS@) = some (.i8 @EXPECTED@) := by decide
+theorem refuted : ¬UInt256Model.Bitwise.Contract Extracted.program Extracted.entryIndex
+    .xor initial @LEFT@ @RIGHT@ @OUT@ := by
+  have actual := observed
+  unfold result at actual
+  cases execution : invoke Extracted.program
+      (executionBound Extracted.program Extracted.entryIndex) Extracted.entryIndex
+      [.object @LEFT@,.object @RIGHT@,.object @OUT@] (byteMemory initial) with
+  | none => simp [execution] at actual
+  | some result =>
+    obtain ⟨memory, returned⟩ := result
+    simp only [execution,Option.map_some] at actual
+    have pair := Option.some.inj actual
+    have values : returned = [] := congrArg Prod.fst pair
+    have byte : memory (.byte @ADDRESS@) = some (.i8 @ACTUAL@) := congrArg Prod.snd pair
+    subst returned
+    apply UInt256Proof.Bitwise.contract_refuted Extracted.program Extracted.entryIndex
+      (executionBound Extracted.program Extracted.entryIndex) .xor initial @LEFT@ @RIGHT@ @OUT@ @ADDRESS@ memory execution
+    rw [byte,expected]
+    decide
+#print axioms refuted
+end UInt256Proof.Bitwise.Witness

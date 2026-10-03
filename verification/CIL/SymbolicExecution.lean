@@ -61,7 +61,7 @@ macro "cil_steps" facts:term,+ : tactic =>
      -- Retain checked rewrite proofs instead of making the kernel repeat large
      -- definitional reductions when checking the resulting execution proof.
      simp (config := { implicitDefEqProofs := false })
-      [cil_code, step, binary, truth, write64, initLocals,
+      [cil_code, step, binary, truth, write64, initLocals, initFrame, Value.initialized,
       FeatureProfile.evaluate, Intrinsic.available,
       fin_val_three, $[$facts:term],*])))
 

@@ -6,7 +6,7 @@ internal static class MetadataValidation
     internal const string UInt256Reference = "Nethermind.Int256.UInt256&";
     internal const string EntrySignature = "System.Void Nethermind.Int256.UInt256::Add(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)";
 
-    internal static (TypeDefinition Type, MethodDefinition[] Methods) Validate(ModuleDefinition module, string entrySignature = EntrySignature, FeatureProfile? selectedProfile = null)
+    internal static (TypeDefinition Type, MethodDefinition[] Methods) Validate(ModuleDefinition module, string entrySignature = EntrySignature, FeatureProfile? selectedProfile = null, EntrySelection? selectedEntry = null)
     {
         FeatureProfile profile = selectedProfile ?? FeatureProfile.Scalar;
         profile.Validate();
@@ -29,8 +29,9 @@ internal static class MetadataValidation
         }
         MethodDefinition entry = type.Methods.SingleOrDefault(m => m.FullName == entrySignature)
             ?? throw new InvalidDataException("Entry calling signature changed");
-        if (!entry.IsPublic || !entry.IsStatic || !entry.Parameters[0].IsIn || !entry.Parameters[1].IsIn ||
-            !entry.Parameters[2].IsOut) throw new InvalidDataException("Entry calling signature changed");
+        (selectedEntry ?? EntrySelection.Select(entrySignature == EntrySignature ? "Add" :
+            entrySignature == SelectedEntry("Subtract") ? "Subtract" :
+            entrySignature == SelectedEntry("AddOverflow") ? "AddOverflow" : "SubtractUnderflow", null)).Validate(entry);
 
         // Discover the managed dependency DAG in the selected runtime environment.
         // No private name, number of methods or decomposition is prescribed.
@@ -48,9 +49,10 @@ internal static class MetadataValidation
             // execute code that the method-body interpreter does not model.
             if (method.DeclaringType != type && method.DeclaringType.Methods.Any(m => m.IsConstructor && m.IsStatic))
                 throw new InvalidDataException($"Unmodelled static initialisation: {method.DeclaringType.FullName}");
-            if (!method.IsStatic || !method.HasBody || method.HasGenericParameters || method.DeclaringType.HasGenericParameters ||
+            if ((!method.IsStatic && method.DeclaringType != type) || method.ExplicitThis ||
+                method.CallingConvention == MethodCallingConvention.VarArg ||
+                !method.HasBody || method.HasGenericParameters || method.DeclaringType.HasGenericParameters ||
                 method.Body.Instructions.Count == 0 || method.Body.ExceptionHandlers.Count != 0 ||
-                (!method.Body.InitLocals && method.Body.Variables.Count != 0) ||
                 !SupportedType(method.ReturnType, returns: true) || method.Parameters.Any(p => !SupportedType(p.ParameterType)))
                 throw new InvalidDataException($"Unsupported method metadata: {method.FullName}");
             RuntimeModels.ValidateTypeIdentity(method.ReturnType, module);
@@ -81,7 +83,7 @@ internal static class MetadataValidation
     }
 
     private static bool SupportedType(TypeReference type, bool returns = false) => RuntimeModels.SupportedType(type) || type.FullName is
-        "System.UInt64" or "System.Boolean" or "System.Int32" ||
+        "System.UInt64" or "System.Int64" or "System.Boolean" or "System.Int32" or "Nethermind.Int256.UInt256" ||
         (returns ? type.FullName == "System.Void" : type.FullName is UInt256Reference or "System.UInt64&");
 
     // Optional acceleration roles are signature candidates, not assumptions of
@@ -90,15 +92,23 @@ internal static class MetadataValidation
     {
         "Add" => EntrySignature,
         "Subtract" => EntrySignature.Replace("::Add(", "::Subtract(", StringComparison.Ordinal),
+        "AddOverflow" => EntrySignature.Replace("System.Void", "System.Boolean", StringComparison.Ordinal).Replace("::Add(", "::AddOverflow(", StringComparison.Ordinal),
+        "SubtractUnderflow" => EntrySignature.Replace("System.Void", "System.Boolean", StringComparison.Ordinal).Replace("::Add(", "::SubtractUnderflow(", StringComparison.Ordinal),
         _ => throw new ArgumentException($"Unsupported verification method: {name}")
     };
 
     internal static string? Role(MethodDefinition method, string entrySignature = EntrySignature)
     {
         string parameters = string.Join(",", method.Parameters.Select(p => p.ParameterType.FullName));
-        bool subtract = entrySignature == SelectedEntry("Subtract");
-        if (!subtract && entrySignature != EntrySignature)
-            throw new ArgumentException("Unsupported verification entry signature");
+        bool subtract = entrySignature == SelectedEntry("Subtract") || entrySignature == SelectedEntry("SubtractUnderflow");
+        bool add = entrySignature == EntrySignature || entrySignature == SelectedEntry("AddOverflow");
+        if (!add && !subtract && method.IsStatic && method.DeclaringType.FullName == "Nethermind.Int256.UInt256" &&
+            method.ReturnType.FullName == "System.UInt64" && parameters == "System.UInt64,System.UInt64,System.UInt64&")
+            return method.Parameters[2].IsOut && !method.Parameters[2].IsIn ? "wideMultiply" :
+                !method.Parameters[2].IsOut && !method.Parameters[2].IsIn ? "carryCount" : null;
+        if (!add && !subtract)
+            return method.ReturnType.FullName == "System.Void" && parameters == UInt256Reference + ",System.UInt64,System.UInt64,System.UInt64,System.UInt64"
+                ? "storeLimbs" : null;
         return (method.ReturnType.FullName, parameters) switch
         {
             ("System.Boolean", UInt256Reference + "," + UInt256Reference + "," + UInt256Reference + ",System.Boolean") when !subtract &&

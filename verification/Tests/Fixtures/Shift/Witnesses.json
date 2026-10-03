@@ -1,0 +1,58 @@
+{
+  "negativeCases": {
+    "LshWrongLane": {
+      "direction": "left",
+      "inputBase": 0,
+      "outputBase": 64,
+      "count": 0,
+      "initialBytes": {
+        "16": 1
+      },
+      "address": 80,
+      "actualByte": 0,
+      "expectedByte": 1,
+      "operatorActual": "0",
+      "operatorExpected": "340282366920938463463374607431768211456"
+    },
+    "LshWrongCount": {
+      "direction": "left",
+      "inputBase": 0,
+      "outputBase": 64,
+      "count": 32,
+      "initialBytes": {
+        "0": 1
+      },
+      "address": 68,
+      "actualByte": 0,
+      "expectedByte": 1,
+      "operatorActual": "79228162514264337593543950336",
+      "operatorExpected": "4294967296"
+    },
+    "RshWrongDirection": {
+      "direction": "right",
+      "inputBase": 0,
+      "outputBase": 64,
+      "count": 1,
+      "initialBytes": {
+        "24": 1
+      },
+      "address": 88,
+      "actualByte": 2,
+      "expectedByte": 0,
+      "operatorActual": "15692754338466701909589473558019166040255888611160086282240",
+      "operatorExpected": "3138550867693340381917894711603833208051177722232017256448"
+    },
+    "LshEarlyStore": {
+      "direction": "left",
+      "inputBase": 0,
+      "outputBase": 0,
+      "count": 1,
+      "initialBytes": {
+        "0": 1
+      },
+      "address": 0,
+      "actualByte": 0,
+      "expectedByte": 2
+    }
+  }
+}

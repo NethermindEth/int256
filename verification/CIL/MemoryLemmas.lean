@@ -6,6 +6,14 @@ set_option maxHeartbeats 2000000
 
 namespace UInt256Proof
 
+@[simp] theorem writeBytes_home (m : Memory)
+    (base word count frame kind index offset : Nat) :
+    writeBytes m base word count (.home frame kind index offset) =
+      m (.home frame kind index offset) := by
+  induction count generalizing m base word with
+  | zero => rfl
+  | succ count ih => rw [writeBytes, ih]; simp [write]
+
 theorem readBytes_congr (m n : Memory)
     (h : ∀ address, m (.byte address) = n (.byte address)) (base count : Nat) :
     readBytes m base count = readBytes n base count := by

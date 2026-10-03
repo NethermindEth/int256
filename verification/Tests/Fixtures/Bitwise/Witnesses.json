@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "negativeCases": {
+    "BitwiseWrongOperator": {
+      "leftBase": 16,
+      "rightBase": 64,
+      "outputBase": 104,
+      "initialBytes": {
+        "16": 1,
+        "64": 1
+      },
+      "witnessAddress": 104,
+      "expectedByte": 0,
+      "actualByte": 1,
+      "profiles": "all"
+    },
+    "BitwiseEarlyStore": {
+      "leftBase": 16,
+      "rightBase": 64,
+      "outputBase": 24,
+      "initialBytes": {
+        "16": 1,
+        "24": 2,
+        "32": 4,
+        "40": 8,
+        "64": 16,
+        "72": 32,
+        "80": 64,
+        "88": 128
+      },
+      "witnessAddress": 32,
+      "expectedByte": 34,
+      "actualByte": 49,
+      "profiles": "all"
+    }
+  }
+}

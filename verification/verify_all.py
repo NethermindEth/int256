@@ -1,6 +1,8 @@
 """Freshly verify both public methods and compose coverage of every valid feature profile."""
 
 import argparse
+import copy
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -11,6 +13,8 @@ import time
 
 from common import PROFILES, ROOT, SEMANTICS_VERSION, VERIFY, expected_profile, generated_directory, run, sha, source_files
 from verify import audit_names, build_artifact, check_proof_snapshot, main as verify_one, source_inputs, theorem_audits
+from methods import LEGACY, api_entries, check_calling_convention, method_manifest
+from gate_templates import audit_module
 
 
 METHODS = ("Add", "Subtract")
@@ -25,7 +29,8 @@ def checked_certificate(method, profile, inputs):
     directory = generated_directory(method, profile)
     path = directory / "report.json"
     report = json.loads(path.read_text(encoding="utf-8"))
-    manifest = json.loads((VERIFY / f"manifests/{method.lower()}.json").read_text(encoding="utf-8"))
+    manifest = (json.loads((VERIFY / f"manifests/{method.lower()}.json").read_text(encoding="utf-8"))
+                if method in LEGACY else method_manifest(method))
     names = audit_names(method)
     artifact = json.loads((directory / "artifact.json").read_text(encoding="utf-8"))
     lean_hashes = {p.relative_to(VERIFY).as_posix(): sha(p) for p in source_files(VERIFY, {".lean"})}
@@ -43,6 +48,18 @@ def checked_certificate(method, profile, inputs):
         raise RuntimeError(f"Profile mismatch: {method}/{profile}")
     if artifact["methods"][artifact["entryIndex"]]["signature"] != manifest["entry"]:
         raise RuntimeError(f"Public entry mismatch: {method}/{profile}")
+    if method not in LEGACY:
+        check_calling_convention(artifact["methods"][artifact["entryIndex"]], manifest["callingConvention"])
+        scope = copy.deepcopy(manifest)
+        scope["environment"]["selectedProfile"] = profile
+        if report.get("scope") != scope:
+            raise RuntimeError(f"Selected contract scope mismatch: {method}/{profile}")
+        if "template" in manifest["verification"]:
+            gate_hash = hashlib.sha256(audit_module(api_entries()[method]).encode("utf-8")).hexdigest()
+            if report.get("generatedGateSha256") != gate_hash or sha(directory / "SelectedGate.lean") != gate_hash:
+                raise RuntimeError(f"Stale typed audit module: {method}/{profile}")
+        elif report.get("generatedGateSha256") is not None:
+            raise RuntimeError(f"Unexpected typed audit module: {method}/{profile}")
     if report.get("auditedTheorems") != names or set(report.get("axiomAudits", {})) != set(names):
         raise RuntimeError(f"Missing family gate: {method}/{profile}")
     for name in names:
@@ -50,6 +67,21 @@ def checked_certificate(method, profile, inputs):
         if len(set(axioms)) != len(axioms) or set(axioms) - set(manifest["approvedAxioms"]):
             raise RuntimeError(f"Unapproved family axioms: {method}/{profile}")
     coverage = report.get("coverage", {})
+    if method not in LEGACY:
+        if coverage != {"kind": manifest["verification"]["profileCoverage"], "aggregateChecked": False,
+                        "representative": profile,
+                        "condition": ("Every valid profile; kernel-checked independence of actual program operations"
+                                      if manifest["verification"].get("allProfiles") else
+                                      "Valid profile agreeing on actual program feature queries and operation availability")}:
+            raise RuntimeError(f"Missing conditional program coverage: {method}/{profile}")
+        return {"method": method, "representative": profile,
+                "report": path.relative_to(ROOT).as_posix(), "reportSha256": sha(path),
+                "assemblySha256": artifact["sha256"],
+                "generatedProgramSha256": report["generatedProgramSha256"],
+                "contract": manifest["verification"]["contract"],
+                "allProfilesTheorem": manifest["verification"].get("allProfilesTheorem"),
+                "auditedTheorems": names, "axiomAudits": report["axiomAudits"],
+                "timings": report.get("timings")}
     if coverage.get("kind") != "feature-family" or coverage.get("representative") != profile:
         raise RuntimeError(f"Missing family coverage: {method}/{profile}")
     return {"method": method, "representative": profile,

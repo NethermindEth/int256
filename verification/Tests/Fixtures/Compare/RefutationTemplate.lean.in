@@ -1,0 +1,48 @@
+import Extracted
+import UInt256.Methods.Compare.Contract
+import UInt256.Methods.Equality.Refutation
+import CIL.SymbolicExecution
+open CIL UInt256Model
+set_option maxRecDepth 8192
+set_option maxHeartbeats 2000000
+namespace UInt256Proof.Compare.Witness
+
+def initial : Bytes := fun address => @INITIAL@
+
+def result := (invoke Extracted.program
+    (executionBound Extracted.program Extracted.entryIndex) Extracted.entryIndex
+    [.object @LEFT@, .object @RIGHT@] (byteMemory initial)).map Prod.snd
+
+theorem observed : result = some [.i32 @ACTUAL@] := by
+  unfold result
+  simp only [invoke, cil_code, Option.bind_eq_bind, Option.bind_some,
+    initFrame_plain, initLocals, List.zipIdx_nil, List.foldl_nil]
+  cil_steps read64, readBytes, byteMemory, initial
+
+
+theorem expected : UInt256Model.Compare.holds .less
+    (byteValue initial @LEFT@).toNat (byteValue initial @RIGHT@).toNat = @EXPECTED@ := by decide
+
+theorem refuted : ¬ UInt256Model.Compare.Contract Extracted.program Extracted.entryIndex
+    .less initial @LEFT@ @RIGHT@ := by
+  intro contract
+  change UInt256Model.Equality.ResultContract Extracted.program Extracted.entryIndex
+    [.object @LEFT@, .object @RIGHT@] initial _ at contract
+  rw [expected] at contract
+  have actual := observed
+  unfold result at actual
+  cases execution : invoke Extracted.program
+      (executionBound Extracted.program Extracted.entryIndex) Extracted.entryIndex
+      [.object @LEFT@, .object @RIGHT@] (byteMemory initial) with
+  | none => simp [execution] at actual
+  | some result =>
+    obtain ⟨observedMemory, returned⟩ := result
+    simp only [execution, Option.map_some] at actual
+    have values : returned = [.i32 @ACTUAL@] := Option.some.inj actual
+    subst returned
+    exact UInt256Proof.Equality.result_contract_refuted Extracted.program Extracted.entryIndex
+      (executionBound Extracted.program Extracted.entryIndex) [.object @LEFT@, .object @RIGHT@] initial
+      @EXPECTED@ @ACTUAL@ observedMemory execution (by decide) contract
+
+#print axioms refuted
+end UInt256Proof.Compare.Witness

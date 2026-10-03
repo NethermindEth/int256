@@ -42,7 +42,11 @@ public readonly partial struct UInt256
 
     /// <summary>Adds fixture operands and returns the overflow flag.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+#if REPORTING_FIXTURE
+    private static bool AddOverflowCore(in UInt256 a, in UInt256 b, out UInt256 res)
+#else
     public static bool AddOverflow(in UInt256 a, in UInt256 b, out UInt256 res)
+#endif
     {
         #if FEATURE_EXPRESSIONS
         if (Avx2.IsSupported & Avx2.IsSupported)

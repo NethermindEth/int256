@@ -7,7 +7,8 @@ from pathlib import Path
 import sys
 import tempfile
 
-from common import PROFILES, ROOT, VERIFY, run
+from common import PROFILE_DIRECTORY, PROFILE_NAMES, PROFILES, ROOT, VERIFY, expected_profile, run
+from methods import LEGACY, check_calling_convention, method_manifest, method_names
 
 
 def proof_inputs_changed(paths):
@@ -26,28 +27,34 @@ def comparison_artifact(artifact):
 
 
 def extract(source, work, extractor, method="Add", profile="scalar"):
+    manifest = method_manifest(method)
     artifacts = work / "artifacts"
     run(["dotnet", "build", str(source / "src/Nethermind.Int256/Nethermind.Int256.csproj"),
          "-c", "Release", "--no-incremental", f"-p:ArtifactsPath={artifacts}",
          "-p:EnableZkEvm=false"], source)
     output = work / "generated"
+    profile_selector = profile if profile in PROFILES else "@" + str(PROFILE_DIRECTORY / f"{profile}.json")
+    selection = ([method, profile] if method in LEGACY else
+                 [manifest["entry"], profile_selector, str(VERIFY / "manifests/api-coverage.json")])
     run(["dotnet", str(extractor),
          str(artifacts / "bin/Nethermind.Int256/release/Nethermind.Int256.dll"),
-         str(output), method, profile], source)
+         str(output), *selection], source)
     artifact = json.loads((output / "artifact.json").read_text(encoding="utf-8"))
-    if artifact.get("profile", {}).get("Name") != profile:
+    if artifact.get("profile") != expected_profile(profile):
         raise RuntimeError("Change-detection extraction profile mismatch")
-    entry = json.loads((VERIFY / f"manifests/{method.lower()}.json").read_text(encoding="utf-8"))["entry"]
-    if artifact["methods"][artifact["entryIndex"]]["signature"] != entry:
+    if artifact["methods"][artifact["entryIndex"]]["signature"] != manifest["entry"]:
         raise RuntimeError("Change-detection extraction method mismatch")
+    if method not in LEGACY:
+        check_calling_convention(artifact["methods"][artifact["entryIndex"]], manifest["callingConvention"])
     return comparison_artifact(artifact), (output / "Extracted.lean").read_bytes()
 
 
 def needs_proof(base, method="Add", profile="scalar"):
-    if method not in ("Add", "Subtract"):
+    if method not in method_names():
         raise ValueError("Unknown verification method")
-    if profile not in PROFILES:
+    if profile not in PROFILE_NAMES or (method in LEGACY and profile not in PROFILES):
         raise ValueError("Unknown execution profile")
+    manifest = method_manifest(method)
     if not base or set(base) == {"0"}:
         return True, "No comparison baseline; verifying production"
     paths = run(["git", "diff", "--no-renames", "--name-only", "-z", base, "HEAD"], ROOT).strip("\0").split("\0")
@@ -56,7 +63,6 @@ def needs_proof(base, method="Add", profile="scalar"):
         return True, "Verification or build inputs changed"
     if not paths:
         return False, "No source changes"
-    manifest = json.loads((VERIFY / f"manifests/{method.lower()}.json").read_text(encoding="utf-8"))
     if run(["dotnet", "--version"], ROOT).strip() != manifest["sdk"]:
         raise RuntimeError("Unexpected .NET SDK for change detection")
     with tempfile.TemporaryDirectory(prefix="int256-changes-") as temporary:
@@ -79,9 +85,11 @@ def needs_proof(base, method="Add", profile="scalar"):
 def main():
     sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--method", choices=("Add", "Subtract"), default="Add")
-    parser.add_argument("--profile", choices=PROFILES, default="scalar")
+    parser.add_argument("--method", choices=method_names(), default="Add")
+    parser.add_argument("--profile", choices=PROFILE_NAMES, default="scalar")
     arguments = parser.parse_args()
+    if arguments.method in LEGACY and arguments.profile not in PROFILES:
+        parser.error("Additional profiles require an exact selected API contract")
     if os.environ.get("VERIFY_EVENT") == "workflow_dispatch":
         required, reason = True, "Manual production verification requested"
     elif os.environ.get("VERIFY_EVENT") == "pull_request" and os.environ.get("VERIFY_BASE_BRANCH") != "main":
