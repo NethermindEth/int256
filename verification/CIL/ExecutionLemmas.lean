@@ -94,4 +94,20 @@ theorem invoke_result_unique (program : Program) (first second method : Nat)
     simp only [invoke, hbody] at ha hb
     exact run_result_unique _ _ _ _ _ _ _ _ _ _ _ ha hb
 
+/-- One mapped witness fixes the observation of every successful fuel. -/
+
+theorem invoke_observation_unique {α : Type} (p : Program)
+    (fuel witnessFuel entry : Nat) (args : List Value) (memory : Memory)
+    (observe : Memory × List Value → α) (outcome : Memory × List Value) (observed : α)
+    (witness : (invoke p witnessFuel entry args memory).map observe = some observed)
+    (normal : invoke p fuel entry args memory = some outcome) :
+    observe outcome = observed := by
+  cases execution : invoke p witnessFuel entry args memory with
+  | none => simp [execution] at witness
+  | some actual =>
+    have unique := invoke_result_unique p fuel witnessFuel entry args memory
+      outcome actual normal execution
+    rw [unique]
+    exact Option.some.inj (by simpa only [execution, Option.map_some] using witness)
+
 end CIL
