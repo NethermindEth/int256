@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>Nethermind.Int256</AssemblyName>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <FixtureCase Condition="'$(FixtureCase)' == ''">Baseline</FixtureCase>
+    <ComparisonCase>Baseline</ComparisonCase>
+    <BitwiseCase>Baseline</BitwiseCase>
+    <ThreeWayCase>ThreeWayBaseline</ThreeWayCase>
+    <ThreeWayCase Condition="'$(FixtureCase)' == 'ThreeWayAlternative'">ThreeWayAlternative</ThreeWayCase>
+    <ComparisonCase Condition="'$(FixtureCase)' == 'ComparisonAlternative' or '$(FixtureCase)' == 'ComparisonLowFirst' or '$(FixtureCase)' == 'ComparisonSigned' or '$(FixtureCase)' == 'ComparisonWrongLane'">$(FixtureCase)</ComparisonCase>
+    <BitwiseCase Condition="'$(FixtureCase)' == 'BitwiseHelper' or '$(FixtureCase)' == 'BitwiseWrongOperator' or '$(FixtureCase)' == 'BitwiseEarlyStore'">$(FixtureCase)</BitwiseCase>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Support.cs" />
+    <Compile Include="$(ComparisonCase).cs" />
+    <Compile Include="../Bitwise/$(BitwiseCase).cs" />
+    <Compile Include="$(ThreeWayCase).cs" />
+  </ItemGroup>
+  <Target Name="ValidateFixtureCase" BeforeTargets="CoreCompile">
+    <Error Condition="'$(FixtureCase)' != 'Baseline' and '$(FixtureCase)' != 'ComparisonAlternative' and '$(FixtureCase)' != 'ComparisonLowFirst' and '$(FixtureCase)' != 'ComparisonSigned' and '$(FixtureCase)' != 'ComparisonWrongLane' and '$(FixtureCase)' != 'BitwiseHelper' and '$(FixtureCase)' != 'BitwiseWrongOperator' and '$(FixtureCase)' != 'BitwiseEarlyStore' and '$(FixtureCase)' != 'ThreeWayAlternative'" Text="Unknown comparison/bitwise fixture case" />
+  </Target>
+</Project>

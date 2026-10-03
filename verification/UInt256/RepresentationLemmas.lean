@@ -7,6 +7,21 @@ set_option maxHeartbeats 2000000
 
 namespace UInt256Proof
 
+theorem limbValue_bound (a : Limbs) :
+    (a 0).toNat + (a 1).toNat * 2^64 + (a 2).toNat * 2^128 +
+      (a 3).toNat * 2^192 < 2^256 := by
+  have h0 := (a 0).isLt
+  have h1 := (a 1).isLt
+  have h2 := (a 2).isLt
+  have h3 := (a 3).isLt
+  omega
+
+theorem value_toNat (a : Limbs) : (value a).toNat =
+    (a 0).toNat + (a 1).toNat * 2^64 + (a 2).toNat * 2^128 +
+      (a 3).toNat * 2^192 := by
+  simp only [value, BitVec.toNat_ofNat]
+  exact Nat.mod_eq_of_lt (limbValue_bound a)
+
 theorem read_initial (m : Bytes) (base n : Nat) :
     readBytes (byteMemory m) base n = some (byteNumber m base n) := by
   induction n generalizing base with

@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+  <Target Name="RequireAssembly" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(VerifiedAssembly)')" Text="Supply -p:VerifiedAssembly with the production DLL path." />
+  </Target>
+  <ItemGroup>
+    <Reference Include="Nethermind.Int256">
+      <HintPath>$(VerifiedAssembly)</HintPath>
+    </Reference>
+  </ItemGroup>
+</Project>

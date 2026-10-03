@@ -9,6 +9,7 @@ inductive Address where
   | byte (address : Nat)
   | local (frame index : Nat)
   | static (bytes : List (BitVec 8)) (offset : Nat)
+  | home (frame kind index offset : Nat)
   deriving DecidableEq, Repr
 
 inductive Value where
@@ -24,5 +25,9 @@ inductive Value where
   | nullRef
   | unmodeled
   deriving DecidableEq, Repr
+
+def Value.initialized : Value → Bool
+  | .unmodeled => false
+  | _ => true
 
 end CIL

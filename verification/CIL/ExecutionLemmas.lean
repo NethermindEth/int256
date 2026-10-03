@@ -34,15 +34,35 @@ theorem run_mono (program : Program) (fuel extra method pc : Nat)
             | none => simp [run, hbody, hop, hstep, hchild] at h
             | some child =>
               cases hrun : run program fuel callee 0 args' (frame + 1) []
-                  (initLocals memory' (frame + 1) child.locals) with
+                  (initFrame memory' (frame + 1) child args') with
               | none => simp [run, hbody, hop, hstep, hchild, hrun] at h
               | some childResult =>
                 obtain ⟨final, values⟩ := childResult
                 have hc := ih callee 0 args' (frame + 1) []
-                  (initLocals memory' (frame + 1) child.locals) (final, values) hrun
+                  (initFrame memory' (frame + 1) child args') (final, values) hrun
                 simp [run, hbody, hop, hstep, hchild, hrun] at h
                 have hp := ih method (pc + 1) args frame (values ++ rest) final result h
                 simpa [Nat.succ_add, run, hbody, hop, hstep, hchild, hc] using hp
+          | construct callee args' rest memory' =>
+            cases hchild : program[callee]? with
+            | none => simp [run, hbody, hop, hstep, hchild] at h
+            | some child =>
+              cases hrun : run program fuel callee 0 args' (frame + 1) []
+                  (initFrame memory' (frame + 1) child args') with
+              | none => simp [run, hbody, hop, hstep, hchild, hrun] at h
+              | some childResult =>
+                obtain ⟨final, values⟩ := childResult
+                have hc := ih callee 0 args' (frame + 1) []
+                  (initFrame memory' (frame + 1) child args') (final, values) hrun
+                cases values with
+                | cons value tail => simp [run, hbody, hop, hstep, hchild, hrun] at h
+                | nil =>
+                  cases hsnapshot : readAggregate final frame 2 pc with
+                  | none => simp [run, hbody, hop, hstep, hchild, hrun, hsnapshot] at h
+                  | some value =>
+                    simp [run, hbody, hop, hstep, hchild, hrun, hsnapshot] at h
+                    have hp := ih method (pc + 1) args frame (value :: rest) final result h
+                    simpa [Nat.succ_add, run, hbody, hop, hstep, hchild, hc, hsnapshot] using hp
 
 theorem run_of_le (program : Program) (fuel larger method pc : Nat)
     (args : List Value) (frame : Nat) (stack : List Value) (memory : Memory)

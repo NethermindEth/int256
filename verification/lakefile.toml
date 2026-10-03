@@ -40,4 +40,10 @@ name = "Tests.ProfileSemantics"
 name = "Tests.SIMDArithmetic"
 
 [[lean_lib]]
+name = "Tests.AggregateSemantics"
+
+[[lean_lib]]
+name = "Tests.ExpansionIntrinsics"
+
+[[lean_lib]]
 name = "SubtractAudit"

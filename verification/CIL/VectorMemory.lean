@@ -20,6 +20,10 @@ def read128 (m : Memory) : Address → Option Value
     let .v128 bits ← m (.local frame index) | none
     return .v128 bits
   | .static bytes base => do return .v128 (BitVec.ofNat 128 (← readStaticBytes bytes base 16))
+  | .home frame kind index offset =>
+    if offset + 16 ≤ 32 then do
+      return .v128 (BitVec.ofNat 128 (← readHomeBytes m frame kind index offset 16))
+    else none
 
 def read256 (m : Memory) : Address → Option Value
   | .byte base => do return .v256 (BitVec.ofNat 256 (← readBytes m base 32))
@@ -27,18 +31,28 @@ def read256 (m : Memory) : Address → Option Value
     let .v256 bits ← m (.local frame index) | none
     return .v256 bits
   | .static bytes base => do return .v256 (BitVec.ofNat 256 (← readStaticBytes bytes base 32))
+  | .home frame kind index offset =>
+    if offset + 32 ≤ 32 then do
+      return .v256 (BitVec.ofNat 256 (← readHomeBytes m frame kind index offset 32))
+    else none
 
 def write128 (m : Memory) (address : Address) (bits : BitVec 128) : Option Memory :=
   match address with
   | .byte base => some (writeBytes m base bits.toNat 16)
   | .local frame index => some (write m (.local frame index) (.v128 bits))
   | .static _ _ => none
+  | .home frame kind index offset =>
+    if offset + 16 ≤ 32 then some (writeHomeBytes m frame kind index offset bits.toNat 16)
+    else none
 
 def write256 (m : Memory) (address : Address) (bits : BitVec 256) : Option Memory :=
   match address with
   | .byte base => some (writeBytes m base bits.toNat 32)
   | .local frame index => some (write m (.local frame index) (.v256 bits))
   | .static _ _ => none
+  | .home frame kind index offset =>
+    if offset + 32 ≤ 32 then some (writeHomeBytes m frame kind index offset bits.toNat 32)
+    else none
 
 /-- Only actual pointer representations may be reinterpreted as managed refs.
     In particular, a vector snapshot cannot become a pointer to caller storage. -/
@@ -59,11 +73,18 @@ def unsafeAdd (sizeBytes : Nat) (offset : Int) : Address → Option Address
   | .static bytes base =>
     let address := (base : Int) + (sizeBytes : Int) * offset
     if 0 ≤ address then some (.static bytes address.toNat) else none
+  | .home frame kind index base =>
+    let address := (base : Int) + (sizeBytes : Int) * offset
+    if 0 ≤ address ∧ address ≤ 32 then some (.home frame kind index address.toNat) else none
+
+@[simp ↓] theorem unsafeAdd_byte_natural (size base offset : Nat) :
+    unsafeAdd size (offset : Int) (.byte base) = some (.byte (base + size * offset)) := by
+  simp [unsafeAdd, ← Int.natCast_mul, ← Int.natCast_add]
 
 /-- Exact memory calls and object opcodes supported by the reachable vector
     bodies. Widths and signedness are fixed by the validated overload. -/
 inductive MemoryOp where
-  | load128 | load256 | store128 | store256
+  | load128 | load256 | store128 | store256 | init256
   | asRef | add (sizeBytes : Nat) (signed : Bool)
   | bitcast256 | bitcastByteBool | skipInit
   | dataToken (bytes : List (BitVec 8)) | createSpan | spanReference
@@ -88,6 +109,10 @@ def evalMemory (op : MemoryOp) (stack : List Value) (m : Memory) :
     return (← write128 m address bits, rest)
   | .store256, .v256 bits :: .ref address :: rest =>
     return (← write256 m address bits, rest)
+  | .store256, .v256 bits :: .object base :: rest =>
+    return (← write256 m (.byte base) bits, rest)
+  | .init256, .ref address :: rest => return (← write256 m address 0, rest)
+  | .init256, .object base :: rest => return (← write256 m (.byte base) 0, rest)
   | .asRef, v :: rest => return (m, (← unsafeAsRef v) :: rest)
   | .add size signed, offset :: .ref address :: rest =>
     return (m, .ref (← unsafeAdd size (← offsetValue signed offset) address) :: rest)

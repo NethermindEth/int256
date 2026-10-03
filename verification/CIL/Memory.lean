@@ -30,6 +30,19 @@ def readStaticBytes (bytes : List (BitVec 8)) (offset : Nat) : Nat → Option Na
     let hi ← readStaticBytes bytes (offset + 1) n
     return lo.toNat + 256 * hi
 
+-- Private byte homes are disjoint from caller addresses and scalar local slots.
+def readHomeBytes (m : Memory) (frame kind index offset : Nat) : Nat → Option Nat
+  | 0 => some 0
+  | n + 1 => do
+    let .i8 lo ← m (.home frame kind index offset) | none
+    let hi ← readHomeBytes m frame kind index (offset + 1) n
+    return lo.toNat + 256 * hi
+
+def writeHomeBytes (m : Memory) (frame kind index offset value : Nat) : Nat → Memory
+  | 0 => m
+  | n + 1 => writeHomeBytes (write m (.home frame kind index offset) (.i8 (BitVec.ofNat 8 value)))
+      frame kind index (offset + 1) (value / 256) n
+
 def read64 (m : Memory) : Address → Option Value
   | .byte base => do return .i64 (BitVec.ofNat 64 (← readBytes m base 8))
   | .local frame index => do
@@ -37,11 +50,15 @@ def read64 (m : Memory) : Address → Option Value
     return .i64 w
   | .static bytes offset => do
     return .i64 (BitVec.ofNat 64 (← readStaticBytes bytes offset 8))
+  | .home frame kind index offset => do
+    if offset + 8 ≤ 32 then return .i64 (BitVec.ofNat 64 (← readHomeBytes m frame kind index offset 8)) else none
 
 def write64 (m : Memory) (address : Address) (word : W64) : Option Memory :=
   match address with
   | .byte base => some (writeBytes m base word.toNat 8)
   | .local frame index => some (write m (.local frame index) (.i64 word))
   | .static _ _ => none
+  | .home frame kind index offset =>
+    if offset + 8 ≤ 32 then some (writeHomeBytes m frame kind index offset word.toNat 8) else none
 
 end CIL

@@ -12,7 +12,8 @@ from common import ROOT, VERIFY, run
 from verify import source_inputs
 
 
-TARGETS = ("VectorSemantics", "VectorMemory", "ProfileSemantics", "SIMDArithmetic")
+TARGETS = ("Tests.VectorSemantics", "Tests.VectorMemory", "Tests.ProfileSemantics", "Tests.SIMDArithmetic",
+           "Tests.AggregateSemantics", "Tests.ExpansionIntrinsics", "CIL.FeatureCoverage")
 REQUIRED = frozenset({
     "CIL.Vector.ternary_add", "CIL.Vector.ternary_subtract",
     "CIL.Vector.pack256_lanes", "CIL.Vector.avx2_blend_incoming",
@@ -28,8 +29,9 @@ REQUIRED = frozenset({
     "UInt256Proof.SIMD.add_cascade_words", "UInt256Proof.SIMD.subtract_cascade_words",
     "UInt256Proof.SIMD.add_cascade_vector", "UInt256Proof.SIMD.subtract_cascade_vector",
     "UInt256Proof.add_contract_profiles", "UInt256Proof.subtract_contract_profiles",
+    "CIL.FeatureProfile.mem_allValid", "CIL.Representative.group_contract",
 })
-AUDIT = re.compile(r"'([^']+)' depends on axioms: \[([^]\r\n]*)\]")
+AUDIT = re.compile(r"'([^']+)' depends on axioms: \[([\w.,\s]*)\]")
 
 
 def check_audits(output, approved, required=REQUIRED):
@@ -50,6 +52,11 @@ def check_audits(output, approved, required=REQUIRED):
 
 
 class AuditParserTests(unittest.TestCase):
+    def test_accepts_wrapped_audits(self):
+        self.assertEqual(check_audits("'a' depends on axioms: [propext,\n Quot.sound]",
+                                     {"propext", "Quot.sound"}, {"a"}),
+                         {"a": ["propext", "Quot.sound"]})
+
     def test_accepts_approved_and_empty(self):
         self.assertEqual(check_audits("'a' depends on axioms: [propext]\n"
                                      "'b' depends on axioms: []", {"propext"}, {"a", "b"}),
@@ -91,11 +98,11 @@ def main():
         raise RuntimeError("Pinned Lean toolchain must be available on PATH")
     inputs = source_inputs()
     output = run([lake, "-d", str(VERIFY), "build",
-                  *(f"+Tests.{target}:olean" for target in TARGETS)], ROOT)
+                  *(f"+{target}:olean" for target in TARGETS)], ROOT)
     audits = check_audits(output, approved)
     if inputs != source_inputs():
         raise RuntimeError("Inputs changed during foundation checking")
-    print(f"Checked four foundation modules and {len(audits)} transitive axiom audits")
+    print(f"Checked {len(TARGETS)} foundation modules and {len(audits)} transitive axiom audits")
 
 
 if __name__ == "__main__":

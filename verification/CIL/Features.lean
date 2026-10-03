@@ -6,9 +6,16 @@ https://github.com/dotnet/runtime/blob/v10.0.0/docs/design/features/hw-intrinsic
 https://github.com/dotnet/runtime/blob/v10.0.0/docs/design/coreclr/botr/vectors-and-intrinsics.md
 IsSupported is a runtime capability, including OS support and runtime disabling;
 it is not just a CPUID bit. Operation prerequisites are retained explicitly.
-The inherited x86 chain in this model is SSE2 <- SSSE3 <- SSE4.2 <- AVX
+The inherited x86 chain in this model is SSE2 <- SSSE3 <- SSE4.1 <- SSE4.2 <- AVX
 <- AVX2 <- AVX512F. AVX512F.VL additionally requires AVX512F; the reverse
 implication is not valid. BMI1 is independent of this chain.
+SSE4.1, AVX512DQ and ARM prerequisites follow the .NET 10 source declarations:
+https://github.com/dotnet/runtime/blob/v10.0.0/src/libraries/System.Private.CoreLib/src/System/Runtime/Intrinsics/X86/Sse41.cs
+https://github.com/dotnet/runtime/blob/v10.0.0/src/libraries/System.Private.CoreLib/src/System/Runtime/Intrinsics/X86/Avx512DQ.cs
+https://github.com/dotnet/runtime/blob/v10.0.0/src/libraries/System.Private.CoreLib/src/System/Runtime/Intrinsics/Arm/AdvSimd.cs
+Vector256.IsHardwareAccelerated is an independent fixed JIT/runtime capability in
+this declared domain, including its portable fallback when AVX2 is unavailable:
+https://github.com/dotnet/runtime/blob/v10.0.0/src/libraries/System.Private.CoreLib/src/System/Runtime/Intrinsics/Vector256.cs
 https://learn.microsoft.com/dotnet/api/system.runtime.intrinsics.x86.avx512f?view=net-10.0
 https://devblogs.microsoft.com/dotnet/hardware-intrinsics-in-net-core/ -/
 
@@ -16,6 +23,7 @@ namespace CIL
 
 inductive Feature where
   | advSimd | sse2 | ssse3 | sse42 | avx | avx2 | avx512F | avx512FVL | bmi1
+  | sse41 | avx512DQ | avx512DQVL | bmi2 | armBase64 | vector256Accelerated
   deriving DecidableEq, Repr
 
 inductive Architecture where
@@ -37,6 +45,12 @@ structure FeatureProfile where
   avx512F : Bool := false
   avx512FVL : Bool := false
   bmi1 : Bool := false
+  sse41 : Bool := false
+  avx512DQ : Bool := false
+  avx512DQVL : Bool := false
+  bmi2 : Bool := false
+  armBase64 : Bool := false
+  vector256Accelerated : Bool := false
   deriving DecidableEq, Repr
 
 def FeatureProfile.scalar : FeatureProfile := {}
@@ -51,11 +65,44 @@ def FeatureProfile.evaluate (p : FeatureProfile) : Feature → Bool
   | .avx512F => p.avx512F
   | .avx512FVL => p.avx512FVL
   | .bmi1 => p.bmi1
+  | .sse41 => p.sse41
+  | .avx512DQ => p.avx512DQ
+  | .avx512DQVL => p.avx512DQVL
+  | .bmi2 => p.bmi2
+  | .armBase64 => p.armBase64
+  | .vector256Accelerated => p.vector256Accelerated
 
 /-- Declared capability domain: 64-bit little-endian execution, architecture
 separation, and prerequisites used by the reachable SSE/AVX operations. This is
 an explicit domain, rather than a claim to enumerate every possible CLR host. -/
 def FeatureProfile.Valid (p : FeatureProfile) : Prop :=
+  p.nativeWidth = 64 ∧ p.littleEndian = true ∧
+  (p.advSimd = true → p.architecture = .arm64) ∧
+  ((p.sse2 || p.ssse3 || p.sse42 || p.avx || p.avx2 || p.avx512F || p.avx512FVL || p.bmi1 || p.sse41 || p.avx512DQ || p.avx512DQVL || p.bmi2) = true →
+    p.architecture = .x64) ∧
+  (p.ssse3 = true → p.sse2 = true) ∧
+  (p.sse42 = true → p.sse2 = true ∧ p.ssse3 = true) ∧
+  (p.avx2 = true → p.avx = true) ∧
+  (p.avx512FVL = true → p.avx512F = true) ∧
+  (p.avx = true → p.sse42 = true) ∧
+  (p.avx512F = true → p.avx2 = true) ∧
+  (p.sse41 = true → p.ssse3 = true) ∧
+  (p.sse42 = true → p.sse41 = true) ∧
+  (p.avx512DQ = true → p.avx512F = true) ∧
+  (p.avx512DQVL = true → p.avx512DQ = true ∧ p.avx512FVL = true) ∧
+  (p.armBase64 = true → p.architecture = .arm64) ∧
+  (p.advSimd = true → p.armBase64 = true)
+
+instance (p : FeatureProfile) : Decidable p.Valid := inferInstanceAs (Decidable (_ ∧ _))
+
+@[simp] theorem FeatureProfile.scalar_evaluate (f : Feature) : scalar.evaluate f = false := by
+  cases f <;> rfl
+
+theorem FeatureProfile.scalar_valid : scalar.Valid := by decide
+
+/-- The original Add/Subtract capability domain, before additional operations
+exposed inherited and independent runtime flags. -/
+def FeatureProfile.LegacyValid (p : FeatureProfile) : Prop :=
   p.nativeWidth = 64 ∧ p.littleEndian = true ∧
   (p.advSimd = true → p.architecture = .arm64) ∧
   ((p.sse2 || p.ssse3 || p.sse42 || p.avx || p.avx2 || p.avx512F || p.avx512FVL || p.bmi1) = true →
@@ -67,15 +114,32 @@ def FeatureProfile.Valid (p : FeatureProfile) : Prop :=
   (p.avx = true → p.sse42 = true) ∧
   (p.avx512F = true → p.avx2 = true)
 
-instance (p : FeatureProfile) : Decidable p.Valid := inferInstanceAs (Decidable (_ ∧ _))
+def FeatureProfile.extendLegacy (p : FeatureProfile) : FeatureProfile :=
+  { p with
+    sse41 := p.sse42
+    armBase64 := p.advSimd
+    avx512DQ := false
+    avx512DQVL := false
+    bmi2 := false
+    vector256Accelerated := false }
 
-@[simp] theorem FeatureProfile.scalar_evaluate (f : Feature) : scalar.evaluate f = false := by
-  cases f <;> rfl
+theorem FeatureProfile.extendLegacy_valid (p : FeatureProfile) (h : p.LegacyValid) :
+    p.extendLegacy.Valid := by
+  rcases h with ⟨hw, he, harm, hx, hss, hsse, havx, hvl, havxsse, hfavx⟩
+  simp only [FeatureProfile.Valid, FeatureProfile.extendLegacy]
+  refine ⟨hw, he, harm, ?_, hss, hsse, havx, hvl, havxsse, hfavx, ?_⟩
+  · intro flags
+    apply hx
+    cases hs : p.sse42 <;> simp_all
+  · simp_all
 
-theorem FeatureProfile.scalar_valid : scalar.Valid := by decide
+theorem FeatureProfile.extendLegacy_evaluate (p : FeatureProfile) (f : Feature)
+    (hf : f ∈ [.advSimd, .sse2, .ssse3, .sse42, .avx, .avx2,
+      .avx512F, .avx512FVL, .bmi1]) : p.extendLegacy.evaluate f = p.evaluate f := by
+  cases f <;> simp_all [FeatureProfile.evaluate, FeatureProfile.extendLegacy]
 
 theorem FeatureProfile.avx512F_implies_avx2 (p : FeatureProfile) (h : p.Valid)
-    (hf : p.avx512F = true) : p.avx2 = true := h.2.2.2.2.2.2.2.2.2 hf
+    (hf : p.avx512F = true) : p.avx2 = true := h.2.2.2.2.2.2.2.2.2.1 hf
 
 theorem FeatureProfile.avx512FVL_implies_avx2 (p : FeatureProfile) (h : p.Valid)
     (hvl : p.avx512FVL = true) : p.avx2 = true :=
@@ -120,12 +184,15 @@ def FeatureProfile.classify (p : FeatureProfile) : FeatureClass :=
     if p.avx512FVL then .avx512 p.bmi1 else .avx2 p.bmi1
   else if p.advSimd then .arm64 else if p.sse42 then .sse else .scalar
 
+theorem FeatureProfile.extendLegacy_classify (p : FeatureProfile) :
+    p.extendLegacy.classify = p.classify := rfl
+
 def FeatureClass.representative : FeatureClass → FeatureProfile
   | .scalar => .scalar
-  | .arm64 => { architecture := .arm64, advSimd := true }
-  | .sse => { architecture := .x64, sse2 := true, ssse3 := true, sse42 := true }
-  | .avx2 bmi => { architecture := .x64, sse2 := true, ssse3 := true, sse42 := true, avx := true, avx2 := true, bmi1 := bmi }
-  | .avx512 bmi => { architecture := .x64, sse2 := true, ssse3 := true, sse42 := true, avx := true, avx2 := true, avx512F := true, avx512FVL := true, bmi1 := bmi }
+  | .arm64 => { architecture := .arm64, advSimd := true, armBase64 := true }
+  | .sse => { architecture := .x64, sse2 := true, ssse3 := true, sse41 := true, sse42 := true }
+  | .avx2 bmi => { architecture := .x64, sse2 := true, ssse3 := true, sse41 := true, sse42 := true, avx := true, avx2 := true, bmi1 := bmi }
+  | .avx512 bmi => { architecture := .x64, sse2 := true, ssse3 := true, sse41 := true, sse42 := true, avx := true, avx2 := true, avx512F := true, avx512FVL := true, bmi1 := bmi }
 
 /-- Getter distinctions encountered on the selected family, including queries
 inside helpers. BMI1 distinguishes subtraction only; addition can share it.
@@ -157,7 +224,7 @@ theorem FeatureClass.representative_valid (c : FeatureClass) : c.representative.
 theorem FeatureProfile.classification_queries (p : FeatureProfile) (h : p.Valid) (f : Feature)
     (hf : f ∈ p.classify.queries) :
     p.evaluate f = p.classify.representative.evaluate f := by
-  rcases h with ⟨_, _, _, _, hss, hsse, havx, hvl, havxsse, hfavx⟩
+  rcases h with ⟨_, _, _, _, hss, hsse, havx, hvl, havxsse, hfavx, _⟩
   cases ha : p.avx2
   · cases hn : p.advSimd <;> cases hs : p.sse42 <;> cases f <;>
       simp_all [FeatureProfile.classify, FeatureClass.queries, FeatureClass.representative,
@@ -176,7 +243,7 @@ def FeatureClass.required : FeatureClass → List Feature
 
 theorem FeatureProfile.classification_required (p : FeatureProfile) (h : p.Valid)
     (f : Feature) (hf : f ∈ p.classify.required) : p.evaluate f = true := by
-  rcases h with ⟨_, _, _, _, hss, hsse, havx, hvl, havxsse, hfavx⟩
+  rcases h with ⟨_, _, _, _, hss, hsse, havx, hvl, havxsse, hfavx, _⟩
   cases ha : p.avx2
   · cases hn : p.advSimd <;> cases hs : p.sse42 <;> cases f <;>
       simp_all [FeatureProfile.classify, FeatureClass.required, FeatureProfile.evaluate]

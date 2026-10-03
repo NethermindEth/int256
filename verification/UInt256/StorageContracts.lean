@@ -18,7 +18,8 @@ theorem execute_store_contract (m : Memory) (frame fuel out : Nat) (r0 r1 r2 r3 
   rw [he]
   generalize fuel - (Extracted.storeLimbsBody.code.length + 1) = remaining
   simp only [cil_code, Nat.add_succ, Nat.add_zero]
-  cil_steps write_local_read_local
+  cil_steps write_local_read_local, evalMemory, unsafeAsRef, unsafeAdd, offsetValue,
+    Int.natCast_add, Int.natCast_mul
   all_goals simp [store4]
   all_goals intro address; rfl
 
