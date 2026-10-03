@@ -45,9 +45,10 @@ def provedCall (index summary : Name) (label : String) (arity : Nat) :
   throwError "No applicable proved {label} helper call"
 
 def rewriteHelperRun (hr : Ident) : TacticM Unit := do
-  evalTactic (← `(tactic| simp [cil_code, initLocals, initFrame] at $hr:ident))
-  evalTactic (← `(tactic| rw [$hr:ident]))
-  evalTactic (← `(tactic| simp only [Option.bind_some]))
+  evalTactic (← `(tactic| simp (config := { failIfUnchanged := false })
+    [cil_code, initLocals, initFrame] at $hr:ident))
+  evalTactic (← `(tactic| rw [$hr:ident] <;>
+    simp (config := { failIfUnchanged := false }) only [Option.bind_some]))
 
 elab "cil_store_call" : tactic => withMainContext do
   let (call, values) ← provedCall `Extracted.storeLimbsIndex
@@ -176,8 +177,9 @@ elab "cil_branch" : tactic => withMainContext do
       if pc.getAppArgs[1]!.hasLooseBVars then continue
       let condition ← PrettyPrinter.delab pc.getAppArgs[1]!
       let h := mkIdent (← mkFreshUserName `branchCondition)
-      let hTerm : Term := ⟨h.raw⟩
-      evalTactic (← `(tactic| by_cases $h:ident : $condition <;> simp only [*, $hTerm:term, ↓reduceIte]))
+      evalTactic (← `(tactic| by_cases $h:ident : $condition <;>
+        (first | rw [ite_eq_left $h:ident] | rw [ite_eq_right $h:ident]) <;>
+        simp (config := { failIfUnchanged := false }) only [*, ↓reduceIte]))
       return
   throwError "No conditional instruction address"
 
