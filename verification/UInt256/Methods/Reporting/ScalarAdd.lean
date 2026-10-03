@@ -34,6 +34,21 @@ theorem execute_scalar_general (m : Memory) (left right out frame fuel : Nat) (a
   simp [*, write]
 
 
+theorem execute_scalar_general_at (m : Memory) (left right out frame fuel : Nat) (a b : Limbs)
+    (ha : ∀ i : Fin 4, read64 m (.byte (left + 8*i.val)) = some (.i64 (a i)))
+    (hb : ∀ i : Fin 4, read64 m (.byte (right + 8*i.val)) = some (.i64 (b i)))
+    (hna : a 1 ||| a 2 ||| a 3 ≠ 0) (hnb : b 1 ||| b 2 ||| b 3 ≠ 0)
+    (hf : executionBound Extracted.program Extracted.addScalarIndex ≤ fuel) :
+    ∃ final, run Extracted.program fuel Extracted.addScalarIndex 0
+      [.object left, .object right, .object out, .i32 1] frame [] m =
+        some (final, [.i32 (if finalCarry a b ≠ 0 then 1 else 0)]) ∧
+      ∀ address, final (.byte address) = store4 m out
+        (sumWords a b 0) (sumWords a b 1) (sumWords a b 2) (sumWords a b 3) (.byte address) := by
+  obtain ⟨final, hr, hm⟩ := execute_scalar_general m left right out frame 0 a b ha hb hna hnb
+  simp only [Nat.zero_add] at hr
+  exact ⟨final, run_of_le _ _ _ _ _ _ _ _ _ _ hf hr, by simpa (config := { implicitDefEqProofs := false }) [sumWords, fin_val_three] using hm⟩
+
+
 #print axioms UInt256Proof.Reporting.execute_scalar_general
 }
 

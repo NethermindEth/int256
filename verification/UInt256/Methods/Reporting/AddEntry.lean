@@ -27,7 +27,7 @@ theorem execute_add_entry_general (m : Memory) (left right out frame fuel : Nat)
   cil_execute ha0, ha1, ha2, ha3, hb0, hb1, hb2, hb3, hna, hnb,
     finalCarry, FeatureProfile.evaluate, word_positive,
     show (1 : W32) = BitVec.ofNat 32 1 from rfl
-    with (first | cil_reporting_add128_call a b | cil_carry_call | cil_store_call)
+    with (first | cil_reporting_add128_call a b | cil_reporting_scalar_call a b | cil_carry_call | cil_store_call)
   intro address
   cil_preserved_store
   intro location
@@ -111,11 +111,13 @@ theorem execute_add_entry_words (m : Memory) (left right out frame fuel : Nat) (
         · simpa only [finalCarry_overflow] using
             execute_add_entry_general m left right out frame fuel a b ha hb hna hnb
   |
-    obtain ⟨ha0, ha1, ha2, ha3⟩ := limb_reads m left a ha
-    obtain ⟨hb0, hb1, hb2, hb3⟩ := limb_reads m right b hb
-    cil_execute ha0, ha1, ha2, ha3, hb0, hb1, hb2, hb3, finalCarry, word_positive,
+    by_cases rawRightSmall : b 1 ||| b 2 ||| b 3 = 0
+    all_goals by_cases rawLeftSmall : a 1 ||| a 2 ||| a 3 = 0
+    all_goals obtain ⟨ha0, ha1, ha2, ha3⟩ := limb_reads m left a ha
+    all_goals obtain ⟨hb0, hb1, hb2, hb3⟩ := limb_reads m right b hb
+    all_goals cil_execute ha0, ha1, ha2, ha3, hb0, hb1, hb2, hb3, finalCarry, word_positive,
       show (1 : W32) = BitVec.ofNat 32 1 from rfl
-      with (first | cil_reporting_add128_call a b | cil_reporting_small_call | cil_carry_call | cil_store_call)
+      with (first | cil_reporting_add128_call a b | cil_reporting_scalar_call a b | cil_reporting_small_call | cil_carry_call | cil_store_call)
     all_goals simp (config := { implicitDefEqProofs := false }) only
       [sumWords, finalCarry, word_positive, write, ↓reduceIte]
 
