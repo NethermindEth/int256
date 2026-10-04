@@ -20,7 +20,18 @@ theorem checked_subtract_profile_contract : ∀ profile : FeatureProfile,
     (uniform_of_profile_map _ _ Extracted.programProfiles) agreement]
   exact execution
 
+theorem checked_subtract_family_contract : ∀ profile : FeatureProfile,
+    profile.Valid → profile.classify = Extracted.profile.classify →
+    ∀ initial left right out,
+      Reporting.Contract .subtract (reprofile Extracted.program profile)
+        Extracted.entryIndex initial left right out := by
+  intro profile valid family
+  exact checked_subtract_profile_contract profile valid
+    (Extracted.program.same_family_profile_agreement profile Extracted.profile
+      valid Extracted.profileValid family Extracted.programClassified)
+
 #print axioms checked_subtract_contract
 #print axioms checked_subtract_profile_contract
+#print axioms checked_subtract_family_contract
 
 end UInt256Proof.Reporting
