@@ -1,5 +1,7 @@
 import UInt256.Methods.Compare.GreaterEqual
 
+import CIL.RelationalProfileCoverage
+
 open CIL UInt256Model
 namespace UInt256Proof.Compare
 
@@ -19,6 +21,20 @@ theorem checked_greater_equal_profile_contract : ∀ profile : FeatureProfile,
   rw [← Extracted.profileExecution_eq profile agreement]
   exact execution
 
+theorem checked_greater_equal_family_contract : ∀ profile : FeatureProfile,
+    profile.Valid → Extracted.profile.avx512FVL = profile.avx512FVL →
+    (Extracted.profile.avx512FVL = false → Extracted.profile.avx2 = profile.avx2) →
+    (Extracted.profile.avx512FVL = false → Extracted.profile.avx2 = false →
+      Extracted.profile.vector256Accelerated = profile.vector256Accelerated) →
+    ∀ initial left right,
+      UInt256Model.Compare.Contract (reprofile Extracted.program profile)
+        Extracted.entryIndex .greaterEqual initial left right := by
+  intro profile valid native avx2 vector
+  apply checked_greater_equal_profile_contract profile valid
+  exact relational_profile_agreement Extracted.program Extracted.profile profile
+    Extracted.profileValid valid (by decide) native avx2 vector
+
 #print axioms checked_greater_equal_contract
 #print axioms checked_greater_equal_profile_contract
+#print axioms checked_greater_equal_family_contract
 end UInt256Proof.Compare

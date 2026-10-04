@@ -5,6 +5,10 @@ import UInt256.Representation
 open CIL UInt256Model
 namespace UInt256Proof.Bitwise
 
+theorem readAggregate_fullWrite (m : Memory) (frame kind index : Nat) (bits : BitVec 256) :
+    readAggregate (writeHomeBytes m frame kind index 0 bits.toNat 32) frame kind index =
+      some (.v256 bits) := aggregate_snapshot_after_write m frame kind index bits
+
 theorem aggregate_fourWrites (m : Memory) (frame kind index : Nat) (r0 r1 r2 r3 : W64) :
  readAggregate (writeHomeBytes (writeHomeBytes (writeHomeBytes (writeHomeBytes m
  frame kind index 0 r0.toNat 8) frame kind index 8 r1.toNat 8)
