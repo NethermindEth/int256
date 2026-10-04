@@ -23,22 +23,10 @@ theorem expected : (writeBytes (byteMemory initial) @OUT@
       (byteValue initial @RIGHT@)).toNat 32) (.byte @ADDRESS@) = some (.i8 @EXPECTED@) := by decide
 theorem refuted : ¬UInt256Model.Bitwise.Contract Extracted.program Extracted.entryIndex
     .xor initial @LEFT@ @RIGHT@ @OUT@ := by
-  have actual := observed
-  unfold result at actual
-  cases execution : invoke Extracted.program
-      (executionBound Extracted.program Extracted.entryIndex) Extracted.entryIndex
-      [.object @LEFT@,.object @RIGHT@,.object @OUT@] (byteMemory initial) with
-  | none => simp [execution] at actual
-  | some result =>
-    obtain ⟨memory, returned⟩ := result
-    simp only [execution,Option.map_some] at actual
-    have pair := Option.some.inj actual
-    have values : returned = [] := congrArg Prod.fst pair
-    have byte : memory (.byte @ADDRESS@) = some (.i8 @ACTUAL@) := congrArg Prod.snd pair
-    subst returned
-    apply UInt256Proof.Bitwise.contract_refuted Extracted.program Extracted.entryIndex
-      (executionBound Extracted.program Extracted.entryIndex) .xor initial @LEFT@ @RIGHT@ @OUT@ @ADDRESS@ memory execution
-    rw [byte,expected]
-    decide
+  apply UInt256Proof.Bitwise.byte_observation_refuted Extracted.program Extracted.entryIndex
+    (executionBound Extracted.program Extracted.entryIndex) .xor initial @LEFT@ @RIGHT@ @OUT@
+    @ADDRESS@ (some (.i8 @ACTUAL@)) observed
+  rw [expected]
+  decide
 #print axioms refuted
 end UInt256Proof.Bitwise.Witness

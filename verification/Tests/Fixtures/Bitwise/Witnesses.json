@@ -12,6 +12,8 @@
       "witnessAddress": 104,
       "expectedByte": 0,
       "actualByte": 1,
+      "actualReturn": 1,
+      "expectedReturn": 0,
       "profiles": "all"
     },
     "BitwiseEarlyStore": {
@@ -33,5 +35,6 @@
       "actualByte": 49,
       "profiles": "all"
     }
-  }
+  },
+  "returnNegativeCases": ["BitwiseWrongOperator"]
 }

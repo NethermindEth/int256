@@ -12,6 +12,13 @@ VERIFY = ROOT / "verification"
 BUILD_DIRECTORIES = frozenset({"artifacts", "bin", "obj", "generated", ".lake", "__pycache__"})
 PROFILES = ("scalar", "arm64-advsimd", "x64-sse42", "x64-avx2", "x64-avx2-bmi1",
             "x64-avx512", "x64-avx512-bmi1")
+MULTIPLY_PROFILES = ("scalar", "x64-vector256",
+                     "x64-avx2", "x64-avx2-vector256",
+                     "x64-avx512dqvl", "x64-avx512dqvl-vector256",
+                     "x64-bmi2", "x64-bmi2-vector256",
+                     "x64-avx2-bmi2", "x64-avx2-bmi2-vector256",
+                     "x64-avx512dqvl-bmi2", "x64-avx512dqvl-bmi2-vector256",
+                     "arm64-armbase", "arm64-armbase-vector256")
 PROFILE_DIRECTORY = VERIFY / "manifests/profiles"
 PROFILE_NAMES = PROFILES + tuple(sorted(path.stem for path in PROFILE_DIRECTORY.glob("*.json")))
 SEMANTICS_VERSION = "cil-uint256-operations-1"

@@ -6,7 +6,7 @@
     "targetFramework": "net10.0",
     "sdk": "10.0.401"
   },
-  "status": "implementation-in-progress; this inventory is not a verification certificate",
+  "status": "proof-gates-registered; current production certificates are required; this inventory is not a verification certificate",
   "entries": [
     {
       "signature": "System.Int32 Nethermind.Int256.UInt256::CompareTo(System.Object)",
@@ -32,8 +32,6 @@
       "signature": "System.Boolean Nethermind.Int256.UInt256::Equals(System.Int32)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": false,
         "returns": "System.Boolean",
@@ -46,14 +44,38 @@
           }
         ]
       },
-      "id": "EqualsInt32"
+      "id": "EqualsInt32",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_family_contract"
+        ],
+        "contract": "UInt256Model.Equality.ScalarContract: equality/complement against initial unsigned UInt256 and declared-width signed/unsigned primitive, normal Boolean return and caller-byte preservation",
+        "profileCoverage": "program-agreement",
+        "template": {
+          "kind": "scalar-equality",
+          "scalarKind": "s32",
+          "scalarFirst": false,
+          "instance": true,
+          "negateResult": false
+        },
+        "familyCoverage": {
+          "kind": "vector256-storage",
+          "theorem": "UInt256Proof.Selected.checked_family_contract",
+          "representatives": [
+            "scalar",
+            "x64-vector256"
+          ]
+        },
+        "fixtureGroup": "Equality"
+      }
     },
     {
       "signature": "System.Boolean Nethermind.Int256.UInt256::Equals(System.Int64)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": false,
         "returns": "System.Boolean",
@@ -66,14 +88,38 @@
           }
         ]
       },
-      "id": "EqualsInt64"
+      "id": "EqualsInt64",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_family_contract"
+        ],
+        "contract": "UInt256Model.Equality.ScalarContract: equality/complement against initial unsigned UInt256 and declared-width signed/unsigned primitive, normal Boolean return and caller-byte preservation",
+        "profileCoverage": "program-agreement",
+        "template": {
+          "kind": "scalar-equality",
+          "scalarKind": "s64",
+          "scalarFirst": false,
+          "instance": true,
+          "negateResult": false
+        },
+        "familyCoverage": {
+          "kind": "vector256-storage",
+          "theorem": "UInt256Proof.Selected.checked_family_contract",
+          "representatives": [
+            "scalar",
+            "x64-vector256"
+          ]
+        },
+        "fixtureGroup": "Equality"
+      }
     },
     {
       "signature": "System.Boolean Nethermind.Int256.UInt256::Equals(Nethermind.Int256.UInt256)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": false,
         "returns": "System.Boolean",
@@ -86,14 +132,32 @@
           }
         ]
       },
-      "id": "EqualsUInt256Value"
+      "id": "EqualsUInt256Value",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.Equality.SnapshotAudit:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Equality.checked_snapshot_contract",
+          "UInt256Proof.Equality.checked_snapshot_profile_contract",
+          "UInt256Proof.Equality.checked_snapshot_family_contract"
+        ],
+        "contract": "UInt256Model.Equality.SnapshotContract: equality of initial unsigned UInt256 and by-value UInt256 snapshot, finite normal Boolean return and preservation of every caller byte",
+        "profileCoverage": "program-agreement",
+        "familyCoverage": {
+          "kind": "vector-reduction",
+          "theorem": "UInt256Proof.Equality.checked_snapshot_family_contract",
+          "representatives": [
+            "scalar",
+            "x64-sse41",
+            "x64-vector256"
+          ]
+        },
+        "fixtureGroup": "Equality"
+      }
     },
     {
       "signature": "System.Int32 Nethermind.Int256.UInt256::CompareTo(Nethermind.Int256.UInt256)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": false,
         "returns": "System.Int32",
@@ -106,14 +170,23 @@
           }
         ]
       },
-      "id": "CompareToUInt256Value"
+      "id": "CompareToUInt256Value",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.Compare.ThreeWaySnapshotAudit:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Compare.checked_three_way_snapshot_contract",
+          "UInt256Proof.Compare.checked_three_way_snapshot_all_profiles_contract"
+        ],
+        "contract": "UInt256Model.Compare.ThreeWaySnapshotContract: unsigned comparison sign against initial by-value UInt256 snapshot, finite normal return and preservation of all caller bytes",
+        "profileCoverage": "all-valid-profiles",
+        "allProfiles": true,
+        "allProfilesTheorem": "UInt256Proof.Compare.checked_three_way_snapshot_all_profiles_contract"
+      }
     },
     {
       "signature": "System.Int32 Nethermind.Int256.UInt256::CompareTo(Nethermind.Int256.UInt256&)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": false,
         "returns": "System.Int32",
@@ -168,8 +241,6 @@
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_Equality(Nethermind.Int256.UInt256&,System.Int32)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -188,14 +259,38 @@
           }
         ]
       },
-      "id": "EqUInt256Int32"
+      "id": "EqUInt256Int32",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_family_contract"
+        ],
+        "contract": "UInt256Model.Equality.ScalarContract: equality/complement against initial unsigned UInt256 and declared-width signed/unsigned primitive, normal Boolean return and caller-byte preservation",
+        "profileCoverage": "program-agreement",
+        "template": {
+          "kind": "scalar-equality",
+          "scalarKind": "s32",
+          "scalarFirst": false,
+          "instance": false,
+          "negateResult": false
+        },
+        "familyCoverage": {
+          "kind": "vector256-storage",
+          "theorem": "UInt256Proof.Selected.checked_family_contract",
+          "representatives": [
+            "scalar",
+            "x64-vector256"
+          ]
+        },
+        "fixtureGroup": "Equality"
+      }
     },
     {
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_Equality(System.Int32,Nethermind.Int256.UInt256&)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -214,14 +309,38 @@
           }
         ]
       },
-      "id": "EqInt32UInt256"
+      "id": "EqInt32UInt256",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_family_contract"
+        ],
+        "contract": "UInt256Model.Equality.ScalarContract: equality/complement against initial unsigned UInt256 and declared-width signed/unsigned primitive, normal Boolean return and caller-byte preservation",
+        "profileCoverage": "program-agreement",
+        "template": {
+          "kind": "scalar-equality",
+          "scalarKind": "s32",
+          "scalarFirst": true,
+          "instance": false,
+          "negateResult": false
+        },
+        "familyCoverage": {
+          "kind": "vector256-storage",
+          "theorem": "UInt256Proof.Selected.checked_family_contract",
+          "representatives": [
+            "scalar",
+            "x64-vector256"
+          ]
+        },
+        "fixtureGroup": "Equality"
+      }
     },
     {
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_Equality(Nethermind.Int256.UInt256&,System.UInt32)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -240,14 +359,38 @@
           }
         ]
       },
-      "id": "EqUInt256UInt32"
+      "id": "EqUInt256UInt32",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_family_contract"
+        ],
+        "contract": "UInt256Model.Equality.ScalarContract: equality/complement against initial unsigned UInt256 and declared-width signed/unsigned primitive, normal Boolean return and caller-byte preservation",
+        "profileCoverage": "program-agreement",
+        "template": {
+          "kind": "scalar-equality",
+          "scalarKind": "u32",
+          "scalarFirst": false,
+          "instance": false,
+          "negateResult": false
+        },
+        "familyCoverage": {
+          "kind": "vector256-storage",
+          "theorem": "UInt256Proof.Selected.checked_family_contract",
+          "representatives": [
+            "scalar",
+            "x64-vector256"
+          ]
+        },
+        "fixtureGroup": "Equality"
+      }
     },
     {
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_Equality(System.UInt32,Nethermind.Int256.UInt256&)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -266,14 +409,38 @@
           }
         ]
       },
-      "id": "EqUInt32UInt256"
+      "id": "EqUInt32UInt256",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_family_contract"
+        ],
+        "contract": "UInt256Model.Equality.ScalarContract: equality/complement against initial unsigned UInt256 and declared-width signed/unsigned primitive, normal Boolean return and caller-byte preservation",
+        "profileCoverage": "program-agreement",
+        "template": {
+          "kind": "scalar-equality",
+          "scalarKind": "u32",
+          "scalarFirst": true,
+          "instance": false,
+          "negateResult": false
+        },
+        "familyCoverage": {
+          "kind": "vector256-storage",
+          "theorem": "UInt256Proof.Selected.checked_family_contract",
+          "representatives": [
+            "scalar",
+            "x64-vector256"
+          ]
+        },
+        "fixtureGroup": "Equality"
+      }
     },
     {
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_Equality(Nethermind.Int256.UInt256&,System.Int64)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -292,14 +459,38 @@
           }
         ]
       },
-      "id": "EqUInt256Int64"
+      "id": "EqUInt256Int64",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_family_contract"
+        ],
+        "contract": "UInt256Model.Equality.ScalarContract: equality/complement against initial unsigned UInt256 and declared-width signed/unsigned primitive, normal Boolean return and caller-byte preservation",
+        "profileCoverage": "program-agreement",
+        "template": {
+          "kind": "scalar-equality",
+          "scalarKind": "s64",
+          "scalarFirst": false,
+          "instance": false,
+          "negateResult": false
+        },
+        "familyCoverage": {
+          "kind": "vector256-storage",
+          "theorem": "UInt256Proof.Selected.checked_family_contract",
+          "representatives": [
+            "scalar",
+            "x64-vector256"
+          ]
+        },
+        "fixtureGroup": "Equality"
+      }
     },
     {
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_Equality(System.Int64,Nethermind.Int256.UInt256&)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -318,14 +509,38 @@
           }
         ]
       },
-      "id": "EqInt64UInt256"
+      "id": "EqInt64UInt256",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_family_contract"
+        ],
+        "contract": "UInt256Model.Equality.ScalarContract: equality/complement against initial unsigned UInt256 and declared-width signed/unsigned primitive, normal Boolean return and caller-byte preservation",
+        "profileCoverage": "program-agreement",
+        "template": {
+          "kind": "scalar-equality",
+          "scalarKind": "s64",
+          "scalarFirst": true,
+          "instance": false,
+          "negateResult": false
+        },
+        "familyCoverage": {
+          "kind": "vector256-storage",
+          "theorem": "UInt256Proof.Selected.checked_family_contract",
+          "representatives": [
+            "scalar",
+            "x64-vector256"
+          ]
+        },
+        "fixtureGroup": "Equality"
+      }
     },
     {
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_Equality(Nethermind.Int256.UInt256&,System.UInt64)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -344,14 +559,38 @@
           }
         ]
       },
-      "id": "EqUInt256UInt64"
+      "id": "EqUInt256UInt64",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_family_contract"
+        ],
+        "contract": "UInt256Model.Equality.ScalarContract: equality/complement against initial unsigned UInt256 and declared-width signed/unsigned primitive, normal Boolean return and caller-byte preservation",
+        "profileCoverage": "program-agreement",
+        "template": {
+          "kind": "scalar-equality",
+          "scalarKind": "u64",
+          "scalarFirst": false,
+          "instance": false,
+          "negateResult": false
+        },
+        "familyCoverage": {
+          "kind": "vector256-storage",
+          "theorem": "UInt256Proof.Selected.checked_family_contract",
+          "representatives": [
+            "scalar",
+            "x64-vector256"
+          ]
+        },
+        "fixtureGroup": "Equality"
+      }
     },
     {
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_Equality(System.UInt64,Nethermind.Int256.UInt256&)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -370,14 +609,38 @@
           }
         ]
       },
-      "id": "EqUInt64UInt256"
+      "id": "EqUInt64UInt256",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_family_contract"
+        ],
+        "contract": "UInt256Model.Equality.ScalarContract: equality/complement against initial unsigned UInt256 and declared-width signed/unsigned primitive, normal Boolean return and caller-byte preservation",
+        "profileCoverage": "program-agreement",
+        "template": {
+          "kind": "scalar-equality",
+          "scalarKind": "u64",
+          "scalarFirst": true,
+          "instance": false,
+          "negateResult": false
+        },
+        "familyCoverage": {
+          "kind": "vector256-storage",
+          "theorem": "UInt256Proof.Selected.checked_family_contract",
+          "representatives": [
+            "scalar",
+            "x64-vector256"
+          ]
+        },
+        "fixtureGroup": "Equality"
+      }
     },
     {
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_Inequality(Nethermind.Int256.UInt256&,System.Int32)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -396,14 +659,38 @@
           }
         ]
       },
-      "id": "NeUInt256Int32"
+      "id": "NeUInt256Int32",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_family_contract"
+        ],
+        "contract": "UInt256Model.Equality.ScalarContract: equality/complement against initial unsigned UInt256 and declared-width signed/unsigned primitive, normal Boolean return and caller-byte preservation",
+        "profileCoverage": "program-agreement",
+        "template": {
+          "kind": "scalar-equality",
+          "scalarKind": "s32",
+          "scalarFirst": false,
+          "instance": false,
+          "negateResult": true
+        },
+        "familyCoverage": {
+          "kind": "vector256-storage",
+          "theorem": "UInt256Proof.Selected.checked_family_contract",
+          "representatives": [
+            "scalar",
+            "x64-vector256"
+          ]
+        },
+        "fixtureGroup": "Equality"
+      }
     },
     {
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_Inequality(System.Int32,Nethermind.Int256.UInt256&)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -422,14 +709,38 @@
           }
         ]
       },
-      "id": "NeInt32UInt256"
+      "id": "NeInt32UInt256",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_family_contract"
+        ],
+        "contract": "UInt256Model.Equality.ScalarContract: equality/complement against initial unsigned UInt256 and declared-width signed/unsigned primitive, normal Boolean return and caller-byte preservation",
+        "profileCoverage": "program-agreement",
+        "template": {
+          "kind": "scalar-equality",
+          "scalarKind": "s32",
+          "scalarFirst": true,
+          "instance": false,
+          "negateResult": true
+        },
+        "familyCoverage": {
+          "kind": "vector256-storage",
+          "theorem": "UInt256Proof.Selected.checked_family_contract",
+          "representatives": [
+            "scalar",
+            "x64-vector256"
+          ]
+        },
+        "fixtureGroup": "Equality"
+      }
     },
     {
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_Inequality(Nethermind.Int256.UInt256&,System.UInt32)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -448,14 +759,38 @@
           }
         ]
       },
-      "id": "NeUInt256UInt32"
+      "id": "NeUInt256UInt32",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_family_contract"
+        ],
+        "contract": "UInt256Model.Equality.ScalarContract: equality/complement against initial unsigned UInt256 and declared-width signed/unsigned primitive, normal Boolean return and caller-byte preservation",
+        "profileCoverage": "program-agreement",
+        "template": {
+          "kind": "scalar-equality",
+          "scalarKind": "u32",
+          "scalarFirst": false,
+          "instance": false,
+          "negateResult": true
+        },
+        "familyCoverage": {
+          "kind": "vector256-storage",
+          "theorem": "UInt256Proof.Selected.checked_family_contract",
+          "representatives": [
+            "scalar",
+            "x64-vector256"
+          ]
+        },
+        "fixtureGroup": "Equality"
+      }
     },
     {
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_Inequality(System.UInt32,Nethermind.Int256.UInt256&)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -474,14 +809,38 @@
           }
         ]
       },
-      "id": "NeUInt32UInt256"
+      "id": "NeUInt32UInt256",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_family_contract"
+        ],
+        "contract": "UInt256Model.Equality.ScalarContract: equality/complement against initial unsigned UInt256 and declared-width signed/unsigned primitive, normal Boolean return and caller-byte preservation",
+        "profileCoverage": "program-agreement",
+        "template": {
+          "kind": "scalar-equality",
+          "scalarKind": "u32",
+          "scalarFirst": true,
+          "instance": false,
+          "negateResult": true
+        },
+        "familyCoverage": {
+          "kind": "vector256-storage",
+          "theorem": "UInt256Proof.Selected.checked_family_contract",
+          "representatives": [
+            "scalar",
+            "x64-vector256"
+          ]
+        },
+        "fixtureGroup": "Equality"
+      }
     },
     {
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_Inequality(Nethermind.Int256.UInt256&,System.Int64)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -500,14 +859,38 @@
           }
         ]
       },
-      "id": "NeUInt256Int64"
+      "id": "NeUInt256Int64",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_family_contract"
+        ],
+        "contract": "UInt256Model.Equality.ScalarContract: equality/complement against initial unsigned UInt256 and declared-width signed/unsigned primitive, normal Boolean return and caller-byte preservation",
+        "profileCoverage": "program-agreement",
+        "template": {
+          "kind": "scalar-equality",
+          "scalarKind": "s64",
+          "scalarFirst": false,
+          "instance": false,
+          "negateResult": true
+        },
+        "familyCoverage": {
+          "kind": "vector256-storage",
+          "theorem": "UInt256Proof.Selected.checked_family_contract",
+          "representatives": [
+            "scalar",
+            "x64-vector256"
+          ]
+        },
+        "fixtureGroup": "Equality"
+      }
     },
     {
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_Inequality(System.Int64,Nethermind.Int256.UInt256&)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -526,14 +909,38 @@
           }
         ]
       },
-      "id": "NeInt64UInt256"
+      "id": "NeInt64UInt256",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_family_contract"
+        ],
+        "contract": "UInt256Model.Equality.ScalarContract: equality/complement against initial unsigned UInt256 and declared-width signed/unsigned primitive, normal Boolean return and caller-byte preservation",
+        "profileCoverage": "program-agreement",
+        "template": {
+          "kind": "scalar-equality",
+          "scalarKind": "s64",
+          "scalarFirst": true,
+          "instance": false,
+          "negateResult": true
+        },
+        "familyCoverage": {
+          "kind": "vector256-storage",
+          "theorem": "UInt256Proof.Selected.checked_family_contract",
+          "representatives": [
+            "scalar",
+            "x64-vector256"
+          ]
+        },
+        "fixtureGroup": "Equality"
+      }
     },
     {
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_Inequality(Nethermind.Int256.UInt256&,System.UInt64)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -552,14 +959,38 @@
           }
         ]
       },
-      "id": "NeUInt256UInt64"
+      "id": "NeUInt256UInt64",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_family_contract"
+        ],
+        "contract": "UInt256Model.Equality.ScalarContract: equality/complement against initial unsigned UInt256 and declared-width signed/unsigned primitive, normal Boolean return and caller-byte preservation",
+        "profileCoverage": "program-agreement",
+        "template": {
+          "kind": "scalar-equality",
+          "scalarKind": "u64",
+          "scalarFirst": false,
+          "instance": false,
+          "negateResult": true
+        },
+        "familyCoverage": {
+          "kind": "vector256-storage",
+          "theorem": "UInt256Proof.Selected.checked_family_contract",
+          "representatives": [
+            "scalar",
+            "x64-vector256"
+          ]
+        },
+        "fixtureGroup": "Equality"
+      }
     },
     {
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_Inequality(System.UInt64,Nethermind.Int256.UInt256&)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -578,14 +1009,38 @@
           }
         ]
       },
-      "id": "NeUInt64UInt256"
+      "id": "NeUInt64UInt256",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_family_contract"
+        ],
+        "contract": "UInt256Model.Equality.ScalarContract: equality/complement against initial unsigned UInt256 and declared-width signed/unsigned primitive, normal Boolean return and caller-byte preservation",
+        "profileCoverage": "program-agreement",
+        "template": {
+          "kind": "scalar-equality",
+          "scalarKind": "u64",
+          "scalarFirst": true,
+          "instance": false,
+          "negateResult": true
+        },
+        "familyCoverage": {
+          "kind": "vector256-storage",
+          "theorem": "UInt256Proof.Selected.checked_family_contract",
+          "representatives": [
+            "scalar",
+            "x64-vector256"
+          ]
+        },
+        "fixtureGroup": "Equality"
+      }
     },
     {
       "signature": "Nethermind.Int256.UInt256 Nethermind.Int256.UInt256::op_ExclusiveOr(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
       "family": "Bitwise",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "Nethermind.Int256.UInt256",
@@ -604,14 +1059,41 @@
           }
         ]
       },
-      "id": "OperatorXor"
+      "id": "OperatorXor",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_family_contract"
+        ],
+        "contract": "UInt256Model.Bitwise.ReturnContract .xor: full-width bitwise XOR of initial UInt256 operands, finite normal UInt256 return and preservation of every caller byte",
+        "profileCoverage": "program-agreement",
+        "template": {
+          "kind": "returning-bitwise",
+          "operation": "xor"
+        },
+        "familyCoverage": {
+          "kind": "vector256-storage",
+          "theorem": "UInt256Proof.Selected.checked_family_contract",
+          "representatives": [
+            "scalar",
+            "x64-vector256"
+          ]
+        },
+        "fixtureGroup": "Bitwise",
+        "fixtureCases": [
+          "Baseline",
+          "BitwiseHelper",
+          "BitwiseWrongOperator",
+          "BitwiseEarlyStore"
+        ]
+      }
     },
     {
       "signature": "Nethermind.Int256.UInt256 Nethermind.Int256.UInt256::op_OnesComplement(Nethermind.Int256.UInt256&)",
       "family": "Bitwise",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "Nethermind.Int256.UInt256",
@@ -624,14 +1106,41 @@
           }
         ]
       },
-      "id": "OperatorNot"
+      "id": "OperatorNot",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_family_contract"
+        ],
+        "contract": "UInt256Model.Bitwise.NotReturnContract: full-width complement of initial UInt256 operand, finite normal UInt256 return and preservation of every caller byte",
+        "profileCoverage": "program-agreement",
+        "template": {
+          "kind": "returning-bitwise",
+          "operation": "not"
+        },
+        "familyCoverage": {
+          "kind": "vector256-storage",
+          "theorem": "UInt256Proof.Selected.checked_family_contract",
+          "representatives": [
+            "scalar",
+            "x64-vector256"
+          ]
+        },
+        "fixtureGroup": "Bitwise",
+        "fixtureCases": [
+          "Baseline",
+          "BitwiseHelper",
+          "BitwiseWrongOperator",
+          "BitwiseEarlyStore"
+        ]
+      }
     },
     {
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_Equality(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -655,18 +1164,27 @@
         "auditTarget": "+UInt256.Methods.Equality.EqualAudit:olean",
         "auditedTheorems": [
           "UInt256Proof.Equality.checked_equal_contract",
-          "UInt256Proof.Equality.checked_equal_profile_contract"
+          "UInt256Proof.Equality.checked_equal_profile_contract",
+          "UInt256Proof.Equality.checked_equal_family_contract"
         ],
         "contract": "UInt256Model.Equality.Contract; initial operands, exact result, normal return and caller-byte footprint",
-        "profileCoverage": "program-agreement"
+        "profileCoverage": "program-agreement",
+        "familyCoverage": {
+          "kind": "vector-reduction",
+          "theorem": "UInt256Proof.Equality.checked_equal_family_contract",
+          "representatives": [
+            "scalar",
+            "x64-sse41",
+            "x64-vector256"
+          ]
+        },
+        "fixtureGroup": "Equality"
       }
     },
     {
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_Inequality(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -690,18 +1208,27 @@
         "auditTarget": "+UInt256.Methods.Equality.UnequalAudit:olean",
         "auditedTheorems": [
           "UInt256Proof.Equality.checked_unequal_contract",
-          "UInt256Proof.Equality.checked_unequal_profile_contract"
+          "UInt256Proof.Equality.checked_unequal_profile_contract",
+          "UInt256Proof.Equality.checked_unequal_family_contract"
         ],
         "contract": "UInt256Model.Equality.InequalityContract; initial operands, exact Boolean, normal return and caller-byte preservation",
-        "profileCoverage": "program-agreement"
+        "profileCoverage": "program-agreement",
+        "familyCoverage": {
+          "kind": "vector-reduction",
+          "theorem": "UInt256Proof.Equality.checked_unequal_family_contract",
+          "representatives": [
+            "scalar",
+            "x64-sse41",
+            "x64-vector256"
+          ]
+        },
+        "fixtureGroup": "Equality"
       }
     },
     {
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThan(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -725,7 +1252,8 @@
         "auditTarget": "+UInt256.Methods.Compare.Audit:olean",
         "auditedTheorems": [
           "UInt256Proof.Compare.checked_less_contract",
-          "UInt256Proof.Compare.checked_less_profile_contract"
+          "UInt256Proof.Compare.checked_less_profile_contract",
+          "UInt256Proof.Compare.checked_less_family_contract"
         ],
         "contract": "UInt256Model.Compare.Contract, unsigned Relation.less; initial operands, normal return and caller-byte preservation",
         "profileCoverage": "program-agreement",
@@ -736,15 +1264,23 @@
           "ComparisonLowFirst",
           "ComparisonSigned",
           "ComparisonWrongLane"
-        ]
+        ],
+        "familyCoverage": {
+          "kind": "relational-dispatch",
+          "theorem": "UInt256Proof.Compare.checked_less_family_contract",
+          "representatives": [
+            "scalar",
+            "x64-vector256",
+            "x64-avx2",
+            "x64-avx512"
+          ]
+        }
       }
     },
     {
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThan(Nethermind.Int256.UInt256&,System.Int32)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -787,8 +1323,6 @@
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThan(System.Int32,Nethermind.Int256.UInt256&)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -831,8 +1365,6 @@
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThan(Nethermind.Int256.UInt256&,System.UInt32)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -875,8 +1407,6 @@
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThan(System.UInt32,Nethermind.Int256.UInt256&)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -919,8 +1449,6 @@
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThan(Nethermind.Int256.UInt256&,System.Int64)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -963,8 +1491,6 @@
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThan(System.Int64,Nethermind.Int256.UInt256&)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -1007,8 +1533,6 @@
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThan(Nethermind.Int256.UInt256&,System.UInt64)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -1051,8 +1575,6 @@
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThan(System.UInt64,Nethermind.Int256.UInt256&)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -1095,8 +1617,6 @@
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThanOrEqual(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -1120,18 +1640,27 @@
         "auditTarget": "+UInt256.Methods.Compare.LessEqualAudit:olean",
         "auditedTheorems": [
           "UInt256Proof.Compare.checked_less_equal_contract",
-          "UInt256Proof.Compare.checked_less_equal_profile_contract"
+          "UInt256Proof.Compare.checked_less_equal_profile_contract",
+          "UInt256Proof.Compare.checked_less_equal_family_contract"
         ],
         "contract": "UInt256Model.Compare.Contract .lessEqual; initial operands, exact Boolean, normal return and caller-byte preservation",
-        "profileCoverage": "program-agreement"
+        "profileCoverage": "program-agreement",
+        "familyCoverage": {
+          "kind": "relational-dispatch",
+          "theorem": "UInt256Proof.Compare.checked_less_equal_family_contract",
+          "representatives": [
+            "scalar",
+            "x64-vector256",
+            "x64-avx2",
+            "x64-avx512"
+          ]
+        }
       }
     },
     {
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThanOrEqual(Nethermind.Int256.UInt256&,System.Int32)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -1174,8 +1703,6 @@
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThanOrEqual(System.Int32,Nethermind.Int256.UInt256&)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -1218,8 +1745,6 @@
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThanOrEqual(Nethermind.Int256.UInt256&,System.UInt32)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -1262,8 +1787,6 @@
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThanOrEqual(System.UInt32,Nethermind.Int256.UInt256&)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -1306,8 +1829,6 @@
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThanOrEqual(Nethermind.Int256.UInt256&,System.Int64)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -1350,8 +1871,6 @@
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThanOrEqual(System.Int64,Nethermind.Int256.UInt256&)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -1394,8 +1913,6 @@
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThanOrEqual(Nethermind.Int256.UInt256&,System.UInt64)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -1438,8 +1955,6 @@
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThanOrEqual(System.UInt64,Nethermind.Int256.UInt256)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -1458,14 +1973,23 @@
           }
         ]
       },
-      "id": "LeUInt64UInt256"
+      "id": "LeUInt64UInt256",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.Compare.ScalarSnapshotAudit:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Compare.checked_scalar_snapshot_contract",
+          "UInt256Proof.Compare.checked_scalar_snapshot_all_profiles_contract"
+        ],
+        "contract": "UInt256Proof.Compare.ScalarSnapshotContract .lessEqual: unsigned UInt64 compared with initial by-value UInt256 snapshot, finite Boolean return and preservation of all caller bytes",
+        "profileCoverage": "all-valid-profiles",
+        "allProfiles": true,
+        "allProfilesTheorem": "UInt256Proof.Compare.checked_scalar_snapshot_all_profiles_contract"
+      }
     },
     {
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThan(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -1489,18 +2013,27 @@
         "auditTarget": "+UInt256.Methods.Compare.GreaterAudit:olean",
         "auditedTheorems": [
           "UInt256Proof.Compare.checked_greater_contract",
-          "UInt256Proof.Compare.checked_greater_profile_contract"
+          "UInt256Proof.Compare.checked_greater_profile_contract",
+          "UInt256Proof.Compare.checked_greater_family_contract"
         ],
         "contract": "UInt256Model.Compare.Contract .greater; initial operands, exact Boolean, normal return and caller-byte preservation",
-        "profileCoverage": "program-agreement"
+        "profileCoverage": "program-agreement",
+        "familyCoverage": {
+          "kind": "relational-dispatch",
+          "theorem": "UInt256Proof.Compare.checked_greater_family_contract",
+          "representatives": [
+            "scalar",
+            "x64-vector256",
+            "x64-avx2",
+            "x64-avx512"
+          ]
+        }
       }
     },
     {
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThan(Nethermind.Int256.UInt256&,System.Int32)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -1543,8 +2076,6 @@
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThan(System.Int32,Nethermind.Int256.UInt256&)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -1587,8 +2118,6 @@
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThan(Nethermind.Int256.UInt256&,System.UInt32)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -1631,8 +2160,6 @@
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThan(System.UInt32,Nethermind.Int256.UInt256&)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -1675,8 +2202,6 @@
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThan(Nethermind.Int256.UInt256&,System.Int64)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -1719,8 +2244,6 @@
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThan(System.Int64,Nethermind.Int256.UInt256&)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -1763,8 +2286,6 @@
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThan(Nethermind.Int256.UInt256&,System.UInt64)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -1807,8 +2328,6 @@
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThan(System.UInt64,Nethermind.Int256.UInt256&)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -1851,8 +2370,6 @@
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThanOrEqual(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -1876,18 +2393,27 @@
         "auditTarget": "+UInt256.Methods.Compare.GreaterEqualAudit:olean",
         "auditedTheorems": [
           "UInt256Proof.Compare.checked_greater_equal_contract",
-          "UInt256Proof.Compare.checked_greater_equal_profile_contract"
+          "UInt256Proof.Compare.checked_greater_equal_profile_contract",
+          "UInt256Proof.Compare.checked_greater_equal_family_contract"
         ],
         "contract": "UInt256Model.Compare.Contract .greaterEqual; initial operands, exact Boolean, normal return and caller-byte preservation",
-        "profileCoverage": "program-agreement"
+        "profileCoverage": "program-agreement",
+        "familyCoverage": {
+          "kind": "relational-dispatch",
+          "theorem": "UInt256Proof.Compare.checked_greater_equal_family_contract",
+          "representatives": [
+            "scalar",
+            "x64-vector256",
+            "x64-avx2",
+            "x64-avx512"
+          ]
+        }
       }
     },
     {
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThanOrEqual(Nethermind.Int256.UInt256&,System.Int32)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -1930,8 +2456,6 @@
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThanOrEqual(System.Int32,Nethermind.Int256.UInt256&)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -1974,8 +2498,6 @@
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThanOrEqual(Nethermind.Int256.UInt256&,System.UInt32)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -2018,8 +2540,6 @@
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThanOrEqual(System.UInt32,Nethermind.Int256.UInt256&)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -2062,8 +2582,6 @@
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThanOrEqual(Nethermind.Int256.UInt256&,System.Int64)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -2106,8 +2624,6 @@
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThanOrEqual(System.Int64,Nethermind.Int256.UInt256&)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -2150,8 +2666,6 @@
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThanOrEqual(Nethermind.Int256.UInt256&,System.UInt64)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -2194,8 +2708,6 @@
       "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThanOrEqual(System.UInt64,Nethermind.Int256.UInt256&)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -2238,8 +2750,6 @@
       "signature": "Nethermind.Int256.UInt256 Nethermind.Int256.UInt256::op_BitwiseOr(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
       "family": "Bitwise",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "Nethermind.Int256.UInt256",
@@ -2258,14 +2768,41 @@
           }
         ]
       },
-      "id": "OperatorOr"
+      "id": "OperatorOr",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_family_contract"
+        ],
+        "contract": "UInt256Model.Bitwise.ReturnContract .or: full-width bitwise OR of initial UInt256 operands, finite normal UInt256 return and preservation of every caller byte",
+        "profileCoverage": "program-agreement",
+        "template": {
+          "kind": "returning-bitwise",
+          "operation": "or"
+        },
+        "familyCoverage": {
+          "kind": "vector256-storage",
+          "theorem": "UInt256Proof.Selected.checked_family_contract",
+          "representatives": [
+            "scalar",
+            "x64-vector256"
+          ]
+        },
+        "fixtureGroup": "Bitwise",
+        "fixtureCases": [
+          "Baseline",
+          "BitwiseHelper",
+          "BitwiseWrongOperator",
+          "BitwiseEarlyStore"
+        ]
+      }
     },
     {
       "signature": "Nethermind.Int256.UInt256 Nethermind.Int256.UInt256::op_BitwiseAnd(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
       "family": "Bitwise",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "Nethermind.Int256.UInt256",
@@ -2284,14 +2821,41 @@
           }
         ]
       },
-      "id": "OperatorAnd"
+      "id": "OperatorAnd",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_family_contract"
+        ],
+        "contract": "UInt256Model.Bitwise.ReturnContract .and: full-width bitwise AND of initial UInt256 operands, finite normal UInt256 return and preservation of every caller byte",
+        "profileCoverage": "program-agreement",
+        "template": {
+          "kind": "returning-bitwise",
+          "operation": "and"
+        },
+        "familyCoverage": {
+          "kind": "vector256-storage",
+          "theorem": "UInt256Proof.Selected.checked_family_contract",
+          "representatives": [
+            "scalar",
+            "x64-vector256"
+          ]
+        },
+        "fixtureGroup": "Bitwise",
+        "fixtureCases": [
+          "Baseline",
+          "BitwiseHelper",
+          "BitwiseWrongOperator",
+          "BitwiseEarlyStore"
+        ]
+      }
     },
     {
       "signature": "System.Void Nethermind.Int256.UInt256::Not(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
       "family": "Bitwise",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Void",
@@ -2315,18 +2879,25 @@
         "auditTarget": "+UInt256.Methods.Bitwise.NotAudit:olean",
         "auditedTheorems": [
           "UInt256Proof.Bitwise.checked_not_contract",
-          "UInt256Proof.Bitwise.checked_not_profile_contract"
+          "UInt256Proof.Bitwise.checked_not_profile_contract",
+          "UInt256Proof.Bitwise.checked_not_family_contract"
         ],
         "contract": "UInt256Model.Bitwise.NotContract; initial operands, exact result, normal return and caller-byte footprint",
-        "profileCoverage": "program-agreement"
+        "profileCoverage": "program-agreement",
+        "familyCoverage": {
+          "kind": "vector256-storage",
+          "theorem": "UInt256Proof.Bitwise.checked_not_family_contract",
+          "representatives": [
+            "scalar",
+            "x64-vector256"
+          ]
+        }
       }
     },
     {
       "signature": "System.Void Nethermind.Int256.UInt256::Or(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
       "family": "Bitwise",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Void",
@@ -2356,13 +2927,22 @@
         "auditTarget": "+UInt256.Methods.SelectedGate:olean",
         "auditedTheorems": [
           "UInt256Proof.Selected.checked_contract",
-          "UInt256Proof.Selected.checked_profile_contract"
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_family_contract"
         ],
         "contract": "UInt256Model.Bitwise.Contract .or: initial operands, finite normal void return, arbitrary overlap and 32-byte output footprint",
         "profileCoverage": "program-agreement",
         "template": {
           "kind": "binary-bitwise",
           "operation": "or"
+        },
+        "familyCoverage": {
+          "kind": "vector256-storage",
+          "theorem": "UInt256Proof.Selected.checked_family_contract",
+          "representatives": [
+            "scalar",
+            "x64-vector256"
+          ]
         }
       }
     },
@@ -2370,8 +2950,6 @@
       "signature": "System.Void Nethermind.Int256.UInt256::And(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
       "family": "Bitwise",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Void",
@@ -2401,13 +2979,22 @@
         "auditTarget": "+UInt256.Methods.SelectedGate:olean",
         "auditedTheorems": [
           "UInt256Proof.Selected.checked_contract",
-          "UInt256Proof.Selected.checked_profile_contract"
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_family_contract"
         ],
         "contract": "UInt256Model.Bitwise.Contract .and: initial operands, finite normal void return, arbitrary overlap and 32-byte output footprint",
         "profileCoverage": "program-agreement",
         "template": {
           "kind": "binary-bitwise",
           "operation": "and"
+        },
+        "familyCoverage": {
+          "kind": "vector256-storage",
+          "theorem": "UInt256Proof.Selected.checked_family_contract",
+          "representatives": [
+            "scalar",
+            "x64-vector256"
+          ]
         }
       }
     },
@@ -2415,8 +3002,6 @@
       "signature": "System.Void Nethermind.Int256.UInt256::Xor(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
       "family": "Bitwise",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": true,
         "returns": "System.Void",
@@ -2446,7 +3031,8 @@
         "auditTarget": "+UInt256.Methods.Bitwise.XorAudit:olean",
         "auditedTheorems": [
           "UInt256Proof.Bitwise.checked_xor_contract",
-          "UInt256Proof.Bitwise.checked_xor_profile_contract"
+          "UInt256Proof.Bitwise.checked_xor_profile_contract",
+          "UInt256Proof.Bitwise.checked_xor_family_contract"
         ],
         "contract": "UInt256Model.Bitwise.Contract .xor; initial operands, exact bitwise result, normal return, arbitrary overlap and caller-byte preservation",
         "profileCoverage": "program-agreement",
@@ -2456,15 +3042,21 @@
           "BitwiseHelper",
           "BitwiseWrongOperator",
           "BitwiseEarlyStore"
-        ]
+        ],
+        "familyCoverage": {
+          "kind": "vector256-storage",
+          "theorem": "UInt256Proof.Bitwise.checked_xor_family_contract",
+          "representatives": [
+            "scalar",
+            "x64-vector256"
+          ]
+        }
       }
     },
     {
       "signature": "System.Boolean Nethermind.Int256.UInt256::Equals(System.UInt32)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": false,
         "returns": "System.Boolean",
@@ -2477,14 +3069,38 @@
           }
         ]
       },
-      "id": "EqualsUInt32"
+      "id": "EqualsUInt32",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_family_contract"
+        ],
+        "contract": "UInt256Model.Equality.ScalarContract: equality/complement against initial unsigned UInt256 and declared-width signed/unsigned primitive, normal Boolean return and caller-byte preservation",
+        "profileCoverage": "program-agreement",
+        "template": {
+          "kind": "scalar-equality",
+          "scalarKind": "u32",
+          "scalarFirst": false,
+          "instance": true,
+          "negateResult": false
+        },
+        "familyCoverage": {
+          "kind": "vector256-storage",
+          "theorem": "UInt256Proof.Selected.checked_family_contract",
+          "representatives": [
+            "scalar",
+            "x64-vector256"
+          ]
+        },
+        "fixtureGroup": "Equality"
+      }
     },
     {
       "signature": "System.Boolean Nethermind.Int256.UInt256::Equals(System.UInt64)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": false,
         "returns": "System.Boolean",
@@ -2497,14 +3113,38 @@
           }
         ]
       },
-      "id": "EqualsUInt64"
+      "id": "EqualsUInt64",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.SelectedGate:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Selected.checked_contract",
+          "UInt256Proof.Selected.checked_profile_contract",
+          "UInt256Proof.Selected.checked_family_contract"
+        ],
+        "contract": "UInt256Model.Equality.ScalarContract: equality/complement against initial unsigned UInt256 and declared-width signed/unsigned primitive, normal Boolean return and caller-byte preservation",
+        "profileCoverage": "program-agreement",
+        "template": {
+          "kind": "scalar-equality",
+          "scalarKind": "u64",
+          "scalarFirst": false,
+          "instance": true,
+          "negateResult": false
+        },
+        "familyCoverage": {
+          "kind": "vector256-storage",
+          "theorem": "UInt256Proof.Selected.checked_family_contract",
+          "representatives": [
+            "scalar",
+            "x64-vector256"
+          ]
+        },
+        "fixtureGroup": "Equality"
+      }
     },
     {
       "signature": "System.Boolean Nethermind.Int256.UInt256::Equals(Nethermind.Int256.UInt256&)",
       "family": "Comparison",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending expanded valid-profile enumeration and checked transport",
       "callingConvention": {
         "static": false,
         "returns": "System.Boolean",
@@ -2517,14 +3157,32 @@
           }
         ]
       },
-      "id": "EqualsUInt256Ref"
+      "id": "EqualsUInt256Ref",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.Equality.EqualAudit:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Equality.checked_equal_contract",
+          "UInt256Proof.Equality.checked_equal_profile_contract",
+          "UInt256Proof.Equality.checked_equal_family_contract"
+        ],
+        "contract": "UInt256Model.Equality.Contract; initial operands, exact result, normal return and caller-byte footprint",
+        "profileCoverage": "program-agreement",
+        "familyCoverage": {
+          "kind": "vector-reduction",
+          "theorem": "UInt256Proof.Equality.checked_equal_family_contract",
+          "representatives": [
+            "scalar",
+            "x64-sse41",
+            "x64-vector256"
+          ]
+        },
+        "fixtureGroup": "Equality"
+      }
     },
     {
       "signature": "System.Void Nethermind.Int256.UInt256::Multiply(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
       "family": "Multiply",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending exact extracted dependencies and expanded profile enumeration",
       "callingConvention": {
         "static": true,
         "returns": "System.Void",
@@ -2549,14 +3207,52 @@
           }
         ]
       },
-      "id": "Multiply"
+      "id": "Multiply",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.Multiply.Audit:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Multiply.checked_contract",
+          "UInt256Proof.Multiply.checked_profile_contract",
+          "UInt256Proof.Multiply.checked_family_contract"
+        ],
+        "contract": "Initial operand product modulo 2^256, finite normal void return, arbitrary overlap, and caller-byte preservation outside output",
+        "profileCoverage": "program-agreement",
+        "familyCoverage": {
+          "kind": "multiply-dispatch-storage",
+          "theorem": "UInt256Proof.Multiply.checked_family_contract",
+          "representatives": [
+            "scalar",
+            "x64-vector256",
+            "x64-avx2",
+            "x64-avx2-vector256",
+            "x64-avx512dqvl",
+            "x64-avx512dqvl-vector256",
+            "x64-bmi2",
+            "x64-bmi2-vector256",
+            "x64-avx2-bmi2",
+            "x64-avx2-bmi2-vector256",
+            "x64-avx512dqvl-bmi2",
+            "x64-avx512dqvl-bmi2-vector256",
+            "arm64-armbase",
+            "arm64-armbase-vector256"
+          ]
+        },
+        "fixtureCases": [
+          "Baseline",
+          "AlternativeOrder",
+          "ExtractedHelper",
+          "WrongCarry",
+          "WrongCrossProduct",
+          "WrongAliasing",
+          "WrongHighLow",
+          "WrongBmiHigh"
+        ]
+      }
     },
     {
       "signature": "System.Void Nethermind.Int256.UInt256::Lsh(Nethermind.Int256.UInt256&,System.Int32,Nethermind.Int256.UInt256&)",
       "family": "Shift",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending exact extracted dependencies and expanded profile enumeration",
       "callingConvention": {
         "static": true,
         "returns": "System.Void",
@@ -2616,8 +3312,6 @@
       "signature": "System.Void Nethermind.Int256.UInt256::Rsh(Nethermind.Int256.UInt256&,System.Int32,Nethermind.Int256.UInt256&)",
       "family": "Shift",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending exact extracted dependencies and expanded profile enumeration",
       "callingConvention": {
         "static": true,
         "returns": "System.Void",
@@ -2674,8 +3368,6 @@
       "signature": "Nethermind.Int256.UInt256 Nethermind.Int256.UInt256::op_Multiply(Nethermind.Int256.UInt256&,System.UInt32)",
       "family": "Multiply",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending exact extracted dependencies and expanded profile enumeration",
       "callingConvention": {
         "static": true,
         "returns": "Nethermind.Int256.UInt256",
@@ -2694,14 +3386,42 @@
           }
         ]
       },
-      "id": "OperatorMultiplyUInt256UInt32"
+      "id": "OperatorMultiplyUInt256UInt32",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.Multiply.ScalarUInt32RightAudit:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Multiply.scalar_return_checked_contract",
+          "UInt256Proof.Multiply.scalar_return_checked_profile_contract",
+          "UInt256Proof.Multiply.scalar_return_checked_family_contract"
+        ],
+        "contract": "Returned initial UInt256 input times the unsigned UInt32 operand modulo 2^256, finite normal return, and preservation of every caller byte",
+        "profileCoverage": "program-agreement",
+        "familyCoverage": {
+          "kind": "multiply-dispatch-storage",
+          "theorem": "UInt256Proof.Multiply.scalar_return_checked_family_contract",
+          "representatives": [
+            "scalar",
+            "x64-vector256",
+            "x64-avx2",
+            "x64-avx2-vector256",
+            "x64-avx512dqvl",
+            "x64-avx512dqvl-vector256",
+            "x64-bmi2",
+            "x64-bmi2-vector256",
+            "x64-avx2-bmi2",
+            "x64-avx2-bmi2-vector256",
+            "x64-avx512dqvl-bmi2",
+            "x64-avx512dqvl-bmi2-vector256",
+            "arm64-armbase",
+            "arm64-armbase-vector256"
+          ]
+        }
+      }
     },
     {
       "signature": "Nethermind.Int256.UInt256 Nethermind.Int256.UInt256::op_Multiply(System.UInt32,Nethermind.Int256.UInt256&)",
       "family": "Multiply",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending exact extracted dependencies and expanded profile enumeration",
       "callingConvention": {
         "static": true,
         "returns": "Nethermind.Int256.UInt256",
@@ -2720,14 +3440,42 @@
           }
         ]
       },
-      "id": "OperatorMultiplyUInt32UInt256"
+      "id": "OperatorMultiplyUInt32UInt256",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.Multiply.ScalarUInt32LeftAudit:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Multiply.scalar_return_checked_contract",
+          "UInt256Proof.Multiply.scalar_return_checked_profile_contract",
+          "UInt256Proof.Multiply.scalar_return_checked_family_contract"
+        ],
+        "contract": "Returned initial UInt256 input times the unsigned UInt32 operand modulo 2^256, finite normal return, and preservation of every caller byte",
+        "profileCoverage": "program-agreement",
+        "familyCoverage": {
+          "kind": "multiply-dispatch-storage",
+          "theorem": "UInt256Proof.Multiply.scalar_return_checked_family_contract",
+          "representatives": [
+            "scalar",
+            "x64-vector256",
+            "x64-avx2",
+            "x64-avx2-vector256",
+            "x64-avx512dqvl",
+            "x64-avx512dqvl-vector256",
+            "x64-bmi2",
+            "x64-bmi2-vector256",
+            "x64-avx2-bmi2",
+            "x64-avx2-bmi2-vector256",
+            "x64-avx512dqvl-bmi2",
+            "x64-avx512dqvl-bmi2-vector256",
+            "arm64-armbase",
+            "arm64-armbase-vector256"
+          ]
+        }
+      }
     },
     {
       "signature": "Nethermind.Int256.UInt256 Nethermind.Int256.UInt256::op_Multiply(Nethermind.Int256.UInt256&,System.UInt64)",
       "family": "Multiply",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending exact extracted dependencies and expanded profile enumeration",
       "callingConvention": {
         "static": true,
         "returns": "Nethermind.Int256.UInt256",
@@ -2746,14 +3494,42 @@
           }
         ]
       },
-      "id": "OperatorMultiplyUInt256UInt64"
+      "id": "OperatorMultiplyUInt256UInt64",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.Multiply.ScalarUInt64RightAudit:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Multiply.scalar_return_checked_contract",
+          "UInt256Proof.Multiply.scalar_return_checked_profile_contract",
+          "UInt256Proof.Multiply.scalar_return_checked_family_contract"
+        ],
+        "contract": "Returned initial UInt256 input times the unsigned UInt64 operand modulo 2^256, finite normal return, and preservation of every caller byte",
+        "profileCoverage": "program-agreement",
+        "familyCoverage": {
+          "kind": "multiply-dispatch-storage",
+          "theorem": "UInt256Proof.Multiply.scalar_return_checked_family_contract",
+          "representatives": [
+            "scalar",
+            "x64-vector256",
+            "x64-avx2",
+            "x64-avx2-vector256",
+            "x64-avx512dqvl",
+            "x64-avx512dqvl-vector256",
+            "x64-bmi2",
+            "x64-bmi2-vector256",
+            "x64-avx2-bmi2",
+            "x64-avx2-bmi2-vector256",
+            "x64-avx512dqvl-bmi2",
+            "x64-avx512dqvl-bmi2-vector256",
+            "arm64-armbase",
+            "arm64-armbase-vector256"
+          ]
+        }
+      }
     },
     {
       "signature": "Nethermind.Int256.UInt256 Nethermind.Int256.UInt256::op_Multiply(System.UInt64,Nethermind.Int256.UInt256&)",
       "family": "Multiply",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending exact extracted dependencies and expanded profile enumeration",
       "callingConvention": {
         "static": true,
         "returns": "Nethermind.Int256.UInt256",
@@ -2772,14 +3548,42 @@
           }
         ]
       },
-      "id": "OperatorMultiplyUInt64UInt256"
+      "id": "OperatorMultiplyUInt64UInt256",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.Multiply.ScalarUInt64LeftAudit:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Multiply.scalar_return_checked_contract",
+          "UInt256Proof.Multiply.scalar_return_checked_profile_contract",
+          "UInt256Proof.Multiply.scalar_return_checked_family_contract"
+        ],
+        "contract": "Returned initial UInt256 input times the unsigned UInt64 operand modulo 2^256, finite normal return, and preservation of every caller byte",
+        "profileCoverage": "program-agreement",
+        "familyCoverage": {
+          "kind": "multiply-dispatch-storage",
+          "theorem": "UInt256Proof.Multiply.scalar_return_checked_family_contract",
+          "representatives": [
+            "scalar",
+            "x64-vector256",
+            "x64-avx2",
+            "x64-avx2-vector256",
+            "x64-avx512dqvl",
+            "x64-avx512dqvl-vector256",
+            "x64-bmi2",
+            "x64-bmi2-vector256",
+            "x64-avx2-bmi2",
+            "x64-avx2-bmi2-vector256",
+            "x64-avx512dqvl-bmi2",
+            "x64-avx512dqvl-bmi2-vector256",
+            "arm64-armbase",
+            "arm64-armbase-vector256"
+          ]
+        }
+      }
     },
     {
       "signature": "Nethermind.Int256.UInt256 Nethermind.Int256.UInt256::op_Multiply(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
       "family": "Multiply",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending exact extracted dependencies and expanded profile enumeration",
       "callingConvention": {
         "static": true,
         "returns": "Nethermind.Int256.UInt256",
@@ -2798,14 +3602,42 @@
           }
         ]
       },
-      "id": "OperatorMultiplyUInt256UInt256"
+      "id": "OperatorMultiplyUInt256UInt256",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.Multiply.ReturnAudit:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Multiply.return_checked_contract",
+          "UInt256Proof.Multiply.return_checked_profile_contract",
+          "UInt256Proof.Multiply.return_checked_family_contract"
+        ],
+        "contract": "Returned initial operand product modulo 2^256, finite normal return, and preservation of every caller byte",
+        "profileCoverage": "program-agreement",
+        "familyCoverage": {
+          "kind": "multiply-dispatch-storage",
+          "theorem": "UInt256Proof.Multiply.return_checked_family_contract",
+          "representatives": [
+            "scalar",
+            "x64-vector256",
+            "x64-avx2",
+            "x64-avx2-vector256",
+            "x64-avx512dqvl",
+            "x64-avx512dqvl-vector256",
+            "x64-bmi2",
+            "x64-bmi2-vector256",
+            "x64-avx2-bmi2",
+            "x64-avx2-bmi2-vector256",
+            "x64-avx512dqvl-bmi2",
+            "x64-avx512dqvl-bmi2-vector256",
+            "arm64-armbase",
+            "arm64-armbase-vector256"
+          ]
+        }
+      }
     },
     {
       "signature": "System.Void Nethermind.Int256.UInt256::Multiply(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
       "family": "Multiply",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending exact extracted dependencies and expanded profile enumeration",
       "callingConvention": {
         "static": false,
         "returns": "System.Void",
@@ -2824,14 +3656,42 @@
           }
         ]
       },
-      "id": "MultiplyInstance"
+      "id": "MultiplyInstance",
+      "verification": {
+        "auditTarget": "+UInt256.Methods.Multiply.Audit:olean",
+        "auditedTheorems": [
+          "UInt256Proof.Multiply.checked_contract",
+          "UInt256Proof.Multiply.checked_profile_contract",
+          "UInt256Proof.Multiply.checked_family_contract"
+        ],
+        "contract": "Initial operand product modulo 2^256, finite normal void return, arbitrary overlap, and caller-byte preservation outside output",
+        "profileCoverage": "program-agreement",
+        "familyCoverage": {
+          "kind": "multiply-dispatch-storage",
+          "theorem": "UInt256Proof.Multiply.checked_family_contract",
+          "representatives": [
+            "scalar",
+            "x64-vector256",
+            "x64-avx2",
+            "x64-avx2-vector256",
+            "x64-avx512dqvl",
+            "x64-avx512dqvl-vector256",
+            "x64-bmi2",
+            "x64-bmi2-vector256",
+            "x64-avx2-bmi2",
+            "x64-avx2-bmi2-vector256",
+            "x64-avx512dqvl-bmi2",
+            "x64-avx512dqvl-bmi2-vector256",
+            "arm64-armbase",
+            "arm64-armbase-vector256"
+          ]
+        }
+      }
     },
     {
       "signature": "System.Void Nethermind.Int256.UInt256::LeftShift(System.Int32,Nethermind.Int256.UInt256&)",
       "family": "Shift",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending exact extracted dependencies and expanded profile enumeration",
       "callingConvention": {
         "static": false,
         "returns": "System.Void",
@@ -2885,8 +3745,6 @@
       "signature": "System.Void Nethermind.Int256.UInt256::RightShift(System.Int32,Nethermind.Int256.UInt256&)",
       "family": "Shift",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending exact extracted dependencies and expanded profile enumeration",
       "callingConvention": {
         "static": false,
         "returns": "System.Void",
@@ -2937,8 +3795,6 @@
       "signature": "Nethermind.Int256.UInt256 Nethermind.Int256.UInt256::op_LeftShift(Nethermind.Int256.UInt256&,System.Int32)",
       "family": "Shift",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending exact extracted dependencies and expanded profile enumeration",
       "callingConvention": {
         "static": true,
         "returns": "Nethermind.Int256.UInt256",
@@ -2991,8 +3847,6 @@
       "signature": "Nethermind.Int256.UInt256 Nethermind.Int256.UInt256::op_RightShift(Nethermind.Int256.UInt256&,System.Int32)",
       "family": "Shift",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "pending exact extracted dependencies and expanded profile enumeration",
       "callingConvention": {
         "static": true,
         "returns": "Nethermind.Int256.UInt256",
@@ -3042,8 +3896,6 @@
       "signature": "System.Boolean Nethermind.Int256.UInt256::AddOverflow(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
       "family": "Reporting",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "all applicable baseline feature configurations; proof pending",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -3073,7 +3925,8 @@
         "auditTarget": "+UInt256.Methods.Reporting.AddAudit:olean",
         "auditedTheorems": [
           "UInt256Proof.Reporting.checked_add_contract",
-          "UInt256Proof.Reporting.checked_add_profile_contract"
+          "UInt256Proof.Reporting.checked_add_profile_contract",
+          "UInt256Proof.Reporting.checked_add_family_contract"
         ],
         "contract": "Reporting.Contract .add; initial operands, exact mathematical overflow flag, wrapping result, normal return and arbitrary overlap",
         "profileCoverage": "program-agreement",
@@ -3099,6 +3952,19 @@
           "WrongAlignment": "Public.cs",
           "WrongTop": "Public.cs",
           "EarlyReread": "Public.cs"
+        },
+        "familyCoverage": {
+          "kind": "feature-class",
+          "theorem": "UInt256Proof.Reporting.checked_add_family_contract",
+          "representatives": [
+            "scalar",
+            "arm64-advsimd",
+            "x64-sse42",
+            "x64-avx2",
+            "x64-avx2-bmi1",
+            "x64-avx512",
+            "x64-avx512-bmi1"
+          ]
         }
       }
     },
@@ -3106,8 +3972,6 @@
       "signature": "System.Boolean Nethermind.Int256.UInt256::SubtractUnderflow(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
       "family": "Reporting",
       "selection": "selected",
-      "proofStatus": "not-yet-proved",
-      "featureCoverageStatus": "all applicable baseline feature configurations; proof pending",
       "callingConvention": {
         "static": true,
         "returns": "System.Boolean",
@@ -3137,7 +4001,8 @@
         "auditTarget": "+UInt256.Methods.Reporting.SubtractAudit:olean",
         "auditedTheorems": [
           "UInt256Proof.Reporting.checked_subtract_contract",
-          "UInt256Proof.Reporting.checked_subtract_profile_contract"
+          "UInt256Proof.Reporting.checked_subtract_profile_contract",
+          "UInt256Proof.Reporting.checked_subtract_family_contract"
         ],
         "contract": "Reporting.Contract .subtract; initial operands, exact mathematical underflow flag, wrapping result, normal return and arbitrary overlap",
         "profileCoverage": "program-agreement",
@@ -3163,6 +4028,19 @@
           "WrongAlignment": "Public.cs",
           "WrongTop": "Public.cs",
           "EarlyReread": "Public.cs"
+        },
+        "familyCoverage": {
+          "kind": "feature-class",
+          "theorem": "UInt256Proof.Reporting.checked_subtract_family_contract",
+          "representatives": [
+            "scalar",
+            "arm64-advsimd",
+            "x64-sse42",
+            "x64-avx2",
+            "x64-avx2-bmi1",
+            "x64-avx512",
+            "x64-avx512-bmi1"
+          ]
         }
       }
     }
@@ -3246,5 +4124,22 @@
     "MultiplyMod",
     "division",
     "signed Int256"
-  ]
+  ],
+  "fixtureGroups": {
+    "Equality": {
+      "cases": [
+        "Baseline",
+        "Renamed",
+        "EquivalentScalar",
+        "EquivalentReduction",
+        "WrongLane",
+        "WrongReduction",
+        "WrongSignedEmbedding",
+        "WrongPolarity",
+        "WrongReceiver",
+        "WrongSnapshot"
+      ],
+      "source": "Public.cs"
+    }
+  }
 }

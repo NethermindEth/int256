@@ -13,7 +13,7 @@ import time
 from common import PROFILE_DIRECTORY, PROFILE_NAMES, PROFILES, ROOT, SEMANTICS_VERSION, VERIFY, expected_profile, generated_directory, run, sha, source_files
 from simd_fixtures import CASES as SIMD_CASES
 from methods import LEGACY, api_entries, check_calling_convention, method_manifest, method_names
-from gate_templates import audit_module
+from gate_templates import audit_module, bound_audit_names
 
 def run_stage(command, cwd, stage):
     try:
@@ -37,7 +37,8 @@ def theorem_audits(output, names, approved):
 
 def audit_names(method):
     if method not in LEGACY:
-        return method_manifest(method)["verification"]["auditedTheorems"]
+        gate = method_manifest(method)["verification"]
+        return gate["auditedTheorems"] + ([] if "template" in gate else bound_audit_names(api_entries()[method]))
     theorem, certificate = {"Add": ("checked_contract", "checked_add_family_certificate"),
                             "Subtract": ("checked_subtract_contract", "checked_subtract_family_certificate")}[method]
     return [f"UInt256Proof.{theorem}", f"UInt256Proof.{theorem}_family",
@@ -117,6 +118,7 @@ def main(argv=None, prepared=None):
     # Invalidate the prior success before any command that can fail.
     report_path.unlink(missing_ok=True)
     (VERIFY / "generated/coverage.json").unlink(missing_ok=True)
+    (generated_directory(arguments.method) / "coverage.json").unlink(missing_ok=True)
     started = time.perf_counter()
     stages = {}
     manifest = method_manifest(arguments.method)
@@ -193,14 +195,14 @@ def main(argv=None, prepared=None):
         if artifact.get("profile") != expected_profile(arguments.profile):
             raise RuntimeError("Extracted feature profile does not match the requested profile")
         generated_gate_hash = None
-        if gate and "template" in gate:
+        if gate:
             target = proof / "UInt256/Methods/SelectedGate.lean"
             if target.exists():
                 raise RuntimeError("Generated typed audit would overwrite handwritten source")
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(audit_module(api_entries()[arguments.method]), encoding="utf-8", newline="\n")
             generated_gate_hash = sha(target)
-        audit_target = gate["auditTarget"] if gate else "Audit" if arguments.method == "Add" else "SubtractAudit"
+        audit_target = "+UInt256.Methods.SelectedGate:olean" if gate else "Audit" if arguments.method == "Add" else "SubtractAudit"
         stage_started = time.perf_counter()
         output = run_stage([lake, "build", audit_target], proof, "Proof checking")
         stages["freshKernelBuildSeconds"] = time.perf_counter() - stage_started

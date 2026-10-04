@@ -1,0 +1,32 @@
+import Extracted
+import UInt256.Methods.Bitwise.Refutation
+import CIL.SymbolicExecution
+open CIL UInt256Model
+set_option maxRecDepth 8192
+set_option maxHeartbeats 2000000
+namespace UInt256Proof.Bitwise.ReturnWitness
+
+def initial : Bytes := fun address => @INITIAL@
+
+def result := (invoke Extracted.program
+    (executionBound Extracted.program Extracted.entryIndex) Extracted.entryIndex
+    @ARGUMENTS@ (byteMemory initial)).map Prod.snd
+
+theorem observed : result = some [.v256 (BitVec.ofNat 256 @ACTUAL@)] := by
+  unfold result
+  simp only [invoke,cil_code,Option.bind_eq_bind,Option.bind_some]
+  cil_steps read64,readBytes,byteMemory,initial,unsafeAdd,readAggregate,readHomeBytes,
+    writeHomeBytes,writeAggregate,clearHome,evalMemory,write256,writeBytes,write
+  try rfl
+
+theorem expected : @EXPECTED_EXPRESSION@ = BitVec.ofNat 256 @EXPECTED@ := by decide
+
+theorem refuted : ¬@CONTRACT@ := by
+  apply @REFUTATION@ Extracted.program Extracted.entryIndex
+    (executionBound Extracted.program Extracted.entryIndex) @PARAMETERS@
+    [.v256 (BitVec.ofNat 256 @ACTUAL@)] observed
+  rw [expected]
+  decide
+
+#print axioms refuted
+end UInt256Proof.Bitwise.ReturnWitness

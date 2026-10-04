@@ -7,15 +7,120 @@ import sys
 import tempfile
 import unittest
 from unittest.mock import patch
+import xml.etree.ElementTree as ET
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import common
 import methods
+import support
 import verify
 
 
 class MethodChecks(unittest.TestCase):
+    def test_fixture_change_must_affect_the_intended_compiled_body(self):
+        baseline = {"methods": [
+            {"signature": "target", "instructions": [{"opcode": "ldc.i4", "operand": 0}]},
+            {"signature": "unrelated", "instructions": []},
+        ]}
+        changed = copy.deepcopy(baseline)
+        changed["methods"][0]["instructions"][0]["operand"] = 1
+        support.require_changed_method(changed, baseline, "target")
+        for mutation in ("metadata", "offset", "unrelated", "missing-target", "missing-baseline"):
+            actual, original = copy.deepcopy(baseline), copy.deepcopy(baseline)
+            if mutation == "metadata":
+                actual["methods"][0]["token"] = 123
+            elif mutation == "offset":
+                actual["methods"][0]["instructions"][0]["Offset"] = 123
+            elif mutation == "unrelated":
+                actual["methods"][1]["instructions"] = [{"opcode": "ret"}]
+            elif mutation == "missing-target":
+                actual["methods"].pop(0)
+            else:
+                original["methods"].pop(0)
+            with self.subTest(mutation=mutation), self.assertRaises(RuntimeError):
+                support.require_changed_method(actual, original, "target")
+
+    def test_multiply_family_requires_each_arithmetic_and_storage_combination(self):
+        for actual in (list(common.MULTIPLY_PROFILES), list(common.MULTIPLY_PROFILES)[::2],
+                       list(common.MULTIPLY_PROFILES)[:-1]):
+            entry = copy.deepcopy(methods.api_entries()["Multiply"])
+            entry["verification"]["familyCoverage"]["representatives"] = actual
+            with self.subTest(representatives=actual), \
+                 patch.object(methods, "api_entries", return_value={"Multiply": entry}):
+                if actual == list(common.MULTIPLY_PROFILES):
+                    methods.method_manifest("Multiply")
+                else:
+                    with self.assertRaisesRegex(RuntimeError, "feature-family"):
+                        methods.method_manifest("Multiply")
+
+    def test_shared_equality_fixtures_match_compiled_registry_and_real_source(self):
+        directory = common.VERIFY / "Tests/Fixtures/Equality"
+        cases = [case.attrib["Include"] for case in ET.parse(directory / "Cases.props").findall("ItemGroup/EqualityCase")]
+        entries = [entry for entry in methods.api_entries().values()
+                   if entry.get("verification", {}).get("fixtureGroup") == "Equality"]
+        self.assertEqual(len(entries), 24)
+        for entry in entries:
+            with self.subTest(api=entry["id"]):
+                gate = entry["verification"]
+                self.assertEqual(gate["fixtureCases"], cases)
+                self.assertEqual(gate["fixtureSources"], dict.fromkeys(cases, "Public.cs"))
+                self.assertTrue((directory / "Public.cs").is_file())
+
+    def test_shared_fixture_registry_rejects_ambiguous_cases_and_overrides(self):
+        for cases, override in ((["Baseline", "Baseline"], False), (["Baseline"], True), ([], False)):
+            entry = {"id": "EqUInt256UInt256", "verification": {"fixtureGroup": "Equality"}}
+            if override:
+                entry["verification"]["fixtureCases"] = cases
+            with self.subTest(cases=cases, override=override), self.assertRaises(RuntimeError):
+                methods.resolve_fixture_groups([entry], {"Equality": {"cases": cases, "source": "Public.cs"}})
+
+    def test_mutation_extraction_uses_registered_source_without_marker_file(self):
+        project = common.VERIFY / "Tests/Fixtures/Equality/Nethermind.Int256.csproj"
+        with patch.object(support, "build_artifact", side_effect=RuntimeError("stop after source selection")) as build:
+            with self.assertRaisesRegex(RuntimeError, "stop after source selection"):
+                support.mutation_proof(Path("unused"), project, "WrongLane", "EqUInt256UInt256", "scalar", {})
+        self.assertEqual(build.call_args.args[3], project.parent / "Public.cs")
+
+    def test_relational_family_cannot_drop_or_reorder_representatives(self):
+        representatives = ["scalar", "x64-vector256", "x64-avx2", "x64-avx512"]
+        for actual in (representatives, representatives[:-1], representatives[::-1]):
+            entry = copy.deepcopy(methods.api_entries()["LtUInt256UInt256"])
+            gate = entry["verification"]
+            theorem = "UInt256Proof.Compare.checked_less_family_contract"
+            if theorem not in gate["auditedTheorems"]:
+                gate["auditedTheorems"].append(theorem)
+            gate["familyCoverage"] = {"kind": "relational-dispatch", "theorem": theorem,
+                                      "representatives": actual}
+            with self.subTest(representatives=actual), \
+                 patch.object(methods, "api_entries", return_value={entry["id"]: entry}):
+                if actual == representatives:
+                    methods.method_manifest(entry["id"])
+                else:
+                    with self.assertRaisesRegex(RuntimeError, "feature-family"):
+                        methods.method_manifest(entry["id"])
+
+    def test_family_coverage_requires_audited_gate_and_both_representatives(self):
+        for mutation in ("unaudited", "one-profile", "unknown-kind", "nonstring-kind", "unknown-field", "universal"):
+            entry = copy.deepcopy(methods.api_entries()["Lsh"])
+            gate = entry["verification"]
+            family = gate["familyCoverage"]
+            if mutation == "unaudited":
+                family["theorem"] = "Unchecked"
+            elif mutation == "one-profile":
+                family["representatives"] = ["scalar"]
+            elif mutation == "unknown-kind":
+                family["kind"] = "assumed"
+            elif mutation == "nonstring-kind":
+                family["kind"] = []
+            elif mutation == "unknown-field":
+                family["assumption"] = True
+            else:
+                gate.update(allProfiles=True, profileCoverage="all-valid-profiles",
+                            allProfilesTheorem=gate["auditedTheorems"][1])
+            with self.subTest(mutation=mutation), patch.object(methods, "api_entries", return_value={"Lsh": entry}):
+                with self.assertRaisesRegex(RuntimeError, "feature-family"):
+                    methods.method_manifest("Lsh")
     def test_refutation_templates_are_freshness_inputs(self):
         inputs = verify.source_inputs()
         for relative in ("Compare/RefutationTemplate.lean.in", "Bitwise/RefutationTemplate.lean.in",
@@ -68,6 +173,8 @@ class MethodChecks(unittest.TestCase):
             report = directory / "generated/operations/AddOverflow/scalar/report.json"
             report.parent.mkdir(parents=True)
             report.write_text(json.dumps({"status": "verified"}), encoding="utf-8")
+            coverage = report.parent / "coverage.json"
+            coverage.write_text(json.dumps({"status": "verified"}), encoding="utf-8")
             pending = copy.deepcopy(methods.api_entries()["AddOverflow"])
             pending.pop("verification", None)
             with (patch.object(common, "VERIFY", directory), patch.object(verify, "VERIFY", directory),
@@ -75,6 +182,7 @@ class MethodChecks(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "proof is not implemented"):
                     verify.main(["--method", "AddOverflow"])
             self.assertFalse(report.exists())
+            self.assertFalse(coverage.exists())
 
     def test_unknown_selector_cannot_escape_generated_directory(self):
         for selector in ("../Add", "Unknown", "System.Void::Add"):

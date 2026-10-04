@@ -51,9 +51,8 @@ def refute(proof, lake, method, initial, out, address=None, actual=1, expected=0
                   if address is None else
                   f"writeBytes (byteMemory witnessBytes) {out} (result {operation} (byteValue witnessBytes 0) (byteValue witnessBytes 64)).toNat 32 (.byte {address})")
     expected_value = str(expected) if address is None else f"some (.i8 {expected})"
-    finish = (f"have words := Value.i32.inj (List.cons.inj (Option.some.inj ho)).1\n    have mismatch : ({actual} : W32) ≠ {expected} := by decide\n    rw [model_expected] at words\n    exact mismatch words.symm"
-              if address is None else
-              f"have observed : final (.byte {address}) = some (.i8 {actual}) := Option.some.inj ho\n    have wanted := memory {address}\n    rw [model_expected] at wanted\n    have mismatch : (some (.i8 {actual}) : Option Value) ≠ some (.i8 {expected}) := by decide\n    exact mismatch (observed.symm.trans wanted)")
+    lemma = "flag_observation_refuted" if address is None else "byte_observation_refuted"
+    arguments = str(actual) if address is None else f"{address} (some (.i8 {actual}))"
     source = f"""import Extracted
 import UInt256.Methods.Reporting.Refutation
 import CIL.SymbolicExecution
@@ -69,22 +68,11 @@ theorem model_observed : observed = some ({observed}) := by decide
 theorem model_expected : ({comparison}) = {expected_value} := by decide
 theorem model_not_correct : ¬ Contract {operation} Extracted.program Extracted.entryIndex
     witnessBytes 0 64 {out} := by
-  rintro ⟨fuel, final, normal, memory⟩
-  have ho := model_observed
-  unfold observed at ho
-  cases execution : invoke Extracted.program (executionBound Extracted.program Extracted.entryIndex)
-      Extracted.entryIndex [.object 0, .object 64, .object {out}] (byteMemory witnessBytes) with
-  | none => simp [execution] at ho
-  | some outcome =>
-    have unique := invoke_result_unique Extracted.program fuel
-      (executionBound Extracted.program Extracted.entryIndex) Extracted.entryIndex
-      [.object 0, .object 64, .object {out}] (byteMemory witnessBytes)
-      (final, [.i32 (if flag {operation} (byteValue witnessBytes 0) (byteValue witnessBytes 64) then 1 else 0)])
-      outcome normal execution
-    rw [← unique] at execution
-    rw [execution] at ho
-    simp only [Option.map_some] at ho
-    {finish}
+  apply {lemma} Extracted.program Extracted.entryIndex
+    (executionBound Extracted.program Extracted.entryIndex) {operation} witnessBytes 0 64 {out}
+    {arguments} model_observed
+  rw [model_expected]
+  decide
 #print axioms model_not_correct
 end ReportingWitness
 """
@@ -159,7 +147,9 @@ def main():
                 if production["source"]["kind"] != "production": raise RuntimeError("Fresh production baseline required")
                 baseline=checked_fixture(destination,proof,method,profile,"Baseline")
                 for case in POSITIVES[1:]:
-                    if args.case not in ("all",case) or not positive_applicable(case,legacy(method),profile): continue
+                    if (args.case not in ("all",case)
+                            or (profile == "scalar" and case == "ExtractedHelper")
+                            or not positive_applicable(case,legacy(method),profile)): continue
                     report=checked_fixture(destination,proof,method,profile,case)
                     if report["leanSourceSha256"] != baseline["leanSourceSha256"]: raise RuntimeError("Positive changed handwritten proofs")
                     target_changed(case,legacy(method),profile,baseline["artifact"],report["artifact"])

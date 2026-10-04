@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "negativeCases": {
+    "WrongLane": {
+      "group": "reference",
+      "initialBytes": {
+        "31": 1
+      },
+      "leftBase": 0,
+      "rightBase": 64,
+      "actualEquality": true,
+      "changedSignature": "System.Boolean Nethermind.Int256.UInt256::ReferenceEqual(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)"
+    },
+    "WrongReduction": {
+      "group": "reference",
+      "initialBytes": {
+        "31": 1
+      },
+      "leftBase": 0,
+      "rightBase": 64,
+      "actualEquality": true,
+      "changedSignature": "System.Boolean Nethermind.Int256.UInt256::ReferenceEqual(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)"
+    },
+    "WrongSignedEmbedding": {
+      "group": "signed",
+      "leftBase": 0,
+      "rightBase": 64,
+      "actualEquality": true,
+      "widths": {
+        "32": {
+          "scalarBits": 4294967295,
+          "initialBytes": {
+            "0": 255,
+            "1": 255,
+            "2": 255,
+            "3": 255
+          }
+        },
+        "64": {
+          "scalarBits": 18446744073709551615,
+          "initialBytes": {
+            "0": 255,
+            "1": 255,
+            "2": 255,
+            "3": 255,
+            "4": 255,
+            "5": 255,
+            "6": 255,
+            "7": 255
+          }
+        }
+      }
+    },
+    "WrongPolarity": {
+      "group": "inequality",
+      "initialBytes": {},
+      "leftBase": 0,
+      "rightBase": 64,
+      "scalarBits": 0,
+      "actualResult": true,
+      "changedSignature": "System.Boolean Nethermind.Int256.UInt256::Unequal(System.Boolean)"
+    },
+    "WrongReceiver": {
+      "group": "reference",
+      "initialBytes": {
+        "64": 1
+      },
+      "leftBase": 0,
+      "rightBase": 64,
+      "actualEquality": true,
+      "changedSignature": "System.Boolean Nethermind.Int256.UInt256::Equals(Nethermind.Int256.UInt256&)"
+    },
+    "WrongSnapshot": {
+      "group": "snapshot",
+      "initialBytes": {},
+      "leftBase": 0,
+      "rightBase": 64,
+      "snapshot": 1,
+      "actualEquality": true
+    }
+  }
+}

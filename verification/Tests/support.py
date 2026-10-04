@@ -52,6 +52,18 @@ def initial_bytes_expression(witness):
     return initial
 
 
+def require_changed_method(artifact, baseline, signature):
+    """Require a compiled change in the intended reachable method."""
+    bodies = [next((body for body in source["methods"] if body["signature"] == signature), None)
+              for source in (artifact, baseline)]
+    if any(body is None for body in bodies):
+        raise RuntimeError(f"Fixture omitted the intended compiled operation: {signature}")
+    instructions = [[(item["opcode"], item.get("scope"), item.get("operand"))
+                     for item in body["instructions"]] for body in bodies]
+    if instructions[0] == instructions[1]:
+        raise RuntimeError("Fixture did not change the intended compiled operation")
+
+
 def selected_fixture_baseline(method, profile, positive=None):
     public = [sys.executable, str(VERIFY / "verify.py"), "--method", method, "--profile", profile]
     report_path = generated_directory(method, profile) / "report.json"
@@ -90,7 +102,8 @@ def template_refutation(proof, lake, template, substitutions, module, theorem, a
 def mutation_proof(work, project, case, method, profile, baseline, intended=None):
     """Fresh fixture extraction with identical proofs and a changed target body."""
     manifest = method_manifest(method)
-    bundle = build_artifact(project, work, method, project.parent / f"{case}.cs", True, case)
+    source = manifest.get("verification", {}).get("fixtureSources", {}).get(case, f"{case}.cs")
+    bundle = build_artifact(project, work, method, project.parent / source, True, case)
     proof = work / "proof"
     proof.mkdir()
     sources = list(source_files(VERIFY, {".lean"}))
@@ -113,10 +126,7 @@ def mutation_proof(work, project, case, method, profile, baseline, intended=None
         raise RuntimeError("Mutation extraction identity changed")
     check_calling_convention(entry, manifest["callingConvention"])
     signature = intended or manifest["entry"]
-    selected = next(body for body in artifact["methods"] if body["signature"] == signature)
-    original = next(body for body in baseline["artifact"]["methods"] if body["signature"] == signature)
-    if selected["instructions"] == original["instructions"]:
-        raise RuntimeError("Mutation did not change the intended compiled operation")
+    require_changed_method(artifact, baseline["artifact"], signature)
     if sha(extracted / "Extracted.lean") == baseline["generatedProgramSha256"]:
         raise RuntimeError("Mutation did not change the extracted program")
     hashes = baseline["leanSourceSha256"]
