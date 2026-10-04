@@ -302,8 +302,10 @@ assembly version and metadata tokens are ignored. An unchanged comparison may
 skip Lean; build/extraction failures fail the check. Other changes, manual runs
 and PRs targeting branches other than main force fresh proofs.
 
-**Main must remain a successfully verified baseline.** The comparison gate checks
-unchanged verification inputs; it does not check the baseline's verification history.
+Skipping also requires a successful main push run for the exact baseline commit,
+with an actually executed, successful proof step for that method and profile.
+A skipped proof does not supply baseline evidence. Missing history, API access
+failures and unmatched jobs force a fresh proof.
 The manual **Verify UInt256 proof tests** workflow uses the same 131 regression
 groups through `all_checks.py --job`, establishing fresh baselines where required.
 Its SIMD matrix covers both methods in every representative profile, and a separate

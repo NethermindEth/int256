@@ -15,6 +15,25 @@ import changes
 
 
 class ChangeChecks(unittest.TestCase):
+    def setUp(self):
+        evidence = patch.object(changes, "baseline_verified", return_value=True)
+        evidence.start()
+        self.addCleanup(evidence.stop)
+
+    def test_missing_baseline_evidence_requires_proof_even_without_changes(self):
+        for paths in ("", "src/UInt256.cs\0"):
+            with self.subTest(paths=paths), patch.object(changes, "run", return_value=paths), \
+                    patch.object(changes, "baseline_verified", return_value=False), \
+                    patch.object(changes, "extract") as extract:
+                self.assertTrue(changes.needs_proof("base")[0])
+                extract.assert_not_called()
+
+    def test_unchanged_source_requires_the_selected_baseline_proof(self):
+        with patch.object(changes, "run", return_value=""), \
+                patch.object(changes, "baseline_verified", return_value=True) as evidence:
+            self.assertFalse(changes.needs_proof("base", "Subtract", "x64-avx2")[0])
+        evidence.assert_called_once_with("base", "Subtract", "x64-avx2")
+
     def test_build_and_verification_changes_force_proof(self):
         for path in ("verification/CIL/Execution.lean", "verification/Extractor/Program.cs",
                      "verification/changes.py", "src/Directory.Build.props", "global.json",
@@ -215,6 +234,82 @@ class ChangeChecks(unittest.TestCase):
                 changes.main()
             detect.assert_not_called()
             self.assertEqual(output.read_text().strip(), "required=true")
+
+
+class BaselineEvidenceChecks(unittest.TestCase):
+    def setUp(self):
+        self.base = "a" * 40
+        self.repository = "NethermindEth/int256"
+        self.run = {"id": 12, "run_attempt": 2, "head_sha": self.base, "head_branch": "main",
+                    "event": "push", "status": "completed", "conclusion": "success",
+                    "path": ".github/workflows/verify-uint256.yml",
+                    "repository": {"full_name": self.repository}}
+        self.job = {"name": "Production proof (Subtract, scalar)", "head_sha": self.base,
+                    "status": "completed", "conclusion": "success", "steps": [
+                        {"name": "Verify freshly built UInt256", "status": "completed", "conclusion": "success"}]}
+        environment = patch.dict(os.environ, {"GITHUB_REPOSITORY": self.repository})
+        environment.start()
+        self.addCleanup(environment.stop)
+
+    def check(self):
+        with patch.object(changes, "github_json", side_effect=[
+                {"workflow_runs": [self.run]}, {"jobs": [self.job], "total_count": 1}]):
+            return changes.baseline_verified(self.base, "Subtract", "scalar")
+
+    def test_exact_successful_proof_supplies_evidence(self):
+        self.assertTrue(self.check())
+
+    def test_run_identity_status_and_origin_must_match(self):
+        for field, value in (("head_sha", "b" * 40), ("head_branch", "feature"),
+                             ("event", "pull_request"), ("status", "in_progress"),
+                             ("conclusion", "failure"), ("path", ".github/workflows/other.yml"),
+                             ("repository", {"full_name": "attacker/int256"})):
+            original = self.run[field]
+            with self.subTest(field=field):
+                self.run[field] = value
+                self.assertFalse(self.check())
+            self.run[field] = original
+
+    def test_job_identity_and_status_must_match(self):
+        for field, value in (("name", "Production proof (Add, scalar)"),
+                             ("name", "Production proof (Subtract, x64-avx2)"),
+                             ("head_sha", "b" * 40), ("status", "queued"),
+                             ("conclusion", "cancelled")):
+            original = self.job[field]
+            with self.subTest(field=field, value=value):
+                self.job[field] = value
+                self.assertFalse(self.check())
+            self.job[field] = original
+
+    def test_green_job_with_skipped_failed_or_missing_proof_is_insufficient(self):
+        for steps in ([], [{"name": "Verify freshly built UInt256", "status": "completed", "conclusion": "skipped"}],
+                      [{"name": "Verify freshly built UInt256", "status": "completed", "conclusion": "failure"}],
+                      [{"name": "Other step", "status": "completed", "conclusion": "success"}]):
+            with self.subTest(steps=steps):
+                self.job["steps"] = steps
+                self.assertFalse(self.check())
+
+    def test_api_errors_or_malformed_evidence_force_proof(self):
+        for error in (OSError("unavailable"), ValueError("bad JSON"), KeyError("missing field"),
+                      AttributeError("malformed record")):
+            with self.subTest(error=error), patch.object(changes, "github_json", side_effect=error):
+                self.assertFalse(changes.baseline_verified(self.base, "Subtract", "scalar"))
+
+    def test_jobs_are_paginated_within_the_successful_attempt(self):
+        with patch.object(changes, "github_json", side_effect=[
+                {"workflow_runs": [self.run]}, {"jobs": [], "total_count": 101},
+                {"jobs": [self.job], "total_count": 101}]) as api:
+            self.assertTrue(changes.baseline_verified(self.base, "Subtract", "scalar"))
+        self.assertIn("actions/runs/12/attempts/2/jobs?per_page=100&page=2", api.call_args.args[1])
+
+    def test_invalid_repository_or_commit_cannot_form_an_api_request(self):
+        with patch.dict(os.environ, {"GITHUB_REPOSITORY": "invalid/path/extra"}), \
+                patch.object(changes, "github_json") as api:
+            self.assertFalse(changes.baseline_verified(self.base, "Subtract", "scalar"))
+            api.assert_not_called()
+        with patch.object(changes, "github_json") as api:
+            self.assertFalse(changes.baseline_verified("not-a-sha", "Subtract", "scalar"))
+            api.assert_not_called()
 
 
 if __name__ == "__main__":

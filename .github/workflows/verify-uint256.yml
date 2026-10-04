@@ -30,6 +30,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   plan:
@@ -73,6 +74,7 @@ jobs:
       - name: Detect changes to verified methods
         id: changes
         env:
+          GH_TOKEN: ${{ github.token }}
           VERIFY_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
           VERIFY_EVENT: ${{ github.event_name }}
           VERIFY_BASE_BRANCH: ${{ github.event.pull_request.base.ref }}
