@@ -3,42 +3,36 @@ import UInt256.Methods.Reporting.Contract
 open CIL UInt256Model
 namespace UInt256Proof.Reporting
 
-/-- One successful wrong flag excludes the complete contract at every fuel. -/
-theorem flag_contract_refuted (p : Program) (entry witnessFuel : Nat)
-    (operation : Operation) (initial : Bytes) (left right out : Nat)
-    (observedMemory : Memory) (actual : W32)
-    (execution : invoke p witnessFuel entry [.object left, .object right, .object out]
-      (byteMemory initial) = some (observedMemory, [.i32 actual]))
+/-- A computed return observation refutes the full contract at every fuel. -/
+theorem flag_observation_refuted (p : Program) (entry witnessFuel : Nat)
+    (operation : Operation) (initial : Bytes) (left right out : Nat) (actual : W32)
+    (observed : (invoke p witnessFuel entry [.object left, .object right, .object out]
+      (byteMemory initial)).map Prod.snd = some [.i32 actual])
     (different : actual ≠ if flag operation (byteValue initial left)
       (byteValue initial right) then 1 else 0) :
     ¬ Contract operation p entry initial left right out := by
   rintro ⟨fuel, final, normal, _⟩
-  have unique := invoke_result_unique p fuel witnessFuel entry
-    [.object left, .object right, .object out] (byteMemory initial)
+  have values := invoke_observation_unique p fuel witnessFuel entry
+    [.object left, .object right, .object out] (byteMemory initial) Prod.snd
     (final, [.i32 (if flag operation (byteValue initial left) (byteValue initial right) then 1 else 0)])
-    (observedMemory, [.i32 actual]) normal execution
-  have values := congrArg Prod.snd unique
-  have words := Value.i32.inj (List.cons.inj values).1
-  exact different words.symm
+    [.i32 actual] observed normal
+  exact different (Value.i32.inj (List.cons.inj values).1).symm
 
-/-- A wrong output or preserved byte also excludes every successful fuel. -/
-theorem byte_contract_refuted (p : Program) (entry witnessFuel : Nat)
+/-- A computed caller-byte observation also excludes every successful fuel. -/
+theorem byte_observation_refuted (p : Program) (entry witnessFuel : Nat)
     (operation : Operation) (initial : Bytes) (left right out address : Nat)
-    (observedMemory : Memory) (actual : W32)
-    (execution : invoke p witnessFuel entry [.object left, .object right, .object out]
-      (byteMemory initial) = some (observedMemory, [.i32 actual]))
-    (different : observedMemory (.byte address) ≠
-      (writeBytes (byteMemory initial) out
-        (result operation (byteValue initial left) (byteValue initial right)).toNat 32) (.byte address)) :
+    (actual : Option Value)
+    (observed : (invoke p witnessFuel entry [.object left, .object right, .object out]
+      (byteMemory initial)).map (fun outcome => outcome.1 (.byte address)) = some actual)
+    (different : actual ≠ (writeBytes (byteMemory initial) out
+      (result operation (byteValue initial left) (byteValue initial right)).toNat 32) (.byte address)) :
     ¬ Contract operation p entry initial left right out := by
   rintro ⟨fuel, final, normal, memory⟩
-  have unique := invoke_result_unique p fuel witnessFuel entry
+  have byte := invoke_observation_unique p fuel witnessFuel entry
     [.object left, .object right, .object out] (byteMemory initial)
+    (fun outcome => outcome.1 (.byte address))
     (final, [.i32 (if flag operation (byteValue initial left) (byteValue initial right) then 1 else 0)])
-    (observedMemory, [.i32 actual]) normal execution
-  have memories := congrArg Prod.fst unique
-  change final = observedMemory at memories
-  subst final
-  exact different (memory address)
+    actual observed normal
+  exact different (byte.symm.trans (memory address))
 
 end UInt256Proof.Reporting

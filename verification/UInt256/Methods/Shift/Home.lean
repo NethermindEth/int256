@@ -5,6 +5,20 @@ open CIL UInt256Model
 
 namespace UInt256Proof.Shift
 
+@[simp] theorem private_write_local (memory : Memory)
+    (frame kind index offset value count other slot : Nat) :
+    writeHomeBytes memory frame kind index offset value count (.local other slot) =
+      memory (.local other slot) := by
+  induction count generalizing memory offset value with
+  | zero => rfl
+  | succ count induction => simp only [writeHomeBytes, induction]; simp [write]
+
+@[simp] theorem read64_private_write (memory : Memory) (frame kind index offset value count base : Nat) :
+    read64 (writeHomeBytes memory frame kind index offset value count) (.byte base) =
+      read64 memory (.byte base) := by
+  exact read64_congr _ _
+    (fun address => writeHomeBytes_caller memory frame kind index offset value count address) base
+
 @[simp↓] theorem eval_init_home (memory : Memory) (frame kind index : Nat) (rest : List Value) :
     evalMemory .init256 (.ref (.home frame kind index 0) :: rest) memory =
       some (writeAggregate memory frame kind index (0 : BitVec 256), rest) := by rfl
