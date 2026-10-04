@@ -135,10 +135,26 @@ internal static class LeanEmitter
                     candidate.Method.Parameters[2].IsOut && !candidate.Method.Parameters[2].IsIn)
                 .Select(candidate => candidate.Index).ToArray();
             lean.Append($"def limbProductCandidates : List Nat := [{string.Join(", ", candidates)}]\n");
+            int[] wideCandidates = methods.Select((method, index) => new { Method = method, Index = index })
+                .Where(candidate => MetadataValidation.Role(candidate.Method, entrySignature) == "wideMultiply")
+                .Select(candidate => candidate.Index).ToArray();
+            lean.Append($"def wideMultiplyCandidates : List Nat := [{string.Join(", ", wideCandidates)}]\n");
             int[] storageCandidates = methods.Select((method, index) => new { Method = method, Index = index })
                 .Where(candidate => MetadataValidation.Role(candidate.Method, entrySignature) == "storeLimbs")
                 .Select(candidate => candidate.Index).ToArray();
             lean.Append($"def storageCandidates : List Nat := [{string.Join(", ", storageCandidates)}]\n");
+            int[] wordCandidates = methods.Select((method, index) => new { Method = method, Index = index })
+                .Where(candidate => candidate.Method.IsStatic &&
+                    candidate.Method.DeclaringType.FullName == "Nethermind.Int256.UInt256" &&
+                    candidate.Method.ReturnType.FullName == "System.Void" &&
+                    candidate.Method.Parameters.Count == 3 &&
+                    candidate.Method.Parameters[0].ParameterType.FullName == MetadataValidation.UInt256Reference &&
+                    candidate.Method.Parameters[0].IsIn && !candidate.Method.Parameters[0].IsOut &&
+                    candidate.Method.Parameters[1].ParameterType.FullName == "System.UInt64" &&
+                    candidate.Method.Parameters[2].ParameterType.FullName == MetadataValidation.UInt256Reference &&
+                    candidate.Method.Parameters[2].IsOut && !candidate.Method.Parameters[2].IsIn)
+                .Select(candidate => candidate.Index).ToArray();
+            lean.Append($"def wordOperationCandidates : List Nat := [{string.Join(", ", wordCandidates)}]\n");
         }
         lean.Append("end Extracted\n");
         return (lean.ToString(), coverage);

@@ -1,0 +1,6 @@
+import UInt256.Methods.Multiply.ScalarReturning
+set_option maxRecDepth 8192
+set_option maxHeartbeats 2000000
+namespace UInt256Proof.Multiply
+multiply_scalar_return_execution execute_scalar_return_entry 32 true
+end UInt256Proof.Multiply

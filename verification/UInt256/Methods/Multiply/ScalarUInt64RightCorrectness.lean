@@ -1,0 +1,8 @@
+import UInt256.Methods.Multiply.ScalarUInt64RightReturning
+import UInt256.Methods.Multiply.ScalarReturnCorrectness
+set_option maxRecDepth 8192
+set_option maxHeartbeats 2000000
+namespace UInt256Proof.Multiply
+multiply_scalar_return_gates 64 false using execute_scalar_return_entry gates
+  scalar_return_checked_contract scalar_return_checked_profile_contract scalar_return_checked_family_contract
+end UInt256Proof.Multiply
