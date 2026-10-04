@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AssemblyName>Nethermind.Int256</AssemblyName>
+    <FixtureCase Condition="'$(FixtureCase)' == ''">Baseline</FixtureCase>
+  </PropertyGroup>
+  <Import Project="Cases.props" />
+  <ItemGroup>
+    <_Fixture Include="@(EqualityCase->WithMetadataValue('Identity', '$(FixtureCase)'))" />
+    <Compile Include="../Support.cs" />
+    <Compile Include="Public.cs" />
+    <Compile Include="Core.cs" />
+  </ItemGroup>
+  <PropertyGroup>
+    <DefineConstants>$(DefineConstants);@(_Fixture->'%(Symbol)')</DefineConstants>
+  </PropertyGroup>
+  <Target Name="ValidateFixture" BeforeTargets="CoreCompile" Condition="'@(_Fixture)' == ''">
+    <Error Text="Unknown equality fixture: $(FixtureCase)" />
+  </Target>
+</Project>

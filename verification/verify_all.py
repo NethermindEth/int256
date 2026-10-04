@@ -1,7 +1,8 @@
-"""Freshly verify both public methods and compose coverage of every valid feature profile."""
+"""Freshly verify selected public APIs and compose total valid-profile coverage."""
 
 import argparse
 import copy
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import hashlib
 import json
 from pathlib import Path
@@ -13,7 +14,7 @@ import time
 
 from common import PROFILES, ROOT, SEMANTICS_VERSION, VERIFY, expected_profile, generated_directory, run, sha, source_files
 from verify import audit_names, build_artifact, check_proof_snapshot, main as verify_one, source_inputs, theorem_audits
-from methods import LEGACY, api_entries, check_calling_convention, method_manifest
+from methods import LEGACY, api_entries, check_calling_convention, method_manifest, method_names
 from gate_templates import audit_module
 
 
@@ -23,6 +24,65 @@ COVERAGE_THEOREMS = ("CIL.FeatureProfile.classification_total",
                      "UInt256Proof.checked_representative_classes",
                      "UInt256Proof.add_complete_coverage",
                      "UInt256Proof.subtract_complete_coverage")
+OPERATION_COVERAGE_THEOREMS = ("UInt256Proof.vector_storage_complete_coverage",
+                               "UInt256Proof.classified_complete_coverage",
+                               "UInt256Proof.vector_reduction_complete_coverage",
+                               "UInt256Proof.relational_complete_coverage",
+                               "CIL.FeatureProfile.multiply_classification_flags",
+                               "UInt256Proof.multiply_complete_coverage")
+
+
+def check_family_representatives(family):
+    """Check the concrete premises of the audited total composition rule."""
+    kind = family["kind"]
+    if kind == "feature-class":
+        # These seven profiles are defined directly by expected_profile.
+        return
+    if kind == "vector256-storage":
+        required = [{"Vector256Accelerated": flag} for flag in (False, True)]
+    elif kind == "vector-reduction":
+        required = [{"Vector256Accelerated": False, "Sse41": flag} for flag in (False, True)]
+        required.append({"Vector256Accelerated": True})
+    elif kind == "relational-dispatch":
+        required = [{"Avx512FVL": False, "Avx2": False, "Vector256Accelerated": flag}
+                    for flag in (False, True)]
+        required.extend([{"Avx512FVL": False, "Avx2": True}, {"Avx512FVL": True}])
+    elif kind == "multiply-dispatch-storage":
+        arithmetic = [(False, False, False, False), (False, False, False, True),
+                      (False, False, True, True), (True, False, False, False),
+                      (True, False, False, True), (True, False, True, True),
+                      (False, True, False, False)]
+        keys = ("Bmi2", "ArmBase64", "Avx512DQVL", "Avx2", "Vector256Accelerated")
+        required = [dict(zip(keys, flags + (storage,)))
+                    for flags in arithmetic for storage in (False, True)]
+    else:
+        raise RuntimeError(f"Unknown total feature family: {kind}")
+    if len(family["representatives"]) != len(required):
+        raise RuntimeError("Incomplete feature-family representative premises")
+    for name, conditions in zip(family["representatives"], required):
+        profile = expected_profile(name)
+        if any(profile.get(key) is not value for key, value in conditions.items()):
+            raise RuntimeError(f"Feature-family representative premise changed: {kind}/{name}")
+
+
+def coverage_plan(methods):
+    """Require total audited coverage before building any selected method."""
+    if not methods or len(set(methods)) != len(methods):
+        raise RuntimeError("Coverage requires distinct selected methods")
+    plan = []
+    for method in methods:
+        manifest = method_manifest(method)
+        if method in LEGACY:
+            representatives = list(PROFILES)
+        elif manifest["verification"].get("allProfiles"):
+            representatives = ["scalar"]
+        elif family := manifest["verification"].get("familyCoverage"):
+            check_family_representatives(family)
+            representatives = family["representatives"]
+        else:
+            raise RuntimeError(f"Total feature coverage is not implemented yet: {method}")
+        plan.extend((method, representative) for representative in representatives)
+    return plan
 
 
 def checked_certificate(method, profile, inputs):
@@ -54,12 +114,9 @@ def checked_certificate(method, profile, inputs):
         scope["environment"]["selectedProfile"] = profile
         if report.get("scope") != scope:
             raise RuntimeError(f"Selected contract scope mismatch: {method}/{profile}")
-        if "template" in manifest["verification"]:
-            gate_hash = hashlib.sha256(audit_module(api_entries()[method]).encode("utf-8")).hexdigest()
-            if report.get("generatedGateSha256") != gate_hash or sha(directory / "SelectedGate.lean") != gate_hash:
-                raise RuntimeError(f"Stale typed audit module: {method}/{profile}")
-        elif report.get("generatedGateSha256") is not None:
-            raise RuntimeError(f"Unexpected typed audit module: {method}/{profile}")
+        gate_hash = hashlib.sha256(audit_module(api_entries()[method]).encode("utf-8")).hexdigest()
+        if report.get("generatedGateSha256") != gate_hash or sha(directory / "SelectedGate.lean") != gate_hash:
+            raise RuntimeError(f"Stale typed audit module: {method}/{profile}")
     if report.get("auditedTheorems") != names or set(report.get("axiomAudits", {})) != set(names):
         raise RuntimeError(f"Missing family gate: {method}/{profile}")
     for name in names:
@@ -80,6 +137,7 @@ def checked_certificate(method, profile, inputs):
                 "generatedProgramSha256": report["generatedProgramSha256"],
                 "contract": manifest["verification"]["contract"],
                 "allProfilesTheorem": manifest["verification"].get("allProfilesTheorem"),
+                "familyCoverage": copy.deepcopy(manifest["verification"].get("familyCoverage")),
                 "auditedTheorems": names, "axiomAudits": report["axiomAudits"],
                 "timings": report.get("timings")}
     if coverage.get("kind") != "feature-family" or coverage.get("representative") != profile:
@@ -92,7 +150,7 @@ def checked_certificate(method, profile, inputs):
             "timings": report.get("timings")}
 
 
-def check_composition(inputs):
+def check_composition(inputs, operations=False):
     lake = shutil.which("lake")
     if lake is None:
         raise RuntimeError("Pinned Lean toolchain must be on PATH")
@@ -114,12 +172,45 @@ def check_composition(inputs):
             shutil.copy2(VERIFY / name, proof / name)
         copied_paths = [p.relative_to(VERIFY) for p in sources] + [Path("lakefile.toml"), Path("lean-toolchain")]
         check_proof_snapshot(proof, copied_paths, inputs)
-        output = run([lake, "build", "+UInt256.FeatureCoverage:olean"], proof)
-        audits = theorem_audits(output, COVERAGE_THEOREMS, approved[0])
+        targets = ["+UInt256.FeatureCoverage:olean"]
+        names = COVERAGE_THEOREMS
+        if operations:
+            targets.append("+UInt256.OperationCoverage:olean")
+            targets.append("+UInt256.MultiplyCoverage:olean")
+            names += OPERATION_COVERAGE_THEOREMS
+        output = run([lake, "build", *targets], proof)
+        audits = theorem_audits(output, names, approved[0])
         check_proof_snapshot(proof, copied_paths, inputs)
     if inputs != source_inputs():
         raise RuntimeError("Inputs changed during coverage checking")
     return audits, lean
+
+
+def positive_jobs(value):
+    jobs = int(value)
+    if jobs < 1:
+        raise argparse.ArgumentTypeError("jobs must be positive")
+    return jobs
+
+
+def verify_profiles(plan, bundle, jobs):
+    def check(selection):
+        method, profile = selection
+        verify_one(["--method", method, "--profile", profile], prepared=bundle)
+
+    if jobs == 1:
+        for selection in plan:
+            check(selection)
+        return
+    with ThreadPoolExecutor(max_workers=jobs) as pool:
+        pending = [pool.submit(check, selection) for selection in plan]
+        try:
+            for future in as_completed(pending):
+                future.result()
+        except BaseException:
+            for future in pending:
+                future.cancel()
+            raise
 
 
 def main():
@@ -127,9 +218,28 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check-reports", action="store_true",
                         help="Compose existing production reports only after checking their complete freshness")
+    parser.add_argument("--print-plan", action="store_true",
+                        help="Print the complete method/profile CI matrix without building or changing reports")
+    parser.add_argument("--jobs", type=positive_jobs, default=1,
+                        help="Maximum concurrent isolated profile proofs (default: 1)")
+    selection = parser.add_mutually_exclusive_group()
+    selection.add_argument("--expanded", action="store_true",
+                           help="Require every selected API and baseline method; missing gates fail explicitly")
+    selection.add_argument("--method", choices=method_names(),
+                           help="Check total profile coverage of one exact method")
     args = parser.parse_args()
-    destination = VERIFY / "generated/coverage.json"
+    if args.print_plan and args.check_reports:
+        parser.error("--print-plan cannot compose reports")
+    methods = tuple(method_names()) if args.expanded else (args.method,) if args.method else METHODS
+    if args.print_plan:
+        plan = coverage_plan(methods)
+        print(json.dumps({"include": [{"method": method, "profile": profile} for method, profile in plan]}))
+        return
+    destination = ((generated_directory(args.method) / "coverage.json") if args.method else
+                   VERIFY / "generated/coverage.json")
     destination.unlink(missing_ok=True)
+    plan = coverage_plan(methods)
+    operations = any(method not in LEGACY for method in methods)
     started = time.perf_counter()
     inputs = source_inputs()
     build_timings = None
@@ -140,30 +250,30 @@ def main():
             bundle = build_artifact(ROOT / "src/Nethermind.Int256/Nethermind.Int256.csproj",
                                     Path(temporary), "Add")
             build_timings = bundle["timings"]
-            for method in METHODS:
-                for profile in PROFILES:
-                    verify_one(["--method", method, "--profile", profile], prepared=bundle)
-    certificates = [checked_certificate(method, profile, inputs) for method in METHODS for profile in PROFILES]
-    composition = check_composition(inputs)
+            verify_profiles(plan, bundle, args.jobs)
+    certificates = [checked_certificate(method, profile, inputs) for method, profile in plan]
+    composition = check_composition(inputs, operations)
     # Recheck generated files as well as reports after the kernel composition.
     current_certificates = [checked_certificate(method, profile, inputs)
-                            for method in METHODS for profile in PROFILES]
+                            for method, profile in plan]
     if inputs != source_inputs() or current_certificates != certificates:
         raise RuntimeError("Certificates changed during composition")
     audits, lean = composition
     report = {"status": "verified", "coverage": "all valid FeatureProfile configurations",
+              "methods": list(methods), "selectedApiCoverage": args.expanded,
               "domain": "CIL.FeatureProfile.Valid", "sourceInputs": inputs,
               "semanticsVersion": SEMANTICS_VERSION,
               "compositionToolchain": lean,
-              "composition": "Seven full family gates per method plus kernel-checked total classification and composition rule",
-              "auditedTheorems": list(COVERAGE_THEOREMS), "axiomAudits": audits,
+              "composition": "Audited universal or full family gates plus kernel-checked total classification and composition rules",
+              "auditedTheorems": list(audits), "axiomAudits": audits,
               "certificates": certificates, "sharedBuildTimings": build_timings,
+              "proofJobs": None if args.check_reports else args.jobs,
               "totalSeconds": time.perf_counter() - started}
     destination.parent.mkdir(parents=True, exist_ok=True)
     temporary = destination.with_suffix(".json.tmp")
     temporary.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     temporary.replace(destination)
-    print("Verified complete Add/Subtract coverage from 14 fresh family certificates")
+    print(f"Verified total profile coverage for {len(methods)} methods from {len(certificates)} certificates")
 
 
 if __name__ == "__main__":

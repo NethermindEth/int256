@@ -1,0 +1,24 @@
+import Extracted
+import UInt256.Methods.Equality.Refutation
+import CIL.SymbolicExecution
+open CIL UInt256Model UInt256Model.Equality
+set_option maxRecDepth 8192
+set_option maxHeartbeats 2000000
+namespace UInt256Proof.Equality.Witness
+
+def initial : Bytes := fun address => @INITIAL@
+def observation := (invoke Extracted.program
+  (executionBound Extracted.program Extracted.entryIndex) Extracted.entryIndex
+  @ARGUMENTS@ (byteMemory initial)).map Prod.snd
+
+theorem observed : observation = some [.i32 @ACTUAL@] := by decide
+theorem expected : (@EXPECTATION@) = @EXPECTED@ := by decide
+
+theorem refuted : ¬ @CONTRACT@ := by
+  change ¬ ResultContract Extracted.program Extracted.entryIndex @ARGUMENTS@ initial (@EXPECTATION@)
+  rw [expected]
+  exact result_observation_refuted Extracted.program Extracted.entryIndex
+    (executionBound Extracted.program Extracted.entryIndex) @ARGUMENTS@ initial
+    @EXPECTED@ @ACTUAL@ observed (by decide)
+#print axioms refuted
+end UInt256Proof.Equality.Witness

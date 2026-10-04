@@ -108,7 +108,7 @@ class CoverageChecks(unittest.TestCase):
         aggregate = self.verify / "generated/coverage.json"
         aggregate.write_text('{"status":"verified"}', encoding="utf-8")
 
-        def composition(inputs):
+        def composition(inputs, operations=False):
             mutate()
             return {}
 

@@ -28,21 +28,10 @@ theorem expected : writeBytes (byteMemory initial) @OUTPUT@
     some (.i8 (BitVec.ofNat 8 @EXPECTED@)) := by decide
 
 theorem refuted : ¬ Contract .@DIRECTION@ Extracted.program Extracted.entryIndex initial @INPUT@ @OUTPUT@ (BitVec.ofNat 32 @COUNT@) := by
-  have actual := observed
-  unfold observation at actual
-  cases execution : invoke Extracted.program (executionBound Extracted.program Extracted.entryIndex)
-      Extracted.entryIndex [.object @INPUT@, .i32 (BitVec.ofNat 32 @COUNT@), .object @OUTPUT@] (byteMemory initial) with
-  | none =>
-    rw [execution] at actual
-    contradiction
-  | some value =>
-    obtain ⟨memory, returned⟩ := value
-    rw [execution] at actual
-    simp only [Option.map_some, Option.some.injEq] at actual
-    apply contract_refuted Extracted.program Extracted.entryIndex
-      (executionBound Extracted.program Extracted.entryIndex) .@DIRECTION@ initial @INPUT@ @OUTPUT@
-      (BitVec.ofNat 32 @COUNT@) memory returned @ADDRESS@ execution
-    rw [actual, expected]
-    decide
+  apply byte_observation_refuted Extracted.program Extracted.entryIndex
+    (executionBound Extracted.program Extracted.entryIndex) .@DIRECTION@ initial @INPUT@
+    @OUTPUT@ (BitVec.ofNat 32 @COUNT@) @ADDRESS@ (some (.i8 (BitVec.ofNat 8 @ACTUAL@))) observed
+  rw [expected]
+  decide
 end UInt256Proof.Shift.Witness
 #print axioms UInt256Proof.Shift.Witness.refuted

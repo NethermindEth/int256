@@ -32,13 +32,31 @@ permissions:
   contents: read
 
 jobs:
+  plan:
+    name: Select complete API and feature coverage
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Require all selected API proof gates
+        id: plan
+        run: |
+          python3 - <<'PY'
+          import os
+          import subprocess
+          import sys
+          matrix = subprocess.check_output(
+              [sys.executable, "verification/verify_all.py", "--expanded", "--print-plan"], text=True)
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write("matrix=" + matrix.strip() + "\n")
+          PY
   verify:
+    needs: plan
     name: Production proof (${{ matrix.method }}, ${{ matrix.profile }})
     strategy:
       fail-fast: false
-      matrix:
-        method: [Add, Subtract]
-        profile: [scalar, arm64-advsimd, x64-sse42, x64-avx2, x64-avx2-bmi1, x64-avx512, x64-avx512-bmi1]
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
