@@ -26,7 +26,8 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     public static readonly UInt256 Zero = 0ul;
     public static readonly UInt256 One = 1ul;
     public static readonly UInt256 MinValue = Zero;
-    public static readonly UInt256 MaxValue = ~Zero;
+    // Spelled out rather than ~Zero: an operator applied to another static keeps ILC from preinitializing the class.
+    public static readonly UInt256 MaxValue = new(ulong.MaxValue, ulong.MaxValue, ulong.MaxValue, ulong.MaxValue);
     public static readonly UInt256 UInt128MaxValue = new(ulong.MaxValue, ulong.MaxValue);
 
     /* in little endian order so u3 is the most significant ulong */
