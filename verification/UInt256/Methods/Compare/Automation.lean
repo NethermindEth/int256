@@ -1,6 +1,7 @@
 import UInt256.ExecutionAutomation
 import UInt256.Methods.Compare.Contract
 import UInt256.Methods.Compare.Lemmas
+import UInt256.Methods.Compare.VectorAutomation
 
 open CIL UInt256Model UInt256Proof
 namespace UInt256Proof.Compare
@@ -8,6 +9,10 @@ namespace UInt256Proof.Compare
 /-- Prove the selected body against its independently stated numerical comparison. -/
 macro "comparison_execute" initial:ident "," left:ident "," right:ident : tactic =>
   `(tactic| (
+    first
+    | (solve | native_comparison_execute $initial:ident,$left:ident,$right:ident)
+    | (solve | portable_comparison_execute $initial:ident,$left:ident,$right:ident)
+    | (
     obtain ⟨ha0,ha1,ha2,ha3⟩ := limb_reads (byteMemory $initial:ident) $left:ident
       (inputLimbs $initial:ident $left:ident) (read64_initial $initial:ident $left:ident)
     obtain ⟨hb0,hb1,hb2,hb3⟩ := limb_reads (byteMemory $initial:ident) $right:ident
@@ -18,7 +23,8 @@ macro "comparison_execute" initial:ident "," left:ident "," right:ident : tactic
     rw [← input_value $initial:ident $left:ident, ← input_value $initial:ident $right:ident]
     simp only [UInt256Proof.value_toNat]
     cil_execute_core ha0,ha1,ha2,ha3,hb0,hb1,hb2,hb3,UInt256Model.Equality.booleanWord,
-      BitVec.lt_def, write with fail
+      BitVec.lt_def, write, read256_initial_limbs, read256_write_local, evalMemory,
+      intrinsic_extract256, UInt256Proof.Equality.value_pack with fail
     all_goals try (simp only [and_assoc])
     all_goals try (simp_all only [← BitVec.toNat_inj])
     all_goals try (refine ⟨_, rfl, ?_, ?_⟩)
@@ -27,7 +33,7 @@ macro "comparison_execute" initial:ident "," left:ident "," right:ident : tactic
     all_goals repeat' first | (solve | omega) | (apply And.intro) | (intro) | (solve | rfl)
     all_goals omega
 
-  ))
+  )))
 
 /-- Primitive operand direction and signedness come from the explicit contract. -/
 macro "scalar_comparison_execute" initial:ident "," input:ident : tactic =>

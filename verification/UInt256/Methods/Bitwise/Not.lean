@@ -6,9 +6,6 @@ open CIL UInt256Model UInt256Proof
 set_option maxRecDepth 8192
 set_option maxHeartbeats 2000000
 namespace UInt256Proof.Bitwise
-theorem word_not_number (x : W64) : 18446744073709551615 - x.toNat = (~~~x).toNat := by
-  rw [BitVec.toNat_not]
-
 theorem not_correct (initial : Bytes) (input out : Nat) :
  UInt256Model.Bitwise.NotContract Extracted.program Extracted.entryIndex initial input out := by
   first
