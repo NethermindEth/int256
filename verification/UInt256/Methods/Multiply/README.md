@@ -1,6 +1,18 @@
 Multiplication contracts describe execution of the extracted CIL, including the
 snapshot semantics of `ldobj` and `stobj`. They do not verify the runtime JIT.
 
+The public contract multiplies the initial 256-bit inputs modulo `2^256`,
+requires a finite normal return, and specifies every caller byte after the
+32-byte output update. Input and output ranges may overlap partially. Execution
+proofs derive all four dispatch cases from the generated instructions; helper
+summaries are checked against each selected assembly's actual bodies.
+
+Arithmetic feature coverage separates software, BMI2 and ARM widening multiply
+from the scalar, AVX2 and AVX512DQ.VL top-limb calculations. Architecture and ISA
+prerequisites leave seven arithmetic classes. Each class has two independent
+Vector256 storage settings, giving fourteen required representatives. The
+instruction checker also validates availability of retained ISA calls.
+
 A native .NET 10.0.12 x64 run with hardware intrinsics disabled exposes a
 discrepancy for partially overlapping struct copies in `MultiplyByUInt64`.
 Multiplying one by limbs `[0, 1, 0, 0]`, with output eight bytes into that input,

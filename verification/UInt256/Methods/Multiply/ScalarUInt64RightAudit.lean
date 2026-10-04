@@ -1,0 +1,4 @@
+import UInt256.Methods.Multiply.ScalarUInt64RightCorrectness
+#print axioms UInt256Proof.Multiply.scalar_return_checked_contract
+#print axioms UInt256Proof.Multiply.scalar_return_checked_profile_contract
+#print axioms UInt256Proof.Multiply.scalar_return_checked_family_contract
