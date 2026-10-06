@@ -70,7 +70,7 @@ theorem scalar_initialized : InitializedBinaryContract (UInt256Model.Bitwise.app
         · simp only [cil_code]; rfl
         · simp (config := { implicitDefEqProofs := false })
             [step, binaryArguments, checkedValue, numericValue, formValue, fl, fr, fo, hl, hr,
-              pureArity, scalars, CIL.step, CIL.binary, CIL.FeatureProfile.evaluate, CIL.truth,
+              pureArity, scalars, CIL.step.eq_def, CIL.binary, CIL.FeatureProfile.evaluate, CIL.truth,
               checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure, cil_code]
           try (exact ⟨rfl, rfl, rfl, rfl⟩)
           done

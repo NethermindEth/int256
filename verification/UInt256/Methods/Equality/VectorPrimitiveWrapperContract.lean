@@ -34,7 +34,7 @@ theorem vector_primitive_wrapper_prefix (memory : Memory) (left : Reference) (ar
        · simp only [cil_code]; rfl
        · simp only [cil_code]; rfl
        · simp [cil_code, step, scalarArguments, checkedValue, numeric, wordNumeric, formValue, formed,
-           pureArity, scalars, CIL.step, CIL.truth, CIL.FeatureProfile.evaluate,
+           pureArity, scalars, CIL.step.eq_def, CIL.truth, CIL.FeatureProfile.evaluate,
            checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
          try (exact ⟨rfl, rfl, rfl, rfl⟩))
 
