@@ -25,7 +25,7 @@ theorem full_scalar_top
   iterate 4
     apply run_next_exists post found (by rfl)
     simp [step, profile, Extracted.profile, CIL.FeatureProfile.evaluate,
-      pureArity, scalars, CIL.step, numericValue, Bind.bind, Except.bind, Pure.pure, Except.pure]
+      pureArity, scalars, CIL.step.eq_def, numericValue, Bind.bind, Except.bind, Pure.pure, Except.pure]
     first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
   have formedLeft := state.call.input_formed (by simp : left ∈ [left, right])
   have formedRight := state.call.input_formed (by simp : right ∈ [left, right])
@@ -60,7 +60,7 @@ theorem full_scalar_top
     | exact load5 _ _
     | simp (config := { implicitDefEqProofs := false })
         [step, pureArity, productArgs, checkedValue, numericValue, formValue, formedLeft, formedRight,
-          readingLeft, readingRight, checkedAt, scalars, CIL.step, CIL.binary,
+          readingLeft, readingRight, checkedAt, scalars, CIL.step.eq_def, CIL.binary,
           Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
       first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
   obtain ⟨after, stored, next⟩ := state.store enteredWF homes 6 (by rfl) (fullTop original left right)
