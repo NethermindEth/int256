@@ -442,45 +442,35 @@ dependency applicability.
 
 ## Measured verification time
 
-Before the safety extension, the arithmetic-only 87-method/256-certificate
-fresh production run (`verify_all.py --expanded --jobs 4`) took 12,411 seconds
-(3h 26m) on Windows with SDK 10.0.401, Lean 4.34.1 and four workers. Individual
-fresh kernel builds had a 74.4-second median (38.6–551.4 seconds). These are
-observed timings under concurrent load. Regression acceptance uses applicable
-retained group results; no new successful full-regression wall time is claimed.
-Concurrent durations overlap and must not be summed.
+The October 2026 consolidation reduced handwritten Lean files from 945 to 769.
+Execution stages are grouped by operation and ISA; constructor proofs and shift
+stepping are shared. Checked instruction equations avoid repeatedly generating
+dispatcher simplification machinery. Contracts, semantics and proof budgets are
+unchanged.
 
-The combined run completed with two workers followed by six. The six-worker
-continuation checked the remaining 50 certificates and composed coverage in
-6,524 seconds; 206 completed certificates were validated and reused. This is a
-partial-run measurement, not an end-to-end timing or a measured parallel speedup.
+Representative before/after medians on Windows with Lean 4.34.1:
 
-On Windows with a Ryzen 9 9950X, SDK 10.0.401 and Lean 4.34.1, the committed
-`3e2b43b` pipeline checked all 14 production families and coverage composition in
-883 seconds without competing builds. Each proof used a fresh directory without
-Lean caches; toolchain dependencies were already installed. The shared DLL and
-extractor builds took 2.7 and 2.4 seconds, paid once. Per-profile times below
-include extraction, fresh kernel checking and setup, excluding those shared builds.
-The measurement retained temporary directories only for subsequent module checks.
-
-| Profile | Add (s) | Subtract (s) |
+| Proof workload | Before (s) | After (s) |
 |---|---:|---:|
-| scalar | 63.1 | 56.4 |
-| arm64-advsimd | 75.7 | 63.0 |
-| x64-sse42 | 73.8 | 62.4 |
-| x64-avx2 | 63.3 | 60.0 |
-| x64-avx2-bmi1 | 54.6 | 62.4 |
-| x64-avx512 | 53.4 | 57.7 |
-| x64-avx512-bmi1 | 55.9 | 61.4 |
+| Binary bitwise vector modules, folded together | 10.12 | 2.93 |
+| Scalar bitwise NOT | 7.52 | 1.98 |
+| SSE equality | 8.23 | 2.79 |
+| Right-shift execution | 17.20 | 9.79 |
 
-Separate standalone scalar repeats, including assembly/extractor builds, took
-59.5/56.9 seconds for Add/Subtract, versus 49.9/43.2 seconds at `d937469`.
-Earlier original runs took 58.7/53.0 seconds. The expanded model adds fresh-build
-work; these samples show variance and do not establish unchanged pipeline speed.
-With dependencies built, generated lookups took 2.3–3.6 seconds, carry/borrow
-arithmetic 1.0–1.7 seconds, and SIMD execution modules 7.6–17.5 seconds.
-Module timings include process/import overhead and cannot be summed as pipeline
-time. No proof budgets were raised.
+These are paired module checks with dependencies already built, including
+process/import overhead; the first three also write `.olean` output. They are
+not full-pipeline timings and must not be summed into an end-to-end speedup.
+Affected public gates and fixtures were checked after each batch, and unchanged
+evidence was reused after comparing dependencies. Both arithmetic and safety
+evidence reconcile across all 256 production jobs; this is not a new fresh
+aggregate run.
+
+For historical context, the arithmetic-only 87-method/256-certificate run took
+12,411 seconds with four workers. The later combined arithmetic/safety run used
+two workers followed by six; its six-worker continuation checked 50 certificates
+and composed coverage in 6,524 seconds, reusing 206 completed certificates.
+Those measurements cover different work and do not establish a parallel or
+end-to-end speedup. No new full-regression wall time is claimed.
 
 ## Trust boundary
 
