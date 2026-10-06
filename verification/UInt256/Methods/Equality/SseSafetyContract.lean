@@ -45,7 +45,7 @@ theorem sse_run (memory : Memory) (left right : Reference) (frame : Frame)
           [cil_code, step, readOnlyArguments, checkedValue, numericValue, formValue, fl, fr,
             hl0, hr0, hl1, hr1, al1, ar1,
             locals, storeLocal, loadLocal, pureArity, scalars, staticInstruction, memoryInstruction,
-            CIL.step, CIL.Intrinsic.available, intrinsic_equal128, intrinsic_xor128, intrinsic_or128, intrinsic_zero128,
+            CIL.step.eq_def, CIL.Intrinsic.available, intrinsic_equal128, intrinsic_xor128, intrinsic_or128, intrinsic_zero128,
             difference, instruction, CIL.offsetValue, referenceAt,
             UInt256Model.Equality.booleanWord, checkedAt,
             Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]

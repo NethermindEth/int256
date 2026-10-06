@@ -21,7 +21,7 @@ theorem vector_primitive_run32 (memory : Memory) (left : Reference) (right : Bit
       · simp (config := { implicitDefEqProofs := false })
           [cil_code, step, scalarArguments, checkedValue, numericValue, formValue, formed,
             loaded, pureArity, scalars, staticInstruction, memoryInstruction,
-            CIL.step, CIL.Intrinsic.available, intrinsic_scalar32, intrinsic_equal256,
+            CIL.step.eq_def, CIL.Intrinsic.available, intrinsic_scalar32, intrinsic_equal256,
             Bitwise.intrinsic_xor256, intrinsic_zero256,
             UInt256Model.Equality.booleanWord, checkedAt,
             Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
