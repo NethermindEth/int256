@@ -3,6 +3,7 @@
 import copy
 import json
 from pathlib import Path
+import re
 import sys
 import tempfile
 import unittest
@@ -15,6 +16,43 @@ from common import PROFILES, MULTIPLY_PROFILES, VERIFY, expected_profile, sha, s
 
 
 class PreparedBuildChecks(unittest.TestCase):
+    def test_all_production_gate_imports_resolve(self):
+        from gate_templates import audit_module
+        from methods import api_entries, LEGACY, method_names
+        from safety_gate import safety_gate
+        from verify_all import coverage_plan
+
+        seen = set()
+        def visit(module, text=None):
+            if module == "Extracted" or module.split(".")[0] in {"Lean", "Std", "Init"}:
+                return
+            if text is None:
+                if module in seen:
+                    return
+                seen.add(module)
+                path = VERIFY / (module.replace(".", "/") + ".lean")
+                self.assertTrue(path.is_file(), module)
+                text = path.read_text(encoding="utf-8")
+            for imported in re.findall(r"^import (\S+)", text, re.M):
+                visit(imported)
+
+        for method, profile in coverage_plan(method_names(), safety=True):
+            with self.subTest(method=method, profile=profile):
+                if method in LEGACY:
+                    visit("Audit" if method == "Add" else "SubtractAudit")
+                else:
+                    visit("SelectedGate", audit_module(api_entries()[method]))
+                gate = safety_gate(method, profile)
+                if gate.get("generatedAudit"):
+                    visit("SelectedSafetyGate", selected_safety_module(method, profile))
+                else:
+                    visit(gate["target"].removeprefix("+").removesuffix(":olean"))
+
+    def test_cil_imports_do_not_depend_on_the_consumer(self):
+        for path in source_files(VERIFY / "CIL", {".lean"}):
+            imports = re.findall(r"^import (\S+)", path.read_text(encoding="utf-8"), re.M)
+            self.assertFalse([name for name in imports if name.startswith(("UInt256", "Extracted"))], path)
+
     def test_editor_layout_is_not_a_verification_input(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

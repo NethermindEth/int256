@@ -320,6 +320,16 @@ and separate: they bind each selected contract and feature family explicitly.
 ISA semantics stay under `CIL/SIMD`; operation-specific vector proofs stay with
 their method family.
 
+The import boundary is enforced, but this is not yet a general LeanCIL library:
+field instructions use four limb indices, aggregate operations assume 32 bytes,
+and extractor validation fixes the UInt256 assembly and layout. Supporting another
+aggregate type requires validated layout descriptors and corresponding semantics;
+moving these files alone would not remove those assumptions.
+
+Higher proofs apply imported lower theorems rather than repeat their proofs.
+Lake stores checked modules in `.olean` files. `verify_all.py` reuses these within
+each fresh worker workspace; changing the extraction rebuilds its dependents.
+
 ## Regression tests and CI
 
 After verifier, extractor, CIL semantics or automation changes, and before
@@ -445,7 +455,7 @@ dependency applicability.
 
 ## Measured verification time
 
-The October 2026 consolidation reduced handwritten Lean files from 945 to 769.
+The October 2026 consolidation reduced handwritten Lean files from 945 to 746.
 Execution stages are grouped by operation and ISA; constructor proofs and shift
 stepping are shared. Checked instruction equations avoid repeatedly generating
 dispatcher simplification machinery. Contracts, semantics and proof budgets are
