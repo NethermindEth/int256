@@ -44,7 +44,7 @@ theorem scalar_run (memory : Memory) (left right : Reference) (frame : Frame)
       · simp only [cil_code]; rfl
       · simp (config := { implicitDefEqProofs := false })
           [step, readOnlyArguments, checkedValue, numericValue, formValue, fl, fr,
-            hl, hr, hc, pureArity, scalars, CIL.step, CIL.binary, checkedAt,
+            hl, hr, hc, pureArity, scalars, CIL.step.eq_def, CIL.binary, checkedAt,
             Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
         try (exact ⟨rfl, rfl, rfl, rfl⟩)
         done

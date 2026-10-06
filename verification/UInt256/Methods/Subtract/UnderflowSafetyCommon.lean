@@ -33,7 +33,7 @@ theorem underflow_prefix (left right output : Reference) (frame : Frame) (memory
        · simp only [cil_code]; rfl
        · simp (config := { implicitDefEqProofs := false })
            [cil_code, binaryArguments, step, checkedValue, numericValue, formValue, fl, fr, fo,
-             pureArity, scalars, CIL.step, CIL.FeatureProfile.evaluate, checkedAt, Except.mapError,
+             pureArity, scalars, CIL.step.eq_def, CIL.FeatureProfile.evaluate, checkedAt, Except.mapError,
              Bind.bind, Except.bind, Pure.pure, Except.pure]
          first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)
 

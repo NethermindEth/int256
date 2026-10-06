@@ -62,7 +62,7 @@ theorem vector_run (memory : Memory) (left right output : Reference) (frame : Fr
       · simp (config := { implicitDefEqProofs := false })
           [cil_code, step, binaryArguments, checkedValue, numericValue, formValue, fl, fr, fo, hl, hr,
             pureArity, scalars, staticInstruction, memoryInstruction, storeValue, referenceAt,
-            CIL.step, CIL.Intrinsic.available, intrinsic, intrinsic_and, intrinsic_or, written, result, selected, UInt256Model.Bitwise.applyBinary,
+            CIL.step.eq_def, CIL.Intrinsic.available, intrinsic, intrinsic_and, intrinsic_or, written, result, selected, UInt256Model.Bitwise.applyBinary,
             checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
         try (exact ⟨rfl, rfl, rfl, rfl⟩)
         done
