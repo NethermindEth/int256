@@ -48,11 +48,31 @@ internal static class LeanEmitter
             }));
             if (!m.Body.InitLocals)
                 locals = string.Join(", ", m.Body.Variables.Select(_ => ".unmodeled"));
+            string localKinds = string.Join(", ", m.Body.Variables.Select(v => v.VariableType.FullName switch
+            {
+                "System.Boolean" => ".byte",
+                "System.Int32" or "System.UInt32" => ".word32",
+                "System.UInt64" or "System.Int64" => ".word64",
+                "Nethermind.Int256.UInt256" => ".vector256",
+                string s when s.EndsWith("&", StringComparison.Ordinal) => ".reference",
+                string s when s.StartsWith("System.Runtime.Intrinsics.Vector128`1<", StringComparison.Ordinal) => ".vector128",
+                string s when s.StartsWith("System.Runtime.Intrinsics.Vector256`1<", StringComparison.Ordinal) => ".vector256",
+                _ => throw new InvalidDataException($"Unsupported local storage {v.VariableType.FullName}")
+            }));
             string aggregateLocals = string.Join(", ", m.Body.Variables.Where(v => v.VariableType.FullName == "Nethermind.Int256.UInt256").Select(v => v.Index));
             string aggregateArgs = string.Join(", ", m.Parameters.Where(p => p.ParameterType.FullName == "Nethermind.Int256.UInt256").Select(p => p.Index + (m.HasThis ? 1 : 0)));
+            string staticSites = string.Join(", ", instructions.Select((instruction, pc) => (instruction, pc))
+                .Where(site => reachable.Contains(site.instruction) && site.instruction.OpCode.Code == Code.Ldsflda)
+                .Select(site =>
+                {
+                    FieldDefinition field = StaticData.Validate((FieldReference)site.instruction.Operand, m.Module);
+                    int identity = Array.IndexOf(data, field);
+                    if (identity < 0) throw new InvalidDataException("Static field identity missing from extraction");
+                    return $"({site.pc}, {{ identity := {identity}, fieldName := {JsonSerializer.Serialize(field.FullName)}, bytes := {StaticData.LeanBytes(field)} }})";
+                }));
             // Keep the body folded during execution simplification. Its fields
             // and concrete instruction fetches have separately checked equations.
-            lean.Append($"def {symbol}Body : Method := {{\n  profile := profile\n  returnsValue := {returnsValue}\n  locals := [{locals}]\n  aggregateLocals := [{aggregateLocals}]\n  aggregateArgs := [{aggregateArgs}]\n  code := [\n");
+            lean.Append($"def {symbol}Body : Method := {{\n  profile := profile\n  returnsValue := {returnsValue}\n  locals := [{locals}]\n  localKinds := [{localKinds}]\n  staticSites := [{staticSites}]\n  aggregateLocals := [{aggregateLocals}]\n  aggregateArgs := [{aggregateArgs}]\n  code := [\n");
             List<string> ops = [];
             List<string> lookups = [];
             for (int instructionIndex = 0; instructionIndex < instructions.Count; instructionIndex++)
@@ -71,6 +91,8 @@ internal static class LeanEmitter
             lean.Append(string.Join("\n", ops));
             lean.Append("\n  ] }\n\n");
             lean.Append($"@[cil_code] theorem {symbol}Locals : {symbol}Body.locals = [{locals}] := by rfl\n");
+            lean.Append($"@[cil_code] theorem {symbol}LocalKinds : {symbol}Body.localKinds = [{localKinds}] := by rfl\n");
+            lean.Append($"@[cil_code] theorem {symbol}StaticSites : {symbol}Body.staticSites = [{staticSites}] := by rfl\n");
             lean.Append($"@[cil_code] theorem {symbol}AggregateLocals : {symbol}Body.aggregateLocals = [{aggregateLocals}] := by rfl\n");
             lean.Append($"@[cil_code] theorem {symbol}AggregateArgs : {symbol}Body.aggregateArgs = [{aggregateArgs}] := by rfl\n");
             lean.Append($"@[cil_code] theorem {symbol}Profile : {symbol}Body.profile = profile := by rfl\n");

@@ -50,7 +50,7 @@ def baseline_verified(base, method, profile):
                     if (job.get("name") == f"Production proof ({method}, {profile})"
                             and job.get("head_sha") == base and job.get("status") == "completed"
                             and job.get("conclusion") == "success"
-                            and any(step.get("name") == "Verify freshly built UInt256"
+                            and any(step.get("name") == "Verify UInt256 arithmetic and memory safety"
                                     and step.get("status") == "completed" and step.get("conclusion") == "success"
                                     for step in job.get("steps", []))):
                         return True

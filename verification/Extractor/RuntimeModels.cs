@@ -89,6 +89,7 @@ internal static class RuntimeModels
         "!!1& System.Runtime.CompilerServices.Unsafe::As<Nethermind.Int256.UInt256,System.UInt64>(!!0&)" => ".memory .asRef",
         "!!0& System.Runtime.CompilerServices.Unsafe::Add<System.UInt64>(!!0&,System.Int32)" => ".memory (.add 8 true)",
         "!!1& System.Runtime.CompilerServices.Unsafe::As<System.Byte,System.Runtime.Intrinsics.Vector256`1<System.UInt64>>(!!0&)" => ".memory .asRef",
+        "!!1& System.Runtime.CompilerServices.Unsafe::As<System.UInt64,System.Runtime.Intrinsics.Vector256`1<System.UInt64>>(!!0&)" => ".memory .asRef",
         "!!0& System.Runtime.CompilerServices.Unsafe::Add<System.Runtime.Intrinsics.Vector128`1<System.UInt64>>(!!0&,System.Int32)" => ".memory (.add 16 true)",
         "!!0& System.Runtime.CompilerServices.Unsafe::Add<System.Runtime.Intrinsics.Vector256`1<System.UInt64>>(!!0&,System.UIntPtr)" => ".memory (.add 32 false)",
         "!!1 System.Runtime.CompilerServices.Unsafe::BitCast<Nethermind.Int256.UInt256,System.Runtime.Intrinsics.Vector256`1<System.UInt64>>(!!0)" => ".memory .bitcast256",

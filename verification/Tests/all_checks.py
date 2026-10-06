@@ -17,6 +17,7 @@ sys.dont_write_bytecode = True
 import support
 from common import BUILD_DIRECTORIES, MULTIPLY_PROFILES, PROFILES, ROOT, VERIFY, sha
 from methods import api_entries
+from safety_gate import MULTIPLY_SAFETY_METHODS, BITWISE_DESCRIPTORS, BITWISE_UNARY, COMPARISON_GATES, OPERATOR_DESCRIPTORS, PRIMITIVE_COMPARISONS
 from verify import source_inputs
 from verify_all import coverage_plan
 
@@ -34,6 +35,64 @@ def regression_plan():
         jobs.append(Job(name, (("verification/" + script, *arguments),)))
 
     add("foundation", "Tests/foundation_checks.py")
+    add("safety-foundation", "Tests/memory_safety_checks.py")
+    add("safety-fixtures", "Tests/Fixtures/Safety/checks.py")
+    add("safety-robustness-Add", "Tests/robustness_checks.py", "--method", "Add", "--case", "Renamed", "--case", "ReversedStore", "--safety")
+    for method in sorted(MULTIPLY_SAFETY_METHODS):
+        for profile in MULTIPLY_PROFILES:
+            add(f"safety-{method}-{profile}", "verify.py", "--method", method, "--profile", profile, "--safety")
+    for profile in ("x64-avx2", "x64-avx2-bmi1", "x64-avx512", "x64-avx512-bmi1"):
+        add(f"safety-Add-{profile}", "verify.py", "--method", "Add", "--profile", profile, "--safety")
+        add(f"safety-AddOverflow-{profile}", "verify.py", "--method", "AddOverflow", "--profile", profile, "--safety")
+    add("safety-Add-scalar", "verify.py", "--method", "Add", "--profile", "scalar", "--safety")
+    add("safety-Add-x64-sse42", "verify.py", "--method", "Add", "--profile", "x64-sse42", "--safety")
+    add("safety-Add-arm64-advsimd", "verify.py", "--method", "Add", "--profile", "arm64-advsimd", "--safety")
+    add("safety-AddOverflow-x64-sse42", "verify.py", "--method", "AddOverflow", "--profile", "x64-sse42", "--safety")
+    add("safety-AddOverflow-arm64-advsimd", "verify.py", "--method", "AddOverflow", "--profile", "arm64-advsimd", "--safety")
+    for method in ("Subtract", "SubtractUnderflow"):
+        for profile in ("x64-sse42", "arm64-advsimd"):
+            add(f"safety-{method}-{profile}", "verify.py", "--method", method, "--profile", profile, "--safety")
+    add("safety-EqUInt256UInt256-scalar", "verify.py", "--method", "EqUInt256UInt256", "--profile", "scalar", "--safety")
+    add("safety-EqUInt256UInt256-vector256", "verify.py", "--method", "EqUInt256UInt256", "--profile", "x64-vector256", "--safety")
+    add("safety-EqualsUInt256Ref-scalar", "verify.py", "--method", "EqualsUInt256Ref", "--profile", "scalar", "--safety")
+    add("safety-NeUInt256UInt256-scalar", "verify.py", "--method", "NeUInt256UInt256", "--profile", "scalar", "--safety")
+    add("safety-EqualsUInt256Ref-vector256", "verify.py", "--method", "EqualsUInt256Ref", "--profile", "x64-vector256", "--safety")
+    add("safety-NeUInt256UInt256-vector256", "verify.py", "--method", "NeUInt256UInt256", "--profile", "x64-vector256", "--safety")
+    add("safety-EqUInt256UInt256-sse41", "verify.py", "--method", "EqUInt256UInt256", "--profile", "x64-sse41", "--safety")
+    add("safety-EqualsUInt256Ref-sse41", "verify.py", "--method", "EqualsUInt256Ref", "--profile", "x64-sse41", "--safety")
+    add("safety-NeUInt256UInt256-sse41", "verify.py", "--method", "NeUInt256UInt256", "--profile", "x64-sse41", "--safety")
+    add("safety-EqualsUInt256Value-scalar", "verify.py", "--method", "EqualsUInt256Value", "--profile", "scalar", "--safety")
+    add("safety-EqualsUInt64-scalar", "verify.py", "--method", "EqualsUInt64", "--profile", "scalar", "--safety")
+    add("safety-EqualsUInt32-scalar", "verify.py", "--method", "EqualsUInt32", "--profile", "scalar", "--safety")
+    add("safety-EqualsUInt64-x64-vector256", "verify.py", "--method", "EqualsUInt64", "--profile", "x64-vector256", "--safety")
+    add("safety-EqualsUInt32-x64-vector256", "verify.py", "--method", "EqualsUInt32", "--profile", "x64-vector256", "--safety")
+    add("safety-EqualsInt64-scalar", "verify.py", "--method", "EqualsInt64", "--profile", "scalar", "--safety")
+    add("safety-EqualsInt32-scalar", "verify.py", "--method", "EqualsInt32", "--profile", "scalar", "--safety")
+    add("safety-EqualsInt64-x64-vector256", "verify.py", "--method", "EqualsInt64", "--profile", "x64-vector256", "--safety")
+    add("safety-EqualsInt32-x64-vector256", "verify.py", "--method", "EqualsInt32", "--profile", "x64-vector256", "--safety")
+    add("safety-EqualsUInt256Value-x64-sse41", "verify.py", "--method", "EqualsUInt256Value", "--profile", "x64-sse41", "--safety")
+    add("safety-EqualsUInt256Value-x64-vector256", "verify.py", "--method", "EqualsUInt256Value", "--profile", "x64-vector256", "--safety")
+    for method in sorted(OPERATOR_DESCRIPTORS):
+        for profile in ("scalar", "x64-vector256"):
+            add(f"safety-{method}-{profile}", "verify.py", "--method", method, "--profile", profile, "--safety")
+    for method in sorted(PRIMITIVE_COMPARISONS):
+        add(f"safety-{method}-scalar", "verify.py", "--method", method, "--profile", "scalar", "--safety")
+    for method in ("LeUInt64UInt256", "AddOverflow", "SubtractUnderflow", "Subtract"):
+        add(f"safety-{method}-scalar", "verify.py", "--method", method, "--profile", "scalar", "--safety")
+    for method in ("Lsh", "Rsh", "LeftShift", "RightShift", "OperatorLsh", "OperatorRsh"):
+        for profile in ("scalar", "x64-vector256"):
+            add(f"safety-{method}-{profile}", "verify.py", "--method", method, "--profile", profile, "--safety")
+    for method in ("Subtract", "SubtractUnderflow"):
+        for profile in ("x64-avx2", "x64-avx2-bmi1", "x64-avx512", "x64-avx512-bmi1"):
+            add(f"safety-{method}-{profile}", "verify.py", "--method", method, "--profile", profile, "--safety")
+    for method in sorted(set(BITWISE_DESCRIPTORS) | BITWISE_UNARY):
+        for profile in ("scalar", "x64-vector256"):
+            add(f"safety-{method}-{profile}", "verify.py", "--method", method, "--profile", profile, "--safety")
+    for method in sorted(COMPARISON_GATES):
+        for profile in ("scalar", "x64-vector256", "x64-avx2", "x64-avx512"):
+            add(f"safety-{method}-{profile}", "verify.py", "--method", method, "--profile", profile, "--safety")
+    for method in ("CompareToUInt256Ref", "CompareToUInt256Value"):
+        add(f"safety-{method}-scalar", "verify.py", "--method", method, "--profile", "scalar", "--safety")
     add("profile-extractor", "Tests/profile_extractor_checks.py")
     for name in ("change", "coverage", "prepared", "rejection", "method", "gate-template", "operation-coverage"):
         add("python-" + name, "Tests/" + name.replace("-", "_") + "_checks.py")
@@ -57,6 +116,8 @@ def regression_plan():
                   "Bitwise/operator_checks.py" if operation.startswith("Operator") and operation[8:] in
                   ("Xor", "And", "Or", "Not") else "Shift/negative_checks.py")
         arguments = () if operation in ("Compare", "Bitwise") else ("--method", operation)
+        if script == "Shift/negative_checks.py":
+            arguments += ("--safety",)
         for profile in ("scalar", "x64-vector256"):
             add(f"operation-{operation}-{profile}", "Tests/Fixtures/" + script,
                 *arguments, "--profile", profile, "--workspace")
@@ -77,9 +138,20 @@ def regression_plan():
         for profile in PROFILES:
             add(f"reporting-{method}-{profile}", "Tests/reporting_checks.py",
                 "--method", method, "--profile", profile)
-    if len(jobs) != 131 or len({job.id for job in jobs}) != 131:
+    if len(jobs) != 390 or len({job.id for job in jobs}) != 390:
         raise RuntimeError("Incomplete or duplicate regression matrix")
     return jobs
+
+
+def ci_matrix(plan):
+    """Retain every regression while staying within Actions' 256-entry limit."""
+    if not plan:
+        raise ValueError("Empty regression matrix")
+    width = (len(plan) + 255) // 256
+    return {"include": [{"batch": index // width,
+                         "jobs": [job.id for job in plan[index:index + width]],
+                         "timeoutMinutes": min(360, 60 * len(plan[index:index + width]))}
+                        for index in range(0, len(plan), width)]}
 
 
 def inputs_at(directory):
@@ -226,7 +298,8 @@ def main(arguments=None):
         parser.error("Unknown exact job ID")
     if args.print_plan:
         print(json.dumps({"scope": "partial" if args.job else "full", "requiredJobs": len(plan),
-                          "jobs": [{"id": job.id, "commands": job.commands} for job in selected]}, indent=2))
+                          "jobs": [{"id": job.id, "commands": job.commands} for job in selected],
+                          "matrix": ci_matrix(selected)}, indent=2))
         return
     target = run_suite(plan, selected, args.jobs, VERIFY / "generated/all-checks", captured)
     print(f"{'Full regression suite' if not args.job else 'Partial regression job'} passed: {target}")

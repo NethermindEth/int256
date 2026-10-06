@@ -3,6 +3,7 @@
 import copy
 import hashlib
 import json
+import shutil
 from pathlib import Path
 import sys
 import threading
@@ -18,6 +19,15 @@ from methods import api_entries, method_manifest
 
 
 class OperationCoverageChecks(unittest.TestCase):
+    def test_multiplication_reports_retain_the_native_execution_boundary(self):
+        for method in ("Multiply", "MultiplyInstance", "OperatorMultiplyUInt256UInt256"):
+            with self.subTest(method=method):
+                limitations = verify_all.native_limitations([method])
+                self.assertEqual(limitations[0]["status"], "observed-failure")
+                self.assertIn("CIL proof", limitations[0]["scope"])
+                self.assertTrue((Path(__file__).resolve().parents[2] / limitations[0]["minimalWitness"]).is_file())
+        self.assertEqual(verify_all.native_limitations(["Add", "Lsh"]), [])
+
     def test_parallel_profiles_share_build_and_wait_for_each_proof(self):
         bundle = {"assemblySha256": "one fresh production assembly"}
         rendezvous = threading.Barrier(2, timeout=10)
@@ -133,6 +143,37 @@ class OperationCoverageChecks(unittest.TestCase):
         certificate = self.check()
         self.assertEqual(certificate["auditedTheorems"], self.report["auditedTheorems"])
         self.assertNotIn("compositionCertificate", certificate)
+
+    def test_combined_operation_requires_arithmetic_binding_and_safety_audits(self):
+        original = self.directory
+        self.directory = original / "safety"
+        self.directory.mkdir()
+        for name in ("artifact.json", "Extracted.lean", "SelectedGate.lean"):
+            shutil.copy2(original / name, self.directory / name)
+        gate = verify_all.safety_gate("LtUInt256UInt256", "x64-avx2")
+        self.report.update(evidenceKind="arithmetic-and-memory-safety", safety=gate,
+                           arithmeticCoverage=self.report["coverage"])
+        self.report["coverage"] = {"aggregateChecked": False, "representative": "x64-avx2",
+                                   **gate["coverage"]}
+        self.report["auditedTheorems"] += gate["theorems"]
+        self.report["axiomAudits"].update({name: ["propext", "Quot.sound"] for name in gate["theorems"]})
+        self.assertFalse(gate.get("generatedAudit"))
+        self.report["generatedSafetyGateSha256"] = None
+        self.write_report()
+        with patch.object(verify_all, "generated_directory", return_value=original):
+            def check():
+                return verify_all.checked_certificate("LtUInt256UInt256", "x64-avx2", self.inputs, safety=True)
+            self.assertEqual(check()["evidenceKind"], "arithmetic-and-memory-safety")
+            path = self.directory / "SelectedGate.lean"
+            original_bytes = path.read_bytes()
+            path.write_text("-- changed binding", encoding="utf-8")
+            with self.assertRaisesRegex(RuntimeError, "Stale typed audit module"):
+                check()
+            path.write_bytes(original_bytes)
+            self.report["axiomAudits"].pop(gate["theorems"][-1])
+            self.write_report()
+            with self.assertRaisesRegex(RuntimeError, "Missing family gate"):
+                check()
 
     def test_total_plan_requires_more_than_a_conditional_gate(self):
         self.manifest["verification"].pop("familyCoverage", None)

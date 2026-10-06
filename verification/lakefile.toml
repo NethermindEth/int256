@@ -47,3 +47,9 @@ name = "Tests.ExpansionIntrinsics"
 
 [[lean_lib]]
 name = "SubtractAudit"
+
+[[lean_lib]]
+name = "Tests.MemorySafety"
+
+[[lean_lib]]
+name = "Tests.MemorySafetyInstructions"

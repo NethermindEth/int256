@@ -48,7 +48,7 @@ jobs:
           import subprocess
           import sys
           matrix = subprocess.check_output(
-              [sys.executable, "verification/verify_all.py", "--expanded", "--print-plan"], text=True)
+              [sys.executable, "verification/verify_all.py", "--expanded", "--safety", "--print-plan"], text=True)
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
               output.write("matrix=" + matrix.strip() + "\n")
           PY
@@ -88,6 +88,6 @@ jobs:
           curl --fail --location --retry 3 https://github.com/leanprover/lean4/releases/download/v4.34.1/lean-4.34.1-linux.tar.zst -o "$RUNNER_TEMP/lean.tar.zst"
           tar --zstd -xf "$RUNNER_TEMP/lean.tar.zst" -C "$RUNNER_TEMP"
           echo "$RUNNER_TEMP/lean-4.34.1-linux/bin" >> "$GITHUB_PATH"
-      - name: Verify freshly built UInt256
+      - name: Verify UInt256 arithmetic and memory safety
         if: steps.changes.outputs.required == 'true'
-        run: python3 verification/verify.py --method ${{ matrix.method }} --profile ${{ matrix.profile }}
+        run: python3 verification/verify.py --method ${{ matrix.method }} --profile ${{ matrix.profile }} --safety

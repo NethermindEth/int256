@@ -12,6 +12,8 @@ internal static class StaticData
             reference.FieldType.Scope != module || reference.FieldType is TypeSpecification ||
             reference.FieldType.IsValueType != layout.IsValueType || reference.FieldType.Resolve() != layout ||
             field.Module != module || layout.Module != module || !field.IsStatic || !field.IsInitOnly ||
+            field.DeclaringType.Fields.Count(candidate => candidate.FullName == field.FullName) != 1 ||
+            module.GetTypes().Count(candidate => candidate.FullName == field.DeclaringType.FullName) != 1 ||
             (field.Attributes & FieldAttributes.HasFieldRVA) == 0 || field.InitialValue.Length == 0 ||
             field.RVA == 0 || !layout.IsValueType || !RuntimeModels.HasRuntimeValueTypeBase(layout) || layout.HasGenericParameters ||
             !layout.IsExplicitLayout || layout.PackingSize != 1 || layout.ClassSize != field.InitialValue.Length ||

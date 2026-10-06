@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from common import BUILD_DIRECTORIES, PROFILE_DIRECTORY, PROFILES, ROOT, VERIFY, expected_profile, generated_directory, run, sha, source_files
 from methods import check_calling_convention, method_manifest
-from verify import build_artifact, check_proof_snapshot, source_inputs, theorem_audits
+from verify import build_artifact, check_proof_snapshot, safety_gate, source_inputs, theorem_audits
 
 
 def isolated_run(script, arguments, prefix):
@@ -64,20 +64,32 @@ def require_changed_method(artifact, baseline, signature):
         raise RuntimeError("Fixture did not change the intended compiled operation")
 
 
-def selected_fixture_baseline(method, profile, positive=None):
+def selected_fixture_baseline(method, profile, positive=None, *, safety=False):
     public = [sys.executable, str(VERIFY / "verify.py"), "--method", method, "--profile", profile]
-    report_path = generated_directory(method, profile) / "report.json"
+    directory = generated_directory(method, profile)
+    if safety:
+        public.append("--safety")
+        directory /= "safety"
+    report_path = directory / "report.json"
+
+    def read_report():
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+        if safety and (report.get("evidenceKind") != "arithmetic-and-memory-safety"
+                       or report.get("safety") != safety_gate(method, profile)):
+            raise RuntimeError("Fixture prerequisite lacks the selected combined safety evidence")
+        return report
+
     run(public, ROOT)
-    production = json.loads(report_path.read_text(encoding="utf-8"))
+    production = read_report()
     if production["source"]["kind"] != "production" or production["sourceInputs"] != source_inputs():
         raise RuntimeError("Fresh production prerequisite was not established")
     run(public + ["--fixture", "Baseline"], ROOT)
-    baseline = json.loads(report_path.read_text(encoding="utf-8"))
+    baseline = read_report()
     if baseline["leanSourceSha256"] != production["leanSourceSha256"]:
         raise RuntimeError("Fixture baseline changed handwritten proofs")
     if positive:
         run(public + ["--fixture", positive], ROOT)
-        alternative = json.loads(report_path.read_text(encoding="utf-8"))
+        alternative = read_report()
         if alternative["leanSourceSha256"] != baseline["leanSourceSha256"]:
             raise RuntimeError("Equivalent fixture changed handwritten proofs")
         if alternative["generatedProgramSha256"] == baseline["generatedProgramSha256"]:

@@ -14,8 +14,9 @@ import time
 
 from common import PROFILES, ROOT, SEMANTICS_VERSION, VERIFY, expected_profile, generated_directory, run, sha, source_files
 from verify import audit_names, build_artifact, check_proof_snapshot, main as verify_one, source_inputs, theorem_audits
-from methods import LEGACY, api_entries, check_calling_convention, method_manifest, method_names
+from methods import LEGACY, api_entries, check_calling_convention, method_manifest, method_names, native_limitations
 from gate_templates import audit_module
+from safety_gate import safety_gate, selected_safety_module
 
 
 METHODS = ("Add", "Subtract")
@@ -65,7 +66,7 @@ def check_family_representatives(family):
             raise RuntimeError(f"Feature-family representative premise changed: {kind}/{name}")
 
 
-def coverage_plan(methods):
+def coverage_plan(methods, safety=False):
     """Require total audited coverage before building any selected method."""
     if not methods or len(set(methods)) != len(methods):
         raise RuntimeError("Coverage requires distinct selected methods")
@@ -82,16 +83,26 @@ def coverage_plan(methods):
         else:
             raise RuntimeError(f"Total feature coverage is not implemented yet: {method}")
         plan.extend((method, representative) for representative in representatives)
+    if safety:
+        for method, profile in plan:
+            gate = safety_gate(method, profile)
+            if gate.get("coverage", {}).get("kind") not in {"feature-family", "all-profiles"}:
+                raise RuntimeError(f"Total safety feature coverage is not implemented yet: {method}/{profile}")
     return plan
 
 
-def checked_certificate(method, profile, inputs):
+def checked_certificate(method, profile, inputs, safety=False):
     directory = generated_directory(method, profile)
+    if safety:
+        directory /= "safety"
     path = directory / "report.json"
     report = json.loads(path.read_text(encoding="utf-8"))
     manifest = (json.loads((VERIFY / f"manifests/{method.lower()}.json").read_text(encoding="utf-8"))
                 if method in LEGACY else method_manifest(method))
     names = audit_names(method)
+    safety_spec = safety_gate(method, profile) if safety else None
+    if safety_spec:
+        names += safety_spec["theorems"]
     artifact = json.loads((directory / "artifact.json").read_text(encoding="utf-8"))
     lean_hashes = {p.relative_to(VERIFY).as_posix(): sha(p) for p in source_files(VERIFY, {".lean"})}
     production_source = {"kind": "production", "project": "src/Nethermind.Int256/Nethermind.Int256.csproj",
@@ -123,7 +134,20 @@ def checked_certificate(method, profile, inputs):
         axioms = report["axiomAudits"][name]
         if len(set(axioms)) != len(axioms) or set(axioms) - set(manifest["approvedAxioms"]):
             raise RuntimeError(f"Unapproved family axioms: {method}/{profile}")
-    coverage = report.get("coverage", {})
+    combined = {}
+    if safety_spec:
+        if report.get("evidenceKind") != "arithmetic-and-memory-safety" or report.get("safety") != safety_spec:
+            raise RuntimeError(f"Missing or mismatched combined safety evidence: {method}/{profile}")
+        expected_coverage = {"aggregateChecked": False, "representative": profile, **safety_spec["coverage"]}
+        if report.get("coverage") != expected_coverage or expected_coverage["kind"] not in {"feature-family", "all-profiles"}:
+            raise RuntimeError(f"Missing safety family coverage: {method}/{profile}")
+        safety_hash = (hashlib.sha256(selected_safety_module(method, profile).encode("utf-8")).hexdigest()
+                       if safety_spec.get("generatedAudit") else None)
+        if report.get("generatedSafetyGateSha256") != safety_hash or (safety_hash is not None and
+                sha(directory / "SelectedSafetyGate.lean") != safety_hash):
+            raise RuntimeError(f"Stale typed safety audit module: {method}/{profile}")
+        combined = {"evidenceKind": report["evidenceKind"], "safety": safety_spec}
+    coverage = report.get("arithmeticCoverage" if safety else "coverage", {})
     if method not in LEGACY:
         if coverage != {"kind": manifest["verification"]["profileCoverage"], "aggregateChecked": False,
                         "representative": profile,
@@ -139,7 +163,7 @@ def checked_certificate(method, profile, inputs):
                 "allProfilesTheorem": manifest["verification"].get("allProfilesTheorem"),
                 "familyCoverage": copy.deepcopy(manifest["verification"].get("familyCoverage")),
                 "auditedTheorems": names, "axiomAudits": report["axiomAudits"],
-                "timings": report.get("timings")}
+                "timings": report.get("timings"), **combined}
     if coverage.get("kind") != "feature-family" or coverage.get("representative") != profile:
         raise RuntimeError(f"Missing family coverage: {method}/{profile}")
     return {"method": method, "representative": profile,
@@ -147,7 +171,7 @@ def checked_certificate(method, profile, inputs):
             "assemblySha256": artifact["sha256"], "generatedProgramSha256": report["generatedProgramSha256"],
             "familyTheorem": names[1], "compositionCertificate": names[2],
             "representativeTheorem": names[3], "axiomAudits": report["axiomAudits"],
-            "timings": report.get("timings")}
+            "timings": report.get("timings"), **combined}
 
 
 def check_composition(inputs, operations=False):
@@ -193,10 +217,10 @@ def positive_jobs(value):
     return jobs
 
 
-def verify_profiles(plan, bundle, jobs):
+def verify_profiles(plan, bundle, jobs, safety=False):
     def check(selection):
         method, profile = selection
-        verify_one(["--method", method, "--profile", profile], prepared=bundle)
+        verify_one(["--method", method, "--profile", profile] + (["--safety"] if safety else []), prepared=bundle)
 
     if jobs == 1:
         for selection in plan:
@@ -220,6 +244,8 @@ def main():
                         help="Compose existing production reports only after checking their complete freshness")
     parser.add_argument("--print-plan", action="store_true",
                         help="Print the complete method/profile CI matrix without building or changing reports")
+    parser.add_argument("--safety", action="store_true",
+                        help="Require combined memory-safety and arithmetic certificates for every profile")
     parser.add_argument("--jobs", type=positive_jobs, default=1,
                         help="Maximum concurrent isolated profile proofs (default: 1)")
     selection = parser.add_mutually_exclusive_group()
@@ -232,14 +258,16 @@ def main():
         parser.error("--print-plan cannot compose reports")
     methods = tuple(method_names()) if args.expanded else (args.method,) if args.method else METHODS
     if args.print_plan:
-        plan = coverage_plan(methods)
+        plan = coverage_plan(methods, args.safety)
         print(json.dumps({"include": [{"method": method, "profile": profile} for method, profile in plan]}))
         return
     destination = ((generated_directory(args.method) / "coverage.json") if args.method else
                    VERIFY / "generated/coverage.json")
+    if args.safety:
+        destination = destination.parent / "safety" / destination.name
     destination.unlink(missing_ok=True)
-    plan = coverage_plan(methods)
-    operations = any(method not in LEGACY for method in methods)
+    plan = coverage_plan(methods, args.safety)
+    operations = args.safety or any(method not in LEGACY for method in methods)
     started = time.perf_counter()
     inputs = source_inputs()
     build_timings = None
@@ -250,16 +278,18 @@ def main():
             bundle = build_artifact(ROOT / "src/Nethermind.Int256/Nethermind.Int256.csproj",
                                     Path(temporary), "Add")
             build_timings = bundle["timings"]
-            verify_profiles(plan, bundle, args.jobs)
-    certificates = [checked_certificate(method, profile, inputs) for method, profile in plan]
+            verify_profiles(plan, bundle, args.jobs, args.safety)
+    certificates = [checked_certificate(method, profile, inputs, args.safety) for method, profile in plan]
     composition = check_composition(inputs, operations)
     # Recheck generated files as well as reports after the kernel composition.
-    current_certificates = [checked_certificate(method, profile, inputs)
+    current_certificates = [checked_certificate(method, profile, inputs, args.safety)
                             for method, profile in plan]
     if inputs != source_inputs() or current_certificates != certificates:
         raise RuntimeError("Certificates changed during composition")
     audits, lean = composition
-    report = {"status": "verified", "coverage": "all valid FeatureProfile configurations",
+    report = {"status": "verified",
+              "evidenceKind": "arithmetic-and-memory-safety" if args.safety else "arithmetic", "coverage": "all valid FeatureProfile configurations",
+              "nativeLimitations": native_limitations(methods),
               "methods": list(methods), "selectedApiCoverage": args.expanded,
               "domain": "CIL.FeatureProfile.Valid", "sourceInputs": inputs,
               "semanticsVersion": SEMANTICS_VERSION,

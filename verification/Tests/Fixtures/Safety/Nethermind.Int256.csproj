@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AssemblyName>Nethermind.Int256</AssemblyName>
+    <FixtureCase Condition="'$(FixtureCase)' == ''">Interior</FixtureCase>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../Support.cs" />
+    <Compile Include="../Common/Add/AddScalar.cs" />
+    <Compile Include="../Common/Add/AddScalarUInt64.cs" />
+    <Compile Include="../Common/Add/AddWithCarry.cs" />
+    <Compile Include="../Common/Add/StoreLimbs.cs" />
+    <Compile Include="Entry.cs" />
+    <Compile Include="AggregateProbe.cs" Condition="'$(FixtureCase)' == 'AggregateHome' Or '$(FixtureCase)' == 'AggregateOverread'" />
+    <Compile Include="StaticProbe.cs" Condition="'$(FixtureCase)' == 'StaticLookup' Or '$(FixtureCase)' == 'StaticOverread'" />
+    <Compile Include="$(FixtureCase).cs" Condition="'$(FixtureCase)' != 'VectorOutsideView'" />
+    <Compile Include="MaskedVectorOverread.cs" Condition="'$(FixtureCase)' == 'VectorOutsideView'" />
+  </ItemGroup>
+  <Target Name="ValidateSafetyFixture" BeforeTargets="CoreCompile"
+          Condition="'$(FixtureCase)' != 'AlignedLoad' And '$(FixtureCase)' != 'UnalignedVector' And '$(FixtureCase)' != 'ReusedLocal' And '$(FixtureCase)' != 'Interior' And '$(FixtureCase)' != 'EndThenInterior' And '$(FixtureCase)' != 'Overread' And '$(FixtureCase)' != 'InvalidThenRepaired' And '$(FixtureCase)' != 'AggregateHome' And '$(FixtureCase)' != 'AggregateOverread' And '$(FixtureCase)' != 'StaticLookup' And '$(FixtureCase)' != 'StaticOverread' And '$(FixtureCase)' != 'InitializedVector' And '$(FixtureCase)' != 'UninitializedVector' And '$(FixtureCase)' != 'MaskedVectorOverread' And '$(FixtureCase)' != 'VectorOutsideView' And '$(FixtureCase)' != 'WriteThenRestore' And '$(FixtureCase)' != 'InvalidNativeOffset' And '$(FixtureCase)' != 'EscapedLocal'">
+    <Error Text="Unknown safety fixture: $(FixtureCase)" />
+  </Target>
+</Project>

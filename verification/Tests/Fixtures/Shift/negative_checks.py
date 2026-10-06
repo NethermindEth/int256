@@ -40,14 +40,15 @@ def refute(proof, lake, witness, approved, operator):
                         "UInt256.Methods.Shift.Witness", "UInt256Proof.Shift.Witness.refuted", approved)
 
 
-def check_workspace(method, profile):
+def check_workspace(method, profile, safety=False):
     lake = shutil.which("lake")
     if not lake:
         raise RuntimeError("Pinned Lean / lake must be on PATH")
     manifest = method_manifest(method)
     direction = METHODS[method]
     operator = method.startswith("Operator")
-    public, report_path, baseline = selected_fixture_baseline(method, profile, "LshHelper" if direction == "left" else None)
+    public, report_path, baseline = selected_fixture_baseline(method, profile,
+        "LshHelper" if direction == "left" else None, safety=safety)
     if method == "OperatorLsh":
         run(public + ["--fixture", "LshEarlyStore"], ROOT)
         alternative = json.loads(report_path.read_text(encoding="utf-8"))
@@ -78,12 +79,16 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--method", choices=METHODS, default="Lsh")
     parser.add_argument("--profile", choices=PROFILE_NAMES, default="scalar")
+    parser.add_argument("--safety", action="store_true", help="Require combined arithmetic and memory-safety verification")
     parser.add_argument("--workspace", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
     if args.workspace:
-        check_workspace(args.method, args.profile)
+        check_workspace(args.method, args.profile, args.safety)
         return
-    isolated_run(__file__, ["--method", args.method, "--profile", args.profile], "int256-shift-negative-")
+    arguments = ["--method", args.method, "--profile", args.profile]
+    if args.safety:
+        arguments.append("--safety")
+    isolated_run(__file__, arguments, "int256-shift-negative-")
 
 
 

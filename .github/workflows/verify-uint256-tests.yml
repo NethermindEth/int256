@@ -30,15 +30,19 @@ jobs:
           plan = json.loads((Path(os.environ["RUNNER_TEMP"]) / "regression-plan.json").read_text())
           if plan["scope"] != "full" or len(plan["jobs"]) != plan["requiredJobs"]:
               raise RuntimeError("Incomplete regression selection")
-          matrix = {"include": [{"job": job["id"]} for job in plan["jobs"]]}
+          matrix = plan["matrix"]
+          if (len(matrix["include"]) > 256 or
+              [job for batch in matrix["include"] for job in batch["jobs"]] !=
+              [job["id"] for job in plan["jobs"]]):
+              raise RuntimeError("Incomplete or oversized regression matrix")
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
               output.write("matrix=" + json.dumps(matrix) + "\n")
           PY
   regressions:
-    name: Regression (${{ matrix.job }})
+    name: Regression batch (${{ matrix.batch }})
     needs: plan
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: ${{ matrix.timeoutMinutes }}
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
@@ -53,13 +57,28 @@ jobs:
           curl --fail --location --retry 3 https://github.com/leanprover/lean4/releases/download/v4.34.1/lean-4.34.1-linux.tar.zst -o "$RUNNER_TEMP/lean.tar.zst"
           tar --zstd -xf "$RUNNER_TEMP/lean.tar.zst" -C "$RUNNER_TEMP"
           echo "$RUNNER_TEMP/lean-4.34.1-linux/bin" >> "$GITHUB_PATH"
-      - name: Run the exact regression group
-        run: python3 verification/Tests/all_checks.py --job ${{ matrix.job }}
+      - name: Run every exact regression group in the batch
+        env:
+          REGRESSION_JOBS: ${{ toJSON(matrix.jobs) }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import subprocess
+          import sys
+          failures = []
+          for job in json.loads(os.environ["REGRESSION_JOBS"]):
+              result = subprocess.run([sys.executable, "verification/Tests/all_checks.py", "--job", job])
+              if result.returncode:
+                  failures.append(job)
+          if failures:
+              raise SystemExit("Failed regression groups: " + ", ".join(failures))
+          PY
       - name: Retain regression evidence
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: uint256-regression-${{ matrix.job }}
+          name: uint256-regression-batch-${{ matrix.batch }}
           path: verification/generated/all-checks/run-*/
   coverage:
     name: Complete selected API feature coverage
@@ -77,7 +96,7 @@ jobs:
           tar --zstd -xf "$RUNNER_TEMP/lean.tar.zst" -C "$RUNNER_TEMP"
           echo "$RUNNER_TEMP/lean-4.34.1-linux/bin" >> "$GITHUB_PATH"
       - name: Verify all full family contracts and compose coverage
-        run: python3 verification/verify_all.py --expanded --jobs 2
+        run: python3 verification/verify_all.py --expanded --safety --jobs 2
       - name: Retain coverage certificates and artifact identities
         uses: actions/upload-artifact@v6
         with:
@@ -87,4 +106,4 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: uint256-coverage-composition
-          path: verification/generated/coverage.json
+          path: verification/generated/safety/coverage.json

@@ -9,7 +9,7 @@ from methods import LEGACY, method_names
 
 ROOT = Path(__file__).resolve().parent.parent
 VERIFY = ROOT / "verification"
-BUILD_DIRECTORIES = frozenset({"artifacts", "bin", "obj", "generated", ".lake", "__pycache__"})
+BUILD_DIRECTORIES = frozenset({"artifacts", "bin", "obj", "generated", ".lake", ".vs", "__pycache__"})
 PROFILES = ("scalar", "arm64-advsimd", "x64-sse42", "x64-avx2", "x64-avx2-bmi1",
             "x64-avx512", "x64-avx512-bmi1")
 MULTIPLY_PROFILES = ("scalar", "x64-vector256",

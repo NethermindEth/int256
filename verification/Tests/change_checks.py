@@ -246,7 +246,7 @@ class BaselineEvidenceChecks(unittest.TestCase):
                     "repository": {"full_name": self.repository}}
         self.job = {"name": "Production proof (Subtract, scalar)", "head_sha": self.base,
                     "status": "completed", "conclusion": "success", "steps": [
-                        {"name": "Verify freshly built UInt256", "status": "completed", "conclusion": "success"}]}
+                        {"name": "Verify UInt256 arithmetic and memory safety", "status": "completed", "conclusion": "success"}]}
         environment = patch.dict(os.environ, {"GITHUB_REPOSITORY": self.repository})
         environment.start()
         self.addCleanup(environment.stop)
@@ -258,6 +258,10 @@ class BaselineEvidenceChecks(unittest.TestCase):
 
     def test_exact_successful_proof_supplies_evidence(self):
         self.assertTrue(self.check())
+
+    def test_arithmetic_only_baseline_is_insufficient(self):
+        self.job["steps"][0]["name"] = "Verify freshly built UInt256"
+        self.assertFalse(self.check())
 
     def test_run_identity_status_and_origin_must_match(self):
         for field, value in (("head_sha", "b" * 40), ("head_branch", "feature"),
@@ -282,8 +286,8 @@ class BaselineEvidenceChecks(unittest.TestCase):
             self.job[field] = original
 
     def test_green_job_with_skipped_failed_or_missing_proof_is_insufficient(self):
-        for steps in ([], [{"name": "Verify freshly built UInt256", "status": "completed", "conclusion": "skipped"}],
-                      [{"name": "Verify freshly built UInt256", "status": "completed", "conclusion": "failure"}],
+        for steps in ([], [{"name": "Verify UInt256 arithmetic and memory safety", "status": "completed", "conclusion": "skipped"}],
+                      [{"name": "Verify UInt256 arithmetic and memory safety", "status": "completed", "conclusion": "failure"}],
                       [{"name": "Other step", "status": "completed", "conclusion": "success"}]):
             with self.subTest(steps=steps):
                 self.job["steps"] = steps

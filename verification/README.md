@@ -13,6 +13,83 @@ The theorems are `UInt256Proof.add_correct` and `UInt256Proof.subtract_correct`.
 Their audit gates, `checked_contract` and `checked_subtract_contract`, check the
 exact public contract types and audit their transitive proof dependencies.
 
+Add `--safety` to require both arithmetic and allocation-aware
+memory/reference-safety gates against the same fresh
+extraction. Combined proofs cover all 87 selected APIs through these representatives:
+
+| Methods | Profiles |
+| --- | --- |
+| `Add` | `scalar`, `arm64-advsimd`, `x64-sse42`, `x64-avx2`, `x64-avx2-bmi1`, `x64-avx512`, `x64-avx512-bmi1` |
+| `AddOverflow` | `scalar`, `arm64-advsimd`, `x64-sse42`, `x64-avx2`, `x64-avx2-bmi1`, `x64-avx512`, `x64-avx512-bmi1` |
+| `Subtract`, `SubtractUnderflow` | `scalar`, `arm64-advsimd`, `x64-sse42`, `x64-avx2`, `x64-avx2-bmi1`, `x64-avx512`, `x64-avx512-bmi1` |
+| All seven multiplication APIs | All fourteen multiplication representatives (seven arithmetic classes × two Vector256 storage settings) |
+| `Lsh`, `Rsh`, `LeftShift`, `RightShift`, `OperatorLsh`, `OperatorRsh` | `scalar`, `x64-vector256` |
+| `LtUInt256UInt256`, `GtUInt256UInt256`, `LeUInt256UInt256`, `GeUInt256UInt256` | `scalar`, `x64-vector256`, `x64-avx2`, `x64-avx512` |
+| `Xor`, `And`, `Or`, `Not`, `OperatorXor`, `OperatorAnd`, `OperatorOr`, `OperatorNot` | `scalar`, `x64-vector256` |
+| `CompareToUInt256Ref`, `CompareToUInt256Value` | `scalar` (checked independence extends to every valid profile) |
+| `Lt`/`Le`/`Gt`/`Ge` between `UInt256` and `Int32`, `UInt32`, `Int64`, `UInt64`, in either order | `scalar` (checked independence extends to every valid profile) |
+| `EqualsUInt64`, `EqualsUInt32`, `EqualsInt64`, `EqualsInt32` | `scalar`, `x64-vector256` |
+| `Eq`/`Ne` between `UInt256` and `Int32`, `UInt32`, `Int64`, `UInt64`, in either order | `scalar`, `x64-vector256` |
+| `EqUInt256UInt256`, `EqualsUInt256Ref`, `NeUInt256UInt256`, `EqualsUInt256Value` | `scalar`, `x64-vector256`, `x64-sse41` |
+
+For example, `python verification/verify.py --method EqualsUInt32 --profile scalar --safety`
+writes `generated/operations/EqualsUInt32/scalar/safety/report.json`; scalar Add
+writes `generated/safety/report.json`. Other representatives fail explicitly.
+Primitive `Equals` and Eq/Ne gates additionally prove the combined contract for every
+valid profile sharing the representative's `vector256Accelerated` flag. Each
+report requires that family theorem's audit and identifies its condition.
+The four UInt256 equality APIs additionally require matching `sse41` when the
+vector flag is false; vector-mode families ignore that unused flag. Subtract and
+SubtractUnderflow on AVX2/AVX512 check both the fast and table-based borrow-repair paths, with
+private input snapshots and the actual extracted lookup bytes. Their AVX2 and
+AVX512 prefixes establish the same mathematical borrow masks through their
+respective comparison or ternary-logic instructions;
+the BMI1 variants separately check bit extraction, byte conversion and canonical
+Boolean representation. The four scalar
+UInt256 relational operators cover valid profiles with `avx512FVL`, `avx2` and
+`vector256Accelerated` disabled. Add, Subtract and overflow/underflow-reporting
+gates additionally require a typed safety-family theorem for every valid profile
+in the representative's checked feature class. Arithmetic family equivalence
+alone never extends safety coverage.
+
+ARM and SSE Add/AddOverflow check both small-operand routes and vector fast and
+repair paths, including ARM early output stores, while retaining arbitrary input/output overlap. AddOverflow
+also binds the returned flag to overflow of the mathematical initial-input sum.
+ARM/SSE Subtract and SubtractUnderflow check the small-operand route and vector
+fast/borrow-repair routes. Both retain initial-input subtraction and arbitrary
+valid overlap; SubtractUnderflow also binds the exact mathematical underflow flag.
+
+`Lsh` and `Rsh` check the full signed-count convention, private operand snapshots,
+all four limb-shift routes, the extracted storage helper and frame teardown.
+Each result is the mathematical shift of the initial input, with arbitrary valid
+overlap and caller-byte preservation. Scalar and vector256-storage representatives
+cover both values of `vector256Accelerated`; checked profile equivalence extends
+each proof to every valid profile with the same flag. `LeftShift` and `RightShift`
+check the actual forwarding calls with the same overlap guarantees. `OperatorLsh`
+and `OperatorRsh` additionally check allocation, initialization, loading and retirement
+of their private result, returning the mathematical value while preserving every
+caller byte. All six APIs have exact direction and feature-family safety gates.
+
+Both `CompareTo` gates prove the exact unsigned comparison result
+`-1`, `0` or `1` and check that their extracted operations are profile-independent.
+The by-value gate also checks initialization and lifetime of its private argument copy.
+
+Equality contracts specify the Boolean result for initial inputs and preserve
+all caller bytes. By-value equality checks its private argument copy; primitive
+equality checks zero extension, construction and private aggregate storage.
+Signed primitive equality returns false for negative arguments and checks the
+unsigned child invocation for nonnegative arguments.
+Vector proofs check full load widths, reference offsets and actual child calls.
+Ordinary reports remain arithmetic-only. See the
+[memory-safety boundary](CIL/Safety/BOUNDARY.md) for calling requirements and
+unsupported CLR behaviours, including native-code and GC-root-map correctness.
+
+Safety reports state the [alignment convention](CIL/Safety/ALIGNMENT.md): ordinary
+reference-free accesses in x64/ARM64 CoreCLR normal memory permit arbitrary byte
+offsets, with hardware alignment traps disabled. Aligned APIs, volatile/atomic
+accesses and device memory are excluded. This target-specific convention retains
+the overlap contracts; it is not a portable CLI or JIT-correctness theorem.
+
 ## Scope and assumptions
 
 The [Add](manifests/add.json) and [Subtract](manifests/subtract.json) manifests
@@ -138,10 +215,18 @@ requires Add/Subtract and every selected API in the coverage manifest. It refuse
 a partial success certificate if any required proof or coverage check fails.
 
 Add `--print-plan` to print the complete method/profile matrix without building
-or changing reports. CI uses `--expanded --print-plan` to select production jobs;
+or changing reports. CI uses `--expanded --safety --print-plan` to select production jobs;
 an incomplete plan fails before any partial matrix is emitted.
-The complete plan contains 87 methods and 256 method/profile jobs. All production
-gates and the 131 required regression groups have passing evidence.
+The complete plan contains 87 methods and 256 method/profile jobs. All have
+checked combined arithmetic and memory-safety evidence, including total valid
+feature-profile coverage under the documented runtime assumptions.
+
+Use `verify_all.py --expanded --safety --jobs 6` for combined coverage; adjust
+`--jobs` for available CPU and memory. Every
+certificate must include the arithmetic and safety audits, exact generated
+bindings and complete safety family coverage. Arithmetic-only reports cannot
+satisfy this mode. Combined aggregate reports live in a separate `safety/`
+directory; `--check-reports --safety` retains the same freshness checks.
 
 Reports live at `verification/generated/report.json` for Add and
 `verification/generated/subtract/report.json` for Subtract, alongside the selected
@@ -240,7 +325,18 @@ inputs; a localized change does not require rerunning everything. Keep reports
 bound to their actual artifacts and inputs. Use isolated snapshots for longer
 tests while continuing independent work.
 
-The regression command runs all 131 required groups from one captured source revision, in
+For focused combined shift regressions, run:
+
+```sh
+python verification/Tests/Fixtures/Shift/negative_checks.py --method Lsh --profile scalar --safety
+```
+
+This requires safety reports for the production, baseline and helper-refactor
+fixtures with identical handwritten proofs, then checks the arithmetic/aliasing
+counterexamples and public-verifier rejection. Omitting `--safety` retains the
+arithmetic-only regression mode.
+
+The regression command runs all required groups from one captured source revision, in
 isolated repositories. Each group establishes its own production baseline where
 required. It checks source hashes before and after execution and retains command
 logs and hashed receipts. Only a complete successful run writes
@@ -255,6 +351,9 @@ python verification/Tests/all_checks.py --job legacy-Add
 
 A selected job emits a clearly marked partial receipt and cannot certify the full
 suite. Individual runners remain available under `Tests/`.
+CI groups the complete plan into at most 256 matrix entries. Each batch runs every
+assigned group and retains its individual receipt, including when another group
+fails. The separate coverage job requires combined arithmetic and safety gates.
 
 Positive fixtures are independent versioned C# programs checked with identical
 handwritten proof sources and changed compiled instructions. They cover renaming,
@@ -262,6 +361,14 @@ inlining, helper extraction, alternative carry/borrow logic, external helpers,
 reversed storage arguments and enlarged excluded hardware branches. Applicable
 summaries must prove; complete inlining has no candidates, while reversed Add
 storage deliberately exercises summary rejection and raw fallback.
+
+The combined suite also checks scalar Add's baseline, renamed helper and reversed
+storage arguments, including rejected arithmetic-summary fallback. It runs the
+shift fixture jobs with `--safety`. To select the Add regression:
+`python verification/Tests/robustness_checks.py --method Add --case Renamed --case ReversedStore --safety`.
+The baseline is always included to compare proof hashes and compiled instructions.
+The other legacy fixture runs continue to check arithmetic; they do not imply
+combined safety coverage for every rewrite.
 
 Negative arithmetic and aliasing fixtures have native witnesses and kernel-checked
 refutations of the full contract for every possible successful fuel. Rejection must
@@ -293,8 +400,14 @@ Positive samples include two large operands, vector fast paths, cross-half
 carry/borrow and cascades (including ARM Add's early-store repair), with disjoint,
 exactly aliased and partially overlapping outputs. Results name each sample.
 
+For byte-offset and overlap samples against a specific production DLL, run
+`python verification/Tests/native_alignment_checks.py --assembly <dll> --output <receipt.json>`.
+The receipt binds the DLL hash and actual runtime features; the
+[alignment audit](CIL/Safety/ALIGNMENT.md) explains the remaining proof obligation.
+
 The **Verify UInt256** workflow derives the required method/profile jobs from the
-expanded coverage plan. Every selected gate must pass. For ordinary
+expanded combined coverage plan and runs each proof with `--safety`. Every
+selected arithmetic and safety gate must pass. For ordinary
 C# edits under `src/`, it compares each method's generated program and validated metadata,
 including reachable helpers, feature queries, exact intrinsics and static data,
 against the PR base or previous push. Only DLL identity,
@@ -303,10 +416,11 @@ skip Lean; build/extraction failures fail the check. Other changes, manual runs
 and PRs targeting branches other than main force fresh proofs.
 
 Skipping also requires a successful main push run for the exact baseline commit,
-with an actually executed, successful proof step for that method and profile.
-A skipped proof does not supply baseline evidence. Missing history, API access
+with an actually executed, successful combined arithmetic and memory-safety
+proof step for that method and profile. Arithmetic-only and skipped proofs do
+not supply baseline evidence. Missing history, API access
 failures and unmatched jobs force a fresh proof.
-The manual **Verify UInt256 proof tests** workflow uses the same 131 regression
+The manual **Verify UInt256 proof tests** workflow uses the same regression
 groups through `all_checks.py --job`, establishing fresh baselines where required.
 Its SIMD matrix covers both methods in every representative profile, and a separate
 job checks complete selected-API production coverage composition. Additional jobs
@@ -320,12 +434,18 @@ dependency applicability.
 
 ## Measured verification time
 
-The expanded 87-method/256-certificate fresh production run took 12,411 seconds
+Before the safety extension, the arithmetic-only 87-method/256-certificate
+fresh production run (`verify_all.py --expanded --jobs 4`) took 12,411 seconds
 (3h 26m) on Windows with SDK 10.0.401, Lean 4.34.1 and four workers. Individual
 fresh kernel builds had a 74.4-second median (38.6–551.4 seconds). These are
 observed timings under concurrent load. Regression acceptance uses applicable
 retained group results; no new successful full-regression wall time is claimed.
 Concurrent durations overlap and must not be summed.
+
+The combined run completed with two workers followed by six. The six-worker
+continuation checked the remaining 50 certificates and composed coverage in
+6,524 seconds; 206 completed certificates were validated and reused. This is a
+partial-run measurement, not an end-to-end timing or a measured parallel speedup.
 
 On Windows with a Ryzen 9 9950X, SDK 10.0.401 and Lean 4.34.1, the committed
 `3e2b43b` pipeline checked all 14 production families and coverage composition in

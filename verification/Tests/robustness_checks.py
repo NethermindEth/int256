@@ -9,7 +9,8 @@ import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from common import ROOT, run
+from common import ROOT, VERIFY, generated_directory, run
+from safety_gate import safety_gate
 from support import copy_source
 
 
@@ -23,22 +24,28 @@ def instructions(artifact):
 SUBTRACT_FIXTURES = ("Baseline", "BorrowAlternative", "Renamed", "FullyInlined", "ExtractedHelper")
 
 
-def verify_fixture(name, method="Add"):
+def verify_fixture(name, method="Add", safety=False):
     started = time.monotonic()
     with tempfile.TemporaryDirectory(prefix=f"int256-robust-{name}-") as temporary:
         destination = Path(temporary)
         run(["git", "clone", "--shared", "--no-checkout", "--quiet", str(ROOT), str(destination)], ROOT)
         proof = copy_source(destination)
         try:
-            output = run([sys.executable, str(proof / "verify.py"), "--fixture", name, "--method", method], destination)
+            command = [sys.executable, str(proof / "verify.py"), "--fixture", name, "--method", method]
+            output = run(command + (["--safety"] if safety else []), destination)
         except RuntimeError as error:
             raise RuntimeError(f"Fixture {name} failed; distinguish build/extraction/proof diagnostics above") from error
         if name not in ("ReversedStore", "FullyInlined", "StraightLine") and "Optional summary candidate" in output:
             raise RuntimeError(f"{method}/{name}: an applicable fixture summary was unexpectedly rejected")
         if name == "ReversedStore" and "Optional summary candidate Extracted.storeLimbsIndex was not proved" not in output:
             raise RuntimeError("Reversed storage fixture did not exercise rejected-summary fallback")
-        report = json.loads((proof / ("generated/report.json" if method == "Add" else "generated/subtract/report.json")).read_text(encoding="utf-8"))
-        generated = proof / ("generated" if method == "Add" else "generated/subtract")
+        generated = proof / generated_directory(method).relative_to(VERIFY)
+        if safety:
+            generated /= "safety"
+        report = json.loads((generated / "report.json").read_text(encoding="utf-8"))
+        if safety and (report.get("evidenceKind") != "arithmetic-and-memory-safety" or
+                       report.get("safety") != safety_gate(method, "scalar")):
+            raise RuntimeError(f"{name}: missing combined safety evidence")
         program = (generated / "Extracted.lean").read_text(encoding="utf-8")
         roles = (("addScalar", "addScalarUInt64", "addWithCarry", "storeLimbs") if method == "Add" else
                  ("subtractScalarUInt64", "subtractWithBorrow", "storeLimbs"))
@@ -60,12 +67,21 @@ def main():
     sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--method", choices=("Add", "Subtract"), default="Add")
-    method = parser.parse_args().method
+    parser.add_argument("--safety", action="store_true", help="Require combined arithmetic and memory-safety proofs")
+    parser.add_argument("--case", action="append", choices=sorted(set(FIXTURES + SUBTRACT_FIXTURES)),
+                        help="Select variants; Baseline is always checked for source/CIL comparison")
+    args = parser.parse_args()
+    method = args.method
+    cases = FIXTURES if method == "Add" else SUBTRACT_FIXTURES
+    if args.case:
+        if set(args.case) - set(cases):
+            parser.error("A selected fixture does not apply to this method")
+        cases = tuple(name for name in cases if name == "Baseline" or name in args.case)
     proof_hashes = None
     baseline = None
     results = []
-    for name in (FIXTURES if method == "Add" else SUBTRACT_FIXTURES):
-        report, seconds = verify_fixture(name, method)
+    for name in cases:
+        report, seconds = verify_fixture(name, method, args.safety)
         if baseline is None:
             baseline = report
             proof_hashes = report["leanSourceSha256"]
@@ -94,7 +110,8 @@ def main():
                         "assemblySha256": report["artifact"]["sha256"],
                         "programSha256": report["generatedProgramSha256"], "managedMethods": len(methods)})
         print(f"PASS: {name}, identical proof sources, {seconds}s", flush=True)
-    print(json.dumps({"proofSources": proof_hashes, "fixtures": results}, indent=2))
+    print(json.dumps({"proofSources": proof_hashes, "fixtures": results,
+                      "combinedSafety": args.safety, "scope": "selected" if args.case else "full"}, indent=2))
 
 
 if __name__ == "__main__":

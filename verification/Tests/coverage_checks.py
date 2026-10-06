@@ -1,8 +1,10 @@
 """Reject incomplete, stale or mismatched aggregate family certificates."""
 
 import copy
+import hashlib
 import json
 from pathlib import Path
+import shutil
 import sys
 import tempfile
 import unittest
@@ -206,6 +208,125 @@ class CoverageChecks(unittest.TestCase):
     def test_public_audit_rejects_duplicate(self):
         with self.assertRaisesRegex(RuntimeError, "ambiguous"):
             theorem_audits("'family' depends on axioms: []\n'family' depends on axioms: []", ["family"], [])
+
+
+class CombinedCoverageChecks(unittest.TestCase):
+    def setUp(self):
+        CoverageChecks.setUp(self)
+        original = self.directory
+        self.directory = original / "safety"
+        self.directory.mkdir()
+        for name in ("artifact.json", "Extracted.lean"):
+            shutil.copy2(original / name, self.directory / name)
+        patcher = patch.object(verify_all, "generated_directory", return_value=original)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.report["evidenceKind"] = "arithmetic-and-memory-safety"
+        self.report["safety"] = verify_all.safety_gate("Add", "x64-avx2")
+        self.report["arithmeticCoverage"] = self.report["coverage"]
+        self.report["coverage"] = {"aggregateChecked": False, "representative": "x64-avx2",
+                                   **self.report["safety"]["coverage"]}
+        self.report["auditedTheorems"] += self.report["safety"]["theorems"]
+        self.report["axiomAudits"].update({name: ["propext", "Quot.sound"]
+                                          for name in self.report["safety"]["theorems"]})
+        module = verify_all.selected_safety_module("Add", "x64-avx2")
+        (self.directory / "SelectedSafetyGate.lean").write_text(module, encoding="utf-8", newline="\n")
+        self.report["generatedSafetyGateSha256"] = hashlib.sha256(module.encode("utf-8")).hexdigest()
+        self.write_report()
+
+    def write_report(self):
+        CoverageChecks.write_report(self)
+
+    def check(self):
+        return verify_all.checked_certificate("Add", "x64-avx2", self.inputs, safety=True)
+
+    def test_combined_certificate(self):
+        self.assertEqual(self.check()["evidenceKind"], "arithmetic-and-memory-safety")
+
+    def test_arithmetic_report_cannot_satisfy_combined_gate(self):
+        self.report.pop("evidenceKind")
+        self.write_report()
+        with self.assertRaisesRegex(RuntimeError, "combined safety evidence"):
+            self.check()
+
+    def test_missing_and_mismatched_safety_descriptors(self):
+        original = copy.deepcopy(self.report)
+        for field in ("contract", "semanticsVersion", "profile", "callingConditions", "modelLimitations", "alignmentPolicy"):
+            with self.subTest(field=field):
+                self.report = copy.deepcopy(original)
+                self.report["safety"][field] = "wrong"
+                self.write_report()
+                with self.assertRaisesRegex(RuntimeError, "combined safety evidence"):
+                    self.check()
+        self.report.pop("safety")
+        self.write_report()
+        with self.assertRaisesRegex(RuntimeError, "combined safety evidence"):
+            self.check()
+
+    def test_missing_safety_audit(self):
+        for name in self.report["safety"]["theorems"]:
+            with self.subTest(name=name):
+                audit = self.report["axiomAudits"].pop(name)
+                self.write_report()
+                with self.assertRaisesRegex(RuntimeError, "Missing family gate"):
+                    self.check()
+                self.report["axiomAudits"][name] = audit
+
+    def test_safety_axiom_rejected(self):
+        self.report["axiomAudits"][self.report["safety"]["theorems"][-1]] = ["sorryAx"]
+        self.write_report()
+        with self.assertRaisesRegex(RuntimeError, "Unapproved family axioms"):
+            self.check()
+
+    def test_changed_typed_safety_module(self):
+        (self.directory / "SelectedSafetyGate.lean").write_text("-- wrong contract", encoding="utf-8")
+        with self.assertRaisesRegex(RuntimeError, "Stale typed safety audit module"):
+            self.check()
+
+    def test_missing_safety_family_coverage(self):
+        self.report["coverage"]["kind"] = "exact-profile"
+        self.write_report()
+        with self.assertRaisesRegex(RuntimeError, "Missing safety family coverage"):
+            self.check()
+
+    def test_missing_arithmetic_family_coverage(self):
+        self.report.pop("arithmeticCoverage")
+        self.write_report()
+        with self.assertRaisesRegex(RuntimeError, "Missing family coverage"):
+            self.check()
+
+    def test_changed_model_inputs(self):
+        (self.verify / "Gate.lean").write_text("-- different allocation model", encoding="utf-8")
+        with self.assertRaisesRegex(RuntimeError, "Stale proof inputs"):
+            self.check()
+
+    def test_exact_profile_safety_cannot_supply_total_plan(self):
+        with patch.object(verify_all, "safety_gate", return_value={"coverage": {"kind": "exact-profile"}}):
+            with self.assertRaisesRegex(RuntimeError, "Total safety feature coverage"):
+                verify_all.coverage_plan(["Add"], safety=True)
+
+    def test_safety_selection_reaches_worker(self):
+        bundle = {"assembly": "same fresh DLL"}
+        with patch.object(verify_all, "verify_one") as worker:
+            verify_all.verify_profiles([("Add", "scalar")], bundle, 1, safety=True)
+        worker.assert_called_once_with(["--method", "Add", "--profile", "scalar", "--safety"], prepared=bundle)
+
+    def test_combined_composition_rechecks_certificates_and_invalidates_prior_report(self):
+        destination = self.verify / "generated/safety/coverage.json"
+        destination.parent.mkdir(parents=True)
+        destination.write_text("old combined certificate", encoding="utf-8")
+        def changed_certificate(*args):
+            self.report["axiomAudits"].pop(self.report["safety"]["theorems"][-1])
+            self.write_report()
+            return {}, "test toolchain"
+        with patch.object(sys, "argv", ["verify_all.py", "--safety", "--check-reports"]), \
+             patch.object(verify_all, "coverage_plan", return_value=[("Add", "x64-avx2")]), \
+             patch.object(verify_all, "source_inputs", return_value=self.inputs), \
+             patch.object(verify_all, "check_composition", side_effect=changed_certificate) as compose:
+            with self.assertRaisesRegex(RuntimeError, "Missing family gate"):
+                verify_all.main()
+        compose.assert_called_once_with(self.inputs, True)
+        self.assertFalse(destination.exists())
 
 
 if __name__ == "__main__":

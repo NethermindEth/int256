@@ -42,10 +42,24 @@ inductive Op where
   | unsupported (description : String)
   deriving Repr
 
+/-- Physical local storage, retained even when InitLocals is false. Reference
+    slots retain managed-reference values rather than numerical addresses. -/
+inductive LocalKind where
+  | byte | word32 | word64 | vector128 | vector256 | reference
+  deriving DecidableEq, Repr
+
+structure StaticDescriptor where
+  identity : Nat
+  fieldName : String
+  bytes : List (BitVec 8)
+  deriving DecidableEq, Repr
+
 structure Method where
   profile : FeatureProfile := FeatureProfile.scalar
   code : List Op
   locals : List Value
+  localKinds : List LocalKind := []
+  staticSites : List (Nat × StaticDescriptor) := []
   aggregateLocals : List Nat := []
   aggregateArgs : List Nat := []
   returnsValue : Bool

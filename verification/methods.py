@@ -54,6 +54,23 @@ def method_names():
     return LEGACY + tuple(api_entries())
 
 
+def native_limitations(methods):
+    """Keep observed native failures separate from the proved CIL contracts."""
+    if any(method not in LEGACY and method_manifest(method)["verification"].get(
+            "familyCoverage", {}).get("kind") == "multiply-dispatch-storage" for method in methods):
+        return [{"kind": "runtime-jit-struct-copy", "status": "observed-failure",
+                 "runtime": ".NET 10.0.12", "architecture": "Windows x64",
+                 "currentMain": {"commit": "d90dbf43be153cc7ba7f49bb271e0b7e56a81891",
+                                 "standaloneCopy": "fails", "multiplicationDefaultTiered": "fails",
+                                 "multiplicationFullyOptimized": "passes"},
+                 "condition": "Hardware intrinsics disabled; partially overlapping input/output",
+                 "witness": "verification/Tests/NativeMultiplyWitness/Program.cs",
+                 "minimalWitness": "verification/Tests/NativeStructCopyWitness/Program.cs",
+                 "scope": "The CIL proof does not establish native partial-overlap correctness",
+                 "notes": "verification/UInt256/Methods/Multiply/README.md"}]
+    return []
+
+
 def method_manifest(name):
     if name in LEGACY:
         return json.loads((MANIFESTS / f"{name.lower()}.json").read_text(encoding="utf-8"))

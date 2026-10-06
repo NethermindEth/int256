@@ -17,17 +17,84 @@ INPUTS_AT = checks.inputs_at
 
 
 class PlanChecks(unittest.TestCase):
+    def test_ci_batches_retain_every_job_at_matrix_boundary(self):
+        for count in (1, 256, 257, 390):
+            with self.subTest(count=count):
+                plan = [checks.Job(f"job-{i}", ()) for i in range(count)]
+                batches = checks.ci_matrix(plan)["include"]
+                self.assertLessEqual(len(batches), 256)
+                self.assertEqual([name for batch in batches for name in batch["jobs"]],
+                                 [job.id for job in plan])
+                self.assertTrue(all(batch["jobs"] for batch in batches))
+                self.assertTrue(all(batch["timeoutMinutes"] == 60 * len(batch["jobs"])
+                                    for batch in batches))
+        with self.assertRaises(ValueError):
+            checks.ci_matrix([])
+
     def test_exact_required_matrix(self):
         plan = checks.regression_plan()
         by_id = {job.id: job for job in plan}
-        self.assertEqual(len(by_id), 131)
+        self.assertEqual(len(by_id), 390)
         expected_counts = {"equality-": 52, "multiply-": 14, "simd-": 12,
                            "operation-": 24, "reporting-": 14, "legacy-": 2, "robustness-": 2}
         for prefix, count in expected_counts.items():
             self.assertEqual(sum(name.startswith(prefix) for name in by_id), count)
-        expected_foundations = {"foundation", "profile-extractor", "gate-binding", "python-all-checks",
+        expected_foundations = {"foundation", "profile-extractor", "gate-binding", "python-all-checks", "safety-robustness-Add",
+                               "safety-foundation", "safety-fixtures", "safety-Add-scalar", "safety-Add-x64-avx2", "safety-Add-x64-avx2-bmi1", "safety-EqUInt256UInt256-scalar",
+                               "safety-Add-x64-sse42", "safety-Add-arm64-advsimd", "safety-AddOverflow-arm64-advsimd", "safety-AddOverflow-x64-sse42", "safety-EqualsUInt256Ref-scalar",
+                               "safety-NeUInt256UInt256-scalar",
+                               "safety-EqUInt256UInt256-vector256",
+                               "safety-EqualsUInt256Value-scalar", "safety-EqualsUInt256Value-x64-sse41",
+                               "safety-EqualsUInt256Value-x64-vector256", "safety-EqualsUInt64-scalar",
+                               "safety-EqualsUInt32-scalar",
+                               "safety-EqualsUInt64-x64-vector256", "safety-EqualsUInt32-x64-vector256",
+                               "safety-EqualsInt64-scalar", "safety-EqualsInt32-scalar",
+                               "safety-EqualsInt64-x64-vector256", "safety-EqualsInt32-x64-vector256",
+                               "safety-EqUInt256UInt256-sse41", "safety-EqualsUInt256Ref-sse41", "safety-NeUInt256UInt256-sse41",
+                               "safety-EqualsUInt256Ref-vector256", "safety-NeUInt256UInt256-vector256",
                                *("python-" + name for name in ("change", "coverage", "prepared", "rejection",
                                   "method", "gate-template", "operation-coverage"))}
+        expected_foundations.update(f"safety-{method}-{profile}"
+                                    for method in ("Multiply", "MultiplyInstance", "OperatorMultiplyUInt256UInt256",
+                                                   "OperatorMultiplyUInt256UInt32", "OperatorMultiplyUInt32UInt256",
+                                                   "OperatorMultiplyUInt256UInt64", "OperatorMultiplyUInt64UInt256")
+                                    for profile in checks.MULTIPLY_PROFILES)
+        expected_foundations.update(f"safety-{method}-{profile}"
+                                    for method in ("LeftShift", "RightShift", "OperatorLsh", "OperatorRsh")
+                                    for profile in ("scalar", "x64-vector256"))
+        expected_foundations.update(f"safety-{method}-{profile}"
+                                    for method in ("Subtract", "SubtractUnderflow")
+                                    for profile in ("x64-sse42", "arm64-advsimd"))
+        for scalar in ("Int32", "UInt32", "Int64", "UInt64"):
+            for operands in ("UInt256" + scalar, scalar + "UInt256"):
+                for polarity in ("Eq", "Ne"):
+                    for profile in ("scalar", "x64-vector256"):
+                        expected_foundations.add(f"safety-{polarity}{operands}-{profile}")
+                for relation in ("Lt", "Le", "Gt", "Ge"):
+                    expected_foundations.add(f"safety-{relation}{operands}-scalar")
+        expected_foundations.update({"safety-Lsh-scalar", "safety-Rsh-scalar", "safety-Lsh-x64-vector256", "safety-Rsh-x64-vector256", "safety-AddOverflow-scalar", "safety-AddOverflow-x64-avx2", "safety-SubtractUnderflow-scalar", "safety-Subtract-scalar", "safety-Subtract-x64-avx2", "safety-Subtract-x64-avx2-bmi1",
+                                     "safety-SubtractUnderflow-x64-avx2", "safety-SubtractUnderflow-x64-avx2-bmi1"})
+        expected_foundations.update(f"safety-{method}-{profile}"
+                                    for method in ("Add", "Subtract", "SubtractUnderflow")
+                                    for profile in ("x64-avx512", "x64-avx512-bmi1"))
+        expected_foundations.update(f"safety-AddOverflow-{profile}"
+                                    for profile in ("x64-avx2-bmi1", "x64-avx512", "x64-avx512-bmi1"))
+        for method in ("Xor", "And", "Or", "Not", "OperatorXor", "OperatorAnd", "OperatorOr", "OperatorNot"):
+            for profile in ("scalar", "x64-vector256"):
+                expected_foundations.add(f"safety-{method}-{profile}")
+        for relation in ("Lt", "Gt", "Le", "Ge"):
+            for profile in ("scalar", "x64-vector256", "x64-avx2", "x64-avx512"):
+                expected_foundations.add(f"safety-{relation}UInt256UInt256-{profile}")
+        for method in ("CompareToUInt256Ref", "CompareToUInt256Value"):
+            expected_foundations.add(f"safety-{method}-scalar")
+        for name in expected_foundations:
+            if name.startswith("safety-") and name not in {"safety-foundation", "safety-fixtures"}:
+                self.assertIn("--safety", by_id[name].commands[0])
+        self.assertEqual(by_id["safety-Add-arm64-advsimd"].commands,
+                         (("verification/verify.py", "--method", "Add", "--profile", "arm64-advsimd", "--safety"),))
+        self.assertEqual(by_id["safety-robustness-Add"].commands,
+                         (("verification/Tests/robustness_checks.py", "--method", "Add",
+                           "--case", "Renamed", "--case", "ReversedStore", "--safety"),))
         self.assertEqual({name for name in by_id if not any(name.startswith(p) for p in expected_counts)},
                          expected_foundations)
         equality = [name for name, entry in checks.api_entries().items()
@@ -57,6 +124,7 @@ class PlanChecks(unittest.TestCase):
                 self.assertEqual(command[0], "verification/Tests/Fixtures/" + runner)
                 if operation not in ("Compare", "Bitwise"):
                     self.assertEqual(command[1:3], ("--method", operation))
+                self.assertEqual("--safety" in command, runner == "Shift/negative_checks.py")
         for job in plan:
             for command in job.commands:
                 self.assertTrue((checks.ROOT / command[0]).is_file(), command)

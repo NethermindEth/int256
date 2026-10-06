@@ -12,8 +12,9 @@ import time
 
 from common import PROFILE_DIRECTORY, PROFILE_NAMES, PROFILES, ROOT, SEMANTICS_VERSION, VERIFY, expected_profile, generated_directory, run, sha, source_files
 from simd_fixtures import CASES as SIMD_CASES
-from methods import LEGACY, api_entries, check_calling_convention, method_manifest, method_names
+from methods import LEGACY, api_entries, check_calling_convention, method_manifest, method_names, native_limitations
 from gate_templates import audit_module, bound_audit_names
+from safety_gate import selected_safety_module, safety_gate
 
 def run_stage(command, cwd, stage):
     try:
@@ -108,19 +109,25 @@ def main(argv=None, prepared=None):
     parser.add_argument("--method", choices=method_names(), default="Add", help="Exact selected entry to verify")
     parser.add_argument("--profile", choices=PROFILE_NAMES, default="scalar",
                         help="Fixed execution feature profile; scalar preserves the original default")
+    parser.add_argument("--safety", action="store_true",
+                        help="Require combined allocation-aware safety and arithmetic evidence")
     fixtures = parser.add_mutually_exclusive_group()
     fixtures.add_argument("--fixture", help="Versioned scalar fixture name (without .cs)")
     fixtures.add_argument("--simd-fixture", help="Registered SIMD fixture case")
     arguments = parser.parse_args(argv)
     output_directory = generated_directory(arguments.method, arguments.profile)
+    if arguments.safety:
+        output_directory /= "safety"
     output_directory.mkdir(parents=True, exist_ok=True)
     report_path = output_directory / "report.json"
     # Invalidate the prior success before any command that can fail.
     report_path.unlink(missing_ok=True)
-    (VERIFY / "generated/coverage.json").unlink(missing_ok=True)
-    (generated_directory(arguments.method) / "coverage.json").unlink(missing_ok=True)
+    for directory in (VERIFY / "generated", generated_directory(arguments.method)):
+        (directory / "coverage.json").unlink(missing_ok=True)
+        (directory / "safety/coverage.json").unlink(missing_ok=True)
     started = time.perf_counter()
     stages = {}
+    safety = safety_gate(arguments.method, arguments.profile) if arguments.safety else None
     manifest = method_manifest(arguments.method)
     gate = manifest.get("verification")
     if not gate and arguments.profile not in PROFILES:
@@ -195,6 +202,7 @@ def main(argv=None, prepared=None):
         if artifact.get("profile") != expected_profile(arguments.profile):
             raise RuntimeError("Extracted feature profile does not match the requested profile")
         generated_gate_hash = None
+        generated_safety_hash = None
         if gate:
             target = proof / "UInt256/Methods/SelectedGate.lean"
             if target.exists():
@@ -202,6 +210,13 @@ def main(argv=None, prepared=None):
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(audit_module(api_entries()[arguments.method]), encoding="utf-8", newline="\n")
             generated_gate_hash = sha(target)
+        if safety and safety.get("generatedAudit"):
+            safety_target = proof / "UInt256/Methods/SelectedSafetyGate.lean"
+            if safety_target.exists():
+                raise RuntimeError("Generated safety audit would overwrite handwritten source")
+            safety_target.parent.mkdir(parents=True, exist_ok=True)
+            safety_target.write_text(selected_safety_module(arguments.method, arguments.profile), encoding="utf-8", newline="\n")
+            generated_safety_hash = sha(safety_target)
         audit_target = "+UInt256.Methods.SelectedGate:olean" if gate else "Audit" if arguments.method == "Add" else "SubtractAudit"
         stage_started = time.perf_counter()
         output = run_stage([lake, "build", audit_target], proof, "Proof checking")
@@ -209,17 +224,27 @@ def main(argv=None, prepared=None):
         audited_names = audit_names(arguments.method)
         audits = theorem_audits(output, audited_names, manifest["approvedAxioms"])
         axioms = audits[audited_names[0]]
+        if safety:
+            stage_started = time.perf_counter()
+            safety_output = run_stage([lake, "build", safety["target"]], proof, "Safety proof checking")
+            stages["safetyKernelBuildSeconds"] = time.perf_counter() - stage_started
+            safety_audits = theorem_audits(safety_output, safety["theorems"], manifest["approvedAxioms"])
+            audited_names += safety["theorems"]
+            audits.update(safety_audits)
         # Neither pre-existing extraction nor an existing olean cache enters this
         # proof directory. Recheck inputs and artifact before issuing a report.
         validate_bundle(bundle, inputs, production=bool(prepared))
         copied_hashes = check_proof_snapshot(proof, copied_paths, inputs)
         if generated_gate_hash is not None and sha(target) != generated_gate_hash:
             raise RuntimeError("Generated typed audit changed during proof checking")
+        if generated_safety_hash is not None and sha(safety_target) != generated_safety_hash:
+            raise RuntimeError("Generated safety audit changed during proof checking")
         commit = run(["git", "rev-parse", "HEAD"], ROOT).strip()
         status = run(["git", "status", "--porcelain"], ROOT).splitlines()
         scope = copy.deepcopy(manifest)
         scope["environment"]["selectedProfile"] = arguments.profile
         report = {"status": "verified", "sourceCommit": commit, "sourceStatus": status,
+                  "nativeLimitations": native_limitations([arguments.method]),
                   "sourceInputs": inputs, "artifact": artifact, "scope": scope,
                   "executionProfile": artifact["profile"],
                   "semanticsVersion": SEMANTICS_VERSION,
@@ -242,10 +267,21 @@ def main(argv=None, prepared=None):
                   "generatedGateSha256": generated_gate_hash,
                   "leanSourceSha256": {p.relative_to(VERIFY).as_posix(): copied_hashes[p.relative_to(VERIFY).as_posix()]
                                        for p in lean_sources}}
+        if safety:
+            report["evidenceKind"] = "arithmetic-and-memory-safety"
+            report["safety"] = safety
+            report["generatedSafetyGateSha256"] = generated_safety_hash
+            # Safety coverage comes only from its own required, audited contract.
+            report["arithmeticCoverage"] = report["coverage"]
+            report["coverage"] = {"aggregateChecked": False, "representative": arguments.profile,
+                                  **safety.get("coverage", {"kind": "exact-profile",
+                                      "condition": "Exactly the extracted execution profile"})}
         for name in ("Extracted.lean", "artifact.json"):
             shutil.copy2(generated / name, output_directory / name)
         if generated_gate_hash is not None:
             shutil.copy2(proof / "UInt256/Methods/SelectedGate.lean", output_directory / "SelectedGate.lean")
+        if generated_safety_hash is not None:
+            shutil.copy2(safety_target, output_directory / "SelectedSafetyGate.lean")
         temp_report = output_directory / "report.json.tmp"
         temp_report.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
         temp_report.replace(report_path)
