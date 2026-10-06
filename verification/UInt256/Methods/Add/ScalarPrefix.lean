@@ -50,7 +50,7 @@ theorem scalar_right_prefix (left right output : Reference) (extra : List Value)
         | exact stored _ _
         | simp (config := { implicitDefEqProofs := false })
             [cil_code, step, checkedValue, numericValue, formValue, rightBefore, rightAfter,
-              pureArity, scalars, CIL.step, CIL.binary, CIL.FeatureProfile.evaluate, firstRead, upperReads,
+              pureArity, scalars, CIL.step.eq_def, CIL.binary, CIL.FeatureProfile.evaluate, firstRead, upperReads,
               checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
           first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
 
@@ -107,7 +107,7 @@ theorem scalar_left_prefix (left right output : Reference) (extra : List Value)
         | exact stored _ _
         | simp (config := { implicitDefEqProofs := false })
             [cil_code, step, checkedValue, numericValue, formValue, leftBefore, leftAfter,
-              pureArity, scalars, CIL.step, CIL.binary, firstRead, upperReads,
+              pureArity, scalars, CIL.step.eq_def, CIL.binary, firstRead, upperReads,
               checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
           first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
 

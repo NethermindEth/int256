@@ -46,7 +46,7 @@ theorem carry_run_of_memory_steps (a b c : BitVec 64) (carry output first second
         · simp (config := { implicitDefEqProofs := false })
             [cil_code, step, locals, s0, s1, r0, rc, r1, r2, r3,
               checkedValue, numericValue, formValue, fc1, fc2, fo3,
-              pureArity, scalars, CIL.step, CIL.binary, instruction, storeValue,
+              pureArity, scalars, CIL.step.eq_def, CIL.binary, instruction, storeValue,
               referenceAt, wc, wo, checkedAt, Except.mapError,
               Bind.bind, Except.bind, Pure.pure, Except.pure]
           exact ⟨rfl, rfl, rfl, rfl⟩

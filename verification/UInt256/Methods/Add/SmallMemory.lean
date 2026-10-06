@@ -67,7 +67,7 @@ theorem small_input_prefix (input output : Reference) (word : BitVec 64)
         | exact s3 _ _
         | simp (config := { implicitDefEqProofs := false })
             [smallArguments, cil_code, step, checkedValue, numericValue, formValue,
-              f0, f1, f2, f3, l0, l1, l2, l3, pureArity, scalars, CIL.step,
+              f0, f1, f2, f3, l0, l1, l2, l3, pureArity, scalars, CIL.step.eq_def,
               CIL.FeatureProfile.evaluate, checkedAt, Except.mapError,
               Bind.bind, Except.bind, Pure.pure, Except.pure]
           first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
