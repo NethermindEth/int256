@@ -1,4 +1,3 @@
-import UInt256.Methods.Multiply.HomeCalls
 import UInt256.Methods.Multiply.HomeWordAll
 open Lean Meta Elab Tactic CIL UInt256Model UInt256Proof
 namespace UInt256Proof.Multiply

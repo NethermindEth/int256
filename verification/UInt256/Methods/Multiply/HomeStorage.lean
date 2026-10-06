@@ -1,8 +1,24 @@
-import UInt256.Methods.Multiply.HomeExecution
+import UInt256.Methods.Multiply.Calls
+import UInt256.Methods.Equality.Aggregate
 open Lean Meta Elab Command Tactic CIL UInt256Model UInt256Proof UInt256Proof.Bitwise
 set_option maxRecDepth 8192
 set_option maxHeartbeats 2000000
 namespace UInt256Proof.Multiply
+
+theorem home_four_numbers (memory : Memory) (frame kind index : Nat) (a b c d : Nat) :
+    readAggregate (writeHomeBytes (writeHomeBytes (writeHomeBytes (writeHomeBytes memory
+      frame kind index 0 a 8) frame kind index 8 b 8)
+      frame kind index 16 c 8) frame kind index 24 d 8) frame kind index =
+      some (.v256 (CIL.Vector.pack256 (BitVec.ofNat 64 a) (BitVec.ofNat 64 b)
+        (BitVec.ofNat 64 c) (BitVec.ofNat 64 d))) := by
+  simpa only [BitVec.toNat_ofNat, show 2^64 = (256 : Nat)^8 from rfl,
+    Equality.writeHomeBytes_mod, four_value_pack] using
+      aggregate_fourWrites memory frame kind index
+        (BitVec.ofNat 64 a) (BitVec.ofNat 64 b) (BitVec.ofNat 64 c) (BitVec.ofNat 64 d)
+
+theorem word_cast_mod (n : Nat) : BitVec.ofNat 64 (n % 18446744073709551616) = BitVec.ofNat 64 n := by
+  apply BitVec.eq_of_toNat_eq
+  simp only [BitVec.toNat_ofNat, show 2^64 = 18446744073709551616 from rfl, Nat.mod_mod]
 
 elab "multiply_home_storage_summaries" : command => do
   let indices ← liftTermElabM do listTerms (mkConst `Extracted.storageCandidates)

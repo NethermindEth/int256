@@ -10,10 +10,6 @@ namespace UInt256Proof.Multiply
   CIL.Vector.pack256 (scalarLimbs a word 0) (scalarLimbs a word 1)
     (scalarLimbs a word 2) (scalarLimbs a word 3)
 
-theorem productVector_correct (a b : Limbs) : productVector a b = value a * value b := by
-  unfold productVector
-  rw [pack_limbs_value, product_limbs_correct]
-
 theorem scalarVector_correct (a : Limbs) (word : W64) :
     scalarVector a word = value a * BitVec.ofNat 256 word.toNat := by
   unfold scalarVector

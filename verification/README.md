@@ -15,7 +15,7 @@ exact public contract types and audit their transitive proof dependencies.
 
 Add `--safety` to require both arithmetic and allocation-aware
 memory/reference-safety gates against the same fresh
-extraction. Combined proofs cover all 87 selected APIs through these representatives:
+extraction. Retained combined certificates cover all 87 selected APIs through these representatives:
 
 | Methods | Profiles |
 | --- | --- |
@@ -31,6 +31,13 @@ extraction. Combined proofs cover all 87 selected APIs through these representat
 | `EqualsUInt64`, `EqualsUInt32`, `EqualsInt64`, `EqualsInt32` | `scalar`, `x64-vector256` |
 | `Eq`/`Ne` between `UInt256` and `Int32`, `UInt32`, `Int64`, `UInt64`, in either order | `scalar`, `x64-vector256` |
 | `EqUInt256UInt256`, `EqualsUInt256Ref`, `NeUInt256UInt256`, `EqualsUInt256Value` | `scalar`, `x64-vector256`, `x64-sse41` |
+
+Fresh scalar multiplication verification currently rejects the newer
+`Multiply64` fallback: its `Math.BigMul` call is not yet modelled by the extractor.
+A fresh BMI2 arithmetic gate passes, but its safety proof also needs updating:
+the widening-helper lookup still expects the old private-local layout. Retained
+multiplication certificates describe the earlier implementation; they do not
+establish combined correctness of the newer implementation.
 
 For example, `python verification/verify.py --method EqualsUInt32 --profile scalar --safety`
 writes `generated/operations/EqualsUInt32/scalar/safety/report.json`; scalar Add
@@ -220,9 +227,10 @@ a partial success certificate if any required proof or coverage check fails.
 Add `--print-plan` to print the complete method/profile matrix without building
 or changing reports. CI uses `--expanded --safety --print-plan` to select production jobs;
 an incomplete plan fails before any partial matrix is emitted.
-The complete plan contains 87 methods and 256 method/profile jobs. All have
-checked combined arithmetic and memory-safety evidence, including total valid
-feature-profile coverage under the documented runtime assumptions.
+The complete plan contains 87 methods and 256 method/profile jobs. The retained
+production snapshot has combined arithmetic and memory-safety evidence for all
+of them, including total valid feature-profile coverage under the documented
+runtime assumptions. Fresh reports are still required for changed implementations.
 
 Use `verify_all.py --expanded --safety --jobs 6` for combined coverage; adjust
 `--jobs` for available CPU and memory. Every
@@ -317,6 +325,9 @@ Within a method family, related setup, execution and preservation lemmas live
 together. Shared stepping tactics retain separate mathematical theorem statements
 and execute the current extracted instructions. Public audit modules remain small
 and separate: they bind each selected contract and feature family explicitly.
+Scalar multiplication audits instantiate their execution and contract macros
+together. Their storage summaries do not import full limb-product execution;
+the full UInt256 multiplication return path still imports those proofs.
 ISA semantics stay under `CIL/SIMD`; operation-specific vector proofs stay with
 their method family.
 
@@ -455,7 +466,7 @@ dependency applicability.
 
 ## Measured verification time
 
-The October 2026 consolidation reduced handwritten Lean files from 945 to 746.
+The October 2026 consolidation reduced handwritten Lean files from 945 to 738.
 Execution stages are grouped by operation and ISA; constructor proofs and shift
 stepping are shared. Checked instruction equations avoid repeatedly generating
 dispatcher simplification machinery. Contracts, semantics and proof budgets are
@@ -478,10 +489,18 @@ OR checking from 53.7 to 23.7 seconds, rebuilding nine modules instead of 116.
 Both arithmetic and safety gates passed; a mismatched AND gate against the warm
 OR extraction was rejected. This single pilot excludes DLL build and extraction
 time and does not establish a full-matrix speedup.
+
+Removing unused general multiplication proofs from scalar operator imports,
+and folding their wrapper modules into audits, reduced one isolated
+`UInt32 × UInt256` arithmetic rebuild from **371.7 to 78.2 seconds**. Both runs
+rebuilt the extraction-dependent modules (24 versus 16) against the same retained
+scalar CIL, with independent dependencies warm and no other verification jobs.
+This single pilot excludes DLL build, extraction and safety checking.
+
 Affected public gates and fixtures were checked after each batch, and unchanged
 evidence was reused after comparing dependencies. Both arithmetic and safety
-evidence reconcile across all 256 production jobs; this is not a new fresh
-aggregate run.
+evidence reconcile across all 256 retained production extractions; this is not
+a new fresh aggregate run or verification of the newer multiplication fallback.
 
 For historical context, the arithmetic-only 87-method/256-certificate run took
 12,411 seconds with four workers. The later combined arithmetic/safety run used
