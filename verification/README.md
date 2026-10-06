@@ -301,6 +301,7 @@ contract, execution proof, correctness theorem and audit gate.
 | `UInt256/Arithmetic/` | Pure carry and borrow arithmetic |
 | `UInt256/ExecutionAutomation.lean` | Shared helper calls and execution automation |
 | `UInt256/Methods/` | Independent operation contracts, execution and audits |
+| `UInt256/Methods/ConstructorSafety.lean`, `ValueSafety.lean` | Extracted helper proofs shared by several operation families |
 | `Extractor/` | Metadata validation, reachability, translation and Lean emission |
 | `verify.py`, `verify_all.py`, `common.py`, `changes.py` | Fresh verification, coverage composition and CI selection |
 | `Tests/` | Versioned fixtures, kernel refutations and regression runners |
@@ -308,6 +309,13 @@ contract, execution proof, correctness theorem and audit gate.
 Pure semantics, representation, storage lemmas and arithmetic do not import
 `Extracted`; execution summaries and method proofs do. `Model.lean`, `Proof.lean`
 and `Audit.lean` are compatibility imports.
+
+Within a method family, related setup, execution and preservation lemmas live
+together. Shared stepping tactics retain separate mathematical theorem statements
+and execute the current extracted instructions. Public audit modules remain small
+and separate: they bind each selected contract and feature family explicitly.
+ISA semantics stay under `CIL/SIMD`; operation-specific vector proofs stay with
+their method family.
 
 ## Regression tests and CI
 

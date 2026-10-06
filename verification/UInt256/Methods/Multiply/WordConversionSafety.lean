@@ -1,11 +1,11 @@
-import UInt256.Methods.Equality.ConstructorContract
+import UInt256.Methods.ConstructorSafety
 import UInt256.Safety.ConstructorSetup
 import CIL.Safety.ConstructComposition
 import CIL.Safety.StepComposition
 import CIL.Safety.ReturnMemory
 
 namespace UInt256Proof.Multiply.Safety
-open CIL.Safety UInt256Model.Safety UInt256Proof.Equality.Safety
+open CIL.Safety UInt256Model.Safety UInt256Proof.ConstructorSafety
 
 def conversionIndex : Nat := Extracted.program.findIdx fun body =>
   body.locals.isEmpty && body.code.any (fun op => match op with | .newValue _ _ => true | _ => false)

@@ -1,7 +1,144 @@
-import UInt256.Methods.Add.SmallSetup
-import UInt256.Methods.Add.SmallPrefix
+import Extracted
+import CIL.Safety.StepComposition
+import CIL.Safety.WordLocals
+import CIL.Safety.WordPrefix
 import UInt256.Safety.CallerSetup
 import CIL.Safety.AccessBelow
+
+namespace UInt256Proof.Safety
+
+open CIL.Safety
+
+def smallArguments (input output : Reference) (word : BitVec 64) : List Value :=
+  [.reference (.address input), .scalar (.i64 word), .reference (.address output)]
+
+/-- Locate the first use of the saved low limb. Disabled hardware instructions
+    are excluded by extraction; a scalar-only helper needs no feature branch. -/
+def smallScalarStart : Nat :=
+  Extracted.addScalarUInt64Body.code.findIdx fun op => match op with
+    | .local 0 => true
+    | _ => false
+
+theorem small_input_prefix (input output : Reference) (word : BitVec 64)
+    (words : Fin 4 → BitVec 64) (frame : Frame) (states : Nat → Memory)
+    (formed : ∀ i : Fin 4, form (states i.val) input = .ok input)
+    (loads : ∀ (i : Fin 4) rest,
+      instruction (.field i) (.reference (.address input) :: rest) (states i.val) =
+        .ok (states i.val, .scalar (.i64 (words i)) :: rest))
+    (stores : ∀ (i : Fin 4) pc rest,
+      step Extracted.addScalarUInt64Body (.setLocal i.val) pc (smallArguments input output word)
+        frame (.scalar (.i64 (words i)) :: rest) (states i.val) =
+          .ok (.next (pc + 1) rest frame (states (i.val + 1))))
+    (post : Memory → List Value → Prop)
+    (continuation : ∃ fuel result returned,
+      run Extracted.program fuel Extracted.addScalarUInt64Index smallScalarStart
+        (smallArguments input output word) frame [] (states 4) = .ok (result, returned) ∧
+      post result returned) :
+    ∃ fuel result returned,
+      run Extracted.program fuel Extracted.addScalarUInt64Index 0
+        (smallArguments input output word) frame [] (states 0) = .ok (result, returned) ∧
+      post result returned := by
+  conv at continuation in smallScalarStart => cbv
+  have f0 := formed 0
+  have f1 := formed 1
+  have f2 := formed 2
+  have f3 := formed 3
+  have l0 := loads 0
+  have l1 := loads 1
+  have l2 := loads 2
+  have l3 := loads 3
+  have s0 := stores 0
+  have s1 := stores 1
+  have s2 := stores 2
+  have s3 := stores 3
+  dsimp at f0 f1 f2 f3 l0 l1 l2 l3 s0 s1 s2 s3
+  simp only [show (3 : Fin 4).val = 3 from rfl] at f3 l3 s3
+  repeat'
+    first
+    | exact continuation
+    | simp (config := { failIfUnchanged := false })
+      apply run_next_exists post
+      · simp only [cil_code]; rfl
+      · simp only [cil_code]; rfl
+      · first
+        | exact s0 _ _
+        | exact s1 _ _
+        | exact s2 _ _
+        | exact s3 _ _
+        | simp (config := { implicitDefEqProofs := false })
+            [smallArguments, cil_code, step, checkedValue, numericValue, formValue,
+              f0, f1, f2, f3, l0, l1, l2, l3, pureArity, scalars, CIL.step,
+              CIL.FeatureProfile.evaluate, checkedAt, Except.mapError,
+              Bind.bind, Except.bind, Pure.pure, Except.pure]
+          first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
+
+#print axioms small_input_prefix
+
+end UInt256Proof.Safety
+
+namespace UInt256Proof.Safety
+
+open CIL.Safety
+
+def smallWordCount : Nat :=
+  (Extracted.addScalarUInt64Body.localKinds.takeWhile (· == .word64)).length
+
+def smallWordSpecs : List (Option (BitVec 64)) :=
+  (Extracted.addScalarUInt64Body.locals.take smallWordCount).map fun value => match value with
+    | .i64 word => some word
+    | _ => none
+
+def smallTailKinds := Extracted.addScalarUInt64Body.localKinds.drop smallWordCount
+def smallTailValues := Extracted.addScalarUInt64Body.locals.drop smallWordCount
+
+theorem small_local_metadata :
+    Extracted.addScalarUInt64Body.localKinds = wordKinds smallWordSpecs ++ smallTailKinds ∧
+    Extracted.addScalarUInt64Body.locals = wordInitializers smallWordSpecs ++ smallTailValues ∧
+    InitializersFit smallTailKinds smallTailValues := by
+  simp [smallWordCount, smallWordSpecs, smallTailKinds, smallTailValues,
+    wordKinds, wordInitializers, InitializersFit, InitializerFits, cil_code]
+
+/-- The extracted byte-local suffix keeps its actual type. Word homes retain
+    their checked initialization and authority through creation of that suffix. -/
+theorem small_frame_setup (memory : Memory) (args : List Value) (wellFormed : memory.WellFormed) :
+    ∃ frame result slots tailSlots,
+      enterFrame Extracted.addScalarUInt64Body args memory = .ok (frame, result) ∧
+      frame.locals = slots ++ tailSlots ∧
+      WordHomes result memory.nextIdentity smallWordSpecs slots ∧
+      MemoryBelow memory.nextIdentity memory result ∧ result.WellFormed := by
+  obtain ⟨slots, tailSlots, owned, result, made, homes⟩ := make_word_prefix memory
+    memory.nextIdentity smallWordSpecs smallTailKinds smallTailValues wellFormed small_local_metadata.2.2
+  let frame : Frame := ⟨memory.nextIdentity, slots ++ tailSlots, owned, []⟩
+  have entered : enterFrame Extracted.addScalarUInt64Body args memory = .ok (frame, result) := by
+    unfold enterFrame
+    dsimp only
+    rw [small_local_metadata.1, small_local_metadata.2.1, made]
+    simp only [Bind.bind, Except.bind, cil_code, makeArgumentHomes, Pure.pure, Except.pure, List.append_nil]
+    rfl
+  exact ⟨frame, result, slots, tailSlots, entered, rfl, homes,
+    enterFrame_preserves_caller_memory _ _ _ _ _ entered,
+    enterFrame_preserves_wellFormed _ _ _ _ _ wellFormed entered⟩
+
+#print axioms small_local_metadata
+#print axioms small_frame_setup
+
+theorem small_word_local {memory : Memory} {lower : Nat} {frame : Frame} {slots tailSlots}
+    (layout : frame.locals = slots ++ tailSlots)
+    (homes : WordHomes memory lower smallWordSpecs slots)
+    (index : Nat) (initial : BitVec 64)
+    (specified : smallWordSpecs[index]? = some (some initial)) :
+    ∃ reference, frame.locals[index]? = some (.bytes .word64 reference) ∧
+      lower ≤ reference.allocation ∧
+      read memory reference 8 1 = .ok (numberBytes initial.toNat 8) ∧
+      access memory reference 8 1 true = .ok () := by
+  obtain ⟨reference, slot, bound, loaded, writable⟩ := homes.word_at index initial specified
+  have inside := (List.getElem?_eq_some_iff.mp slot).1
+  exact ⟨reference, by rw [layout, List.getElem?_append_left inside]; exact slot,
+    bound, loaded, writable⟩
+
+#print axioms small_word_local
+
+end UInt256Proof.Safety
 
 namespace UInt256Proof.Safety
 

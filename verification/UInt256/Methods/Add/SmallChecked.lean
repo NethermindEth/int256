@@ -1,4 +1,167 @@
-import UInt256.Methods.Add.SmallCarryFinish
+import UInt256.Methods.Add.SmallCarryBranch
+import UInt256.Methods.Reporting.Arithmetic
+
+namespace UInt256Proof.Safety
+
+open UInt256Model.Safety
+
+def incrementedWords (count : Nat) (words : Fin 4 → BitVec 64) : Fin 4 → BitVec 64 :=
+  fun i => if 0 < i.val ∧ i.val ≤ count then words i + 1 else words i
+
+theorem incrementedWords_next (segment : Fin 3) (words : Fin 4 → BitVec 64) :
+    (fun i => if i = (⟨segment.val + 1, by omega⟩ : Fin 4)
+      then incrementedWords segment.val words i + 1 else incrementedWords segment.val words i) =
+      incrementedWords (segment.val + 1) words := by
+  obtain ⟨n, bound⟩ := segment
+  have cases : n = 0 ∨ n = 1 ∨ n = 2 := by omega
+  rcases cases with rfl | rfl | rfl
+  all_goals
+    funext ⟨i, hi⟩
+    have cases : i = 0 ∨ i = 1 ∨ i = 2 ∨ i = 3 := by omega
+    rcases cases with rfl | rfl | rfl | rfl <;> simp [incrementedWords]
+
+theorem small_stopped_words (segment : Fin 3) (words : Fin 4 → BitVec 64) (word : BitVec 64)
+    (carry : words 0 + word < words 0)
+    (previous : ∀ i : Fin 4, 0 < i.val → i.val ≤ segment.val → words i + 1 = 0)
+    (stop : words ⟨segment.val + 1, by omega⟩ + 1 ≠ 0) :
+    smallCarryOutput segment.val (words 0 + word) (incrementedWords (segment.val + 1) words) =
+      UInt256Proof.smallResult words word := by
+  have p1 := previous 1
+  have p2 := previous 2
+  simp only [BitVec.ofNat_eq_ofNat] at p1 p2 stop
+  obtain ⟨n, bound⟩ := segment
+  have cases : n = 0 ∨ n = 1 ∨ n = 2 := by omega
+  rcases cases with rfl | rfl | rfl
+  all_goals
+    dsimp at p1 p2 stop
+    funext ⟨i, hi⟩
+    have cases : i = 0 ∨ i = 1 ∨ i = 2 ∨ i = 3 := by omega
+    rcases cases with rfl | rfl | rfl | rfl <;>
+      simp [smallCarryOutput, incrementedWords, UInt256Proof.smallResult, carry, p1, p2, stop]
+
+theorem small_overflow_words (words : Fin 4 → BitVec 64) (word : BitVec 64)
+    (carry : words 0 + word < words 0)
+    (first : words 1 + 1 = 0) (second : words 2 + 1 = 0) (third : words 3 + 1 = 0) :
+    (fun i : Fin 4 => if i.val = 0 then words 0 + word else 0) = UInt256Proof.smallResult words word := by
+  simp only [BitVec.ofNat_eq_ofNat] at first second third
+  funext ⟨i, hi⟩
+  have cases : i = 0 ∨ i = 1 ∨ i = 2 ∨ i = 3 := by omega
+  rcases cases with rfl | rfl | rfl | rfl <;>
+    simp [UInt256Proof.smallResult, carry, first, second, third]
+
+theorem small_result_value (memory : CIL.Safety.Memory) (input : CIL.Safety.Reference) (word : BitVec 64) :
+    UInt256Model.value (UInt256Proof.smallResult (inputLimb memory input) word) =
+      inputValue memory input + BitVec.ofNat 256 word.toNat := by
+  rw [UInt256Proof.small_result_sum]
+  have initial : UInt256Model.value (inputLimb memory input) = inputValue memory input :=
+    UInt256Proof.input_value (fun offset => (memory.cells input.allocation offset).bits) input.offset
+  rw [initial]
+  simp [UInt256Model.value, UInt256Proof.singleLimb]
+
+def smallOverflow (memory : CIL.Safety.Memory) (input : CIL.Safety.Reference) (word : BitVec 64) : BitVec 32 :=
+  if 2^256 ≤ (inputValue memory input).toNat + word.toNat then 1 else 0
+
+theorem smallOverflow_cases (memory : CIL.Safety.Memory) (input : CIL.Safety.Reference) (word : BitVec 64) :
+    smallOverflow memory input word =
+      if inputLimb memory input 0 + word < inputLimb memory input 0 ∧
+        inputLimb memory input 1 + 1 = 0 ∧ inputLimb memory input 2 + 1 = 0 ∧
+        inputLimb memory input 3 + 1 = 0 then 1 else 0 := by
+  have overflow := UInt256Proof.Reporting.small_overflow_iff (inputLimb memory input) word
+  have initial : UInt256Model.value (inputLimb memory input) = inputValue memory input :=
+    UInt256Proof.input_value (fun offset => (memory.cells input.allocation offset).bits) input.offset
+  have wideBound : word.toNat < 2^256 := Nat.lt_trans word.isLt (by decide)
+  rw [initial] at overflow
+  simp [UInt256Model.value, UInt256Proof.singleLimb, BitVec.toNat_ofNat,
+    Nat.mod_eq_of_lt wideBound] at overflow
+  unfold smallOverflow
+  simp only [BitVec.ofNat_eq_ofNat, Nat.reducePow, ← overflow]
+
+#print axioms incrementedWords_next
+#print axioms small_stopped_words
+#print axioms small_overflow_words
+#print axioms small_result_value
+#print axioms smallOverflow_cases
+
+end UInt256Proof.Safety
+
+namespace UInt256Proof.Safety
+
+open CIL.Safety UInt256Model.Safety
+
+theorem small_stopped_finish (segment : Fin 3) (original entered current : CIL.Safety.Memory)
+    (frame : Frame) (input output sumHome : Reference) (homes : Fin 4 → Reference) (word : BitVec 64)
+    (call : CallingConditions Extracted.program original [input] [output])
+    (setup : enterFrame Extracted.addScalarUInt64Body (smallArguments input output word) original =
+      .ok (frame, entered))
+    (state : SmallCarryState original current frame input output sumHome homes
+      (incrementedWords (segment.val + 1) (inputLimb original input)) (inputLimb original input 0 + word))
+    (carry : inputLimb original input 0 + word < inputLimb original input 0)
+    (previous : ∀ i : Fin 4, 0 < i.val → i.val ≤ segment.val → inputLimb original input i + 1 = 0)
+    (stop : inputLimb original input ⟨segment.val + 1, by omega⟩ + 1 ≠ 0) :
+    ∃ fuel final values,
+      run Extracted.program fuel Extracted.addScalarUInt64Index (smallIncrementDecision segment.val)
+        (smallArguments input output word) frame
+        [.scalar (.i64 (inputLimb original input ⟨segment.val + 1, by omega⟩ + 1))] current =
+          .ok (final, values) ∧ SmallResult original final values input output word (smallOverflow original input word) := by
+  let words := smallCarryOutput segment.val (inputLimb original input 0 + word)
+    (incrementedWords (segment.val + 1) (inputLimb original input))
+  have math : UInt256Model.value words = inputValue original input + BitVec.ofNat 256 word.toNat :=
+    (congrArg UInt256Model.value (small_stopped_words segment (inputLimb original input) word carry previous stop)).trans
+      (small_result_value original input word)
+  have atIndex : incrementedWords (segment.val + 1) (inputLimb original input)
+      ⟨segment.val + 1, by omega⟩ = inputLimb original input ⟨segment.val + 1, by omega⟩ + 1 := by
+    simp [incrementedWords]
+  have flag : smallOverflow original input word = 0 := by
+    rw [smallOverflow_cases]
+    simp only [BitVec.ofNat_eq_ofNat] at stop
+    obtain ⟨n, bound⟩ := segment
+    have cases : n = 0 ∨ n = 1 ∨ n = 2 := by omega
+    rcases cases with rfl | rfl | rfl
+    all_goals dsimp at stop
+    all_goals simp [stop]
+  let post := fun final values => SmallResult original final values input output word (smallOverflow original input word)
+  have execution := state.nonzero_prefix segment word (by rw [atIndex]; exact stop) post
+  rw [atIndex] at execution
+  apply execution
+  have finished := small_store_finish ⟨segment.val + 1, by omega⟩ original entered current frame
+    input output word words call setup state.call state.preserved.cells math
+  have notOverflow : segment.val + 1 ≠ 4 := by omega
+  simpa [post, words, smallCarryOutput, smallBranchFlag, notOverflow, flag] using finished
+
+theorem small_overflow_finish (original entered current : CIL.Safety.Memory)
+    (frame : Frame) (input output sumHome : Reference) (homes : Fin 4 → Reference) (word : BitVec 64)
+    (call : CallingConditions Extracted.program original [input] [output])
+    (setup : enterFrame Extracted.addScalarUInt64Body (smallArguments input output word) original =
+      .ok (frame, entered))
+    (state : SmallCarryState original current frame input output sumHome homes
+      (incrementedWords 3 (inputLimb original input)) (inputLimb original input 0 + word))
+    (carry : inputLimb original input 0 + word < inputLimb original input 0)
+    (first : inputLimb original input 1 + 1 = 0)
+    (second : inputLimb original input 2 + 1 = 0)
+    (third : inputLimb original input 3 + 1 = 0) :
+    ∃ fuel final values,
+      run Extracted.program fuel Extracted.addScalarUInt64Index (smallIncrementStart 3)
+        (smallArguments input output word) frame [] current = .ok (final, values) ∧
+      SmallResult original final values input output word (smallOverflow original input word) := by
+  let words := fun i : Fin 4 => if i.val = 0 then inputLimb original input 0 + word else 0
+  have math : UInt256Model.value words = inputValue original input + BitVec.ofNat 256 word.toNat :=
+    (congrArg UInt256Model.value (small_overflow_words (inputLimb original input) word carry first second third)).trans
+      (small_result_value original input word)
+  have flag : smallOverflow original input word = 1 := by
+    rw [smallOverflow_cases]
+    simp only [BitVec.ofNat_eq_ofNat] at first second third
+    simp [carry, first, second, third]
+  apply state.overflow_prefix word
+    (fun final values => SmallResult original final values input output word (smallOverflow original input word))
+  have finished := small_store_finish 4 original entered current frame input output word words
+    call setup state.call state.preserved.cells math
+  simpa [words, smallBranchFlag, show (3 : Fin 4).val = 3 from rfl,
+    show (4 : Fin 5).val = 4 from rfl, flag] using finished
+
+#print axioms small_stopped_finish
+#print axioms small_overflow_finish
+
+end UInt256Proof.Safety
 
 namespace UInt256Proof.Safety
 

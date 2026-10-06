@@ -1,4 +1,5 @@
-import UInt256.Methods.Equality.ValueSafetyExecution
+import UInt256.Methods.ValueSafety
+import UInt256.Methods.Equality.WrapperSafetyContract
 
 namespace UInt256Proof.Equality.Safety
 

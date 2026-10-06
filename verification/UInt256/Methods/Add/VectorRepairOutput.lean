@@ -1,5 +1,105 @@
-import UInt256.Methods.Add.VectorRepairLookup
+import UInt256.Methods.Add.VectorRepairMasks
+import UInt256.Methods.AddSubtract.CascadeIndexExecution
+import UInt256.Methods.AddSubtract.CascadeLookupExecution
+import UInt256.Methods.AddSubtract.LookupRead
+import CIL.Safety.CallComposition
 import UInt256.Methods.AddSubtract.VectorOutputMemory
+
+namespace UInt256Proof.Add.Safety
+open CIL.Safety UInt256Model.Safety UInt256Proof.AddSubtract.Safety
+
+/-- Checked scalar index arithmetic, including both overwrites of slot seven.
+    Its final mask proves the lookup index is below sixteen. -/
+theorem repair_index_checked (boundary : Nat) (entered current : Memory)
+    (inputs outputs : List Reference) (frame : Frame) (args : List Value)
+    (currentCall : CallingConditions Extracted.program current inputs outputs)
+    (enteredWF : entered.WellFormed)
+    (homes : NumericHomes entered boundary repairSpecs frame.locals)
+    (authority : AccessBelow entered.nextIdentity entered current)
+    (generatedHome equalHome : Reference) (generated equal : BitVec 32)
+    (generatedSlot : frame.locals[0]? = some (.bytes .word32 generatedHome))
+    (equalSlot : frame.locals[1]? = some (.bytes .word32 equalHome))
+    (generatedRead : read current generatedHome 4 1 = .ok (numberBytes generated.toNat 4))
+    (equalRead : read current equalHome 4 1 = .ok (numberBytes equal.toNat 4))
+    (post : Memory → List Value → Prop)
+    (continuation : ∀ sumHome indexHome after,
+      frame.locals[0]? = some (.bytes .word32 sumHome) →
+      frame.locals[1]? = some (.bytes .word32 indexHome) →
+      read after sumHome 4 1 = .ok (numberBytes (equal + 2 * generated).toNat 4) →
+      read after indexHome 4 1 = .ok (numberBytes (UInt256Proof.SIMD.cascadeIndex generated equal).toNat 4) →
+      (UInt256Proof.SIMD.cascadeIndex generated equal).toNat < 16 →
+      MemoryBelow sumHome.allocation current after →
+      MemoryBelow boundary current after →
+      CallingConditions Extracted.program after inputs outputs →
+      AccessBelow entered.nextIdentity entered after →
+      current.nextIdentity ≤ after.nextIdentity →
+      ∃ fuel result returned,
+        run Extracted.program fuel repairIndex 24 args frame [] after =
+          .ok (result, returned) ∧ post result returned) :
+    ∃ fuel result returned,
+      run Extracted.program fuel repairIndex 10 args frame [] current =
+        .ok (result, returned) ∧ post result returned :=
+  cascade_index_checked boundary entered current inputs outputs frame args currentCall enteredWF homes authority
+    generatedHome equalHome generated equal generatedSlot equalSlot generatedRead equalRead post continuation
+
+#print axioms repair_index_checked
+end UInt256Proof.Add.Safety
+
+namespace UInt256Proof.Add.Safety
+open CIL.Safety UInt256Model.Safety UInt256Proof.AddSubtract.Safety
+
+/-- Compose the extracted zero-argument lookup call with the checked getter.
+    This includes possible first-use allocation and child-frame teardown. -/
+theorem repair_lookup_call (memory : Memory) (inputs outputs : List Reference)
+    (frame : Frame) (args : List Value)
+    (call : CallingConditions Extracted.program memory inputs outputs)
+    (post : Memory → List Value → Prop)
+    (continuation : ∀ result reference,
+      StaticBindingValid result lookupDescriptor reference →
+      MemoryBelow memory.nextIdentity memory result →
+      CallingConditions Extracted.program result inputs outputs →
+      ∃ fuel final returned,
+        run Extracted.program fuel repairIndex 25 args frame
+          [.span (.address reference) 512] result = .ok (final, returned) ∧ post final returned) :
+    ∃ fuel final returned,
+      run Extracted.program fuel repairIndex 24 args frame [] memory =
+        .ok (final, returned) ∧ post final returned :=
+  cascade_lookup_call memory inputs outputs frame args call post continuation
+
+#print axioms repair_lookup_call
+
+/-- Execute the span-reference/native-offset/load/store sequence. The table
+    entry is initialized in a private vector home before any correction write. -/
+theorem repair_lookup_load (boundary : Nat) (entered current : Memory)
+    (inputs outputs : List Reference) (frame : Frame) (args : List Value)
+    (currentCall : CallingConditions Extracted.program current inputs outputs)
+    (enteredWF : entered.WellFormed)
+    (homes : NumericHomes entered boundary repairSpecs frame.locals)
+    (authority : AccessBelow entered.nextIdentity entered current)
+    (table indexHome : Reference) (index : BitVec 32)
+    (valid : StaticBindingValid current lookupDescriptor table)
+    (bound : index.toNat < 16)
+    (indexSlot : frame.locals[1]? = some (.bytes .word32 indexHome))
+    (indexRead : read current indexHome 4 1 = .ok (numberBytes index.toNat 4))
+    (post : Memory → List Value → Prop)
+    (continuation : ∀ correctionHome after,
+      frame.locals[2]? = some (.bytes .vector256 correctionHome) →
+      read after correctionHome 32 1 = .ok (numberBytes (UInt256Proof.SIMD.cascadeVector index).toNat 32) →
+      MemoryBelow correctionHome.allocation current after →
+      MemoryBelow boundary current after →
+      CallingConditions Extracted.program after inputs outputs →
+      AccessBelow entered.nextIdentity entered after →
+      ∃ fuel final returned,
+        run Extracted.program fuel repairIndex 32 args frame [] after =
+          .ok (final, returned) ∧ post final returned) :
+    ∃ fuel final returned,
+      run Extracted.program fuel repairIndex 25 args frame
+        [.span (.address table) 512] current = .ok (final, returned) ∧ post final returned :=
+  cascade_lookup_load boundary entered current inputs outputs frame args currentCall enteredWF homes authority
+    table indexHome index valid bound indexSlot indexRead post continuation
+
+#print axioms repair_lookup_load
+end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
 open CIL.Safety UInt256Model.Safety UInt256Proof.AddSubtract.Safety

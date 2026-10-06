@@ -1,4 +1,4 @@
-import UInt256.Methods.Equality.ConstructorContract
+import UInt256.Methods.ConstructorSafety
 import UInt256.Safety.ConstructorSetup
 import UInt256.Safety.InitializedOutput
 import CIL.Safety.ConstructComposition
@@ -6,7 +6,7 @@ import CIL.Safety.StepComposition
 import CIL.Safety.ReturnMemory
 
 namespace UInt256Proof.Bitwise.ScalarSafety
-open CIL.Safety UInt256Model.Safety UInt256Proof.Equality.Safety
+open CIL.Safety UInt256Model.Safety UInt256Proof.ConstructorSafety
 
 def scalarIndex : Nat := Extracted.program.findIdx fun body => body.code.any fun op =>
   match op with | .newValue callee 4 => callee == constructorIndex | _ => false
