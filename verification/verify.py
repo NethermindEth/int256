@@ -8,6 +8,7 @@ import re
 import shutil
 import sys
 import tempfile
+import threading
 import time
 
 from common import PROFILE_DIRECTORY, PROFILE_NAMES, PROFILES, ROOT, SEMANTICS_VERSION, VERIFY, expected_profile, generated_directory, run, sha, source_files
@@ -64,6 +65,49 @@ def check_proof_snapshot(proof, relative_paths, inputs):
     return hashes
 
 
+def copy_proof_sources(proof, inputs):
+    sources = sorted(source_files(VERIFY, {".lean"}))
+    paths = [p.relative_to(VERIFY) for p in sources] + [Path("lakefile.toml"), Path("lean-toolchain")]
+    for path in paths:
+        target = proof / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(VERIFY / path, target)
+    check_proof_snapshot(proof, paths, inputs)
+    return sources, paths
+
+
+class ProofSession:
+    """One worker's fresh, run-local Lake cache; never import an external cache."""
+
+    def __enter__(self):
+        self.temporary = tempfile.TemporaryDirectory(prefix="int256-proof-worker-")
+        self.proof = Path(self.temporary.name)
+        self.owner = threading.get_ident()
+        self.inputs = None
+        self.uses = 0
+        return self
+
+    def __exit__(self, *error):
+        self.temporary.cleanup()
+
+    def prepare(self, inputs):
+        if threading.get_ident() != self.owner:
+            raise RuntimeError("Proof session belongs to another worker")
+        if self.inputs is None:
+            self.sources, self.paths = copy_proof_sources(self.proof, inputs)
+            self.inputs = dict(inputs)
+        elif inputs != self.inputs:
+            raise RuntimeError("Proof session has stale source inputs")
+        check_proof_snapshot(self.proof, self.paths, inputs)
+        for relative in ("generated/Extracted.lean", "generated/artifact.json",
+                         "UInt256/Methods/SelectedGate.lean", "UInt256/Methods/SelectedSafetyGate.lean"):
+            if Path(relative) in self.paths:
+                raise RuntimeError("Generated audit would overwrite handwritten source")
+            (self.proof / relative).unlink(missing_ok=True)
+        self.uses += 1
+        return self.proof, self.sources, self.paths
+
+
 def build_artifact(project, work, method, fixture=None, simd_fixture=False, fixture_name=None):
     inputs = source_inputs()
     stages = {}
@@ -103,7 +147,7 @@ def validate_bundle(bundle, inputs, production=False):
         raise RuntimeError("A shared production build cannot verify fixtures")
 
 
-def main(argv=None, prepared=None):
+def main(argv=None, prepared=None, proof_session=None):
     sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--method", choices=method_names(), default="Add", help="Exact selected entry to verify")
@@ -167,24 +211,21 @@ def main(argv=None, prepared=None):
                                             bool(arguments.simd_fixture or gate), fixture_name)
         if prepared and fixture:
             raise RuntimeError("A shared production build cannot verify fixtures")
+        if proof_session is not None and (prepared is None or fixture):
+            raise RuntimeError("Proof reuse requires a shared production build")
         validate_bundle(bundle, inputs, production=bool(prepared))
         assembly, extractor = bundle["assembly"], bundle["extractor"]
         if prepared:
             stages["sharedAssemblyBuild"] = True
         else:
             stages.update(bundle["timings"])
-        proof = work / "proof"
-        proof.mkdir()
-        # Copy source modules recursively, never generated programs or compiled caches.
-        lean_sources = sorted(source_files(VERIFY, {".lean"}))
-        for source in lean_sources:
-            target = proof / source.relative_to(VERIFY)
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source, target)
-        for name in ("lakefile.toml", "lean-toolchain"):
-            shutil.copy2(VERIFY / name, proof / name)
-        copied_paths = [p.relative_to(VERIFY) for p in lean_sources] + [Path("lakefile.toml"), Path("lean-toolchain")]
-        check_proof_snapshot(proof, copied_paths, inputs)
+        if proof_session is None:
+            proof = work / "proof"
+            proof.mkdir()
+            lean_sources, copied_paths = copy_proof_sources(proof, inputs)
+        else:
+            proof, lean_sources, copied_paths = proof_session.prepare(inputs)
+            stages["sessionProofReuse"] = proof_session.uses > 1
         generated = proof / "generated"
         stage_started = time.perf_counter()
         profile_selector = ("@" + str(PROFILE_DIRECTORY / f"{arguments.profile}.json")
@@ -220,7 +261,7 @@ def main(argv=None, prepared=None):
         audit_target = "+UInt256.Methods.SelectedGate:olean" if gate else "Audit" if arguments.method == "Add" else "SubtractAudit"
         stage_started = time.perf_counter()
         output = run_stage([lake, "build", audit_target], proof, "Proof checking")
-        stages["freshKernelBuildSeconds"] = time.perf_counter() - stage_started
+        stages["kernelBuildSeconds" if stages.get("sessionProofReuse") else "freshKernelBuildSeconds"] = time.perf_counter() - stage_started
         audited_names = audit_names(arguments.method)
         audits = theorem_audits(output, audited_names, manifest["approvedAxioms"])
         axioms = audits[audited_names[0]]
@@ -231,8 +272,8 @@ def main(argv=None, prepared=None):
             safety_audits = theorem_audits(safety_output, safety["theorems"], manifest["approvedAxioms"])
             audited_names += safety["theorems"]
             audits.update(safety_audits)
-        # Neither pre-existing extraction nor an existing olean cache enters this
-        # proof directory. Recheck inputs and artifact before issuing a report.
+        # Every workspace starts empty. A session reuses only its own checked
+        # dependencies; extraction and typed gates are regenerated for each job.
         validate_bundle(bundle, inputs, production=bool(prepared))
         copied_hashes = check_proof_snapshot(proof, copied_paths, inputs)
         if generated_gate_hash is not None and sha(target) != generated_gate_hash:

@@ -6,14 +6,16 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import hashlib
 import json
 from pathlib import Path
+from queue import Empty, SimpleQueue
 import re
 import shutil
 import sys
 import tempfile
+import threading
 import time
 
 from common import PROFILES, ROOT, SEMANTICS_VERSION, VERIFY, expected_profile, generated_directory, run, sha, source_files
-from verify import audit_names, build_artifact, check_proof_snapshot, main as verify_one, source_inputs, theorem_audits
+from verify import ProofSession, audit_names, build_artifact, check_proof_snapshot, main as verify_one, source_inputs, theorem_audits
 from methods import LEGACY, api_entries, check_calling_convention, method_manifest, method_names, native_limitations
 from gate_templates import audit_module
 from safety_gate import safety_gate, selected_safety_module
@@ -218,16 +220,30 @@ def positive_jobs(value):
 
 
 def verify_profiles(plan, bundle, jobs, safety=False):
-    def check(selection):
-        method, profile = selection
-        verify_one(["--method", method, "--profile", profile] + (["--safety"] if safety else []), prepared=bundle)
+    selections = SimpleQueue()
+    for selection in plan:
+        selections.put(selection)
+    failed = threading.Event()
+
+    def check():
+        with ProofSession() as session:
+            while not failed.is_set():
+                try:
+                    method, profile = selections.get_nowait()
+                except Empty:
+                    return
+                try:
+                    verify_one(["--method", method, "--profile", profile] + (["--safety"] if safety else []),
+                               prepared=bundle, proof_session=session)
+                except BaseException:
+                    failed.set()
+                    raise
 
     if jobs == 1:
-        for selection in plan:
-            check(selection)
+        check()
         return
     with ThreadPoolExecutor(max_workers=jobs) as pool:
-        pending = [pool.submit(check, selection) for selection in plan]
+        pending = [pool.submit(check) for _ in range(min(jobs, len(plan)))]
         try:
             for future in as_completed(pending):
                 future.result()

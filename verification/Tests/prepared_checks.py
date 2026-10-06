@@ -818,5 +818,63 @@ class PreparedBuildChecks(unittest.TestCase):
         self.assert_invalidated()
 
 
+class ProofSessionChecks(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.source = Path(directory.name)
+        for name in ("Example.lean", "lakefile.toml", "lean-toolchain"):
+            (self.source / name).write_text("source", encoding="utf-8")
+        patcher = patch.object(verify, "VERIFY", self.source)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.inputs = {"verification/" + p.name: sha(p) for p in self.source.iterdir()}
+
+    def test_reuses_own_cache_but_clears_previous_extraction_and_gates(self):
+        with verify.ProofSession() as session:
+            proof, _, _ = session.prepare(self.inputs)
+            cache = proof / ".lake/build/lib/lean/Example.olean"
+            cache.parent.mkdir(parents=True)
+            cache.write_bytes(b"session cache")
+            generated = [proof / p for p in ("generated/Extracted.lean", "generated/artifact.json",
+                         "UInt256/Methods/SelectedGate.lean", "UInt256/Methods/SelectedSafetyGate.lean")]
+            for path in generated:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("previous job", encoding="utf-8")
+            self.assertEqual(session.prepare(self.inputs)[0], proof)
+            self.assertEqual(cache.read_bytes(), b"session cache")
+            self.assertTrue(all(not path.exists() for path in generated))
+        self.assertFalse(proof.exists())
+
+    def test_changed_inputs_cannot_reuse_session(self):
+        with verify.ProofSession() as session:
+            session.prepare(self.inputs)
+            with self.assertRaisesRegex(RuntimeError, "stale source inputs"):
+                session.prepare({**self.inputs, "verification/new.lean": "changed"})
+
+    def test_modified_snapshot_is_rejected_before_reuse(self):
+        with verify.ProofSession() as session:
+            proof, _, _ = session.prepare(self.inputs)
+            (proof / "Example.lean").write_text("changed", encoding="utf-8")
+            with self.assertRaisesRegex(RuntimeError, "Proof snapshot"):
+                session.prepare(self.inputs)
+
+    def test_handwritten_audit_cannot_be_deleted_as_generated(self):
+        path = self.source / "UInt256/Methods/SelectedGate.lean"
+        path.parent.mkdir(parents=True)
+        path.write_text("handwritten", encoding="utf-8")
+        self.inputs["verification/UInt256/Methods/SelectedGate.lean"] = sha(path)
+        with verify.ProofSession() as session:
+            with self.assertRaisesRegex(RuntimeError, "overwrite handwritten"):
+                session.prepare(self.inputs)
+            self.assertEqual((session.proof / path.relative_to(self.source)).read_text(), "handwritten")
+
+    def test_other_worker_cannot_use_session(self):
+        from concurrent.futures import ThreadPoolExecutor
+        with verify.ProofSession() as session, ThreadPoolExecutor(max_workers=1) as pool:
+            with self.assertRaisesRegex(RuntimeError, "another worker"):
+                pool.submit(session.prepare, self.inputs).result()
+
+
 if __name__ == "__main__":
     unittest.main()

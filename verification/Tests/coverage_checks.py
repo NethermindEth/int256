@@ -8,7 +8,7 @@ import shutil
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import ANY, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import verify_all
@@ -309,7 +309,8 @@ class CombinedCoverageChecks(unittest.TestCase):
         bundle = {"assembly": "same fresh DLL"}
         with patch.object(verify_all, "verify_one") as worker:
             verify_all.verify_profiles([("Add", "scalar")], bundle, 1, safety=True)
-        worker.assert_called_once_with(["--method", "Add", "--profile", "scalar", "--safety"], prepared=bundle)
+        worker.assert_called_once_with(["--method", "Add", "--profile", "scalar", "--safety"],
+                                       prepared=bundle, proof_session=ANY)
 
     def test_combined_composition_rechecks_certificates_and_invalidates_prior_report(self):
         destination = self.verify / "generated/safety/coverage.json"

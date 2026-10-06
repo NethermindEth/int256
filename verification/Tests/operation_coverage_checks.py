@@ -32,9 +32,12 @@ class OperationCoverageChecks(unittest.TestCase):
         bundle = {"assemblySha256": "one fresh production assembly"}
         rendezvous = threading.Barrier(2, timeout=10)
         completed = []
+        sessions = []
 
-        def proof(arguments, prepared):
+        def proof(arguments, prepared, proof_session):
             self.assertIs(prepared, bundle)
+            self.assertEqual(proof_session.owner, threading.get_ident())
+            sessions.append(proof_session)
             rendezvous.wait()
             completed.append(tuple(arguments))
 
@@ -43,6 +46,21 @@ class OperationCoverageChecks(unittest.TestCase):
             verify_all.verify_profiles(plan, bundle, 2)
         self.assertCountEqual(completed, [
             ("--method", method, "--profile", profile) for method, profile in plan])
+        self.assertIsNot(sessions[0], sessions[1])
+        self.assertTrue(all(not session.proof.exists() for session in sessions))
+
+    def test_sequential_profiles_reuse_only_their_run_workspace(self):
+        sessions = []
+        def proof(arguments, prepared, proof_session):
+            sessions.append(proof_session)
+        plan = [("Lsh", "scalar"), ("Lsh", "x64-vector256")]
+        with patch.object(verify_all, "verify_one", side_effect=proof):
+            verify_all.verify_profiles(plan, {}, 1)
+            verify_all.verify_profiles(plan, {}, 1)
+        self.assertIs(sessions[0], sessions[1])
+        self.assertIs(sessions[2], sessions[3])
+        self.assertIsNot(sessions[0], sessions[2])
+        self.assertTrue(all(not session.proof.exists() for session in sessions))
 
     def test_parallel_proof_failure_prevents_composition_and_invalidates_report(self):
         aggregate = self.directory / "coverage.json"

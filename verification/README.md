@@ -188,9 +188,12 @@ python verification/verify_all.py
 python verification/verify_all.py --method Lsh
 ```
 
-Use `--jobs 2` with `verify_all.py` to check two profiles concurrently. Each gets
-an uncached proof directory; all use the same fresh DLL, and coverage is issued
-only after every certificate and the composition audit pass. The default is one job.
+Use `--jobs 2` with `verify_all.py` to check two profiles concurrently. Each worker
+starts with an empty proof directory and reuses its own checked dependencies
+between jobs; workers share the fresh DLL, not their Lean caches. Extraction and
+typed gates are regenerated for every job, and Lake rebuilds their dependents.
+No compiled cache is imported from an earlier run. Coverage is issued only after
+every certificate and the composition audit pass. The default is one worker.
 
 Add and the scalar profile are the defaults. A selected command rebuilds the assembly and extractor, imports
 that invocation's DLL into an isolated proof directory without generated data or
@@ -199,7 +202,7 @@ the previous success report before starting and rechecks source inputs and the
 DLL digest before issuing a new one.
 
 By default, `verify_all.py` covers Add/Subtract. It builds one fresh production DLL and checks both methods in all
-seven classes, using isolated proof directories. It then audits the total
+seven classes, using worker-local proof directories. It then audits the total
 classification and composition rules and checks every full family certificate
 before issuing `generated/coverage.json`. The proof host does not need ARM or
 AVX-512 hardware: profiles parameterize the managed execution model. Native
