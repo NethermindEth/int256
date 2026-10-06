@@ -94,7 +94,7 @@ theorem multiply_upper_mask (rightSide : Bool)
       apply run_next_exists post found (by rfl)
       simp (config := { implicitDefEqProofs := false })
         [step, pureArity, productArgs, checkedValue, numericValue, formValue, formed, reading2, reading3,
-          checkedAt, scalars, CIL.step, CIL.binary, Except.mapError,
+          checkedAt, scalars, CIL.step.eq_def, CIL.binary, Except.mapError,
           Bind.bind, Except.bind, Pure.pure, Except.pure]
       first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
     exact run_next_exists post found (by rfl) stored (continuation after next)
@@ -140,7 +140,7 @@ theorem multiply_tail_mask (rightSide : Bool)
       | exact loadUpper _ _
       | simp (config := { implicitDefEqProofs := false })
           [step, pureArity, productArgs, checkedValue, numericValue, formValue, formed, reading,
-            checkedAt, scalars, CIL.step, CIL.binary, Except.mapError,
+            checkedAt, scalars, CIL.step.eq_def, CIL.binary, Except.mapError,
             Bind.bind, Except.bind, Pure.pure, Except.pure]
         first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
     exact run_next_exists post found (by rfl) stored (continuation after next)
