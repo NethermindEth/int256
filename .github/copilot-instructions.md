@@ -61,14 +61,14 @@ In addition to the rules enforced by `.editorconfig`, you SHOULD:
 
 ### Internal Structure
 ```csharp
-// UInt256 uses explicit layout with 4 ulong components
-[StructLayout(LayoutKind.Explicit)]
+// UInt256 uses sequential layout: 4 ulong fields in declaration order, no padding
+[StructLayout(LayoutKind.Sequential)]
 public readonly struct UInt256
 {
-    [FieldOffset(0)] public readonly ulong u0;  // Least significant
-    [FieldOffset(8)] public readonly ulong u1;
-    [FieldOffset(16)] public readonly ulong u2;
-    [FieldOffset(24)] public readonly ulong u3; // Most significant
+    public readonly ulong u0;  // Least significant
+    public readonly ulong u1;
+    public readonly ulong u2;
+    public readonly ulong u3; // Most significant
 }
 ```
 
@@ -141,8 +141,8 @@ dotnet run -c Release --project src/Nethermind.Int256.Benchmark
 // Always consider endianness
 public UInt256(ReadOnlySpan<byte> bytes, bool isBigEndian)
 
-// Use explicit field offsets for predictable layout
-[FieldOffset(0)] public readonly ulong u0; // Little-endian: LSB first
+// Field declaration order is the memory layout (LayoutKind.Explicit/FieldOffset are unsafe under unsafe-v2)
+public readonly ulong u0; // Little-endian: LSB first
 ```
 
 ## Testing Guidelines

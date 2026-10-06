@@ -18,7 +18,7 @@ using x64 = System.Runtime.Intrinsics.X86;
 
 namespace Nethermind.Int256;
 
-[StructLayout(LayoutKind.Explicit)]
+[StructLayout(LayoutKind.Sequential)]
 public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComparable<UInt256>, IInteger<UInt256>, IConvertible
 {
     public const int Len = 4;
@@ -31,13 +31,9 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     public static readonly UInt256 UInt128MaxValue = new(ulong.MaxValue, ulong.MaxValue);
 
     /* in little endian order so u3 is the most significant ulong */
-    [FieldOffset(0)]
     public readonly ulong u0;
-    [FieldOffset(8)]
     public readonly ulong u1;
-    [FieldOffset(16)]
     public readonly ulong u2;
-    [FieldOffset(24)]
     public readonly ulong u3;
 
     public static UInt256 Negate(in UInt256 a)
