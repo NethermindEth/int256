@@ -69,22 +69,12 @@ theorem vector_run (memory : Memory) (left right output : Reference) (frame : Fr
   simp [run, cil_code, step, checkedValue, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 #print axioms vector_run
-end UInt256Proof.Bitwise.Safety
-
-namespace UInt256Proof.Bitwise.Safety
-open CIL.Safety UInt256Model.Safety
-
 
 theorem vector_initialized : InitializedBinaryContract (UInt256Model.Bitwise.applyBinary vectorOperation) Extracted.program vectorIndex := by
   intro memory left right output call
   let frame : Frame := ⟨memory.nextIdentity, [], [], []⟩
   have found : Extracted.program[vectorIndex]? = some vectorBody := by rfl
-  have kinds : vectorBody.localKinds = [] := by rfl
-  have values : vectorBody.locals = [] := by rfl
-  have arguments : vectorBody.aggregateArgs = [] := by rfl
-  have setup : enterFrame vectorBody (binaryArguments left right output) memory = .ok (frame, memory) := by
-    simp [enterFrame, kinds, values, arguments, makeLocals, makeArgumentHomes, frame,
-      Bind.bind, Except.bind, Pure.pure, Except.pure]
+  have setup : enterFrame vectorBody (binaryArguments left right output) memory = .ok (frame, memory) := by rfl
   have checked : (binaryArguments left right output).mapM (checkedValue memory) =
       .ok (binaryArguments left right output) := by
     have fl := call.input_formed (reference := left) (by simp)
