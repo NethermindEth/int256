@@ -121,7 +121,8 @@ jobs:
       contents: read
       id-token: write
     env:
-      NUGET_HOST: ${{ github.event.inputs.publish == 'Staging' && 'https://int.nugettest.org' || 'https://www.nuget.org' }}
+      NUGET_URL: ${{ github.event.inputs.publish == 'Staging' && 'https://int.nugettest.org' || 'https://www.nuget.org' }}
+      NUGET_SOURCE: ${{ github.event.inputs.publish == 'Staging' && 'https://apiint.nugettest.org' || 'https://api.nuget.org' }}/v3/index.json
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -134,8 +135,8 @@ jobs:
         id: login
         with:
           user: ${{ secrets.NUGET_USER }}
-          audience: ${{ env.NUGET_HOST }}
-          token-service-url: ${{ env.NUGET_HOST }}/api/v2/token
+          audience: ${{ env.NUGET_URL }}
+          token-service-url: ${{ env.NUGET_URL }}/api/v2/token
 
       - name: Publish
         env:
@@ -156,4 +157,4 @@ jobs:
             unzip -l "$snupkg" | grep -qF "$f" || { echo "::error::missing $f in $(basename "$snupkg")"; exit 1; }
           done
           dotnet nuget push "$nupkg" \
-            -k "${{ steps.login.outputs.NUGET_API_KEY }}" -s ${{ env.NUGET_HOST }}/api/v2/package
+            -k "${{ steps.login.outputs.NUGET_API_KEY }}" -s ${{ env.NUGET_SOURCE }}
