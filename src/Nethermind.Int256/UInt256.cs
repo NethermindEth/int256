@@ -26,7 +26,8 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     public static readonly UInt256 Zero = 0ul;
     public static readonly UInt256 One = 1ul;
     public static readonly UInt256 MinValue = Zero;
-    public static readonly UInt256 MaxValue = ~Zero;
+    // Spelled out rather than ~Zero: an operator applied to another static keeps ILC from preinitializing the class.
+    public static readonly UInt256 MaxValue = new(ulong.MaxValue, ulong.MaxValue, ulong.MaxValue, ulong.MaxValue);
     public static readonly UInt256 UInt128MaxValue = new(ulong.MaxValue, ulong.MaxValue);
 
     /* in little endian order so u3 is the most significant ulong */
@@ -1640,18 +1641,12 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         }
         else
         {
-            // No widening multiply instruction on this target (e.g. riscv64). Spelled out rather than
-            // deferred to Math.BigMul, which repeats the same ISA checks and then calls an
-            // out-of-line software fallback that cannot inline into the 256-bit limb loops.
-            uint al = (uint)a, ah = (uint)(a >> 32);
-            uint bl = (uint)b, bh = (uint)(b >> 32);
-
-            ulong mull = (ulong)al * bl;
-            ulong t = (ulong)ah * bl + (mull >> 32);
-            ulong tl = (ulong)al * bh + (uint)t;
-
-            low = (tl << 32) | (uint)mull;
-            return (ulong)ah * bh + (t >> 32) + (tl >> 32);
+            // Math.BigMul(ulong, ulong, out ulong) is a JIT intrinsic on riscv64 (.NET 11 with the
+            // dotnet-riscv perf profile): the M extension's `mul` + `mulhu` pair, with no call. The
+            // 32-bit limb expansion that used to live here cost four `mul` and ~20 shifts and adds
+            // per product, i.e. ~24 instructions where the hardware has two. On a target where
+            // BigMul is not intrinsified it is the same software fallback, out of line.
+            return Math.BigMul(a, b, out low);
         }
     }
 
