@@ -31,12 +31,7 @@ theorem scalar_initialized : InitializedBinaryContract (UInt256Model.Bitwise.app
   intro memory left right output call
   let frame : Frame := ⟨memory.nextIdentity, [], [], []⟩
   have found : Extracted.program[scalarIndex]? = some scalarBody := by rfl
-  have kinds : scalarBody.localKinds = [] := by rfl
-  have values : scalarBody.locals = [] := by rfl
-  have arguments : scalarBody.aggregateArgs = [] := by rfl
-  have setup : enterFrame scalarBody (binaryArguments left right output) memory = .ok (frame, memory) := by
-    simp [enterFrame, kinds, values, arguments, makeLocals, makeArgumentHomes, frame,
-      Bind.bind, Except.bind, Pure.pure, Except.pure]
+  have setup : enterFrame scalarBody (binaryArguments left right output) memory = .ok (frame, memory) := by rfl
   have fl := call.input_formed (reference := left) (by simp)
   have fr := call.input_formed (reference := right) (by simp)
   have fo := call.output_formed (reference := output) (by simp)

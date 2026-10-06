@@ -18,12 +18,7 @@ theorem not_initialized : InitializedUnaryContract (fun input => ~~~input)
   intro memory input output call
   let frame : Frame := ⟨memory.nextIdentity, [], [], []⟩
   have found : Extracted.program[scalarIndex]? = some scalarBody := by rfl
-  have kinds : scalarBody.localKinds = [] := by rfl
-  have values : scalarBody.locals = [] := by rfl
-  have arguments : scalarBody.aggregateArgs = [] := by rfl
-  have setup : enterFrame scalarBody (unaryArguments input output) memory = .ok (frame, memory) := by
-    simp [enterFrame, kinds, values, arguments, makeLocals, makeArgumentHomes, frame,
-      Bind.bind, Except.bind, Pure.pure, Except.pure]
+  have setup : enterFrame scalarBody (unaryArguments input output) memory = .ok (frame, memory) := by rfl
   have fl := call.input_formed (reference := input) (by simp)
   have fo := call.output_formed (reference := output) (by simp)
   have hl := fun index rest => call.input_field_instruction (reference := input) (by simp) index rest
@@ -53,7 +48,7 @@ theorem not_initialized : InitializedUnaryContract (fun input => ~~~input)
         · simp only [cil_code]; rfl
         · simp (config := { implicitDefEqProofs := false })
             [step, unaryArguments, checkedValue, numericValue, formValue, fl, fo, hl,
-              pureArity, scalars, CIL.step, CIL.FeatureProfile.evaluate, CIL.truth,
+              pureArity, scalars, CIL.step.eq_def, CIL.FeatureProfile.evaluate, CIL.truth,
               checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure, cil_code]
           try (exact ⟨rfl, rfl, rfl, rfl⟩)
           done
