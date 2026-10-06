@@ -52,7 +52,7 @@ theorem vector128_sum_checked (boundary : Nat) (entered current : Memory)
        | exact load 3 _ _
        | exact stored _ _ _
        | (simp (config := { implicitDefEqProofs := false })
-           [step, profile, cil_code, pureArity, scalars, CIL.step, CIL.Intrinsic.available,
+           [step, profile, cil_code, pureArity, scalars, CIL.step.eq_def, CIL.Intrinsic.available,
              CIL.Vector.intrinsic_add128, halfSum, checkedValue, numericValue,
              Bind.bind, Except.bind, Pure.pure, Except.pure]
           first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
@@ -122,7 +122,7 @@ theorem vector128_carry_checked (boundary : Nat) (entered current : Memory)
          | exact loadSum _ _
          | exact stored _ _ _
          | (simp (config := { implicitDefEqProofs := false })
-             [step, profile, cil_code, pureArity, scalars, CIL.step, CIL.Intrinsic.available,
+             [step, profile, cil_code, pureArity, scalars, CIL.step.eq_def, CIL.Intrinsic.available,
                CIL.Vector.intrinsic_lt128, halfCarry, checkedValue, numericValue,
                Bind.bind, Except.bind, Pure.pure, Except.pure]
             first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))

@@ -41,7 +41,7 @@ theorem borrow_run (a b c : BitVec 64) (borrow output : Reference) (frame : Fram
          · simp only [cil_code]; rfl
          · simp (config := { implicitDefEqProofs := false })
              [cil_code, step, checkedValue, numericValue, formValue, borrowFormed, outputFormed,
-               borrowStored, beforeRead, afterRead, pureArity, scalars, CIL.step, CIL.binary,
+               borrowStored, beforeRead, afterRead, pureArity, scalars, CIL.step.eq_def, CIL.binary,
                instruction, storeValue, referenceAt, resultWrite, borrowWrite, checkedAt,
                Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
            exact ⟨rfl, rfl, rfl, rfl⟩)
