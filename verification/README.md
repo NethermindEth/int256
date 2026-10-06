@@ -473,6 +473,11 @@ Representative before/after medians on Windows with Lean 4.34.1:
 These are paired module checks with dependencies already built, including
 process/import overhead; the first three also write `.olean` output. They are
 not full-pipeline timings and must not be summed into an end-to-end speedup.
+In a separate two-method scalar AND/OR pilot, run-local workspace reuse reduced
+OR checking from 53.7 to 23.7 seconds, rebuilding nine modules instead of 116.
+Both arithmetic and safety gates passed; a mismatched AND gate against the warm
+OR extraction was rejected. This single pilot excludes DLL build and extraction
+time and does not establish a full-matrix speedup.
 Affected public gates and fixtures were checked after each batch, and unchanged
 evidence was reused after comparing dependencies. Both arithmetic and safety
 evidence reconcile across all 256 production jobs; this is not a new fresh
