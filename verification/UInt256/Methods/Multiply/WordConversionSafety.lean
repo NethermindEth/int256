@@ -76,7 +76,7 @@ theorem conversion_invoke (memory : Memory) (argument : CIL.Value) (word : BitVe
       Bind.bind, Except.bind, Pure.pure, Except.pure]
   have finished : invoke Extracted.program fuel conversionIndex args memory =
       .ok (leaveFrame nextFrame constructed, [.scalar (.v256 (BitVec.ofNat 256 word.toNat))]) := by
-    simpa only [invoke, found, checkedArgs, setup, Except.mapError, Bind.bind, Except.bind] using ran
+    exact invoke_of_run found checkedArgs setup ran
   have growth := step_extends_allocations _ _ _ _ _ _ _ _ stepped
   have retained := leaveFrame_preserves_memory_below nextFrame constructed memory.nextIdentity (by
     intro id member

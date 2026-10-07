@@ -284,7 +284,7 @@ theorem full_invoke (contract : WordContract) (top : FullTopContract) (memory : 
     simp [productArgs, checkedValue, formValue, leftFormed, rightFormed, outputFormed, checkedAt,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   refine ⟨fuel, final, ?_, result⟩
-  simpa only [invoke, found, checked, setup, Except.mapError, Bind.bind, Except.bind] using ran
+  exact invoke_of_run found checked setup ran
 
 #print axioms full_invoke
 end UInt256Proof.Multiply.Safety

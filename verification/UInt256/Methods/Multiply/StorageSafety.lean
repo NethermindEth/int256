@@ -72,7 +72,7 @@ theorem store_product_contract (memory : Memory) (inputs : List Reference) (outp
     obtain ⟨fuel, result, returned, ran, rfl, rfl⟩ := started
     refine ⟨fuel, result, ?_, valid, outside, authority, value, readable⟩
     change invoke Extracted.program fuel productStoreIndex args memory = _
-    simpa only [invoke, found, checked, setup, Except.mapError, Bind.bind, Except.bind] using ran
+    exact invoke_of_run found checked setup ran
 
 #print axioms store_product_contract
 end UInt256Proof.Multiply.Safety

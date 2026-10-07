@@ -466,7 +466,7 @@ dependency applicability.
 
 ## Measured verification time
 
-The October 2026 consolidation reduced handwritten Lean files from 945 to 738.
+The October 2026 consolidation reduced handwritten Lean files from 945 to 736.
 Execution stages are grouped by operation and ISA; constructor proofs and shift
 stepping are shared. Checked instruction equations avoid repeatedly generating
 dispatcher simplification machinery. Contracts, semantics and proof budgets are
@@ -480,6 +480,7 @@ Representative before/after medians on Windows with Lean 4.34.1:
 | Scalar bitwise NOT | 7.52 | 1.98 |
 | SSE equality | 8.23 | 2.79 |
 | Right-shift execution | 17.20 | 9.79 |
+| 32-bit multiply conversion/contract modules, retained scalar extraction | 9.32 | 1.93 |
 
 These are paired module checks with dependencies already built, including
 process/import overhead; the first three also write `.olean` output. They are

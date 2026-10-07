@@ -146,7 +146,7 @@ theorem scalar_invoke (contract : WordContract) (memory : Memory) (input output 
     simp [scalarArgs, checkedValue, numericValue, formValue, inputFormed, outputFormed, checkedAt,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   refine ⟨fuel, final, ?_, result⟩
-  simpa only [invoke, found, checked, setup, Except.mapError, Bind.bind, Except.bind] using ran
+  exact invoke_of_run found checked setup ran
 
 #print axioms scalar_invoke
 end UInt256Proof.Multiply.Safety
