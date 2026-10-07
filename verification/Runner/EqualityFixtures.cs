@@ -30,6 +30,71 @@ internal static class EqualityFixtures
         result["scalarFirst"] = isStatic && Catalog.Text(parameters[0]!["type"]) == scalar;
         return result;
     }
+    internal static Dictionary<string, string> Substitutions(Catalog catalog, string method, JsonObject data)
+    {
+        var shape = Shape(catalog, method);
+        string left = data["leftBase"]!.ToString(), right = data["rightBase"]!.ToString();
+        const string common = "Extracted.program Extracted.entryIndex initial";
+        bool negate = shape["negate"]!.GetValue<bool>();
+        string arguments, contract, expectation;
+        if (Catalog.Text(shape["kind"]) == "scalar")
+        {
+            string width = shape["width"]!.ToString(), kind = Catalog.Text(shape["scalarKind"]);
+            string word = $"(BitVec.ofNat {width} {data["scalarBits"]})", scalar = $"(Scalar.{kind} {word})", argument = $".i{width} {word}";
+            bool first = shape["scalarFirst"]!.GetValue<bool>();
+            arguments = first ? $"[{argument}, .object {left}]" : $"[.object {left}, {argument}]";
+            contract = $"ScalarContract {common} {left} {scalar} {first.ToString().ToLowerInvariant()} {negate.ToString().ToLowerInvariant()}";
+            expectation = $"((decide (((byteValue initial {left}).toNat : Int) = Scalar.number {scalar})) != {negate.ToString().ToLowerInvariant()})";
+        }
+        else if (Catalog.Text(shape["kind"]) == "snapshot")
+        {
+            string bits = $"(BitVec.ofNat 256 {data["snapshot"]})";
+            arguments = $"[.object {left}, .v256 {bits}]";
+            contract = $"SnapshotContract {common} {left} {bits}";
+            expectation = $"decide (byteValue initial {left} = {bits})";
+        }
+        else
+        {
+            arguments = $"[.object {left}, .object {right}]";
+            contract = $"{(negate ? "InequalityContract" : "Contract")} {common} {left} {right}";
+            expectation = $"decide (byteValue initial {left} {(negate ? "≠" : "=")} byteValue initial {right})";
+        }
+        return new() { ["INITIAL"] = FixtureChecks.InitialBytes(data["initialBytes"]!.AsObject().Select(pair => KeyValuePair.Create(pair.Key, pair.Value!.ToString()))),
+            ["ARGUMENTS"] = arguments, ["CONTRACT"] = contract, ["EXPECTATION"] = expectation,
+            ["ACTUAL"] = data["actualResult"]!.GetValue<bool>() ? "1" : "0", ["EXPECTED"] = data["expectedResult"]!.GetValue<bool>().ToString().ToLowerInvariant() };
+    }
+    internal static string NativeSource(Catalog catalog, string method, JsonObject data)
+    {
+        var shape = Shape(catalog, method);
+        bool instance = shape["instance"]!.GetValue<bool>(); string expression, op = shape["negate"]!.GetValue<bool>() ? "!=" : "==";
+        if (Catalog.Text(shape["kind"]) == "scalar")
+        {
+            string scalar = $"unchecked(({Catalog.Text(shape["csharp"])}){data["scalarBits"]}UL)";
+            expression = instance ? $"left.Equals({scalar})" : shape["scalarFirst"]!.GetValue<bool>() ? $"{scalar} {op} left" : $"left {op} {scalar}";
+        }
+        else if (Catalog.Text(shape["kind"]) == "snapshot")
+        {
+            BigInteger value = BigInteger.Parse(data["snapshot"]!.ToString(), CultureInfo.InvariantCulture);
+            string words = string.Join(", ", Enumerable.Range(0, 4).Select(i => $"{(value >> (64 * i)) & ((BigInteger.One << 64) - 1)}UL"));
+            expression = $"left.Equals(new UInt256({words}))";
+        }
+        else expression = instance ? "left.Equals(in right)" : $"left {op} right";
+        string assignments = string.Join('\n', data["initialBytes"]!.AsObject().Select(pair => $"bytes[{pair.Key}] = {pair.Value};"));
+        return $$"""
+            using System;
+            using System.Runtime.CompilerServices;
+            using Nethermind.Int256;
+            byte[] bytes = new byte[128];
+            {{assignments}}
+            byte[] original = (byte[])bytes.Clone();
+            ref UInt256 left = ref Unsafe.As<byte, UInt256>(ref bytes[{{data["leftBase"]}}]);
+            ref UInt256 right = ref Unsafe.As<byte, UInt256>(ref bytes[{{data["rightBase"]}}]);
+            bool result = {{expression}};
+            Console.WriteLine($"Native equality witness: {result}; Vector256={System.Runtime.Intrinsics.Vector256.IsHardwareAccelerated}; SSE41={System.Runtime.Intrinsics.X86.Sse41.IsSupported}");
+            for (int i = 0; i < bytes.Length; ++i) if (bytes[i] != original[i]) return 2;
+            return result == {{data["actualResult"]!.GetValue<bool>().ToString().ToLowerInvariant()}} ? 0 : 1;
+            """ + "\n";
+    }
     private static JsonObject Negatives(Workspace workspace) => JsonNode.Parse(File.ReadAllText(Path.Combine(workspace.Verification, "Tests/Fixtures/Equality/Witnesses.json")))!["negativeCases"]!.AsObject();
     internal static bool Applicable(Workspace workspace, string name, string method, string profile)
     {

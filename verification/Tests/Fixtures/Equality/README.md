@@ -3,9 +3,9 @@ Equality fixtures reuse the production contracts and handwritten execution proof
 Run from the repository root:
 
 ```text
-python verification/Tests/Fixtures/Equality/checks.py --method EqUInt256UInt256 --profile scalar
-python verification/Tests/Fixtures/Equality/checks.py --method EqualsUInt256Value --profile x64-sse41
-python verification/Tests/Fixtures/Equality/checks.py --method EqUInt256Int32 --profile x64-vector256
+dotnet run --project verification/Runner.Tests -c Release -- equality-fixtures --method EqUInt256UInt256 --profile scalar
+dotnet run --project verification/Runner.Tests -c Release -- equality-fixtures --method EqualsUInt256Value --profile x64-sse41
+dotnet run --project verification/Runner.Tests -c Release -- equality-fixtures --method EqUInt256Int32 --profile x64-vector256
 ```
 
 Each run establishes fresh production and fixture baselines, then checks applicable cases. Positive cases rename and extract a helper, replace scalar reductions with limb comparisons, or use equivalent vector reductions. They must change the extracted program while retaining identical handwritten proof hashes.

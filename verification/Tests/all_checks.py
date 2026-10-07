@@ -128,7 +128,7 @@ def regression_plan():
             or multiply_profiles != [("Multiply", profile) for profile in MULTIPLY_PROFILES]):
         raise RuntimeError("Incomplete equality or multiplication regression selection")
     for method, profile in equal_profiles:
-        add(f"equality-{method}-{profile}", "Tests/Fixtures/Equality/checks.py",
+        add(f"equality-{method}-{profile}", "Runner.Tests/Verification.Tests.csproj", "equality-fixtures",
             "--method", method, "--profile", profile, "--workspace")
     for _, profile in multiply_profiles:
         add("multiply-" + profile, "Runner.Tests/Verification.Tests.csproj", "multiply-fixtures",

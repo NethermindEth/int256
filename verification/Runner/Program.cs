@@ -81,15 +81,6 @@ internal static class Program
                 object result;
                 switch (command)
                 {
-                    case "equality-data":
-                        Workspace equalityWorkspace = new(root);
-                        result = Catalog.Text(input["kind"]) switch
-                        {
-                            "shape" => EqualityFixtures.Shape(catalog, Catalog.Text(input["method"])),
-                            "applicable" => (object)EqualityFixtures.Applicable(equalityWorkspace, Catalog.Text(input["case"]), Catalog.Text(input["method"]), Catalog.Text(input["profile"])),
-                            "witness" => EqualityFixtures.Witness(equalityWorkspace, Catalog.Text(input["case"]), Catalog.Text(input["method"])),
-                            _ => throw new ArgumentException("Unknown equality fixture request")
-                        }; break;
                     case "initial-bytes":
                         result = FixtureChecks.InitialBytes(input.AsArray().Select(pair => new KeyValuePair<string, string>(Catalog.Text(pair![0]), Catalog.Text(pair[1])))); break;
                     case "isolated-run":

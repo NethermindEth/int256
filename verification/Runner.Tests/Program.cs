@@ -10,6 +10,11 @@ internal static class Program
 {
     private static int Main(string[] args)
     {
+        if (args.Length > 0 && args[0] == "equality-fixtures")
+        {
+            EqualityFixtureChecks.Run(new Workspace(Directory.GetCurrentDirectory()), args[1..]);
+            return 0;
+        }
         if (args.Length > 0 && args[0] == "multiply-fixtures")
         {
             MultiplyFixtureChecks.Run(new Workspace(Directory.GetCurrentDirectory()), args[1..]);
@@ -222,6 +227,7 @@ internal static class Program
         BinaryFixtureChecks.Register(Check);
         ShiftFixtureChecks.Register(Check);
         MultiplyFixtureChecks.Register(Check);
+        EqualityFixtureChecks.Register(Check);
         RobustnessChecks.Register(Check);
         NativeSimdChecks.Register(Check);
         GateBindingChecks.Register(Check);

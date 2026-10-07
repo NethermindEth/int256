@@ -100,6 +100,9 @@ class PlanChecks(unittest.TestCase):
                     if entry.get("verification", {}).get("fixtureGroup") == "Equality"]
         self.assertEqual({name for name in by_id if name.startswith("equality-")},
                          {f"equality-{method}-{profile}" for method, profile in checks.coverage_plan(equality)})
+        for name, job in by_id.items():
+            if name.startswith("equality-"):
+                self.assertEqual(job.commands[0][:2], ("verification/Runner.Tests/Verification.Tests.csproj", "equality-fixtures"))
         self.assertEqual({name for name in by_id if name.startswith("multiply-")},
                          {"multiply-" + profile for profile in checks.MULTIPLY_PROFILES})
         for profile in checks.MULTIPLY_PROFILES:
