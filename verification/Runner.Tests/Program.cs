@@ -10,6 +10,11 @@ internal static class Program
 {
     private static int Main(string[] args)
     {
+        if (args is ["profile-extractor"])
+        {
+            ProfileExtractorChecks.Run(new Workspace(Directory.GetCurrentDirectory()));
+            return 0;
+        }
         if (args.Length > 0 && args[0] == "equality-fixtures")
         {
             EqualityFixtureChecks.Run(new Workspace(Directory.GetCurrentDirectory()), args[1..]);
@@ -228,6 +233,7 @@ internal static class Program
         ShiftFixtureChecks.Register(Check);
         MultiplyFixtureChecks.Register(Check);
         EqualityFixtureChecks.Register(Check);
+        ProfileExtractorChecks.Register(Check);
         RobustnessChecks.Register(Check);
         NativeSimdChecks.Register(Check);
         GateBindingChecks.Register(Check);

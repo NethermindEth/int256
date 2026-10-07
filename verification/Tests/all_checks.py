@@ -89,7 +89,7 @@ def regression_plan():
             add(f"safety-{method}-{profile}", "Runner/Verification.csproj", "verify", "--method", method, "--profile", profile, "--safety")
     for method in ("CompareToUInt256Ref", "CompareToUInt256Value"):
         add(f"safety-{method}-scalar", "Runner/Verification.csproj", "verify", "--method", method, "--profile", "scalar", "--safety")
-    add("profile-extractor", "Tests/profile_extractor_checks.py")
+    add("profile-extractor", "Runner.Tests/Verification.Tests.csproj", "profile-extractor")
     add("csharp-runner", "Runner.Tests/Verification.Tests.csproj")
     for name in ("change", "prepared", "method"):
         add("python-" + name, "Tests/" + name.replace("-", "_") + "_checks.py")
