@@ -120,10 +120,11 @@ class PlanChecks(unittest.TestCase):
         for operation in operations:
             for profile in ("scalar", "x64-vector256"):
                 command = by_id[f"operation-{operation}-{profile}"].commands[0]
-                runner = ("Compare/negative_checks.py" if operation == "Compare" else
-                          "Bitwise/checks.py" if operation == "Bitwise" else
-                          "Bitwise/operator_checks.py" if operation in operations[2:6] else
-                          "Shift/negative_checks.py")
+                if operation in ("Compare", "Bitwise"):
+                    self.assertEqual(command, ("verification/Runner.Tests/Verification.Tests.csproj",
+                        "compare-fixtures" if operation == "Compare" else "bitwise-fixtures", "--profile", profile, "--workspace"))
+                    continue
+                runner = "Bitwise/operator_checks.py" if operation in operations[2:6] else "Shift/negative_checks.py"
                 self.assertEqual(command[0], "verification/Tests/Fixtures/" + runner)
                 if operation not in ("Compare", "Bitwise"):
                     self.assertEqual(command[1:3], ("--method", operation))

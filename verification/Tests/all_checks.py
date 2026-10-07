@@ -108,11 +108,13 @@ def regression_plan():
     operations = ("Compare", "Bitwise", "OperatorXor", "OperatorAnd", "OperatorOr", "OperatorNot",
                   "Lsh", "Rsh", "LeftShift", "RightShift", "OperatorLsh", "OperatorRsh")
     for operation in operations:
-        script = ("Compare/negative_checks.py" if operation == "Compare" else
-                  "Bitwise/checks.py" if operation == "Bitwise" else
-                  "Bitwise/operator_checks.py" if operation.startswith("Operator") and operation[8:] in
-                  ("Xor", "And", "Or", "Not") else "Shift/negative_checks.py")
-        arguments = () if operation in ("Compare", "Bitwise") else ("--method", operation)
+        if operation in ("Compare", "Bitwise"):
+            for profile in ("scalar", "x64-vector256"):
+                add(f"operation-{operation}-{profile}", "Runner.Tests/Verification.Tests.csproj",
+                    "compare-fixtures" if operation == "Compare" else "bitwise-fixtures", "--profile", profile, "--workspace")
+            continue
+        script = "Bitwise/operator_checks.py" if operation in ("OperatorXor", "OperatorAnd", "OperatorOr", "OperatorNot") else "Shift/negative_checks.py"
+        arguments = ("--method", operation)
         if script == "Shift/negative_checks.py":
             arguments += ("--safety",)
         for profile in ("scalar", "x64-vector256"):
