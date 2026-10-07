@@ -9,8 +9,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from common import PROFILE_NAMES, ROOT, run
-from methods import method_manifest
+from common import PROFILE_NAMES, ROOT, run, method_manifest
 from support import isolated_run, initial_bytes_expression, mutation_proof, native_witness, require_diagnostic_rejection, selected_fixture_baseline, template_refutation
 
 OPERATIONS = {

@@ -14,8 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import coverage_checks
 import verify_all
-from common import audit_module
-from methods import api_entries, method_manifest
+from common import audit_module, api_entries, method_manifest
 
 
 class OperationCoverageChecks(unittest.TestCase):

@@ -9,8 +9,7 @@ import xml.etree.ElementTree as ET
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from common import PROFILE_NAMES, ROOT, VERIFY, expected_profile, run
-from methods import method_manifest, method_names
+from common import PROFILE_NAMES, ROOT, VERIFY, expected_profile, run, method_manifest, method_names
 from support import (isolated_run, initial_bytes_expression, mutation_proof, native_witness,
                      require_diagnostic_rejection, selected_fixture_baseline, template_refutation)
 

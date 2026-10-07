@@ -38,9 +38,10 @@ internal sealed class Catalog(string verificationDirectory)
         : throw new InvalidOperationException("Expected a string array");
     private static JsonArray Array(IEnumerable<string> values) => new(values.Select(x => (JsonNode?)JsonValue.Create(x)).ToArray());
 
-    internal Dictionary<string, JsonObject> Entries()
+    internal Dictionary<string, JsonObject> Entries() => Entries(Read("api-coverage.json"));
+
+    internal static Dictionary<string, JsonObject> Entries(JsonObject document)
     {
-        JsonObject document = Read("api-coverage.json");
         if (document["schemaVersion"]?.GetValue<int>() != 1)
             throw new InvalidOperationException("Unsupported API coverage manifest schema");
         Dictionary<string, JsonObject> entries = [];
@@ -59,6 +60,12 @@ internal sealed class Catalog(string verificationDirectory)
         JsonObject groups = document.ContainsKey("fixtureGroups")
             ? document["fixtureGroups"]?.AsObject() ?? throw new InvalidOperationException("Invalid shared fixture groups")
             : [];
+        ResolveFixtureGroups(entries.Values, groups);
+        return entries;
+    }
+
+    internal static void ResolveFixtureGroups(IEnumerable<JsonObject> entries, JsonObject groups)
+    {
         foreach ((string group, JsonNode? value) in groups)
         {
             JsonObject data = value?.AsObject() ?? throw new InvalidOperationException("Invalid shared fixture groups");
@@ -69,7 +76,7 @@ internal sealed class Catalog(string verificationDirectory)
                 || Path.GetFileName(source) != source || !source.EndsWith(".cs", StringComparison.Ordinal))
                 throw new InvalidOperationException($"Invalid shared fixture group: {group}");
         }
-        foreach (JsonObject entry in entries.Values)
+        foreach (JsonObject entry in entries)
         {
             if (entry["verification"] is not JsonObject gate || gate["fixtureGroup"] is not JsonValue groupValue
                 || !groupValue.TryGetValue(out string? group) || !groups.TryGetPropertyValue(group, out JsonNode? data)) continue;
@@ -80,7 +87,6 @@ internal sealed class Catalog(string verificationDirectory)
             foreach (string item in Strings(data["cases"])) sources[item] = Text(data["source"]);
             gate["fixtureSources"] = sources;
         }
-        return entries;
     }
 
     internal string[] MethodNames => [.. Legacy, .. Entries().Keys];
@@ -120,6 +126,12 @@ internal sealed class Catalog(string verificationDirectory)
         if (Legacy.Contains(name)) return Read($"{name.ToLowerInvariant()}.json");
         if (!Entries().TryGetValue(name, out JsonObject? entry))
             throw new ArgumentException($"Unknown verification method: {name}");
+        return Manifest(entry);
+    }
+
+    internal JsonObject Manifest(JsonObject entry)
+    {
+        string name = Text(entry["id"]);
         JsonObject gate = entry["verification"]?.AsObject()
             ?? throw new InvalidOperationException($"Selected API proof is not implemented yet: {name}");
         string coverage = Text(gate["profileCoverage"]);
@@ -139,7 +151,9 @@ internal sealed class Catalog(string verificationDirectory)
         if (gate["familyCoverage"] is JsonNode familyNode)
         {
             JsonObject family = familyNode.AsObject();
-            string[] expected = Text(family["kind"]) switch
+            if (family["kind"] is not JsonValue familyKind || !familyKind.TryGetValue(out string? kind))
+                throw new InvalidOperationException($"Unbound feature-family contract gate: {name}");
+            string[] expected = kind switch
             {
                 "vector256-storage" => ["scalar", "x64-vector256"],
                 "vector-reduction" => ["scalar", "x64-sse41", "x64-vector256"],
@@ -187,6 +201,44 @@ internal sealed class Catalog(string verificationDirectory)
         foreach (string method in MethodNames) methods[method] = Manifest(method);
         foreach (string profile in ProfileNames) profiles[profile] = Profile(profile);
         return new JsonObject { ["methods"] = methods, ["profiles"] = profiles };
+    }
+
+    internal JsonArray NativeLimitations(IEnumerable<string> methods)
+    {
+        if (!methods.Any(method => !Legacy.Contains(method)
+            && Manifest(method)["verification"]?["familyCoverage"]?["kind"]?.GetValue<string>() == "multiply-dispatch-storage"))
+            return [];
+        return JsonNode.Parse("""
+            [{"kind":"runtime-jit-struct-copy","status":"observed-failure",
+              "runtime":".NET 10.0.12","architecture":"Windows x64",
+              "currentMain":{"commit":"d90dbf43be153cc7ba7f49bb271e0b7e56a81891",
+                "standaloneCopy":"fails","multiplicationDefaultTiered":"fails","multiplicationFullyOptimized":"passes"},
+              "condition":"Hardware intrinsics disabled; partially overlapping input/output",
+              "witness":"verification/Tests/NativeMultiplyWitness/Program.cs",
+              "minimalWitness":"verification/Tests/NativeStructCopyWitness/Program.cs",
+              "scope":"The CIL proof does not establish native partial-overlap correctness",
+              "notes":"verification/UInt256/Methods/Multiply/README.md"}]
+            """)!.AsArray();
+    }
+
+    internal static void CheckCallingConvention(JsonObject actual, JsonObject expected)
+    {
+        static bool RequiredFlag(JsonNode? node) => node is JsonValue value && value.TryGetValue(out bool flag)
+            ? flag : throw new InvalidOperationException("Expected a Boolean calling convention field");
+        bool isStatic = RequiredFlag(expected["static"]);
+        if (RequiredFlag(actual["isStatic"]) != isStatic || Text(actual["returnType"]) != Text(expected["returns"]))
+            throw new InvalidOperationException("Extracted entry static/return convention differs from its selected contract");
+        JsonArray parameters = actual["parameters"]?.AsArray() ?? [];
+        JsonArray selected = expected["parameters"]!.AsArray();
+        if (parameters.Count != selected.Count)
+            throw new InvalidOperationException("Extracted entry parameter count changed");
+        for (int i = 0; i < parameters.Count; i++)
+            if (Text(parameters[i]!["type"]) != Text(selected[i]!["type"])
+                || RequiredFlag(parameters[i]!["IsIn"]) != RequiredFlag(selected[i]!["isIn"])
+                || RequiredFlag(parameters[i]!["IsOut"]) != RequiredFlag(selected[i]!["isOut"]))
+                throw new InvalidOperationException("Extracted entry parameter type/direction changed");
+        if (RequiredFlag(actual["hasThis"]) != !isStatic)
+            throw new InvalidOperationException("Extracted implicit receiver convention changed");
     }
 
     internal JsonObject Plan(IReadOnlyList<string> methods)

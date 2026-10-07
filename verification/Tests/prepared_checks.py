@@ -4,6 +4,7 @@ import copy
 import json
 from pathlib import Path
 import re
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -11,14 +12,41 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import verify
+import common
 from safety_gate import representative_safety_gate, OPERATOR_DESCRIPTORS, PRIMITIVE_COMPARISONS, operator_safety_module, selected_safety_module
 from common import PROFILES, MULTIPLY_PROFILES, VERIFY, expected_profile, sha, source_files
 
 
 class PreparedBuildChecks(unittest.TestCase):
+    def test_runner_bridge_reuses_only_successful_matching_inputs(self):
+        revision = ["original"]
+        fail = [False]
+        commands = []
+        def execute(command, **kwargs):
+            commands.append(command)
+            return subprocess.CompletedProcess(command, 1 if fail[0] else 0, "result", "rejected")
+        with patch.object(common, "_runner_inputs", None), patch.object(common, "_runner_outputs", {}), \
+             patch.object(common, "sha", side_effect=lambda _: revision[0]), \
+             patch.object(common.subprocess, "run", side_effect=execute), \
+             patch.object(Path, "is_file", return_value=True):
+            request = lambda payload: common._runner_request(["gate", "--entry-json"], payload)
+            self.assertEqual(request({"test": 1}), "result")
+            self.assertEqual(len(commands), 2)  # Build and first invocation.
+            request({"test": 1})
+            self.assertEqual(len(commands), 2)
+            request({"test": 2})
+            self.assertEqual(len(commands), 3)
+            revision[0] = "changed source"
+            request({"test": 1})
+            self.assertEqual(len(commands), 5)
+            fail[0] = True
+            for _ in range(2):
+                with self.assertRaisesRegex(RuntimeError, "rejected"):
+                    request({"test": 3})
+            self.assertEqual(len(commands), 7)
+
     def test_all_production_gate_imports_resolve(self):
-        from common import audit_module
-        from methods import api_entries, LEGACY, method_names
+        from common import audit_module, api_entries, LEGACY, method_names
         from safety_gate import safety_gate
         from verify_all import coverage_plan
 

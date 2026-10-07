@@ -8,9 +8,7 @@ import sys
 import tempfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from common import ROOT, VERIFY, generated_directory, run, source_files
-from common import audit_module
-from methods import api_entries
+from common import ROOT, VERIFY, generated_directory, run, source_files, audit_module, api_entries
 from support import isolated_run, reject_resource_failure
 from verify import main as verify_one, source_inputs, check_proof_snapshot
 

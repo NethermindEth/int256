@@ -9,8 +9,7 @@ import sys
 import tempfile
 from urllib.request import Request, urlopen
 
-from common import PROFILE_DIRECTORY, PROFILE_NAMES, PROFILES, ROOT, VERIFY, expected_profile, run
-from methods import LEGACY, check_calling_convention, method_manifest, method_names
+from common import PROFILE_DIRECTORY, PROFILE_NAMES, PROFILES, ROOT, VERIFY, expected_profile, run, LEGACY, check_calling_convention, method_manifest, method_names
 
 
 def github_json(repository, path):

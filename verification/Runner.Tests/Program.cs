@@ -104,6 +104,52 @@ internal static class Program
             Edit(Path.Combine(directory, "profiles/x64-bmi2.json"), profile => profile["vector256Accelerated"] = null);
             Reject(() => catalog.Plan(catalog.MethodNames));
         });
+        Check("extracted calling convention binds every ABI field", (catalog, _) =>
+        {
+            foreach (string method in catalog.Entries().Keys)
+            {
+                JsonObject expected = catalog.Manifest(method)["callingConvention"]!.AsObject();
+                JsonArray parameters = [];
+                foreach (JsonNode? parameter in expected["parameters"]!.AsArray())
+                    parameters.Add(new JsonObject { ["Name"] = "renamed", ["type"] = parameter!["type"]!.DeepClone(),
+                        ["IsIn"] = parameter["isIn"]!.DeepClone(), ["IsOut"] = parameter["isOut"]!.DeepClone() });
+                JsonObject actual = new() { ["isStatic"] = expected["static"]!.DeepClone(),
+                    ["hasThis"] = !expected["static"]!.GetValue<bool>(), ["returnType"] = expected["returns"]!.DeepClone(),
+                    ["parameters"] = parameters };
+                Catalog.CheckCallingConvention(actual, expected);
+                foreach (string field in new[] { "isStatic", "hasThis", "returnType", "parameters" })
+                {
+                    JsonObject changed = actual.DeepClone().AsObject();
+                    changed[field] = field == "parameters" ? new JsonArray() : field == "returnType"
+                        ? JsonValue.Create("Wrong") : JsonValue.Create(!actual[field]!.GetValue<bool>());
+                    Reject(() => Catalog.CheckCallingConvention(changed, expected));
+                    changed.Remove(field);
+                    Reject(() => Catalog.CheckCallingConvention(changed, expected));
+                }
+                foreach (string field in new[] { "type", "IsIn", "IsOut" })
+                {
+                    JsonObject changed = actual.DeepClone().AsObject();
+                    changed["parameters"]![0]![field] = field == "type" ? JsonValue.Create("Wrong")
+                        : JsonValue.Create(!actual["parameters"]![0]![field]!.GetValue<bool>());
+                    Reject(() => Catalog.CheckCallingConvention(changed, expected));
+                    changed["parameters"]![0]!.AsObject().Remove(field);
+                    Reject(() => Catalog.CheckCallingConvention(changed, expected));
+                }
+                JsonObject nonBoolean = actual.DeepClone().AsObject();
+                nonBoolean["isStatic"] = 1;
+                Reject(() => Catalog.CheckCallingConvention(nonBoolean, expected));
+            }
+        });
+        Check("native limitation remains scoped to multiplication", (catalog, _) =>
+        {
+            Require(catalog.NativeLimitations(["Add", "Subtract", "Lsh"]).Count == 0, "Unrelated limitation");
+            JsonArray limitations = catalog.NativeLimitations(["Multiply", "MultiplyInstance"]);
+            Require(limitations.Count == 1, "Missing or duplicate native limitation");
+            Require(Catalog.Text(limitations[0]!["status"]) == "observed-failure", "Failure disappeared");
+            Require(Catalog.Text(limitations[0]!["currentMain"]!["multiplicationDefaultTiered"]) == "fails", "Tiered failure disappeared");
+            Require(Catalog.Text(limitations[0]!["scope"]) == "The CIL proof does not establish native partial-overlap correctness", "Scope weakened");
+            Reject(() => catalog.NativeLimitations(["Unknown"]));
+        });
         GateTests.Register(Check);
         Console.WriteLine($"Passed {passed} C# verification tests.");
         return 0;

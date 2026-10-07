@@ -191,7 +191,9 @@ dotnet run --project verification/Runner.Tests -c Release
 ```
 
 The C# runner also provides `catalog`, `manifest <method>` and `gate <method>`.
-Python orchestration builds and calls this generator through `common.py`.
+Python orchestration builds and calls the C# catalog, metadata checks and gate
+generator through `common.py`; successful responses are reused only while their
+source inputs and request match.
 It does not yet
 run proofs or produce verification reports.
 

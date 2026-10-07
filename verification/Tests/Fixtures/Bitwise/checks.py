@@ -9,8 +9,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from common import PROFILE_NAMES, ROOT, expected_profile, VERIFY, run
-from methods import method_manifest
+from common import PROFILE_NAMES, ROOT, expected_profile, VERIFY, run, method_manifest
 from support import isolated_run, require_diagnostic_rejection, initial_bytes_expression, template_refutation, mutation_proof, selected_fixture_baseline, native_witness
 
 METHOD = "Xor"
