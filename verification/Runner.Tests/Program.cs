@@ -55,6 +55,11 @@ internal static class Program
             ReportingChecks.Run(new Workspace(Directory.GetCurrentDirectory()), args[1..]);
             return 0;
         }
+        if (args is ["add-negative"])
+        {
+            AddNegativeChecks.Run(new Workspace(Directory.GetCurrentDirectory()));
+            return 0;
+        }
         if (args is ["subtract-negative"])
         {
             SubtractNegativeChecks.Run(new Workspace(Directory.GetCurrentDirectory()));

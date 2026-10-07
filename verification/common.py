@@ -175,44 +175,10 @@ def require_changed_method(artifact, baseline, signature):
     fixture_check("changed-method", artifact=artifact, baseline=baseline, signature=signature)
 
 
-def require_semantic_rejection(output, module):
-    # Requires an independently checked full-contract refutation.
-    rejection_check("semantic", output, module)
-
-
 def selected_fixture_baseline(method, profile, positive=None, *, safety=False):
     command, report, baseline = json.loads(_runner_request(["fixture-baseline", "--json"],
         {"method": method, "profile": profile, "positive": positive, "safety": safety}, cache=False, show_output=True))
     return command, Path(report), baseline
-
-
-def build_fixture(destination, name, method="Add"):
-    return Path(json.loads(_runner_request(["legacy-fixture", "--json"],
-        {"destination": str(Path(destination).resolve()), "case": name, "method": method, "extract": False}, cache=False, show_output=True)))
-
-
-def build_extract(destination, name, method="Add"):
-    assembly, generated, output = json.loads(_runner_request(["legacy-fixture", "--json"],
-        {"destination": str(Path(destination).resolve()), "case": name, "method": method, "extract": True}, cache=False, show_output=True))
-    return Path(assembly), Path(generated), output
-
-
-def require_production_report(method="Add"):
-    return Path(json.loads(_runner_request(["production-report", "--json"], {"method": method}, cache=False)))
-
-
-def model_refutation(proof, lake, initial, left, right, out, address, actual, expected, method="Add"):
-    _runner_request(["model-refutation", "--json"],
-        {"proof": str(Path(proof).resolve()), "lake": str(lake), "initial": initial, "method": method,
-         "left": str(left), "right": str(right), "out": str(out), "address": str(address), "actual": str(actual), "expected": str(expected)},
-        cache=False, show_output=True)
-    print(f"PASS: kernel refutes the full contract at byte {address}: actual {actual}, expected {expected}")
-
-
-def native_witness(destination, assembly, source):
-    _runner_request(["native-witness", "--json"],
-        {"destination": str(Path(destination).resolve()), "assembly": str(Path(assembly).resolve()), "source": source},
-        cache=False, show_output=True)
 
 
 def mutation_proof(work, project, case, method, profile, baseline, intended=None):

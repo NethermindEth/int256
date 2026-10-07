@@ -149,7 +149,7 @@ class PlanChecks(unittest.TestCase):
                 self.assertNotIn("--case", job.commands[0])
 
     def test_legacy_baseline_precedes_complete_negative_runner(self):
-        for method, negative in (("Add", ("verification/Tests/negative_checks.py",)), ("Subtract", ("verification/Runner.Tests/Verification.Tests.csproj", "subtract-negative"))):
+        for method, negative in (("Add", ("verification/Runner.Tests/Verification.Tests.csproj", "add-negative")), ("Subtract", ("verification/Runner.Tests/Verification.Tests.csproj", "subtract-negative"))):
             job = next(job for job in checks.regression_plan() if job.id == "legacy-" + method)
             self.assertEqual(job.commands, (
                 ("verification/Runner/Verification.csproj", "verify", "--method", method, "--profile", "scalar"),

@@ -91,25 +91,6 @@ internal static class Program
                         var baseline = FixtureChecks.SelectedBaseline(new Workspace(root), Catalog.Text(input["method"]), Catalog.Text(input["profile"]),
                             input["positive"]?.GetValue<string>(), input["safety"]!.GetValue<bool>());
                         result = new object[] { baseline.Command, baseline.ReportPath, baseline.Baseline }; break;
-                    case "legacy-fixture":
-                        Workspace fixtureWorkspace = new(root);
-                        string fixtureDestination = Catalog.Text(input["destination"]), name = Catalog.Text(input["case"]), method = Catalog.Text(input["method"]);
-                        if (input["extract"]!.GetValue<bool>())
-                        {
-                            var extracted = FixtureChecks.BuildExtract(fixtureWorkspace, fixtureDestination, name, method);
-                            result = new[] { extracted.Assembly, extracted.Generated, extracted.Output };
-                        }
-                        else result = FixtureChecks.BuildFixture(fixtureWorkspace, fixtureDestination, name, method);
-                        break;
-                    case "production-report": result = FixtureChecks.RequireProductionReport(new Workspace(root), Catalog.Text(input["method"])); break;
-                    case "model-refutation":
-                        FixtureChecks.ModelRefutation(new Workspace(root), Catalog.Text(input["proof"]), Catalog.Text(input["lake"]), Catalog.Text(input["initial"]),
-                            Catalog.Text(input["left"]), Catalog.Text(input["right"]), Catalog.Text(input["out"]), Catalog.Text(input["address"]),
-                            Catalog.Text(input["actual"]), Catalog.Text(input["expected"]), Catalog.Text(input["method"]));
-                        result = true; break;
-                    case "native-witness":
-                        FixtureChecks.NativeWitness(new Workspace(root), Catalog.Text(input["destination"]), Catalog.Text(input["assembly"]), Catalog.Text(input["source"]));
-                        result = true; break;
                     case "mutation":
                         var mutation = FixtureChecks.Mutation(new Workspace(root), Catalog.Text(input["work"]), Catalog.Text(input["project"]), Catalog.Text(input["case"]),
                             Catalog.Text(input["method"]), Catalog.Text(input["profile"]), input["baseline"]!.AsObject(), input["intended"]?.GetValue<string>());
