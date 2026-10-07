@@ -9,7 +9,7 @@ import tempfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from common import BUILD_DIRECTORIES, PROFILE_DIRECTORY, PROFILES, ROOT, VERIFY, expected_profile, generated_directory, run, sha, source_files, check_calling_convention, method_manifest
+from common import verifier_command, BUILD_DIRECTORIES, PROFILE_DIRECTORY, PROFILES, ROOT, VERIFY, expected_profile, generated_directory, run, sha, source_files, check_calling_convention, method_manifest
 from verify import build_artifact, check_proof_snapshot, safety_gate, source_inputs
 from common import theorem_audits, rejection_check
 
@@ -52,7 +52,7 @@ def require_changed_method(artifact, baseline, signature):
 
 
 def selected_fixture_baseline(method, profile, positive=None, *, safety=False):
-    public = [sys.executable, str(VERIFY / "verify.py"), "--method", method, "--profile", profile]
+    public = [*verifier_command(ROOT), "--method", method, "--profile", profile]
     directory = generated_directory(method, profile)
     if safety:
         public.append("--safety")

@@ -7,7 +7,7 @@ import tempfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from common import ROOT, VERIFY, run, sha
+from common import verifier_command, ROOT, VERIFY, run, sha
 from support import (build_extract, build_fixture, copy_source, model_refutation,
                      native_witness, require_production_report, require_semantic_rejection)
 
@@ -60,7 +60,7 @@ def main():
         # its new build/extraction, fail on the changed code, and remove the old report.
         for name in ("Extracted.lean", "artifact.json", "report.json"):
             shutil.copy2(VERIFY / "generated" / name, generated / name)
-        output = run([sys.executable, str(proof / "verify.py"), "--fixture", "WrongCarry"], destination, succeeds=False)
+        output = run([*verifier_command(proof.parent), "--fixture", "WrongCarry"], destination, succeeds=False)
         require_semantic_rejection(output, "UInt256/Methods/Add/Entry.lean")
         if "Verification failed:" not in output:
             raise RuntimeError("Stale regression did not reach fresh proof checking")

@@ -8,9 +8,9 @@ import sys
 import tempfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from common import ROOT, VERIFY, generated_directory, run, source_files, audit_module, api_entries
+from common import verifier_command, ROOT, VERIFY, generated_directory, run, source_files, audit_module, api_entries
 from support import isolated_run, reject_resource_failure
-from verify import main as verify_one, source_inputs, check_proof_snapshot
+from verify import source_inputs, check_proof_snapshot
 
 
 def check_safety_bindings(proof, lake):
@@ -51,7 +51,7 @@ def check_safety_bindings(proof, lake):
 
 
 def check_workspace():
-    verify_one(["--method", "Lsh", "--safety"])
+    run([*verifier_command(), "--method", "Lsh", "--safety"], ROOT)
     inputs = source_inputs()
     lake = shutil.which("lake")
     with tempfile.TemporaryDirectory(prefix="int256-gate-binding-proof-") as temporary:

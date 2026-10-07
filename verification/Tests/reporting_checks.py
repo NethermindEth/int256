@@ -9,7 +9,7 @@ import tempfile
 import xml.etree.ElementTree as ET
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from common import ROOT, PROFILES, run, sha
+from common import verifier_command, ROOT, PROFILES, run, sha
 from support import copy_source, require_semantic_rejection
 from simd_checks import positive_applicable, target_changed, applicable, witness
 from common import theorem_audits
@@ -29,7 +29,7 @@ def legacy(method):
 
 
 def checked_fixture(destination, proof, method, profile, case):
-    run([sys.executable, str(proof / "verify.py"), "--method", method,
+    run([*verifier_command(proof.parent), "--method", method,
          "--profile", profile, "--fixture", case], destination)
     report = json.loads(report_path(proof, method, profile).read_text(encoding="utf-8"))
     if (report["source"]["kind"] != "fixture" or report["source"].get("case") != case
@@ -116,7 +116,7 @@ def negative(destination, proof, lake, method, profile, case, baseline):
         initial = (f"if address < 32 then BitVec.ofNat 8 (({a} : List Nat)[address / 8]! / 256^(address % 8)) "
                    f"else if 64 ≤ address ∧ address < 96 then BitVec.ofNat 8 (({b} : List Nat)[(address-64) / 8]! / 256^(address % 8)) else 0")
         refute(proof,lake,method,initial,out,address,actual,expected)
-    output = run([sys.executable,str(proof/"verify.py"),"--method",method,"--profile",profile,
+    output = run([*verifier_command(proof.parent),"--method",method,"--profile",profile,
                   "--fixture",case], destination,succeeds=False)
     entry = "AddEntry" if method == "AddOverflow" else "SubtractEntry"
     require_semantic_rejection(output,f"UInt256/Methods/Reporting/{entry}.lean")
@@ -142,7 +142,7 @@ def main():
         proof=copy_source(destination)
         for method in methods:
             for profile in profiles:
-                run([sys.executable,str(proof/"verify.py"),"--method",method,"--profile",profile],destination)
+                run([*verifier_command(proof.parent),"--method",method,"--profile",profile],destination)
                 production=json.loads(report_path(proof,method,profile).read_text(encoding="utf-8"))
                 if production["source"]["kind"] != "production": raise RuntimeError("Fresh production baseline required")
                 baseline=checked_fixture(destination,proof,method,profile,"Baseline")

@@ -70,6 +70,13 @@ def run(command, cwd, *, succeeds=True):
     return result.stdout
 
 
+def verifier_command(root=ROOT):
+    """Invoke the C# public verifier in the selected regression workspace."""
+    root = Path(root).resolve()
+    return ["dotnet", "run", "--project", str(root / "verification/Runner/Verification.csproj"),
+            "-c", "Release", "--", "--root", str(root), "verify"]
+
+
 def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 

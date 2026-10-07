@@ -14,7 +14,7 @@ import tempfile
 import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from common import ROOT, PROFILES, run, sha
+from common import verifier_command, ROOT, PROFILES, run, sha
 from common import SIMD_POSITIVES as POSITIVES, SIMD_NEGATIVES as NEGATIVES
 from support import copy_source, model_refutation, require_semantic_rejection
 
@@ -33,7 +33,7 @@ def cil(artifact):
 
 def positive(destination, proof, case, method, profile):
     started = time.monotonic()
-    output = run([sys.executable, str(proof / "verify.py"), "--method", method,
+    output = run([*verifier_command(proof.parent), "--method", method,
                   "--profile", profile, "--simd-fixture", case], destination)
     report = json.loads(report_path(proof, method, profile).read_text(encoding="utf-8"))
     expected_source = "verification/Tests/Fixtures/SIMD/Cases.props"
@@ -160,7 +160,7 @@ def negative(destination, proof, case, method, profile, lake, baseline):
     target = "Audit" if method == "Add" else "SubtractAudit"
     output = run([lake, "build", target], proof, succeeds=False)
     require_semantic_rejection(output, f"UInt256/Methods/{method}/Entry.lean")
-    output = run([sys.executable, str(proof / "verify.py"), "--method", method, "--profile", profile,
+    output = run([*verifier_command(proof.parent), "--method", method, "--profile", profile,
                   "--simd-fixture", case], destination, succeeds=False)
     require_semantic_rejection(output, f"UInt256/Methods/{method}/Entry.lean")
     if report_path(proof, method, profile).exists():
@@ -195,7 +195,7 @@ def main():
         for method in methods:
             for profile in profiles:
                 if args.suite != "positive":
-                    run([sys.executable,str(proof/"verify.py"),"--method",method,"--profile",profile],destination)
+                    run([*verifier_command(proof.parent),"--method",method,"--profile",profile],destination)
                     production = json.loads(report_path(proof,method,profile).read_text(encoding="utf-8"))
                     if production["source"]["kind"] != "production": raise RuntimeError("Production baseline required")
                 baseline = positive(destination, proof, "Baseline", method, profile)

@@ -90,7 +90,7 @@ class PlanChecks(unittest.TestCase):
             if name.startswith("safety-") and name not in {"safety-foundation", "safety-fixtures"}:
                 self.assertIn("--safety", by_id[name].commands[0])
         self.assertEqual(by_id["safety-Add-arm64-advsimd"].commands,
-                         (("verification/verify.py", "--method", "Add", "--profile", "arm64-advsimd", "--safety"),))
+                         (("verification/Runner/Verification.csproj", "verify", "--method", "Add", "--profile", "arm64-advsimd", "--safety"),))
         self.assertEqual(by_id["safety-robustness-Add"].commands,
                          (("verification/Tests/robustness_checks.py", "--method", "Add",
                            "--case", "Renamed", "--case", "ReversedStore", "--safety"),))
@@ -134,7 +134,7 @@ class PlanChecks(unittest.TestCase):
         for method, negative in (("Add", "negative_checks.py"), ("Subtract", "subtract_negative_checks.py")):
             job = next(job for job in checks.regression_plan() if job.id == "legacy-" + method)
             self.assertEqual(job.commands, (
-                ("verification/verify.py", "--method", method, "--profile", "scalar"),
+                ("verification/Runner/Verification.csproj", "verify", "--method", method, "--profile", "scalar"),
                 ("verification/Tests/" + negative,),
             ))
 

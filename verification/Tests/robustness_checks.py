@@ -9,7 +9,7 @@ import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from common import ROOT, VERIFY, generated_directory, run, safety_gate
+from common import verifier_command, ROOT, VERIFY, generated_directory, run, safety_gate
 from support import copy_source
 
 
@@ -30,7 +30,7 @@ def verify_fixture(name, method="Add", safety=False):
         run(["git", "clone", "--shared", "--no-checkout", "--quiet", str(ROOT), str(destination)], ROOT)
         proof = copy_source(destination)
         try:
-            command = [sys.executable, str(proof / "verify.py"), "--fixture", name, "--method", method]
+            command = [*verifier_command(proof.parent), "--fixture", name, "--method", method]
             output = run(command + (["--safety"] if safety else []), destination)
         except RuntimeError as error:
             raise RuntimeError(f"Fixture {name} failed; distinguish build/extraction/proof diagnostics above") from error

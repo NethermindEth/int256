@@ -37,59 +37,59 @@ def regression_plan():
     add("safety-robustness-Add", "Tests/robustness_checks.py", "--method", "Add", "--case", "Renamed", "--case", "ReversedStore", "--safety")
     for method in sorted(MULTIPLY_SAFETY_METHODS):
         for profile in MULTIPLY_PROFILES:
-            add(f"safety-{method}-{profile}", "verify.py", "--method", method, "--profile", profile, "--safety")
+            add(f"safety-{method}-{profile}", "Runner/Verification.csproj", "verify", "--method", method, "--profile", profile, "--safety")
     for profile in ("x64-avx2", "x64-avx2-bmi1", "x64-avx512", "x64-avx512-bmi1"):
-        add(f"safety-Add-{profile}", "verify.py", "--method", "Add", "--profile", profile, "--safety")
-        add(f"safety-AddOverflow-{profile}", "verify.py", "--method", "AddOverflow", "--profile", profile, "--safety")
-    add("safety-Add-scalar", "verify.py", "--method", "Add", "--profile", "scalar", "--safety")
-    add("safety-Add-x64-sse42", "verify.py", "--method", "Add", "--profile", "x64-sse42", "--safety")
-    add("safety-Add-arm64-advsimd", "verify.py", "--method", "Add", "--profile", "arm64-advsimd", "--safety")
-    add("safety-AddOverflow-x64-sse42", "verify.py", "--method", "AddOverflow", "--profile", "x64-sse42", "--safety")
-    add("safety-AddOverflow-arm64-advsimd", "verify.py", "--method", "AddOverflow", "--profile", "arm64-advsimd", "--safety")
+        add(f"safety-Add-{profile}", "Runner/Verification.csproj", "verify", "--method", "Add", "--profile", profile, "--safety")
+        add(f"safety-AddOverflow-{profile}", "Runner/Verification.csproj", "verify", "--method", "AddOverflow", "--profile", profile, "--safety")
+    add("safety-Add-scalar", "Runner/Verification.csproj", "verify", "--method", "Add", "--profile", "scalar", "--safety")
+    add("safety-Add-x64-sse42", "Runner/Verification.csproj", "verify", "--method", "Add", "--profile", "x64-sse42", "--safety")
+    add("safety-Add-arm64-advsimd", "Runner/Verification.csproj", "verify", "--method", "Add", "--profile", "arm64-advsimd", "--safety")
+    add("safety-AddOverflow-x64-sse42", "Runner/Verification.csproj", "verify", "--method", "AddOverflow", "--profile", "x64-sse42", "--safety")
+    add("safety-AddOverflow-arm64-advsimd", "Runner/Verification.csproj", "verify", "--method", "AddOverflow", "--profile", "arm64-advsimd", "--safety")
     for method in ("Subtract", "SubtractUnderflow"):
         for profile in ("x64-sse42", "arm64-advsimd"):
-            add(f"safety-{method}-{profile}", "verify.py", "--method", method, "--profile", profile, "--safety")
-    add("safety-EqUInt256UInt256-scalar", "verify.py", "--method", "EqUInt256UInt256", "--profile", "scalar", "--safety")
-    add("safety-EqUInt256UInt256-vector256", "verify.py", "--method", "EqUInt256UInt256", "--profile", "x64-vector256", "--safety")
-    add("safety-EqualsUInt256Ref-scalar", "verify.py", "--method", "EqualsUInt256Ref", "--profile", "scalar", "--safety")
-    add("safety-NeUInt256UInt256-scalar", "verify.py", "--method", "NeUInt256UInt256", "--profile", "scalar", "--safety")
-    add("safety-EqualsUInt256Ref-vector256", "verify.py", "--method", "EqualsUInt256Ref", "--profile", "x64-vector256", "--safety")
-    add("safety-NeUInt256UInt256-vector256", "verify.py", "--method", "NeUInt256UInt256", "--profile", "x64-vector256", "--safety")
-    add("safety-EqUInt256UInt256-sse41", "verify.py", "--method", "EqUInt256UInt256", "--profile", "x64-sse41", "--safety")
-    add("safety-EqualsUInt256Ref-sse41", "verify.py", "--method", "EqualsUInt256Ref", "--profile", "x64-sse41", "--safety")
-    add("safety-NeUInt256UInt256-sse41", "verify.py", "--method", "NeUInt256UInt256", "--profile", "x64-sse41", "--safety")
-    add("safety-EqualsUInt256Value-scalar", "verify.py", "--method", "EqualsUInt256Value", "--profile", "scalar", "--safety")
-    add("safety-EqualsUInt64-scalar", "verify.py", "--method", "EqualsUInt64", "--profile", "scalar", "--safety")
-    add("safety-EqualsUInt32-scalar", "verify.py", "--method", "EqualsUInt32", "--profile", "scalar", "--safety")
-    add("safety-EqualsUInt64-x64-vector256", "verify.py", "--method", "EqualsUInt64", "--profile", "x64-vector256", "--safety")
-    add("safety-EqualsUInt32-x64-vector256", "verify.py", "--method", "EqualsUInt32", "--profile", "x64-vector256", "--safety")
-    add("safety-EqualsInt64-scalar", "verify.py", "--method", "EqualsInt64", "--profile", "scalar", "--safety")
-    add("safety-EqualsInt32-scalar", "verify.py", "--method", "EqualsInt32", "--profile", "scalar", "--safety")
-    add("safety-EqualsInt64-x64-vector256", "verify.py", "--method", "EqualsInt64", "--profile", "x64-vector256", "--safety")
-    add("safety-EqualsInt32-x64-vector256", "verify.py", "--method", "EqualsInt32", "--profile", "x64-vector256", "--safety")
-    add("safety-EqualsUInt256Value-x64-sse41", "verify.py", "--method", "EqualsUInt256Value", "--profile", "x64-sse41", "--safety")
-    add("safety-EqualsUInt256Value-x64-vector256", "verify.py", "--method", "EqualsUInt256Value", "--profile", "x64-vector256", "--safety")
+            add(f"safety-{method}-{profile}", "Runner/Verification.csproj", "verify", "--method", method, "--profile", profile, "--safety")
+    add("safety-EqUInt256UInt256-scalar", "Runner/Verification.csproj", "verify", "--method", "EqUInt256UInt256", "--profile", "scalar", "--safety")
+    add("safety-EqUInt256UInt256-vector256", "Runner/Verification.csproj", "verify", "--method", "EqUInt256UInt256", "--profile", "x64-vector256", "--safety")
+    add("safety-EqualsUInt256Ref-scalar", "Runner/Verification.csproj", "verify", "--method", "EqualsUInt256Ref", "--profile", "scalar", "--safety")
+    add("safety-NeUInt256UInt256-scalar", "Runner/Verification.csproj", "verify", "--method", "NeUInt256UInt256", "--profile", "scalar", "--safety")
+    add("safety-EqualsUInt256Ref-vector256", "Runner/Verification.csproj", "verify", "--method", "EqualsUInt256Ref", "--profile", "x64-vector256", "--safety")
+    add("safety-NeUInt256UInt256-vector256", "Runner/Verification.csproj", "verify", "--method", "NeUInt256UInt256", "--profile", "x64-vector256", "--safety")
+    add("safety-EqUInt256UInt256-sse41", "Runner/Verification.csproj", "verify", "--method", "EqUInt256UInt256", "--profile", "x64-sse41", "--safety")
+    add("safety-EqualsUInt256Ref-sse41", "Runner/Verification.csproj", "verify", "--method", "EqualsUInt256Ref", "--profile", "x64-sse41", "--safety")
+    add("safety-NeUInt256UInt256-sse41", "Runner/Verification.csproj", "verify", "--method", "NeUInt256UInt256", "--profile", "x64-sse41", "--safety")
+    add("safety-EqualsUInt256Value-scalar", "Runner/Verification.csproj", "verify", "--method", "EqualsUInt256Value", "--profile", "scalar", "--safety")
+    add("safety-EqualsUInt64-scalar", "Runner/Verification.csproj", "verify", "--method", "EqualsUInt64", "--profile", "scalar", "--safety")
+    add("safety-EqualsUInt32-scalar", "Runner/Verification.csproj", "verify", "--method", "EqualsUInt32", "--profile", "scalar", "--safety")
+    add("safety-EqualsUInt64-x64-vector256", "Runner/Verification.csproj", "verify", "--method", "EqualsUInt64", "--profile", "x64-vector256", "--safety")
+    add("safety-EqualsUInt32-x64-vector256", "Runner/Verification.csproj", "verify", "--method", "EqualsUInt32", "--profile", "x64-vector256", "--safety")
+    add("safety-EqualsInt64-scalar", "Runner/Verification.csproj", "verify", "--method", "EqualsInt64", "--profile", "scalar", "--safety")
+    add("safety-EqualsInt32-scalar", "Runner/Verification.csproj", "verify", "--method", "EqualsInt32", "--profile", "scalar", "--safety")
+    add("safety-EqualsInt64-x64-vector256", "Runner/Verification.csproj", "verify", "--method", "EqualsInt64", "--profile", "x64-vector256", "--safety")
+    add("safety-EqualsInt32-x64-vector256", "Runner/Verification.csproj", "verify", "--method", "EqualsInt32", "--profile", "x64-vector256", "--safety")
+    add("safety-EqualsUInt256Value-x64-sse41", "Runner/Verification.csproj", "verify", "--method", "EqualsUInt256Value", "--profile", "x64-sse41", "--safety")
+    add("safety-EqualsUInt256Value-x64-vector256", "Runner/Verification.csproj", "verify", "--method", "EqualsUInt256Value", "--profile", "x64-vector256", "--safety")
     for method in sorted(OPERATOR_DESCRIPTORS):
         for profile in ("scalar", "x64-vector256"):
-            add(f"safety-{method}-{profile}", "verify.py", "--method", method, "--profile", profile, "--safety")
+            add(f"safety-{method}-{profile}", "Runner/Verification.csproj", "verify", "--method", method, "--profile", profile, "--safety")
     for method in sorted(PRIMITIVE_COMPARISONS):
-        add(f"safety-{method}-scalar", "verify.py", "--method", method, "--profile", "scalar", "--safety")
+        add(f"safety-{method}-scalar", "Runner/Verification.csproj", "verify", "--method", method, "--profile", "scalar", "--safety")
     for method in ("LeUInt64UInt256", "AddOverflow", "SubtractUnderflow", "Subtract"):
-        add(f"safety-{method}-scalar", "verify.py", "--method", method, "--profile", "scalar", "--safety")
+        add(f"safety-{method}-scalar", "Runner/Verification.csproj", "verify", "--method", method, "--profile", "scalar", "--safety")
     for method in ("Lsh", "Rsh", "LeftShift", "RightShift", "OperatorLsh", "OperatorRsh"):
         for profile in ("scalar", "x64-vector256"):
-            add(f"safety-{method}-{profile}", "verify.py", "--method", method, "--profile", profile, "--safety")
+            add(f"safety-{method}-{profile}", "Runner/Verification.csproj", "verify", "--method", method, "--profile", profile, "--safety")
     for method in ("Subtract", "SubtractUnderflow"):
         for profile in ("x64-avx2", "x64-avx2-bmi1", "x64-avx512", "x64-avx512-bmi1"):
-            add(f"safety-{method}-{profile}", "verify.py", "--method", method, "--profile", profile, "--safety")
+            add(f"safety-{method}-{profile}", "Runner/Verification.csproj", "verify", "--method", method, "--profile", profile, "--safety")
     for method in sorted(set(BITWISE_DESCRIPTORS) | BITWISE_UNARY):
         for profile in ("scalar", "x64-vector256"):
-            add(f"safety-{method}-{profile}", "verify.py", "--method", method, "--profile", profile, "--safety")
+            add(f"safety-{method}-{profile}", "Runner/Verification.csproj", "verify", "--method", method, "--profile", profile, "--safety")
     for method in sorted(COMPARISON_GATES):
         for profile in ("scalar", "x64-vector256", "x64-avx2", "x64-avx512"):
-            add(f"safety-{method}-{profile}", "verify.py", "--method", method, "--profile", profile, "--safety")
+            add(f"safety-{method}-{profile}", "Runner/Verification.csproj", "verify", "--method", method, "--profile", profile, "--safety")
     for method in ("CompareToUInt256Ref", "CompareToUInt256Value"):
-        add(f"safety-{method}-scalar", "verify.py", "--method", method, "--profile", "scalar", "--safety")
+        add(f"safety-{method}-scalar", "Runner/Verification.csproj", "verify", "--method", method, "--profile", "scalar", "--safety")
     add("profile-extractor", "Tests/profile_extractor_checks.py")
     add("csharp-runner", "Runner.Tests/Verification.Tests.csproj")
     for name in ("change", "prepared", "method"):
@@ -99,7 +99,7 @@ def regression_plan():
     for method in ("Add", "Subtract"):
         negative = "negative_checks.py" if method == "Add" else "subtract_negative_checks.py"
         jobs.append(Job("legacy-" + method, (
-            ("verification/verify.py", "--method", method, "--profile", "scalar"),
+            ("verification/Runner/Verification.csproj", "verify", "--method", method, "--profile", "scalar"),
             ("verification/Tests/" + negative,),
         )))
         add("robustness-" + method, "Tests/robustness_checks.py", "--method", method)

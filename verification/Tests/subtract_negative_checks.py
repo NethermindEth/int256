@@ -6,7 +6,7 @@ import sys
 import tempfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from common import ROOT, VERIFY, run
+from common import verifier_command, ROOT, VERIFY, run
 from support import (build_extract, copy_source, model_refutation, native_witness,
                      require_production_report, require_semantic_rejection)
 
@@ -36,7 +36,7 @@ def check_fixture(name, byte_values, left, right, out, address, actual, expected
         stale.mkdir(parents=True, exist_ok=True)
         for artifact in ("Extracted.lean", "artifact.json", "report.json"):
             shutil.copy2(VERIFY / "generated/subtract" / artifact, stale / artifact)
-        output = run([sys.executable, str(proof / "verify.py"), "--method", "Subtract", "--fixture", name],
+        output = run([*verifier_command(proof.parent), "--method", "Subtract", "--fixture", name],
                      destination, succeeds=False)
         require_semantic_rejection(output, "UInt256/Methods/Subtract/Entry.lean")
         if "Verification failed:" not in output:
