@@ -151,6 +151,15 @@ def build_artifact(project, work, method, fixture=None, simd_fixture=False, fixt
     return bundle
 
 
+def mutation_proof(work, project, case, method, profile, baseline, intended=None):
+    result = json.loads(_runner_request(["mutation", "--json"],
+        {"work": str(Path(work).resolve()), "project": str(Path(project).resolve()), "case": case,
+         "method": method, "profile": profile, "baseline": baseline, "intended": intended}, cache=False, show_output=True))
+    for name in ("assembly", "extractor", "project"):
+        result["bundle"][name] = Path(result["bundle"][name])
+    return result["bundle"], Path(result["proof"])
+
+
 def audit_module(entry):
     return _runner_request(["gate", "--entry-json"], entry)
 

@@ -81,6 +81,11 @@ internal static class Program
                 object result;
                 switch (command)
                 {
+                    case "mutation":
+                        var mutation = FixtureChecks.Mutation(new Workspace(root), Catalog.Text(input["work"]), Catalog.Text(input["project"]), Catalog.Text(input["case"]),
+                            Catalog.Text(input["method"]), Catalog.Text(input["profile"]), input["baseline"]!.AsObject(), input["intended"]?.GetValue<string>());
+                        result = JsonSerializer.SerializeToNode(new { mutation.Bundle, mutation.Proof }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase })!;
+                        break;
                     case "refutation":
                         FixtureChecks.Refutation(new Workspace(root), Catalog.Text(input["proof"]), Catalog.Text(input["lake"]), Catalog.Text(input["template"]),
                             input["substitutions"]!.AsArray().Select(pair => new KeyValuePair<string, string>(Catalog.Text(pair![0]), Catalog.Text(pair[1]))),

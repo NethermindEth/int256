@@ -8,6 +8,32 @@ namespace UInt256Verification;
 
 internal static class FixtureChecks
 {
+    internal static string MutationSource(Catalog catalog, string project, string method, string name) => Path.Combine(Path.GetDirectoryName(project)!,
+        catalog.Manifest(method)["verification"]?["fixtureSources"]?[name]?.GetValue<string>() ?? name + ".cs");
+
+    internal static (ArtifactBundle Bundle, string Proof) Mutation(Workspace workspace, string work, string project, string name, string method,
+        string profile, JsonObject baseline, string? intended)
+    {
+        string proof = Path.Combine(work, "proof");
+        if (Directory.Exists(proof) || File.Exists(proof)) throw new InvalidOperationException("Mutation proof directory must be fresh");
+        ArtifactBundle bundle = workspace.BuildArtifact(project, work, method, MutationSource(workspace.Catalog, project, method, name), true, name);
+        Directory.CreateDirectory(proof);
+        string[] paths = workspace.CopyProofSources(proof, bundle.SourceInputs);
+        string generated = Path.Combine(proof, "generated");
+        JsonObject artifact = workspace.Extract(bundle, generated, method, profile);
+        ChangedMethod(artifact, baseline["artifact"]!.AsObject(), intended ?? Catalog.Text(workspace.Catalog.Manifest(method)["entry"]));
+        if (Workspace.Hash(Path.Combine(generated, "Extracted.lean")) == Catalog.Text(baseline["generatedProgramSha256"]))
+            throw new InvalidOperationException("Mutation did not change the extracted program");
+        JsonObject hashes = baseline["leanSourceSha256"]!.AsObject();
+        var actual = Workspace.SourceFiles(proof, [".lean"]).Select(path => (Path: Workspace.Relative(proof, path), Hash: Workspace.Hash(path)))
+            .Where(pair => hashes.ContainsKey(pair.Path)).ToDictionary(pair => pair.Path, pair => pair.Hash);
+        if (!Workspace.SameInputs(actual, hashes.ToDictionary(pair => pair.Key, pair => Catalog.Text(pair.Value))))
+            throw new InvalidOperationException("Mutation changed handwritten proofs");
+        Workspace.CheckProofSnapshot(proof, paths, bundle.SourceInputs);
+        workspace.ValidateBundle(bundle, bundle.SourceInputs);
+        return (bundle, proof);
+    }
+
     internal static string ExpandRefutation(string source, IEnumerable<KeyValuePair<string, string>> substitutions)
     {
         foreach (var pair in substitutions) source = source.Replace($"@{pair.Key}@", pair.Value, StringComparison.Ordinal);

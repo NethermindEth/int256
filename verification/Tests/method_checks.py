@@ -131,13 +131,6 @@ class MethodChecks(unittest.TestCase):
             with self.subTest(cases=cases, override=override), self.assertRaises(RuntimeError):
                 common.resolve_fixture_groups([entry], {"Equality": {"cases": cases, "source": "Public.cs"}})
 
-    def test_mutation_extraction_uses_registered_source_without_marker_file(self):
-        project = common.VERIFY / "Tests/Fixtures/Equality/Nethermind.Int256.csproj"
-        with patch.object(support, "build_artifact", side_effect=RuntimeError("stop after source selection")) as build:
-            with self.assertRaisesRegex(RuntimeError, "stop after source selection"):
-                support.mutation_proof(Path("unused"), project, "WrongLane", "EqUInt256UInt256", "scalar", {})
-        self.assertEqual(build.call_args.args[3], project.parent / "Public.cs")
-
     def test_relational_family_cannot_drop_or_reorder_representatives(self):
         representatives = ["scalar", "x64-vector256", "x64-avx2", "x64-avx512"]
         for actual in (representatives, representatives[:-1], representatives[::-1]):

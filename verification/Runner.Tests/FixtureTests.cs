@@ -10,6 +10,48 @@ internal static class FixtureTests
 {
     internal static void Register(Action<string, Action<Catalog, string>> check)
     {
+        check("negative fixture extraction retains registered sources and unchanged proof snapshots", (catalog, manifests) =>
+        {
+            const string method = "EqInt64UInt256";
+            foreach (string failure in new[] { "", "unchanged-body", "unchanged-program", "changed-proof", "missing-proof", "wrong-target" })
+            {
+                Workspace commands = VerifierTests.Setup(catalog, manifests);
+                Workspace workspace = new(commands.Root, (command, cwd, stage) =>
+                {
+                    string output = commands.Run(command, cwd, stage);
+                    if (stage == "Extraction")
+                    {
+                        string path = Path.Combine(command[3], "artifact.json");
+                        JsonObject artifact = JsonNode.Parse(File.ReadAllText(path))!.AsObject();
+                        artifact["methods"]![0]!["instructions"] = new JsonArray(new JsonObject { ["opcode"] = "ldc.i4", ["operand"] = failure == "unchanged-body" ? 0 : 1 });
+                        File.WriteAllText(path, artifact.ToJsonString());
+                        if (failure == "changed-proof") File.WriteAllText(Path.Combine(Path.GetDirectoryName(command[3])!, "Proof.lean"), "changed");
+                    }
+                    return output;
+                });
+                string signature = Catalog.Text(catalog.Manifest(method)["entry"]);
+                string project = Path.Combine(workspace.Verification, "Tests/Fixtures/Equality/Nethermind.Int256.csproj");
+                Program.Require(FixtureChecks.MutationSource(catalog, project, method, "WrongLane") == Path.Combine(Path.GetDirectoryName(project)!, "Public.cs"), "Shared source selection requires a marker file");
+                JsonObject baseline = new() { ["artifact"] = new JsonObject { ["methods"] = new JsonArray(new JsonObject { ["signature"] = signature,
+                    ["instructions"] = new JsonArray(new JsonObject { ["opcode"] = "ldc.i4", ["operand"] = 0 }) }) }, ["generatedProgramSha256"] = "different",
+                    ["leanSourceSha256"] = new JsonObject { ["Proof.lean"] = Workspace.Hash(Path.Combine(workspace.Verification, "Proof.lean")) } };
+                if (failure == "missing-proof") baseline["leanSourceSha256"]!["Missing.lean"] = "missing";
+                if (failure == "unchanged-program")
+                {
+                    string extracted = Path.Combine(workspace.Root, "expected.lean"); File.WriteAllText(extracted, "extracted");
+                    baseline["generatedProgramSha256"] = Workspace.Hash(extracted);
+                }
+                string work = Path.Combine(workspace.Root, "mutation-" + failure);
+                void Run() => FixtureChecks.Mutation(workspace, work, project, "Renamed", method, "scalar", baseline, failure == "wrong-target" ? "missing" : null);
+                if (failure.Length == 0)
+                {
+                    Run();
+                    Program.Require(File.Exists(Path.Combine(work, "proof/generated/Extracted.lean")), "Fresh extraction missing");
+                    Program.Reject(Run);
+                }
+                else Program.Reject(Run);
+            }
+        });
         check("refutation templates preserve substitution order and require checked theorem audits", (_, manifests) =>
         {
             Program.Require(FixtureChecks.ExpandRefutation("@FIRST@", new Dictionary<string, string> { ["FIRST"] = "@SECOND@", ["SECOND"] = "value" }) == "value", "Substitution order changed");

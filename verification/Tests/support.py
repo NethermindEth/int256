@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from common import verifier_command, PROFILE_DIRECTORY, PROFILES, ROOT, VERIFY, expected_profile, generated_directory, run, sha, source_files, check_calling_convention, method_manifest
 from common import check_proof_snapshot, safety_gate, source_inputs
-from common import build_artifact, copy_source, template_refutation
+from common import build_artifact, copy_source, template_refutation, mutation_proof
 from common import theorem_audits, rejection_check, fixture_check
 
 
@@ -69,43 +69,6 @@ def selected_fixture_baseline(method, profile, positive=None, *, safety=False):
         alternative = read_report()
         fixture_check("alternative", baseline=baseline, alternative=alternative)
     return public, report_path, baseline
-
-
-def mutation_proof(work, project, case, method, profile, baseline, intended=None):
-    """Fresh fixture extraction with identical proofs and a changed target body."""
-    manifest = method_manifest(method)
-    source = manifest.get("verification", {}).get("fixtureSources", {}).get(case, f"{case}.cs")
-    bundle = build_artifact(project, work, method, project.parent / source, True, case)
-    proof = work / "proof"
-    proof.mkdir()
-    sources = list(source_files(VERIFY, {".lean"}))
-    for source in sources:
-        target = proof / source.relative_to(VERIFY)
-        target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(source, target)
-    for name in ("lakefile.toml", "lean-toolchain"):
-        shutil.copy2(VERIFY / name, proof / name)
-    check_proof_snapshot(proof, [source.relative_to(VERIFY) for source in sources] +
-                         [Path("lakefile.toml"), Path("lean-toolchain")], bundle["sourceInputs"])
-    extracted = proof / "generated"
-    selector = profile if profile in PROFILES else "@" + str(PROFILE_DIRECTORY / f"{profile}.json")
-    run(["dotnet", str(bundle["extractor"]), str(bundle["assembly"]), str(extracted),
-         manifest["entry"], selector, str(VERIFY / "manifests/api-coverage.json")], ROOT)
-    artifact = json.loads((extracted / "artifact.json").read_text(encoding="utf-8"))
-    entry = artifact["methods"][artifact["entryIndex"]]
-    if (entry["signature"] != manifest["entry"] or artifact["profile"] != expected_profile(profile)
-            or artifact["sha256"] != bundle["assemblySha256"]):
-        raise RuntimeError("Mutation extraction identity changed")
-    check_calling_convention(entry, manifest["callingConvention"])
-    signature = intended or manifest["entry"]
-    require_changed_method(artifact, baseline["artifact"], signature)
-    if sha(extracted / "Extracted.lean") == baseline["generatedProgramSha256"]:
-        raise RuntimeError("Mutation did not change the extracted program")
-    hashes = baseline["leanSourceSha256"]
-    if {path.relative_to(proof).as_posix(): sha(path) for path in source_files(proof, {".lean"})
-            if path.relative_to(proof).as_posix() in hashes} != hashes:
-        raise RuntimeError("Mutation changed handwritten proofs")
-    return bundle, proof
 
 
 def build_fixture(destination, name, method="Add"):
