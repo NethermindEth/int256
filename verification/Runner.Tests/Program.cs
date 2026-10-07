@@ -10,6 +10,11 @@ internal static class Program
 {
     private static int Main(string[] args)
     {
+        if (args.Length > 0 && args[0] == "reporting")
+        {
+            ReportingChecks.Run(new Workspace(Directory.GetCurrentDirectory()), args[1..]);
+            return 0;
+        }
         if (args is ["subtract-negative"])
         {
             SubtractNegativeChecks.Run(new Workspace(Directory.GetCurrentDirectory()));
@@ -193,6 +198,7 @@ internal static class Program
         FoundationChecks.Register(Check);
         NativeAlignmentChecks.Register(Check);
         FixtureTests.Register(Check);
+        ReportingChecks.Register(Check);
         RobustnessChecks.Register(Check);
         NativeSimdChecks.Register(Check);
         GateBindingChecks.Register(Check);

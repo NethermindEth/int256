@@ -16,7 +16,7 @@ memory reads. Each applicable negative needs a separate kernel proof refuting
 the full arithmetic, flag, and memory contract for every successful fuel before
 its public proof rejection is classified. Resource exhaustion is inconclusive.
 
-Run `python verification/Tests/reporting_checks.py` with the pinned Lean tools on
+Run `dotnet run --project verification/Runner.Tests -c Release -- reporting` with the pinned Lean tools on
 PATH. `--method`, `--profile`, and `--case` select a smaller run. The runner uses a
 source snapshot, establishes fresh production and fixture baselines, checks
 artifact provenance and proof hashes, and requires rejected cases to invalidate

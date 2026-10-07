@@ -133,7 +133,7 @@ def regression_plan():
             "--profile", profile, "--workspace")
     for method in ("AddOverflow", "SubtractUnderflow"):
         for profile in PROFILES:
-            add(f"reporting-{method}-{profile}", "Tests/reporting_checks.py",
+            add(f"reporting-{method}-{profile}", "Runner.Tests/Verification.Tests.csproj", "reporting",
                 "--method", method, "--profile", profile)
     if len(jobs) != 387 or len({job.id for job in jobs}) != 387:
         raise RuntimeError("Incomplete or duplicate regression matrix")

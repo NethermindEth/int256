@@ -482,6 +482,8 @@ Its SIMD matrix covers both methods in every representative profile, and a separ
 job checks complete selected-API production coverage composition. Additional jobs
 run comparison, bitwise, all four returning bitwise operators and all six shift fixture runners with
 scalar/vector storage, and reporting fixtures in all seven arithmetic classes.
+Run a reporting group with
+`dotnet run --project verification/Runner.Tests -c Release -- reporting --method AddOverflow --profile scalar`.
 Equality jobs derive all 52 API/profile groups from the registered contracts.
 Multiplication fixtures use all 14 arithmetic/storage representatives, with
 wrong-result witnesses in scalar and BMI2 profiles. Passing evidence covers every

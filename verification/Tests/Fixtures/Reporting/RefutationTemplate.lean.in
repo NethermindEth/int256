@@ -1,0 +1,22 @@
+import Extracted
+import UInt256.Methods.Reporting.Refutation
+import CIL.SymbolicExecution
+open CIL UInt256Model UInt256Proof.Reporting
+set_option maxRecDepth 8192
+set_option maxHeartbeats 2000000
+namespace ReportingWitness
+def witnessBytes : Bytes := fun address => @INITIAL@
+def observed := (invoke Extracted.program (executionBound Extracted.program Extracted.entryIndex)
+  Extracted.entryIndex [.object 0, .object 64, .object @OUT@] (byteMemory witnessBytes)).map
+    (fun outcome => @OBSERVATION@)
+theorem model_observed : observed = some (@OBSERVED@) := by decide
+theorem model_expected : (@COMPARISON@) = @EXPECTED_VALUE@ := by decide
+theorem model_not_correct : ¬ Contract @OPERATION@ Extracted.program Extracted.entryIndex
+    witnessBytes 0 64 @OUT@ := by
+  apply @LEMMA@ Extracted.program Extracted.entryIndex
+    (executionBound Extracted.program Extracted.entryIndex) @OPERATION@ witnessBytes 0 64 @OUT@
+    @ARGUMENTS@ model_observed
+  rw [model_expected]
+  decide
+#print axioms model_not_correct
+end ReportingWitness

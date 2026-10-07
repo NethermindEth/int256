@@ -108,6 +108,10 @@ class PlanChecks(unittest.TestCase):
         self.assertEqual({name for name in by_id if name.startswith("reporting-")},
                          {f"reporting-{method}-{profile}" for method in ("AddOverflow", "SubtractUnderflow")
                           for profile in checks.PROFILES})
+        for method in ("AddOverflow", "SubtractUnderflow"):
+            for profile in checks.PROFILES:
+                self.assertEqual(by_id[f"reporting-{method}-{profile}"].commands[0],
+                    ("verification/Runner.Tests/Verification.Tests.csproj", "reporting", "--method", method, "--profile", profile))
         operations = ("Compare", "Bitwise", "OperatorXor", "OperatorAnd", "OperatorOr", "OperatorNot",
                       "Lsh", "Rsh", "LeftShift", "RightShift", "OperatorLsh", "OperatorRsh")
         self.assertEqual({name for name in by_id if name.startswith("operation-")},
