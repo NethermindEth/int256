@@ -484,7 +484,8 @@ run comparison, bitwise, all four returning bitwise operators and all six shift 
 scalar/vector storage, and reporting fixtures in all seven arithmetic classes.
 Comparison and bitwise mutation groups use
 `dotnet run --project verification/Runner.Tests -c Release -- compare-fixtures --profile scalar`
-and the corresponding `bitwise-fixtures` command.
+and the corresponding `bitwise-fixtures` command. Returning bitwise operators use
+`bitwise-operator-fixtures --method OperatorXor --profile scalar` with the same runner.
 Run a reporting group with
 `dotnet run --project verification/Runner.Tests -c Release -- reporting --method AddOverflow --profile scalar`.
 Equality jobs derive all 52 API/profile groups from the registered contracts.

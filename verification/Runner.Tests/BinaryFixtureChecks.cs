@@ -10,6 +10,26 @@ internal static class BinaryFixtureChecks
 {
     internal static void Register(Action<string, Action<Catalog, string>> check)
     {
+        check("returned bitwise witnesses preserve unary/binary contracts and caller bytes", (_, _) =>
+        {
+            Workspace workspace = new(Directory.GetCurrentDirectory());
+            JsonObject witnesses = JsonNode.Parse(File.ReadAllText(Path.Combine(workspace.Verification, "Tests/Fixtures/Bitwise/Witnesses.json")))!.AsObject();
+            string template = File.ReadAllText(Path.Combine(workspace.Verification, "Tests/Fixtures/Bitwise/ReturnRefutationTemplate.lean.in"));
+            foreach (string method in new[] { "OperatorXor", "OperatorAnd", "OperatorOr", "OperatorNot" })
+            foreach (string name in witnesses["returnNegativeCases"]!.AsArray().Select(Catalog.Text))
+            {
+                var witness = ReturnWitness(method, witnesses["negativeCases"]![name]!.AsObject());
+                string proof = FixtureChecks.ExpandRefutation(template, witness.Substitutions);
+                Program.Require(proof.Contains(method == "OperatorNot" ? "NotReturnContract" : "ReturnContract", StringComparison.Ordinal)
+                    && proof.Contains("#print axioms refuted", StringComparison.Ordinal), "Returned-value contract/audit lost");
+                Program.Require(witness.Native.Contains("bytes.AsSpan().SequenceEqual(before)", StringComparison.Ordinal), "Native caller-memory preservation lost");
+                Program.Require(witness.Substitutions["ACTUAL"] != witness.Substitutions["EXPECTED"], "Indistinguishable returned-value witness");
+                if (method == "OperatorNot") Program.Require(witness.Substitutions["EXPECTED"] == "115792089237316195423570985008687907853269984665640564039457584007913129639934", "Complement witness lost precision");
+            }
+            Program.Reject(() => RunReturn(workspace, ["--method", "Xor"]));
+            Program.Reject(() => RunReturn(workspace, ["--profile", "missing"]));
+            Program.Reject(() => RunReturn(workspace, ["--unknown"]));
+        });
         check("comparison and bitwise fixtures retain profiles, witnesses and full-contract bindings", (_, _) =>
         {
             Workspace workspace = new(Directory.GetCurrentDirectory());
@@ -87,6 +107,100 @@ internal static class BinaryFixtureChecks
             return result == {{witness["actualByte"]}} ? 0 : 1;
             """) + "\n";
     }
+    internal static (string Dependency, string? Operation, string Symbol) ReturnSettings(string method) => method switch
+    {
+        "OperatorXor" => ("Xor", "xor", "^"), "OperatorAnd" => ("And", "and", "&"),
+        "OperatorOr" => ("Or", "or", "|"), "OperatorNot" => ("Not", null, "~"),
+        _ => throw new ArgumentException("Unknown returning bitwise method")
+    };
+    internal static (Dictionary<string, string> Substitutions, string Native) ReturnWitness(string method, JsonObject witness)
+    {
+        var settings = ReturnSettings(method);
+        string left = witness["leftBase"]!.ToString(), right = witness["rightBase"]!.ToString();
+        string actual = method is "OperatorAnd" or "OperatorOr" ? "0" : method == "OperatorNot" ? "1" : witness["actualReturn"]!.ToString();
+        string expected = method is "OperatorAnd" or "OperatorOr" ? "1" : method == "OperatorNot" ? ((System.Numerics.BigInteger.One << 256) - 2).ToString() : witness["expectedReturn"]!.ToString();
+        bool unary = settings.Operation is null;
+        Dictionary<string, string> substitutions = new()
+        {
+            ["INITIAL"] = FixtureChecks.InitialBytes(witness["initialBytes"]!.AsObject().Select(pair => KeyValuePair.Create(pair.Key, pair.Value!.ToString()))),
+            ["LEFT"] = left, ["RIGHT"] = right, ["ACTUAL"] = actual, ["EXPECTED"] = expected,
+            ["ARGUMENTS"] = unary ? $"[.object {left}]" : $"[.object {left},.object {right}]",
+            ["EXPECTED_EXPRESSION"] = unary ? $"~~~byteValue initial {left}" : $"UInt256Model.Bitwise.applyBinary .{settings.Operation} (byteValue initial {left}) (byteValue initial {right})",
+            ["CONTRACT"] = unary ? $"UInt256Model.Bitwise.NotReturnContract Extracted.program Extracted.entryIndex initial {left}"
+                : $"UInt256Model.Bitwise.ReturnContract Extracted.program Extracted.entryIndex .{settings.Operation} initial {left} {right}",
+            ["PARAMETERS"] = unary ? $"initial {left}" : $".{settings.Operation} initial {left} {right}",
+            ["REFUTATION"] = "UInt256Proof.Bitwise." + (unary ? "not_return_observation_refuted" : "return_observation_refuted")
+        };
+        string assignments = string.Join('\n', witness["initialBytes"]!.AsObject().Select(pair => $"bytes[{pair.Key}] = {pair.Value};"));
+        string source = $$"""
+            using System;
+            using System.Runtime.CompilerServices;
+            using Nethermind.Int256;
+            byte[] bytes = new byte[192];
+            {{assignments}}
+            byte[] before = (byte[])bytes.Clone();
+            ref UInt256 left = ref Unsafe.As<byte, UInt256>(ref bytes[{{left}}]);
+            ref UInt256 right = ref Unsafe.As<byte, UInt256>(ref bytes[{{right}}]);
+            UInt256 result = {{(unary ? "~left" : "left " + settings.Symbol + " right")}};
+            Console.WriteLine($"Native returned bitwise witness: {result.u0}");
+            return result.u0 == {{actual}} && result.u1 == 0 && result.u2 == 0 && result.u3 == 0
+                && bytes.AsSpan().SequenceEqual(before) ? 0 : 1;
+            """ + "\n";
+        return (substitutions, source);
+    }
+    internal static void RunReturn(Workspace workspace, string[] arguments)
+    {
+        string method = "OperatorXor", profile = "scalar"; bool isolated = false;
+        for (int i = 0; i < arguments.Length; i++)
+            if (arguments[i] == "--workspace") isolated = true;
+            else if (arguments[i] == "--method" && i + 1 < arguments.Length) method = arguments[++i];
+            else if (arguments[i] == "--profile" && i + 1 < arguments.Length) profile = arguments[++i];
+            else throw new ArgumentException("Unknown or incomplete returning bitwise option");
+        var settings = ReturnSettings(method);
+        workspace.Catalog.Profile(profile);
+        if (!isolated)
+        {
+            Isolate(workspace, child => RunReturn(child, ["--method", method, "--profile", profile, "--workspace"]));
+            return;
+        }
+        var baseline = FixtureChecks.SelectedBaseline(workspace, method, profile, "BitwiseHelper", false);
+        workspace.Run([.. baseline.Command, "--fixture", "BitwiseEarlyStore"], workspace.Root);
+        JsonObject positive = JsonNode.Parse(File.ReadAllText(baseline.ReportPath))!.AsObject();
+        if (!JsonNode.DeepEquals(positive["leanSourceSha256"], baseline.Baseline["leanSourceSha256"])) throw new InvalidOperationException("Private output fixture changed handwritten proofs");
+        string intended = Catalog.Text(workspace.Catalog.Manifest(settings.Dependency)["entry"]);
+        JsonNode Instructions(JsonObject report) => report["artifact"]!["methods"]!.AsArray().First(body => Catalog.Text(body!["signature"]) == intended)!["instructions"]!;
+        if (JsonNode.DeepEquals(Instructions(positive), Instructions(baseline.Baseline))) throw new InvalidOperationException("Private output fixture did not change the actual selected dependency");
+        Console.WriteLine("PASS: early output stores preserve returned arithmetic and caller bytes");
+        string directory = Path.Combine(workspace.Verification, "Tests/Fixtures/Bitwise");
+        JsonObject witnesses = JsonNode.Parse(File.ReadAllText(Path.Combine(directory, "Witnesses.json")))!.AsObject();
+        foreach (string name in witnesses["returnNegativeCases"]!.AsArray().Select(Catalog.Text))
+        {
+            string work = Path.Combine(workspace.Root, "artifacts/bitwise-return-negatives", method, name);
+            if (Directory.Exists(work)) throw new InvalidOperationException("Returning bitwise fixture workspace must be fresh");
+            Directory.CreateDirectory(work);
+            string target = settings.Operation == "xor" ? intended : $"System.UInt64 Nethermind.Int256.UInt256::Word{settings.Dependency}(System.UInt64" + (settings.Operation is null ? ")" : ",System.UInt64)");
+            var mutation = FixtureChecks.Mutation(workspace, work, Path.Combine(directory, "Nethermind.Int256.csproj"), name, method, profile, baseline.Baseline, target);
+            var witness = ReturnWitness(method, witnesses["negativeCases"]![name]!.AsObject());
+            FixtureChecks.Refutation(workspace, mutation.Proof, "lake", Path.Combine(directory, "ReturnRefutationTemplate.lean.in"), witness.Substitutions,
+                "ReturnRefutation", "UInt256Proof.Bitwise.ReturnWitness.refuted", workspace.Catalog.Manifest(method)["approvedAxioms"]!.AsArray().Select(Catalog.Text), true);
+            FixtureChecks.NativeWitness(workspace, work, mutation.Bundle.Assembly, witness.Native);
+            string rejected = workspace.RunRejected([.. baseline.Command, "--fixture", name], workspace.Root, "Returned bitwise public rejection");
+            RejectionChecks.Diagnostic(rejected, "UInt256/Methods/SelectedGate.lean", "Tactic `first` failed:.*|Tactic `introN` failed:.*|Tactic `apply` failed:.*");
+            if (File.Exists(baseline.ReportPath)) throw new InvalidOperationException("Failed returned-value verification retained a report");
+            Console.WriteLine($"PASS: {name}, returned-value full-contract refutation and public rejection");
+        }
+    }
+    private static void Isolate(Workspace workspace, Action<Workspace> run)
+    {
+        string destination = Path.Combine(Path.GetTempPath(), "int256-binary-fixtures-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            workspace.Run(["git", "clone", "--shared", "--no-checkout", workspace.Root, destination], workspace.Root);
+            workspace.CopyRegressionSource(destination);
+            run(new Workspace(destination));
+        }
+        finally { if (Directory.Exists(destination)) Directory.Delete(destination, true); }
+    }
     internal static void Run(Workspace workspace, string group, string[] arguments)
     {
         var settings = Settings(group);
@@ -98,14 +212,7 @@ internal static class BinaryFixtureChecks
         JsonObject cases = Cases(workspace, group, profile);
         if (!isolated)
         {
-            string destination = Path.Combine(Path.GetTempPath(), "int256-binary-fixtures-" + Guid.NewGuid().ToString("N"));
-            try
-            {
-                workspace.Run(["git", "clone", "--shared", "--no-checkout", workspace.Root, destination], workspace.Root);
-                workspace.CopyRegressionSource(destination);
-                Run(new Workspace(destination), group, ["--profile", profile, "--workspace"]);
-            }
-            finally { if (Directory.Exists(destination)) Directory.Delete(destination, true); }
+            Isolate(workspace, child => Run(child, group, ["--profile", profile, "--workspace"]));
             return;
         }
         var baseline = FixtureChecks.SelectedBaseline(workspace, settings.Method, profile, settings.Positive, false);

@@ -10,6 +10,11 @@ internal static class Program
 {
     private static int Main(string[] args)
     {
+        if (args.Length > 0 && args[0] == "bitwise-operator-fixtures")
+        {
+            BinaryFixtureChecks.RunReturn(new Workspace(Directory.GetCurrentDirectory()), args[1..]);
+            return 0;
+        }
         if (args.Length > 0 && args[0] is "compare-fixtures" or "bitwise-fixtures")
         {
             BinaryFixtureChecks.Run(new Workspace(Directory.GetCurrentDirectory()), args[0] == "compare-fixtures" ? "Compare" : "Bitwise", args[1..]);

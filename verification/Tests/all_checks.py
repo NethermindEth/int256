@@ -113,13 +113,13 @@ def regression_plan():
                 add(f"operation-{operation}-{profile}", "Runner.Tests/Verification.Tests.csproj",
                     "compare-fixtures" if operation == "Compare" else "bitwise-fixtures", "--profile", profile, "--workspace")
             continue
-        script = "Bitwise/operator_checks.py" if operation in ("OperatorXor", "OperatorAnd", "OperatorOr", "OperatorNot") else "Shift/negative_checks.py"
-        arguments = ("--method", operation)
-        if script == "Shift/negative_checks.py":
-            arguments += ("--safety",)
         for profile in ("scalar", "x64-vector256"):
-            add(f"operation-{operation}-{profile}", "Tests/Fixtures/" + script,
-                *arguments, "--profile", profile, "--workspace")
+            if operation in ("OperatorXor", "OperatorAnd", "OperatorOr", "OperatorNot"):
+                add(f"operation-{operation}-{profile}", "Runner.Tests/Verification.Tests.csproj", "bitwise-operator-fixtures",
+                    "--method", operation, "--profile", profile, "--workspace")
+            else:
+                add(f"operation-{operation}-{profile}", "Tests/Fixtures/Shift/negative_checks.py",
+                    "--method", operation, "--safety", "--profile", profile, "--workspace")
     equality = [name for name, entry in api_entries().items()
                 if entry.get("verification", {}).get("fixtureGroup") == "Equality"]
     equal_profiles = coverage_plan(equality)

@@ -124,11 +124,12 @@ class PlanChecks(unittest.TestCase):
                     self.assertEqual(command, ("verification/Runner.Tests/Verification.Tests.csproj",
                         "compare-fixtures" if operation == "Compare" else "bitwise-fixtures", "--profile", profile, "--workspace"))
                     continue
-                runner = "Bitwise/operator_checks.py" if operation in operations[2:6] else "Shift/negative_checks.py"
-                self.assertEqual(command[0], "verification/Tests/Fixtures/" + runner)
-                if operation not in ("Compare", "Bitwise"):
-                    self.assertEqual(command[1:3], ("--method", operation))
-                self.assertEqual("--safety" in command, runner == "Shift/negative_checks.py")
+                if operation in operations[2:6]:
+                    self.assertEqual(command, ("verification/Runner.Tests/Verification.Tests.csproj", "bitwise-operator-fixtures",
+                        "--method", operation, "--profile", profile, "--workspace"))
+                else:
+                    self.assertEqual(command, ("verification/Tests/Fixtures/Shift/negative_checks.py",
+                        "--method", operation, "--safety", "--profile", profile, "--workspace"))
         for job in plan:
             for command in job.commands:
                 self.assertTrue((checks.ROOT / command[0]).is_file(), command)
