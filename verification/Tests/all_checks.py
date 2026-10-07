@@ -92,7 +92,7 @@ def regression_plan():
         add(f"safety-{method}-scalar", "verify.py", "--method", method, "--profile", "scalar", "--safety")
     add("profile-extractor", "Tests/profile_extractor_checks.py")
     add("csharp-runner", "Runner.Tests/Verification.Tests.csproj")
-    for name in ("change", "prepared", "rejection", "method"):
+    for name in ("change", "prepared", "method"):
         add("python-" + name, "Tests/" + name.replace("-", "_") + "_checks.py")
     add("python-all-checks", "Tests/all_checks_tests.py")
     add("gate-binding", "Tests/gate_binding_checks.py", "--workspace")
@@ -136,7 +136,7 @@ def regression_plan():
         for profile in PROFILES:
             add(f"reporting-{method}-{profile}", "Tests/reporting_checks.py",
                 "--method", method, "--profile", profile)
-    if len(jobs) != 388 or len({job.id for job in jobs}) != 388:
+    if len(jobs) != 387 or len({job.id for job in jobs}) != 387:
         raise RuntimeError("Incomplete or duplicate regression matrix")
     return jobs
 

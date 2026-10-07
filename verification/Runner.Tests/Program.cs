@@ -158,6 +158,7 @@ internal static class Program
             Reject(() => catalog.NativeLimitations(["Unknown"]));
         });
         GateTests.Register(Check);
+        RejectionTests.Register(Check);
         Check("foundation audits reject missing, duplicate and unapproved extra declarations", (_, _) => FoundationChecks.ParserChecks());
         SafetyTests.Register(Check);
         WorkspaceTests.Register(Check);

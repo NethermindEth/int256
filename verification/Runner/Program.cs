@@ -81,6 +81,16 @@ internal static class Program
                 object result;
                 switch (command)
                 {
+                    case "rejection":
+                        string rejectionOutput = Catalog.Text(input["output"]), module = Catalog.Text(input["module"]);
+                        switch (Catalog.Text(input["kind"]))
+                        {
+                            case "resources": RejectionChecks.Resources(rejectionOutput); break;
+                            case "semantic": RejectionChecks.Semantic(rejectionOutput, module); break;
+                            case "diagnostic": RejectionChecks.Diagnostic(rejectionOutput, module, Catalog.Text(input["diagnostic"])); break;
+                            default: throw new ArgumentException("Unknown rejection check");
+                        }
+                        result = true; break;
                     case "theorem-audits": result = ProofAudits.Check(Catalog.Text(input["output"]), input["names"]!.AsArray().Select(Catalog.Text), input["approved"]!.AsArray().Select(Catalog.Text)); break;
                     case "plan": result = catalog.Plan(input["methods"]!.AsArray().Select(Catalog.Text).ToArray(), input["safety"]!.GetValue<bool>()); break;
                     case "entries": result = Catalog.Entries(input.AsObject()); break;

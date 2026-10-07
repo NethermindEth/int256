@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from common import BUILD_DIRECTORIES, PROFILE_DIRECTORY, PROFILES, ROOT, VERIFY, expected_profile, generated_directory, run, sha, source_files, check_calling_convention, method_manifest
 from verify import build_artifact, check_proof_snapshot, safety_gate, source_inputs
-from common import theorem_audits
+from common import theorem_audits, rejection_check
 
 
 def isolated_run(script, arguments, prefix):
@@ -25,24 +25,11 @@ def isolated_run(script, arguments, prefix):
 
 def require_diagnostic_rejection(output, module, diagnostic):
     """Use only after an independent full-contract refutation has passed."""
-    normalized = output.replace("\\", "/")
-    reject_resource_failure(normalized)
-    expected = rf"error: {re.escape(module)}:\d+:\d+: (?:{diagnostic})"
-    errors = [line for line in normalized.splitlines() if line.startswith("error: ")]
-    if not any(re.fullmatch(expected, line) for line in errors):
-        raise RuntimeError("Missing expected execution proof rejection")
-    if any(line != "error: build failed" and not re.fullmatch(expected, line) for line in errors):
-        raise RuntimeError("Rejection included an unrelated proof failure")
-    if "Proof checking failure:" not in output:
-        raise RuntimeError("The complete public verifier did not reach its proof gate")
+    rejection_check("diagnostic", output, module, diagnostic)
 
 
 def reject_resource_failure(output):
-    if any(marker in output.lower() for marker in (
-            "maximum number of heartbeats", "maximum recursion depth",
-            "maximum number of steps exceeded", "deep recursion", "stack overflow",
-            "out of memory", "allocation failed", "killed", "timed out")):
-        raise RuntimeError("Mutation rejection was inconclusive due to exhausted proof resources")
+    rejection_check("resources", output)
 
 
 def initial_bytes_expression(witness):
@@ -185,27 +172,8 @@ def build_extract(destination, name, method="Add"):
 
 
 def require_semantic_rejection(output, module):
-    # A kernel-checked model refutation precedes this check. Tactic failures can
-    # phrase the remaining semantic obligation differently. Require a printed
-    # goal or the final simplifier's no-progress diagnostic in the expected
-    # execution module; syntax/import failures alone cannot satisfy this gate.
-    normalized = output.replace("\\", "/")
-    reject_resource_failure(normalized)
-    errors = [block for block in re.split(r"(?=^error: )", normalized, flags=re.MULTILINE)
-              if block.startswith("error: ")]
-    relevant = [block for block in errors if block.startswith(f"error: {module}:")]
-    no_progress = r":\d+:\d+: `simp` made no progress(?:\n|$)"
-    if not any("⊢" in block or re.search(no_progress, block) for block in relevant):
-        raise RuntimeError("Mutation failed outside the expected semantic proof obligation")
-    for block in errors:
-        headline = block.splitlines()[0]
-        if headline == "error: build failed":
-            continue
-        if not block.startswith(f"error: {module}:") or not (
-                "unsolved goals" in headline or "Tactic `introN` failed:" in headline or
-                "Extracted storage operands differ from the required result:" in headline or
-                re.search(no_progress, headline + "\n")):
-            raise RuntimeError("Mutation included an unrelated or maintenance proof failure")
+    # A kernel-checked full-contract refutation must precede this diagnostic gate.
+    rejection_check("semantic", output, module)
 
 
 def model_refutation(proof, lake, initial, left, right, out, address, actual, expected, method="Add"):

@@ -178,6 +178,11 @@ def theorem_audits(output, names, approved):
                       {"output": output, "names": list(names), "approved": list(approved)}))
 
 
+def rejection_check(kind, output, module="", diagnostic=""):
+    _runner_request(["rejection", "--json"],
+                    {"kind": kind, "output": output, "module": module, "diagnostic": diagnostic})
+
+
 def __getattr__(name):
     # Temporary registry exports for Python regression scheduling during migration.
     if name in {"SIMD_CASES", "SIMD_POSITIVES", "SIMD_NEGATIVES"}:
