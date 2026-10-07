@@ -9,8 +9,7 @@ import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from common import ROOT, VERIFY, generated_directory, run
-from safety_gate import safety_gate
+from common import ROOT, VERIFY, generated_directory, run, safety_gate
 from support import copy_source
 
 

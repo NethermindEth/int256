@@ -241,7 +241,7 @@ internal sealed class Catalog(string verificationDirectory)
             throw new InvalidOperationException("Extracted implicit receiver convention changed");
     }
 
-    internal JsonObject Plan(IReadOnlyList<string> methods)
+    internal JsonObject Plan(IReadOnlyList<string> methods, bool safety = false)
     {
         if (methods.Count == 0 || methods.Distinct().Count() != methods.Count)
             throw new InvalidOperationException("Coverage requires distinct selected methods");
@@ -256,7 +256,12 @@ internal sealed class Catalog(string verificationDirectory)
                 : manifest["verification"]!["familyCoverage"] is JsonObject family
                     ? Strings(family["representatives"])
                     : throw new InvalidOperationException($"Total feature coverage is not implemented yet: {method}");
-            foreach (string profile in profiles) include.Add(new JsonObject { ["method"] = method, ["profile"] = profile });
+            foreach (string profile in profiles)
+            {
+                if (safety && SafetyCatalog.Gate(method, profile)["coverage"]?["kind"]?.GetValue<string>() is not ("feature-family" or "all-profiles"))
+                    throw new InvalidOperationException($"Total safety feature coverage is not implemented yet: {method}/{profile}");
+                include.Add(new JsonObject { ["method"] = method, ["profile"] = profile });
+            }
         }
         return new JsonObject { ["include"] = include };
     }

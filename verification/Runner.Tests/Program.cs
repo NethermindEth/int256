@@ -151,6 +151,7 @@ internal static class Program
             Reject(() => catalog.NativeLimitations(["Unknown"]));
         });
         GateTests.Register(Check);
+        SafetyTests.Register(Check);
         Console.WriteLine($"Passed {passed} C# verification tests.");
         return 0;
     }

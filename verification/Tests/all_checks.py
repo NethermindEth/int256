@@ -15,8 +15,7 @@ import time
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.dont_write_bytecode = True
 import support
-from common import BUILD_DIRECTORIES, MULTIPLY_PROFILES, PROFILES, ROOT, VERIFY, sha, api_entries
-from safety_gate import MULTIPLY_SAFETY_METHODS, BITWISE_DESCRIPTORS, BITWISE_UNARY, COMPARISON_GATES, OPERATOR_DESCRIPTORS, PRIMITIVE_COMPARISONS
+from common import BUILD_DIRECTORIES, MULTIPLY_PROFILES, PROFILES, ROOT, VERIFY, sha, api_entries, MULTIPLY_SAFETY_METHODS, BITWISE_DESCRIPTORS, BITWISE_UNARY, COMPARISON_GATES, OPERATOR_DESCRIPTORS, PRIMITIVE_COMPARISONS
 from verify import source_inputs
 from verify_all import coverage_plan
 

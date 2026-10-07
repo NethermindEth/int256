@@ -152,3 +152,24 @@ def resolve_fixture_groups(entries, groups):
     for entry, replacement in zip(entries, resolved):
         entry.clear()
         entry.update(replacement)
+
+
+def representative_safety_gate(method, profile):
+    return json.loads(_runner_request(["safety-representative", method, profile]))
+
+
+def safety_gate(method, profile):
+    return json.loads(_runner_request(["safety", method, profile]))
+
+
+def selected_safety_module(method, profile):
+    return _runner_request(["safety-module", method, profile])
+
+
+def __getattr__(name):
+    # Temporary registry exports for Python regression scheduling during migration.
+    if name not in {"MULTIPLY_SAFETY_METHODS", "BITWISE_UNARY", "BITWISE_DESCRIPTORS",
+                    "COMPARISON_GATES", "OPERATOR_DESCRIPTORS", "PRIMITIVE_COMPARISONS"}:
+        raise AttributeError(name)
+    value = json.loads(_runner_request(["safety-registry"]))[name]
+    return frozenset(value) if name in {"MULTIPLY_SAFETY_METHODS", "BITWISE_UNARY"} else value

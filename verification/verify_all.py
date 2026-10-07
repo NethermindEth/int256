@@ -14,9 +14,8 @@ import tempfile
 import threading
 import time
 
-from common import audit_module, PROFILES, ROOT, SEMANTICS_VERSION, VERIFY, expected_profile, generated_directory, run, sha, source_files, LEGACY, api_entries, check_calling_convention, method_manifest, method_names, native_limitations
+from common import audit_module, PROFILES, ROOT, SEMANTICS_VERSION, VERIFY, expected_profile, generated_directory, run, sha, source_files, LEGACY, api_entries, check_calling_convention, method_manifest, method_names, native_limitations, safety_gate, selected_safety_module
 from verify import ProofSession, audit_names, build_artifact, check_proof_snapshot, main as verify_one, source_inputs, theorem_audits
-from safety_gate import safety_gate, selected_safety_module
 
 
 METHODS = ("Add", "Subtract")

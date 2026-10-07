@@ -181,16 +181,17 @@ ranges do not weaken the arithmetic guarantee. The mathematical value is a
 
 ## Run verification
 
-A C# runner is being introduced under `Runner/`. It generates the arithmetic
-audit gates and provides catalog and coverage planning; proof execution and CI still
+A C# runner is being introduced under `Runner/`. It generates the arithmetic and
+safety audit gates and provides catalog and coverage planning; proof execution and CI still
 use the commands below. From the repository root:
 
 ```sh
-dotnet run --project verification/Runner -c Release -- plan --expanded
+dotnet run --project verification/Runner -c Release -- plan --expanded --safety
 dotnet run --project verification/Runner.Tests -c Release
 ```
 
-The C# runner also provides `catalog`, `manifest <method>` and `gate <method>`.
+The C# runner also provides `catalog`, `manifest <method>`, `gate <method>`,
+`safety <method> <profile>` and `safety-module <method> <profile>`.
 Python orchestration builds and calls the C# catalog, metadata checks and gate
 generator through `common.py`; successful responses are reused only while their
 source inputs and request match.

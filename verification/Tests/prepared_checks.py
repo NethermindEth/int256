@@ -13,8 +13,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import verify
 import common
-from safety_gate import representative_safety_gate, OPERATOR_DESCRIPTORS, PRIMITIVE_COMPARISONS, operator_safety_module, selected_safety_module
-from common import PROFILES, MULTIPLY_PROFILES, VERIFY, expected_profile, sha, source_files
+from common import representative_safety_gate, OPERATOR_DESCRIPTORS, PRIMITIVE_COMPARISONS, selected_safety_module, PROFILES, MULTIPLY_PROFILES, VERIFY, expected_profile, sha, source_files
 
 
 class PreparedBuildChecks(unittest.TestCase):
@@ -47,7 +46,7 @@ class PreparedBuildChecks(unittest.TestCase):
 
     def test_all_production_gate_imports_resolve(self):
         from common import audit_module, api_entries, LEGACY, method_names
-        from safety_gate import safety_gate
+        from common import safety_gate
         from verify_all import coverage_plan
 
         seen = set()
@@ -526,7 +525,7 @@ class PreparedBuildChecks(unittest.TestCase):
                 self.assertIn("UInt256Proof.SafetySelected.checked_family_contract", gate["theorems"])
                 self.assertEqual(gate["coverage"]["family"],
                                  {"vector256Accelerated": profile == "x64-vector256"})
-                source = operator_safety_module(method, profile)
+                source = selected_safety_module(method, profile)
                 self.assertIn(f"ScalarOperatorContract {str(first).lower()} {str(negate).lower()} CIL.Value.i{width}", source)
                 self.assertIn("right.toInt" if signed else "right.toNat : Int", source)
                 self.assertEqual(source.count("#print axioms"), 3)

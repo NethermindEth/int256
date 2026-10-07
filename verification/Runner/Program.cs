@@ -24,6 +24,21 @@ internal static class Program
             }
 
             Catalog catalog = new(Path.Combine(root, "verification"));
+            if (arguments is ["safety-registry"])
+            {
+                Console.Write(JsonSerializer.Serialize(SafetyCatalog.Registry()));
+                return 0;
+            }
+            if (arguments is ["safety" or "safety-representative" or "safety-module", string safetyMethod, string profile])
+            {
+                Console.Write(arguments[0] switch
+                {
+                    "safety" => SafetyCatalog.Gate(safetyMethod, profile).ToJsonString(),
+                    "safety-representative" => SafetyCatalog.Representative(safetyMethod, profile).ToJsonString(),
+                    _ => SafetyGates.Module(catalog, safetyMethod, profile)
+                });
+                return 0;
+            }
             if (arguments is [string command, "--json"])
             {
                 JsonNode input = JsonNode.Parse(Console.In.ReadToEnd())
@@ -64,15 +79,16 @@ internal static class Program
                 Console.Write(AuditGates.Module(entry).ReplaceLineEndings("\n"));
                 return 0;
             }
+            bool safetyPlan = arguments.Count > 0 && arguments[0] == "plan" && arguments.Remove("--safety");
             JsonNode output = arguments.ToArray() switch
             {
                 ["catalog"] => catalog.Snapshot(),
                 ["manifest", string method] => catalog.Manifest(method),
-                ["plan", "--expanded"] => catalog.Plan(catalog.MethodNames),
-                ["plan", "--method", string method] => catalog.Plan([method]),
-                ["plan"] => catalog.Plan(Catalog.Legacy),
+                ["plan", "--expanded"] => catalog.Plan(catalog.MethodNames, safetyPlan),
+                ["plan", "--method", string method] => catalog.Plan([method], safetyPlan),
+                ["plan"] => catalog.Plan(Catalog.Legacy, safetyPlan),
                 _ => throw new ArgumentException(
-                    "Usage: Verification [--root <repository>] catalog | manifest <method> | gate <method> | plan [--expanded | --method <method>]")
+                    "Usage: Verification [--root <repository>] catalog | manifest <method> | gate <method> | safety[-module] <method> <profile> | plan [--expanded | --method <method>] [--safety]")
             };
             Console.WriteLine(output.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
             return 0;
