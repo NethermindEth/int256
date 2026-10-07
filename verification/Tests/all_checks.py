@@ -94,7 +94,8 @@ def regression_plan():
     for method in ("CompareToUInt256Ref", "CompareToUInt256Value"):
         add(f"safety-{method}-scalar", "verify.py", "--method", method, "--profile", "scalar", "--safety")
     add("profile-extractor", "Tests/profile_extractor_checks.py")
-    for name in ("change", "coverage", "prepared", "rejection", "method", "gate-template", "operation-coverage"):
+    add("csharp-runner", "Runner.Tests/Verification.Tests.csproj")
+    for name in ("change", "coverage", "prepared", "rejection", "method", "operation-coverage"):
         add("python-" + name, "Tests/" + name.replace("-", "_") + "_checks.py")
     add("python-all-checks", "Tests/all_checks_tests.py")
     add("gate-binding", "Tests/gate_binding_checks.py", "--workspace")
@@ -200,7 +201,9 @@ def run_job(job, seed, expected, output):
             receipt["workspace"] = str(workspace)
             require_inputs(workspace, expected)
             for index, tokens in enumerate(job.commands):
-                command = [sys.executable, str(workspace / tokens[0]), *tokens[1:]]
+                command = (["dotnet", "run", "--project", str(workspace / tokens[0]), "-c", "Release", "--", *tokens[1:]]
+                           if tokens[0].endswith(".csproj") else
+                           [sys.executable, str(workspace / tokens[0]), *tokens[1:]])
                 log = directory / f"{index + 1}.log"
                 command_started = time.perf_counter()
                 code = run_process(command, workspace, log)

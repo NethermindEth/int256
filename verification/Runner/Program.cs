@@ -24,6 +24,22 @@ internal static class Program
             }
 
             Catalog catalog = new(Path.Combine(root, "verification"));
+            if (arguments is ["gate" or "bound-audits", "--entry-json"])
+            {
+                JsonObject entry = JsonNode.Parse(Console.In.ReadToEnd()) as JsonObject
+                    ?? throw new ArgumentException("Expected an entry JSON object");
+                Console.Write(arguments[0] == "gate" ? AuditGates.Module(entry)
+                    : JsonSerializer.Serialize(AuditGates.BoundAuditNames(entry)));
+                return 0;
+            }
+            if (arguments is ["gate", string selector])
+            {
+                _ = catalog.Manifest(selector);
+                if (!catalog.Entries().TryGetValue(selector, out JsonObject? entry))
+                    throw new ArgumentException("Legacy Add/Subtract use their existing static audit modules");
+                Console.Write(AuditGates.Module(entry).ReplaceLineEndings("\n"));
+                return 0;
+            }
             JsonNode output = arguments.ToArray() switch
             {
                 ["catalog"] => catalog.Snapshot(),
@@ -32,7 +48,7 @@ internal static class Program
                 ["plan", "--method", string method] => catalog.Plan([method]),
                 ["plan"] => catalog.Plan(Catalog.Legacy),
                 _ => throw new ArgumentException(
-                    "Usage: Verification [--root <repository>] catalog | manifest <method> | plan [--expanded | --method <method>]")
+                    "Usage: Verification [--root <repository>] catalog | manifest <method> | gate <method> | plan [--expanded | --method <method>]")
             };
             Console.WriteLine(output.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
             return 0;

@@ -39,7 +39,7 @@ class PlanChecks(unittest.TestCase):
                            "operation-": 24, "reporting-": 14, "legacy-": 2, "robustness-": 2}
         for prefix, count in expected_counts.items():
             self.assertEqual(sum(name.startswith(prefix) for name in by_id), count)
-        expected_foundations = {"foundation", "profile-extractor", "gate-binding", "python-all-checks", "safety-robustness-Add",
+        expected_foundations = {"csharp-runner", "foundation", "profile-extractor", "gate-binding", "python-all-checks", "safety-robustness-Add",
                                "safety-foundation", "safety-fixtures", "safety-Add-scalar", "safety-Add-x64-avx2", "safety-Add-x64-avx2-bmi1", "safety-EqUInt256UInt256-scalar",
                                "safety-Add-x64-sse42", "safety-Add-arm64-advsimd", "safety-AddOverflow-arm64-advsimd", "safety-AddOverflow-x64-sse42", "safety-EqualsUInt256Ref-scalar",
                                "safety-NeUInt256UInt256-scalar",
@@ -53,7 +53,7 @@ class PlanChecks(unittest.TestCase):
                                "safety-EqUInt256UInt256-sse41", "safety-EqualsUInt256Ref-sse41", "safety-NeUInt256UInt256-sse41",
                                "safety-EqualsUInt256Ref-vector256", "safety-NeUInt256UInt256-vector256",
                                *("python-" + name for name in ("change", "coverage", "prepared", "rejection",
-                                  "method", "gate-template", "operation-coverage"))}
+                                  "method", "operation-coverage"))}
         expected_foundations.update(f"safety-{method}-{profile}"
                                     for method in ("Multiply", "MultiplyInstance", "OperatorMultiplyUInt256UInt256",
                                                    "OperatorMultiplyUInt256UInt32", "OperatorMultiplyUInt32UInt256",
@@ -213,6 +213,19 @@ class ExecutionChecks(unittest.TestCase):
         self.assertEqual(receipt["commands"][0]["exitCode"], 7)
         self.assertEqual(receipt["commands"][0]["logSha256"], checks.sha(
             next(self.output.glob("run-*/legacy-Add/1.log"))))
+
+    def test_csharp_project_uses_dotnet_runner(self):
+        job = checks.Job("csharp-runner", (("verification/Runner.Tests/Verification.Tests.csproj",),))
+        commands = []
+        def capture(command, directory, log):
+            commands.append(command)
+            return self.success(command, directory, log)
+        with patch.object(checks, "run_process", capture):
+            checks.run_suite([job], [job], 1, self.output)
+        self.assertEqual(len(commands), 1)
+        self.assertEqual(commands[0][:3], ["dotnet", "run", "--project"])
+        self.assertTrue(commands[0][3].endswith("Verification.Tests.csproj"))
+        self.assertEqual(commands[0][4:], ["-c", "Release", "--"])
 
     def test_immutable_copy_mismatch_prevents_commands_and_aggregate(self):
         job = checks.Job("one", (("runner.py",),))

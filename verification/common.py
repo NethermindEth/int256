@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import threading
 from methods import LEGACY, method_names
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -74,3 +75,38 @@ def sha(path):
 def source_files(directory, suffixes):
     return (p for p in directory.rglob("*") if p.is_file() and p.suffix in suffixes
             and not BUILD_DIRECTORIES.intersection(p.relative_to(directory).parts))
+
+
+_runner_lock = threading.Lock()
+_runner_inputs = None
+
+
+def _runner_gate(command, entry):
+    """Temporary bridge while proof orchestration moves to the C# runner."""
+    global _runner_inputs
+    root = Path(__file__).resolve().parent.parent
+    project = root / "verification/Runner/Verification.csproj"
+    binary = project.parent / "bin/Release/net10.0/Verification.dll"
+    with _runner_lock:
+        inputs = {str(p): sha(p) for p in source_files(project.parent, {".cs", ".csproj"})}
+        inputs.update({str(p): sha(p) for p in root.iterdir()
+                       if p.is_file() and (p.suffix in {".props", ".targets"} or p.name in {"global.json", "NuGet.Config"})})
+        if inputs != _runner_inputs or not binary.is_file():
+            result = subprocess.run(["dotnet", "build", str(project), "-c", "Release", "--nologo"],
+                                    cwd=root, capture_output=True, text=True, encoding="utf-8")
+            if result.returncode:
+                raise RuntimeError("C# gate generator build failed:\n" + result.stdout + result.stderr)
+            _runner_inputs = inputs
+    result = subprocess.run(["dotnet", str(binary), command, "--entry-json"], cwd=root,
+                            input=json.dumps(entry), capture_output=True, text=True, encoding="utf-8")
+    if result.returncode:
+        raise RuntimeError(result.stderr.strip() or "C# gate generator failed")
+    return result.stdout
+
+
+def audit_module(entry):
+    return _runner_gate("gate", entry)
+
+
+def bound_audit_names(entry):
+    return json.loads(_runner_gate("bound-audits", entry))

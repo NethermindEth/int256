@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import coverage_checks
 import verify_all
-from gate_templates import audit_module
+from common import audit_module
 from methods import api_entries, method_manifest
 
 

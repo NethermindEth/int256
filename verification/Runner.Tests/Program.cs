@@ -104,7 +104,8 @@ internal static class Program
             Edit(Path.Combine(directory, "profiles/x64-bmi2.json"), profile => profile["vector256Accelerated"] = null);
             Reject(() => catalog.Plan(catalog.MethodNames));
         });
-        Console.WriteLine($"Passed {passed} C# catalog tests.");
+        GateTests.Register(Check);
+        Console.WriteLine($"Passed {passed} C# verification tests.");
         return 0;
     }
 
@@ -125,12 +126,12 @@ internal static class Program
         File.WriteAllText(path, document.ToJsonString());
     }
 
-    private static void Require(bool condition, string message)
+    internal static void Require(bool condition, string message)
     {
         if (!condition) throw new InvalidOperationException(message);
     }
 
-    private static void Reject(Action action)
+    internal static void Reject(Action action)
     {
         try { action(); }
         catch (Exception error) when (error is InvalidOperationException or ArgumentException) { return; }
