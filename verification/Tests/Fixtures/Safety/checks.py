@@ -13,7 +13,8 @@ import tempfile
 
 sys.path[:0] = [str(Path(__file__).resolve().parents[3])]
 from common import ROOT, VERIFY, run, sha, source_files
-from verify import build_artifact, source_inputs
+from common import source_inputs
+from verify import build_artifact
 from common import theorem_audits
 
 CASES = {

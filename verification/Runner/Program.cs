@@ -81,6 +81,10 @@ internal static class Program
                 object result;
                 switch (command)
                 {
+                    case "snapshot":
+                        result = Workspace.CheckProofSnapshot(Catalog.Text(input["proof"]), input["paths"]!.AsArray().Select(Catalog.Text),
+                            input["inputs"]!.AsObject().ToDictionary(pair => pair.Key, pair => Catalog.Text(pair.Value)));
+                        break;
                     case "rejection":
                         string rejectionOutput = Catalog.Text(input["output"]), module = Catalog.Text(input["module"]);
                         switch (Catalog.Text(input["kind"]))

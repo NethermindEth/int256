@@ -91,7 +91,7 @@ _runner_inputs = None
 _runner_outputs = {}
 
 
-def _runner_request(arguments, payload=None):
+def _runner_request(arguments, payload=None, *, cache=True):
     """Temporary bridge while proof orchestration moves to the C# runner."""
     global _runner_inputs
     root = Path(__file__).resolve().parent.parent
@@ -113,13 +113,24 @@ def _runner_request(arguments, payload=None):
             if result.returncode:
                 raise RuntimeError("C# gate generator build failed:\n" + result.stdout + result.stderr)
             _runner_inputs = inputs
-        if key not in _runner_outputs:
+        if not cache or key not in _runner_outputs:
             result = subprocess.run(["dotnet", str(binary), *arguments], cwd=root,
                                     input=serialized, capture_output=True, text=True, encoding="utf-8")
             if result.returncode:
                 raise RuntimeError(result.stderr.strip() or "C# verification runner failed")
+            if not cache:
+                return result.stdout
             _runner_outputs[key] = result.stdout
         return _runner_outputs[key]
+
+
+def source_inputs(root=ROOT):
+    return json.loads(_runner_request(["--root", str(Path(root).resolve()), "inputs"], cache=False))
+
+
+def check_proof_snapshot(proof, relative_paths, inputs):
+    return json.loads(_runner_request(["snapshot", "--json"],
+        {"proof": str(Path(proof).resolve()), "paths": [str(path) for path in relative_paths], "inputs": inputs}, cache=False))
 
 
 def audit_module(entry):

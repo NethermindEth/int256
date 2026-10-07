@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.dont_write_bytecode = True
 import support
 from common import BUILD_DIRECTORIES, MULTIPLY_PROFILES, PROFILES, ROOT, VERIFY, sha, api_entries, MULTIPLY_SAFETY_METHODS, BITWISE_DESCRIPTORS, BITWISE_UNARY, COMPARISON_GATES, OPERATOR_DESCRIPTORS, PRIMITIVE_COMPARISONS, coverage_plan
-from verify import source_inputs
+from common import source_inputs
 
 
 @dataclass(frozen=True)
@@ -154,7 +154,7 @@ def ci_matrix(plan):
 
 def inputs_at(directory):
     # Execute the same source selector in the copied repository; also detects added inputs.
-    code = "import sys,json;sys.path.insert(0,'verification');from verify import source_inputs;print(json.dumps(source_inputs()))"
+    code = "import sys,json;sys.path.insert(0,'verification');from common import source_inputs;print(json.dumps(source_inputs()))"
     command = [sys.executable, "-B", "-c", code]
     result = subprocess.run(command, cwd=directory,
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8")

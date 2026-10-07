@@ -17,6 +17,26 @@ import verify
 
 
 class MethodChecks(unittest.TestCase):
+    def test_workspace_bridge_never_caches_file_checks(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "verification").mkdir()
+            for name in ("global.json", ".editorconfig", "verification/lean-toolchain"):
+                (root / name).write_text("initial", encoding="utf-8")
+            source = root / "verification/Test.lean"
+            source.write_text("initial", encoding="utf-8")
+            inputs = common.source_inputs(root)
+            self.assertEqual(common.check_proof_snapshot(source.parent, [Path("Test.lean")], inputs),
+                             {"Test.lean": common.sha(source)})
+            source.write_text("changed", encoding="utf-8")
+            self.assertNotEqual(common.source_inputs(root), inputs)
+            with self.assertRaisesRegex(RuntimeError, "snapshot"):
+                common.check_proof_snapshot(source.parent, [Path("Test.lean")], inputs)
+            source.unlink()
+            self.assertNotIn("verification/Test.lean", common.source_inputs(root))
+            with self.assertRaises(RuntimeError):
+                common.check_proof_snapshot(source.parent, [Path("Test.lean")], inputs)
+
     def test_combined_fixture_baseline_uses_safety_reports_and_identical_proofs(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)

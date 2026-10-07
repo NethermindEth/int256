@@ -12,7 +12,7 @@ import threading
 import time
 
 from common import audit_module, bound_audit_names, PROFILE_DIRECTORY, PROFILE_NAMES, PROFILES, ROOT, SEMANTICS_VERSION, VERIFY, expected_profile, generated_directory, run, sha, source_files, LEGACY, api_entries, check_calling_convention, method_manifest, method_names, native_limitations, selected_safety_module, safety_gate
-from common import SIMD_CASES, theorem_audits
+from common import SIMD_CASES, theorem_audits, check_proof_snapshot, source_inputs as workspace_inputs
 
 def run_stage(command, cwd, stage):
     try:
@@ -32,21 +32,7 @@ def audit_names(method):
 
 
 def source_inputs():
-    paths = [ROOT / "global.json", ROOT / ".editorconfig"]
-    paths.extend(p for p in ROOT.iterdir() if p.is_file() and p.suffix.lower() in {".props", ".targets", ".config"})
-    paths.extend((ROOT / ".github/workflows").glob("verify-uint256*.yml"))
-    for directory in (ROOT / "src", VERIFY):
-        paths.extend(source_files(directory,
-                     {".cs", ".csproj", ".props", ".targets", ".lean", ".in", ".json", ".toml", ".py"}))
-    paths.append(VERIFY / "lean-toolchain")
-    return {p.relative_to(ROOT).as_posix(): sha(p) for p in sorted(set(paths))}
-
-
-def check_proof_snapshot(proof, relative_paths, inputs):
-    hashes = {str(path).replace("\\", "/"): sha(proof / path) for path in relative_paths}
-    if any(inputs.get(f"verification/{path}") != digest for path, digest in hashes.items()):
-        raise RuntimeError("Proof snapshot does not match captured source inputs")
-    return hashes
+    return workspace_inputs(ROOT)
 
 
 def copy_proof_sources(proof, inputs):
