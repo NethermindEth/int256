@@ -1,10 +1,51 @@
 // SPDX-FileCopyrightText: 2026 Demerzel Solutions Limited
 // SPDX-License-Identifier: LGPL-3.0-only
 
+using System.Text.Json.Nodes;
+
 namespace UInt256Verification;
 
 internal static class SimdFixtures
 {
+    internal static void TargetChanged(string name, string method, string profile, JsonObject before, JsonObject after)
+    {
+        JsonArray Instructions(JsonNode body) => new(body["instructions"]!.AsArray().Select(item => (JsonNode)new JsonArray(
+            item!["opcode"]!.DeepClone(), item["operand"]?.DeepClone())).ToArray());
+        if (name == "FeatureExpressions")
+        {
+            int Getters(JsonObject artifact)
+            {
+                var live = artifact["coverage"]!.AsArray().ToDictionary(item => Catalog.Text(item!["method"]),
+                    item => item!["reachable"]!.AsArray().Select(value => value!.GetValue<int>()).ToHashSet());
+                return artifact["methods"]!.AsArray().Sum(body => body!["instructions"]!.AsArray().Count(op =>
+                    live[Catalog.Text(body["signature"])].Contains(op!["Offset"]!.GetValue<int>()) && Catalog.Text(op["opcode"]) == "call"
+                    && op["operand"]!.ToString().Contains("::get_IsSupported()", StringComparison.Ordinal)));
+            }
+            if (Getters(after) <= Getters(before)) throw new InvalidOperationException("Feature rewrite did not change reachable feature expressions");
+            return;
+        }
+        if (name == "Renamed")
+        {
+            JsonArray Bodies(JsonObject artifact) => new(artifact["methods"]!.AsArray().Select(body => (JsonNode)Instructions(body!)).ToArray());
+            if (JsonNode.DeepEquals(Bodies(before), Bodies(after))) throw new InvalidOperationException("Renaming did not change a reachable call operand");
+            return;
+        }
+        string target = name switch
+        {
+            "ReversedStore" => "StoreLimbs",
+            "EquivalentMask" => method == "Add" ? "PrepareAdd" : "SubtractImpl",
+            "ExtractedHelper" when profile is not ("arm64-advsimd" or "x64-sse42") => method == "Add" ? "FinishAdd" : "SubtractImpl",
+            _ => method == "Add" ? "AddVector128" : "SubtractVector128"
+        };
+        JsonArray Body(JsonObject artifact)
+        {
+            JsonNode[] found = artifact["methods"]!.AsArray().Where(body => Catalog.Text(body!["signature"]).Contains($"::{target}(", StringComparison.Ordinal)).Select(body => body!).ToArray();
+            if (found.Length != 1) throw new InvalidOperationException($"Missing/ambiguous targeted fixture method {target}");
+            return Instructions(found[0]);
+        }
+        if (JsonNode.DeepEquals(Body(before), Body(after))) throw new InvalidOperationException($"{name}: targeted reachable CIL {target} did not change");
+    }
+
     internal static bool Positive(string name, string method, string profile) => name switch
     {
         "Baseline" or "Renamed" or "ExtractedHelper" or "FeatureExpressions" => true,

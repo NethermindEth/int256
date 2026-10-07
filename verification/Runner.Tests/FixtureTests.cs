@@ -10,6 +10,43 @@ internal static class FixtureTests
 {
     internal static void Register(Action<string, Action<Catalog, string>> check)
     {
+        check("SIMD fixture changes target the selected helper and reachable feature expressions", (_, _) =>
+        {
+            JsonObject Artifact(params string[] signatures) => new()
+            {
+                ["methods"] = new JsonArray(signatures.Select(signature => (JsonNode)new JsonObject { ["signature"] = signature,
+                    ["instructions"] = new JsonArray(new JsonObject { ["opcode"] = "call", ["operand"] = "Feature::get_IsSupported()", ["Offset"] = 0 }) }).ToArray()),
+                ["coverage"] = new JsonArray(signatures.Select(signature => (JsonNode)new JsonObject { ["method"] = signature, ["reachable"] = new JsonArray(0) }).ToArray())
+            };
+            foreach (string method in new[] { "Add", "Subtract" })
+                foreach (string profile in new[] { "arm64-advsimd", "x64-sse42", "x64-avx2", "x64-avx512" })
+                    foreach (string name in new[] { "LaneLocals", "InlineCarry", "EquivalentMask", "ExtractedHelper", "ReversedStore" })
+                    {
+                        string target = name == "ReversedStore" ? "StoreLimbs" : name == "EquivalentMask" ? (method == "Add" ? "PrepareAdd" : "SubtractImpl")
+                            : name == "ExtractedHelper" && profile.StartsWith("x64-avx", StringComparison.Ordinal) ? (method == "Add" ? "FinishAdd" : "SubtractImpl")
+                            : method == "Add" ? "AddVector128" : "SubtractVector128";
+                        JsonObject before = Artifact($"::{target}(", "::Other(");
+                        JsonObject after = before.DeepClone().AsObject();
+                        after["methods"]![0]!["instructions"]![0]!["operand"] = "changed";
+                        SimdFixtures.TargetChanged(name, method, profile, before, after);
+                        Program.Reject(() => SimdFixtures.TargetChanged(name, method, profile, before, before));
+                        after = before.DeepClone().AsObject(); after["methods"]![1]!["instructions"]![0]!["operand"] = "changed";
+                        Program.Reject(() => SimdFixtures.TargetChanged(name, method, profile, before, after));
+                        Program.Reject(() => SimdFixtures.TargetChanged(name, method, profile, before, Artifact("::Other(")));
+                        Program.Reject(() => SimdFixtures.TargetChanged(name, method, profile, before, Artifact($"::{target}(", $"::{target}(")));
+                    }
+            JsonObject baseline = Artifact("::Entry("), changed = baseline.DeepClone().AsObject();
+            changed["methods"]![0]!["signature"] = "::Renamed(";
+            Program.Reject(() => SimdFixtures.TargetChanged("Renamed", "Add", "x64-avx2", baseline, changed));
+            changed["methods"]![0]!["instructions"]![0]!["operand"] = "::NewCall(";
+            SimdFixtures.TargetChanged("Renamed", "Add", "x64-avx2", baseline, changed);
+            changed = baseline.DeepClone().AsObject();
+            changed["methods"]![0]!["instructions"]!.AsArray().Add(new JsonObject { ["opcode"] = "call", ["operand"] = "Other::get_IsSupported()", ["Offset"] = 1 });
+            Program.Reject(() => SimdFixtures.TargetChanged("FeatureExpressions", "Add", "x64-avx2", baseline, changed));
+            changed["coverage"]![0]!["reachable"]!.AsArray().Add(1);
+            SimdFixtures.TargetChanged("FeatureExpressions", "Add", "x64-avx2", baseline, changed);
+            Program.Reject(() => SimdFixtures.TargetChanged("FeatureExpressions", "Add", "x64-avx2", changed, baseline));
+        });
         check("fixture changes require instructions in the intended reachable method", (_, _) =>
         {
             JsonObject baseline = JsonNode.Parse("""

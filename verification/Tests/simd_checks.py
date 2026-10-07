@@ -14,11 +14,10 @@ import tempfile
 import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from common import simd_data, verifier_command, ROOT, PROFILES, run, sha
+from common import fixture_check, simd_data, verifier_command, ROOT, PROFILES, run, sha
 from common import SIMD_POSITIVES as POSITIVES, SIMD_NEGATIVES as NEGATIVES
 from support import copy_source, model_refutation, require_semantic_rejection
 
-FAMILIES = ("arm64-advsimd", "x64-sse42", "x64-avx2", "x64-avx512")
 
 
 def report_path(proof, method, profile):
@@ -60,29 +59,7 @@ def positive_applicable(case, method, profile):
 
 
 def target_changed(case, method, profile, before, after):
-    if case == "FeatureExpressions":
-        def getters(artifact):
-            live = {c["method"]: set(c["reachable"]) for c in artifact["coverage"]}
-            return sum(op["opcode"] == "call" and "::get_IsSupported()" in str(op["operand"])
-                       for body in artifact["methods"] for op in body["instructions"]
-                       if op["Offset"] in live[body["signature"]])
-        if getters(after) <= getters(before):
-            raise RuntimeError("Feature rewrite did not change reachable feature expressions")
-        return
-    if case == "Renamed":
-        if cil(before) == cil(after): raise RuntimeError("Renaming did not change a reachable call operand")
-        return
-    name = ("AddVector128" if method == "Add" else "SubtractVector128")
-    if case == "ReversedStore": name = "StoreLimbs"
-    if case == "EquivalentMask": name = "PrepareAdd" if method == "Add" else "SubtractImpl"
-    if case == "ExtractedHelper" and profile not in FAMILIES[:2]:
-        name = "FinishAdd" if method == "Add" else "SubtractImpl"
-    def body(artifact):
-        found = [m for m in artifact["methods"] if f"::{name}(" in m["signature"]]
-        if len(found) != 1: raise RuntimeError(f"Missing/ambiguous targeted fixture method {name}")
-        return [(i["opcode"],i["operand"]) for i in found[0]["instructions"]]
-    if body(before) == body(after):
-        raise RuntimeError(f"{case}: targeted reachable CIL {name} did not change")
+    fixture_check("simd-target", case=case, method=method, profile=profile, before=before, after=after)
 
 
 def witness(case, method):

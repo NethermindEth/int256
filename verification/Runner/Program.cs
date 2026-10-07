@@ -98,6 +98,7 @@ internal static class Program
                     case "fixture-check":
                         switch (Catalog.Text(input["kind"]))
                         {
+                            case "simd-target": SimdFixtures.TargetChanged(Catalog.Text(input["case"]), Catalog.Text(input["method"]), Catalog.Text(input["profile"]), input["before"]!.AsObject(), input["after"]!.AsObject()); break;
                             case "changed-method": FixtureChecks.ChangedMethod(input["artifact"]!.AsObject(), input["baseline"]!.AsObject(), Catalog.Text(input["signature"])); break;
                             case "safety-report": FixtureChecks.SafetyReport(input["report"]!.AsObject(), Catalog.Text(input["method"]), Catalog.Text(input["profile"])); break;
                             case "baseline": FixtureChecks.Baseline(input["production"]!.AsObject(), input["baseline"]!.AsObject(), input["inputs"]!.AsObject()); break;
