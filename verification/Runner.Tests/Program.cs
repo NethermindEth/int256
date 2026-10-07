@@ -154,6 +154,7 @@ internal static class Program
         SafetyTests.Register(Check);
         WorkspaceTests.Register(Check);
         VerifierTests.Register(Check);
+        CoverageTests.Register(Check);
         Console.WriteLine($"Passed {passed} C# verification tests.");
         return 0;
     }

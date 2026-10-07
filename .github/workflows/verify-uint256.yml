@@ -40,18 +40,15 @@ jobs:
       matrix: ${{ steps.plan.outputs.matrix }}
     steps:
       - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.401'
       - name: Require all selected API proof gates
         id: plan
         run: |
-          python3 - <<'PY'
-          import os
-          import subprocess
-          import sys
-          matrix = subprocess.check_output(
-              [sys.executable, "verification/verify_all.py", "--expanded", "--safety", "--print-plan"], text=True)
-          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
-              output.write("matrix=" + matrix.strip() + "\n")
-          PY
+          dotnet build verification/Runner -c Release --nologo
+          matrix=$(dotnet verification/Runner/bin/Release/net10.0/Verification.dll plan --expanded --safety)
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
   verify:
     needs: plan
     name: Production proof (${{ matrix.method }}, ${{ matrix.profile }})
@@ -90,4 +87,4 @@ jobs:
           echo "$RUNNER_TEMP/lean-4.34.1-linux/bin" >> "$GITHUB_PATH"
       - name: Verify UInt256 arithmetic and memory safety
         if: steps.changes.outputs.required == 'true'
-        run: python3 verification/verify.py --method ${{ matrix.method }} --profile ${{ matrix.profile }} --safety
+        run: dotnet run --project verification/Runner -c Release -- verify --method ${{ matrix.method }} --profile ${{ matrix.profile }} --safety

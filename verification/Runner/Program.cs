@@ -24,6 +24,11 @@ internal static class Program
             }
 
             Catalog catalog = new(Path.Combine(root, "verification"));
+            if (arguments.Count > 0 && arguments[0] == "verify-all")
+            {
+                new Coverage(new Workspace(root)).Run(CoverageOptions.Parse(arguments.Skip(1).ToArray()));
+                return 0;
+            }
             if (arguments is ["simd-fixtures"])
             {
                 Console.WriteLine(JsonSerializer.Serialize(Verifier.SimdRegistry(Path.Combine(root, "verification"))));
@@ -118,9 +123,9 @@ internal static class Program
                 ["plan", "--method", string method] => catalog.Plan([method], safetyPlan),
                 ["plan"] => catalog.Plan(Catalog.Legacy, safetyPlan),
                 _ => throw new ArgumentException(
-                    "Usage: Verification [--root <repository>] verify [--method <method>] [--profile <profile>] [--safety] [--fixture <case> | --simd-fixture <case>] | catalog | inputs | extract <method> <profile> <new-directory> | manifest <method> | gate <method> | safety[-module] <method> <profile> | plan [--expanded | --method <method>] [--safety]")
+                    "Usage: Verification [--root <repository>] verify [--method <method>] [--profile <profile>] [--safety] [--fixture <case> | --simd-fixture <case>] | verify-all [--expanded | --method <method>] [--safety] [--jobs <count>] [--check-reports | --print-plan] | catalog | inputs | extract <method> <profile> <new-directory> | manifest <method> | gate <method> | safety[-module] <method> <profile> | plan [--expanded | --method <method>] [--safety]")
             };
-            Console.WriteLine(output.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+            Console.WriteLine(output.ToJsonString(new JsonSerializerOptions { WriteIndented = arguments[0] != "plan" }));
             return 0;
         }
         catch (Exception error) when (error is ArgumentException or InvalidOperationException or IOException or JsonException or System.ComponentModel.Win32Exception)

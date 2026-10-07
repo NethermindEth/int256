@@ -39,7 +39,7 @@ Helper discovery now uses extracted signature candidates and validates their
 actual frames. Retained multiplication certificates describe the earlier
 implementation; they do not verify the newer scalar fallback.
 
-For example, `python verification/verify.py --method EqualsUInt32 --profile scalar --safety`
+For example, `dotnet run --project verification/Runner -c Release -- verify --method EqualsUInt32 --profile scalar --safety`
 writes `generated/operations/EqualsUInt32/scalar/safety/report.json`; scalar Add
 writes `generated/safety/report.json`. Other representatives fail explicitly.
 Primitive `Equals` and Eq/Ne gates additionally prove the combined contract for every
@@ -181,9 +181,9 @@ ranges do not weaken the arithmetic guarantee. The mathematical value is a
 
 ## Run verification
 
-A C# runner is being introduced under `Runner/`. It generates the arithmetic and
-safety audit gates and provides catalog, coverage planning and individual proof
-execution. Coverage orchestration and CI still use Python. From the repository root:
+The C# runner under `Runner/` generates arithmetic and safety gates, executes
+proofs, and composes total coverage. Production CI uses it; regression orchestration
+and change selection still use Python. From the repository root:
 
 ```sh
 dotnet run --project verification/Runner -c Release -- plan --expanded --safety
@@ -207,15 +207,15 @@ manifests. The first build needs NuGet access for Mono.Cecil and repository
 dependencies. Run from the repository root:
 
 ```sh
-python verification/verify.py --method Add
-python verification/verify.py --method Subtract
-python verification/verify.py --method Subtract --profile x64-avx2-bmi1
-python verification/verify.py --method LtUInt256UInt64
-python verification/verify_all.py
-python verification/verify_all.py --method Lsh
+dotnet run --project verification/Runner -c Release -- verify --method Add
+dotnet run --project verification/Runner -c Release -- verify --method Subtract
+dotnet run --project verification/Runner -c Release -- verify --method Subtract --profile x64-avx2-bmi1
+dotnet run --project verification/Runner -c Release -- verify --method LtUInt256UInt64
+dotnet run --project verification/Runner -c Release -- verify-all
+dotnet run --project verification/Runner -c Release -- verify-all --method Lsh
 ```
 
-Use `--jobs 2` with `verify_all.py` to check two profiles concurrently. Each worker
+Use `--jobs 2` with `verify-all` to check two profiles concurrently. Each worker
 starts with an empty proof directory and reuses its own checked dependencies
 between jobs; workers share the fresh DLL, not their Lean caches. Extraction and
 typed gates are regenerated for every job, and Lake rebuilds their dependents.
@@ -228,7 +228,7 @@ compiled caches, and checks the selected theorem and axiom audit. It invalidates
 the previous success report before starting and rechecks source inputs and the
 DLL digest before issuing a new one.
 
-By default, `verify_all.py` covers Add/Subtract. It builds one fresh production DLL and checks both methods in all
+By default, `verify-all` covers Add/Subtract. It builds one fresh production DLL and checks both methods in all
 seven classes, using worker-local proof directories. It then audits the total
 classification and composition rules and checks every full family certificate
 before issuing `generated/coverage.json`. The proof host does not need ARM or
@@ -244,15 +244,15 @@ proofs; a conditional profile-agreement proof alone is insufficient. `--expanded
 requires Add/Subtract and every selected API in the coverage manifest. It refuses
 a partial success certificate if any required proof or coverage check fails.
 
-Add `--print-plan` to print the complete method/profile matrix without building
-or changing reports. CI uses `--expanded --safety --print-plan` to select production jobs;
+The `plan` command prints the complete method/profile matrix without building
+production code or changing reports. CI uses `plan --expanded --safety` to select production jobs;
 an incomplete plan fails before any partial matrix is emitted.
 The complete plan contains 87 methods and 256 method/profile jobs. The retained
 production snapshot has combined arithmetic and memory-safety evidence for all
 of them, including total valid feature-profile coverage under the documented
 runtime assumptions. Fresh reports are still required for changed implementations.
 
-Use `verify_all.py --expanded --safety --jobs 6` for combined coverage; adjust
+Use `verify-all --expanded --safety --jobs 6` for combined coverage; adjust
 `--jobs` for available CPU and memory. Every
 certificate must include the arithmetic and safety audits, exact generated
 bindings and complete safety family coverage. Arithmetic-only reports cannot
@@ -334,7 +334,8 @@ contract, execution proof, correctness theorem and audit gate.
 | `UInt256/Methods/` | Independent operation contracts, execution and audits |
 | `UInt256/Methods/ConstructorSafety.lean`, `ValueSafety.lean` | Extracted helper proofs shared by several operation families |
 | `Extractor/` | Metadata validation, reachability, translation and Lean emission |
-| `verify.py`, `verify_all.py`, `common.py`, `changes.py` | Fresh verification, coverage composition and CI selection |
+| `Runner/` | Fresh verification, coverage composition and typed gate generation |
+| `verify.py`, `verify_all.py`, `common.py`, `changes.py` | Python compatibility helpers and CI change selection |
 | `Tests/` | Versioned fixtures, kernel refutations and regression runners |
 
 Pure semantics, representation, storage lemmas and arithmetic do not import
@@ -358,7 +359,7 @@ aggregate type requires validated layout descriptors and corresponding semantics
 moving these files alone would not remove those assumptions.
 
 Higher proofs apply imported lower theorems rather than repeat their proofs.
-Lake stores checked modules in `.olean` files. `verify_all.py` reuses these within
+Lake stores checked modules in `.olean` files. `verify-all` reuses these within
 each fresh worker workspace; changing the extraction rebuilds its dependents.
 
 ## Regression tests and CI
@@ -367,7 +368,7 @@ After verifier, extractor, CIL semantics or automation changes, and before
 releases, check production coverage and then the complete regression matrix:
 
 ```sh
-python verification/verify_all.py --expanded --jobs 2
+dotnet run --project verification/Runner -c Release -- verify-all --expanded --jobs 2
 python verification/Tests/all_checks.py --jobs 2
 ```
 
@@ -433,7 +434,7 @@ build, extraction and rejection checks live in `Tests/support.py`; `Fixtures.pro
 selects shared C# components explicitly. Readable `RefutationTemplate.lean.in`
 files supply case data to shared Lean observation lemmas, which exclude every
 successful execution fuel. Expected results remain independent of extracted CIL.
-A direct fixture run, such as `python verification/verify.py --fixture CarryOr`,
+A direct fixture run, such as `dotnet run --project verification/Runner -c Release -- verify --fixture CarryOr`,
 replaces that method's extraction and report; rerun production verification before
 using them as a production baseline.
 

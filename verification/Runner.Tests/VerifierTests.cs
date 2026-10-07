@@ -16,13 +16,13 @@ internal static class VerifierTests
         File.WriteAllText(target, text);
     }
 
-    private static Workspace Setup(Catalog catalog, string manifests, string failure = "")
+    internal static Workspace Setup(Catalog catalog, string manifests, string failure = "", Action<string, string>? during = null, string method = Method)
     {
         string root = Path.Combine(Path.GetDirectoryName(manifests)!, "source");
         foreach (string source in Directory.EnumerateFiles(manifests, "*", SearchOption.AllDirectories))
             Write(root, "verification/manifests/" + Path.GetRelativePath(manifests, source), File.ReadAllText(source));
         foreach (string path in new[] { "global.json", ".editorconfig", "verification/lean-toolchain", "verification/lakefile.toml", "verification/Proof.lean" }) Write(root, path, "source");
-        JsonObject manifest = catalog.Manifest(Method), abi = manifest["callingConvention"]!.AsObject();
+        JsonObject manifest = catalog.Manifest(method), abi = manifest["callingConvention"]!.AsObject();
         JsonArray parameters = [];
         foreach (JsonNode? p in abi["parameters"]!.AsArray()) parameters.Add(new JsonObject
         {
@@ -32,6 +32,7 @@ internal static class VerifierTests
             ["returnType"] = abi["returns"]!.DeepClone(), ["parameters"] = parameters };
         return new(root, (command, cwd, stage) =>
         {
+            during?.Invoke(stage, cwd);
             if (command.SequenceEqual(new[] { "dotnet", "--version" })) return failure == "sdk" ? "0.0.0" : Catalog.Text(manifest["sdk"]);
             if (command.SequenceEqual(new[] { "lake", "env", "lean", "--version" })) return failure == "lean" ? "Lean (version 4.35.0)" : "Lean (version 4.34.1)";
             if (command[0] == "git") return command[1] == "rev-parse" ? "commit\n" : " M source.cs\n";
@@ -52,8 +53,14 @@ internal static class VerifierTests
             }
             if (command[0] == "lake")
             {
+                if (stage == "Coverage checking")
+                {
+                    IEnumerable<string> compositionNames = command.Contains("+UInt256.OperationCoverage:olean")
+                        ? Coverage.Theorems.Concat(Coverage.OperationTheorems) : Coverage.Theorems;
+                    return string.Join('\n', compositionNames.Select(name => $"'{name}' depends on axioms: [propext]"));
+                }
                 bool safety = stage == "Safety proof checking";
-                string[] names = safety ? SafetyCatalog.Gate(Method, "scalar")["theorems"]!.AsArray().Select(Catalog.Text).ToArray() : ProofAudits.Names(catalog, Method);
+                string[] names = safety ? SafetyCatalog.Gate(method, "scalar")["theorems"]!.AsArray().Select(Catalog.Text).ToArray() : ProofAudits.Names(catalog, method);
                 if (failure == "source" && safety) Write(root, "verification/Proof.lean", "changed");
                 if (failure == "snapshot" && safety) Write(cwd, "Proof.lean", "changed");
                 if (failure == "gate" && safety) Write(cwd, "UInt256/Methods/SelectedGate.lean", "changed");
