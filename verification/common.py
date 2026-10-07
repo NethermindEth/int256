@@ -151,6 +151,41 @@ def build_artifact(project, work, method, fixture=None, simd_fixture=False, fixt
     return bundle
 
 
+def isolated_run(script, arguments, prefix):
+    _runner_request(["isolated-run", "--json"],
+        {"script": str(Path(script).resolve()), "arguments": arguments, "prefix": prefix, "python": sys.executable},
+        cache=False, show_output=True)
+
+
+def initial_bytes_expression(witness):
+    return json.loads(_runner_request(["initial-bytes", "--json"],
+        [[str(address), str(value)] for address, value in witness["initialBytes"].items()]))
+
+
+def require_diagnostic_rejection(output, module, diagnostic):
+    # Requires an independently checked full-contract refutation.
+    rejection_check("diagnostic", output, module, diagnostic)
+
+
+def reject_resource_failure(output):
+    rejection_check("resources", output)
+
+
+def require_changed_method(artifact, baseline, signature):
+    fixture_check("changed-method", artifact=artifact, baseline=baseline, signature=signature)
+
+
+def require_semantic_rejection(output, module):
+    # Requires an independently checked full-contract refutation.
+    rejection_check("semantic", output, module)
+
+
+def selected_fixture_baseline(method, profile, positive=None, *, safety=False):
+    command, report, baseline = json.loads(_runner_request(["fixture-baseline", "--json"],
+        {"method": method, "profile": profile, "positive": positive, "safety": safety}, cache=False, show_output=True))
+    return command, Path(report), baseline
+
+
 def build_fixture(destination, name, method="Add"):
     return Path(json.loads(_runner_request(["legacy-fixture", "--json"],
         {"destination": str(Path(destination).resolve()), "case": name, "method": method, "extract": False}, cache=False, show_output=True)))

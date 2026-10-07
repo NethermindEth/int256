@@ -176,7 +176,7 @@ class ExecutionChecks(unittest.TestCase):
             manager = patch.object(checks, target, value)
             manager.start()
             self.addCleanup(manager.stop)
-        manager = patch.object(checks.support, "copy_source", self.copy_seed)
+        manager = patch.object(checks, "copy_source", self.copy_seed)
         manager.start()
         self.addCleanup(manager.stop)
 
@@ -231,7 +231,7 @@ class ExecutionChecks(unittest.TestCase):
         def changed_copy(destination):
             self.copy_seed(destination)
             (destination / "source.txt").write_text("changed", encoding="utf-8")
-        with patch.object(checks.support, "copy_source", changed_copy), \
+        with patch.object(checks, "copy_source", changed_copy), \
              patch.object(checks, "run_process") as process:
             with self.assertRaisesRegex(RuntimeError, "Immutable source"):
                 checks.run_suite([job], [job], 1, self.output)

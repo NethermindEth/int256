@@ -8,7 +8,7 @@ import tempfile
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from common import verifier_command, ROOT, VERIFY, run, sha
-from support import (build_extract, build_fixture, copy_source, model_refutation,
+from common import (build_extract, build_fixture, copy_source, model_refutation,
                      native_witness, require_production_report, require_semantic_rejection)
 
 

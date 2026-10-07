@@ -10,7 +10,7 @@ import xml.etree.ElementTree as ET
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from common import verifier_command, ROOT, PROFILES, run, sha
-from support import copy_source, require_semantic_rejection
+from common import copy_source, require_semantic_rejection
 from simd_checks import positive_applicable, target_changed, applicable, witness
 from common import theorem_audits
 

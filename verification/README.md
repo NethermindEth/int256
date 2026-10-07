@@ -433,7 +433,7 @@ covers unsupported instructions, unresolved calls, layout, cycles,
 framework/configuration, static initialization and transactional summary rollback.
 Keep each case's distinct algorithm and witness in its fixture files. Shared
 build, extraction and rejection checks live in the C# runner; remaining Python
-fixtures call them through `Tests/support.py`. `Fixtures.props`
+fixtures call them through the temporary bridge in `common.py`. `Fixtures.props`
 selects shared C# components explicitly. Readable `RefutationTemplate.lean.in`
 files supply case data to shared Lean observation lemmas, which exclude every
 successful execution fuel. Expected results remain independent of extracted CIL.

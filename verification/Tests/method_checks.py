@@ -12,7 +12,6 @@ import xml.etree.ElementTree as ET
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import common
-import support
 
 
 class MethodChecks(unittest.TestCase):
@@ -35,67 +34,6 @@ class MethodChecks(unittest.TestCase):
             self.assertNotIn("verification/Test.lean", common.source_inputs(root))
             with self.assertRaises(RuntimeError):
                 common.check_proof_snapshot(source.parent, [Path("Test.lean")], inputs)
-
-    def test_combined_fixture_baseline_uses_safety_reports_and_identical_proofs(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            directory = Path(temporary)
-            report_path = directory / "safety/report.json"
-            report_path.parent.mkdir()
-            inputs = {"source": "current"}
-            commands = []
-
-            def run(arguments, _):
-                commands.append(arguments)
-                case = arguments[-1] if "--fixture" in arguments else None
-                report_path.write_text(json.dumps({
-                    "source": {"kind": "fixture" if case else "production"},
-                    "sourceInputs": inputs, "leanSourceSha256": {"proof": "unchanged"},
-                    "generatedProgramSha256": case or "production",
-                    "evidenceKind": "arithmetic-and-memory-safety",
-                    "safety": common.safety_gate("Lsh", "scalar"),
-                }), encoding="utf-8")
-
-            with patch.object(support, "generated_directory", return_value=directory), \
-                 patch.object(support, "source_inputs", return_value=inputs), \
-                 patch.object(support, "run", side_effect=run):
-                public, path, baseline = support.selected_fixture_baseline("Lsh", "scalar", "LshHelper", safety=True)
-            self.assertEqual(path, report_path)
-            self.assertEqual(baseline["source"]["kind"], "fixture")
-            self.assertIn("--safety", public)
-            self.assertEqual(len(commands), 3)
-            self.assertTrue(all("--safety" in command for command in commands))
-
-    def test_combined_fixture_baseline_rejects_arithmetic_only_or_wrong_safety_gate(self):
-        for invalid_case in (None, "Baseline", "LshHelper"):
-            for wrong_gate in (False, True):
-                with self.subTest(case=invalid_case, wrong_gate=wrong_gate), tempfile.TemporaryDirectory() as temporary:
-                    directory = Path(temporary)
-                    report_path = directory / "safety/report.json"
-                    report_path.parent.mkdir()
-                    inputs = {"source": "current"}
-
-                    def run(arguments, _):
-                        case = arguments[-1] if "--fixture" in arguments else None
-                        report = {
-                            "source": {"kind": "fixture" if case else "production"},
-                            "sourceInputs": inputs, "leanSourceSha256": {"proof": "unchanged"},
-                            "generatedProgramSha256": case or "production",
-                            "evidenceKind": "arithmetic-and-memory-safety",
-                            "safety": common.safety_gate("Lsh", "scalar"),
-                        }
-                        if case == invalid_case:
-                            if wrong_gate:
-                                report["safety"] = common.safety_gate("Rsh", "scalar")
-                            else:
-                                report.pop("evidenceKind")
-                        report_path.write_text(json.dumps(report), encoding="utf-8")
-
-                    with patch.object(support, "generated_directory", return_value=directory), \
-                         patch.object(support, "source_inputs", return_value=inputs), \
-                         patch.object(support, "run", side_effect=run):
-                        with self.assertRaisesRegex(RuntimeError, "lacks the selected combined safety evidence"):
-                            support.selected_fixture_baseline("Lsh", "scalar", "LshHelper", safety=True)
-
 
     def test_multiply_family_requires_each_arithmetic_and_storage_combination(self):
         for actual in (list(common.MULTIPLY_PROFILES), list(common.MULTIPLY_PROFILES)[::2],

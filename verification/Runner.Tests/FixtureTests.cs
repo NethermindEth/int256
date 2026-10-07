@@ -10,6 +10,55 @@ internal static class FixtureTests
 {
     internal static void Register(Action<string, Action<Catalog, string>> check)
     {
+        check("byte witnesses preserve ordered addresses and exact integers", (_, manifests) =>
+        {
+            Program.Require(FixtureChecks.InitialBytes([]) == "0", "Empty memory changed");
+            Program.Require(FixtureChecks.InitialBytes(new Dictionary<string, string> { [" 0008 "] = "255", ["18446744073709551616"] = "1", ["0"] = "2" })
+                == "if address = 8 then 255 else if address = 18446744073709551616 then 1 else if address = 0 then 2 else 0", "Witness order or integer precision changed");
+            string root = Path.GetDirectoryName(manifests)!;
+            Program.Reject(() => FixtureChecks.IsolatedRun(new Workspace(root), Path.Combine(root, "../outside.py"), [], "fixture-", "python"));
+        });
+        check("fixture baselines preserve order, safety scope, freshness and proof identity", (catalog, manifests) =>
+        {
+            Workspace setup = VerifierTests.Setup(catalog, manifests);
+            foreach (bool safety in new[] { false, true })
+            foreach (string failure in new[] { "", "production", "inputs", "baseline-proofs", "alternative-proofs", "unchanged", "production-safety", "baseline-safety", "alternative-safety", "production-evidence", "baseline-evidence", "alternative-evidence" })
+            {
+                if (!safety && (failure.EndsWith("-safety", StringComparison.Ordinal) || failure.EndsWith("-evidence", StringComparison.Ordinal))) continue;
+                List<string> calls = [];
+                Workspace workspace = new(setup.Root, (command, cwd, stage) =>
+                {
+                    string kind = command.Contains("--fixture") ? command[^1] : "production";
+                    calls.Add(kind);
+                    Program.Require(cwd == setup.Root && command.Contains("--safety") == safety && command.Contains("Lsh") && command.Contains("scalar"), "Baseline command changed scope");
+                    string directory = new Verifier(setup).OutputDirectory("Lsh");
+                    if (safety) directory = Path.Combine(directory, "safety");
+                    Directory.CreateDirectory(directory);
+                    JsonObject report = new() { ["source"] = new JsonObject { ["kind"] = kind == "production" && failure != "production" ? "production" : "fixture" },
+                        ["sourceInputs"] = System.Text.Json.JsonSerializer.SerializeToNode(setup.Inputs()),
+                        ["leanSourceSha256"] = new JsonObject { ["proof"] = "unchanged" }, ["generatedProgramSha256"] = kind,
+                        ["evidenceKind"] = "arithmetic-and-memory-safety", ["safety"] = SafetyCatalog.Gate("Lsh", "scalar") };
+                    if (failure == "inputs" && kind == "production") report["sourceInputs"] = new JsonObject();
+                    if (failure == "baseline-proofs" && kind == "Baseline" || failure == "alternative-proofs" && kind == "LshHelper") report["leanSourceSha256"]!["proof"] = "changed";
+                    if (failure == "unchanged" && kind == "LshHelper") report["generatedProgramSha256"] = "Baseline";
+                    if (failure == "production-safety" && kind == "production" || failure == "baseline-safety" && kind == "Baseline" || failure == "alternative-safety" && kind == "LshHelper")
+                        report["safety"] = SafetyCatalog.Gate("Rsh", "scalar");
+                    if (failure == "production-evidence" && kind == "production" || failure == "baseline-evidence" && kind == "Baseline" || failure == "alternative-evidence" && kind == "LshHelper")
+                        report.Remove("evidenceKind");
+                    File.WriteAllText(Path.Combine(directory, "report.json"), report.ToJsonString());
+                    return "";
+                });
+                if (failure.Length != 0) Program.Reject(() => FixtureChecks.SelectedBaseline(workspace, "Lsh", "scalar", "LshHelper", safety));
+                else
+                {
+                    var result = FixtureChecks.SelectedBaseline(workspace, "Lsh", "scalar", "LshHelper", safety);
+                    Program.Require(calls.SequenceEqual(new[] { "production", "Baseline", "LshHelper" }) && Catalog.Text(result.Baseline["generatedProgramSha256"]) == "Baseline", "Baseline order or returned report changed");
+                    calls.Clear();
+                    FixtureChecks.SelectedBaseline(workspace, "Lsh", "scalar", null, safety);
+                    Program.Require(calls.SequenceEqual(new[] { "production", "Baseline" }), "Unexpected alternative verification");
+                }
+            }
+        });
         check("legacy fixture extraction preserves build flags and selected method", (_, manifests) =>
         {
             string root = Path.GetDirectoryName(manifests)!, destination = Path.Combine(root, "fixture");

@@ -81,6 +81,16 @@ internal static class Program
                 object result;
                 switch (command)
                 {
+                    case "initial-bytes":
+                        result = FixtureChecks.InitialBytes(input.AsArray().Select(pair => new KeyValuePair<string, string>(Catalog.Text(pair![0]), Catalog.Text(pair[1])))); break;
+                    case "isolated-run":
+                        FixtureChecks.IsolatedRun(new Workspace(root), Catalog.Text(input["script"]), input["arguments"]!.AsArray().Select(Catalog.Text).ToArray(),
+                            Catalog.Text(input["prefix"]), Catalog.Text(input["python"]));
+                        result = true; break;
+                    case "fixture-baseline":
+                        var baseline = FixtureChecks.SelectedBaseline(new Workspace(root), Catalog.Text(input["method"]), Catalog.Text(input["profile"]),
+                            input["positive"]?.GetValue<string>(), input["safety"]!.GetValue<bool>());
+                        result = new object[] { baseline.Command, baseline.ReportPath, baseline.Baseline }; break;
                     case "legacy-fixture":
                         Workspace fixtureWorkspace = new(root);
                         string fixtureDestination = Catalog.Text(input["destination"]), name = Catalog.Text(input["case"]), method = Catalog.Text(input["method"]);

@@ -8,6 +8,55 @@ namespace UInt256Verification;
 
 internal static class FixtureChecks
 {
+    internal static string InitialBytes(IEnumerable<KeyValuePair<string, string>> bytes)
+    {
+        string Number(string text) => System.Numerics.BigInteger.Parse(text, System.Globalization.CultureInfo.InvariantCulture).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        return string.Concat(bytes.Select(pair => $"if address = {Number(pair.Key)} then {Number(pair.Value)} else ")) + "0";
+    }
+
+    internal static void IsolatedRun(Workspace workspace, string script, string[] arguments, string prefix, string python)
+    {
+        string relative = Workspace.Relative(workspace.Root, Path.GetFullPath(script));
+        if (relative == ".." || relative.StartsWith("../", StringComparison.Ordinal) || Path.IsPathRooted(relative))
+            throw new ArgumentException("Regression script must be inside the repository");
+        string temporary = Directory.CreateTempSubdirectory(prefix).FullName;
+        try
+        {
+            string destination = Path.Combine(temporary, "source");
+            workspace.Run(["git", "clone", "--shared", "--no-checkout", workspace.Root, destination], workspace.Root);
+            workspace.CopyRegressionSource(destination);
+            workspace.Run([python, Path.Combine(destination, relative), "--workspace", .. arguments], destination, "Isolated regression");
+        }
+        finally { Directory.Delete(temporary, true); }
+    }
+
+    internal static (string[] Command, string ReportPath, JsonObject Baseline) SelectedBaseline(Workspace workspace, string method, string profile, string? positive, bool safety)
+    {
+        string[] command = ["dotnet", "run", "--project", Path.Combine(workspace.Verification, "Runner/Verification.csproj"), "-c", "Release", "--",
+            "--root", workspace.Root, "verify", "--method", method, "--profile", profile, .. safety ? new[] { "--safety" } : []];
+        string directory = new Verifier(workspace).OutputDirectory(method, profile);
+        string reportPath = Path.Combine(safety ? Path.Combine(directory, "safety") : directory, "report.json");
+        JsonObject Read()
+        {
+            JsonObject report = JsonNode.Parse(File.ReadAllText(reportPath))!.AsObject();
+            if (safety) SafetyReport(report, method, profile);
+            return report;
+        }
+        JsonObject Inputs() => System.Text.Json.JsonSerializer.SerializeToNode(workspace.Inputs())!.AsObject();
+        workspace.Run(command, workspace.Root, "Fixture production baseline");
+        JsonObject production = Read();
+        Production(production, Inputs());
+        workspace.Run([.. command, "--fixture", "Baseline"], workspace.Root, "Fixture baseline");
+        JsonObject baseline = Read();
+        Baseline(production, baseline, Inputs());
+        if (!string.IsNullOrEmpty(positive))
+        {
+            workspace.Run([.. command, "--fixture", positive], workspace.Root, "Fixture alternative");
+            Alternative(baseline, Read());
+        }
+        return (command, reportPath, baseline);
+    }
+
     internal static string BuildFixture(Workspace workspace, string destination, string name, string method)
     {
         string project = Path.Combine(destination, "verification/Tests/Fixtures/Nethermind.Int256.csproj");

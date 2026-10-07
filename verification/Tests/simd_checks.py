@@ -16,7 +16,7 @@ import time
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from common import fixture_check, simd_data, verifier_command, ROOT, PROFILES, run, sha
 from common import SIMD_POSITIVES as POSITIVES, SIMD_NEGATIVES as NEGATIVES
-from support import copy_source, model_refutation, require_semantic_rejection
+from common import copy_source, model_refutation, require_semantic_rejection
 
 
 

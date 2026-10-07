@@ -14,9 +14,8 @@ import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.dont_write_bytecode = True
-import support
 from common import BUILD_DIRECTORIES, MULTIPLY_PROFILES, PROFILES, ROOT, VERIFY, sha, api_entries, MULTIPLY_SAFETY_METHODS, BITWISE_DESCRIPTORS, BITWISE_UNARY, COMPARISON_GATES, OPERATOR_DESCRIPTORS, PRIMITIVE_COMPARISONS, coverage_plan
-from common import source_inputs
+from common import source_inputs, copy_source
 
 
 @dataclass(frozen=True)
@@ -241,7 +240,7 @@ def run_suite(plan, selected, jobs, output, captured_inputs=None):
         with tempfile.TemporaryDirectory(prefix="int256-check-seed-") as temporary:
             seed = Path(temporary) / "source"
             clone_source(ROOT, seed)
-            support.copy_source(seed)
+            copy_source(seed)
             require_inputs(seed, expected)
             if source_inputs() != expected:
                 raise RuntimeError("Source inputs changed during seed capture")
