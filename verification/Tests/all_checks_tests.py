@@ -35,6 +35,7 @@ class PlanChecks(unittest.TestCase):
         plan = checks.regression_plan()
         by_id = {job.id: job for job in plan}
         self.assertEqual(by_id["profile-extractor"].commands, (("verification/Runner.Tests/Verification.Tests.csproj", "profile-extractor"),))
+        self.assertEqual(by_id["safety-fixtures"].commands, (("verification/Runner.Tests/Verification.Tests.csproj", "safety-fixtures"),))
         self.assertEqual(len(by_id), 387)
         expected_counts = {"equality-": 52, "multiply-": 14, "simd-": 12,
                            "operation-": 24, "reporting-": 14, "legacy-": 2, "robustness-": 2}

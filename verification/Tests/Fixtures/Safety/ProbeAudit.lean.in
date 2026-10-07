@@ -1,0 +1,53 @@
+import Extracted
+import CIL.Safety.Execution
+import CIL.Safety.Calling
+import CIL.Safety.FuelLemmas
+import CIL.Safety.ExecutionStaticWorld
+namespace CompiledSafety
+open CIL.Safety
+def memory : Memory := {
+  allocations := fun id => if id = 0 then
+    some { kind := .callerStack, layout := { size := @SIZE@, alignment := 8 }, sentinels := [32] }
+    else none
+  cells := fun _ offset => { bits := if offset = 8 then 1 else 0, initialized := true }
+  views := [⟨0, @INPUT_BASE@, 32, true, false⟩]
+  nextIdentity := 1 }
+theorem memory_wellFormed : memory.WellFormed := by
+  constructor
+  · intro id a ha
+    simp only [memory] at ha
+    split at ha
+    · simp only [Option.some.injEq] at ha
+      subst a
+      subst id
+      constructor
+      · decide
+      · simp [Allocation.WellFormed, nativeLimit]
+    · cases ha
+  · intro view hv
+    simp only [memory, List.mem_singleton] at hv
+    subst view
+    exact ⟨_, rfl, by decide⟩
+theorem valid_start : ValidCall memory [⟨⟨0, @INPUT_BASE@⟩, 32⟩] [] := by
+  refine ⟨memory_wellFormed, ?_, ?_⟩
+  · intro input hi
+    simp only [List.mem_singleton] at hi
+    subst input
+    exact ⟨_, rfl⟩
+  · simp
+theorem static_world :
+    StaticWorldValid (programStaticDescriptors Extracted.program) memory := by
+  apply empty_static_world_valid
+  · simp [programStaticDescriptors, Extracted.program, cil_code, nativeLimit]
+  · simp [programStaticDescriptors, Extracted.program, cil_code]
+  · rfl
+
+theorem actual_probe :
+    (ValidCall memory [⟨⟨0, @INPUT_BASE@⟩, 32⟩] [] ∧
+      StaticWorldValid (programStaticDescriptors Extracted.program) memory) ∧
+    (match invoke Extracted.program 64 @INDEX@ [.reference (.address ⟨0, @INPUT_BASE@⟩)] memory with
+  @MATCH@) = true := by
+  exact ⟨⟨valid_start, static_world⟩, rfl⟩
+#print axioms actual_probe
+@PUBLIC_REFUTATION@
+end CompiledSafety

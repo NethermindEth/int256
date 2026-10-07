@@ -10,6 +10,11 @@ internal static class Program
 {
     private static int Main(string[] args)
     {
+        if (args.Length > 0 && args[0] == "safety-fixtures")
+        {
+            CompiledSafetyChecks.Run(new Workspace(Directory.GetCurrentDirectory()), args[1..]);
+            return 0;
+        }
         if (args.Length > 0 && args[0] == "simd-fixtures")
         {
             SimdFixtureChecks.Run(new Workspace(Directory.GetCurrentDirectory()), args[1..]);
@@ -240,6 +245,7 @@ internal static class Program
         EqualityFixtureChecks.Register(Check);
         ProfileExtractorChecks.Register(Check);
         SimdFixtureChecks.Register(Check);
+        CompiledSafetyChecks.Register(Check);
         RobustnessChecks.Register(Check);
         NativeSimdChecks.Register(Check);
         GateBindingChecks.Register(Check);

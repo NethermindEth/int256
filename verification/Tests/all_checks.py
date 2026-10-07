@@ -32,7 +32,7 @@ def regression_plan():
 
     add("foundation", "Runner.Tests/Verification.Tests.csproj", "foundation")
     add("safety-foundation", "Runner.Tests/Verification.Tests.csproj", "safety-foundation")
-    add("safety-fixtures", "Tests/Fixtures/Safety/checks.py")
+    add("safety-fixtures", "Runner.Tests/Verification.Tests.csproj", "safety-fixtures")
     add("safety-robustness-Add", "Runner.Tests/Verification.Tests.csproj", "robustness", "--method", "Add", "--case", "Renamed", "--case", "ReversedStore", "--safety")
     for method in sorted(MULTIPLY_SAFETY_METHODS):
         for profile in MULTIPLY_PROFILES:

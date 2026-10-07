@@ -1,0 +1,52 @@
+
+def publicMemory : Memory := { memory with
+  allocations := fun id => if id = 0 ∨ id = 1 then memory.allocations 0 else none
+  cells := fun id offset => if id = 0 then memory.cells 0 offset else ⟨0, false⟩
+  views := [⟨0, 0, 32, true, false⟩, ⟨1, 0, 32, true, true⟩]
+  nextIdentity := 2 }
+theorem public_memory_wellFormed : publicMemory.WellFormed := by
+  constructor
+  · intro id a ha
+    simp only [publicMemory, memory] at ha
+    split at ha
+    · simp only [ite_true, Option.some.injEq] at ha
+      subst a
+      constructor
+      · rcases (by assumption : id = 0 ∨ id = 1) with h | h <;> subst id <;> decide
+      · simp [Allocation.WellFormed, nativeLimit]
+    · cases ha
+  · intro view hv
+    simp [publicMemory] at hv
+    rcases hv with h | h <;> subst view
+    · exact ⟨_, rfl, by decide⟩
+    · exact ⟨_, rfl, by decide⟩
+theorem public_valid_call :
+    ValidCall publicMemory [⟨⟨0, 0⟩, 32⟩, ⟨⟨0, 0⟩, 32⟩] [⟨⟨1, 0⟩, 32⟩] := by
+  refine ⟨public_memory_wellFormed, ?_, ?_⟩
+  · intro input hi
+    simp at hi
+    subst input
+    exact ⟨_, rfl⟩
+  · intro output ho
+    simp only [List.mem_singleton] at ho
+    subst output
+    rfl
+def publicArguments : List Value := [
+  .reference (.address ⟨0, 0⟩), .reference (.address ⟨0, 0⟩), .reference (.address ⟨1, 0⟩)]
+theorem public_static_world :
+    StaticWorldValid (programStaticDescriptors Extracted.program) publicMemory := by
+  apply empty_static_world_valid
+  · simp [programStaticDescriptors, Extracted.program, cil_code, nativeLimit]
+  · simp [programStaticDescriptors, Extracted.program, cil_code]
+  · rfl
+
+theorem public_fault_witness :
+    invoke Extracted.program 64 @ENTRY@ publicArguments publicMemory = .error @FAULT@ := by rfl
+theorem public_counterexample :
+    (ValidCall publicMemory [⟨⟨0, 0⟩, 32⟩, ⟨⟨0, 0⟩, 32⟩] [⟨⟨1, 0⟩, 32⟩] ∧
+      StaticWorldValid (programStaticDescriptors Extracted.program) publicMemory) ∧
+    ∀ fuel result, invoke Extracted.program fuel @ENTRY@ publicArguments publicMemory ≠ .ok result := by
+  refine ⟨⟨public_valid_call, public_static_world⟩, ?_⟩
+  exact invoke_fault_refutes_success Extracted.program 64 @ENTRY@ publicArguments publicMemory
+    @FAULT@ (by decide) public_fault_witness
+#print axioms public_counterexample

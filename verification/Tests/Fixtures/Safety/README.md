@@ -1,6 +1,6 @@
 # Compiled memory-safety probes
 
-Run `python verification/Tests/Fixtures/Safety/checks.py` from the repository
+Run `dotnet run --project verification/Runner.Tests -c Release -- safety-fixtures` from the repository
 root with the pinned .NET and Lean toolchains available. Use `--case NAME` to
 select affected cases and `--output PATH` to retain the receipt.
 
