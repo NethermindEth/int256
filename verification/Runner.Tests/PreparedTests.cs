@@ -11,6 +11,70 @@ internal static class PreparedTests
 {
     internal static void Register(Action<string, Action<Catalog, string>> check)
     {
+        check("comparison safety preserves signed-helper interpretation and three-way value contracts", (catalog, _) =>
+        {
+            string source = SafetyGates.Module(catalog, "GtUInt256UInt32", "scalar");
+            foreach (string fragment in new[] { "decide ((input.toNat : Int) > (word.toNat : Int))", "show wrapperSigned32 = false from rfl", "show leafSigned = true from rfl", "UInt256Proof.Compare.zeroExtend32_toInt" })
+                Program.Require(source.Contains(fragment, StringComparison.Ordinal), "Unsigned comparison meaning changed");
+            JsonObject reference = SafetyCatalog.Gate("CompareToUInt256Ref", "scalar"), value = SafetyCatalog.Gate("CompareToUInt256Value", "scalar");
+            foreach (var (gate, module, theorem) in new[] { (reference, "ThreeWay", "threeWay"), (value, "ThreeWayValue", "threeWayValue") })
+            {
+                Program.Require(Catalog.Text(gate["target"]) == $"+UInt256.Methods.Compare.{module}SafetyAudit:olean", "Three-way audit target changed");
+                Program.Require(gate["theorems"]!.AsArray().Select(Catalog.Text).SequenceEqual(new[] { "contract", "binding", "family" }.Select(kind => $"UInt256Proof.Compare.Safety.checked_{theorem}_{kind}")), "Three-way required audits changed");
+                Program.Require(Catalog.Text(gate["coverage"]!["kind"]) == "all-profiles", "Three-way profile independence lost");
+            }
+            Program.Require(Catalog.Text(value["contract"]) == "UInt256Model.Safety.ReadOnlyValueContract" && JsonNode.DeepEquals(reference["coverage"], value["coverage"]), "By-value three-way contract changed");
+        });
+        check("relational safety binds each relation and dispatch family to its own audits", (_, _) =>
+        {
+            foreach (var (method, relation, module) in new[] { ("LtUInt256UInt256", "less", ""), ("GtUInt256UInt256", "greater", "Greater"),
+                ("LeUInt256UInt256", "less_equal", "LessEqual"), ("GeUInt256UInt256", "greater_equal", "GreaterEqual") })
+            foreach (var (profile, prefix, family) in new[] {
+                ("scalar", "", "{\"avx512FVL\":false,\"avx2\":false,\"vector256Accelerated\":false}"),
+                ("x64-vector256", "Portable", "{\"avx512FVL\":false,\"avx2\":false,\"vector256Accelerated\":true}"),
+                ("x64-avx2", "", "{\"avx512FVL\":false,\"avx2\":true}"),
+                ("x64-avx512", "Native", "{\"avx512FVL\":true}") })
+            {
+                JsonObject gate = SafetyCatalog.Gate(method, profile);
+                Program.Require(Catalog.Text(gate["target"]) == $"+UInt256.Methods.Compare.{prefix}{module}FamilySafetyAudit:olean", "Relation/ISA audit target changed");
+                Program.Require(Catalog.Text(gate["contract"]) == "UInt256Model.Safety.ReadOnlyContract", "Relational memory/result contract changed");
+                Program.Require(gate["theorems"]!.AsArray().Select(Catalog.Text).SequenceEqual(new[] { "contract", "binding", "family" }.Select(kind => $"UInt256Proof.Compare.Safety.checked_{relation}_{kind}")), "Relational audits changed");
+                Program.Require(JsonNode.DeepEquals(gate["coverage"]!["family"], JsonNode.Parse(family)), "Comparison dispatch family changed");
+                Program.Reject(() => SafetyCatalog.Gate(method, "arm64"));
+            }
+            Program.Reject(() => SafetyCatalog.Gate("LeUInt64UInt256", "x64-vector256"));
+            Program.Require(JsonNode.DeepEquals(SafetyCatalog.Gate("LtUInt256UInt256", "scalar")["coverage"], SafetyCatalog.Gate("GtUInt256UInt256", "scalar")["coverage"]), "Reversed comparison coverage changed");
+        });
+        check("Add and Subtract representative safety gates retain exact arithmetic and reporting bindings", (_, _) =>
+        {
+            void Representative(string method, string profile, string contract, string? target, params string[] names)
+            {
+                JsonObject gate = SafetyCatalog.Representative(method, profile);
+                Program.Require(Catalog.Text(gate["contract"]) == "UInt256Model.Safety." + contract && Catalog.Text(gate["profile"]) == profile, "Wrong representative contract/profile");
+                if (target is not null) Program.Require(Catalog.Text(gate["target"]) == $"+UInt256.Methods.{target}:olean", "Wrong representative audit module");
+                Program.Require(gate["theorems"]!.AsArray().Select(Catalog.Text).SequenceEqual(names) && !gate.ContainsKey("coverage"), "Representative audits changed or gained unconditional coverage");
+            }
+            foreach (string profile in new[] { "x64-avx2", "x64-avx2-bmi1", "x64-avx512", "x64-avx512-bmi1" })
+            {
+                Representative("Add", profile, "WrappingBinaryContract", "Add.VectorSafetyAudit", "UInt256Proof.Add.Safety.checked_vector_parent_contract", "UInt256Proof.Add.Safety.checked_vector_add_binding");
+                Representative("AddOverflow", profile, "ReportingBinaryContract", "Add.VectorOverflowSafetyAudit", "UInt256Proof.Add.Safety.checked_vector_reporting_contract", "UInt256Proof.Add.Safety.checked_vector_overflow_binding");
+                Representative("Subtract", profile, "WrappingBinaryContract", "Subtract.VectorWrappingSafetyAudit", "UInt256Proof.Subtract.Safety.checked_vector_wrapping_contract", "UInt256Proof.Subtract.Safety.checked_vector_wrapping_binding");
+                Representative("SubtractUnderflow", profile, "ReportingBinaryContract", "Subtract.VectorUnderflowSafetyAudit", "UInt256Proof.Subtract.Safety.checked_vector_underflow_contract", "UInt256Proof.Subtract.Safety.checked_vector_underflow_binding");
+            }
+            foreach (var (isa, profile) in new[] { ("arm", "arm64-advsimd"), ("sse", "x64-sse42") })
+            {
+                Representative("Add", profile, "WrappingBinaryContract", $"Add.{isa.ToUpperInvariant()}SafetyAudit", $"UInt256Proof.Add.Safety.checked_{isa}_add_contract", $"UInt256Proof.Add.Safety.checked_{isa}_add_binding");
+                Representative("AddOverflow", profile, "ReportingBinaryContract", $"Add.{isa.ToUpperInvariant()}OverflowSafetyAudit", $"UInt256Proof.Add.Safety.checked_{isa}_overflow_contract", $"UInt256Proof.Add.Safety.checked_{isa}_overflow_binding");
+                Representative("Subtract", profile, "WrappingBinaryContract", "Subtract.Vector128SafetyAudit", "UInt256Proof.Subtract.Safety.checked_vector128_wrapping_contract", "UInt256Proof.Subtract.Safety.checked_vector128_wrapping_binding");
+                Representative("SubtractUnderflow", profile, "ReportingBinaryContract", "Subtract.Vector128UnderflowSafetyAudit", "UInt256Proof.Subtract.Safety.checked_vector128_underflow_contract", "UInt256Proof.Subtract.Safety.checked_vector128_underflow_binding");
+            }
+            Representative("Subtract", "scalar", "WrappingBinaryContract", "Subtract.SafetyAudit", "UInt256Proof.Subtract.Safety.checked_wrapping_contract", "UInt256Proof.Subtract.Safety.checked_wrapping_binding");
+            Representative("AddOverflow", "scalar", "ReportingBinaryContract", null, "UInt256Proof.Safety.checked_overflow_contract", "UInt256Proof.Safety.checked_overflow_binding");
+            Representative("SubtractUnderflow", "scalar", "ReportingBinaryContract", null, "UInt256Proof.Subtract.Safety.checked_underflow_contract", "UInt256Proof.Subtract.Safety.checked_underflow_binding");
+            foreach (string method in new[] { "Add", "Subtract" })
+                foreach (string profile in new[] { "x64-sse41", "x64-vector256" }) Program.Reject(() => SafetyCatalog.Representative(method, profile));
+            Program.Reject(() => SafetyCatalog.Representative("AddOverflow", "arm64"));
+        });
         check("every production arithmetic and safety gate has a complete import closure", (catalog, _) =>
         {
             string verification = Path.Combine(Directory.GetCurrentDirectory(), "verification"); HashSet<string> seen = [];
