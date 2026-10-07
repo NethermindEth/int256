@@ -18,20 +18,6 @@ INPUTS_AT = checks.inputs_at
 
 
 class PlanChecks(unittest.TestCase):
-    def test_ci_batches_retain_every_job_at_matrix_boundary(self):
-        for count in (1, 256, 257, 387):
-            with self.subTest(count=count):
-                plan = [checks.Job(f"job-{i}", ()) for i in range(count)]
-                batches = checks.ci_matrix(plan)["include"]
-                self.assertLessEqual(len(batches), 256)
-                self.assertEqual([name for batch in batches for name in batch["jobs"]],
-                                 [job.id for job in plan])
-                self.assertTrue(all(batch["jobs"] for batch in batches))
-                self.assertTrue(all(batch["timeoutMinutes"] == 60 * len(batch["jobs"])
-                                    for batch in batches))
-        with self.assertRaises(ValueError):
-            checks.ci_matrix([])
-
     def test_exact_required_matrix(self):
         plan = checks.regression_plan()
         by_id = {job.id: job for job in plan}
@@ -159,12 +145,6 @@ class PlanChecks(unittest.TestCase):
                 ("verification/Runner/Verification.csproj", "verify", "--method", method, "--profile", "scalar"),
                 negative,
             ))
-
-    def test_incomplete_coverage_fails_closed(self):
-        original = checks.coverage_plan
-        with patch.object(checks, "coverage_plan", side_effect=lambda methods: original(methods)[:-1]):
-            with self.assertRaisesRegex(RuntimeError, "Incomplete"):
-                checks.regression_plan()
 
     def test_print_plan_is_read_only_and_exact_job_selection(self):
         with patch.object(checks, "run_suite") as runner, redirect_stdout(io.StringIO()) as output:

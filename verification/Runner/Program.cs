@@ -24,6 +24,11 @@ internal static class Program
             }
 
             Catalog catalog = new(Path.Combine(root, "verification"));
+            if (arguments is ["regression-plan"])
+            {
+                Console.WriteLine(JsonSerializer.Serialize(RegressionPlan.Create(catalog)));
+                return 0;
+            }
             if (arguments.Count > 0 && arguments[0] == "changes")
             {
                 ChangeDetection.Run(new Workspace(root), arguments.Skip(1).ToArray());
@@ -64,11 +69,6 @@ internal static class Program
                 Console.WriteLine(artifact.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
                 return 0;
             }
-            if (arguments is ["safety-registry"])
-            {
-                Console.Write(JsonSerializer.Serialize(SafetyCatalog.Registry()));
-                return 0;
-            }
             if (arguments is ["safety" or "safety-module", string safetyMethod, string profile])
             {
                 Console.Write(arguments[0] switch
@@ -86,6 +86,7 @@ internal static class Program
                 switch (command)
                 {
                     case "copy-source": result = new Workspace(root).CopyRegressionSource(Catalog.Text(input["destination"])); break;
+                    case "regression-matrix": result = RegressionPlan.Matrix(input.AsArray().Select(Catalog.Text).ToArray()); break;
                     case "plan": result = catalog.Plan(input["methods"]!.AsArray().Select(Catalog.Text).ToArray(), input["safety"]!.GetValue<bool>()); break;
                     case "entries": result = Catalog.Entries(input.AsObject()); break;
                     default: throw new ArgumentException("Unknown JSON command");

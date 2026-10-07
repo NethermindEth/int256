@@ -45,16 +45,6 @@ internal static class SafetyCatalog
         return result;
     }
 
-    internal static object Registry() => new
-    {
-        MULTIPLY_SAFETY_METHODS = MultiplyMethods.Order(StringComparer.Ordinal),
-        BITWISE_UNARY = Unary.Order(StringComparer.Ordinal),
-        BITWISE_DESCRIPTORS = Bitwise.ToDictionary(x => x.Key, x => new[] { x.Value.Operation, x.Value.Symbol }),
-        COMPARISON_GATES = Comparisons.ToDictionary(x => x.Key, x => new[] { x.Value.Relation, x.Value.Audit }),
-        OPERATOR_DESCRIPTORS = Operators.ToDictionary(x => x.Key, x => new object[] { x.Value.Width, x.Value.Signed, x.Value.First, x.Value.Negate }),
-        PRIMITIVE_COMPARISONS = PrimitiveComparisons.ToDictionary(x => x.Key, x => new object[] { x.Value.Width, x.Value.Signed, x.Value.First, x.Value.Relation })
-    };
-
     private static JsonArray Names(IEnumerable<string> names) => new(names.Select(x => (JsonNode?)JsonValue.Create(x)).ToArray());
     private static JsonObject Coverage(string condition, JsonObject? family = null, string kind = "feature-family")
     {

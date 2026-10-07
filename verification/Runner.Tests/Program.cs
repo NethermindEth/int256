@@ -276,6 +276,7 @@ internal static class Program
         ChangeDetectionTests.Register(Check);
         MethodTests.Register(Check);
         PreparedTests.Register(Check);
+        RegressionPlanTests.Register(Check);
         RobustnessChecks.Register(Check);
         NativeSimdChecks.Register(Check);
         GateBindingChecks.Register(Check);

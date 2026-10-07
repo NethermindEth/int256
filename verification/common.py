@@ -84,12 +84,3 @@ def api_entries():
 def coverage_plan(methods, safety=False):
     plan = json.loads(_runner_request(["plan", "--json"], {"methods": list(methods), "safety": safety}))
     return [(job["method"], job["profile"]) for job in plan["include"]]
-
-
-def __getattr__(name):
-    # Temporary registry exports for Python regression scheduling during migration.
-    if name not in {"MULTIPLY_SAFETY_METHODS", "BITWISE_UNARY", "BITWISE_DESCRIPTORS",
-                    "COMPARISON_GATES", "OPERATOR_DESCRIPTORS", "PRIMITIVE_COMPARISONS"}:
-        raise AttributeError(name)
-    value = json.loads(_runner_request(["safety-registry"]))[name]
-    return frozenset(value) if name in {"MULTIPLY_SAFETY_METHODS", "BITWISE_UNARY"} else value
