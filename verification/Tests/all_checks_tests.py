@@ -12,6 +12,7 @@ import unittest
 from unittest.mock import patch
 
 import all_checks as checks
+import common
 
 INPUTS_AT = checks.inputs_at
 
@@ -38,6 +39,7 @@ class PlanChecks(unittest.TestCase):
         self.assertEqual(by_id["safety-fixtures"].commands, (("verification/Runner.Tests/Verification.Tests.csproj", "safety-fixtures"),))
         self.assertEqual(by_id["csharp-change"].commands, (("verification/Runner.Tests/Verification.Tests.csproj", "change-checks"),))
         self.assertEqual(by_id["csharp-method"].commands, (("verification/Runner.Tests/Verification.Tests.csproj", "method-checks"),))
+        self.assertEqual(by_id["csharp-prepared"].commands, (("verification/Runner.Tests/Verification.Tests.csproj", "prepared-checks"),))
         self.assertEqual(len(by_id), 387)
         expected_counts = {"equality-": 52, "multiply-": 14, "simd-": 12,
                            "operation-": 24, "reporting-": 14, "legacy-": 2, "robustness-": 2}
@@ -56,7 +58,7 @@ class PlanChecks(unittest.TestCase):
                                "safety-EqualsInt64-x64-vector256", "safety-EqualsInt32-x64-vector256",
                                "safety-EqUInt256UInt256-sse41", "safety-EqualsUInt256Ref-sse41", "safety-NeUInt256UInt256-sse41",
                                "safety-EqualsUInt256Ref-vector256", "safety-NeUInt256UInt256-vector256",
-                               "csharp-change", "csharp-method", "python-prepared"}
+                               "csharp-change", "csharp-method", "csharp-prepared"}
         expected_foundations.update(f"safety-{method}-{profile}"
                                     for method in ("Multiply", "MultiplyInstance", "OperatorMultiplyUInt256UInt256",
                                                    "OperatorMultiplyUInt256UInt32", "OperatorMultiplyUInt32UInt256",
@@ -356,6 +358,35 @@ class ExecutionChecks(unittest.TestCase):
         clone.assert_not_called()
         process.assert_not_called()
         self.assertFalse((self.output / "report.json").exists())
+
+
+class RunnerBridgeChecks(unittest.TestCase):
+    def test_runner_bridge_reuses_only_successful_matching_inputs(self):
+        revision = ["original"]
+        fail = [False]
+        commands = []
+        def execute(command, **kwargs):
+            commands.append(command)
+            return subprocess.CompletedProcess(command, 1 if fail[0] else 0, "result", "rejected")
+        with patch.object(common, "_runner_inputs", None), patch.object(common, "_runner_outputs", {}), \
+             patch.object(common, "sha", side_effect=lambda _: revision[0]), \
+             patch.object(common.subprocess, "run", side_effect=execute), \
+             patch.object(Path, "is_file", return_value=True):
+            request = lambda payload: common._runner_request(["entries", "--json"], payload)
+            self.assertEqual(request({"test": 1}), "result")
+            self.assertEqual(len(commands), 2)  # Build and first invocation.
+            request({"test": 1})
+            self.assertEqual(len(commands), 2)
+            request({"test": 2})
+            self.assertEqual(len(commands), 3)
+            revision[0] = "changed source"
+            request({"test": 1})
+            self.assertEqual(len(commands), 5)
+            fail[0] = True
+            for _ in range(2):
+                with self.assertRaisesRegex(RuntimeError, "rejected"):
+                    request({"test": 3})
+            self.assertEqual(len(commands), 7)
 
 
 if __name__ == "__main__":

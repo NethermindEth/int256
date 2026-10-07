@@ -10,7 +10,6 @@ import threading
 ROOT = Path(__file__).resolve().parent.parent
 VERIFY = ROOT / "verification"
 MANIFESTS = VERIFY / "manifests"
-LEGACY = ("Add", "Subtract")
 BUILD_DIRECTORIES = frozenset({"artifacts", "bin", "obj", "generated", ".lake", ".vs", "__pycache__"})
 PROFILES = ("scalar", "arm64-advsimd", "x64-sse42", "x64-avx2", "x64-avx2-bmi1",
             "x64-avx512", "x64-avx512-bmi1")
@@ -21,9 +20,6 @@ MULTIPLY_PROFILES = ("scalar", "x64-vector256",
                      "x64-avx2-bmi2", "x64-avx2-bmi2-vector256",
                      "x64-avx512dqvl-bmi2", "x64-avx512dqvl-bmi2-vector256",
                      "arm64-armbase", "arm64-armbase-vector256")
-PROFILE_DIRECTORY = VERIFY / "manifests/profiles"
-PROFILE_NAMES = PROFILES + tuple(sorted(path.stem for path in PROFILE_DIRECTORY.glob("*.json")))
-SEMANTICS_VERSION = "cil-uint256-operations-1"
 
 
 def sha(path):
@@ -80,39 +76,14 @@ def copy_source(destination):
                 {"destination": str(Path(destination).resolve())}, cache=False)))
 
 
-def audit_module(entry):
-    return _runner_request(["gate", "--entry-json"], entry)
-
-
 def api_entries():
     document = json.loads((MANIFESTS / "api-coverage.json").read_text(encoding="utf-8"))
     return json.loads(_runner_request(["entries", "--json"], document))
 
 
-def method_names():
-    return LEGACY + tuple(api_entries())
-
-
-def representative_safety_gate(method, profile):
-    return json.loads(_runner_request(["safety-representative", method, profile]))
-
-
-def safety_gate(method, profile):
-    return json.loads(_runner_request(["safety", method, profile]))
-
-
-def selected_safety_module(method, profile):
-    return _runner_request(["safety-module", method, profile])
-
-
 def coverage_plan(methods, safety=False):
     plan = json.loads(_runner_request(["plan", "--json"], {"methods": list(methods), "safety": safety}))
     return [(job["method"], job["profile"]) for job in plan["include"]]
-
-
-def theorem_audits(output, names, approved):
-    return json.loads(_runner_request(["theorem-audits", "--json"],
-                      {"output": output, "names": list(names), "approved": list(approved)}))
 
 
 def __getattr__(name):

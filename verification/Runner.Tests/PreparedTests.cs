@@ -11,6 +11,94 @@ internal static class PreparedTests
 {
     internal static void Register(Action<string, Action<Catalog, string>> check)
     {
+        check("bitwise gates bind each operation, returned value and scalar constructor path", (catalog, _) =>
+        {
+            foreach (var (method, operation, symbol) in new[] { ("Xor", "xor", "^^^"), ("And", "and", "&&&"), ("Or", "or", "|||") })
+            {
+                var gate = SafetyCatalog.Gate(method, "x64-vector256"); string source = SafetyGates.Module(catalog, method, "x64-vector256");
+                Contract(gate, "WrappingBinaryContract"); Family(gate, true);
+                Program.Require(gate["generatedAudit"]!.GetValue<bool>(), "Bitwise audit not generated");
+                Contains(source, $"left {symbol} right", $"vectorOperation = .{operation} from rfl");
+                string returned = "Operator" + method;
+                Contract(SafetyCatalog.Gate(returned, "x64-vector256"), "ReadOnlyContract");
+                source = SafetyGates.Module(catalog, returned, "x64-vector256");
+                Contains(source, "import UInt256.Methods.Bitwise.ReturnSafetyContract", $".v256 ((values[0]?.getD 0) {symbol} (values[1]?.getD 0))", "using return_contract");
+                Absent(source, "binaryIndex = Extracted.entryIndex");
+            }
+            foreach (var (method, contract, expression) in new[] { ("Not", "InitializedUnaryContract", "fun input => ~~~input"), ("OperatorNot", "ReadOnlyContract", ".v256 (~~~(values[0]?.getD 0))") })
+            {
+                var gate = SafetyCatalog.Gate(method, "x64-vector256"); Contract(gate, contract); Family(gate, true);
+                string source = SafetyGates.Module(catalog, method, "x64-vector256"); Contains(source, expression, $"{contract}.reprofile"); Absent(source, "vectorOperation");
+            }
+            foreach (string method in new[] { "Xor", "And", "Or", "Not", "OperatorXor", "OperatorAnd", "OperatorOr", "OperatorNot" })
+            {
+                Family(SafetyCatalog.Gate(method, "scalar"), false);
+                string source = SafetyGates.Module(catalog, method, "scalar"); Contains(source, "UInt256Proof.Bitwise.ScalarSafety"); Absent(source, "vectorOperation", "vector_entry");
+                if (!method.StartsWith("Operator", StringComparison.Ordinal)) Contains(source, "scalarIndex = Extracted.entryIndex from rfl");
+                if (!method.Contains("Not", StringComparison.Ordinal)) Contains(source, $"scalarOperation = .{method.Replace("Operator", "", StringComparison.Ordinal).ToLowerInvariant()} from rfl");
+                Program.Reject(() => SafetyCatalog.Gate(method, "arm64"));
+            }
+        });
+        check("scalar equality operator gates bind order, signedness, polarity and profile transfer", (catalog, _) =>
+        {
+            Program.Require(SafetyCatalog.Operators.Count == 16, "Equality operator inventory changed");
+            foreach (var (method, scalar) in SafetyCatalog.Operators)
+            {
+                foreach (string profile in new[] { "scalar", "x64-vector256" })
+                {
+                    var gate = SafetyCatalog.Gate(method, profile); Family(gate, profile == "x64-vector256");
+                    Program.Require(gate["generatedAudit"]!.GetValue<bool>() && gate["theorems"]!.AsArray().Select(Catalog.Text).Contains("UInt256Proof.SafetySelected.checked_family_contract"), "Operator family audit missing");
+                    string source = SafetyGates.Module(catalog, method, profile);
+                    Contains(source, $"ScalarOperatorContract {scalar.First.ToString().ToLowerInvariant()} {scalar.Negate.ToString().ToLowerInvariant()} CIL.Value.i{scalar.Width}",
+                        scalar.Signed ? "right.toInt" : "right.toNat : Int", "CIL.storage_profile_agreement Extracted.program (by decide)", "(CIL.reprofile Extracted.program profile)");
+                    Program.Require(source.Split("#print axioms", StringSplitOptions.None).Length == 4, "Operator audit count changed");
+                }
+                Program.Reject(() => SafetyCatalog.Gate(method, "x64-sse41"));
+            }
+        });
+        check("equality reference, snapshot and primitive gates retain exact independent contracts", (_, _) =>
+        {
+            var equality = SafetyCatalog.Gate("EqUInt256UInt256", "scalar"); Contract(equality, "ReadOnlyContract"); EqualityAudits(equality, "equality");
+            foreach (string method in new[] { "EqUInt256UInt256", "EqualsUInt256Ref", "NeUInt256UInt256", "EqualsUInt256Value" })
+            foreach (var (profile, prefix) in new[] { ("scalar", ""), ("x64-sse41", "Sse"), ("x64-vector256", "Vector") })
+            {
+                var gate = SafetyCatalog.Gate(method, profile);
+                JsonObject family = new() { ["vector256Accelerated"] = profile == "x64-vector256" };
+                if (profile != "x64-vector256") family["sse41"] = profile == "x64-sse41";
+                Program.Require(JsonNode.DeepEquals(gate["coverage"]!["family"], family) && gate["theorems"]!.AsArray().Count == 3, "Reference family scope/audits changed");
+                if (method == "EqualsUInt256Value") { Contract(gate, "ReadOnlyValueContract"); EqualityTarget(gate, prefix + "Value"); EqualityAudits(gate, "value"); }
+                else if (profile != "scalar") EqualityTarget(gate, prefix + (method == "NeUInt256UInt256" ? "Negation" : ""));
+                if (method == "EqUInt256UInt256" && profile == "x64-vector256") Program.Require(JsonNode.DeepEquals(gate["theorems"], equality["theorems"]), "Vector equality audits differ");
+            }
+            foreach (string method in new[] { "EqUInt256UInt256", "EqualsUInt256Value" }) Program.Reject(() => SafetyCatalog.Gate(method, "x64-avx2"));
+            foreach (string method in new[] { "Add", "Subtract", "LtUInt256UInt64" }) Program.Reject(() => SafetyCatalog.Gate(method, "x64-vector256"));
+            Program.Reject(() => SafetyCatalog.Gate("Add", "x64-sse41"));
+            foreach (int width in new[] { 32, 64 })
+            foreach (bool signed in new[] { false, true })
+            foreach (string profile in new[] { "scalar", "x64-vector256" })
+            {
+                string method = $"Equals{(signed ? "Int" : "UInt")}{width}";
+                var gate = SafetyCatalog.Gate(method, profile); Contract(gate, "ReadOnlyScalarContract"); Family(gate, profile == "x64-vector256");
+                string stem = signed ? $"Signed{width}" : $"Primitive{(width == 64 && profile == "scalar" ? "" : width.ToString())}";
+                EqualityTarget(gate, (profile == "scalar" ? "" : "Vector") + stem);
+                Program.Require(Catalog.Text(gate["profile"]) == profile && gate["theorems"]!.AsArray().Count == 3 && Catalog.Text(gate["theorems"]!.AsArray()[^1]).EndsWith("_family", StringComparison.Ordinal), "Primitive profile/family audit changed");
+                if (signed) EqualityAudits(gate, "signed"); else if (width == 64 && profile == "scalar") EqualityAudits(gate, "primitive");
+                Program.Reject(() => SafetyCatalog.Gate(method, "x64-sse41"));
+            }
+        });
+        check("all shift APIs retain exact result, binding and profile-family audits", (_, _) =>
+        {
+            foreach (var (method, prefix, contract, binding) in new[] { ("Lsh", "", "shift", "shift"), ("Rsh", "Right", "shift", "right_shift"),
+                ("LeftShift", "Wrapper", "wrapper", "wrapper"), ("RightShift", "RightWrapper", "wrapper", "right_wrapper"), ("OperatorLsh", "Return", "return", "return"), ("OperatorRsh", "RightReturn", "return", "right_return") })
+            {
+                var gate = SafetyCatalog.Gate(method, "scalar"); Contract(gate, contract == "return" ? "ReadOnlyScalarContract" : "ShiftContract"); Family(gate, false);
+                Program.Require(Catalog.Text(gate["target"]) == $"+UInt256.Methods.Shift.{prefix}SafetyAudit:olean", "Shift audit target changed");
+                Program.Require(gate["theorems"]!.AsArray().Select(Catalog.Text).SequenceEqual(new[] { $"UInt256Proof.Shift.Safety.checked_{contract}_contract", $"UInt256Proof.Shift.Safety.checked_{binding}_binding", $"UInt256Proof.Shift.Safety.checked_{binding}_family_binding" }), "Shift audit bindings changed");
+                var vector = SafetyCatalog.Gate(method, "x64-vector256"); Family(vector, true);
+                Program.Require(JsonNode.DeepEquals(vector["theorems"], gate["theorems"]), "Vector shift audits changed");
+                foreach (string profile in new[] { "x64-sse41", "arm64-advsimd" }) Program.Reject(() => SafetyCatalog.Gate(method, profile));
+            }
+        });
         check("comparison safety preserves signed-helper interpretation and three-way value contracts", (catalog, _) =>
         {
             string source = SafetyGates.Module(catalog, "GtUInt256UInt32", "scalar");
@@ -170,4 +258,11 @@ internal static class PreparedTests
             Program.Require(Catalog.Text(value["contract"]) == "UInt256Model.Safety.ScalarValueContract" && Catalog.Text(value["coverage"]!["kind"]) == "all-profiles" && !value.ContainsKey("generatedAudit"), "By-value argument received reference contract");
         });
     }
+
+    private static void Contract(JsonObject gate, string name) => Program.Require(Catalog.Text(gate["contract"]) == "UInt256Model.Safety." + name, "Independent safety contract changed");
+    private static void Family(JsonObject gate, bool vector) => Program.Require(JsonNode.DeepEquals(gate["coverage"]!["family"], new JsonObject { ["vector256Accelerated"] = vector }), "Storage family changed");
+    private static void Contains(string source, params string[] fragments) { foreach (string fragment in fragments) Program.Require(source.Contains(fragment, StringComparison.Ordinal), "Missing safety binding: " + fragment); }
+    private static void Absent(string source, params string[] fragments) { foreach (string fragment in fragments) Program.Require(!source.Contains(fragment, StringComparison.Ordinal), "Unexpected safety binding: " + fragment); }
+    private static void EqualityTarget(JsonObject gate, string prefix) => Program.Require(Catalog.Text(gate["target"]) == $"+UInt256.Methods.Equality.{prefix}SafetyAudit:olean", "Equality target changed");
+    private static void EqualityAudits(JsonObject gate, string stem) => Program.Require(gate["theorems"]!.AsArray().Select(Catalog.Text).SequenceEqual(new[] { "contract", "binding", "family" }.Select(kind => $"UInt256Proof.Equality.Safety.checked_{stem}_{kind}")), "Equality audits changed");
 }

@@ -69,12 +69,11 @@ internal static class Program
                 Console.Write(JsonSerializer.Serialize(SafetyCatalog.Registry()));
                 return 0;
             }
-            if (arguments is ["safety" or "safety-representative" or "safety-module", string safetyMethod, string profile])
+            if (arguments is ["safety" or "safety-module", string safetyMethod, string profile])
             {
                 Console.Write(arguments[0] switch
                 {
                     "safety" => SafetyCatalog.Gate(safetyMethod, profile).ToJsonString(),
-                    "safety-representative" => SafetyCatalog.Representative(safetyMethod, profile).ToJsonString(),
                     _ => SafetyGates.Module(catalog, safetyMethod, profile)
                 });
                 return 0;
@@ -87,19 +86,11 @@ internal static class Program
                 switch (command)
                 {
                     case "copy-source": result = new Workspace(root).CopyRegressionSource(Catalog.Text(input["destination"])); break;
-                    case "theorem-audits": result = ProofAudits.Check(Catalog.Text(input["output"]), input["names"]!.AsArray().Select(Catalog.Text), input["approved"]!.AsArray().Select(Catalog.Text)); break;
                     case "plan": result = catalog.Plan(input["methods"]!.AsArray().Select(Catalog.Text).ToArray(), input["safety"]!.GetValue<bool>()); break;
                     case "entries": result = Catalog.Entries(input.AsObject()); break;
                     default: throw new ArgumentException("Unknown JSON command");
                 }
                 Console.Write(JsonSerializer.Serialize(result));
-                return 0;
-            }
-            if (arguments is ["gate", "--entry-json"])
-            {
-                JsonObject entry = JsonNode.Parse(Console.In.ReadToEnd()) as JsonObject
-                    ?? throw new ArgumentException("Expected an entry JSON object");
-                Console.Write(AuditGates.Module(entry));
                 return 0;
             }
             if (arguments is ["gate", string selector])
