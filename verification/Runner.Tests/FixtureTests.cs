@@ -10,6 +10,20 @@ internal static class FixtureTests
 {
     internal static void Register(Action<string, Action<Catalog, string>> check)
     {
+        check("equality fixture descriptors and witnesses preserve signed interpretation and exact integers", (_, _) =>
+        {
+            Workspace workspace = new(Directory.GetCurrentDirectory());
+            var signed = EqualityFixtures.Shape(workspace.Catalog, "EqInt64UInt256");
+            Program.Require(signed["scalarFirst"]!.GetValue<bool>() && signed["width"]!.GetValue<int>() == 64 && Catalog.Text(signed["scalarKind"]) == "s64", "Signed operand ABI changed");
+            var witness = EqualityFixtures.Witness(workspace, "WrongSignedEmbedding", "EqInt64UInt256");
+            Program.Require(witness["scalarBits"]!.ToString() == "18446744073709551615" && witness["actualResult"]!.GetValue<bool>() && !witness["expectedResult"]!.GetValue<bool>(), "Signed negative interpreted as unsigned equality");
+            Program.Require(!EqualityFixtures.Witness(workspace, "WrongSignedEmbedding", "NeInt64UInt256")["actualResult"]!.GetValue<bool>(), "Inequality polarity changed");
+            Program.Require(Catalog.Text(EqualityFixtures.Shape(workspace.Catalog, "EqualsUInt256Value")["kind"]) == "snapshot", "Value receiver snapshot lost");
+            Program.Require(!EqualityFixtures.Applicable(workspace, "WrongSignedEmbedding", "EqUInt256UInt256", "scalar"), "Signed witness applied to reference equality");
+            Program.Require(EqualityFixtures.Applicable(workspace, "EquivalentReduction", "EqUInt256UInt256", "x64-sse41")
+                && !EqualityFixtures.Applicable(workspace, "EquivalentScalar", "EqUInt256UInt256", "x64-sse41"), "SSE equality selection changed");
+            Program.Reject(() => EqualityFixtures.Shape(workspace.Catalog, "missing"));
+        });
         check("byte witnesses preserve ordered addresses and exact integers", (_, manifests) =>
         {
             Program.Require(FixtureChecks.InitialBytes([]) == "0", "Empty memory changed");

@@ -107,6 +107,8 @@ def _runner_request(arguments, payload=None, *, cache=True, show_output=False):
         inputs.update({str(p): sha(p) for p in source_files(project.parent.parent / "manifests", {".json"})})
         registry = project.parent.parent / "Tests/Fixtures/SIMD/Cases.props"
         inputs[str(registry)] = sha(registry)
+        equality_witnesses = project.parent.parent / "Tests/Fixtures/Equality/Witnesses.json"
+        inputs[str(equality_witnesses)] = sha(equality_witnesses)
         if inputs != _runner_inputs or not binary.is_file():
             _runner_outputs.clear()
             result = subprocess.run(["dotnet", "build", str(project), "-c", "Release", "--nologo"],
@@ -178,6 +180,11 @@ def require_changed_method(artifact, baseline, signature):
 def require_semantic_rejection(output, module):
     # Requires an independently checked full-contract refutation.
     rejection_check("semantic", output, module)
+
+
+def equality_data(kind, method, case=None, profile=None):
+    return json.loads(_runner_request(["equality-data", "--json"],
+        {"kind": kind, "method": method, "case": case, "profile": profile}))
 
 
 def selected_fixture_baseline(method, profile, positive=None, *, safety=False):

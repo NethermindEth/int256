@@ -9,73 +9,25 @@ import xml.etree.ElementTree as ET
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from common import PROFILE_NAMES, ROOT, VERIFY, expected_profile, run, method_manifest, method_names
+from common import PROFILE_NAMES, ROOT, run, method_manifest, method_names, equality_data
 from common import (isolated_run, initial_bytes_expression, mutation_proof, native_witness,
                      require_diagnostic_rejection, selected_fixture_baseline, template_refutation)
 
 DIRECTORY = Path(__file__).parent
 METHODS = tuple(name for name in method_names() if name.startswith(("Eq", "Ne", "Equals")))
-REFERENCE = ("EqUInt256UInt256", "NeUInt256UInt256", "EqualsUInt256Ref", "EqualsUInt256Value")
-SCALARS = {"System.Int32": ("s32", 32, "int"), "System.UInt32": ("u32", 32, "uint"),
-           "System.Int64": ("s64", 64, "long"), "System.UInt64": ("u64", 64, "ulong")}
 CASES = ET.parse(DIRECTORY / "Cases.props").findall("ItemGroup/EqualityCase")
-NEGATIVES = json.loads((DIRECTORY / "Witnesses.json").read_text(encoding="utf-8"))["negativeCases"]
 
 
 def shape(method):
-    calling = method_manifest(method)["callingConvention"]
-    if method in REFERENCE:
-        return {"kind": "snapshot" if method == "EqualsUInt256Value" else "reference",
-                "negate": method.startswith("Ne"), "instance": not calling["static"]}
-    parameters = calling["parameters"]
-    scalar = next((parameter["type"] for parameter in parameters if parameter["type"] in SCALARS), None)
-    if scalar is None:
-        raise RuntimeError("Unsupported equality fixture calling convention")
-    kind, width, csharp = SCALARS[scalar]
-    return {"kind": "scalar", "scalarKind": kind, "width": width, "csharp": csharp,
-            "negate": method.startswith("Ne"), "instance": not calling["static"],
-            "scalarFirst": calling["static"] and parameters[0]["type"] == scalar}
+    return equality_data("shape", method)
 
 
 def applicable(case, method, profile):
-    descriptor = shape(method)
-    if case == "Baseline": return True
-    if case == "Renamed": return True
-    if case == "EquivalentScalar":
-        features = expected_profile(profile)
-        return not features["Vector256Accelerated"] and (method not in REFERENCE or not features["Sse41"])
-    if case == "EquivalentReduction":
-        features = expected_profile(profile)
-        return features["Vector256Accelerated"] or (method in REFERENCE and features["Sse41"])
-    group = NEGATIVES[case]["group"]
-    return ((group == "reference" and method in REFERENCE)
-            or (group == "snapshot" and descriptor["kind"] == "snapshot")
-            or (group == "signed" and descriptor.get("scalarKind", "").startswith("s"))
-            or (group == "inequality" and descriptor["negate"]))
+    return equality_data("applicable", method, case, profile)
 
 
 def witness(case, method):
-    descriptor = shape(method)
-    data = dict(NEGATIVES[case])
-    if "widths" in data:
-        data.update(data["widths"][str(descriptor["width"])])
-        scalar_type = "System.Int32" if descriptor["width"] == 32 else "System.Int64"
-        data["changedSignature"] = f"System.Boolean Nethermind.Int256.UInt256::Equals({scalar_type})"
-    left, right = data["leftBase"], data["rightBase"]
-    number = lambda base: sum(int(data["initialBytes"].get(str(base+i), 0)) << (8*i) for i in range(32))
-    left_value = number(left)
-    if descriptor["kind"] == "scalar":
-        bits = data["scalarBits"]
-        scalar = bits - 2**descriptor["width"] if descriptor["scalarKind"].startswith("s") and bits >= 2**(descriptor["width"]-1) else bits
-        equal = left_value == scalar
-    else:
-        data["snapshot"] = data.get("snapshot", number(right))
-        equal = left_value == (data["snapshot"] if descriptor["kind"] == "snapshot" else number(right))
-    data["expectedResult"] = equal != descriptor["negate"]
-    data["actualResult"] = data.get("actualResult", data.get("actualEquality") != descriptor["negate"])
-    if data["actualResult"] == data["expectedResult"]:
-        raise RuntimeError("Equality witness does not contradict the complete contract")
-    return data
+    return equality_data("witness", method, case)
 
 
 def refute(proof, lake, method, data, approved):
