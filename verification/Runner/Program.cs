@@ -81,6 +81,11 @@ internal static class Program
                 object result;
                 switch (command)
                 {
+                    case "model-refutation":
+                        FixtureChecks.ModelRefutation(new Workspace(root), Catalog.Text(input["proof"]), Catalog.Text(input["lake"]), Catalog.Text(input["initial"]),
+                            Catalog.Text(input["left"]), Catalog.Text(input["right"]), Catalog.Text(input["out"]), Catalog.Text(input["address"]),
+                            Catalog.Text(input["actual"]), Catalog.Text(input["expected"]), Catalog.Text(input["method"]));
+                        result = true; break;
                     case "native-witness":
                         FixtureChecks.NativeWitness(new Workspace(root), Catalog.Text(input["destination"]), Catalog.Text(input["assembly"]), Catalog.Text(input["source"]));
                         result = true; break;

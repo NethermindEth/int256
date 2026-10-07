@@ -10,6 +10,34 @@ internal static class FixtureTests
 {
     internal static void Register(Action<string, Action<Catalog, string>> check)
     {
+        check("arithmetic refutations retain complete contracts and required audits", (_, manifests) =>
+        {
+            string root = Path.GetDirectoryName(manifests)!, template = Path.Combine(root, "verification/Tests/Fixtures/RefutationTemplate.lean.in");
+            Directory.CreateDirectory(Path.GetDirectoryName(template)!);
+            File.Copy(Path.Combine(Directory.GetCurrentDirectory(), "verification/Tests/Fixtures/RefutationTemplate.lean.in"), template);
+            foreach (string method in new[] { "Add", "Subtract" })
+            {
+                string proof = Path.Combine(root, "refutation-" + method);
+                Directory.CreateDirectory(Path.Combine(proof, "manifests"));
+                File.Copy(Path.Combine(manifests, method.ToLowerInvariant() + ".json"), Path.Combine(proof, "manifests", method.ToLowerInvariant() + ".json"));
+                string audit = "'UInt256Proof.model_not_correct' depends on axioms: [propext, Classical.choice, Quot.sound]";
+                Workspace workspace = new(root, (command, cwd, _) =>
+                {
+                    Program.Require(cwd == proof && command.SequenceEqual(new[] { "lake", "build", "+Refutation:olean" }), "Arithmetic kernel command changed");
+                    string source = File.ReadAllText(Path.Combine(proof, "Refutation.lean"));
+                    string contract = method == "Add" ? "Contract" : "SubtractContract", operation = method == "Add" ? "+" : "-";
+                    Program.Require(source.Contains($"¬ {contract} Extracted.program Extracted.entryIndex witnessBytes 0 32 64", StringComparison.Ordinal)
+                        && source.Contains($"byteValue witnessBytes 0 {operation} byteValue witnessBytes 32", StringComparison.Ordinal)
+                        && source.Contains("invoke_result_unique", StringComparison.Ordinal) && source.Contains("rintro ⟨fuel, final, hr, hm⟩", StringComparison.Ordinal), "Complete contract refutation changed");
+                    return audit;
+                });
+                void Run(string selected) => FixtureChecks.ModelRefutation(workspace, proof, "lake", "if address = 0 then 1 else 0", "0", "32", "64", "72", "2", "3", selected);
+                Run(method);
+                audit = "'UInt256Proof.model_not_correct' depends on axioms: [sorryAx]";
+                Program.Reject(() => Run(method));
+                Program.Reject(() => Run("Multiply"));
+            }
+        });
         check("native witnesses require clean builds and successful execution", (_, manifests) =>
         {
             string root = Path.GetDirectoryName(manifests)!;

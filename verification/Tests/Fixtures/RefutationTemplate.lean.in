@@ -1,0 +1,38 @@
+import Extracted
+import UInt256.Methods.@METHOD@.Contract
+import CIL.SymbolicExecution
+open CIL UInt256Model
+set_option maxRecDepth 8192
+set_option maxHeartbeats 2000000
+namespace UInt256Proof
+def witnessBytes : Bytes := fun address => @INITIAL@
+def observed := (invoke Extracted.program (executionBound Extracted.program Extracted.entryIndex) Extracted.entryIndex
+  [.object @LEFT@, .object @RIGHT@, .object @OUT@] (byteMemory witnessBytes)).map
+    (fun result => result.1 (.byte @ADDRESS@))
+theorem model_observed : observed = some (some (.i8 @ACTUAL@)) := by decide
+theorem model_expected : writeBytes (byteMemory witnessBytes) @OUT@
+    (byteValue witnessBytes @LEFT@ @OPERATION@ byteValue witnessBytes @RIGHT@).toNat 32 (.byte @ADDRESS@) =
+      some (.i8 @EXPECTED@) := by decide
+theorem model_not_correct : ¬ @CONTRACT@ Extracted.program Extracted.entryIndex witnessBytes @LEFT@ @RIGHT@ @OUT@ := by
+  rintro ⟨fuel, final, hr, hm⟩
+  have ho := model_observed
+  unfold observed at ho
+  cases he : invoke Extracted.program (executionBound Extracted.program Extracted.entryIndex)
+      Extracted.entryIndex [.object @LEFT@, .object @RIGHT@, .object @OUT@]
+      (byteMemory witnessBytes) with
+  | none => simp [he] at ho
+  | some result =>
+    have unique := invoke_result_unique Extracted.program fuel
+      (executionBound Extracted.program Extracted.entryIndex) Extracted.entryIndex
+      [.object @LEFT@, .object @RIGHT@, .object @OUT@] (byteMemory witnessBytes)
+      (final, []) result hr he
+    rw [← unique] at he
+    rw [he] at ho
+    simp only [Option.map_some] at ho
+    have ha : final (.byte @ADDRESS@) = some (.i8 @ACTUAL@) := Option.some.inj ho
+    have he := hm @ADDRESS@
+    rw [model_expected] at he
+    have different : (some (.i8 @ACTUAL@) : Option Value) ≠ some (.i8 @EXPECTED@) := by decide
+    exact different (ha.symm.trans he)
+#print axioms model_not_correct
+end UInt256Proof

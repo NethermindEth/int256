@@ -151,6 +151,14 @@ def build_artifact(project, work, method, fixture=None, simd_fixture=False, fixt
     return bundle
 
 
+def model_refutation(proof, lake, initial, left, right, out, address, actual, expected, method="Add"):
+    _runner_request(["model-refutation", "--json"],
+        {"proof": str(Path(proof).resolve()), "lake": str(lake), "initial": initial, "method": method,
+         "left": str(left), "right": str(right), "out": str(out), "address": str(address), "actual": str(actual), "expected": str(expected)},
+        cache=False, show_output=True)
+    print(f"PASS: kernel refutes the full contract at byte {address}: actual {actual}, expected {expected}")
+
+
 def native_witness(destination, assembly, source):
     _runner_request(["native-witness", "--json"],
         {"destination": str(Path(destination).resolve()), "assembly": str(Path(assembly).resolve()), "source": source},

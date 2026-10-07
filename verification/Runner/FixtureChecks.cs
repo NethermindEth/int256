@@ -8,6 +8,21 @@ namespace UInt256Verification;
 
 internal static class FixtureChecks
 {
+    internal static void ModelRefutation(Workspace workspace, string proof, string lake, string initial, string left, string right,
+        string output, string address, string actual, string expected, string method)
+    {
+        if (method is not ("Add" or "Subtract")) throw new ArgumentException("Unknown arithmetic refutation method");
+        Dictionary<string, string> substitutions = new()
+        {
+            ["METHOD"] = method, ["INITIAL"] = initial, ["LEFT"] = left, ["RIGHT"] = right, ["OUT"] = output,
+            ["ADDRESS"] = address, ["ACTUAL"] = actual, ["EXPECTED"] = expected,
+            ["CONTRACT"] = method == "Add" ? "Contract" : "SubtractContract", ["OPERATION"] = method == "Add" ? "+" : "-"
+        };
+        var manifest = JsonNode.Parse(File.ReadAllText(Path.Combine(proof, "manifests", method.ToLowerInvariant() + ".json")))!;
+        Refutation(workspace, proof, lake, Path.Combine(workspace.Verification, "Tests/Fixtures/RefutationTemplate.lean.in"), substitutions,
+            "Refutation", "UInt256Proof.model_not_correct", manifest["approvedAxioms"]!.AsArray().Select(Catalog.Text), true);
+    }
+
     internal static void NativeWitness(Workspace workspace, string destination, string assembly, string source)
     {
         string witness = Path.Combine(destination, "Witness");

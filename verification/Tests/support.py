@@ -2,16 +2,14 @@
 
 import json
 from pathlib import Path
-import shutil
 import sys
 import tempfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from common import verifier_command, PROFILE_DIRECTORY, PROFILES, ROOT, VERIFY, expected_profile, generated_directory, run, sha, source_files, check_calling_convention, method_manifest
-from common import check_proof_snapshot, safety_gate, source_inputs
-from common import build_artifact, copy_source, template_refutation, mutation_proof, native_witness
-from common import theorem_audits, rejection_check, fixture_check
+from common import verifier_command, ROOT, VERIFY, generated_directory, run, sha, source_inputs
+from common import copy_source, template_refutation, mutation_proof, native_witness, model_refutation
+from common import rejection_check, fixture_check
 
 
 def isolated_run(script, arguments, prefix):
@@ -93,58 +91,6 @@ def build_extract(destination, name, method="Add"):
 def require_semantic_rejection(output, module):
     # A kernel-checked full-contract refutation must precede this diagnostic gate.
     rejection_check("semantic", output, module)
-
-
-def model_refutation(proof, lake, initial, left, right, out, address, actual, expected, method="Add"):
-    """Kernel-check a concrete refutation of the unchanged full contract."""
-    contract = "Contract" if method == "Add" else "SubtractContract"
-    operation = "+" if method == "Add" else "-"
-    source = f'''import Extracted
-import UInt256.Methods.{method}.Contract
-import CIL.SymbolicExecution
-open CIL UInt256Model
-set_option maxRecDepth 8192
-set_option maxHeartbeats 2000000
-namespace UInt256Proof
-def witnessBytes : Bytes := fun address => {initial}
-def observed := (invoke Extracted.program (executionBound Extracted.program Extracted.entryIndex) Extracted.entryIndex
-  [.object {left}, .object {right}, .object {out}] (byteMemory witnessBytes)).map
-    (fun result => result.1 (.byte {address}))
-theorem model_observed : observed = some (some (.i8 {actual})) := by decide
-theorem model_expected : writeBytes (byteMemory witnessBytes) {out}
-    (byteValue witnessBytes {left} {operation} byteValue witnessBytes {right}).toNat 32 (.byte {address}) =
-      some (.i8 {expected}) := by decide
-theorem model_not_correct : ¬ {contract} Extracted.program Extracted.entryIndex witnessBytes {left} {right} {out} := by
-  rintro ⟨fuel, final, hr, hm⟩
-  have ho := model_observed
-  unfold observed at ho
-  cases he : invoke Extracted.program (executionBound Extracted.program Extracted.entryIndex)
-      Extracted.entryIndex [.object {left}, .object {right}, .object {out}]
-      (byteMemory witnessBytes) with
-  | none => simp [he] at ho
-  | some result =>
-    have unique := invoke_result_unique Extracted.program fuel
-      (executionBound Extracted.program Extracted.entryIndex) Extracted.entryIndex
-      [.object {left}, .object {right}, .object {out}] (byteMemory witnessBytes)
-      (final, []) result hr he
-    rw [← unique] at he
-    rw [he] at ho
-    simp only [Option.map_some] at ho
-    have ha : final (.byte {address}) = some (.i8 {actual}) := Option.some.inj ho
-    have he := hm {address}
-    rw [model_expected] at he
-    have different : (some (.i8 {actual}) : Option Value) ≠ some (.i8 {expected}) := by decide
-    exact different (ha.symm.trans he)
-#print axioms model_not_correct
-end UInt256Proof
-'''
-    (proof / "Refutation.lean").write_text(source, encoding="utf-8")
-    with (proof / "lakefile.toml").open("a", encoding="utf-8") as configuration:
-        configuration.write('\n[[lean_lib]]\nname = "Refutation"\n')
-    output = run([lake, "build", "Refutation"], proof)
-    permitted = set(json.loads((proof / f"manifests/{method.lower()}.json").read_text(encoding="utf-8"))["approvedAxioms"])
-    theorem_audits(output, ["UInt256Proof.model_not_correct"], permitted)
-    print(f"PASS: kernel refutes the full contract at byte {address}: actual {actual}, expected {expected}")
 
 
 def require_production_report(method="Add"):
