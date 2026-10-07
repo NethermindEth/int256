@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import threading
 
 
@@ -91,7 +92,7 @@ _runner_inputs = None
 _runner_outputs = {}
 
 
-def _runner_request(arguments, payload=None, *, cache=True):
+def _runner_request(arguments, payload=None, *, cache=True, show_output=False):
     """Temporary bridge while proof orchestration moves to the C# runner."""
     global _runner_inputs
     root = Path(__file__).resolve().parent.parent
@@ -116,6 +117,8 @@ def _runner_request(arguments, payload=None, *, cache=True):
         if not cache or key not in _runner_outputs:
             result = subprocess.run(["dotnet", str(binary), *arguments], cwd=root,
                                     input=serialized, capture_output=True, text=True, encoding="utf-8")
+            if show_output:
+                print(result.stderr, end="", file=sys.stderr)
             if result.returncode:
                 raise RuntimeError(result.stderr.strip() or "C# verification runner failed")
             if not cache:
@@ -131,6 +134,16 @@ def source_inputs(root=ROOT):
 def check_proof_snapshot(proof, relative_paths, inputs):
     return json.loads(_runner_request(["snapshot", "--json"],
         {"proof": str(Path(proof).resolve()), "paths": [str(path) for path in relative_paths], "inputs": inputs}, cache=False))
+
+
+def build_artifact(project, work, method, fixture=None, simd_fixture=False, fixture_name=None):
+    bundle = json.loads(_runner_request(["build-artifact", "--json"],
+        {"project": str(Path(project).resolve()), "work": str(Path(work).resolve()), "method": method,
+         "fixture": str(Path(fixture).resolve()) if fixture else None,
+         "registeredFixture": simd_fixture, "fixtureName": fixture_name}, cache=False, show_output=True))
+    for name in ("assembly", "extractor", "project"):
+        bundle[name] = Path(bundle[name])
+    return bundle
 
 
 def audit_module(entry):

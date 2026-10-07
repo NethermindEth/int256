@@ -81,6 +81,12 @@ internal static class Program
                 object result;
                 switch (command)
                 {
+                    case "build-artifact":
+                        ArtifactBundle built = new Workspace(root).BuildArtifact(Catalog.Text(input["project"]), Catalog.Text(input["work"]),
+                            Catalog.Text(input["method"]), input["fixture"]?.GetValue<string>(), input["registeredFixture"]!.GetValue<bool>(),
+                            input["fixtureName"]?.GetValue<string>());
+                        result = JsonSerializer.SerializeToNode(built, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase })!;
+                        break;
                     case "snapshot":
                         result = Workspace.CheckProofSnapshot(Catalog.Text(input["proof"]), input["paths"]!.AsArray().Select(Catalog.Text),
                             input["inputs"]!.AsObject().ToDictionary(pair => pair.Key, pair => Catalog.Text(pair.Value)));

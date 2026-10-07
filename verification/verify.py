@@ -12,7 +12,7 @@ import threading
 import time
 
 from common import audit_module, bound_audit_names, PROFILE_DIRECTORY, PROFILE_NAMES, PROFILES, ROOT, SEMANTICS_VERSION, VERIFY, expected_profile, generated_directory, run, sha, source_files, LEGACY, api_entries, check_calling_convention, method_manifest, method_names, native_limitations, selected_safety_module, safety_gate
-from common import SIMD_CASES, theorem_audits, check_proof_snapshot, source_inputs as workspace_inputs
+from common import build_artifact, SIMD_CASES, theorem_audits, check_proof_snapshot, source_inputs as workspace_inputs
 
 def run_stage(command, cwd, stage):
     try:
@@ -76,35 +76,6 @@ class ProofSession:
             (self.proof / relative).unlink(missing_ok=True)
         self.uses += 1
         return self.proof, self.sources, self.paths
-
-
-def build_artifact(project, work, method, fixture=None, simd_fixture=False, fixture_name=None):
-    inputs = source_inputs()
-    stages = {}
-    artifacts = work / "artifacts"
-    build = ["dotnet", "build", str(project), "-c", "Release", "--no-incremental",
-             f"-p:ArtifactsPath={artifacts}", "-p:EnableZkEvm=false"]
-    if fixture:
-        build += [f"-p:FixtureMethod={method}", "-p:EnforceCodeStyleInBuild=true", "-p:GenerateDocumentationFile=true"]
-        build += ([f"-p:FixtureCase={fixture_name}"] if simd_fixture else [f"-p:FixtureSource={fixture}"])
-    stage_started = time.perf_counter()
-    run_stage(build, ROOT, "Fixture maintenance/build" if fixture else "Production build")
-    stages["assemblyBuildSeconds"] = time.perf_counter() - stage_started
-    assembly = artifacts / "bin/Nethermind.Int256/release/Nethermind.Int256.dll"
-    if not assembly.is_file():
-        raise RuntimeError("Fresh build did not produce the selected assembly")
-    tools = work / "tools"
-    stage_started = time.perf_counter()
-    run(["dotnet", "build", str(VERIFY / "Extractor/Extractor.csproj"), "-c", "Release",
-         "--no-incremental", f"-p:ArtifactsPath={tools}", "-p:EnforceCodeStyleInBuild=true",
-         "-p:GenerateDocumentationFile=true"], ROOT)
-    stages["extractorBuildSeconds"] = time.perf_counter() - stage_started
-    extractor = tools / "bin/Extractor/release/Extractor.dll"
-    if inputs != source_inputs():
-        raise RuntimeError("Inputs changed during artifact build")
-    return {"assembly": assembly, "extractor": extractor, "timings": stages,
-            "sourceInputs": inputs, "assemblySha256": sha(assembly), "extractorSha256": sha(extractor),
-            "project": project.resolve(), "fixture": fixture_name if fixture else None}
 
 
 def validate_bundle(bundle, inputs, production=False):

@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from common import verifier_command, BUILD_DIRECTORIES, PROFILE_DIRECTORY, PROFILES, ROOT, VERIFY, expected_profile, generated_directory, run, sha, source_files, check_calling_convention, method_manifest
 from common import check_proof_snapshot, safety_gate, source_inputs
-from verify import build_artifact
+from common import build_artifact
 from common import theorem_audits, rejection_check
 
 
