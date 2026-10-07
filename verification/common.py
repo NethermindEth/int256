@@ -71,13 +71,6 @@ def run(command, cwd, *, succeeds=True):
     return result.stdout
 
 
-def verifier_command(root=ROOT):
-    """Invoke the C# public verifier in the selected regression workspace."""
-    root = Path(root).resolve()
-    return ["dotnet", "run", "--project", str(root / "verification/Runner/Verification.csproj"),
-            "-c", "Release", "--", "--root", str(root), "verify"]
-
-
 def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -105,8 +98,6 @@ def _runner_request(arguments, payload=None, *, cache=True, show_output=False):
         inputs.update({str(p): sha(p) for p in root.iterdir()
                        if p.is_file() and (p.suffix in {".props", ".targets"} or p.name in {"global.json", "NuGet.Config"})})
         inputs.update({str(p): sha(p) for p in source_files(project.parent.parent / "manifests", {".json"})})
-        registry = project.parent.parent / "Tests/Fixtures/SIMD/Cases.props"
-        inputs[str(registry)] = sha(registry)
         if inputs != _runner_inputs or not binary.is_file():
             _runner_outputs.clear()
             result = subprocess.run(["dotnet", "build", str(project), "-c", "Release", "--nologo"],
@@ -141,61 +132,8 @@ def check_proof_snapshot(proof, relative_paths, inputs):
         {"proof": str(Path(proof).resolve()), "paths": [str(path) for path in relative_paths], "inputs": inputs}, cache=False))
 
 
-def build_artifact(project, work, method, fixture=None, simd_fixture=False, fixture_name=None):
-    bundle = json.loads(_runner_request(["build-artifact", "--json"],
-        {"project": str(Path(project).resolve()), "work": str(Path(work).resolve()), "method": method,
-         "fixture": str(Path(fixture).resolve()) if fixture else None,
-         "registeredFixture": simd_fixture, "fixtureName": fixture_name}, cache=False, show_output=True))
-    for name in ("assembly", "extractor", "project"):
-        bundle[name] = Path(bundle[name])
-    return bundle
-
-
-def isolated_run(script, arguments, prefix):
-    _runner_request(["isolated-run", "--json"],
-        {"script": str(Path(script).resolve()), "arguments": arguments, "prefix": prefix, "python": sys.executable},
-        cache=False, show_output=True)
-
-
-def initial_bytes_expression(witness):
-    return json.loads(_runner_request(["initial-bytes", "--json"],
-        [[str(address), str(value)] for address, value in witness["initialBytes"].items()]))
-
-
-def require_diagnostic_rejection(output, module, diagnostic):
-    # Requires an independently checked full-contract refutation.
-    rejection_check("diagnostic", output, module, diagnostic)
-
-
-def reject_resource_failure(output):
-    rejection_check("resources", output)
-
-
-def require_changed_method(artifact, baseline, signature):
-    fixture_check("changed-method", artifact=artifact, baseline=baseline, signature=signature)
-
-
-def selected_fixture_baseline(method, profile, positive=None, *, safety=False):
-    command, report, baseline = json.loads(_runner_request(["fixture-baseline", "--json"],
-        {"method": method, "profile": profile, "positive": positive, "safety": safety}, cache=False, show_output=True))
-    return command, Path(report), baseline
-
-
-def mutation_proof(work, project, case, method, profile, baseline, intended=None):
-    result = json.loads(_runner_request(["mutation", "--json"],
-        {"work": str(Path(work).resolve()), "project": str(Path(project).resolve()), "case": case,
-         "method": method, "profile": profile, "baseline": baseline, "intended": intended}, cache=False, show_output=True))
-    for name in ("assembly", "extractor", "project"):
-        result["bundle"][name] = Path(result["bundle"][name])
-    return result["bundle"], Path(result["proof"])
-
-
 def audit_module(entry):
     return _runner_request(["gate", "--entry-json"], entry)
-
-
-def bound_audit_names(entry):
-    return json.loads(_runner_request(["bound-audits", "--entry-json"], entry))
 
 
 def api_entries():
@@ -214,10 +152,6 @@ def method_manifest(name):
     if entry is None:
         raise ValueError(f"Unknown verification method: {name}")
     return json.loads(_runner_request(["manifest", "--json"], entry))
-
-
-def native_limitations(methods):
-    return json.loads(_runner_request(["native-limitations", "--json"], list(methods)))
 
 
 def check_calling_convention(actual, expected):
@@ -251,22 +185,6 @@ def coverage_plan(methods, safety=False):
 def theorem_audits(output, names, approved):
     return json.loads(_runner_request(["theorem-audits", "--json"],
                       {"output": output, "names": list(names), "approved": list(approved)}))
-
-
-def rejection_check(kind, output, module="", diagnostic=""):
-    _runner_request(["rejection", "--json"],
-                    {"kind": kind, "output": output, "module": module, "diagnostic": diagnostic})
-
-
-def fixture_check(kind, **payload):
-    _runner_request(["fixture-check", "--json"], {"kind": kind, **payload})
-
-
-def template_refutation(proof, lake, template, substitutions, module, theorem, approved, register=False):
-    _runner_request(["refutation", "--json"],
-        {"proof": str(Path(proof).resolve()), "lake": str(lake), "template": str(Path(template).resolve()),
-         "substitutions": [[name, str(value)] for name, value in substitutions.items()],
-         "module": module, "theorem": theorem, "approved": list(approved), "register": register}, cache=False, show_output=True)
 
 
 def __getattr__(name):

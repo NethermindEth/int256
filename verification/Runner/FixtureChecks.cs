@@ -14,22 +14,6 @@ internal static class FixtureChecks
         return string.Concat(bytes.Select(pair => $"if address = {Number(pair.Key)} then {Number(pair.Value)} else ")) + "0";
     }
 
-    internal static void IsolatedRun(Workspace workspace, string script, string[] arguments, string prefix, string python)
-    {
-        string relative = Workspace.Relative(workspace.Root, Path.GetFullPath(script));
-        if (relative == ".." || relative.StartsWith("../", StringComparison.Ordinal) || Path.IsPathRooted(relative))
-            throw new ArgumentException("Regression script must be inside the repository");
-        string temporary = Directory.CreateTempSubdirectory(prefix).FullName;
-        try
-        {
-            string destination = Path.Combine(temporary, "source");
-            workspace.Run(["git", "clone", "--shared", "--no-checkout", workspace.Root, destination], workspace.Root);
-            workspace.CopyRegressionSource(destination);
-            workspace.Run([python, Path.Combine(destination, relative), "--workspace", .. arguments], destination, "Isolated regression");
-        }
-        finally { Directory.Delete(temporary, true); }
-    }
-
     internal static (string[] Command, string ReportPath, JsonObject Baseline) SelectedBaseline(Workspace workspace, string method, string profile, string? positive, bool safety)
     {
         string[] command = ["dotnet", "run", "--project", Path.Combine(workspace.Verification, "Runner/Verification.csproj"), "-c", "Release", "--",

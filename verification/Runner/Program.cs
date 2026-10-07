@@ -81,63 +81,15 @@ internal static class Program
                 object result;
                 switch (command)
                 {
-                    case "initial-bytes":
-                        result = FixtureChecks.InitialBytes(input.AsArray().Select(pair => new KeyValuePair<string, string>(Catalog.Text(pair![0]), Catalog.Text(pair[1])))); break;
-                    case "isolated-run":
-                        FixtureChecks.IsolatedRun(new Workspace(root), Catalog.Text(input["script"]), input["arguments"]!.AsArray().Select(Catalog.Text).ToArray(),
-                            Catalog.Text(input["prefix"]), Catalog.Text(input["python"]));
-                        result = true; break;
-                    case "fixture-baseline":
-                        var baseline = FixtureChecks.SelectedBaseline(new Workspace(root), Catalog.Text(input["method"]), Catalog.Text(input["profile"]),
-                            input["positive"]?.GetValue<string>(), input["safety"]!.GetValue<bool>());
-                        result = new object[] { baseline.Command, baseline.ReportPath, baseline.Baseline }; break;
-                    case "mutation":
-                        var mutation = FixtureChecks.Mutation(new Workspace(root), Catalog.Text(input["work"]), Catalog.Text(input["project"]), Catalog.Text(input["case"]),
-                            Catalog.Text(input["method"]), Catalog.Text(input["profile"]), input["baseline"]!.AsObject(), input["intended"]?.GetValue<string>());
-                        result = JsonSerializer.SerializeToNode(new { mutation.Bundle, mutation.Proof }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase })!;
-                        break;
-                    case "refutation":
-                        FixtureChecks.Refutation(new Workspace(root), Catalog.Text(input["proof"]), Catalog.Text(input["lake"]), Catalog.Text(input["template"]),
-                            input["substitutions"]!.AsArray().Select(pair => new KeyValuePair<string, string>(Catalog.Text(pair![0]), Catalog.Text(pair[1]))),
-                            Catalog.Text(input["module"]), Catalog.Text(input["theorem"]), input["approved"]!.AsArray().Select(Catalog.Text), input["register"]!.GetValue<bool>());
-                        result = true; break;
                     case "copy-source": result = new Workspace(root).CopyRegressionSource(Catalog.Text(input["destination"])); break;
-                    case "fixture-check":
-                        switch (Catalog.Text(input["kind"]))
-                        {
-                            case "changed-method": FixtureChecks.ChangedMethod(input["artifact"]!.AsObject(), input["baseline"]!.AsObject(), Catalog.Text(input["signature"])); break;
-                            case "safety-report": FixtureChecks.SafetyReport(input["report"]!.AsObject(), Catalog.Text(input["method"]), Catalog.Text(input["profile"])); break;
-                            case "baseline": FixtureChecks.Baseline(input["production"]!.AsObject(), input["baseline"]!.AsObject(), input["inputs"]!.AsObject()); break;
-                            case "production": FixtureChecks.Production(input["production"]!.AsObject(), input["inputs"]!.AsObject()); break;
-                            case "alternative": FixtureChecks.Alternative(input["baseline"]!.AsObject(), input["alternative"]!.AsObject()); break;
-                            default: throw new ArgumentException("Unknown fixture check");
-                        }
-                        result = true; break;
-                    case "build-artifact":
-                        ArtifactBundle built = new Workspace(root).BuildArtifact(Catalog.Text(input["project"]), Catalog.Text(input["work"]),
-                            Catalog.Text(input["method"]), input["fixture"]?.GetValue<string>(), input["registeredFixture"]!.GetValue<bool>(),
-                            input["fixtureName"]?.GetValue<string>());
-                        result = JsonSerializer.SerializeToNode(built, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase })!;
-                        break;
                     case "snapshot":
                         result = Workspace.CheckProofSnapshot(Catalog.Text(input["proof"]), input["paths"]!.AsArray().Select(Catalog.Text),
                             input["inputs"]!.AsObject().ToDictionary(pair => pair.Key, pair => Catalog.Text(pair.Value)));
                         break;
-                    case "rejection":
-                        string rejectionOutput = Catalog.Text(input["output"]), module = Catalog.Text(input["module"]);
-                        switch (Catalog.Text(input["kind"]))
-                        {
-                            case "resources": RejectionChecks.Resources(rejectionOutput); break;
-                            case "semantic": RejectionChecks.Semantic(rejectionOutput, module); break;
-                            case "diagnostic": RejectionChecks.Diagnostic(rejectionOutput, module, Catalog.Text(input["diagnostic"])); break;
-                            default: throw new ArgumentException("Unknown rejection check");
-                        }
-                        result = true; break;
                     case "theorem-audits": result = ProofAudits.Check(Catalog.Text(input["output"]), input["names"]!.AsArray().Select(Catalog.Text), input["approved"]!.AsArray().Select(Catalog.Text)); break;
                     case "plan": result = catalog.Plan(input["methods"]!.AsArray().Select(Catalog.Text).ToArray(), input["safety"]!.GetValue<bool>()); break;
                     case "entries": result = Catalog.Entries(input.AsObject()); break;
                     case "manifest": result = catalog.Manifest(input.AsObject()); break;
-                    case "native-limitations": result = catalog.NativeLimitations(input.AsArray().Select(Catalog.Text)); break;
                     case "calling-convention":
                         Catalog.CheckCallingConvention(input["actual"]!.AsObject(), input["expected"]!.AsObject());
                         result = true;
@@ -152,12 +104,11 @@ internal static class Program
                 Console.Write(JsonSerializer.Serialize(result));
                 return 0;
             }
-            if (arguments is ["gate" or "bound-audits", "--entry-json"])
+            if (arguments is ["gate", "--entry-json"])
             {
                 JsonObject entry = JsonNode.Parse(Console.In.ReadToEnd()) as JsonObject
                     ?? throw new ArgumentException("Expected an entry JSON object");
-                Console.Write(arguments[0] == "gate" ? AuditGates.Module(entry)
-                    : JsonSerializer.Serialize(AuditGates.BoundAuditNames(entry)));
+                Console.Write(AuditGates.Module(entry));
                 return 0;
             }
             if (arguments is ["gate", string selector])

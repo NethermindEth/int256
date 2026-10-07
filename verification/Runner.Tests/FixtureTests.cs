@@ -24,13 +24,11 @@ internal static class FixtureTests
                 && !EqualityFixtures.Applicable(workspace, "EquivalentScalar", "EqUInt256UInt256", "x64-sse41"), "SSE equality selection changed");
             Program.Reject(() => EqualityFixtures.Shape(workspace.Catalog, "missing"));
         });
-        check("byte witnesses preserve ordered addresses and exact integers", (_, manifests) =>
+        check("byte witnesses preserve ordered addresses and exact integers", (_, _) =>
         {
             Program.Require(FixtureChecks.InitialBytes([]) == "0", "Empty memory changed");
             Program.Require(FixtureChecks.InitialBytes(new Dictionary<string, string> { [" 0008 "] = "255", ["18446744073709551616"] = "1", ["0"] = "2" })
                 == "if address = 8 then 255 else if address = 18446744073709551616 then 1 else if address = 0 then 2 else 0", "Witness order or integer precision changed");
-            string root = Path.GetDirectoryName(manifests)!;
-            Program.Reject(() => FixtureChecks.IsolatedRun(new Workspace(root), Path.Combine(root, "../outside.py"), [], "fixture-", "python"));
         });
         check("fixture baselines preserve order, safety scope, freshness and proof identity", (catalog, manifests) =>
         {
