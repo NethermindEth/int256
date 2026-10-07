@@ -81,6 +81,7 @@ internal static class Program
                 object result;
                 switch (command)
                 {
+                    case "baseline-evidence": result = BaselineEvidence.Check(Catalog.Text(input["baseline"]), Catalog.Text(input["method"]), Catalog.Text(input["profile"]), Catalog.Text(input["repository"])); break;
                     case "copy-source": result = new Workspace(root).CopyRegressionSource(Catalog.Text(input["destination"])); break;
                     case "snapshot":
                         result = Workspace.CheckProofSnapshot(Catalog.Text(input["proof"]), input["paths"]!.AsArray().Select(Catalog.Text),

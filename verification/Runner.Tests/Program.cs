@@ -251,6 +251,7 @@ internal static class Program
         ProfileExtractorChecks.Register(Check);
         SimdFixtureChecks.Register(Check);
         CompiledSafetyChecks.Register(Check);
+        BaselineEvidenceTests.Register(Check);
         RobustnessChecks.Register(Check);
         NativeSimdChecks.Register(Check);
         GateBindingChecks.Register(Check);
