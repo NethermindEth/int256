@@ -24,6 +24,26 @@ internal static class Program
             }
 
             Catalog catalog = new(Path.Combine(root, "verification"));
+            if (arguments is ["inputs"])
+            {
+                Console.WriteLine(JsonSerializer.Serialize(new Workspace(root).Inputs()));
+                return 0;
+            }
+            if (arguments is ["extract", string extractMethod, string extractProfile, string destination])
+            {
+                Workspace workspace = new(root);
+                JsonObject manifest = catalog.Manifest(extractMethod);
+                _ = catalog.Profile(extractProfile);
+                string sdk = workspace.Run(["dotnet", "--version"], root).Trim();
+                if (sdk != Catalog.Text(manifest["sdk"])) throw new InvalidOperationException($"SDK {manifest["sdk"]} required; got {sdk}");
+                string work = Path.GetFullPath(destination);
+                if (Directory.Exists(work) || File.Exists(work)) throw new ArgumentException("Extraction destination must be a new directory");
+                Directory.CreateDirectory(work);
+                ArtifactBundle bundle = workspace.BuildArtifact(workspace.ProductionProject, work, extractMethod);
+                JsonObject artifact = workspace.Extract(bundle, Path.Combine(work, "generated"), extractMethod, extractProfile);
+                Console.WriteLine(artifact.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+                return 0;
+            }
             if (arguments is ["safety-registry"])
             {
                 Console.Write(JsonSerializer.Serialize(SafetyCatalog.Registry()));
@@ -88,12 +108,12 @@ internal static class Program
                 ["plan", "--method", string method] => catalog.Plan([method], safetyPlan),
                 ["plan"] => catalog.Plan(Catalog.Legacy, safetyPlan),
                 _ => throw new ArgumentException(
-                    "Usage: Verification [--root <repository>] catalog | manifest <method> | gate <method> | safety[-module] <method> <profile> | plan [--expanded | --method <method>] [--safety]")
+                    "Usage: Verification [--root <repository>] catalog | inputs | extract <method> <profile> <new-directory> | manifest <method> | gate <method> | safety[-module] <method> <profile> | plan [--expanded | --method <method>] [--safety]")
             };
             Console.WriteLine(output.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
             return 0;
         }
-        catch (Exception error) when (error is ArgumentException or InvalidOperationException or IOException or JsonException)
+        catch (Exception error) when (error is ArgumentException or InvalidOperationException or IOException or JsonException or System.ComponentModel.Win32Exception)
         {
             Console.Error.WriteLine($"Verification failed: {error.Message}");
             return 1;

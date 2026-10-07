@@ -195,8 +195,9 @@ The C# runner also provides `catalog`, `manifest <method>`, `gate <method>`,
 Python orchestration builds and calls the C# catalog, metadata checks and gate
 generator through `common.py`; successful responses are reused only while their
 source inputs and request match.
-It does not yet
-run proofs or produce verification reports.
+`inputs` prints the source hashes; `extract <method> <profile> <new-directory>`
+builds a fresh production DLL and extractor and validates the extracted identity.
+The C# runner does not yet run proofs or produce verification reports.
 
 Install Python 3, .NET SDK 10.0.401 and Lean 4.34.1, including Lake. Keep `dotnet`
 and `lake` on PATH; versions are pinned in `global.json`, `lean-toolchain` and the
