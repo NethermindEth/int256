@@ -81,6 +81,9 @@ internal static class Program
                 object result;
                 switch (command)
                 {
+                    case "native-witness":
+                        FixtureChecks.NativeWitness(new Workspace(root), Catalog.Text(input["destination"]), Catalog.Text(input["assembly"]), Catalog.Text(input["source"]));
+                        result = true; break;
                     case "mutation":
                         var mutation = FixtureChecks.Mutation(new Workspace(root), Catalog.Text(input["work"]), Catalog.Text(input["project"]), Catalog.Text(input["case"]),
                             Catalog.Text(input["method"]), Catalog.Text(input["profile"]), input["baseline"]!.AsObject(), input["intended"]?.GetValue<string>());

@@ -10,6 +10,37 @@ internal static class FixtureTests
 {
     internal static void Register(Action<string, Action<Catalog, string>> check)
     {
+        check("native witnesses require clean builds and successful execution", (_, manifests) =>
+        {
+            string root = Path.GetDirectoryName(manifests)!;
+            foreach (string failure in new[] { "", "imports", "build", "execution" })
+            {
+                string destination = Path.Combine(root, "native-" + failure), assembly = Path.Combine(root, "a & b", "Nethermind.Int256.dll");
+                Directory.CreateDirectory(destination);
+                int executions = 0;
+                Workspace workspace = new(root, (command, cwd, stage) =>
+                {
+                    Program.Require(cwd == destination, "Native working directory changed");
+                    if (stage == "Native witness build")
+                    {
+                        Program.Require(command.Contains("-p:EnforceCodeStyleInBuild=true") && command.Contains("-p:GenerateDocumentationFile=true"), "Native analyzer flags missing");
+                        var project = System.Xml.Linq.XDocument.Load(command[2]);
+                        Program.Require(project.Descendants("HintPath").Single().Value == assembly, "Assembly reference was not XML escaped");
+                        Program.Require(File.ReadAllText(Path.Combine(destination, "Witness/Program.cs")) == "source", "Witness source changed");
+                        if (failure == "build") throw new InvalidOperationException("Build failed");
+                        return failure == "imports" ? "IDE0005" : "";
+                    }
+                    executions++;
+                    Program.Require(command.SequenceEqual(new[] { "dotnet", Path.Combine(destination, "Witness", "bin/Release/net10.0/Witness.dll") }), "Native execution command changed");
+                    if (failure == "execution") throw new InvalidOperationException("Wrong native result");
+                    return "";
+                });
+                void Run() => FixtureChecks.NativeWitness(workspace, destination, assembly, "source");
+                if (failure.Length == 0) Run(); else Program.Reject(Run);
+                Program.Require(executions == (failure is "imports" or "build" ? 0 : 1), "Executed witness after rejected build");
+                Program.Reject(Run);
+            }
+        });
         check("negative fixture extraction retains registered sources and unchanged proof snapshots", (catalog, manifests) =>
         {
             const string method = "EqInt64UInt256";

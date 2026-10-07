@@ -8,6 +8,23 @@ namespace UInt256Verification;
 
 internal static class FixtureChecks
 {
+    internal static void NativeWitness(Workspace workspace, string destination, string assembly, string source)
+    {
+        string witness = Path.Combine(destination, "Witness");
+        if (Directory.Exists(witness) || File.Exists(witness)) throw new InvalidOperationException("Native witness directory must be fresh");
+        Directory.CreateDirectory(witness);
+        string project = Path.Combine(witness, "Witness.csproj");
+        var document = new System.Xml.Linq.XElement("Project", new System.Xml.Linq.XAttribute("Sdk", "Microsoft.NET.Sdk"),
+            new System.Xml.Linq.XElement("PropertyGroup", new System.Xml.Linq.XElement("OutputType", "Exe"), new System.Xml.Linq.XElement("TargetFramework", "net10.0")),
+            new System.Xml.Linq.XElement("ItemGroup", new System.Xml.Linq.XElement("Reference", new System.Xml.Linq.XAttribute("Include", "Nethermind.Int256"),
+                new System.Xml.Linq.XElement("HintPath", Path.GetFullPath(assembly)))));
+        File.WriteAllText(project, document.ToString());
+        File.WriteAllText(Path.Combine(witness, "Program.cs"), source);
+        string output = workspace.Run(["dotnet", "build", project, "-c", "Release", "-p:EnforceCodeStyleInBuild=true", "-p:GenerateDocumentationFile=true"], destination, "Native witness build");
+        if (output.Contains("IDE0005", StringComparison.Ordinal)) throw new InvalidOperationException("Native witness contains unused imports");
+        workspace.Run(["dotnet", Path.Combine(witness, "bin/Release/net10.0/Witness.dll")], destination, "Native witness execution");
+    }
+
     internal static string MutationSource(Catalog catalog, string project, string method, string name) => Path.Combine(Path.GetDirectoryName(project)!,
         catalog.Manifest(method)["verification"]?["fixtureSources"]?[name]?.GetValue<string>() ?? name + ".cs");
 

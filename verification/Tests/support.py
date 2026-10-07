@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from common import verifier_command, PROFILE_DIRECTORY, PROFILES, ROOT, VERIFY, expected_profile, generated_directory, run, sha, source_files, check_calling_convention, method_manifest
 from common import check_proof_snapshot, safety_gate, source_inputs
-from common import build_artifact, copy_source, template_refutation, mutation_proof
+from common import build_artifact, copy_source, template_refutation, mutation_proof, native_witness
 from common import theorem_audits, rejection_check, fixture_check
 
 
@@ -160,19 +160,3 @@ def require_production_report(method="Add"):
             or any(sha(VERIFY / name) != digest for name, digest in report["leanSourceSha256"].items())):
         raise RuntimeError(f"Fresh current {method} production report required")
     return baseline
-
-
-def native_witness(destination, assembly, source):
-    witness = destination / "Witness"
-    witness.mkdir()
-    (witness / "Witness.csproj").write_text(
-        '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType>'
-        '<TargetFramework>net10.0</TargetFramework></PropertyGroup><ItemGroup>'
-        f'<Reference Include="Nethermind.Int256"><HintPath>{assembly.as_posix()}</HintPath>'
-        '</Reference></ItemGroup></Project>', encoding="utf-8")
-    (witness / "Program.cs").write_text(source, encoding="utf-8")
-    output = run(["dotnet", "build", str(witness / "Witness.csproj"), "-c", "Release",
-                  "-p:EnforceCodeStyleInBuild=true", "-p:GenerateDocumentationFile=true"], destination)
-    if "IDE0005" in output:
-        raise RuntimeError("Native witness contains unused imports")
-    run(["dotnet", str(witness / "bin/Release/net10.0/Witness.dll")], destination)

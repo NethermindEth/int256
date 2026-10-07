@@ -151,6 +151,12 @@ def build_artifact(project, work, method, fixture=None, simd_fixture=False, fixt
     return bundle
 
 
+def native_witness(destination, assembly, source):
+    _runner_request(["native-witness", "--json"],
+        {"destination": str(Path(destination).resolve()), "assembly": str(Path(assembly).resolve()), "source": source},
+        cache=False, show_output=True)
+
+
 def mutation_proof(work, project, case, method, profile, baseline, intended=None):
     result = json.loads(_runner_request(["mutation", "--json"],
         {"work": str(Path(work).resolve()), "project": str(Path(project).resolve()), "case": case,
