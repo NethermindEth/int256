@@ -12,26 +12,13 @@ import threading
 import time
 
 from common import audit_module, bound_audit_names, PROFILE_DIRECTORY, PROFILE_NAMES, PROFILES, ROOT, SEMANTICS_VERSION, VERIFY, expected_profile, generated_directory, run, sha, source_files, LEGACY, api_entries, check_calling_convention, method_manifest, method_names, native_limitations, selected_safety_module, safety_gate
-from common import SIMD_CASES
+from common import SIMD_CASES, theorem_audits
 
 def run_stage(command, cwd, stage):
     try:
         return run(command, cwd)
     except RuntimeError as error:
         raise RuntimeError(f"{stage} failure: {error}") from error
-
-
-def theorem_audits(output, names, approved):
-    audits = {}
-    for name in names:
-        matches = re.findall(rf"'{re.escape(name)}' (?:depends on axioms: \[([\w.,\s]*)\]|does not depend on any axioms)", output)
-        if len(matches) != 1:
-            raise RuntimeError(f"Missing or ambiguous theorem axiom audit: {name}")
-        axioms = [item.strip() for item in matches[0].split(",") if item.strip()]
-        if len(axioms) != len(set(axioms)) or set(axioms) - set(approved):
-            raise RuntimeError(f"Unapproved or duplicate axioms for {name}: {axioms}")
-        audits[name] = axioms
-    return audits
 
 
 def audit_names(method):

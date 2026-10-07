@@ -12,7 +12,7 @@ import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from common import ROOT, VERIFY, run, sha, source_files
-from verify import theorem_audits
+from common import theorem_audits
 
 AUDITS = (
     "CIL.Safety.access_alignment_at_placement",

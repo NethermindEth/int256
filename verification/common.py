@@ -173,6 +173,11 @@ def coverage_plan(methods, safety=False):
     return [(job["method"], job["profile"]) for job in plan["include"]]
 
 
+def theorem_audits(output, names, approved):
+    return json.loads(_runner_request(["theorem-audits", "--json"],
+                      {"output": output, "names": list(names), "approved": list(approved)}))
+
+
 def __getattr__(name):
     # Temporary registry exports for Python regression scheduling during migration.
     if name in {"SIMD_CASES", "SIMD_POSITIVES", "SIMD_NEGATIVES"}:

@@ -31,7 +31,7 @@ def regression_plan():
     def add(name, script, *arguments):
         jobs.append(Job(name, (("verification/" + script, *arguments),)))
 
-    add("foundation", "Tests/foundation_checks.py")
+    add("foundation", "Runner.Tests/Verification.Tests.csproj", "foundation")
     add("safety-foundation", "Tests/memory_safety_checks.py")
     add("safety-fixtures", "Tests/Fixtures/Safety/checks.py")
     add("safety-robustness-Add", "Tests/robustness_checks.py", "--method", "Add", "--case", "Renamed", "--case", "ReversedStore", "--safety")

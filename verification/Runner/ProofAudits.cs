@@ -8,6 +8,14 @@ namespace UInt256Verification;
 
 internal static class ProofAudits
 {
+    internal static Dictionary<string, string[]> CheckAll(string output, IEnumerable<string> approved, IEnumerable<string> required)
+    {
+        string[] names = Regex.Matches(output, @"'([^']+)' depends on axioms: \[([\w.,\s]*)\]")
+            .Select(match => match.Groups[1].Value).ToArray();
+        if (names.Distinct().Count() != names.Length) throw new InvalidOperationException("Duplicate axiom audit");
+        if (!required.All(names.Contains)) throw new InvalidOperationException("Missing axiom audits");
+        return Check(output, names, approved);
+    }
     internal static string[] Names(Catalog catalog, string method)
     {
         if (!Catalog.Legacy.Contains(method))

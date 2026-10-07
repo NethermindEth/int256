@@ -8,8 +8,14 @@ namespace UInt256VerificationTests;
 
 internal static class Program
 {
-    private static int Main()
+    private static int Main(string[] args)
     {
+        if (args is ["foundation"])
+        {
+            FoundationChecks.Run(new Workspace(Directory.GetCurrentDirectory()));
+            return 0;
+        }
+        if (args.Length != 0) throw new ArgumentException("Unknown verification test selection");
         string manifests = Path.Combine(Directory.GetCurrentDirectory(), "verification", "manifests");
         if (!Directory.Exists(manifests))
             throw new InvalidOperationException("Run the tests from the repository root");
@@ -152,6 +158,7 @@ internal static class Program
             Reject(() => catalog.NativeLimitations(["Unknown"]));
         });
         GateTests.Register(Check);
+        Check("foundation audits reject missing, duplicate and unapproved extra declarations", (_, _) => FoundationChecks.ParserChecks());
         SafetyTests.Register(Check);
         WorkspaceTests.Register(Check);
         VerifierTests.Register(Check);

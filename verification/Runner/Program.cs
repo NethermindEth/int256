@@ -81,6 +81,7 @@ internal static class Program
                 object result;
                 switch (command)
                 {
+                    case "theorem-audits": result = ProofAudits.Check(Catalog.Text(input["output"]), input["names"]!.AsArray().Select(Catalog.Text), input["approved"]!.AsArray().Select(Catalog.Text)); break;
                     case "plan": result = catalog.Plan(input["methods"]!.AsArray().Select(Catalog.Text).ToArray(), input["safety"]!.GetValue<bool>()); break;
                     case "entries": result = Catalog.Entries(input.AsObject()); break;
                     case "manifest": result = catalog.Manifest(input.AsObject()); break;
