@@ -103,7 +103,7 @@ def regression_plan():
         )))
         add("robustness-" + method, "Runner.Tests/Verification.Tests.csproj", "robustness", "--method", method)
         for profile in PROFILES[1:]:
-            add(f"simd-{method}-{profile}", "Tests/simd_checks.py", "--method", method,
+            add(f"simd-{method}-{profile}", "Runner.Tests/Verification.Tests.csproj", "simd-fixtures", "--method", method,
                 "--profile", profile, "--suite", "all")
     operations = ("Compare", "Bitwise", "OperatorXor", "OperatorAnd", "OperatorOr", "OperatorNot",
                   "Lsh", "Rsh", "LeftShift", "RightShift", "OperatorLsh", "OperatorRsh")

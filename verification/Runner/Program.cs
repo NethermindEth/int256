@@ -121,24 +121,9 @@ internal static class Program
                             Catalog.Text(input["module"]), Catalog.Text(input["theorem"]), input["approved"]!.AsArray().Select(Catalog.Text), input["register"]!.GetValue<bool>());
                         result = true; break;
                     case "copy-source": result = new Workspace(root).CopyRegressionSource(Catalog.Text(input["destination"])); break;
-                    case "simd-data":
-                        string fixtureCase = Catalog.Text(input["case"]), fixtureMethod = Catalog.Text(input["method"]);
-                        if (input["kind"]!.GetValue<string>() == "witness")
-                        {
-                            var witness = SimdFixtures.Witness(fixtureCase, fixtureMethod);
-                            result = new object[] { witness.Left, witness.Right, witness.Output, new[] { witness.Address, witness.Actual } };
-                        }
-                        else result = input["kind"]!.GetValue<string>() switch
-                        {
-                            "positive" => SimdFixtures.Positive(fixtureCase, fixtureMethod, Catalog.Text(input["profile"])),
-                            "negative" => SimdFixtures.Negative(fixtureCase, fixtureMethod, Catalog.Text(input["profile"])),
-                            _ => throw new ArgumentException("Unknown SIMD data request")
-                        };
-                        break;
                     case "fixture-check":
                         switch (Catalog.Text(input["kind"]))
                         {
-                            case "simd-target": SimdFixtures.TargetChanged(Catalog.Text(input["case"]), Catalog.Text(input["method"]), Catalog.Text(input["profile"]), input["before"]!.AsObject(), input["after"]!.AsObject()); break;
                             case "changed-method": FixtureChecks.ChangedMethod(input["artifact"]!.AsObject(), input["baseline"]!.AsObject(), Catalog.Text(input["signature"])); break;
                             case "safety-report": FixtureChecks.SafetyReport(input["report"]!.AsObject(), Catalog.Text(input["method"]), Catalog.Text(input["profile"])); break;
                             case "baseline": FixtureChecks.Baseline(input["production"]!.AsObject(), input["baseline"]!.AsObject(), input["inputs"]!.AsObject()); break;

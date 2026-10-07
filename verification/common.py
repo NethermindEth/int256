@@ -303,15 +303,8 @@ def template_refutation(proof, lake, template, substitutions, module, theorem, a
          "module": module, "theorem": theorem, "approved": list(approved), "register": register}, cache=False, show_output=True)
 
 
-def simd_data(kind, case, method, profile=""):
-    return json.loads(_runner_request(["simd-data", "--json"],
-                      {"kind": kind, "case": case, "method": method, "profile": profile}))
-
-
 def __getattr__(name):
     # Temporary registry exports for Python regression scheduling during migration.
-    if name in {"SIMD_CASES", "SIMD_POSITIVES", "SIMD_NEGATIVES"}:
-        return tuple(json.loads(_runner_request(["simd-fixtures"]))[name])
     if name not in {"MULTIPLY_SAFETY_METHODS", "BITWISE_UNARY", "BITWISE_DESCRIPTORS",
                     "COMPARISON_GATES", "OPERATOR_DESCRIPTORS", "PRIMITIVE_COMPARISONS"}:
         raise AttributeError(name)

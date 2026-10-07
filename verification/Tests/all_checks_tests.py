@@ -109,6 +109,10 @@ class PlanChecks(unittest.TestCase):
         for profile in checks.MULTIPLY_PROFILES:
             self.assertEqual(by_id["multiply-" + profile].commands[0],
                 ("verification/Runner.Tests/Verification.Tests.csproj", "multiply-fixtures", "--profile", profile, "--workspace"))
+        for method in ("Add", "Subtract"):
+            for profile in checks.PROFILES[1:]:
+                self.assertEqual(by_id[f"simd-{method}-{profile}"].commands[0],
+                    ("verification/Runner.Tests/Verification.Tests.csproj", "simd-fixtures", "--method", method, "--profile", profile, "--suite", "all"))
         self.assertEqual({name for name in by_id if name.startswith("simd-")},
                          {f"simd-{method}-{profile}" for method in ("Add", "Subtract")
                           for profile in checks.PROFILES[1:]})
