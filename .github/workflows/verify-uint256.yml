@@ -76,8 +76,8 @@ jobs:
           VERIFY_EVENT: ${{ github.event_name }}
           VERIFY_BASE_BRANCH: ${{ github.event.pull_request.base.ref }}
         run: |
-          python3 verification/Tests/change_checks.py
-          python3 verification/changes.py --method ${{ matrix.method }} --profile ${{ matrix.profile }}
+          dotnet run --project verification/Runner.Tests -c Release -- change-checks
+          dotnet run --project verification/Runner -c Release -- changes --method ${{ matrix.method }} --profile ${{ matrix.profile }}
       - name: Install Lean 4.34.1
         if: steps.changes.outputs.required == 'true'
         shell: bash

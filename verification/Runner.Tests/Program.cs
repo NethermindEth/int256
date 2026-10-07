@@ -95,7 +95,8 @@ internal static class Program
             FoundationChecks.Run(new Workspace(Directory.GetCurrentDirectory()));
             return 0;
         }
-        if (args.Length != 0) throw new ArgumentException("Unknown verification test selection");
+        bool changeOnly = args is ["change-checks"];
+        if (args.Length != 0 && !changeOnly) throw new ArgumentException("Unknown verification test selection");
         string manifests = Path.Combine(Directory.GetCurrentDirectory(), "verification", "manifests");
         if (!Directory.Exists(manifests))
             throw new InvalidOperationException("Run the tests from the repository root");
@@ -121,6 +122,14 @@ internal static class Program
             {
                 Directory.Delete(temporary, recursive: true);
             }
+        }
+
+        if (changeOnly)
+        {
+            BaselineEvidenceTests.Register(Check);
+            ChangeDetectionTests.Register(Check);
+            Console.WriteLine($"Passed {passed} C# change-selection test groups.");
+            return 0;
         }
 
         Check("expanded production inventory", (catalog, _) =>

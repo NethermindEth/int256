@@ -10,6 +10,71 @@ internal static class ChangeDetectionTests
 {
     internal static void Register(Action<string, Action<Catalog, string>> check)
     {
+        check("proof selection requires baseline evidence and treats non-source inputs conservatively", (_, _) =>
+        {
+            string paths = ""; List<string[]> commands = [];
+            Workspace workspace = new(Directory.GetCurrentDirectory(), (command, _, _) => { commands.Add(command); return paths; });
+            foreach (string baseline in new[] { "", new string('0', 40) }) Program.Require(ChangeDetection.NeedsProof(workspace, baseline).Required, "Missing baseline skipped");
+            foreach (var (method, profile) in new[] { ("Unknown", "scalar"), ("Add", "unknown"), ("Add", "x64-bmi2") })
+                Program.Reject(() => ChangeDetection.NeedsProof(workspace, "", method, profile));
+            foreach (string changed in new[] { "", "src/UInt256.cs\0" })
+            {
+                paths = changed;
+                Program.Require(ChangeDetection.NeedsProof(workspace, "base", evidence: (_, _, _) => false).Required, "Unverified baseline skipped");
+            }
+            paths = ""; bool selected = false;
+            Program.Require(!ChangeDetection.NeedsProof(workspace, "base", "Subtract", "x64-avx2", (b, m, p) => selected = b == "base" && m == "Subtract" && p == "x64-avx2").Required && selected, "Wrong baseline selection");
+            foreach (string path in new[] { "verification/CIL/Execution.lean", "verification/Extractor/Program.cs", "verification/Runner/ChangeDetection.cs", "src/Directory.Build.props", "global.json",
+                ".github/workflows/verify-uint256-tests.yml", "verification/CIL/Features.lean", "verification/CIL/ProfileEquivalence.lean", "verification/Extractor/StaticData.cs", "verification/AggregateAudit.lean" })
+                Program.Require(ChangeDetection.ProofInputsChanged(["src/UInt256.cs", path]), "Non-source input allowed a skip");
+            Program.Require(!ChangeDetection.ProofInputsChanged(["src/UInt256.cs", "src/Helper.cs"]), "Ordinary C# changes cannot be compared");
+            paths = "verification/Helper.cs\0src/Helper.cs\0";
+            Program.Require(ChangeDetection.NeedsProof(workspace, "base", evidence: (_, _, _) => throw new InvalidOperationException("Must not request history")).Required
+                && commands[^1].Contains("--no-renames"), "Rename hid verification input changes");
+        });
+        check("proof decisions compare both metadata and bytes using the selected dependency graph", (_, _) =>
+        {
+            foreach (var (method, profile) in Catalog.Profiles.Select(p => ("Subtract", p)).Append(("Add", "scalar")).Append(("LtUInt256UInt64", "x64-bmi2")))
+            foreach (string change in new[] { "", "metadata", "program", "extraction", "sdk" })
+            {
+                List<string[]> commands = []; int extracted = 0;
+                Workspace workspace = new(Directory.GetCurrentDirectory(), (command, _, _) =>
+                {
+                    commands.Add(command);
+                    return command.Contains("diff") ? "src/UInt256.cs\0" : command.Contains("--version") ? change == "sdk" ? "wrong" : "10.0.401" : "";
+                });
+                (JsonObject, byte[]) Extract(string source, string work, string tool, string m, string p)
+                {
+                    Program.Require(m == method && p == profile, "Wrong selected graph"); extracted++;
+                    if (change == "extraction") throw new InvalidOperationException("unsupported reachable instruction");
+                    return (new JsonObject { ["layout"] = change == "metadata" && extracted == 2 ? 64 : 32 }, [change == "program" && extracted == 2 ? (byte)2 : (byte)1]);
+                }
+                if (change is "extraction" or "sdk") Program.Reject(() => ChangeDetection.NeedsProof(workspace, "base", method, profile, (_, _, _) => true, Extract));
+                else Program.Require(ChangeDetection.NeedsProof(workspace, "base", method, profile, (_, _, _) => true, Extract).Required == (change != "") && extracted == 2, "Wrong proof decision");
+                if (change != "sdk") Program.Require(commands.Any(c => c.Contains("checkout") && c.Contains("--detach") && c[^1] == "base"), "Baseline was not checked out exactly");
+            }
+        });
+        check("change CLI validates selectors before forced runs and appends GitHub outputs", (_, manifests) =>
+        {
+            Workspace workspace = new(Directory.GetCurrentDirectory());
+            string output = Path.Combine(Path.GetDirectoryName(manifests)!, "output"), summary = output + "-summary";
+            Dictionary<string, string> env = new() { ["GITHUB_OUTPUT"] = output, ["GITHUB_STEP_SUMMARY"] = summary, ["VERIFY_BASE"] = "base" };
+            string? Environment(string name) => env.GetValueOrDefault(name);
+            foreach (string mode in new[] { "workflow_dispatch", "pull_request" })
+            {
+                env["VERIFY_EVENT"] = mode; env["VERIFY_BASE_BRANCH"] = "feature";
+                ChangeDetection.Run(workspace, [], Environment, (_, _, _) => throw new InvalidOperationException("Forced proof must not compare"));
+            }
+            Program.Require(File.ReadAllText(output) == "required=true\nrequired=true\n", "Forced runs did not append required output");
+            Program.Require(File.ReadAllText(summary).Contains("Production proof required:", StringComparison.Ordinal), "Required summary missing");
+            env["VERIFY_EVENT"] = "push"; bool selected = false;
+            ChangeDetection.Run(workspace, ["--method", "Subtract", "--profile", "x64-avx512-bmi1"], Environment, (b, m, p) =>
+            { selected = b == "base" && m == "Subtract" && p == "x64-avx512-bmi1"; return (false, "Selected profile"); });
+            Program.Require(selected && File.ReadAllText(output).EndsWith("required=false\n", StringComparison.Ordinal) && File.ReadAllText(summary).EndsWith("Production proof skipped: Selected profile.\n", StringComparison.Ordinal), "Selected profile/skip outputs changed");
+            env["VERIFY_EVENT"] = "workflow_dispatch";
+            foreach (string[] args in new[] { new[] { "--profile", "unknown" }, ["--profile", "x64-bmi2"], ["--method", "Unknown"], ["--method"], ["--unknown", "value"] })
+                Program.Reject(() => ChangeDetection.Run(workspace, args, Environment));
+        });
         check("change comparison ignores only assembly identity and method tokens", (_, _) =>
         {
             JsonObject baseline = JsonNode.Parse("""{"sha256":"old","assembly":"version1","layout":{"ClassSize":32},"methods":[{"token":1,"signature":"Add","instructions":["add"]},{"token":2,"signature":"Helper","instructions":["add"]}]}""")!.AsObject();

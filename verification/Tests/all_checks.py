@@ -91,7 +91,8 @@ def regression_plan():
         add(f"safety-{method}-scalar", "Runner/Verification.csproj", "verify", "--method", method, "--profile", "scalar", "--safety")
     add("profile-extractor", "Runner.Tests/Verification.Tests.csproj", "profile-extractor")
     add("csharp-runner", "Runner.Tests/Verification.Tests.csproj")
-    for name in ("change", "prepared", "method"):
+    add("csharp-change", "Runner.Tests/Verification.Tests.csproj", "change-checks")
+    for name in ("prepared", "method"):
         add("python-" + name, "Tests/" + name.replace("-", "_") + "_checks.py")
     add("python-all-checks", "Tests/all_checks_tests.py")
     add("gate-binding", "Runner.Tests/Verification.Tests.csproj", "gate-binding", "--workspace")

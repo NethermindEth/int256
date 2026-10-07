@@ -24,6 +24,11 @@ internal static class Program
             }
 
             Catalog catalog = new(Path.Combine(root, "verification"));
+            if (arguments.Count > 0 && arguments[0] == "changes")
+            {
+                ChangeDetection.Run(new Workspace(root), arguments.Skip(1).ToArray());
+                return 0;
+            }
             if (arguments.Count > 0 && arguments[0] == "verify-all")
             {
                 new Coverage(new Workspace(root)).Run(CoverageOptions.Parse(arguments.Skip(1).ToArray()));
@@ -81,10 +86,6 @@ internal static class Program
                 object result;
                 switch (command)
                 {
-                    case "change-extract":
-                        var change = ChangeDetection.Extract(new Workspace(root), Catalog.Text(input["source"]), Catalog.Text(input["work"]), Catalog.Text(input["extractor"]), Catalog.Text(input["method"]), Catalog.Text(input["profile"]));
-                        result = new { artifact = change.Artifact, program = Convert.ToBase64String(change.Program) }; break;
-                    case "baseline-evidence": result = BaselineEvidence.Check(Catalog.Text(input["baseline"]), Catalog.Text(input["method"]), Catalog.Text(input["profile"]), Catalog.Text(input["repository"])); break;
                     case "copy-source": result = new Workspace(root).CopyRegressionSource(Catalog.Text(input["destination"])); break;
                     case "snapshot":
                         result = Workspace.CheckProofSnapshot(Catalog.Text(input["proof"]), input["paths"]!.AsArray().Select(Catalog.Text),
@@ -132,7 +133,7 @@ internal static class Program
                 ["plan", "--method", string method] => catalog.Plan([method], safetyPlan),
                 ["plan"] => catalog.Plan(Catalog.Legacy, safetyPlan),
                 _ => throw new ArgumentException(
-                    "Usage: Verification [--root <repository>] verify [--method <method>] [--profile <profile>] [--safety] [--fixture <case> | --simd-fixture <case>] | verify-all [--expanded | --method <method>] [--safety] [--jobs <count>] [--check-reports | --print-plan] | catalog | inputs | extract <method> <profile> <new-directory> | manifest <method> | gate <method> | safety[-module] <method> <profile> | plan [--expanded | --method <method>] [--safety]")
+                    "Usage: Verification [--root <repository>] verify [--method <method>] [--profile <profile>] [--safety] [--fixture <case> | --simd-fixture <case>] | verify-all [--expanded | --method <method>] [--safety] [--jobs <count>] [--check-reports | --print-plan] | changes [--method <method>] [--profile <profile>] | catalog | inputs | extract <method> <profile> <new-directory> | manifest <method> | gate <method> | safety[-module] <method> <profile> | plan [--expanded | --method <method>] [--safety]")
             };
             Console.WriteLine(output.ToJsonString(new JsonSerializerOptions { WriteIndented = arguments[0] != "plan" }));
             return 0;

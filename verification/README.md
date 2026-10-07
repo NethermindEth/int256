@@ -335,7 +335,7 @@ contract, execution proof, correctness theorem and audit gate.
 | `UInt256/Methods/ConstructorSafety.lean`, `ValueSafety.lean` | Extracted helper proofs shared by several operation families |
 | `Extractor/` | Metadata validation, reachability, translation and Lean emission |
 | `Runner/` | Fresh verification, coverage composition and typed gate generation |
-| `common.py`, `changes.py` | Python compatibility helpers and CI change selection |
+| `common.py` | Remaining Python compatibility helpers |
 | `Tests/` | Versioned fixtures, kernel refutations and regression runners |
 
 Pure semantics, representation, storage lemmas and arithmetic do not import
