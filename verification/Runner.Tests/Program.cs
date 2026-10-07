@@ -269,6 +269,7 @@ internal static class Program
         BaselineEvidenceTests.Register(Check);
         ChangeDetectionTests.Register(Check);
         MethodTests.Register(Check);
+        PreparedTests.Register(Check);
         RobustnessChecks.Register(Check);
         NativeSimdChecks.Register(Check);
         GateBindingChecks.Register(Check);

@@ -1,16 +1,14 @@
 """Reject stale shared build bundles before and after per-profile proof checking."""
 
 from pathlib import Path
-import re
 import subprocess
 import sys
-import tempfile
 import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import common
-from common import representative_safety_gate, OPERATOR_DESCRIPTORS, PRIMITIVE_COMPARISONS, selected_safety_module, PROFILES, MULTIPLY_PROFILES, VERIFY, source_files
+from common import representative_safety_gate, OPERATOR_DESCRIPTORS, selected_safety_module
 
 
 class PreparedBuildChecks(unittest.TestCase):
@@ -40,139 +38,6 @@ class PreparedBuildChecks(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "rejected"):
                     request({"test": 3})
             self.assertEqual(len(commands), 7)
-
-    def test_all_production_gate_imports_resolve(self):
-        from common import audit_module, api_entries, LEGACY, method_names
-        from common import safety_gate
-        from common import coverage_plan
-
-        seen = set()
-        def visit(module, text=None):
-            if module == "Extracted" or module.split(".")[0] in {"Lean", "Std", "Init"}:
-                return
-            if text is None:
-                if module in seen:
-                    return
-                seen.add(module)
-                path = VERIFY / (module.replace(".", "/") + ".lean")
-                self.assertTrue(path.is_file(), module)
-                text = path.read_text(encoding="utf-8")
-            for imported in re.findall(r"^import (\S+)", text, re.M):
-                visit(imported)
-
-        for method, profile in coverage_plan(method_names(), safety=True):
-            with self.subTest(method=method, profile=profile):
-                if method in LEGACY:
-                    visit("Audit" if method == "Add" else "SubtractAudit")
-                else:
-                    visit("SelectedGate", audit_module(api_entries()[method]))
-                gate = safety_gate(method, profile)
-                if gate.get("generatedAudit"):
-                    visit("SelectedSafetyGate", selected_safety_module(method, profile))
-                else:
-                    visit(gate["target"].removeprefix("+").removesuffix(":olean"))
-
-    def test_cil_imports_do_not_depend_on_the_consumer(self):
-        for path in source_files(VERIFY / "CIL", {".lean"}):
-            imports = re.findall(r"^import (\S+)", path.read_text(encoding="utf-8"), re.M)
-            self.assertFalse([name for name in imports if name.startswith(("UInt256", "Extracted"))], path)
-
-    def test_editor_layout_is_not_a_verification_input(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            for name in ("Code.cs", "manifest.json", ".vs/v17/DocumentLayout.json", ".vs/Generated.cs"):
-                path = root / name
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_text("test input", encoding="utf-8")
-            self.assertEqual({path.relative_to(root).as_posix()
-                              for path in source_files(root, {".cs", ".json"})},
-                             {"Code.cs", "manifest.json"})
-
-    def test_safety_reports_expose_target_alignment_boundary(self):
-        for method in ("Add", "EqualsUInt64", "CompareToUInt256Ref", "Lsh", "Multiply"):
-            with self.subTest(method=method):
-                gate = common.safety_gate(method, "scalar")
-                limitation = gate["modelLimitations"][0]
-                self.assertEqual(limitation["kind"], "instruction-alignment")
-                self.assertEqual(limitation["status"], "target-runtime-assumption")
-                policy = gate["alignmentPolicy"]
-                self.assertEqual(policy["ordinaryAccessBytes"], 1)
-                self.assertEqual(policy["targetArchitectures"], ["x64", "arm64"])
-                self.assertFalse(policy["portableCliGuarantee"])
-                self.assertIn("aligned memory APIs", policy["excluded"])
-
-    def test_classified_safety_requires_representative_and_family_audits(self):
-        for method in ("Add", "Subtract", "AddOverflow", "SubtractUnderflow"):
-            for profile in PROFILES:
-                with self.subTest(method=method, profile=profile):
-                    gate = common.safety_gate(method, profile)
-                    base = representative_safety_gate(method, profile)
-                    self.assertEqual(gate["target"], "+UInt256.Methods.SelectedSafetyGate:olean")
-                    self.assertTrue(gate["generatedAudit"])
-                    self.assertEqual(gate["theorems"], base["theorems"] +
-                                     ["UInt256Proof.SafetySelected.checked_family_contract"])
-                    self.assertEqual(gate["coverage"]["kind"], "feature-family")
-                    source = selected_safety_module(method, profile)
-                    self.assertIn("import " + base["target"][1:].split(":")[0], source)
-                    self.assertIn(base["theorems"][-1], source)
-                    self.assertIn("same_family_profile_agreement", source)
-                    self.assertIn("profile.classify = Extracted.profile.classify", source)
-                    for omitted in gate["theorems"]:
-                        output = "\n".join(f"'{name}' depends on axioms: []"
-                                           for name in gate["theorems"] if name != omitted)
-                        with self.assertRaisesRegex(RuntimeError, "Missing or ambiguous theorem axiom audit"):
-                            common.theorem_audits(output, gate["theorems"], [])
-
-    def test_multiply_requires_bound_contract_and_family_audits(self):
-        for method in ("Multiply", "MultiplyInstance", "OperatorMultiplyUInt256UInt256",
-                       "OperatorMultiplyUInt256UInt32", "OperatorMultiplyUInt32UInt256",
-                       "OperatorMultiplyUInt256UInt64", "OperatorMultiplyUInt64UInt256"):
-            for profile in MULTIPLY_PROFILES:
-                with self.subTest(method=method, profile=profile):
-                    gate = common.safety_gate(method, profile)
-                    contract = ("OrderedScalarContract" if "UInt32" in method or "UInt64" in method else
-                                "ReadOnlyContract" if method.startswith("Operator") else "WrappingBinaryContract")
-                    self.assertEqual(gate["contract"], "UInt256Model.Safety." + contract)
-                    self.assertTrue(gate["generatedAudit"])
-                    if contract == "OrderedScalarContract":
-                        width = 32 if "UInt32" in method else 64
-                        first = method.startswith(f"OperatorMultiplyUInt{width}")
-                        source = selected_safety_module(method, profile)
-                        self.assertIn(f"OrderedScalarContract {str(first).lower()} CIL.Value.i{width}", source)
-                        self.assertIn("input * BitVec.ofNat 256 scalar.toNat", source)
-                        self.assertIn("OrderedScalarContract.reprofile", source)
-                    for omitted in gate["theorems"]:
-                        output = "\n".join(f"'{name}' depends on axioms: []"
-                                           for name in gate["theorems"] if name != omitted)
-                        with self.assertRaisesRegex(RuntimeError, "Missing or ambiguous theorem axiom audit"):
-                            common.theorem_audits(output, gate["theorems"], [])
-        for method, profile in (("OperatorMultiplyUInt256UInt64", "x64-sse41"), ("Multiply", "x64-sse41")):
-            with self.assertRaisesRegex(RuntimeError, "not yet available"):
-                common.safety_gate(method, profile)
-
-    def test_primitive_comparisons_require_exact_contract_and_family_audits(self):
-        expected = {relation + operands
-                    for scalar in ("Int32", "UInt32", "Int64", "UInt64")
-                    for operands in (scalar + "UInt256", "UInt256" + scalar)
-                    for relation in ("Lt", "Le", "Gt", "Ge")} - {"LeUInt64UInt256"}
-        self.assertEqual(set(PRIMITIVE_COMPARISONS), expected)
-        for method in expected:
-            with self.subTest(method=method):
-                gate = common.safety_gate(method, "scalar")
-                self.assertEqual(gate["contract"], "UInt256Model.Safety.ScalarOperatorContract")
-                self.assertEqual(gate["coverage"]["kind"], "all-profiles")
-                self.assertTrue(gate["generatedAudit"])
-                output = "\n".join(f"'{name}' depends on axioms: []" for name in gate["theorems"][:-1])
-                with self.assertRaisesRegex(RuntimeError, "Missing or ambiguous theorem axiom audit"):
-                    common.theorem_audits(output, gate["theorems"], [])
-        # A by-value argument must never silently receive the reference contract.
-        value = common.safety_gate("LeUInt64UInt256", "scalar")
-        self.assertEqual(value["contract"], "UInt256Model.Safety.ScalarValueContract")
-        self.assertEqual(value["coverage"]["kind"], "all-profiles")
-        self.assertNotIn("generatedAudit", value)
-        output = "\n".join(f"'{name}' depends on axioms: []" for name in value["theorems"][:-1])
-        with self.assertRaisesRegex(RuntimeError, "Missing or ambiguous theorem axiom audit"):
-            common.theorem_audits(output, value["theorems"], [])
 
     def test_add_vector_safety_requires_exact_public_audits(self):
         gate = representative_safety_gate("Add", "x64-avx2")
