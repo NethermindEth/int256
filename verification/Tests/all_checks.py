@@ -131,7 +131,7 @@ def regression_plan():
         add(f"equality-{method}-{profile}", "Tests/Fixtures/Equality/checks.py",
             "--method", method, "--profile", profile, "--workspace")
     for _, profile in multiply_profiles:
-        add("multiply-" + profile, "Tests/Fixtures/Multiply/negative_checks.py",
+        add("multiply-" + profile, "Runner.Tests/Verification.Tests.csproj", "multiply-fixtures",
             "--profile", profile, "--workspace")
     for method in ("AddOverflow", "SubtractUnderflow"):
         for profile in PROFILES:

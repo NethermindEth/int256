@@ -489,7 +489,8 @@ and the corresponding `bitwise-fixtures` command. Returning bitwise operators us
 Run a reporting group with
 `dotnet run --project verification/Runner.Tests -c Release -- reporting --method AddOverflow --profile scalar`.
 Equality jobs derive all 52 API/profile groups from the registered contracts.
-Multiplication fixtures use all 14 arithmetic/storage representatives, with
+Multiplication fixtures (`dotnet run --project verification/Runner.Tests -c Release -- multiply-fixtures`)
+use all 14 arithmetic/storage representatives, with
 wrong-result witnesses in scalar and BMI2 profiles. Passing evidence covers every
 required group; reused results retain their original identities and have checked
 dependency applicability.
