@@ -28,27 +28,6 @@ PROFILE_NAMES = PROFILES + tuple(sorted(path.stem for path in PROFILE_DIRECTORY.
 SEMANTICS_VERSION = "cil-uint256-operations-1"
 
 
-def expected_profile(name):
-    """The representative for each constructor of Lean FeatureClass.all."""
-    if name in PROFILE_NAMES and name not in PROFILES:
-        profile = json.loads((PROFILE_DIRECTORY / f"{name}.json").read_text(encoding="utf-8"))
-        expected_keys = {key[0].lower() + key[1:] for key in expected_profile("scalar")}
-        if set(profile) != expected_keys or profile.get("name") != name:
-            raise RuntimeError("Named profile has incomplete or inconsistent capability fields")
-        return {key[0].upper() + key[1:]: value for key, value in profile.items()}
-    if name not in PROFILES:
-        raise RuntimeError(f"Unclassified representative: {name}")
-    x64 = name.startswith("x64-")
-    avx = name.startswith("x64-avx")
-    vl = name.startswith("x64-avx512")
-    return {"Name": name, "Architecture": "x64" if x64 else "arm64" if name == "arm64-advsimd" else "scalar",
-            "NativeWidth": 64, "LittleEndian": True, "AdvSimd": name == "arm64-advsimd",
-            "Sse2": x64, "Ssse3": x64, "Sse42": x64, "Avx": avx, "Avx2": avx,
-            "Avx512F": vl, "Avx512FVL": vl, "Bmi1": name.endswith("-bmi1"),
-            "Sse41": x64, "Avx512DQ": False, "Avx512DQVL": False,
-            "Bmi2": False, "ArmBase64": name == "arm64-advsimd", "Vector256Accelerated": False}
-
-
 def generated_directory(method="Add", profile="scalar"):
     if method not in method_names() or profile not in PROFILE_NAMES:
         raise ValueError("Unknown verification method or feature profile")

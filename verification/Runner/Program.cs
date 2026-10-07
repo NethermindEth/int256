@@ -81,6 +81,9 @@ internal static class Program
                 object result;
                 switch (command)
                 {
+                    case "change-extract":
+                        var change = ChangeDetection.Extract(new Workspace(root), Catalog.Text(input["source"]), Catalog.Text(input["work"]), Catalog.Text(input["extractor"]), Catalog.Text(input["method"]), Catalog.Text(input["profile"]));
+                        result = new { artifact = change.Artifact, program = Convert.ToBase64String(change.Program) }; break;
                     case "baseline-evidence": result = BaselineEvidence.Check(Catalog.Text(input["baseline"]), Catalog.Text(input["method"]), Catalog.Text(input["profile"]), Catalog.Text(input["repository"])); break;
                     case "copy-source": result = new Workspace(root).CopyRegressionSource(Catalog.Text(input["destination"])); break;
                     case "snapshot":

@@ -1,7 +1,5 @@
 """Check that method-change selection skips only unchanged verified inputs."""
 
-import copy
-import json
 import os
 from pathlib import Path
 import sys
@@ -49,22 +47,6 @@ class ChangeChecks(unittest.TestCase):
             self.assertTrue(changes.needs_proof("base")[0])
         self.assertIn("--no-renames", run.call_args.args[0])
 
-    def test_comparison_preserves_semantic_metadata(self):
-        baseline = {"sha256": "old", "assembly": "version1", "layout": {"ClassSize": 32},
-                    "methods": [{"token": 1, "signature": "Add", "instructions": ["add"]},
-                                {"token": 2, "signature": "Helper", "instructions": ["add"]}]}
-        identities = copy.deepcopy(baseline)
-        identities.update(sha256="new", assembly="version2")
-        identities["methods"][0]["token"] = 100
-        self.assertEqual(changes.comparison_artifact(baseline), changes.comparison_artifact(identities))
-        for mutate in (lambda value: value["layout"].update(ClassSize=64),
-                       lambda value: value["methods"][1].update(instructions=["sub"]),
-                       lambda value: value["methods"].append({"signature": "NewHelper"})):
-            changed = copy.deepcopy(baseline)
-            mutate(changed)
-            self.assertNotEqual(changes.comparison_artifact(baseline), changes.comparison_artifact(changed))
-        self.assertIn("token", baseline["methods"][0])
-
     def decision(self, before, after, profile="scalar"):
         sdk = '10.0.401'
         with patch.object(changes, "run", side_effect=["src/UInt256.cs\0", sdk, "", "", ""]), \
@@ -104,49 +86,6 @@ class ChangeChecks(unittest.TestCase):
                 self.assertFalse(changes.needs_proof("base", "Subtract", profile)[0])
                 self.assertTrue(all(call.args[-2:] == ("Subtract", profile) for call in extract.call_args_list))
 
-    def test_profile_static_data_and_intrinsic_metadata_are_compared(self):
-        baseline = {"sha256": "old", "assembly": "version1", "profile": {"Name": "x64-avx2", "Bmi1": False},
-                    "queriedFeatures": ["Avx2"], "staticData": [{"bytes": "0100", "size": 2, "packing": 1}],
-                    "methods": [{"token": 1, "signature": "Add", "instructions": [
-                        {"opcode": "call", "operand": "Avx2::Permute4x64", "scope": "System.Runtime.Intrinsics"},
-                        {"opcode": "ldc.i4", "operand": "144"}]}]}
-        mutations = (
-            lambda value: value["profile"].update(Name="x64-avx512"),
-            lambda value: value["profile"].update(Bmi1=True),
-            lambda value: value["queriedFeatures"].append("Bmi1"),
-            lambda value: value["staticData"][0].update(bytes="0000"),
-            lambda value: value["staticData"][0].update(packing=8),
-            lambda value: value["methods"][0]["instructions"][0].update(operand="Avx2::Blend"),
-            lambda value: value["methods"][0]["instructions"][0].update(scope="Other.Assembly"),
-            lambda value: value["methods"][0]["instructions"][1].update(operand="145"),
-        )
-        for index, mutate in enumerate(mutations):
-            with self.subTest(index=index):
-                changed = copy.deepcopy(baseline)
-                mutate(changed)
-                self.assertNotEqual(changes.comparison_artifact(baseline), changes.comparison_artifact(changed))
-
-    def test_extraction_profile_mismatch_fails_closed(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            work = Path(temporary)
-            generated = work / "generated"
-            generated.mkdir()
-            (generated / "artifact.json").write_text('{"profile":{"Name":"scalar"}}', encoding="utf-8")
-            with patch.object(changes, "run"), self.assertRaisesRegex(RuntimeError, "profile mismatch"):
-                changes.extract(changes.ROOT, work, Path("extractor.dll"), "Add", "x64-avx2")
-
-    def test_extraction_method_mismatch_fails_closed(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            work = Path(temporary)
-            generated = work / "generated"
-            generated.mkdir()
-            (generated / "artifact.json").write_text(
-                json.dumps({"profile": changes.expected_profile("scalar"), "entryIndex": 0,
-                            "methods": [{"signature": "Other"}]}),
-                encoding="utf-8")
-            with patch.object(changes, "run"), self.assertRaisesRegex(RuntimeError, "method mismatch"):
-                changes.extract(changes.ROOT, work, Path("extractor.dll"))
-
     def test_selected_api_and_additional_profile_use_their_exact_dependency_graph(self):
         with patch.object(changes, "run", side_effect=["src/UInt256.cs\0", '10.0.401', "", "", ""]), \
                 patch.object(changes, "extract", side_effect=[({}, b"same"), ({}, b"same")]) as extract:
@@ -154,42 +93,9 @@ class ChangeChecks(unittest.TestCase):
         self.assertTrue(all(call.args[-2:] == ("LtUInt256UInt64", "x64-bmi2")
                             for call in extract.call_args_list))
 
-    def test_profile_feature_tampering_fails_even_with_correct_profile_name(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            work = Path(temporary)
-            generated = work / "generated"
-            generated.mkdir()
-            profile = changes.expected_profile("scalar")
-            profile["Bmi2"] = True
-            (generated / "artifact.json").write_text(json.dumps({"profile": profile}), encoding="utf-8")
-            with patch.object(changes, "run"), self.assertRaisesRegex(RuntimeError, "profile mismatch"):
-                changes.extract(changes.ROOT, work, Path("extractor.dll"))
-
     def test_additional_profiles_cannot_silently_expand_legacy_selection(self):
         with self.assertRaisesRegex(ValueError, "execution profile"):
             changes.needs_proof("", "Add", "x64-bmi2")
-
-    def test_selected_api_extraction_checks_directions_and_uses_exact_selection(self):
-        manifest = changes.method_manifest("LtUInt256UInt64")
-        convention = manifest["callingConvention"]
-        body = {"signature": manifest["entry"], "isStatic": convention["static"],
-                "returnType": convention["returns"], "hasThis": not convention["static"],
-                "parameters": [{"type": p["type"], "IsIn": p["isIn"], "IsOut": p["isOut"]}
-                               for p in convention["parameters"]]}
-        body["parameters"][0]["IsIn"] = False
-        with tempfile.TemporaryDirectory() as temporary:
-            work = Path(temporary)
-            generated = work / "generated"
-            generated.mkdir()
-            (generated / "artifact.json").write_text(json.dumps({
-                "profile": changes.expected_profile("x64-bmi2"), "entryIndex": 0,
-                "methods": [body]}), encoding="utf-8")
-            with patch.object(changes, "run") as run, self.assertRaisesRegex(RuntimeError, "parameter type/direction"):
-                changes.extract(changes.ROOT, work, Path("extractor.dll"), "LtUInt256UInt64", "x64-bmi2")
-            selection = run.call_args.args[0]
-            self.assertEqual(selection[-3], manifest["entry"])
-            self.assertEqual(selection[-2], "@" + str(changes.PROFILE_DIRECTORY / "x64-bmi2.json"))
-            self.assertEqual(selection[-1], str(changes.VERIFY / "manifests/api-coverage.json"))
 
     def test_profile_model_and_aggregate_inputs_force_proof(self):
         for path in ("verification/CIL/Features.lean", "verification/CIL/ProfileEquivalence.lean",

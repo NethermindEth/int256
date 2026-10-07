@@ -1,6 +1,7 @@
 """Select a fresh production proof by comparing the selected extracted dependency graph."""
 
 import argparse
+import base64
 import json
 import os
 from pathlib import Path
@@ -8,7 +9,7 @@ import sys
 import tempfile
 
 from common import _runner_request
-from common import PROFILE_DIRECTORY, PROFILE_NAMES, PROFILES, ROOT, VERIFY, expected_profile, run, LEGACY, check_calling_convention, method_manifest, method_names
+from common import PROFILE_NAMES, PROFILES, ROOT, VERIFY, run, LEGACY, method_manifest, method_names
 
 
 def baseline_verified(base, method, profile):
@@ -23,36 +24,11 @@ def proof_inputs_changed(paths):
     return any(not (path.startswith("src/") and path.endswith(".cs")) for path in paths)
 
 
-def comparison_artifact(artifact):
-    # DLL identity and metadata tokens can change when unrelated methods change.
-    # Keep all other metadata, including layout, signatures and dependency CIL.
-    artifact = {key: value for key, value in artifact.items() if key not in ("sha256", "assembly")}
-    artifact["methods"] = [{key: value for key, value in method.items() if key != "token"}
-                           for method in artifact["methods"]]
-    return artifact
-
-
 def extract(source, work, extractor, method="Add", profile="scalar"):
-    manifest = method_manifest(method)
-    artifacts = work / "artifacts"
-    run(["dotnet", "build", str(source / "src/Nethermind.Int256/Nethermind.Int256.csproj"),
-         "-c", "Release", "--no-incremental", f"-p:ArtifactsPath={artifacts}",
-         "-p:EnableZkEvm=false"], source)
-    output = work / "generated"
-    profile_selector = profile if profile in PROFILES else "@" + str(PROFILE_DIRECTORY / f"{profile}.json")
-    selection = ([method, profile] if method in LEGACY else
-                 [manifest["entry"], profile_selector, str(VERIFY / "manifests/api-coverage.json")])
-    run(["dotnet", str(extractor),
-         str(artifacts / "bin/Nethermind.Int256/release/Nethermind.Int256.dll"),
-         str(output), *selection], source)
-    artifact = json.loads((output / "artifact.json").read_text(encoding="utf-8"))
-    if artifact.get("profile") != expected_profile(profile):
-        raise RuntimeError("Change-detection extraction profile mismatch")
-    if artifact["methods"][artifact["entryIndex"]]["signature"] != manifest["entry"]:
-        raise RuntimeError("Change-detection extraction method mismatch")
-    if method not in LEGACY:
-        check_calling_convention(artifact["methods"][artifact["entryIndex"]], manifest["callingConvention"])
-    return comparison_artifact(artifact), (output / "Extracted.lean").read_bytes()
+    result = json.loads(_runner_request(["change-extract", "--json"],
+        {"source": str(source), "work": str(work), "extractor": str(extractor),
+         "method": method, "profile": profile}, cache=False, show_output=True))
+    return result["artifact"], base64.b64decode(result["program"])
 
 
 def needs_proof(base, method="Add", profile="scalar"):

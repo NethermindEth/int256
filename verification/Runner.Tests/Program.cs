@@ -252,6 +252,7 @@ internal static class Program
         SimdFixtureChecks.Register(Check);
         CompiledSafetyChecks.Register(Check);
         BaselineEvidenceTests.Register(Check);
+        ChangeDetectionTests.Register(Check);
         RobustnessChecks.Register(Check);
         NativeSimdChecks.Register(Check);
         GateBindingChecks.Register(Check);
