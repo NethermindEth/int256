@@ -181,6 +181,18 @@ ranges do not weaken the arithmetic guarantee. The mathematical value is a
 
 ## Run verification
 
+A C# runner is being introduced under `Runner/`. Its catalog and arithmetic
+coverage planning currently match the Python tools; proof execution and CI still
+use the commands below. From the repository root:
+
+```sh
+dotnet run --project verification/Runner -c Release -- plan --expanded
+dotnet run --project verification/Runner.Tests -c Release
+```
+
+The C# runner also provides `catalog` and `manifest <method>`. It does not yet
+run proofs or produce verification reports.
+
 Install Python 3, .NET SDK 10.0.401 and Lean 4.34.1, including Lake. Keep `dotnet`
 and `lake` on PATH; versions are pinned in `global.json`, `lean-toolchain` and the
 manifests. The first build needs NuGet access for Mono.Cecil and repository
