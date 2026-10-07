@@ -37,6 +37,7 @@ class PlanChecks(unittest.TestCase):
         self.assertEqual(by_id["profile-extractor"].commands, (("verification/Runner.Tests/Verification.Tests.csproj", "profile-extractor"),))
         self.assertEqual(by_id["safety-fixtures"].commands, (("verification/Runner.Tests/Verification.Tests.csproj", "safety-fixtures"),))
         self.assertEqual(by_id["csharp-change"].commands, (("verification/Runner.Tests/Verification.Tests.csproj", "change-checks"),))
+        self.assertEqual(by_id["csharp-method"].commands, (("verification/Runner.Tests/Verification.Tests.csproj", "method-checks"),))
         self.assertEqual(len(by_id), 387)
         expected_counts = {"equality-": 52, "multiply-": 14, "simd-": 12,
                            "operation-": 24, "reporting-": 14, "legacy-": 2, "robustness-": 2}
@@ -55,7 +56,7 @@ class PlanChecks(unittest.TestCase):
                                "safety-EqualsInt64-x64-vector256", "safety-EqualsInt32-x64-vector256",
                                "safety-EqUInt256UInt256-sse41", "safety-EqualsUInt256Ref-sse41", "safety-NeUInt256UInt256-sse41",
                                "safety-EqualsUInt256Ref-vector256", "safety-NeUInt256UInt256-vector256",
-                               "csharp-change", *("python-" + name for name in ("prepared", "method"))}
+                               "csharp-change", "csharp-method", "python-prepared"}
         expected_foundations.update(f"safety-{method}-{profile}"
                                     for method in ("Multiply", "MultiplyInstance", "OperatorMultiplyUInt256UInt256",
                                                    "OperatorMultiplyUInt256UInt32", "OperatorMultiplyUInt32UInt256",

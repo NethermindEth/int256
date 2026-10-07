@@ -2,10 +2,8 @@
 
 import hashlib
 import json
-import os
 from pathlib import Path
 import subprocess
-import sys
 import threading
 
 
@@ -28,28 +26,6 @@ PROFILE_NAMES = PROFILES + tuple(sorted(path.stem for path in PROFILE_DIRECTORY.
 SEMANTICS_VERSION = "cil-uint256-operations-1"
 
 
-def generated_directory(method="Add", profile="scalar"):
-    if method not in method_names() or profile not in PROFILE_NAMES:
-        raise ValueError("Unknown verification method or feature profile")
-    if method not in LEGACY:
-        return VERIFY / "generated/operations" / method / profile
-    if profile == "scalar":
-        return VERIFY / ("generated" if method == "Add" else "generated/subtract")
-    return VERIFY / "generated/profiles" / profile / method.lower()
-
-
-def run(command, cwd, *, succeeds=True):
-    env = os.environ.copy()
-    env.update(DOTNET_EnableHWIntrinsic="0", DOTNET_CLI_TELEMETRY_OPTOUT="1",
-               DOTNET_SKIP_FIRST_TIME_EXPERIENCE="1", MSBuildEnableWorkloadResolver="false")
-    result = subprocess.run(command, cwd=cwd, env=env, text=True, encoding="utf-8",
-                            errors="replace", stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    print(result.stdout, end="")
-    if succeeds != (result.returncode == 0):
-        raise RuntimeError(f"Unexpected exit {result.returncode}: {command}")
-    return result.stdout
-
-
 def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -64,7 +40,7 @@ _runner_inputs = None
 _runner_outputs = {}
 
 
-def _runner_request(arguments, payload=None, *, cache=True, show_output=False):
+def _runner_request(arguments, payload=None, *, cache=True):
     """Temporary bridge while proof orchestration moves to the C# runner."""
     global _runner_inputs
     root = Path(__file__).resolve().parent.parent
@@ -87,8 +63,6 @@ def _runner_request(arguments, payload=None, *, cache=True, show_output=False):
         if not cache or key not in _runner_outputs:
             result = subprocess.run(["dotnet", str(binary), *arguments], cwd=root,
                                     input=serialized, capture_output=True, text=True, encoding="utf-8")
-            if show_output:
-                print(result.stderr, end="", file=sys.stderr)
             if result.returncode:
                 raise RuntimeError(result.stderr.strip() or "C# verification runner failed")
             if not cache:
@@ -106,11 +80,6 @@ def copy_source(destination):
                 {"destination": str(Path(destination).resolve())}, cache=False)))
 
 
-def check_proof_snapshot(proof, relative_paths, inputs):
-    return json.loads(_runner_request(["snapshot", "--json"],
-        {"proof": str(Path(proof).resolve()), "paths": [str(path) for path in relative_paths], "inputs": inputs}, cache=False))
-
-
 def audit_module(entry):
     return _runner_request(["gate", "--entry-json"], entry)
 
@@ -122,26 +91,6 @@ def api_entries():
 
 def method_names():
     return LEGACY + tuple(api_entries())
-
-
-def method_manifest(name):
-    if name in LEGACY:
-        return json.loads(_runner_request(["manifest", name]))
-    entry = api_entries().get(name)
-    if entry is None:
-        raise ValueError(f"Unknown verification method: {name}")
-    return json.loads(_runner_request(["manifest", "--json"], entry))
-
-
-def check_calling_convention(actual, expected):
-    _runner_request(["calling-convention", "--json"], {"actual": actual, "expected": expected})
-
-
-def resolve_fixture_groups(entries, groups):
-    resolved = json.loads(_runner_request(["fixture-groups", "--json"], {"entries": entries, "groups": groups}))
-    for entry, replacement in zip(entries, resolved):
-        entry.clear()
-        entry.update(replacement)
 
 
 def representative_safety_gate(method, profile):

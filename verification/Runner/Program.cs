@@ -87,23 +87,9 @@ internal static class Program
                 switch (command)
                 {
                     case "copy-source": result = new Workspace(root).CopyRegressionSource(Catalog.Text(input["destination"])); break;
-                    case "snapshot":
-                        result = Workspace.CheckProofSnapshot(Catalog.Text(input["proof"]), input["paths"]!.AsArray().Select(Catalog.Text),
-                            input["inputs"]!.AsObject().ToDictionary(pair => pair.Key, pair => Catalog.Text(pair.Value)));
-                        break;
                     case "theorem-audits": result = ProofAudits.Check(Catalog.Text(input["output"]), input["names"]!.AsArray().Select(Catalog.Text), input["approved"]!.AsArray().Select(Catalog.Text)); break;
                     case "plan": result = catalog.Plan(input["methods"]!.AsArray().Select(Catalog.Text).ToArray(), input["safety"]!.GetValue<bool>()); break;
                     case "entries": result = Catalog.Entries(input.AsObject()); break;
-                    case "manifest": result = catalog.Manifest(input.AsObject()); break;
-                    case "calling-convention":
-                        Catalog.CheckCallingConvention(input["actual"]!.AsObject(), input["expected"]!.AsObject());
-                        result = true;
-                        break;
-                    case "fixture-groups":
-                        JsonObject[] entries = input["entries"]!.AsArray().Select(node => node!.AsObject()).ToArray();
-                        Catalog.ResolveFixtureGroups(entries, input["groups"]!.AsObject());
-                        result = entries;
-                        break;
                     default: throw new ArgumentException("Unknown JSON command");
                 }
                 Console.Write(JsonSerializer.Serialize(result));

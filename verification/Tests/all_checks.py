@@ -92,7 +92,8 @@ def regression_plan():
     add("profile-extractor", "Runner.Tests/Verification.Tests.csproj", "profile-extractor")
     add("csharp-runner", "Runner.Tests/Verification.Tests.csproj")
     add("csharp-change", "Runner.Tests/Verification.Tests.csproj", "change-checks")
-    for name in ("prepared", "method"):
+    add("csharp-method", "Runner.Tests/Verification.Tests.csproj", "method-checks")
+    for name in ("prepared",):
         add("python-" + name, "Tests/" + name.replace("-", "_") + "_checks.py")
     add("python-all-checks", "Tests/all_checks_tests.py")
     add("gate-binding", "Runner.Tests/Verification.Tests.csproj", "gate-binding", "--workspace")
