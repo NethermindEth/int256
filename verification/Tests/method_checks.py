@@ -96,28 +96,6 @@ class MethodChecks(unittest.TestCase):
                         with self.assertRaisesRegex(RuntimeError, "lacks the selected combined safety evidence"):
                             support.selected_fixture_baseline("Lsh", "scalar", "LshHelper", safety=True)
 
-    def test_fixture_change_must_affect_the_intended_compiled_body(self):
-        baseline = {"methods": [
-            {"signature": "target", "instructions": [{"opcode": "ldc.i4", "operand": 0}]},
-            {"signature": "unrelated", "instructions": []},
-        ]}
-        changed = copy.deepcopy(baseline)
-        changed["methods"][0]["instructions"][0]["operand"] = 1
-        support.require_changed_method(changed, baseline, "target")
-        for mutation in ("metadata", "offset", "unrelated", "missing-target", "missing-baseline"):
-            actual, original = copy.deepcopy(baseline), copy.deepcopy(baseline)
-            if mutation == "metadata":
-                actual["methods"][0]["token"] = 123
-            elif mutation == "offset":
-                actual["methods"][0]["instructions"][0]["Offset"] = 123
-            elif mutation == "unrelated":
-                actual["methods"][1]["instructions"] = [{"opcode": "ret"}]
-            elif mutation == "missing-target":
-                actual["methods"].pop(0)
-            else:
-                original["methods"].pop(0)
-            with self.subTest(mutation=mutation), self.assertRaises(RuntimeError):
-                support.require_changed_method(actual, original, "target")
 
     def test_multiply_family_requires_each_arithmetic_and_storage_combination(self):
         for actual in (list(common.MULTIPLY_PROFILES), list(common.MULTIPLY_PROFILES)[::2],

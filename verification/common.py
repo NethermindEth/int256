@@ -214,6 +214,10 @@ def rejection_check(kind, output, module="", diagnostic=""):
                     {"kind": kind, "output": output, "module": module, "diagnostic": diagnostic})
 
 
+def fixture_check(kind, **payload):
+    _runner_request(["fixture-check", "--json"], {"kind": kind, **payload})
+
+
 def __getattr__(name):
     # Temporary registry exports for Python regression scheduling during migration.
     if name in {"SIMD_CASES", "SIMD_POSITIVES", "SIMD_NEGATIVES"}:

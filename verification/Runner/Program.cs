@@ -81,6 +81,17 @@ internal static class Program
                 object result;
                 switch (command)
                 {
+                    case "fixture-check":
+                        switch (Catalog.Text(input["kind"]))
+                        {
+                            case "changed-method": FixtureChecks.ChangedMethod(input["artifact"]!.AsObject(), input["baseline"]!.AsObject(), Catalog.Text(input["signature"])); break;
+                            case "safety-report": FixtureChecks.SafetyReport(input["report"]!.AsObject(), Catalog.Text(input["method"]), Catalog.Text(input["profile"])); break;
+                            case "baseline": FixtureChecks.Baseline(input["production"]!.AsObject(), input["baseline"]!.AsObject(), input["inputs"]!.AsObject()); break;
+                            case "production": FixtureChecks.Production(input["production"]!.AsObject(), input["inputs"]!.AsObject()); break;
+                            case "alternative": FixtureChecks.Alternative(input["baseline"]!.AsObject(), input["alternative"]!.AsObject()); break;
+                            default: throw new ArgumentException("Unknown fixture check");
+                        }
+                        result = true; break;
                     case "build-artifact":
                         ArtifactBundle built = new Workspace(root).BuildArtifact(Catalog.Text(input["project"]), Catalog.Text(input["work"]),
                             Catalog.Text(input["method"]), input["fixture"]?.GetValue<string>(), input["registeredFixture"]!.GetValue<bool>(),

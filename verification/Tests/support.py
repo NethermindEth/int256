@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from common import verifier_command, BUILD_DIRECTORIES, PROFILE_DIRECTORY, PROFILES, ROOT, VERIFY, expected_profile, generated_directory, run, sha, source_files, check_calling_convention, method_manifest
 from common import check_proof_snapshot, safety_gate, source_inputs
 from common import build_artifact
-from common import theorem_audits, rejection_check
+from common import theorem_audits, rejection_check, fixture_check
 
 
 def isolated_run(script, arguments, prefix):
@@ -42,14 +42,7 @@ def initial_bytes_expression(witness):
 
 def require_changed_method(artifact, baseline, signature):
     """Require a compiled change in the intended reachable method."""
-    bodies = [next((body for body in source["methods"] if body["signature"] == signature), None)
-              for source in (artifact, baseline)]
-    if any(body is None for body in bodies):
-        raise RuntimeError(f"Fixture omitted the intended compiled operation: {signature}")
-    instructions = [[(item["opcode"], item.get("scope"), item.get("operand"))
-                     for item in body["instructions"]] for body in bodies]
-    if instructions[0] == instructions[1]:
-        raise RuntimeError("Fixture did not change the intended compiled operation")
+    fixture_check("changed-method", artifact=artifact, baseline=baseline, signature=signature)
 
 
 def selected_fixture_baseline(method, profile, positive=None, *, safety=False):
@@ -62,26 +55,20 @@ def selected_fixture_baseline(method, profile, positive=None, *, safety=False):
 
     def read_report():
         report = json.loads(report_path.read_text(encoding="utf-8"))
-        if safety and (report.get("evidenceKind") != "arithmetic-and-memory-safety"
-                       or report.get("safety") != safety_gate(method, profile)):
-            raise RuntimeError("Fixture prerequisite lacks the selected combined safety evidence")
+        if safety:
+            fixture_check("safety-report", report=report, method=method, profile=profile)
         return report
 
     run(public, ROOT)
     production = read_report()
-    if production["source"]["kind"] != "production" or production["sourceInputs"] != source_inputs():
-        raise RuntimeError("Fresh production prerequisite was not established")
+    fixture_check("production", production=production, inputs=source_inputs())
     run(public + ["--fixture", "Baseline"], ROOT)
     baseline = read_report()
-    if baseline["leanSourceSha256"] != production["leanSourceSha256"]:
-        raise RuntimeError("Fixture baseline changed handwritten proofs")
+    fixture_check("baseline", production=production, baseline=baseline, inputs=source_inputs())
     if positive:
         run(public + ["--fixture", positive], ROOT)
         alternative = read_report()
-        if alternative["leanSourceSha256"] != baseline["leanSourceSha256"]:
-            raise RuntimeError("Equivalent fixture changed handwritten proofs")
-        if alternative["generatedProgramSha256"] == baseline["generatedProgramSha256"]:
-            raise RuntimeError("Equivalent fixture did not change its actual extracted program")
+        fixture_check("alternative", baseline=baseline, alternative=alternative)
     return public, report_path, baseline
 
 

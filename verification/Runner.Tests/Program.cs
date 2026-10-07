@@ -172,6 +172,7 @@ internal static class Program
         Check("foundation audits reject missing, duplicate and unapproved extra declarations", (_, _) => FoundationChecks.ParserChecks());
         FoundationChecks.Register(Check);
         NativeAlignmentChecks.Register(Check);
+        FixtureTests.Register(Check);
         SafetyTests.Register(Check);
         WorkspaceTests.Register(Check);
         VerifierTests.Register(Check);
