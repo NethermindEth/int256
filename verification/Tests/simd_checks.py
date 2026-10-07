@@ -14,12 +14,11 @@ import tempfile
 import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from common import verifier_command, ROOT, PROFILES, run, sha
+from common import simd_data, verifier_command, ROOT, PROFILES, run, sha
 from common import SIMD_POSITIVES as POSITIVES, SIMD_NEGATIVES as NEGATIVES
 from support import copy_source, model_refutation, require_semantic_rejection
 
 FAMILIES = ("arm64-advsimd", "x64-sse42", "x64-avx2", "x64-avx512")
-MAX_WORD = 2**64 - 1
 
 
 def report_path(proof, method, profile):
@@ -57,11 +56,7 @@ def positive(destination, proof, case, method, profile):
 
 
 def positive_applicable(case, method, profile):
-    if case in ("Baseline", "Renamed", "ExtractedHelper", "FeatureExpressions"): return True
-    if case == "EquivalentMask": return profile in ("x64-avx2", "x64-avx2-bmi1")
-    if case in ("LaneLocals", "ReversedStore"): return profile in FAMILIES[:2]
-    if case == "InlineCarry": return profile == "x64-sse42" or (method == "Subtract" and profile == "arm64-advsimd")
-    return False
+    return simd_data("positive", case, method, profile)
 
 
 def target_changed(case, method, profile, before, after):
@@ -91,32 +86,11 @@ def target_changed(case, method, profile, before, after):
 
 
 def witness(case, method):
-    if case in ("WrongAlignment", "WrongAvxAlignment", "WrongBlend", "WrongTernary"):
-        return ([MAX_WORD, 2, 4, 6] if method == "Add" else [0, 2, 4, 6]), [1, 1, 1, 1], 64, {
-            "WrongAlignment": (80, 6 if method == "Add" else 2),
-            "WrongAvxAlignment": (72, 3 if method == "Add" else 1),
-            "WrongBlend": (72, 3 if method == "Add" else 1),
-            "WrongTernary": (72, 3 if method == "Add" else 1),
-        }[case]
-    if case in ("WrongPredicate", "WrongTable", "WrongScale", "EarlyReread"):
-        a = [MAX_WORD, MAX_WORD, 0, 0] if method == "Add" else [0, 1, 2, 2]
-        b = [1, 0, 1, 1] if method == "Add" else [1, 1, 1, 1]
-        out = 8 if case == "EarlyReread" else 128
-        offset = 8 if case == "WrongScale" else 16
-        actual = (255 if method == "Add" else 0) if case == "WrongScale" else 1
-        return a, b, out, (out + offset, actual)
-    if case == "WrongTop":
-        a = [MAX_WORD, MAX_WORD, MAX_WORD, 0] if method == "Add" else [0, 0, 0, 2]
-        return a, [1, 0, 0, 1], 128, (152, 1)
-    raise ValueError(case)
+    return simd_data("witness", case, method)
 
 
 def applicable(case, method, profile):
-    if case == "WrongAlignment": return profile in FAMILIES[:2]
-    if case == "WrongTop": return profile == "arm64-advsimd" or (method == "Subtract" and profile == "x64-sse42")
-    if case == "WrongBlend": return profile in ("x64-avx2", "x64-avx2-bmi1")
-    if case in ("WrongAvxAlignment", "WrongTernary"): return profile in ("x64-avx512", "x64-avx512-bmi1")
-    return profile in ("x64-avx2", "x64-avx2-bmi1", "x64-avx512", "x64-avx512-bmi1")
+    return simd_data("negative", case, method, profile)
 
 
 def negative(destination, proof, case, method, profile, lake, baseline):

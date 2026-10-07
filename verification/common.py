@@ -218,6 +218,11 @@ def fixture_check(kind, **payload):
     _runner_request(["fixture-check", "--json"], {"kind": kind, **payload})
 
 
+def simd_data(kind, case, method, profile=""):
+    return json.loads(_runner_request(["simd-data", "--json"],
+                      {"kind": kind, "case": case, "method": method, "profile": profile}))
+
+
 def __getattr__(name):
     # Temporary registry exports for Python regression scheduling during migration.
     if name in {"SIMD_CASES", "SIMD_POSITIVES", "SIMD_NEGATIVES"}:

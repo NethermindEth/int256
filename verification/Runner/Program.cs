@@ -81,6 +81,20 @@ internal static class Program
                 object result;
                 switch (command)
                 {
+                    case "simd-data":
+                        string fixtureCase = Catalog.Text(input["case"]), fixtureMethod = Catalog.Text(input["method"]);
+                        if (input["kind"]!.GetValue<string>() == "witness")
+                        {
+                            var witness = SimdFixtures.Witness(fixtureCase, fixtureMethod);
+                            result = new object[] { witness.Left, witness.Right, witness.Output, new[] { witness.Address, witness.Actual } };
+                        }
+                        else result = input["kind"]!.GetValue<string>() switch
+                        {
+                            "positive" => SimdFixtures.Positive(fixtureCase, fixtureMethod, Catalog.Text(input["profile"])),
+                            "negative" => SimdFixtures.Negative(fixtureCase, fixtureMethod, Catalog.Text(input["profile"])),
+                            _ => throw new ArgumentException("Unknown SIMD data request")
+                        };
+                        break;
                     case "fixture-check":
                         switch (Catalog.Text(input["kind"]))
                         {

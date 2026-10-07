@@ -146,15 +146,22 @@ internal static class NativeAlignmentChecks
 
     private static string RunWitness(string driver, string root, Dictionary<string, string> environment)
     {
+        var result = Execute(driver, [], root, environment);
+        if (result.Code != 0) throw new InvalidOperationException($"Native witness failed ({result.Code}): {result.Error}\n{result.Output}");
+        return result.Output;
+    }
+
+    internal static (int Code, string Output, string Error) Execute(string driver, IEnumerable<string> arguments, string root, Dictionary<string, string> environment)
+    {
         ProcessStartInfo start = new("dotnet") { WorkingDirectory = root, UseShellExecute = false, CreateNoWindow = true,
             RedirectStandardOutput = true, RedirectStandardError = true };
         start.ArgumentList.Add(driver);
+        foreach (string argument in arguments) start.ArgumentList.Add(argument);
         foreach (var pair in environment) start.Environment[pair.Key] = pair.Value;
         using Process process = Process.Start(start) ?? throw new InvalidOperationException("Cannot start native witness");
         Task<string> stdout = process.StandardOutput.ReadToEndAsync(), stderr = process.StandardError.ReadToEndAsync();
         process.WaitForExit();
         string result = stdout.GetAwaiter().GetResult(), errors = stderr.GetAwaiter().GetResult();
-        if (process.ExitCode != 0) throw new InvalidOperationException($"Native witness failed ({process.ExitCode}): {errors}\n{result}");
-        return result;
+        return (process.ExitCode, result, errors);
     }
 }

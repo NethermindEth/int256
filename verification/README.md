@@ -447,7 +447,7 @@ is counted. Mixed syntax/import errors and resource limits fail the test.
 Use `--method`, `--profile`, `--suite` and `--case` to select a smaller run.
 
 Optional native comparisons record actual capabilities and complete byte maps:
-`python verification/Tests/native_simd_checks.py --output native-results.json`.
+`dotnet run --project verification/Runner.Tests -c Release -- native-simd --output native-results.json`.
 Unavailable profiles are explicitly skipped; native sampling supplements proofs.
 Positive samples include two large operands, vector fast paths, cross-half
 carry/borrow and cascades (including ARM Add's early-store repair), with disjoint,
