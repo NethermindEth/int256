@@ -97,6 +97,8 @@ def _runner_request(arguments, payload=None):
         inputs.update({str(p): sha(p) for p in root.iterdir()
                        if p.is_file() and (p.suffix in {".props", ".targets"} or p.name in {"global.json", "NuGet.Config"})})
         inputs.update({str(p): sha(p) for p in source_files(project.parent.parent / "manifests", {".json"})})
+        registry = project.parent.parent / "Tests/Fixtures/SIMD/Cases.props"
+        inputs[str(registry)] = sha(registry)
         if inputs != _runner_inputs or not binary.is_file():
             _runner_outputs.clear()
             result = subprocess.run(["dotnet", "build", str(project), "-c", "Release", "--nologo"],
@@ -168,6 +170,8 @@ def selected_safety_module(method, profile):
 
 def __getattr__(name):
     # Temporary registry exports for Python regression scheduling during migration.
+    if name in {"SIMD_CASES", "SIMD_POSITIVES", "SIMD_NEGATIVES"}:
+        return tuple(json.loads(_runner_request(["simd-fixtures"]))[name])
     if name not in {"MULTIPLY_SAFETY_METHODS", "BITWISE_UNARY", "BITWISE_DESCRIPTORS",
                     "COMPARISON_GATES", "OPERATOR_DESCRIPTORS", "PRIMITIVE_COMPARISONS"}:
         raise AttributeError(name)

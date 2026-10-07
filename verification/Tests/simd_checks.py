@@ -15,7 +15,7 @@ import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from common import ROOT, PROFILES, run, sha
-from simd_fixtures import POSITIVES, NEGATIVES
+from common import SIMD_POSITIVES as POSITIVES, SIMD_NEGATIVES as NEGATIVES
 from support import copy_source, model_refutation, require_semantic_rejection
 
 FAMILIES = ("arm64-advsimd", "x64-sse42", "x64-avx2", "x64-avx512")

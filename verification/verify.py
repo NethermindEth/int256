@@ -12,7 +12,7 @@ import threading
 import time
 
 from common import audit_module, bound_audit_names, PROFILE_DIRECTORY, PROFILE_NAMES, PROFILES, ROOT, SEMANTICS_VERSION, VERIFY, expected_profile, generated_directory, run, sha, source_files, LEGACY, api_entries, check_calling_convention, method_manifest, method_names, native_limitations, selected_safety_module, safety_gate
-from simd_fixtures import CASES as SIMD_CASES
+from common import SIMD_CASES
 
 def run_stage(command, cwd, stage):
     try:

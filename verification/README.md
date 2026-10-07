@@ -182,11 +182,12 @@ ranges do not weaken the arithmetic guarantee. The mathematical value is a
 ## Run verification
 
 A C# runner is being introduced under `Runner/`. It generates the arithmetic and
-safety audit gates and provides catalog and coverage planning; proof execution and CI still
-use the commands below. From the repository root:
+safety audit gates and provides catalog, coverage planning and individual proof
+execution. Coverage orchestration and CI still use Python. From the repository root:
 
 ```sh
 dotnet run --project verification/Runner -c Release -- plan --expanded --safety
+dotnet run --project verification/Runner -c Release -- verify --method EqInt64UInt256 --safety
 dotnet run --project verification/Runner.Tests -c Release
 ```
 
@@ -197,7 +198,8 @@ generator through `common.py`; successful responses are reused only while their
 source inputs and request match.
 `inputs` prints the source hashes; `extract <method> <profile> <new-directory>`
 builds a fresh production DLL and extractor and validates the extracted identity.
-The C# runner does not yet run proofs or produce verification reports.
+`verify` accepts the same method, profile, safety and fixture options as `verify.py`
+and writes the same reports after kernel checking and freshness validation.
 
 Install Python 3, .NET SDK 10.0.401 and Lean 4.34.1, including Lake. Keep `dotnet`
 and `lake` on PATH; versions are pinned in `global.json`, `lean-toolchain` and the

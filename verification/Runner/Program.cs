@@ -24,6 +24,16 @@ internal static class Program
             }
 
             Catalog catalog = new(Path.Combine(root, "verification"));
+            if (arguments is ["simd-fixtures"])
+            {
+                Console.WriteLine(JsonSerializer.Serialize(Verifier.SimdRegistry(Path.Combine(root, "verification"))));
+                return 0;
+            }
+            if (arguments.Count > 0 && arguments[0] == "verify")
+            {
+                new Verifier(new Workspace(root)).Verify(VerifyOptions.Parse(arguments.Skip(1).ToArray()));
+                return 0;
+            }
             if (arguments is ["inputs"])
             {
                 Console.WriteLine(JsonSerializer.Serialize(new Workspace(root).Inputs()));
@@ -108,7 +118,7 @@ internal static class Program
                 ["plan", "--method", string method] => catalog.Plan([method], safetyPlan),
                 ["plan"] => catalog.Plan(Catalog.Legacy, safetyPlan),
                 _ => throw new ArgumentException(
-                    "Usage: Verification [--root <repository>] catalog | inputs | extract <method> <profile> <new-directory> | manifest <method> | gate <method> | safety[-module] <method> <profile> | plan [--expanded | --method <method>] [--safety]")
+                    "Usage: Verification [--root <repository>] verify [--method <method>] [--profile <profile>] [--safety] [--fixture <case> | --simd-fixture <case>] | catalog | inputs | extract <method> <profile> <new-directory> | manifest <method> | gate <method> | safety[-module] <method> <profile> | plan [--expanded | --method <method>] [--safety]")
             };
             Console.WriteLine(output.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
             return 0;
