@@ -9,9 +9,9 @@ import tempfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from common import verifier_command, BUILD_DIRECTORIES, PROFILE_DIRECTORY, PROFILES, ROOT, VERIFY, expected_profile, generated_directory, run, sha, source_files, check_calling_convention, method_manifest
+from common import verifier_command, PROFILE_DIRECTORY, PROFILES, ROOT, VERIFY, expected_profile, generated_directory, run, sha, source_files, check_calling_convention, method_manifest
 from common import check_proof_snapshot, safety_gate, source_inputs
-from common import build_artifact
+from common import build_artifact, copy_source
 from common import theorem_audits, rejection_check, fixture_check
 
 
@@ -121,23 +121,6 @@ def mutation_proof(work, project, case, method, profile, baseline, intended=None
             if path.relative_to(proof).as_posix() in hashes} != hashes:
         raise RuntimeError("Mutation changed handwritten proofs")
     return bundle, proof
-
-
-def copy_source(destination):
-    shutil.copytree(ROOT / "src", destination / "src",
-                    ignore=shutil.ignore_patterns(*BUILD_DIRECTORIES, "TestResults"))
-    for name in ("global.json", "README.md", ".editorconfig"):
-        shutil.copy2(ROOT / name, destination / name)
-    for source in ROOT.iterdir():
-        if source.is_file() and source.suffix.lower() in {".props", ".targets", ".config"}:
-            shutil.copy2(source, destination / source.name)
-    proof = destination / "verification"
-    shutil.copytree(VERIFY, proof, ignore=shutil.ignore_patterns(*BUILD_DIRECTORIES))
-    workflows = destination / ".github/workflows"
-    workflows.mkdir(parents=True)
-    for workflow in (ROOT / ".github/workflows").glob("verify-uint256*.yml"):
-        shutil.copy2(workflow, workflows / workflow.name)
-    return proof
 
 
 def build_fixture(destination, name, method="Add"):

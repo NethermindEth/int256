@@ -25,6 +25,32 @@ internal static class WorkspaceTests
 
     internal static void Register(Action<string, Action<Catalog, string>> check)
     {
+        check("regression source copies preserve inputs and exclude external build caches", (_, manifests) =>
+        {
+            Workspace workspace = new(Root(manifests));
+            Write(workspace.Root, "README.md", "documentation");
+            Write(workspace.Root, "Directory.Build.props", "build configuration");
+            Write(workspace.Root, ".github/workflows/unrelated.yml", "unrelated");
+            foreach (string directory in Workspace.BuildDirectories)
+            {
+                Write(workspace.Root, $"src/{directory}/Cache.dll", "external cache");
+                Write(workspace.Root, $"verification/{directory}/Cache.olean", "external cache");
+            }
+            Write(workspace.Root, "src/TestResults/results.trx", "old results");
+            string target = Path.Combine(Path.GetDirectoryName(manifests)!, "copied source");
+            Write(target, ".git/marker", "keep clone metadata");
+            string proof = workspace.CopyRegressionSource(target);
+            Program.Require(proof == Path.Combine(target, "verification") && Workspace.SameInputs(workspace.Inputs(), new Workspace(target).Inputs()), "Copy lost a verification input");
+            Program.Require(File.ReadAllText(Path.Combine(target, ".git/marker")) == "keep clone metadata", "Copy altered clone metadata");
+            Program.Require(File.Exists(Path.Combine(target, "README.md")) && File.Exists(Path.Combine(target, "Directory.Build.props")), "Root configuration/documentation omitted");
+            Program.Require(!File.Exists(Path.Combine(target, ".github/workflows/unrelated.yml")), "Unrelated workflow copied");
+            foreach (string directory in Workspace.BuildDirectories)
+                Program.Require(!Directory.Exists(Path.Combine(target, "src", directory)) && !Directory.Exists(Path.Combine(proof, directory)), "External build cache copied");
+            Program.Require(!Directory.Exists(Path.Combine(target, "src/TestResults")), "Native test results copied");
+            Program.Reject(() => workspace.CopyRegressionSource(target));
+            Program.Reject(() => workspace.CopyRegressionSource(Path.Combine(workspace.Verification, "nested")));
+            Program.Reject(() => workspace.CopyRegressionSource(workspace.Root));
+        });
         check("theorem audits require one complete approved axiom list", (_, _) =>
         {
             string name = "UInt256Proof.Checked", output = $"info: Audit.lean:1:0: '{name}' depends on axioms: [propext,\n Classical.choice,\n Quot.sound]\n";

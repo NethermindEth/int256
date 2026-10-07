@@ -131,14 +131,6 @@ internal static class RobustnessChecks
             throw new InvalidOperationException("Excluded hardware expansion did not exceed old budget");
     }
 
-    private static void CopyTree(string source, string destination)
-    {
-        Directory.CreateDirectory(destination);
-        foreach (string path in Directory.EnumerateFiles(source)) File.Copy(path, Path.Combine(destination, Path.GetFileName(path)));
-        foreach (string path in Directory.EnumerateDirectories(source))
-            if (!Workspace.BuildDirectories.Contains(Path.GetFileName(path)) && Path.GetFileName(path) != "TestResults") CopyTree(path, Path.Combine(destination, Path.GetFileName(path)));
-    }
-
     internal static void Run(Workspace workspace, IReadOnlyList<string> arguments)
     {
         var options = Options(arguments);
@@ -151,11 +143,7 @@ internal static class RobustnessChecks
             using ProofSession temporary = new(workspace);
             string root = temporary.Directory;
             workspace.Run(["git", "clone", "--shared", "--no-checkout", "--quiet", workspace.Root, root], workspace.Root);
-            foreach (string directory in new[] { "src", "verification" }) CopyTree(Path.Combine(workspace.Root, directory), Path.Combine(root, directory));
-            foreach (string path in Directory.EnumerateFiles(workspace.Root).Where(path => Path.GetFileName(path) is "global.json" or "README.md" or ".editorconfig" || Path.GetExtension(path).ToLowerInvariant() is ".props" or ".targets" or ".config"))
-                File.Copy(path, Path.Combine(root, Path.GetFileName(path)));
-            string workflows = Path.Combine(root, ".github/workflows"); Directory.CreateDirectory(workflows);
-            foreach (string path in Directory.EnumerateFiles(Path.Combine(workspace.Root, ".github/workflows"), "verify-uint256*.yml")) File.Copy(path, Path.Combine(workflows, Path.GetFileName(path)));
+            workspace.CopyRegressionSource(root);
             Workspace isolated = new(root);
             if (!Workspace.SameInputs(inputs, isolated.Inputs())) throw new InvalidOperationException("Fixture source snapshot changed");
             StringBuilder log = new();

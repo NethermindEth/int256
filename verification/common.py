@@ -131,6 +131,11 @@ def source_inputs(root=ROOT):
     return json.loads(_runner_request(["--root", str(Path(root).resolve()), "inputs"], cache=False))
 
 
+def copy_source(destination):
+    return Path(json.loads(_runner_request(["copy-source", "--json"],
+                {"destination": str(Path(destination).resolve())}, cache=False)))
+
+
 def check_proof_snapshot(proof, relative_paths, inputs):
     return json.loads(_runner_request(["snapshot", "--json"],
         {"proof": str(Path(proof).resolve()), "paths": [str(path) for path in relative_paths], "inputs": inputs}, cache=False))

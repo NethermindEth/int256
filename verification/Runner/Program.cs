@@ -81,6 +81,7 @@ internal static class Program
                 object result;
                 switch (command)
                 {
+                    case "copy-source": result = new Workspace(root).CopyRegressionSource(Catalog.Text(input["destination"])); break;
                     case "simd-data":
                         string fixtureCase = Catalog.Text(input["case"]), fixtureMethod = Catalog.Text(input["method"]);
                         if (input["kind"]!.GetValue<string>() == "witness")

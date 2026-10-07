@@ -34,6 +34,44 @@ internal sealed class Workspace(string root, Func<string[], string, string, stri
     }
 
     internal static string Relative(string rootDirectory, string path) => Path.GetRelativePath(rootDirectory, path).Replace('\\', '/');
+
+    internal string CopyRegressionSource(string destination)
+    {
+        destination = Path.GetFullPath(destination);
+        foreach (string directory in new[] { "src", "verification" })
+        {
+            string source = Path.Combine(Root, directory), target = Path.Combine(destination, directory);
+            string relative = Relative(source, destination);
+            if (relative == "." || !relative.StartsWith("../", StringComparison.Ordinal) && !Path.IsPathRooted(relative)
+                || Directory.Exists(target) || File.Exists(target))
+                throw new ArgumentException("Regression destination must have fresh source directories outside the copied trees");
+        }
+        var inputs = Inputs();
+        void CopyTree(string source, string target, bool sourceTree)
+        {
+            Directory.CreateDirectory(target);
+            foreach (string path in Directory.EnumerateFileSystemEntries(source))
+            {
+                string name = Path.GetFileName(path);
+                if (BuildDirectories.Contains(name) || sourceTree && name == "TestResults") continue;
+                if (Directory.Exists(path)) CopyTree(path, Path.Combine(target, name), sourceTree);
+                else File.Copy(path, Path.Combine(target, name));
+            }
+        }
+        CopyTree(Path.Combine(Root, "src"), Path.Combine(destination, "src"), true);
+        CopyTree(Verification, Path.Combine(destination, "verification"), false);
+        foreach (string path in Directory.EnumerateFiles(Root).Where(path => Path.GetFileName(path) is "global.json" or "README.md" or ".editorconfig"
+            || Path.GetExtension(path).ToLowerInvariant() is ".props" or ".targets" or ".config"))
+            File.Copy(path, Path.Combine(destination, Path.GetFileName(path)), overwrite: true);
+        string workflows = Path.Combine(destination, ".github/workflows");
+        Directory.CreateDirectory(workflows);
+        foreach (string path in Directory.EnumerateFiles(Path.Combine(Root, ".github/workflows"), "verify-uint256*.yml"))
+            File.Copy(path, Path.Combine(workflows, Path.GetFileName(path)), overwrite: true);
+        if (!SameInputs(inputs, Inputs()) || !SameInputs(inputs, new Workspace(destination).Inputs()))
+            throw new InvalidOperationException("Regression source snapshot changed");
+        return Path.Combine(destination, "verification");
+    }
+
     internal Dictionary<string, string> Inputs()
     {
         HashSet<string> paths = [Path.Combine(Root, "global.json"), Path.Combine(Root, ".editorconfig"), Path.Combine(Verification, "lean-toolchain")];
