@@ -18,7 +18,7 @@ INPUTS_AT = checks.inputs_at
 
 class PlanChecks(unittest.TestCase):
     def test_ci_batches_retain_every_job_at_matrix_boundary(self):
-        for count in (1, 256, 257, 390):
+        for count in (1, 256, 257, 388):
             with self.subTest(count=count):
                 plan = [checks.Job(f"job-{i}", ()) for i in range(count)]
                 batches = checks.ci_matrix(plan)["include"]
@@ -34,7 +34,7 @@ class PlanChecks(unittest.TestCase):
     def test_exact_required_matrix(self):
         plan = checks.regression_plan()
         by_id = {job.id: job for job in plan}
-        self.assertEqual(len(by_id), 390)
+        self.assertEqual(len(by_id), 388)
         expected_counts = {"equality-": 52, "multiply-": 14, "simd-": 12,
                            "operation-": 24, "reporting-": 14, "legacy-": 2, "robustness-": 2}
         for prefix, count in expected_counts.items():
@@ -52,8 +52,7 @@ class PlanChecks(unittest.TestCase):
                                "safety-EqualsInt64-x64-vector256", "safety-EqualsInt32-x64-vector256",
                                "safety-EqUInt256UInt256-sse41", "safety-EqualsUInt256Ref-sse41", "safety-NeUInt256UInt256-sse41",
                                "safety-EqualsUInt256Ref-vector256", "safety-NeUInt256UInt256-vector256",
-                               *("python-" + name for name in ("change", "coverage", "prepared", "rejection",
-                                  "method", "operation-coverage"))}
+                               *("python-" + name for name in ("change", "prepared", "rejection", "method"))}
         expected_foundations.update(f"safety-{method}-{profile}"
                                     for method in ("Multiply", "MultiplyInstance", "OperatorMultiplyUInt256UInt256",
                                                    "OperatorMultiplyUInt256UInt32", "OperatorMultiplyUInt32UInt256",

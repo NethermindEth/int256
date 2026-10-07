@@ -47,7 +47,7 @@ class PreparedBuildChecks(unittest.TestCase):
     def test_all_production_gate_imports_resolve(self):
         from common import audit_module, api_entries, LEGACY, method_names
         from common import safety_gate
-        from verify_all import coverage_plan
+        from common import coverage_plan
 
         seen = set()
         def visit(module, text=None):

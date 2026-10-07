@@ -78,6 +78,21 @@ internal static class WorkspaceTests
             using ProofSession session = new(workspace);
             Program.Reject(() => session.Prepare(workspace.Inputs()));
         });
+        check("transient source edits cannot enter a proof snapshot", (_, manifests) =>
+        {
+            Workspace workspace = new(Root(manifests));
+            var inputs = workspace.Inputs();
+            string source = Path.Combine(workspace.Verification, "CIL/Test.lean"), original = File.ReadAllText(source);
+            using ProofSession proof = new(workspace);
+            try
+            {
+                File.WriteAllText(source, "transient replacement");
+                Program.Reject(() => workspace.CopyProofSources(proof.Directory, inputs));
+            }
+            finally { File.WriteAllText(source, original); }
+            Program.Require(Workspace.SameInputs(inputs, workspace.Inputs()), "Test did not restore the transient edit");
+            Program.Reject(() => Workspace.CheckProofSnapshot(proof.Directory, ["CIL/Test.lean"], inputs));
+        });
         check("shared artifact bundle binds sources, binaries and production identity", (_, manifests) =>
         {
             string root = Root(manifests);

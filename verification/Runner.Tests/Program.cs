@@ -148,6 +148,7 @@ internal static class Program
             Require(Catalog.Text(limitations[0]!["status"]) == "observed-failure", "Failure disappeared");
             Require(Catalog.Text(limitations[0]!["currentMain"]!["multiplicationDefaultTiered"]) == "fails", "Tiered failure disappeared");
             Require(Catalog.Text(limitations[0]!["scope"]) == "The CIL proof does not establish native partial-overlap correctness", "Scope weakened");
+            Require(File.Exists(Path.Combine(Directory.GetCurrentDirectory(), Catalog.Text(limitations[0]!["minimalWitness"]))), "Native witness missing");
             Reject(() => catalog.NativeLimitations(["Unknown"]));
         });
         GateTests.Register(Check);

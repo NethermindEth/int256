@@ -12,6 +12,7 @@ internal static class CoverageTests
 
     internal static void Register(Action<string, Action<Catalog, string>> check)
     {
+        CoverageRegressionTests.Register(check);
         check("coverage options reject conflicting selections and invalid worker counts", (_, _) =>
         {
             Program.Require(CoverageOptions.Parse([]) == new CoverageOptions(), "Default coverage changed");
@@ -159,6 +160,33 @@ internal static class CoverageTests
                 JsonObject certificate = new Coverage(workspace).Certificate(method, "scalar", workspace.Inputs());
                 Program.Require(Catalog.Text(certificate["familyTheorem"]) == names[1] && Catalog.Text(certificate["compositionCertificate"]) == names[2]
                     && Catalog.Text(certificate["representativeTheorem"]) == names[3], "Legacy bindings changed");
+                JsonObject combined = report.DeepClone().AsObject(), safety = SafetyCatalog.Gate(method, "scalar");
+                combined["evidenceKind"] = "arithmetic-and-memory-safety";
+                combined["safety"] = safety;
+                combined["arithmeticCoverage"] = combined["coverage"]!.DeepClone();
+                JsonObject expectedCoverage = safety["coverage"]!.DeepClone().AsObject();
+                expectedCoverage["aggregateChecked"] = false; expectedCoverage["representative"] = "scalar";
+                combined["coverage"] = expectedCoverage;
+                foreach (JsonNode? name in safety["theorems"]!.AsArray())
+                {
+                    combined["auditedTheorems"]!.AsArray().Add(name!.DeepClone());
+                    combined["axiomAudits"]![Catalog.Text(name)] = new JsonArray("propext");
+                }
+                string safetyDirectory = Path.Combine(directory, "safety");
+                Directory.CreateDirectory(safetyDirectory);
+                foreach (string file in new[] { "artifact.json", "Extracted.lean" }) File.Copy(Path.Combine(directory, file), Path.Combine(safetyDirectory, file));
+                string safetyTarget = Path.Combine(safetyDirectory, "SelectedSafetyGate.lean");
+                File.WriteAllText(safetyTarget, SafetyGates.Module(catalog, method, "scalar"));
+                combined["generatedSafetyGateSha256"] = Workspace.Hash(safetyTarget);
+                string safetyPath = Path.Combine(safetyDirectory, "report.json");
+                File.WriteAllText(safetyPath, combined.ToJsonString());
+                new Coverage(workspace).Certificate(method, "scalar", workspace.Inputs(), safety: true);
+                foreach (string field in new[] { "evidenceKind", "safety", "arithmeticCoverage" })
+                {
+                    JsonObject changed = combined.DeepClone().AsObject(); changed.Remove(field);
+                    File.WriteAllText(safetyPath, changed.ToJsonString());
+                    Program.Reject(() => new Coverage(workspace).Certificate(method, "scalar", workspace.Inputs(), safety: true));
+                }
                 report["auditedTheorems"]!.AsArray().RemoveAt(1);
                 File.WriteAllText(path, report.ToJsonString());
                 Program.Reject(() => new Coverage(workspace).Certificate(method, "scalar", workspace.Inputs()));

@@ -99,7 +99,7 @@ jobs:
           tar --zstd -xf "$RUNNER_TEMP/lean.tar.zst" -C "$RUNNER_TEMP"
           echo "$RUNNER_TEMP/lean-4.34.1-linux/bin" >> "$GITHUB_PATH"
       - name: Verify all full family contracts and compose coverage
-        run: python3 verification/verify_all.py --expanded --safety --jobs 2
+        run: dotnet run --project verification/Runner -c Release -- verify-all --expanded --safety --jobs 2
       - name: Retain coverage certificates and artifact identities
         uses: actions/upload-artifact@v6
         with:

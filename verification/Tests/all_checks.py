@@ -15,9 +15,8 @@ import time
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.dont_write_bytecode = True
 import support
-from common import BUILD_DIRECTORIES, MULTIPLY_PROFILES, PROFILES, ROOT, VERIFY, sha, api_entries, MULTIPLY_SAFETY_METHODS, BITWISE_DESCRIPTORS, BITWISE_UNARY, COMPARISON_GATES, OPERATOR_DESCRIPTORS, PRIMITIVE_COMPARISONS
+from common import BUILD_DIRECTORIES, MULTIPLY_PROFILES, PROFILES, ROOT, VERIFY, sha, api_entries, MULTIPLY_SAFETY_METHODS, BITWISE_DESCRIPTORS, BITWISE_UNARY, COMPARISON_GATES, OPERATOR_DESCRIPTORS, PRIMITIVE_COMPARISONS, coverage_plan
 from verify import source_inputs
-from verify_all import coverage_plan
 
 
 @dataclass(frozen=True)
@@ -93,7 +92,7 @@ def regression_plan():
         add(f"safety-{method}-scalar", "verify.py", "--method", method, "--profile", "scalar", "--safety")
     add("profile-extractor", "Tests/profile_extractor_checks.py")
     add("csharp-runner", "Runner.Tests/Verification.Tests.csproj")
-    for name in ("change", "coverage", "prepared", "rejection", "method", "operation-coverage"):
+    for name in ("change", "prepared", "rejection", "method"):
         add("python-" + name, "Tests/" + name.replace("-", "_") + "_checks.py")
     add("python-all-checks", "Tests/all_checks_tests.py")
     add("gate-binding", "Tests/gate_binding_checks.py", "--workspace")
@@ -137,7 +136,7 @@ def regression_plan():
         for profile in PROFILES:
             add(f"reporting-{method}-{profile}", "Tests/reporting_checks.py",
                 "--method", method, "--profile", profile)
-    if len(jobs) != 390 or len({job.id for job in jobs}) != 390:
+    if len(jobs) != 388 or len({job.id for job in jobs}) != 388:
         raise RuntimeError("Incomplete or duplicate regression matrix")
     return jobs
 

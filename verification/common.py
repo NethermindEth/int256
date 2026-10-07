@@ -168,6 +168,11 @@ def selected_safety_module(method, profile):
     return _runner_request(["safety-module", method, profile])
 
 
+def coverage_plan(methods, safety=False):
+    plan = json.loads(_runner_request(["plan", "--json"], {"methods": list(methods), "safety": safety}))
+    return [(job["method"], job["profile"]) for job in plan["include"]]
+
+
 def __getattr__(name):
     # Temporary registry exports for Python regression scheduling during migration.
     if name in {"SIMD_CASES", "SIMD_POSITIVES", "SIMD_NEGATIVES"}:

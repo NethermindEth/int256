@@ -47,7 +47,8 @@ internal static class VerifierTests
             if (command[0] == "dotnet")
             {
                 JsonObject artifact = new() { ["sha256"] = Workspace.Hash(command[2]), ["entryIndex"] = 0,
-                    ["methods"] = new JsonArray(entry.DeepClone()), ["profile"] = catalog.Profile("scalar") };
+                    ["methods"] = new JsonArray(entry.DeepClone()), ["profile"] = catalog.Profile(command[5].StartsWith('@')
+                        ? Path.GetFileNameWithoutExtension(command[5][1..]) : command[5]) };
                 Write(command[3], "artifact.json", artifact.ToJsonString()); Write(command[3], "Extracted.lean", "extracted");
                 return "extracted";
             }
