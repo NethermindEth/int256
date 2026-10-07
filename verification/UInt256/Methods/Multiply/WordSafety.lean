@@ -9,27 +9,20 @@ import CIL.Safety.StepComposition
 namespace UInt256Proof.Multiply.Safety
 open CIL.Safety
 
-/-- Discover the widening helper by its mixed-width private frame. Every
-    selected instruction, including the intrinsic overload, is still checked. -/
-def wordIndex : Nat := Extracted.program.findIdx fun body =>
-  match body.localKinds with
-  | [.word32, .word32, .word32, .word64, .word64, .word64] => true
-  | _ => false
+/-- Select a signature candidate; the proof checks its actual body and frame. -/
+def wordIndex : Nat := Extracted.wideMultiplyCandidates.headD 0
 
 def wordBody : CIL.Method := Extracted.program[wordIndex]?.getD
   { code := [], locals := [], returnsValue := false }
 
 def hardwareReturnPc : Nat := if Extracted.profile.bmi2 then 10 else 21
 
-/-- SkipLocalsInit metadata is preserved: these six homes start unknown.
-    The hardware paths never read them. -/
+/-- Validate the extracted frame without depending on private-local layout. -/
 theorem word_frame_setup (memory : Memory) (args : List Value) (wf : memory.WellFormed) :
     ∃ frame entered, enterFrame wordBody args memory = .ok (frame, entered) := by
   apply enterFrame_succeeds wordBody args memory wf
-  have kinds : wordBody.localKinds = [.word32, .word32, .word32, .word64, .word64, .word64] := by rfl
-  have locals : wordBody.locals = [.unmodeled, .unmodeled, .unmodeled, .unmodeled, .unmodeled, .unmodeled] := by rfl
-  have arguments : wordBody.aggregateArgs = [] := by rfl
-  simp [FrameSetupFits, kinds, locals, arguments, InitializersFit, InitializerFits, AggregateArgumentsFit]
+  simp [FrameSetupFits, wordBody, wordIndex, Extracted.wideMultiplyCandidates, cil_code,
+    InitializersFit, InitializerFits, AggregateArgumentsFit]
 
 /-- Both widening-intrinsic paths write the exact low product and return the
     exact high product. The output needs write authority, not prior initialization. -/
@@ -86,7 +79,7 @@ theorem hardware_word_invoke (memory : Memory) (a b : BitVec 64) (output : Refer
         simp only [found, fetched]
         rfl
       change invoke Extracted.program 24 wordIndex args memory = _
-      simp only [invoke, found, checked, setup, Except.mapError, Bind.bind, Except.bind]
+      apply invoke_of_run found checked setup
       conv in wordIndex => cbv
       repeat'
         first

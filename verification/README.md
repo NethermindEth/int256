@@ -34,10 +34,10 @@ extraction. Retained combined certificates cover all 87 selected APIs through th
 
 Fresh scalar multiplication verification currently rejects the newer
 `Multiply64` fallback: its `Math.BigMul` call is not yet modelled by the extractor.
-A fresh BMI2 arithmetic gate passes, but its safety proof also needs updating:
-the widening-helper lookup still expects the old private-local layout. Retained
-multiplication certificates describe the earlier implementation; they do not
-establish combined correctness of the newer implementation.
+A fresh combined arithmetic/safety gate passes for `UInt32 × UInt256` on BMI2.
+Helper discovery now uses extracted signature candidates and validates their
+actual frames. Retained multiplication certificates describe the earlier
+implementation; they do not verify the newer scalar fallback.
 
 For example, `python verification/verify.py --method EqualsUInt32 --profile scalar --safety`
 writes `generated/operations/EqualsUInt32/scalar/safety/report.json`; scalar Add
@@ -496,6 +496,12 @@ and folding their wrapper modules into audits, reduced one isolated
 rebuilt the extraction-dependent modules (24 versus 16) against the same retained
 scalar CIL, with independent dependencies warm and no other verification jobs.
 This single pilot excludes DLL build, extraction and safety checking.
+
+Factoring checked invocation setup into a shared composition lemma also removed
+a multiplication safety proof's kernel-memory bottleneck. Its expanded version
+exhausted a 2 GiB diagnostic Lean limit; the factored proof passes with the same
+limit in a median **2.67 seconds** across three profiled checks, including imports
+with dependencies warm. Execution semantics and contracts are unchanged.
 
 Affected public gates and fixtures were checked after each batch, and unchanged
 evidence was reused after comparing dependencies. Both arithmetic and safety

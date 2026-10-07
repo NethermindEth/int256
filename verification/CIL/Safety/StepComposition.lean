@@ -1,5 +1,17 @@
 import CIL.Safety.Execution
 namespace CIL.Safety
+/-- Compose checked argument/frame setup with execution. Keeping this boundary
+    explicit avoids rechecking an expanded interpreter expression at every call. -/
+theorem invoke_of_run {program : CIL.Program} {fuel method : Nat} {body : CIL.Method}
+    {args : List Value} {frame : Frame} {memory entered final : Memory} {result : List Value}
+    (found : program[method]? = some body)
+    (checked : args.mapM (checkedValue memory) = .ok args)
+    (setup : enterFrame body args memory = .ok (frame, entered))
+    (executed : run program fuel method 0 args frame [] entered = .ok (final, result)) :
+    invoke program fuel method args memory = .ok (final, result) := by
+  simp only [invoke, found, checked, setup, Except.mapError, Bind.bind, Except.bind]
+  exact executed
+
 theorem run_next {program : CIL.Program} {fuel method pc target : Nat}
     {body : CIL.Method} {op : CIL.Op} {args stack values : List Value}
     {frame nextFrame : Frame} {memory updated : Memory}
