@@ -81,6 +81,11 @@ internal static class Program
                 object result;
                 switch (command)
                 {
+                    case "refutation":
+                        FixtureChecks.Refutation(new Workspace(root), Catalog.Text(input["proof"]), Catalog.Text(input["lake"]), Catalog.Text(input["template"]),
+                            input["substitutions"]!.AsArray().Select(pair => new KeyValuePair<string, string>(Catalog.Text(pair![0]), Catalog.Text(pair[1]))),
+                            Catalog.Text(input["module"]), Catalog.Text(input["theorem"]), input["approved"]!.AsArray().Select(Catalog.Text), input["register"]!.GetValue<bool>());
+                        result = true; break;
                     case "copy-source": result = new Workspace(root).CopyRegressionSource(Catalog.Text(input["destination"])); break;
                     case "simd-data":
                         string fixtureCase = Catalog.Text(input["case"]), fixtureMethod = Catalog.Text(input["method"]);

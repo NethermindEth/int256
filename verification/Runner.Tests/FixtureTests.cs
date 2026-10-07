@@ -10,6 +10,35 @@ internal static class FixtureTests
 {
     internal static void Register(Action<string, Action<Catalog, string>> check)
     {
+        check("refutation templates preserve substitution order and require checked theorem audits", (_, manifests) =>
+        {
+            Program.Require(FixtureChecks.ExpandRefutation("@FIRST@", new Dictionary<string, string> { ["FIRST"] = "@SECOND@", ["SECOND"] = "value" }) == "value", "Substitution order changed");
+            Program.Reject(() => FixtureChecks.ExpandRefutation("@UNBOUND@", []));
+            string proof = Path.GetDirectoryName(manifests)!, template = Path.Combine(proof, "Refutation.lean.in");
+            File.WriteAllText(template, "theorem @NAME@ : @VALUE@ = @VALUE@ := rfl\n#print axioms @NAME@\n");
+            string output = "'checked' does not depend on any axioms";
+            bool failed = false;
+            Workspace workspace = new(proof, (command, cwd, stage) =>
+            {
+                Program.Require(command.SequenceEqual(new[] { "lake", "build", "+Refutation:olean" }) && cwd == proof && stage == "Refutation checking", "Refutation command changed");
+                if (failed) throw new InvalidOperationException("Kernel rejection");
+                return output;
+            });
+            void Run(bool register = false) => FixtureChecks.Refutation(workspace, proof, "lake", template,
+                new Dictionary<string, string> { ["NAME"] = "checked", ["VALUE"] = "18446744073709551615" }, "Refutation", "checked", ["propext"], register);
+            Run(true);
+            Program.Require(File.ReadAllText(Path.Combine(proof, "Refutation.lean")).Contains("18446744073709551615", StringComparison.Ordinal), "Large numeral changed");
+            string configuration = File.ReadAllText(Path.Combine(proof, "lakefile.toml"));
+            Run();
+            Program.Require(File.ReadAllText(Path.Combine(proof, "lakefile.toml")) == configuration, "Unrequested library registration");
+            foreach (string invalid in new[] { "", "'other' does not depend on any axioms", "'checked' depends on axioms: [sorryAx]", output + "\n" + output })
+            {
+                output = invalid;
+                Program.Reject(() => Run());
+            }
+            failed = true;
+            Program.Reject(() => Run());
+        });
         check("SIMD fixture changes target the selected helper and reachable feature expressions", (_, _) =>
         {
             JsonObject Artifact(params string[] signatures) => new()

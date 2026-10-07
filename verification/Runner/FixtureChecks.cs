@@ -2,11 +2,29 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 
 namespace UInt256Verification;
 
 internal static class FixtureChecks
 {
+    internal static string ExpandRefutation(string source, IEnumerable<KeyValuePair<string, string>> substitutions)
+    {
+        foreach (var pair in substitutions) source = source.Replace($"@{pair.Key}@", pair.Value, StringComparison.Ordinal);
+        if (Regex.IsMatch(source, "@[A-Z_]+@")) throw new InvalidOperationException("Unresolved refutation template input");
+        return source;
+    }
+
+    internal static void Refutation(Workspace workspace, string proof, string lake, string template, IEnumerable<KeyValuePair<string, string>> substitutions,
+        string module, string theorem, IEnumerable<string> approved, bool register)
+    {
+        string source = ExpandRefutation(File.ReadAllText(template).ReplaceLineEndings("\n"), substitutions);
+        File.WriteAllText(Path.Combine(proof, module.Replace('.', '/') + ".lean"), source.ReplaceLineEndings(Environment.NewLine));
+        if (register) File.AppendAllText(Path.Combine(proof, "lakefile.toml"), $"\n[[lean_lib]]\nname = \"{module}\"\n".ReplaceLineEndings(Environment.NewLine));
+        string output = workspace.Run([lake, "build", $"+{module}:olean"], proof, "Refutation checking");
+        ProofAudits.Check(output, [theorem], approved);
+    }
+
     internal static void ChangedMethod(JsonObject artifact, JsonObject baseline, string signature)
     {
         JsonArray Instructions(JsonObject source)

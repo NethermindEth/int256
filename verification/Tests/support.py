@@ -2,7 +2,6 @@
 
 import json
 from pathlib import Path
-import re
 import shutil
 import sys
 import tempfile
@@ -11,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from common import verifier_command, PROFILE_DIRECTORY, PROFILES, ROOT, VERIFY, expected_profile, generated_directory, run, sha, source_files, check_calling_convention, method_manifest
 from common import check_proof_snapshot, safety_gate, source_inputs
-from common import build_artifact, copy_source
+from common import build_artifact, copy_source, template_refutation
 from common import theorem_audits, rejection_check, fixture_check
 
 
@@ -70,20 +69,6 @@ def selected_fixture_baseline(method, profile, positive=None, *, safety=False):
         alternative = read_report()
         fixture_check("alternative", baseline=baseline, alternative=alternative)
     return public, report_path, baseline
-
-
-def template_refutation(proof, lake, template, substitutions, module, theorem, approved, register=False):
-    source = Path(template).read_text(encoding="utf-8")
-    for name, value in substitutions.items():
-        source = source.replace(f"@{name}@", str(value))
-    if re.search(r"@[A-Z_]+@", source):
-        raise RuntimeError("Unresolved refutation template input")
-    (proof / (module.replace(".", "/") + ".lean")).write_text(source, encoding="utf-8")
-    if register:
-        with (proof / "lakefile.toml").open("a", encoding="utf-8") as config:
-            config.write(f'\n[[lean_lib]]\nname = "{module}"\n')
-    output = run([lake, "build", f"+{module}:olean"], proof)
-    theorem_audits(output, [theorem], approved)
 
 
 def mutation_proof(work, project, case, method, profile, baseline, intended=None):

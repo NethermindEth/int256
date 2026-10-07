@@ -223,6 +223,13 @@ def fixture_check(kind, **payload):
     _runner_request(["fixture-check", "--json"], {"kind": kind, **payload})
 
 
+def template_refutation(proof, lake, template, substitutions, module, theorem, approved, register=False):
+    _runner_request(["refutation", "--json"],
+        {"proof": str(Path(proof).resolve()), "lake": str(lake), "template": str(Path(template).resolve()),
+         "substitutions": [[name, str(value)] for name, value in substitutions.items()],
+         "module": module, "theorem": theorem, "approved": list(approved), "register": register}, cache=False, show_output=True)
+
+
 def simd_data(kind, case, method, profile=""):
     return json.loads(_runner_request(["simd-data", "--json"],
                       {"kind": kind, "case": case, "method": method, "profile": profile}))
