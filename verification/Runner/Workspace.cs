@@ -171,7 +171,11 @@ internal sealed class Workspace(string root, Func<string[], string, string, stri
         return artifact;
     }
 
-    private static string RunProcess(string[] command, string cwd, string stage)
+    internal string RunRejected(string[] command, string cwd, string stage) => RunProcess(command, cwd, stage, false);
+
+    private static string RunProcess(string[] command, string cwd, string stage) => RunProcess(command, cwd, stage, true);
+
+    private static string RunProcess(string[] command, string cwd, string stage, bool succeeds)
     {
         ProcessStartInfo start = new(command[0])
         {
@@ -189,7 +193,7 @@ internal sealed class Workspace(string root, Func<string[], string, string, stri
         process.WaitForExit();
         string output = stdout.GetAwaiter().GetResult() + stderr.GetAwaiter().GetResult();
         Console.Error.Write(output);
-        if (process.ExitCode != 0) throw new InvalidOperationException($"{stage} failure: Unexpected exit {process.ExitCode}: {string.Join(' ', command)}");
+        if ((process.ExitCode == 0) != succeeds) throw new InvalidOperationException($"{stage} failure: Unexpected exit {process.ExitCode}: {string.Join(' ', command)}");
         return output;
     }
 }

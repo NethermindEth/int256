@@ -95,7 +95,7 @@ def regression_plan():
     for name in ("change", "prepared", "method"):
         add("python-" + name, "Tests/" + name.replace("-", "_") + "_checks.py")
     add("python-all-checks", "Tests/all_checks_tests.py")
-    add("gate-binding", "Tests/gate_binding_checks.py", "--workspace")
+    add("gate-binding", "Runner.Tests/Verification.Tests.csproj", "gate-binding", "--workspace")
     for method in ("Add", "Subtract"):
         negative = "negative_checks.py" if method == "Add" else "subtract_negative_checks.py"
         jobs.append(Job("legacy-" + method, (

@@ -10,6 +10,11 @@ internal static class Program
 {
     private static int Main(string[] args)
     {
+        if (args is ["gate-binding"] or ["gate-binding", "--workspace"])
+        {
+            GateBindingChecks.Run(new Workspace(Directory.GetCurrentDirectory()), args.Length == 2);
+            return 0;
+        }
         if (args.Length > 0 && args[0] == "native-simd")
         {
             NativeSimdChecks.Run(new Workspace(Directory.GetCurrentDirectory()), args[1..]);
@@ -185,6 +190,7 @@ internal static class Program
         FixtureTests.Register(Check);
         RobustnessChecks.Register(Check);
         NativeSimdChecks.Register(Check);
+        GateBindingChecks.Register(Check);
         SafetyTests.Register(Check);
         WorkspaceTests.Register(Check);
         VerifierTests.Register(Check);
