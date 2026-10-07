@@ -67,7 +67,7 @@ They do not turn byte alignment into a guarantee that an access otherwise succee
 
 ## Supplementary native checks
 
-`Tests/native_alignment_checks.py --assembly <production.dll> --output <receipt.json>`
+`dotnet run --project verification/Runner.Tests -c Release -- native-alignment --assembly <production.dll> --output <receipt.json>`
 builds the witness against that exact DLL and records its SHA-256, runtime,
 architecture and actual feature flags. It exercises Add and Subtract over shared
 initial bytes, offsets with every residue modulo eight, input/output partial

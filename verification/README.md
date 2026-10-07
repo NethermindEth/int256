@@ -454,7 +454,7 @@ carry/borrow and cascades (including ARM Add's early-store repair), with disjoin
 exactly aliased and partially overlapping outputs. Results name each sample.
 
 For byte-offset and overlap samples against a specific production DLL, run
-`python verification/Tests/native_alignment_checks.py --assembly <dll> --output <receipt.json>`.
+`dotnet run --project verification/Runner.Tests -c Release -- native-alignment --assembly <dll> --output <receipt.json>`.
 The receipt binds the DLL hash and actual runtime features; the
 [alignment audit](CIL/Safety/ALIGNMENT.md) explains the remaining proof obligation.
 
