@@ -10,6 +10,11 @@ internal static class Program
 {
     private static int Main(string[] args)
     {
+        if (args.Length > 0 && args[0] == "shift-fixtures")
+        {
+            ShiftFixtureChecks.Run(new Workspace(Directory.GetCurrentDirectory()), args[1..]);
+            return 0;
+        }
         if (args.Length > 0 && args[0] == "bitwise-operator-fixtures")
         {
             BinaryFixtureChecks.RunReturn(new Workspace(Directory.GetCurrentDirectory()), args[1..]);
@@ -210,6 +215,7 @@ internal static class Program
         FixtureTests.Register(Check);
         ReportingChecks.Register(Check);
         BinaryFixtureChecks.Register(Check);
+        ShiftFixtureChecks.Register(Check);
         RobustnessChecks.Register(Check);
         NativeSimdChecks.Register(Check);
         GateBindingChecks.Register(Check);

@@ -128,7 +128,7 @@ class PlanChecks(unittest.TestCase):
                     self.assertEqual(command, ("verification/Runner.Tests/Verification.Tests.csproj", "bitwise-operator-fixtures",
                         "--method", operation, "--profile", profile, "--workspace"))
                 else:
-                    self.assertEqual(command, ("verification/Tests/Fixtures/Shift/negative_checks.py",
+                    self.assertEqual(command, ("verification/Runner.Tests/Verification.Tests.csproj", "shift-fixtures",
                         "--method", operation, "--safety", "--profile", profile, "--workspace"))
         for job in plan:
             for command in job.commands:

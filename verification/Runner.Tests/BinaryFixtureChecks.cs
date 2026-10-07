@@ -190,7 +190,7 @@ internal static class BinaryFixtureChecks
             Console.WriteLine($"PASS: {name}, returned-value full-contract refutation and public rejection");
         }
     }
-    private static void Isolate(Workspace workspace, Action<Workspace> run)
+    internal static void Isolate(Workspace workspace, Action<Workspace> run)
     {
         string destination = Path.Combine(Path.GetTempPath(), "int256-binary-fixtures-" + Guid.NewGuid().ToString("N"));
         try

@@ -118,7 +118,7 @@ def regression_plan():
                 add(f"operation-{operation}-{profile}", "Runner.Tests/Verification.Tests.csproj", "bitwise-operator-fixtures",
                     "--method", operation, "--profile", profile, "--workspace")
             else:
-                add(f"operation-{operation}-{profile}", "Tests/Fixtures/Shift/negative_checks.py",
+                add(f"operation-{operation}-{profile}", "Runner.Tests/Verification.Tests.csproj", "shift-fixtures",
                     "--method", operation, "--safety", "--profile", profile, "--workspace")
     equality = [name for name, entry in api_entries().items()
                 if entry.get("verification", {}).get("fixtureGroup") == "Equality"]

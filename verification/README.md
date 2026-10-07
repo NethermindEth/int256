@@ -381,7 +381,7 @@ tests while continuing independent work.
 For focused combined shift regressions, run:
 
 ```sh
-python verification/Tests/Fixtures/Shift/negative_checks.py --method Lsh --profile scalar --safety
+dotnet run --project verification/Runner.Tests -c Release -- shift-fixtures --method Lsh --profile scalar --safety
 ```
 
 This requires safety reports for the production, baseline and helper-refactor
