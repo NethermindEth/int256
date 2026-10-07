@@ -1,9 +1,33 @@
-import UInt256.Methods.Compare.PortableLessEqualSafetyAudit
+import UInt256.Methods.Compare.PortableSafetyContract
+import UInt256.Methods.Compare.InclusiveSafety
 import UInt256.Safety.ProfileContracts
 import CIL.RelationalProfileCoverage
 
 namespace UInt256Proof.Compare.Safety
 open UInt256Model.Safety
+
+/-- Bind the discovered comparison chain to the extracted public entry and the
+independent unsigned ordering of its two initial inputs. -/
+theorem checked_less_equal_contract :
+    ReadOnlyContract
+      (fun values => .i32 (if (values[0]?.getD 0).toNat ≤ (values[1]?.getD 0).toNat then 1 else 0))
+      Extracted.program Extracted.entryIndex 2 := by
+  have value (x y : BitVec 256) : inclusiveValue y x =
+      .i32 (if x.toNat ≤ y.toNat then 1 else 0) := by
+    simp [inclusiveValue, middleFlag, show middleSwaps = false from rfl, strictFlag]
+  have entry : BinaryReadOnlyInvocation
+      (fun x y => .i32 (if x.toNat ≤ y.toNat then 1 else 0))
+      Extracted.program Extracted.entryIndex := by
+    simpa only [value, show wrapperIndex .entry = Extracted.entryIndex from rfl] using (inclusive_entry_checked portable_checked)
+  exact entry.to_contract
+
+theorem checked_less_equal_binding :
+    ReadOnlyContract
+      (fun values => .i32 (if (values[0]?.getD 0).toNat ≤ (values[1]?.getD 0).toNat then 1 else 0))
+      Extracted.program Extracted.entryIndex 2 := checked_less_equal_contract
+
+#print axioms checked_less_equal_contract
+#print axioms checked_less_equal_binding
 
 theorem checked_less_equal_family (profile : CIL.FeatureProfile) (valid : profile.Valid)
     (native : Extracted.profile.avx512FVL = profile.avx512FVL)

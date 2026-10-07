@@ -13,6 +13,25 @@ def BinaryReadOnlyInvocation (operation : BitVec 256 → BitVec 256 → CIL.Valu
         [.scalar (operation (inputValue memory left) (inputValue memory right))] ∧
       ∀ id, id < memory.nextIdentity → ∀ offset, final.cells id offset = memory.cells id offset
 
+/-- Expose a binary invocation through the public list-based contract. -/
+theorem BinaryReadOnlyInvocation.to_contract
+    {operation : BitVec 256 → BitVec 256 → CIL.Value} {program : CIL.Program} {method : Nat}
+    (entry : BinaryReadOnlyInvocation operation program method) :
+    ReadOnlyContract (fun values => operation (values[0]?.getD 0) (values[1]?.getD 0))
+      program method 2 := by
+  intro memory inputs arity call
+  cases inputs with
+  | nil => simp at arity
+  | cons left rest =>
+    cases rest with
+    | nil => simp at arity
+    | cons right tail =>
+      cases tail with
+      | cons _ _ => simp at arity
+      | nil =>
+        simpa only [List.map_cons, List.map_nil, List.getElem?_cons_zero,
+          List.getElem?_cons_succ, Option.getD_some] using entry memory left right call
+
 /-- Reordering read-only inputs preserves every calling requirement, including
 shared or partially overlapping storage. -/
 theorem CallingConditions.swap_binary_inputs {program : CIL.Program}

@@ -12,20 +12,10 @@ theorem checked_threeWay_contract :
       (fun values => .i32 (UInt256Model.Compare.compareWord
         (values[0]?.getD 0).toNat (values[1]?.getD 0).toNat))
       Extracted.program Extracted.entryIndex 2 := by
-  have entry : BinaryReadOnlyInvocation (fun x y => .i32 (UInt256Model.Compare.compareWord x.toNat y.toNat)) Extracted.program Extracted.entryIndex :=
-    threeWay_checked
-  intro memory inputs arity call
-  cases inputs with
-  | nil => simp at arity
-  | cons left rest =>
-    cases rest with
-    | nil => simp at arity
-    | cons right tail =>
-      cases tail with
-      | cons _ _ => simp at arity
-      | nil =>
-        simpa only [List.map_cons, List.map_nil, List.getElem?_cons_zero,
-          List.getElem?_cons_succ, Option.getD_some] using entry memory left right call
+  have entry : BinaryReadOnlyInvocation
+      (fun x y => .i32 (UInt256Model.Compare.compareWord x.toNat y.toNat))
+      Extracted.program Extracted.entryIndex := threeWay_checked
+  exact entry.to_contract
 
 theorem checked_threeWay_binding :
     ReadOnlyContract

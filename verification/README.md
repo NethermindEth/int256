@@ -323,8 +323,8 @@ and `Audit.lean` are compatibility imports.
 
 Within a method family, related setup, execution and preservation lemmas live
 together. Shared stepping tactics retain separate mathematical theorem statements
-and execute the current extracted instructions. Public audit modules remain small
-and separate: they bind each selected contract and feature family explicitly.
+and execute the current extracted instructions. Public audits bind each selected
+contract and feature family together. Comparisons reuse one binary-to-list contract proof.
 Scalar multiplication audits instantiate their execution and contract macros
 together. Their storage summaries do not import full limb-product execution;
 the full UInt256 multiplication return path still imports those proofs.
@@ -466,7 +466,7 @@ dependency applicability.
 
 ## Measured verification time
 
-The October 2026 consolidation reduced handwritten Lean files from 945 to 736.
+The October 2026 consolidation reduced handwritten Lean files from 945 to 724.
 Execution stages are grouped by operation and ISA; constructor proofs and shift
 stepping are shared. Checked instruction equations avoid repeatedly generating
 dispatcher simplification machinery. Contracts, semantics and proof budgets are
@@ -481,6 +481,7 @@ Representative before/after medians on Windows with Lean 4.34.1:
 | SSE equality | 8.23 | 2.79 |
 | Right-shift execution | 17.20 | 9.79 |
 | 32-bit multiply conversion/contract modules, retained scalar extraction | 9.32 | 1.93 |
+| Comparison contract/family audit modules, AVX2 greater-or-equal | 3.59 | 1.84 |
 
 These are paired module checks with dependencies already built, including
 process/import overhead; the first three also write `.olean` output. They are
