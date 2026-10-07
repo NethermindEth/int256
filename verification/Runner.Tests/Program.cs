@@ -10,6 +10,11 @@ internal static class Program
 {
     private static int Main(string[] args)
     {
+        if (args is ["safety-foundation"])
+        {
+            FoundationChecks.RunSafety(new Workspace(Directory.GetCurrentDirectory()));
+            return 0;
+        }
         if (args is ["foundation"])
         {
             FoundationChecks.Run(new Workspace(Directory.GetCurrentDirectory()));
@@ -160,6 +165,7 @@ internal static class Program
         GateTests.Register(Check);
         RejectionTests.Register(Check);
         Check("foundation audits reject missing, duplicate and unapproved extra declarations", (_, _) => FoundationChecks.ParserChecks());
+        FoundationChecks.Register(Check);
         SafetyTests.Register(Check);
         WorkspaceTests.Register(Check);
         VerifierTests.Register(Check);

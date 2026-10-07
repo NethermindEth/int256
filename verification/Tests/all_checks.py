@@ -32,7 +32,7 @@ def regression_plan():
         jobs.append(Job(name, (("verification/" + script, *arguments),)))
 
     add("foundation", "Runner.Tests/Verification.Tests.csproj", "foundation")
-    add("safety-foundation", "Tests/memory_safety_checks.py")
+    add("safety-foundation", "Runner.Tests/Verification.Tests.csproj", "safety-foundation")
     add("safety-fixtures", "Tests/Fixtures/Safety/checks.py")
     add("safety-robustness-Add", "Tests/robustness_checks.py", "--method", "Add", "--case", "Renamed", "--case", "ReversedStore", "--safety")
     for method in sorted(MULTIPLY_SAFETY_METHODS):
