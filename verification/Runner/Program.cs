@@ -24,9 +24,9 @@ internal static class Program
             }
 
             Catalog catalog = new(Path.Combine(root, "verification"));
-            if (arguments is ["regression-plan"])
+            if (arguments.Count > 0 && arguments[0] == "regressions")
             {
-                Console.WriteLine(JsonSerializer.Serialize(RegressionPlan.Create(catalog)));
+                RegressionCli.Run(new Workspace(root), arguments.Skip(1).ToArray());
                 return 0;
             }
             if (arguments.Count > 0 && arguments[0] == "changes")
@@ -78,22 +78,6 @@ internal static class Program
                 });
                 return 0;
             }
-            if (arguments is [string command, "--json"])
-            {
-                JsonNode input = JsonNode.Parse(Console.In.ReadToEnd())
-                    ?? throw new ArgumentException("Expected JSON input");
-                object result;
-                switch (command)
-                {
-                    case "copy-source": result = new Workspace(root).CopyRegressionSource(Catalog.Text(input["destination"])); break;
-                    case "regression-matrix": result = RegressionPlan.Matrix(input.AsArray().Select(Catalog.Text).ToArray()); break;
-                    case "plan": result = catalog.Plan(input["methods"]!.AsArray().Select(Catalog.Text).ToArray(), input["safety"]!.GetValue<bool>()); break;
-                    case "entries": result = Catalog.Entries(input.AsObject()); break;
-                    default: throw new ArgumentException("Unknown JSON command");
-                }
-                Console.Write(JsonSerializer.Serialize(result));
-                return 0;
-            }
             if (arguments is ["gate", string selector])
             {
                 _ = catalog.Manifest(selector);
@@ -111,7 +95,7 @@ internal static class Program
                 ["plan", "--method", string method] => catalog.Plan([method], safetyPlan),
                 ["plan"] => catalog.Plan(Catalog.Legacy, safetyPlan),
                 _ => throw new ArgumentException(
-                    "Usage: Verification [--root <repository>] verify [--method <method>] [--profile <profile>] [--safety] [--fixture <case> | --simd-fixture <case>] | verify-all [--expanded | --method <method>] [--safety] [--jobs <count>] [--check-reports | --print-plan] | changes [--method <method>] [--profile <profile>] | catalog | inputs | extract <method> <profile> <new-directory> | manifest <method> | gate <method> | safety[-module] <method> <profile> | plan [--expanded | --method <method>] [--safety]")
+                    "Usage: Verification [--root <repository>] verify [--method <method>] [--profile <profile>] [--safety] [--fixture <case> | --simd-fixture <case>] | verify-all [--expanded | --method <method>] [--safety] [--jobs <count>] [--check-reports | --print-plan] | regressions [--job <id> | --batch <json-array>] [--jobs <count>] [--print-plan [--github-output <path>]] | changes [--method <method>] [--profile <profile>] | catalog | inputs | extract <method> <profile> <new-directory> | manifest <method> | gate <method> | safety[-module] <method> <profile> | plan [--expanded | --method <method>] [--safety]")
             };
             Console.WriteLine(output.ToJsonString(new JsonSerializerOptions { WriteIndented = arguments[0] != "plan" }));
             return 0;

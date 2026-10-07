@@ -95,8 +95,8 @@ internal static class Program
             FoundationChecks.Run(new Workspace(Directory.GetCurrentDirectory()));
             return 0;
         }
-        bool changeOnly = args is ["change-checks"], methodOnly = args is ["method-checks"], preparedOnly = args is ["prepared-checks"];
-        if (args.Length != 0 && !changeOnly && !methodOnly && !preparedOnly) throw new ArgumentException("Unknown verification test selection");
+        bool changeOnly = args is ["change-checks"], methodOnly = args is ["method-checks"], preparedOnly = args is ["prepared-checks"], regressionOnly = args is ["regression-checks"];
+        if (args.Length != 0 && !changeOnly && !methodOnly && !preparedOnly && !regressionOnly) throw new ArgumentException("Unknown verification test selection");
         string manifests = Path.Combine(Directory.GetCurrentDirectory(), "verification", "manifests");
         if (!Directory.Exists(manifests))
             throw new InvalidOperationException("Run the tests from the repository root");
@@ -124,6 +124,13 @@ internal static class Program
             }
         }
 
+        if (regressionOnly)
+        {
+            RegressionPlanTests.Register(Check);
+            RegressionRunnerTests.Register(Check);
+            Console.WriteLine($"Passed {passed} C# regression test groups.");
+            return 0;
+        }
         if (preparedOnly)
         {
             PreparedTests.Register(Check);
@@ -277,6 +284,7 @@ internal static class Program
         MethodTests.Register(Check);
         PreparedTests.Register(Check);
         RegressionPlanTests.Register(Check);
+        RegressionRunnerTests.Register(Check);
         RobustnessChecks.Register(Check);
         NativeSimdChecks.Register(Check);
         GateBindingChecks.Register(Check);

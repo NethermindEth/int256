@@ -116,7 +116,7 @@ internal static class ProfileExtractorChecks
         foreach (string profile in Catalog.Profiles)
         {
             var (output, artifact) = Extract(assembly, label, profile);
-            workspace.Run(["lake", "env", "lean", Path.Combine(output, "Extracted.lean")], workspace.Verification);
+            workspace.Run(["lake", "lean", Path.Combine(output, "Extracted.lean")], workspace.Verification);
             var live = artifact["coverage"]!.AsArray().ToDictionary(c => Catalog.Text(c!["method"]), c => c!["reachable"]!.AsArray().Select(n => n!.GetValue<int>()).ToHashSet());
             bool calls = artifact["methods"]!.AsArray().Any(method => method!["instructions"]!.AsArray().Any(op =>
                 live[Catalog.Text(method["signature"])].Contains(op!["Offset"]!.GetValue<int>()) && Catalog.Text(op["opcode"]) == "call" &&

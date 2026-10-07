@@ -1,6 +1,6 @@
 # SIMD regression fixtures
 
-`Common/` contains the production-shaped Add/Subtract algorithms, input snapshots, scalar dispatch and lookup table. `Cases.props` registers each case, compiler symbol and test suite for both MSBuild and Python. Unknown cases fail before compilation; reports identify the registry and selected case.
+`Common/` contains the production-shaped Add/Subtract algorithms, input snapshots, scalar dispatch and lookup table. `Cases.props` registers each case, compiler symbol and test suite for both MSBuild and the C# verification runner. Unknown cases fail before compilation; reports identify the registry and selected case.
 
 Run `dotnet run --project verification/Runner.Tests -c Release -- simd-fixtures`. The default checks both methods and all six SIMD profiles, including BMI variants. `--method`, `--profile`, `--case` and `--suite positive|negative` narrow the run. Inapplicable explicit cases fail rather than appearing to pass.
 

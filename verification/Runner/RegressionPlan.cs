@@ -59,8 +59,7 @@ internal static class RegressionPlan
         Test("profile-extractor", "profile-extractor");
         Test("csharp-runner");
         foreach (string name in new[] { "change", "method", "prepared" }) Test("csharp-" + name, name + "-checks");
-        // Removed when the isolation/receipt tests have also migrated.
-        jobs.Add(new("python-all-checks", [["verification/Tests/all_checks_tests.py"]]));
+        Test("csharp-regression", "regression-checks");
         Test("gate-binding", "gate-binding", "--workspace");
         foreach (string method in Catalog.Legacy)
         {

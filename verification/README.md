@@ -182,8 +182,8 @@ ranges do not weaken the arithmetic guarantee. The mathematical value is a
 ## Run verification
 
 The C# runner under `Runner/` generates arithmetic and safety gates, executes
-proofs, and composes total coverage. Production CI uses it; regression orchestration
-and change selection still use Python. From the repository root:
+proofs, composes total coverage, selects CI changes and runs isolated regressions.
+From the repository root:
 
 ```sh
 dotnet run --project verification/Runner -c Release -- plan --expanded --safety
@@ -193,15 +193,12 @@ dotnet run --project verification/Runner.Tests -c Release
 
 The C# runner also provides `catalog`, `manifest <method>`, `gate <method>`,
 `safety <method> <profile>` and `safety-module <method> <profile>`.
-Python orchestration builds and calls the C# catalog, metadata checks and gate
-generator through `common.py`; successful responses are reused only while their
-source inputs and request match.
 `inputs` prints the source hashes; `extract <method> <profile> <new-directory>`
 builds a fresh production DLL and extractor and validates the extracted identity.
 `verify` accepts method, profile, safety and fixture options and writes reports
 after kernel checking and freshness validation.
 
-Install Python 3, .NET SDK 10.0.401 and Lean 4.34.1, including Lake. Keep `dotnet`
+Install .NET SDK 10.0.401 and Lean 4.34.1, including Lake. Keep `dotnet`
 and `lake` on PATH; versions are pinned in `global.json`, `lean-toolchain` and the
 manifests. The first build needs NuGet access for Mono.Cecil and repository
 dependencies. Run from the repository root:
@@ -334,9 +331,9 @@ contract, execution proof, correctness theorem and audit gate.
 | `UInt256/Methods/` | Independent operation contracts, execution and audits |
 | `UInt256/Methods/ConstructorSafety.lean`, `ValueSafety.lean` | Extracted helper proofs shared by several operation families |
 | `Extractor/` | Metadata validation, reachability, translation and Lean emission |
-| `Runner/` | Fresh verification, coverage composition and typed gate generation |
-| `common.py` | Remaining Python compatibility helpers |
-| `Tests/` | Versioned fixtures, kernel refutations and regression runners |
+| `Runner/` | Fresh verification, coverage composition, typed gates and regression scheduling |
+| `Runner.Tests/` | Tooling tests and fixture/regression runners |
+| `Tests/` | Versioned fixtures, native witnesses and kernel refutations |
 
 Pure semantics, representation, storage lemmas and arithmetic do not import
 `Extracted`; execution summaries and method proofs do. `Model.lean`, `Proof.lean`
@@ -369,7 +366,7 @@ releases, check production coverage and then the complete regression matrix:
 
 ```sh
 dotnet run --project verification/Runner -c Release -- verify-all --expanded --jobs 2
-python verification/Tests/all_checks.py --jobs 2
+dotnet run --project verification/Runner -c Release -- regressions --jobs 2
 ```
 
 During development, batch related changes and run affected checks first. Reuse
@@ -398,12 +395,12 @@ logs and hashed receipts. Only a complete successful run writes
 Inspect the matrix or run one group during development:
 
 ```sh
-python verification/Tests/all_checks.py --print-plan
-python verification/Tests/all_checks.py --job legacy-Add
+dotnet run --project verification/Runner -c Release -- regressions --print-plan
+dotnet run --project verification/Runner -c Release -- regressions --job legacy-Add
 ```
 
 A selected job emits a clearly marked partial receipt and cannot certify the full
-suite. Individual runners remain available under `Tests/`.
+suite. Individual runners remain available under `Runner.Tests/`.
 CI groups the complete plan into at most 256 matrix entries. Each batch runs every
 assigned group and retains its individual receipt, including when another group
 fails. The separate coverage job requires combined arithmetic and safety gates.
@@ -432,8 +429,7 @@ Subtract verification, run its suite with
 covers unsupported instructions, unresolved calls, layout, cycles,
 framework/configuration, static initialization and transactional summary rollback.
 Keep each case's distinct algorithm and witness in its fixture files. Shared
-build, extraction and rejection checks live in the C# runner; remaining Python
-fixtures call them through the temporary bridge in `common.py`. `Fixtures.props`
+build, extraction and rejection checks live in the C# runner. `Fixtures.props`
 selects shared C# components explicitly. Readable `RefutationTemplate.lean.in`
 files supply case data to shared Lean observation lemmas, which exclude every
 successful execution fuel. Expected results remain independent of extracted CIL.
@@ -477,7 +473,7 @@ proof step for that method and profile. Arithmetic-only and skipped proofs do
 not supply baseline evidence. Missing history, API access
 failures and unmatched jobs force a fresh proof.
 The manual **Verify UInt256 proof tests** workflow uses the same regression
-groups through `all_checks.py --job`, establishing fresh baselines where required.
+groups through `regressions --job`, establishing fresh baselines where required.
 Its SIMD matrix covers both methods in every representative profile, and a separate
 job checks complete selected-API production coverage composition. Additional jobs
 run comparison, bitwise, all four returning bitwise operators and all six shift fixture runners with
