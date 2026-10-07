@@ -10,6 +10,11 @@ internal static class Program
 {
     private static int Main(string[] args)
     {
+        if (args.Length > 0 && args[0] == "robustness")
+        {
+            RobustnessChecks.Run(new Workspace(Directory.GetCurrentDirectory()), args[1..]);
+            return 0;
+        }
         if (args.Length > 0 && args[0] == "native-alignment")
         {
             NativeAlignmentChecks.Run(new Workspace(Directory.GetCurrentDirectory()), args[1..]);
@@ -173,6 +178,7 @@ internal static class Program
         FoundationChecks.Register(Check);
         NativeAlignmentChecks.Register(Check);
         FixtureTests.Register(Check);
+        RobustnessChecks.Register(Check);
         SafetyTests.Register(Check);
         WorkspaceTests.Register(Check);
         VerifierTests.Register(Check);

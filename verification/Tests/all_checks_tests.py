@@ -92,7 +92,7 @@ class PlanChecks(unittest.TestCase):
         self.assertEqual(by_id["safety-Add-arm64-advsimd"].commands,
                          (("verification/Runner/Verification.csproj", "verify", "--method", "Add", "--profile", "arm64-advsimd", "--safety"),))
         self.assertEqual(by_id["safety-robustness-Add"].commands,
-                         (("verification/Tests/robustness_checks.py", "--method", "Add",
+                         (("verification/Runner.Tests/Verification.Tests.csproj", "robustness", "--method", "Add",
                            "--case", "Renamed", "--case", "ReversedStore", "--safety"),))
         self.assertEqual({name for name in by_id if not any(name.startswith(p) for p in expected_counts)},
                          expected_foundations)

@@ -418,7 +418,7 @@ storage deliberately exercises summary rejection and raw fallback.
 The combined suite also checks scalar Add's baseline, renamed helper and reversed
 storage arguments, including rejected arithmetic-summary fallback. It runs the
 shift fixture jobs with `--safety`. To select the Add regression:
-`python verification/Tests/robustness_checks.py --method Add --case Renamed --case ReversedStore --safety`.
+`dotnet run --project verification/Runner.Tests -c Release -- robustness --method Add --case Renamed --case ReversedStore --safety`.
 The baseline is always included to compare proof hashes and compiled instructions.
 The other legacy fixture runs continue to check arithmetic; they do not imply
 combined safety coverage for every rewrite.

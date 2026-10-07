@@ -34,7 +34,7 @@ def regression_plan():
     add("foundation", "Runner.Tests/Verification.Tests.csproj", "foundation")
     add("safety-foundation", "Runner.Tests/Verification.Tests.csproj", "safety-foundation")
     add("safety-fixtures", "Tests/Fixtures/Safety/checks.py")
-    add("safety-robustness-Add", "Tests/robustness_checks.py", "--method", "Add", "--case", "Renamed", "--case", "ReversedStore", "--safety")
+    add("safety-robustness-Add", "Runner.Tests/Verification.Tests.csproj", "robustness", "--method", "Add", "--case", "Renamed", "--case", "ReversedStore", "--safety")
     for method in sorted(MULTIPLY_SAFETY_METHODS):
         for profile in MULTIPLY_PROFILES:
             add(f"safety-{method}-{profile}", "Runner/Verification.csproj", "verify", "--method", method, "--profile", profile, "--safety")
@@ -102,7 +102,7 @@ def regression_plan():
             ("verification/Runner/Verification.csproj", "verify", "--method", method, "--profile", "scalar"),
             ("verification/Tests/" + negative,),
         )))
-        add("robustness-" + method, "Tests/robustness_checks.py", "--method", method)
+        add("robustness-" + method, "Runner.Tests/Verification.Tests.csproj", "robustness", "--method", method)
         for profile in PROFILES[1:]:
             add(f"simd-{method}-{profile}", "Tests/simd_checks.py", "--method", method,
                 "--profile", profile, "--suite", "all")
