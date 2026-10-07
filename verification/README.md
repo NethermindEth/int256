@@ -198,8 +198,8 @@ generator through `common.py`; successful responses are reused only while their
 source inputs and request match.
 `inputs` prints the source hashes; `extract <method> <profile> <new-directory>`
 builds a fresh production DLL and extractor and validates the extracted identity.
-`verify` accepts the same method, profile, safety and fixture options as `verify.py`
-and writes the same reports after kernel checking and freshness validation.
+`verify` accepts method, profile, safety and fixture options and writes reports
+after kernel checking and freshness validation.
 
 Install Python 3, .NET SDK 10.0.401 and Lean 4.34.1, including Lake. Keep `dotnet`
 and `lake` on PATH; versions are pinned in `global.json`, `lean-toolchain` and the
@@ -335,7 +335,7 @@ contract, execution proof, correctness theorem and audit gate.
 | `UInt256/Methods/ConstructorSafety.lean`, `ValueSafety.lean` | Extracted helper proofs shared by several operation families |
 | `Extractor/` | Metadata validation, reachability, translation and Lean emission |
 | `Runner/` | Fresh verification, coverage composition and typed gate generation |
-| `verify.py`, `common.py`, `changes.py` | Python compatibility helpers and CI change selection |
+| `common.py`, `changes.py` | Python compatibility helpers and CI change selection |
 | `Tests/` | Versioned fixtures, kernel refutations and regression runners |
 
 Pure semantics, representation, storage lemmas and arithmetic do not import

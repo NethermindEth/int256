@@ -13,7 +13,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import common
 import support
-import verify
 
 
 class MethodChecks(unittest.TestCase):
@@ -53,7 +52,7 @@ class MethodChecks(unittest.TestCase):
                     "sourceInputs": inputs, "leanSourceSha256": {"proof": "unchanged"},
                     "generatedProgramSha256": case or "production",
                     "evidenceKind": "arithmetic-and-memory-safety",
-                    "safety": verify.safety_gate("Lsh", "scalar"),
+                    "safety": common.safety_gate("Lsh", "scalar"),
                 }), encoding="utf-8")
 
             with patch.object(support, "generated_directory", return_value=directory), \
@@ -82,11 +81,11 @@ class MethodChecks(unittest.TestCase):
                             "sourceInputs": inputs, "leanSourceSha256": {"proof": "unchanged"},
                             "generatedProgramSha256": case or "production",
                             "evidenceKind": "arithmetic-and-memory-safety",
-                            "safety": verify.safety_gate("Lsh", "scalar"),
+                            "safety": common.safety_gate("Lsh", "scalar"),
                         }
                         if case == invalid_case:
                             if wrong_gate:
-                                report["safety"] = verify.safety_gate("Rsh", "scalar")
+                                report["safety"] = common.safety_gate("Rsh", "scalar")
                             else:
                                 report.pop("evidenceKind")
                         report_path.write_text(json.dumps(report), encoding="utf-8")
@@ -201,7 +200,7 @@ class MethodChecks(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "feature-family"):
                     common.method_manifest("Lsh")
     def test_refutation_templates_are_freshness_inputs(self):
-        inputs = verify.source_inputs()
+        inputs = common.source_inputs()
         for relative in ("Compare/RefutationTemplate.lean.in", "Bitwise/RefutationTemplate.lean.in",
                          "Shift/RefutationTemplate.lean.in", "Shift/OperatorRefutationTemplate.lean.in"):
             path = common.VERIFY / "Tests/Fixtures" / relative
@@ -211,20 +210,20 @@ class MethodChecks(unittest.TestCase):
         name = "UInt256Proof.Compare.checked_three_way_all_profiles_contract"
         approved = ["propext", "Classical.choice", "Quot.sound"]
         output = f"info: Audit.lean:1:0: '{name}' depends on axioms: [propext,\n Classical.choice,\n Quot.sound]\n"
-        self.assertEqual(verify.theorem_audits(output, [name], approved), {name: approved})
-        self.assertEqual(verify.theorem_audits(
+        self.assertEqual(common.theorem_audits(output, [name], approved), {name: approved})
+        self.assertEqual(common.theorem_audits(
             f"'{name}' does not depend on any axioms", [name], approved), {name: []})
 
     def test_wrapped_audit_still_rejects_unapproved_and_duplicate_axioms(self):
         for axioms in ("propext,\n sorryAx", "propext,\n propext"):
             with self.subTest(axioms=axioms), self.assertRaisesRegex(RuntimeError, "Unapproved or duplicate"):
-                verify.theorem_audits(f"'Gate' depends on axioms: [{axioms}]", ["Gate"], ["propext"])
+                common.theorem_audits(f"'Gate' depends on axioms: [{axioms}]", ["Gate"], ["propext"])
 
     def test_audit_cannot_cross_a_diagnostic_or_accept_duplicates(self):
         for output in ("'Gate' depends on axioms: [propext,\nerror: missing close\n]",
                        "'Gate' depends on axioms: [propext]\n'Gate' depends on axioms: [propext]"):
             with self.subTest(output=output), self.assertRaisesRegex(RuntimeError, "Missing or ambiguous"):
-                verify.theorem_audits(output, ["Gate"], ["propext"])
+                common.theorem_audits(output, ["Gate"], ["propext"])
 
     def test_metadata_directions_and_receiver_are_contract_inputs(self):
         expected = common.api_entries()["LtUInt256UInt256"]["callingConvention"]
@@ -246,22 +245,6 @@ class MethodChecks(unittest.TestCase):
             with self.subTest(key=key), self.assertRaises(RuntimeError):
                 common.check_calling_convention(changed, expected)
 
-    def test_missing_proof_invalidates_prior_success_before_failing(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            directory = Path(temporary)
-            report = directory / "generated/operations/AddOverflow/scalar/report.json"
-            report.parent.mkdir(parents=True)
-            report.write_text(json.dumps({"status": "verified"}), encoding="utf-8")
-            coverage = report.parent / "coverage.json"
-            coverage.write_text(json.dumps({"status": "verified"}), encoding="utf-8")
-            pending = copy.deepcopy(common.api_entries()["AddOverflow"])
-            pending.pop("verification", None)
-            with (patch.object(common, "VERIFY", directory), patch.object(verify, "VERIFY", directory),
-                  patch.object(common, "api_entries", return_value={"AddOverflow": pending})):
-                with self.assertRaisesRegex(RuntimeError, "proof is not implemented"):
-                    verify.main(["--method", "AddOverflow"])
-            self.assertFalse(report.exists())
-            self.assertFalse(coverage.exists())
 
     def test_unknown_selector_cannot_escape_generated_directory(self):
         for selector in ("../Add", "Unknown", "System.Void::Add"):

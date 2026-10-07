@@ -22,7 +22,15 @@ internal static class VerifierTests
         foreach (string source in Directory.EnumerateFiles(manifests, "*", SearchOption.AllDirectories))
             Write(root, "verification/manifests/" + Path.GetRelativePath(manifests, source), File.ReadAllText(source));
         foreach (string path in new[] { "global.json", ".editorconfig", "verification/lean-toolchain", "verification/lakefile.toml", "verification/Proof.lean" }) Write(root, path, "source");
-        JsonObject manifest = catalog.Manifest(method), abi = manifest["callingConvention"]!.AsObject();
+        JsonObject manifest = catalog.Manifest(method);
+        JsonObject abi = manifest["callingConvention"]?.AsObject() ?? new JsonObject
+        {
+            ["returns"] = "System.Void",
+            ["parameters"] = new JsonArray(Enumerable.Range(0, 3).Select(index => (JsonNode)new JsonObject
+            {
+                ["type"] = "Nethermind.Int256.UInt256&", ["isIn"] = index < 2, ["isOut"] = index == 2
+            }).ToArray())
+        };
         JsonArray parameters = [];
         foreach (JsonNode? p in abi["parameters"]!.AsArray()) parameters.Add(new JsonObject
         {
@@ -30,6 +38,7 @@ internal static class VerifierTests
         });
         JsonObject entry = new() { ["signature"] = manifest["entry"]!.DeepClone(), ["isStatic"] = true, ["hasThis"] = false,
             ["returnType"] = abi["returns"]!.DeepClone(), ["parameters"] = parameters };
+        string? extractor = null;
         return new(root, (command, cwd, stage) =>
         {
             during?.Invoke(stage, cwd);
@@ -42,6 +51,7 @@ internal static class VerifierTests
                     Program.Require(command.Contains("-p:FixtureCase=Renamed") && command.Contains("-p:EnforceCodeStyleInBuild=true"), "Fixture case or analyzer selection lost");
                 string artifacts = command.Single(arg => arg.StartsWith("-p:ArtifactsPath=", StringComparison.Ordinal))[17..];
                 Write(artifacts, command[2].EndsWith("Extractor.csproj", StringComparison.Ordinal) ? "bin/Extractor/release/Extractor.dll" : "bin/Nethermind.Int256/release/Nethermind.Int256.dll", "binary");
+                if (command[2].EndsWith("Extractor.csproj", StringComparison.Ordinal)) extractor = Path.Combine(artifacts, "bin/Extractor/release/Extractor.dll");
                 return "built";
             }
             if (command[0] == "dotnet")
@@ -49,6 +59,7 @@ internal static class VerifierTests
                 JsonObject artifact = new() { ["sha256"] = Workspace.Hash(command[2]), ["entryIndex"] = 0,
                     ["methods"] = new JsonArray(entry.DeepClone()), ["profile"] = catalog.Profile(command[5].StartsWith('@')
                         ? Path.GetFileNameWithoutExtension(command[5][1..]) : command[5]) };
+                if (failure == "profile") artifact["profile"]!["Bmi1"] = true;
                 Write(command[3], "artifact.json", artifact.ToJsonString()); Write(command[3], "Extracted.lean", "extracted");
                 return "extracted";
             }
@@ -62,6 +73,8 @@ internal static class VerifierTests
                 }
                 bool safety = stage == "Safety proof checking";
                 string[] names = safety ? SafetyCatalog.Gate(method, "scalar")["theorems"]!.AsArray().Select(Catalog.Text).ToArray() : ProofAudits.Names(catalog, method);
+                if (failure == "arithmetic-only") names = ProofAudits.Names(catalog, method);
+                if (failure == "extractor" && safety) File.WriteAllText(extractor!, "changed during kernel checking");
                 if (failure == "source" && safety) Write(root, "verification/Proof.lean", "changed");
                 if (failure == "snapshot" && safety) Write(cwd, "Proof.lean", "changed");
                 if (failure == "gate" && safety) Write(cwd, "UInt256/Methods/SelectedGate.lean", "changed");
@@ -123,7 +136,7 @@ internal static class VerifierTests
             Program.Reject(() => verifier.Verify(new(Method)));
             Program.Require(!File.Exists(Path.Combine(output, "report.json")), "Unimplemented proof retained old success");
         });
-        foreach (string failure in new[] { "sdk", "lean", "proof", "axiom", "duplicate-audit", "missing-audit", "source", "snapshot", "gate", "safety-gate" })
+        foreach (string failure in new[] { "sdk", "lean", "proof", "axiom", "duplicate-audit", "missing-audit", "source", "snapshot", "gate", "safety-gate", "extractor", "arithmetic-only" })
             check("verifier invalidates prior success on " + failure, (catalog, manifests) =>
             {
                 Workspace workspace = Setup(catalog, manifests, failure);
@@ -137,6 +150,36 @@ internal static class VerifierTests
                 Program.Require(!File.Exists(Path.Combine(verifier.OutputDirectory(Method), "coverage.json")), "Stale arithmetic aggregate survived");
                 Program.Require(!File.Exists(Path.Combine(workspace.Verification, "generated/safety/coverage.json")), "Stale safety aggregate survived");
             });
+        foreach (string failure in new[] { "stale-build", "profile", "unsupported-safety" })
+            check("invalid " + failure + " is rejected before kernel work and invalidates prior reports", (catalog, manifests) =>
+            {
+                bool kernel = false;
+                Workspace workspace = Setup(catalog, manifests, failure, (stage, _) => kernel |= stage is "Proof checking" or "Safety proof checking");
+                Verifier verifier = new(workspace);
+                ArtifactBundle bundle = workspace.BuildArtifact(workspace.ProductionProject, Path.Combine(workspace.Root, "build"), Method);
+                VerifyOptions options = failure == "unsupported-safety" ? new("Subtract", "x64-sse41", true) : new(Method, Safety: true);
+                string output = Path.Combine(verifier.OutputDirectory(options.Method, options.Profile), "safety");
+                Write(output, "report.json", "old success");
+                Write(verifier.OutputDirectory(options.Method), "coverage.json", "old aggregate");
+                Write(workspace.Verification, "generated/safety/coverage.json", "old aggregate");
+                if (failure == "stale-build") bundle = bundle with { SourceInputs = new() { ["old"] = "input" } };
+                Program.Reject(() => verifier.Verify(options, bundle));
+                Program.Require(!kernel, "Invalid inputs reached the kernel");
+                Program.Require(!File.Exists(Path.Combine(output, "report.json")), "Prior success survived");
+                Program.Require(!File.Exists(Path.Combine(verifier.OutputDirectory(options.Method), "coverage.json")), "Prior arithmetic aggregate survived");
+                Program.Require(!File.Exists(Path.Combine(workspace.Verification, "generated/safety/coverage.json")), "Prior safety aggregate survived");
+            });
+        check("legacy combined report binds exact profile and both independent audits", (catalog, manifests) =>
+        {
+            Workspace workspace = Setup(catalog, manifests, method: "Add");
+            Verifier verifier = new(workspace);
+            JsonObject report = verifier.Verify(new("Add", Safety: true));
+            string[] names = [.. ProofAudits.Names(catalog, "Add"), .. SafetyCatalog.Gate("Add", "scalar")["theorems"]!.AsArray().Select(Catalog.Text)];
+            Program.Require(report["axiomAudits"]!.AsObject().Select(pair => pair.Key).ToHashSet().SetEquals(names), "Combined audit set changed");
+            Program.Require(JsonNode.DeepEquals(report["executionProfile"], catalog.Profile("scalar")), "Profile changed");
+            Program.Require(Catalog.Text(report["coverage"]!["kind"]) == "feature-family" && Catalog.Text(report["arithmeticCoverage"]!["kind"]) == "feature-family", "Family scope lost");
+            Program.Require(!File.Exists(Path.Combine(verifier.OutputDirectory("Add"), "report.json")), "Combined report published as arithmetic-only");
+        });
         check("shared worker reuse retains exact report bindings", (catalog, manifests) =>
         {
             Workspace workspace = Setup(catalog, manifests);

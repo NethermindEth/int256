@@ -61,6 +61,8 @@ internal static class WorkspaceTests
             Program.Require(session.Uses == 2 && File.Exists(Path.Combine(session.Directory, ".lake/build/lib/lean/Checked.olean")), "Session discarded checked dependencies");
             Program.Require(!File.Exists(Path.Combine(session.Directory, "generated/Extracted.lean")), "Stale generated program survived");
             Program.Require(!File.Exists(Path.Combine(session.Directory, "UInt256/Methods/SelectedGate.lean")), "Stale typed gate survived");
+            Program.Require(!File.Exists(Path.Combine(session.Directory, "generated/artifact.json")), "Stale extraction metadata survived");
+            Program.Require(!File.Exists(Path.Combine(session.Directory, "UInt256/Methods/SelectedSafetyGate.lean")), "Stale safety gate survived");
             Exception? failure = null;
             Thread thread = new(() => { try { session.Prepare(inputs); } catch (Exception error) { failure = error; } });
             thread.Start(); thread.Join();
@@ -71,12 +73,24 @@ internal static class WorkspaceTests
             Write(workspace.Root, "src/Test.cs", "changed");
             Program.Reject(() => session.Prepare(workspace.Inputs()));
         });
+        check("worker proof directory is removed on disposal", (_, manifests) =>
+        {
+            Workspace workspace = new(Root(manifests));
+            string directory;
+            using (ProofSession session = new(workspace))
+            {
+                session.Prepare(workspace.Inputs());
+                directory = session.Directory;
+            }
+            Program.Require(!Directory.Exists(directory), "Worker proof directory survived disposal");
+        });
         check("generated gates cannot overwrite handwritten proof sources", (_, manifests) =>
         {
             Workspace workspace = new(Root(manifests));
             Write(workspace.Root, "verification/UInt256/Methods/SelectedGate.lean");
             using ProofSession session = new(workspace);
             Program.Reject(() => session.Prepare(workspace.Inputs()));
+            Program.Require(File.Exists(Path.Combine(session.Directory, "UInt256/Methods/SelectedGate.lean")), "Rejected generated gate erased handwritten source");
         });
         check("transient source edits cannot enter a proof snapshot", (_, manifests) =>
         {

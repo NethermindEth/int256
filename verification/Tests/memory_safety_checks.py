@@ -370,7 +370,8 @@ def main():
                *sorted(source_files(VERIFY / "UInt256/Safety", {".lean"})),
                VERIFY / "UInt256/Representation.lean",
                VERIFY / "UInt256/RepresentationLemmas.lean",
-               Path(__file__).resolve(), VERIFY / "lean-toolchain", VERIFY / "common.py", VERIFY / "verify.py",
+               Path(__file__).resolve(), VERIFY / "lean-toolchain", VERIFY / "common.py",
+               *sorted(source_files(VERIFY / "Runner", {".cs", ".csproj"})),
                VERIFY / "Tests/MemorySafety.lean", VERIFY / "Tests/MemorySafetyInstructions.lean"]
     identities = {str(p.relative_to(ROOT)): sha(p) for p in sources}
     started = time.perf_counter()
