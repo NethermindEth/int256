@@ -97,10 +97,10 @@ def regression_plan():
     add("python-all-checks", "Tests/all_checks_tests.py")
     add("gate-binding", "Runner.Tests/Verification.Tests.csproj", "gate-binding", "--workspace")
     for method in ("Add", "Subtract"):
-        negative = "negative_checks.py" if method == "Add" else "subtract_negative_checks.py"
+        negative = ("verification/Tests/negative_checks.py",) if method == "Add" else ("verification/Runner.Tests/Verification.Tests.csproj", "subtract-negative")
         jobs.append(Job("legacy-" + method, (
             ("verification/Runner/Verification.csproj", "verify", "--method", method, "--profile", "scalar"),
-            ("verification/Tests/" + negative,),
+            negative,
         )))
         add("robustness-" + method, "Runner.Tests/Verification.Tests.csproj", "robustness", "--method", method)
         for profile in PROFILES[1:]:

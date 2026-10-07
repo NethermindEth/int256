@@ -7,9 +7,9 @@ import tempfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from common import verifier_command, ROOT, VERIFY, generated_directory, run, sha, source_inputs
+from common import verifier_command, ROOT, VERIFY, generated_directory, run, source_inputs
 from common import copy_source, template_refutation, mutation_proof, native_witness, model_refutation
-from common import rejection_check, fixture_check
+from common import rejection_check, fixture_check, build_fixture, build_extract, require_production_report
 
 
 def isolated_run(script, arguments, prefix):
@@ -69,40 +69,6 @@ def selected_fixture_baseline(method, profile, positive=None, *, safety=False):
     return public, report_path, baseline
 
 
-def build_fixture(destination, name, method="Add"):
-    project = destination / "verification/Tests/Fixtures/Nethermind.Int256.csproj"
-    source = project.parent / method / f"{name}.cs"
-    if not source.is_file():
-        raise RuntimeError(f"Fixture maintenance failure: missing {name}")
-    run(["dotnet", "build", str(project), "-c", "Release",
-         f"-p:FixtureSource={source}", f"-p:FixtureMethod={method}", "-p:EnforceCodeStyleInBuild=true",
-         "-p:GenerateDocumentationFile=true"], destination)
-    return project.parent / "bin/Release/net10.0/Nethermind.Int256.dll"
-
-
-def build_extract(destination, name, method="Add"):
-    assembly = build_fixture(destination, name, method)
-    output = destination / "verification/generated"
-    result = run(["dotnet", "run", "--project", str(VERIFY / "Extractor"), "-c", "Release", "--",
-                  str(assembly), str(output), method], ROOT)
-    return assembly, output, result
-
-
 def require_semantic_rejection(output, module):
     # A kernel-checked full-contract refutation must precede this diagnostic gate.
     rejection_check("semantic", output, module)
-
-
-def require_production_report(method="Add"):
-    generated = VERIFY / ("generated" if method == "Add" else "generated/subtract")
-    baseline = generated / "Extracted.lean"
-    report_path = generated / "report.json"
-    if not baseline.is_file() or not report_path.is_file():
-        raise RuntimeError(f"Freshly verify production {method} before negative checks")
-    report = json.loads(report_path.read_text(encoding="utf-8"))
-    if (report.get("status") != "verified" or report.get("source", {}).get("kind") != "production"
-            or report["sourceInputs"] != source_inputs()
-            or report["generatedProgramSha256"] != sha(baseline)
-            or any(sha(VERIFY / name) != digest for name, digest in report["leanSourceSha256"].items())):
-        raise RuntimeError(f"Fresh current {method} production report required")
-    return baseline

@@ -81,6 +81,17 @@ internal static class Program
                 object result;
                 switch (command)
                 {
+                    case "legacy-fixture":
+                        Workspace fixtureWorkspace = new(root);
+                        string fixtureDestination = Catalog.Text(input["destination"]), name = Catalog.Text(input["case"]), method = Catalog.Text(input["method"]);
+                        if (input["extract"]!.GetValue<bool>())
+                        {
+                            var extracted = FixtureChecks.BuildExtract(fixtureWorkspace, fixtureDestination, name, method);
+                            result = new[] { extracted.Assembly, extracted.Generated, extracted.Output };
+                        }
+                        else result = FixtureChecks.BuildFixture(fixtureWorkspace, fixtureDestination, name, method);
+                        break;
+                    case "production-report": result = FixtureChecks.RequireProductionReport(new Workspace(root), Catalog.Text(input["method"])); break;
                     case "model-refutation":
                         FixtureChecks.ModelRefutation(new Workspace(root), Catalog.Text(input["proof"]), Catalog.Text(input["lake"]), Catalog.Text(input["initial"]),
                             Catalog.Text(input["left"]), Catalog.Text(input["right"]), Catalog.Text(input["out"]), Catalog.Text(input["address"]),

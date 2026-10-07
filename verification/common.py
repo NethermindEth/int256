@@ -151,6 +151,21 @@ def build_artifact(project, work, method, fixture=None, simd_fixture=False, fixt
     return bundle
 
 
+def build_fixture(destination, name, method="Add"):
+    return Path(json.loads(_runner_request(["legacy-fixture", "--json"],
+        {"destination": str(Path(destination).resolve()), "case": name, "method": method, "extract": False}, cache=False, show_output=True)))
+
+
+def build_extract(destination, name, method="Add"):
+    assembly, generated, output = json.loads(_runner_request(["legacy-fixture", "--json"],
+        {"destination": str(Path(destination).resolve()), "case": name, "method": method, "extract": True}, cache=False, show_output=True))
+    return Path(assembly), Path(generated), output
+
+
+def require_production_report(method="Add"):
+    return Path(json.loads(_runner_request(["production-report", "--json"], {"method": method}, cache=False)))
+
+
 def model_refutation(proof, lake, initial, left, right, out, address, actual, expected, method="Add"):
     _runner_request(["model-refutation", "--json"],
         {"proof": str(Path(proof).resolve()), "lake": str(lake), "initial": initial, "method": method,

@@ -10,6 +10,11 @@ internal static class Program
 {
     private static int Main(string[] args)
     {
+        if (args is ["subtract-negative"])
+        {
+            SubtractNegativeChecks.Run(new Workspace(Directory.GetCurrentDirectory()));
+            return 0;
+        }
         if (args is ["gate-binding"] or ["gate-binding", "--workspace"])
         {
             GateBindingChecks.Run(new Workspace(Directory.GetCurrentDirectory()), args.Length == 2);

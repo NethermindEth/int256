@@ -10,6 +10,55 @@ internal static class FixtureTests
 {
     internal static void Register(Action<string, Action<Catalog, string>> check)
     {
+        check("legacy fixture extraction preserves build flags and selected method", (_, manifests) =>
+        {
+            string root = Path.GetDirectoryName(manifests)!, destination = Path.Combine(root, "fixture");
+            string source = Path.Combine(destination, "verification/Tests/Fixtures/Subtract/WrongBorrow.cs");
+            Directory.CreateDirectory(Path.GetDirectoryName(source)!); File.WriteAllText(source, "fixture");
+            int builds = 0, extracts = 0;
+            Workspace workspace = new(root, (command, cwd, stage) =>
+            {
+                if (stage == "Fixture build")
+                {
+                    builds++;
+                    Program.Require(cwd == destination && Path.GetFullPath(command.Single(argument => argument.StartsWith("-p:FixtureSource=", StringComparison.Ordinal))[17..]) == Path.GetFullPath(source) && command.Contains("-p:FixtureMethod=Subtract")
+                        && command.Contains("-p:EnforceCodeStyleInBuild=true") && command.Contains("-p:GenerateDocumentationFile=true"), "Fixture build scope changed");
+                }
+                else
+                {
+                    extracts++;
+                    Program.Require(cwd == root && command[^1] == "Subtract" && command.Contains(Path.Combine(root, "verification", "Extractor")), "Fixture extraction scope changed");
+                }
+                return "extracted";
+            });
+            var result = FixtureChecks.BuildExtract(workspace, destination, "WrongBorrow", "Subtract");
+            Program.Require(builds == 1 && extracts == 1 && result.Output == "extracted", "Missing extraction output");
+            Program.Reject(() => FixtureChecks.BuildFixture(workspace, destination, "Missing", "Subtract"));
+        });
+        check("legacy prerequisite rejects stale and fixture certificates", (catalog, manifests) =>
+        {
+            string root = Path.GetDirectoryName(manifests)!;
+            Workspace workspace = VerifierTests.Setup(catalog, manifests);
+            string generated = Path.Combine(workspace.Verification, "generated/subtract"); Directory.CreateDirectory(generated);
+            Program.Reject(() => FixtureChecks.RequireProductionReport(workspace, "Subtract"));
+            string program = Path.Combine(generated, "Extracted.lean"), proof = Path.Combine(workspace.Verification, "Proof.lean");
+            File.WriteAllText(program, "program"); File.WriteAllText(proof, "proof");
+            JsonObject report = new() { ["status"] = "verified", ["source"] = new JsonObject { ["kind"] = "production" },
+                ["sourceInputs"] = System.Text.Json.JsonSerializer.SerializeToNode(workspace.Inputs()), ["generatedProgramSha256"] = Workspace.Hash(program),
+                ["leanSourceSha256"] = new JsonObject { ["Proof.lean"] = Workspace.Hash(proof) } };
+            void Write(JsonObject value) => File.WriteAllText(Path.Combine(generated, "report.json"), value.ToJsonString());
+            Write(report); Program.Require(FixtureChecks.RequireProductionReport(workspace, "Subtract") == program, "Valid baseline rejected");
+            foreach (string field in new[] { "status", "kind", "inputs", "program", "proof" })
+            {
+                var invalid = report.DeepClone().AsObject();
+                if (field == "status") invalid["status"] = "failed";
+                if (field == "kind") invalid["source"]!["kind"] = "fixture";
+                if (field == "inputs") invalid["sourceInputs"] = new JsonObject();
+                if (field == "program") invalid["generatedProgramSha256"] = "wrong";
+                if (field == "proof") invalid["leanSourceSha256"]!["Proof.lean"] = "wrong";
+                Write(invalid); Program.Reject(() => FixtureChecks.RequireProductionReport(workspace, "Subtract"));
+            }
+        });
         check("arithmetic refutations retain complete contracts and required audits", (_, manifests) =>
         {
             string root = Path.GetDirectoryName(manifests)!, template = Path.Combine(root, "verification/Tests/Fixtures/RefutationTemplate.lean.in");

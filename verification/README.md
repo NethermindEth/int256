@@ -426,11 +426,14 @@ combined safety coverage for every rewrite.
 Negative arithmetic and aliasing fixtures have native witnesses and kernel-checked
 refutations of the full contract for every possible successful fuel. Rejection must
 reach a semantic proof obligation, not a resource limit or maintenance failure.
-Both negative suites check stale artifact/report invalidation. The Add suite also
+Both negative suites check stale artifact/report invalidation. After fresh scalar
+Subtract verification, run its suite with
+`dotnet run --project verification/Runner.Tests -c Release -- subtract-negative`. The Add suite also
 covers unsupported instructions, unresolved calls, layout, cycles,
 framework/configuration, static initialization and transactional summary rollback.
 Keep each case's distinct algorithm and witness in its fixture files. Shared
-build, extraction and rejection checks live in `Tests/support.py`; `Fixtures.props`
+build, extraction and rejection checks live in the C# runner; remaining Python
+fixtures call them through `Tests/support.py`. `Fixtures.props`
 selects shared C# components explicitly. Readable `RefutationTemplate.lean.in`
 files supply case data to shared Lean observation lemmas, which exclude every
 successful execution fuel. Expected results remain independent of extracted CIL.

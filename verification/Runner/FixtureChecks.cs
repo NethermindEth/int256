@@ -8,6 +8,39 @@ namespace UInt256Verification;
 
 internal static class FixtureChecks
 {
+    internal static string BuildFixture(Workspace workspace, string destination, string name, string method)
+    {
+        string project = Path.Combine(destination, "verification/Tests/Fixtures/Nethermind.Int256.csproj");
+        string source = Path.Combine(Path.GetDirectoryName(project)!, method, name + ".cs");
+        if (!File.Exists(source)) throw new InvalidOperationException($"Fixture maintenance failure: missing {name}");
+        workspace.Run(["dotnet", "build", project, "-c", "Release", $"-p:FixtureSource={source}", $"-p:FixtureMethod={method}",
+            "-p:EnforceCodeStyleInBuild=true", "-p:GenerateDocumentationFile=true"], destination, "Fixture build");
+        return Path.Combine(Path.GetDirectoryName(project)!, "bin/Release/net10.0/Nethermind.Int256.dll");
+    }
+
+    internal static (string Assembly, string Generated, string Output) BuildExtract(Workspace workspace, string destination, string name, string method)
+    {
+        string assembly = BuildFixture(workspace, destination, name, method), generated = Path.Combine(destination, "verification/generated");
+        string output = workspace.Run(["dotnet", "run", "--project", Path.Combine(workspace.Verification, "Extractor"), "-c", "Release", "--",
+            assembly, generated, method], workspace.Root, "Fixture extraction");
+        return (assembly, generated, output);
+    }
+
+    internal static string RequireProductionReport(Workspace workspace, string method)
+    {
+        if (method is not ("Add" or "Subtract")) throw new ArgumentException("Unknown legacy production report");
+        string generated = Path.Combine(workspace.Verification, method == "Add" ? "generated" : "generated/subtract");
+        string program = Path.Combine(generated, "Extracted.lean"), reportPath = Path.Combine(generated, "report.json");
+        if (!File.Exists(program) || !File.Exists(reportPath)) throw new InvalidOperationException($"Freshly verify production {method} before negative checks");
+        JsonObject report = JsonNode.Parse(File.ReadAllText(reportPath))!.AsObject();
+        if (Catalog.Text(report["status"]) != "verified" || Catalog.Text(report["source"]?["kind"]) != "production"
+            || !Workspace.SameInputs(report["sourceInputs"]!.AsObject().ToDictionary(pair => pair.Key, pair => Catalog.Text(pair.Value)), workspace.Inputs())
+            || Catalog.Text(report["generatedProgramSha256"]) != Workspace.Hash(program)
+            || report["leanSourceSha256"]!.AsObject().Any(pair => Workspace.Hash(Path.Combine(workspace.Verification, pair.Key)) != Catalog.Text(pair.Value)))
+            throw new InvalidOperationException($"Fresh current {method} production report required");
+        return program;
+    }
+
     internal static void ModelRefutation(Workspace workspace, string proof, string lake, string initial, string left, string right,
         string output, string address, string actual, string expected, string method)
     {
