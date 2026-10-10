@@ -285,17 +285,10 @@ public readonly partial struct UInt256 : INumber<UInt256>, IMinMaxValue<UInt256>
 
     /// <summary>Writes the decimal digits of <paramref name="magnitude"/>, after a '-' when <paramref name="negative"/>.</summary>
     [SkipLocalsInit]
-    internal static bool TryFormatDecimal<TChar>(in UInt256 magnitude, Span<TChar> destination, out int written, bool negative)
-        where TChar : unmanaged, IBinaryInteger<TChar>
+    internal static bool TryFormatDecimal(in UInt256 magnitude, Span<char> destination, out int written, bool negative)
     {
-        Span<TChar> buffer = stackalloc TChar[MaxDecimalDigits + 1];
-        int position = WriteDecimalDigits(in magnitude, buffer);
-        if (negative)
-        {
-            buffer[--position] = TChar.CreateTruncating('-');
-        }
-
-        ReadOnlySpan<TChar> text = buffer[position..];
+        Span<char> buffer = stackalloc char[MaxDecimalDigits + 1];
+        ReadOnlySpan<char> text = FormatDecimal(in magnitude, buffer, negative);
         if (text.TryCopyTo(destination))
         {
             written = text.Length;
@@ -304,6 +297,40 @@ public readonly partial struct UInt256 : INumber<UInt256>, IMinMaxValue<UInt256>
 
         written = 0;
         return false;
+    }
+
+    /// <inheritdoc cref="TryFormatDecimal(in UInt256, Span{char}, out int, bool)"/>
+    [SkipLocalsInit]
+    internal static bool TryFormatDecimal(in UInt256 magnitude, Span<byte> destination, out int written, bool negative)
+    {
+        Span<char> buffer = stackalloc char[MaxDecimalDigits + 1];
+        ReadOnlySpan<char> text = FormatDecimal(in magnitude, buffer, negative);
+        if (text.Length > destination.Length)
+        {
+            written = 0;
+            return false;
+        }
+
+        // ASCII digits and '-' narrow one to one.
+        for (int i = 0; i < text.Length; i++)
+        {
+            destination[i] = (byte)text[i];
+        }
+
+        written = text.Length;
+        return true;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static ReadOnlySpan<char> FormatDecimal(in UInt256 magnitude, Span<char> buffer, bool negative)
+    {
+        int position = WriteDecimalDigits(in magnitude, buffer);
+        if (negative)
+        {
+            buffer[--position] = '-';
+        }
+
+        return buffer[position..];
     }
 
     // Conversions. The BCL types do not know these types, so both directions cover every primitive here.

@@ -1504,47 +1504,81 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         return new string(buffer[position..]);
     }
 
-    /// <summary>Writes the digits right-aligned into <paramref name="buffer"/> and returns where they start.</summary>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static int WriteDecimalDigits<TChar>(in UInt256 value, Span<TChar> buffer)
-        where TChar : unmanaged, IBinaryInteger<TChar>
+    /// <summary>
+    /// Writes the digits right-aligned into <paramref name="buffer"/>, which holds at least
+    /// <see cref="MaxDecimalDigits"/> characters, and returns where they start.
+    /// </summary>
+    /// <remarks>Two digits per division by a constant, read from a pair table.</remarks>
+    private static int WriteDecimalDigits(in UInt256 value, Span<char> buffer)
     {
+        Debug.Assert(buffer.Length >= MaxDecimalDigits);
+        ref char start = ref MemoryMarshal.GetReference(buffer);
         int position = buffer.Length;
         ulong l0 = value.u0, l1 = value.u1, l2 = value.u2, l3 = value.u3;
 
-        // Interior chunks keep their leading zeros; only the most significant one is trimmed.
+        // Interior chunks keep their leading zeros: nine pairs and a single digit make the 19.
         while ((l1 | l2 | l3) != 0)
         {
             ulong chunk = DivideByChunk(ref l0, ref l1, ref l2, ref l3);
-            for (int i = 0; i < DecimalChunkDigits; i++)
+            for (int i = 0; i < DecimalChunkDigits / 2; i++)
             {
-                buffer[--position] = TChar.CreateTruncating('0' + (int)(chunk % 10));
-                chunk /= 10;
+                ulong quotient = chunk / 100;
+                position -= 2;
+                WriteDigitPair(ref Unsafe.Add(ref start, position), (uint)(chunk - quotient * 100));
+                chunk = quotient;
             }
+
+            Unsafe.Add(ref start, --position) = (char)('0' + chunk);
         }
 
-        do
+        // The most significant chunk is trimmed.
+        while (l0 >= 100)
         {
-            buffer[--position] = TChar.CreateTruncating('0' + (int)(l0 % 10));
-            l0 /= 10;
+            ulong quotient = l0 / 100;
+            position -= 2;
+            WriteDigitPair(ref Unsafe.Add(ref start, position), (uint)(l0 - quotient * 100));
+            l0 = quotient;
         }
-        while (l0 != 0);
+
+        if (l0 >= 10)
+        {
+            position -= 2;
+            WriteDigitPair(ref Unsafe.Add(ref start, position), (uint)l0);
+        }
+        else
+        {
+            Unsafe.Add(ref start, --position) = (char)('0' + l0);
+        }
 
         return position;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void WriteDigitPair(ref char destination, uint pair)
+    {
+        ref byte digits = ref Unsafe.Add(ref MemoryMarshal.GetReference(DigitPairs), pair * 2);
+        destination = (char)digits;
+        Unsafe.Add(ref destination, 1) = (char)Unsafe.Add(ref digits, 1);
+    }
+
+    private static ReadOnlySpan<byte> DigitPairs =>
+        "00010203040506070809101112131415161718192021222324252627282930313233343536373839404142434445464748495051525354555657585960616263646566676869707172737475767778798081828384858687888990919293949596979899"u8;
+
+    /// <summary>floor((2^128 - 1) / <see cref="DecimalChunk"/>) - 2^64, for <c>UDivRem2By1</c>.</summary>
+    private const ulong DecimalChunkReciprocal = 0xD83C_94FB_6D2A_C34A;
+
     /// <summary>Divides the limbs by <see cref="DecimalChunk"/> in place and returns the remainder.</summary>
+    /// <remarks>
+    /// 10^19 already has its top bit set, so it divides by reciprocal without normalising. <see cref="UInt128"/>
+    /// division by a <see cref="ulong"/> is a software loop.
+    /// </remarks>
     private static ulong DivideByChunk(ref ulong l0, ref ulong l1, ref ulong l2, ref ulong l3)
     {
-        UInt128 acc = l3;
-        l3 = (ulong)(acc / DecimalChunk);
-        acc = ((UInt128)(ulong)(acc % DecimalChunk) << 64) | l2;
-        l2 = (ulong)(acc / DecimalChunk);
-        acc = ((UInt128)(ulong)(acc % DecimalChunk) << 64) | l1;
-        l1 = (ulong)(acc / DecimalChunk);
-        acc = ((UInt128)(ulong)(acc % DecimalChunk) << 64) | l0;
-        l0 = (ulong)(acc / DecimalChunk);
-        return (ulong)(acc % DecimalChunk);
+        l3 = UDivRem2By1(0, DecimalChunkReciprocal, DecimalChunk, l3, out ulong rem);
+        l2 = UDivRem2By1(rem, DecimalChunkReciprocal, DecimalChunk, l2, out rem);
+        l1 = UDivRem2By1(rem, DecimalChunkReciprocal, DecimalChunk, l1, out rem);
+        l0 = UDivRem2By1(rem, DecimalChunkReciprocal, DecimalChunk, l0, out rem);
+        return rem;
     }
 
     public int CompareTo(object? obj) => obj is not UInt256 int256 ? throw new InvalidOperationException() : CompareTo(int256);

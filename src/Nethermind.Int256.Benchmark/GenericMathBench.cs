@@ -51,76 +51,102 @@ public class GenericMathBench
     }
 
     [Benchmark(Baseline = true, OperationsPerInvoke = OperationCount), BenchmarkCategory("UInt256 +")]
-    public void UInt256AddDirect()
-    {
-        for (int i = 0; i < OperationCount; i++) _ur[i] = _ua[i] + _ub[i];
-    }
+    public void UInt256AddDirect() => AddDirect(_ua, _ub, _ur);
 
     [Benchmark(OperationsPerInvoke = OperationCount), BenchmarkCategory("UInt256 +")]
     public void UInt256AddGeneric() => Add(_ua, _ub, _ur);
 
     [Benchmark(Baseline = true, OperationsPerInvoke = OperationCount), BenchmarkCategory("UInt256 -")]
-    public void UInt256SubtractDirect()
-    {
-        for (int i = 0; i < OperationCount; i++) _ur[i] = _ua[i] - _ub[i];
-    }
+    public void UInt256SubtractDirect() => SubtractDirect(_ua, _ub, _ur);
 
     [Benchmark(OperationsPerInvoke = OperationCount), BenchmarkCategory("UInt256 -")]
     public void UInt256SubtractGeneric() => Subtract(_ua, _ub, _ur);
 
     [Benchmark(Baseline = true, OperationsPerInvoke = OperationCount), BenchmarkCategory("UInt256 *")]
-    public void UInt256MultiplyDirect()
-    {
-        for (int i = 0; i < OperationCount; i++) _ur[i] = _ua[i] * _ub[i];
-    }
+    public void UInt256MultiplyDirect() => MultiplyDirect(_ua, _ub, _ur);
 
     [Benchmark(OperationsPerInvoke = OperationCount), BenchmarkCategory("UInt256 *")]
     public void UInt256MultiplyGeneric() => Multiply(_ua, _ub, _ur);
 
     [Benchmark(Baseline = true, OperationsPerInvoke = OperationCount), BenchmarkCategory("UInt256 /")]
-    public void UInt256DivideDirect()
-    {
-        for (int i = 0; i < OperationCount; i++) _ur[i] = _ua[i] / _ub[i];
-    }
+    public void UInt256DivideDirect() => DivideDirect(_ua, _ub, _ur);
 
     [Benchmark(OperationsPerInvoke = OperationCount), BenchmarkCategory("UInt256 /")]
     public void UInt256DivideGeneric() => Divide(_ua, _ub, _ur);
 
     [Benchmark(Baseline = true, OperationsPerInvoke = OperationCount), BenchmarkCategory("UInt256 <")]
-    public void UInt256LessThanDirect()
-    {
-        for (int i = 0; i < OperationCount; i++) _flags[i] = _ub[i] < _ua[i];
-    }
+    public void UInt256LessThanDirect() => LessThanDirect(_ub, _ua, _flags);
 
     [Benchmark(OperationsPerInvoke = OperationCount), BenchmarkCategory("UInt256 <")]
     public void UInt256LessThanGeneric() => LessThan(_ub, _ua, _flags);
 
     [Benchmark(Baseline = true, OperationsPerInvoke = OperationCount), BenchmarkCategory("Int256 +")]
-    public void Int256AddDirect()
-    {
-        for (int i = 0; i < OperationCount; i++) _sr[i] = _sa[i] + _sb[i];
-    }
+    public void Int256AddDirect() => AddDirect(_sa, _sb, _sr);
 
     [Benchmark(OperationsPerInvoke = OperationCount), BenchmarkCategory("Int256 +")]
     public void Int256AddGeneric() => Add(_sa, _sb, _sr);
 
     [Benchmark(Baseline = true, OperationsPerInvoke = OperationCount), BenchmarkCategory("Int256 *")]
-    public void Int256MultiplyDirect()
-    {
-        for (int i = 0; i < OperationCount; i++) _sr[i] = _sa[i] * _sb[i];
-    }
+    public void Int256MultiplyDirect() => MultiplyDirect(_sa, _sb, _sr);
 
     [Benchmark(OperationsPerInvoke = OperationCount), BenchmarkCategory("Int256 *")]
     public void Int256MultiplyGeneric() => Multiply(_sa, _sb, _sr);
 
     [Benchmark(Baseline = true, OperationsPerInvoke = OperationCount), BenchmarkCategory("Int256 <")]
-    public void Int256LessThanDirect()
-    {
-        for (int i = 0; i < OperationCount; i++) _flags[i] = _sb[i] < _sa[i];
-    }
+    public void Int256LessThanDirect() => LessThanDirect(_sb, _sa, _flags);
 
     [Benchmark(OperationsPerInvoke = OperationCount), BenchmarkCategory("Int256 <")]
     public void Int256LessThanGeneric() => LessThan(_sb, _sa, _flags);
+
+    // Direct twins of the generic loops below: same shape, binding to the public `in` operators.
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void AddDirect(UInt256[] a, UInt256[] b, UInt256[] r)
+    {
+        for (int i = 0; i < OperationCount; i++) r[i] = a[i] + b[i];
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void AddDirect(Int256[] a, Int256[] b, Int256[] r)
+    {
+        for (int i = 0; i < OperationCount; i++) r[i] = a[i] + b[i];
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void SubtractDirect(UInt256[] a, UInt256[] b, UInt256[] r)
+    {
+        for (int i = 0; i < OperationCount; i++) r[i] = a[i] - b[i];
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void MultiplyDirect(UInt256[] a, UInt256[] b, UInt256[] r)
+    {
+        for (int i = 0; i < OperationCount; i++) r[i] = a[i] * b[i];
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void MultiplyDirect(Int256[] a, Int256[] b, Int256[] r)
+    {
+        for (int i = 0; i < OperationCount; i++) r[i] = a[i] * b[i];
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void DivideDirect(UInt256[] a, UInt256[] b, UInt256[] r)
+    {
+        for (int i = 0; i < OperationCount; i++) r[i] = a[i] / b[i];
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void LessThanDirect(UInt256[] a, UInt256[] b, bool[] r)
+    {
+        for (int i = 0; i < OperationCount; i++) r[i] = a[i] < b[i];
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void LessThanDirect(Int256[] a, Int256[] b, bool[] r)
+    {
+        for (int i = 0; i < OperationCount; i++) r[i] = a[i] < b[i];
+    }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void Add<T>(T[] a, T[] b, T[] r) where T : INumber<T>

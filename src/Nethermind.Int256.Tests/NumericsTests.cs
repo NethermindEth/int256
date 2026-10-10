@@ -420,6 +420,12 @@ public class NumericsTests
         IEnumerable<BigInteger> values = UnsignedValues.Concat(
         [
             (BigInteger.One << 53) + 1,
+            // One limb: these round wrongly if a step goes through double first.
+            (BigInteger.One << 54) + (BigInteger.One << 30) + 1,
+            (BigInteger.One << 63) + (BigInteger.One << 39) + 1,
+            (BigInteger.One << 63) + (BigInteger.One << 10) + 1,
+            (BigInteger.One << 64) - 1,
+            (BigInteger.One << 64) - (BigInteger.One << 10),
             (BigInteger.One << 54) + 2,
             (BigInteger.One << 54) + 6,
             (BigInteger.One << 100) + (BigInteger.One << 47),
@@ -567,6 +573,20 @@ public class NumericsTests
         Assert.That(((IUtf8SpanFormattable)value).TryFormat(bytes, out int bytesWritten, default, null), Is.True);
         Assert.That(Encoding.UTF8.GetString(bytes[..bytesWritten]), Is.EqualTo(expected));
         Assert.That(((IUtf8SpanFormattable)value).TryFormat(bytes[..(expected.Length - 1)], out _, default, null), Is.False);
+    }
+
+    [Test]
+    public void Decimal_digits_match_BigInteger_for_random_values()
+    {
+        foreach (BigInteger big in UnaryOps.RandomUnsigned(2000).Select((v, i) => i % 2 == 0 ? v : v * 2 + 1))
+        {
+            Assert.That(U(big).ToString(), Is.EqualTo(big.ToString(CultureInfo.InvariantCulture)));
+        }
+
+        foreach (BigInteger big in UnaryOps.RandomSigned(2000))
+        {
+            Assert.That(S(big).ToString(), Is.EqualTo(big.ToString(CultureInfo.InvariantCulture)));
+        }
     }
 
     [Test]
