@@ -400,3 +400,6 @@ FodyWeavers.xsd
 
 ## macOS
 .DS_Store
+
+# Coding agent scratch files
+.testagent/

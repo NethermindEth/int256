@@ -9,11 +9,11 @@ on:
     inputs:
       runner:
         description: Runner to benchmark on
-        default: ubuntu-24.04-arm
+        default: ubuntu-26.04-arm
         type: choice
         options:
           - ubuntu-latest
-          - ubuntu-24.04-arm
+          - ubuntu-26.04-arm
           - both
       filter:
         description: BenchmarkDotNet --filter glob. Keep the suite small — ARM runners have 4 vCPUs. (ToBigEndianAB is x86-only.)
@@ -34,7 +34,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON((inputs.runner || 'both') == 'both' && '["ubuntu-latest","ubuntu-24.04-arm"]' || format('["{0}"]', inputs.runner)) }}
+        os: ${{ fromJSON((inputs.runner || 'both') == 'both' && '["ubuntu-latest","ubuntu-26.04-arm"]' || format('["{0}"]', inputs.runner)) }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
