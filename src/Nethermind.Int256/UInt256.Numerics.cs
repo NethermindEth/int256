@@ -131,16 +131,20 @@ public readonly partial struct UInt256 : IBinaryInteger<UInt256>, IMinMaxValue<U
     static bool IEqualityOperators<UInt256, UInt256, bool>.operator !=(UInt256 left, UInt256 right) => left != right;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    static bool IComparisonOperators<UInt256, UInt256, bool>.operator <(UInt256 left, UInt256 right) => left < right;
+    static bool IComparisonOperators<UInt256, UInt256, bool>.operator <(UInt256 left, UInt256 right) =>
+        Avx2.IsSupported ? LessThanAvx2(in left, in right) : left < right;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    static bool IComparisonOperators<UInt256, UInt256, bool>.operator <=(UInt256 left, UInt256 right) => left <= right;
+    static bool IComparisonOperators<UInt256, UInt256, bool>.operator <=(UInt256 left, UInt256 right) =>
+        Avx2.IsSupported ? !LessThanAvx2(in right, in left) : left <= right;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    static bool IComparisonOperators<UInt256, UInt256, bool>.operator >(UInt256 left, UInt256 right) => left > right;
+    static bool IComparisonOperators<UInt256, UInt256, bool>.operator >(UInt256 left, UInt256 right) =>
+        Avx2.IsSupported ? LessThanAvx2(in right, in left) : left > right;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    static bool IComparisonOperators<UInt256, UInt256, bool>.operator >=(UInt256 left, UInt256 right) => left >= right;
+    static bool IComparisonOperators<UInt256, UInt256, bool>.operator >=(UInt256 left, UInt256 right) =>
+        Avx2.IsSupported ? !LessThanAvx2(in left, in right) : left >= right;
 
     // INumberBase
 
