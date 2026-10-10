@@ -1,15 +1,16 @@
 // SPDX-FileCopyrightText: 2026 Demerzel Solutions Limited
-// SPDX-License-Identifier: LGPL-3.0-only
+// SPDX-License-Identifier: MIT
 
 using System;
+using System.Buffers.Binary;
 using System.Runtime.CompilerServices;
 using BenchmarkDotNet.Attributes;
 
 namespace Nethermind.Int256.Benchmark;
 
 /// <summary>
-/// The 32-byte conversions in caller shapes: <c>Prod</c> is <see cref="UInt256"/>, <c>Cur</c>/<c>Old</c> are the
-/// ByteSwapCopies.cs copies with and without AdvSimd. Prod = Cur checks the copies; Cur vs Old is the AdvSimd effect.
+/// The 32-byte conversions in caller shapes: right after a value is computed, reading bytes just written, and
+/// with the decoded value consumed at once. <see cref="ByteSwapBench"/> covers idle values.
 /// </summary>
 public class ByteSwapChainBench
 {
@@ -36,41 +37,11 @@ public class ByteSwapChainBench
             _a[i] = new UInt256((ulong)rnd.NextInt64(), (ulong)rnd.NextInt64(), (ulong)rnd.NextInt64(), (ulong)rnd.NextInt64());
             _b[i] = new UInt256((ulong)rnd.NextInt64(), (ulong)rnd.NextInt64(), (ulong)rnd.NextInt64(), (ulong)rnd.NextInt64());
         }
-
-        byte[] p = new byte[32], c = new byte[32], o = new byte[32];
-        for (int i = 0; i < N; i++)
-        {
-            ReadOnlySpan<byte> src = _bytes.AsSpan(i * 32, 32);
-            foreach (bool bigEndian in new[] { false, true })
-            {
-                UInt256 prod = new(src, bigEndian);
-                U256Current cur = new(src, bigEndian);
-                U256Old old = new(src, bigEndian);
-                if (!prod.Equals(Unsafe.As<U256Current, UInt256>(ref cur)) || !prod.Equals(Unsafe.As<U256Old, UInt256>(ref old)))
-                    throw new InvalidOperationException($"read mismatch at {i}, bigEndian={bigEndian}");
-
-                if (bigEndian)
-                {
-                    prod.ToBigEndian(p);
-                    cur.ToBigEndian(c);
-                    old.ToBigEndian(o);
-                }
-                else
-                {
-                    prod.ToLittleEndian(p);
-                    cur.ToLittleEndian(c);
-                    old.ToLittleEndian(o);
-                }
-                if (!p.AsSpan().SequenceEqual(c) || !p.AsSpan().SequenceEqual(o) || !p.AsSpan().SequenceEqual(src))
-                    throw new InvalidOperationException($"write mismatch at {i}, bigEndian={bigEndian}");
-            }
-        }
     }
 
     // Writes right after Multiply, which stores 8-byte limbs on ARM64.
-
-    [Benchmark(Baseline = true, OperationsPerInvoke = N)]
-    public void MulToLE_Prod()
+    [Benchmark(OperationsPerInvoke = N)]
+    public void MulToLE()
     {
         UInt256[] a = _a, b = _b;
         byte[] dst = _dst;
@@ -78,49 +49,12 @@ public class ByteSwapChainBench
         {
             UInt256.Multiply(in a[i], in b[i], out UInt256 t);
             t.ToLittleEndian(dst.AsSpan(i * 32, 32));
-        }
-    }
-
-    // A/A control.
-    [Benchmark(OperationsPerInvoke = N)]
-    public void MulToLE_ProdAA()
-    {
-        UInt256[] a = _a, b = _b;
-        byte[] dst = _dst;
-        for (int i = 0; i < N; i++)
-        {
-            UInt256.Multiply(in a[i], in b[i], out UInt256 t);
-            t.ToLittleEndian(dst.AsSpan(i * 32, 32));
-        }
-    }
-
-    [Benchmark(OperationsPerInvoke = N)]
-    public void MulToLE_Cur()
-    {
-        UInt256[] a = _a, b = _b;
-        byte[] dst = _dst;
-        for (int i = 0; i < N; i++)
-        {
-            UInt256.Multiply(in a[i], in b[i], out UInt256 t);
-            Unsafe.As<UInt256, U256Current>(ref t).ToLittleEndian(dst.AsSpan(i * 32, 32));
-        }
-    }
-
-    [Benchmark(OperationsPerInvoke = N)]
-    public void MulToLE_Old()
-    {
-        UInt256[] a = _a, b = _b;
-        byte[] dst = _dst;
-        for (int i = 0; i < N; i++)
-        {
-            UInt256.Multiply(in a[i], in b[i], out UInt256 t);
-            Unsafe.As<UInt256, U256Old>(ref t).ToLittleEndian(dst.AsSpan(i * 32, 32));
         }
     }
 
     // Add stores 16-byte halves on ARM64.
     [Benchmark(OperationsPerInvoke = N)]
-    public void AddToLE_Prod()
+    public void AddToLE()
     {
         UInt256[] a = _a, b = _b;
         byte[] dst = _dst;
@@ -132,56 +66,7 @@ public class ByteSwapChainBench
     }
 
     [Benchmark(OperationsPerInvoke = N)]
-    public void AddToLE_Cur()
-    {
-        UInt256[] a = _a, b = _b;
-        byte[] dst = _dst;
-        for (int i = 0; i < N; i++)
-        {
-            UInt256.Add(in a[i], in b[i], out UInt256 t);
-            Unsafe.As<UInt256, U256Current>(ref t).ToLittleEndian(dst.AsSpan(i * 32, 32));
-        }
-    }
-
-    [Benchmark(OperationsPerInvoke = N)]
-    public void AddToLE_Old()
-    {
-        UInt256[] a = _a, b = _b;
-        byte[] dst = _dst;
-        for (int i = 0; i < N; i++)
-        {
-            UInt256.Add(in a[i], in b[i], out UInt256 t);
-            Unsafe.As<UInt256, U256Old>(ref t).ToLittleEndian(dst.AsSpan(i * 32, 32));
-        }
-    }
-
-    // Idle values.
-    [Benchmark(OperationsPerInvoke = N)]
-    public void IdleToLE_Prod()
-    {
-        UInt256[] a = _a;
-        byte[] dst = _dst;
-        for (int i = 0; i < N; i++) a[i].ToLittleEndian(dst.AsSpan(i * 32, 32));
-    }
-
-    [Benchmark(OperationsPerInvoke = N)]
-    public void IdleToLE_Cur()
-    {
-        UInt256[] a = _a;
-        byte[] dst = _dst;
-        for (int i = 0; i < N; i++) Unsafe.As<UInt256, U256Current>(ref a[i]).ToLittleEndian(dst.AsSpan(i * 32, 32));
-    }
-
-    [Benchmark(OperationsPerInvoke = N)]
-    public void IdleToLE_Old()
-    {
-        UInt256[] a = _a;
-        byte[] dst = _dst;
-        for (int i = 0; i < N; i++) Unsafe.As<UInt256, U256Old>(ref a[i]).ToLittleEndian(dst.AsSpan(i * 32, 32));
-    }
-
-    [Benchmark(OperationsPerInvoke = N)]
-    public void MulToBE_Prod()
+    public void MulToBE()
     {
         UInt256[] a = _a, b = _b;
         byte[] dst = _dst;
@@ -192,58 +77,9 @@ public class ByteSwapChainBench
         }
     }
 
-    [Benchmark(OperationsPerInvoke = N)]
-    public void MulToBE_Cur()
-    {
-        UInt256[] a = _a, b = _b;
-        byte[] dst = _dst;
-        for (int i = 0; i < N; i++)
-        {
-            UInt256.Multiply(in a[i], in b[i], out UInt256 t);
-            Unsafe.As<UInt256, U256Current>(ref t).ToBigEndian(dst.AsSpan(i * 32, 32));
-        }
-    }
-
-    [Benchmark(OperationsPerInvoke = N)]
-    public void MulToBE_Old()
-    {
-        UInt256[] a = _a, b = _b;
-        byte[] dst = _dst;
-        for (int i = 0; i < N; i++)
-        {
-            UInt256.Multiply(in a[i], in b[i], out UInt256 t);
-            Unsafe.As<UInt256, U256Old>(ref t).ToBigEndian(dst.AsSpan(i * 32, 32));
-        }
-    }
-
-    [Benchmark(OperationsPerInvoke = N)]
-    public void IdleToBE_Prod()
-    {
-        UInt256[] a = _a;
-        byte[] dst = _dst;
-        for (int i = 0; i < N; i++) a[i].ToBigEndian(dst.AsSpan(i * 32, 32));
-    }
-
-    [Benchmark(OperationsPerInvoke = N)]
-    public void IdleToBE_Cur()
-    {
-        UInt256[] a = _a;
-        byte[] dst = _dst;
-        for (int i = 0; i < N; i++) Unsafe.As<UInt256, U256Current>(ref a[i]).ToBigEndian(dst.AsSpan(i * 32, 32));
-    }
-
-    [Benchmark(OperationsPerInvoke = N)]
-    public void IdleToBE_Old()
-    {
-        UInt256[] a = _a;
-        byte[] dst = _dst;
-        for (int i = 0; i < N; i++) Unsafe.As<UInt256, U256Old>(ref a[i]).ToBigEndian(dst.AsSpan(i * 32, 32));
-    }
-
     // Reads consumed as limbs by a direct caller.
-
     [Benchmark(OperationsPerInvoke = N)]
-    public ulong FromLE_Prod()
+    public ulong FromLE()
     {
         byte[] bytes = _bytes;
         ulong x0 = 0, x1 = 0, x2 = 0, x3 = 0;
@@ -256,33 +92,7 @@ public class ByteSwapChainBench
     }
 
     [Benchmark(OperationsPerInvoke = N)]
-    public ulong FromLE_Cur()
-    {
-        byte[] bytes = _bytes;
-        ulong x0 = 0, x1 = 0, x2 = 0, x3 = 0;
-        for (int i = 0; i < N; i++)
-        {
-            U256Current v = new(bytes.AsSpan(i * 32, 32));
-            x0 ^= v.u0; x1 ^= v.u1; x2 ^= v.u2; x3 ^= v.u3;
-        }
-        return x0 ^ x1 ^ x2 ^ x3;
-    }
-
-    [Benchmark(OperationsPerInvoke = N)]
-    public ulong FromLE_Old()
-    {
-        byte[] bytes = _bytes;
-        ulong x0 = 0, x1 = 0, x2 = 0, x3 = 0;
-        for (int i = 0; i < N; i++)
-        {
-            U256Old v = new(bytes.AsSpan(i * 32, 32));
-            x0 ^= v.u0; x1 ^= v.u1; x2 ^= v.u2; x3 ^= v.u3;
-        }
-        return x0 ^ x1 ^ x2 ^ x3;
-    }
-
-    [Benchmark(OperationsPerInvoke = N)]
-    public ulong FromBE_Prod()
+    public ulong FromBE()
     {
         byte[] bytes = _bytes;
         ulong x0 = 0, x1 = 0, x2 = 0, x3 = 0;
@@ -294,36 +104,9 @@ public class ByteSwapChainBench
         return x0 ^ x1 ^ x2 ^ x3;
     }
 
-    [Benchmark(OperationsPerInvoke = N)]
-    public ulong FromBE_Cur()
-    {
-        byte[] bytes = _bytes;
-        ulong x0 = 0, x1 = 0, x2 = 0, x3 = 0;
-        for (int i = 0; i < N; i++)
-        {
-            U256Current v = new(bytes.AsSpan(i * 32, 32), isBigEndian: true);
-            x0 ^= v.u0; x1 ^= v.u1; x2 ^= v.u2; x3 ^= v.u3;
-        }
-        return x0 ^ x1 ^ x2 ^ x3;
-    }
-
-    [Benchmark(OperationsPerInvoke = N)]
-    public ulong FromBE_Old()
-    {
-        byte[] bytes = _bytes;
-        ulong x0 = 0, x1 = 0, x2 = 0, x3 = 0;
-        for (int i = 0; i < N; i++)
-        {
-            U256Old v = new(bytes.AsSpan(i * 32, 32), isBigEndian: true);
-            x0 ^= v.u0; x1 ^= v.u1; x2 ^= v.u2; x3 ^= v.u3;
-        }
-        return x0 ^ x1 ^ x2 ^ x3;
-    }
-
     // Reads of bytes just written by 8-byte stores.
-
     [Benchmark(OperationsPerInvoke = N)]
-    public ulong WriteFromLE_Prod()
+    public ulong WriteFromLE()
     {
         UInt256[] a = _a;
         byte[] buf = _dst;
@@ -331,7 +114,10 @@ public class ByteSwapChainBench
         for (int i = 0; i < N; i++)
         {
             Span<byte> slot = buf.AsSpan(i * 32, 32);
-            Unsafe.As<UInt256, U256Old>(ref a[i]).ToLittleEndian(slot);
+            BinaryPrimitives.WriteUInt64LittleEndian(slot, a[i].u0);
+            BinaryPrimitives.WriteUInt64LittleEndian(slot[8..], a[i].u1);
+            BinaryPrimitives.WriteUInt64LittleEndian(slot[16..], a[i].u2);
+            BinaryPrimitives.WriteUInt64LittleEndian(slot[24..], a[i].u3);
             UInt256 v = new(slot);
             acc += v.u0 ^ v.u1 ^ v.u2 ^ v.u3;
         }
@@ -339,7 +125,7 @@ public class ByteSwapChainBench
     }
 
     [Benchmark(OperationsPerInvoke = N)]
-    public ulong WriteFromLE_Cur()
+    public ulong WriteFromBE()
     {
         UInt256[] a = _a;
         byte[] buf = _dst;
@@ -347,244 +133,69 @@ public class ByteSwapChainBench
         for (int i = 0; i < N; i++)
         {
             Span<byte> slot = buf.AsSpan(i * 32, 32);
-            Unsafe.As<UInt256, U256Old>(ref a[i]).ToLittleEndian(slot);
-            U256Current v = new(slot);
-            acc += v.u0 ^ v.u1 ^ v.u2 ^ v.u3;
-        }
-        return acc;
-    }
-
-    [Benchmark(OperationsPerInvoke = N)]
-    public ulong WriteFromLE_Old()
-    {
-        UInt256[] a = _a;
-        byte[] buf = _dst;
-        ulong acc = 0;
-        for (int i = 0; i < N; i++)
-        {
-            Span<byte> slot = buf.AsSpan(i * 32, 32);
-            Unsafe.As<UInt256, U256Old>(ref a[i]).ToLittleEndian(slot);
-            U256Old v = new(slot);
-            acc += v.u0 ^ v.u1 ^ v.u2 ^ v.u3;
-        }
-        return acc;
-    }
-
-    [Benchmark(OperationsPerInvoke = N)]
-    public ulong WriteFromBE_Prod()
-    {
-        UInt256[] a = _a;
-        byte[] buf = _dst;
-        ulong acc = 0;
-        for (int i = 0; i < N; i++)
-        {
-            Span<byte> slot = buf.AsSpan(i * 32, 32);
-            Unsafe.As<UInt256, U256Old>(ref a[i]).ToBigEndian(slot);
+            BinaryPrimitives.WriteUInt64BigEndian(slot, a[i].u3);
+            BinaryPrimitives.WriteUInt64BigEndian(slot[8..], a[i].u2);
+            BinaryPrimitives.WriteUInt64BigEndian(slot[16..], a[i].u1);
+            BinaryPrimitives.WriteUInt64BigEndian(slot[24..], a[i].u0);
             UInt256 v = new(slot, isBigEndian: true);
             acc += v.u0 ^ v.u1 ^ v.u2 ^ v.u3;
         }
         return acc;
     }
 
-    [Benchmark(OperationsPerInvoke = N)]
-    public ulong WriteFromBE_Cur()
-    {
-        UInt256[] a = _a;
-        byte[] buf = _dst;
-        ulong acc = 0;
-        for (int i = 0; i < N; i++)
-        {
-            Span<byte> slot = buf.AsSpan(i * 32, 32);
-            Unsafe.As<UInt256, U256Old>(ref a[i]).ToBigEndian(slot);
-            U256Current v = new(slot, isBigEndian: true);
-            acc += v.u0 ^ v.u1 ^ v.u2 ^ v.u3;
-        }
-        return acc;
-    }
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static UInt256 DecodeLE(ReadOnlySpan<byte> s) => new(s);
 
-    [Benchmark(OperationsPerInvoke = N)]
-    public ulong WriteFromBE_Old()
-    {
-        UInt256[] a = _a;
-        byte[] buf = _dst;
-        ulong acc = 0;
-        for (int i = 0; i < N; i++)
-        {
-            Span<byte> slot = buf.AsSpan(i * 32, 32);
-            Unsafe.As<UInt256, U256Old>(ref a[i]).ToBigEndian(slot);
-            U256Old v = new(slot, isBigEndian: true);
-            acc += v.u0 ^ v.u1 ^ v.u2 ^ v.u3;
-        }
-        return acc;
-    }
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static UInt256 DecodeBE(ReadOnlySpan<byte> s) => new(s, isBigEndian: true);
 
     // Non-inlined decode, then Add.
-
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static UInt256 ProdFromLE(ReadOnlySpan<byte> s) => new(s);
-
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static U256Current CurFromLE(ReadOnlySpan<byte> s) => new(s);
-
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static U256Old OldFromLE(ReadOnlySpan<byte> s) => new(s);
-
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static UInt256 ProdFromBE(ReadOnlySpan<byte> s) => new(s, isBigEndian: true);
-
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static U256Current CurFromBE(ReadOnlySpan<byte> s) => new(s, isBigEndian: true);
-
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static U256Old OldFromBE(ReadOnlySpan<byte> s) => new(s, isBigEndian: true);
-
     [Benchmark(OperationsPerInvoke = N)]
-    public void DecodeLEAdd_Prod()
+    public void DecodeLEAdd()
     {
         UInt256[] b = _b, r = _r;
         byte[] bytes = _bytes;
         for (int i = 0; i < N; i++)
         {
-            UInt256 v = ProdFromLE(bytes.AsSpan(i * 32, 32));
+            UInt256 v = DecodeLE(bytes.AsSpan(i * 32, 32));
             UInt256.Add(in v, in b[i], out r[i]);
         }
     }
 
     [Benchmark(OperationsPerInvoke = N)]
-    public void DecodeLEAdd_Cur()
+    public void DecodeBEAdd()
     {
         UInt256[] b = _b, r = _r;
         byte[] bytes = _bytes;
         for (int i = 0; i < N; i++)
         {
-            U256Current v = CurFromLE(bytes.AsSpan(i * 32, 32));
-            UInt256.Add(in Unsafe.As<U256Current, UInt256>(ref v), in b[i], out r[i]);
-        }
-    }
-
-    [Benchmark(OperationsPerInvoke = N)]
-    public void DecodeLEAdd_Old()
-    {
-        UInt256[] b = _b, r = _r;
-        byte[] bytes = _bytes;
-        for (int i = 0; i < N; i++)
-        {
-            U256Old v = OldFromLE(bytes.AsSpan(i * 32, 32));
-            UInt256.Add(in Unsafe.As<U256Old, UInt256>(ref v), in b[i], out r[i]);
-        }
-    }
-
-    [Benchmark(OperationsPerInvoke = N)]
-    public void DecodeBEAdd_Prod()
-    {
-        UInt256[] b = _b, r = _r;
-        byte[] bytes = _bytes;
-        for (int i = 0; i < N; i++)
-        {
-            UInt256 v = ProdFromBE(bytes.AsSpan(i * 32, 32));
+            UInt256 v = DecodeBE(bytes.AsSpan(i * 32, 32));
             UInt256.Add(in v, in b[i], out r[i]);
-        }
-    }
-
-    [Benchmark(OperationsPerInvoke = N)]
-    public void DecodeBEAdd_Cur()
-    {
-        UInt256[] b = _b, r = _r;
-        byte[] bytes = _bytes;
-        for (int i = 0; i < N; i++)
-        {
-            U256Current v = CurFromBE(bytes.AsSpan(i * 32, 32));
-            UInt256.Add(in Unsafe.As<U256Current, UInt256>(ref v), in b[i], out r[i]);
-        }
-    }
-
-    [Benchmark(OperationsPerInvoke = N)]
-    public void DecodeBEAdd_Old()
-    {
-        UInt256[] b = _b, r = _r;
-        byte[] bytes = _bytes;
-        for (int i = 0; i < N; i++)
-        {
-            U256Old v = OldFromBE(bytes.AsSpan(i * 32, 32));
-            UInt256.Add(in Unsafe.As<U256Old, UInt256>(ref v), in b[i], out r[i]);
         }
     }
 
     // Non-inlined decode, then limb reads.
-
     [Benchmark(OperationsPerInvoke = N)]
-    public ulong DecodeLELimbs_Prod()
+    public ulong DecodeLELimbs()
     {
         byte[] bytes = _bytes;
         ulong acc = 0;
         for (int i = 0; i < N; i++)
         {
-            UInt256 v = ProdFromLE(bytes.AsSpan(i * 32, 32));
+            UInt256 v = DecodeLE(bytes.AsSpan(i * 32, 32));
             acc += (v.u0 | v.u1) ^ (v.u2 | v.u3);
         }
         return acc;
     }
 
     [Benchmark(OperationsPerInvoke = N)]
-    public ulong DecodeLELimbs_Cur()
+    public ulong DecodeBELimbs()
     {
         byte[] bytes = _bytes;
         ulong acc = 0;
         for (int i = 0; i < N; i++)
         {
-            U256Current v = CurFromLE(bytes.AsSpan(i * 32, 32));
-            acc += (v.u0 | v.u1) ^ (v.u2 | v.u3);
-        }
-        return acc;
-    }
-
-    [Benchmark(OperationsPerInvoke = N)]
-    public ulong DecodeLELimbs_Old()
-    {
-        byte[] bytes = _bytes;
-        ulong acc = 0;
-        for (int i = 0; i < N; i++)
-        {
-            U256Old v = OldFromLE(bytes.AsSpan(i * 32, 32));
-            acc += (v.u0 | v.u1) ^ (v.u2 | v.u3);
-        }
-        return acc;
-    }
-
-    [Benchmark(OperationsPerInvoke = N)]
-    public ulong DecodeBELimbs_Prod()
-    {
-        byte[] bytes = _bytes;
-        ulong acc = 0;
-        for (int i = 0; i < N; i++)
-        {
-            UInt256 v = ProdFromBE(bytes.AsSpan(i * 32, 32));
-            acc += (v.u0 | v.u1) ^ (v.u2 | v.u3);
-        }
-        return acc;
-    }
-
-    [Benchmark(OperationsPerInvoke = N)]
-    public ulong DecodeBELimbs_Cur()
-    {
-        byte[] bytes = _bytes;
-        ulong acc = 0;
-        for (int i = 0; i < N; i++)
-        {
-            U256Current v = CurFromBE(bytes.AsSpan(i * 32, 32));
-            acc += (v.u0 | v.u1) ^ (v.u2 | v.u3);
-        }
-        return acc;
-    }
-
-    [Benchmark(OperationsPerInvoke = N)]
-    public ulong DecodeBELimbs_Old()
-    {
-        byte[] bytes = _bytes;
-        ulong acc = 0;
-        for (int i = 0; i < N; i++)
-        {
-            U256Old v = OldFromBE(bytes.AsSpan(i * 32, 32));
+            UInt256 v = DecodeBE(bytes.AsSpan(i * 32, 32));
             acc += (v.u0 | v.u1) ^ (v.u2 | v.u3);
         }
         return acc;
