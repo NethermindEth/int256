@@ -22,7 +22,7 @@ internal enum ConversionMode
 // interface members are explicit implementations that forward; public by-value overloads would rebind
 // every existing caller. Unchecked operators keep the public operators' semantics (subtraction throws on
 // underflow, addition and multiplication wrap); checked operators throw on any overflow.
-public readonly partial struct UInt256 : INumber<UInt256>, IMinMaxValue<UInt256>, IUnsignedNumber<UInt256>
+public readonly partial struct UInt256 : IBinaryInteger<UInt256>, IMinMaxValue<UInt256>, IUnsignedNumber<UInt256>
 {
     /// <summary>The remainder of <paramref name="a"/> divided by <paramref name="b"/>.</summary>
     /// <exception cref="DivideByZeroException"><paramref name="b"/> is zero.</exception>
@@ -198,6 +198,190 @@ public readonly partial struct UInt256 : INumber<UInt256>, IMinMaxValue<UInt256>
     static UInt256 INumber<UInt256>.MinNumber(UInt256 x, UInt256 y) => Min(in x, in y);
 
     static int INumber<UInt256>.Sign(UInt256 value) => value.IsZero ? 0 : 1;
+
+    // IBinaryInteger. Shifts keep the public operators' EVM semantics: a count of 256 or more gives zero rather
+    // than being masked to the width, as it is for the BCL integers. Rotation is modular.
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    static UInt256 IBitwiseOperators<UInt256, UInt256, UInt256>.operator &(UInt256 left, UInt256 right) => left & right;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    static UInt256 IBitwiseOperators<UInt256, UInt256, UInt256>.operator |(UInt256 left, UInt256 right) => left | right;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    static UInt256 IBitwiseOperators<UInt256, UInt256, UInt256>.operator ^(UInt256 left, UInt256 right) => left ^ right;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    static UInt256 IBitwiseOperators<UInt256, UInt256, UInt256>.operator ~(UInt256 value) => ~value;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    static UInt256 IShiftOperators<UInt256, int, UInt256>.operator <<(UInt256 value, int shiftAmount) => value << shiftAmount;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    static UInt256 IShiftOperators<UInt256, int, UInt256>.operator >>(UInt256 value, int shiftAmount) => value >> shiftAmount;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    static UInt256 IShiftOperators<UInt256, int, UInt256>.operator >>>(UInt256 value, int shiftAmount) => value >> shiftAmount;
+
+    static UInt256 IBinaryNumber<UInt256>.AllBitsSet => new(ulong.MaxValue, ulong.MaxValue, ulong.MaxValue, ulong.MaxValue);
+
+    static bool IBinaryNumber<UInt256>.IsPow2(UInt256 value) => PopCount(in value) == 1;
+
+    static UInt256 IBinaryNumber<UInt256>.Log2(UInt256 value) => new((ulong)(value.IsZero ? 0 : value.BitLen - 1));
+
+    static (UInt256 Quotient, UInt256 Remainder) IBinaryInteger<UInt256>.DivRem(UInt256 left, UInt256 right)
+    {
+        DivRem(in left, in right, out UInt256 quotient, out UInt256 remainder);
+        return (quotient, remainder);
+    }
+
+    static UInt256 IBinaryInteger<UInt256>.LeadingZeroCount(UInt256 value) => new((ulong)(256 - value.BitLen));
+
+    static UInt256 IBinaryInteger<UInt256>.PopCount(UInt256 value) => new((ulong)PopCount(in value));
+
+    static UInt256 IBinaryInteger<UInt256>.TrailingZeroCount(UInt256 value) => new((ulong)TrailingZeroCount(in value));
+
+    static UInt256 IBinaryInteger<UInt256>.RotateLeft(UInt256 value, int rotateAmount) => RotateLeft(in value, rotateAmount);
+
+    static UInt256 IBinaryInteger<UInt256>.RotateRight(UInt256 value, int rotateAmount) => RotateLeft(in value, -rotateAmount);
+
+    int IBinaryInteger<UInt256>.GetByteCount() => 32;
+
+    int IBinaryInteger<UInt256>.GetShortestBitLength() => BitLen;
+
+    static bool IBinaryInteger<UInt256>.TryReadBigEndian(ReadOnlySpan<byte> source, bool isUnsigned, out UInt256 value) =>
+        TryReadBytes(source, isBigEndian: true, isUnsigned, signedTarget: false, out value);
+
+    static bool IBinaryInteger<UInt256>.TryReadLittleEndian(ReadOnlySpan<byte> source, bool isUnsigned, out UInt256 value) =>
+        TryReadBytes(source, isBigEndian: false, isUnsigned, signedTarget: false, out value);
+
+    bool IBinaryInteger<UInt256>.TryWriteBigEndian(Span<byte> destination, out int bytesWritten) =>
+        TryWriteBytes(in this, destination, isBigEndian: true, out bytesWritten);
+
+    bool IBinaryInteger<UInt256>.TryWriteLittleEndian(Span<byte> destination, out int bytesWritten) =>
+        TryWriteBytes(in this, destination, isBigEndian: false, out bytesWritten);
+
+    // The interface's instance defaults would box a struct receiver, so the writers are implemented here.
+
+    int IBinaryInteger<UInt256>.WriteBigEndian(byte[] destination) => WriteBytes(in this, destination, isBigEndian: true);
+
+    int IBinaryInteger<UInt256>.WriteBigEndian(byte[] destination, int startIndex) =>
+        WriteBytes(in this, destination.AsSpan(startIndex), isBigEndian: true);
+
+    int IBinaryInteger<UInt256>.WriteBigEndian(Span<byte> destination) => WriteBytes(in this, destination, isBigEndian: true);
+
+    int IBinaryInteger<UInt256>.WriteLittleEndian(byte[] destination) => WriteBytes(in this, destination, isBigEndian: false);
+
+    int IBinaryInteger<UInt256>.WriteLittleEndian(byte[] destination, int startIndex) =>
+        WriteBytes(in this, destination.AsSpan(startIndex), isBigEndian: false);
+
+    int IBinaryInteger<UInt256>.WriteLittleEndian(Span<byte> destination) => WriteBytes(in this, destination, isBigEndian: false);
+
+    /// <summary>Sets <paramref name="quotient"/> and <paramref name="remainder"/> from one division.</summary>
+    /// <exception cref="DivideByZeroException"><paramref name="y"/> is zero.</exception>
+    internal static void DivRem(in UInt256 x, in UInt256 y, out UInt256 quotient, out UInt256 remainder)
+    {
+        if (y.IsZero) ThrowDivideByZeroException();
+
+        int order = x.CompareTo(in y);
+        if (order <= 0)
+        {
+            // Copy x first: remainder may alias it.
+            UInt256 dividend = x;
+            quotient = new UInt256(order == 0 ? 1ul : 0ul);
+            remainder = order == 0 ? default : dividend;
+            return;
+        }
+
+        if (x.IsUint64)
+        {
+            // y < x, so it fits a limb too.
+            ulong q = x.u0 / y.u0;
+            ulong r = x.u0 - q * y.u0;
+            quotient = new UInt256(q);
+            remainder = new UInt256(r);
+            return;
+        }
+
+        DivideImpl(in x, in y, out quotient, out remainder);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static int PopCount(in UInt256 value) =>
+        BitOperations.PopCount(value.u0) + BitOperations.PopCount(value.u1) + BitOperations.PopCount(value.u2) + BitOperations.PopCount(value.u3);
+
+    internal static int TrailingZeroCount(in UInt256 value) =>
+        value.u0 != 0 ? BitOperations.TrailingZeroCount(value.u0)
+        : value.u1 != 0 ? 64 + BitOperations.TrailingZeroCount(value.u1)
+        : value.u2 != 0 ? 128 + BitOperations.TrailingZeroCount(value.u2)
+        : value.u3 != 0 ? 192 + BitOperations.TrailingZeroCount(value.u3)
+        : 256;
+
+    /// <summary>Rotates left by <paramref name="amount"/> modulo 256; a negative amount rotates right.</summary>
+    internal static UInt256 RotateLeft(in UInt256 value, int amount)
+    {
+        int n = amount & 255;
+        if (n == 0) return value;
+        Lsh(in value, n, out UInt256 high);
+        Rsh(in value, 256 - n, out UInt256 low);
+        return high | low;
+    }
+
+    /// <summary>
+    /// Reads two's complement bytes into 256 bits. Fails when the value does not fit: a negative source for an
+    /// unsigned target, excess bytes that are not sign fill, or a signed target whose bit 255 disagrees with the
+    /// source's sign.
+    /// </summary>
+    [SkipLocalsInit]
+    internal static bool TryReadBytes(ReadOnlySpan<byte> source, bool isBigEndian, bool isUnsigned, bool signedTarget, out UInt256 value)
+    {
+        value = default;
+        if (source.IsEmpty) return true;
+
+        bool negative = !isUnsigned && (sbyte)(isBigEndian ? source[0] : source[^1]) < 0;
+        if (negative && !signedTarget) return false;
+
+        byte fill = negative ? (byte)0xFF : (byte)0;
+        Span<byte> bytes = stackalloc byte[32];
+        if (source.Length >= 32)
+        {
+            ReadOnlySpan<byte> excess = isBigEndian ? source[..^32] : source[32..];
+            if (excess.ContainsAnyExcept(fill)) return false;
+            (isBigEndian ? source[^32..] : source[..32]).CopyTo(bytes);
+        }
+        else
+        {
+            bytes.Fill(fill);
+            source.CopyTo(isBigEndian ? bytes[(32 - source.Length)..] : bytes);
+        }
+
+        value = new UInt256(bytes, isBigEndian);
+        return !signedTarget || (value.u3 >> 63 != 0) == negative;
+    }
+
+    internal static bool TryWriteBytes(in UInt256 value, Span<byte> destination, bool isBigEndian, out int bytesWritten)
+    {
+        if (destination.Length < 32)
+        {
+            bytesWritten = 0;
+            return false;
+        }
+
+        if (isBigEndian) value.ToBigEndian(destination[..32]);
+        else value.ToLittleEndian(destination[..32]);
+        bytesWritten = 32;
+        return true;
+    }
+
+    internal static int WriteBytes(in UInt256 value, Span<byte> destination, bool isBigEndian)
+    {
+        if (!TryWriteBytes(in value, destination, isBigEndian, out int bytesWritten))
+        {
+            throw new ArgumentException("Destination is too short.", nameof(destination));
+        }
+
+        return bytesWritten;
+    }
 
     // Parsing. The span overload of the existing public TryParse takes the span by `in`, so these stay explicit.
 

@@ -13,7 +13,7 @@ namespace Nethermind.Int256;
 // Generic math, laid out as for UInt256: explicit interface members forward to the public `in` operators.
 // Unchecked operators wrap, as Add and Divide do (MinValue / -1 gives MinValue, the EVM's SDIV);
 // checked operators throw on any overflow.
-public readonly partial struct Int256 : INumber<Int256>, IMinMaxValue<Int256>, ISignedNumber<Int256>
+public readonly partial struct Int256 : IBinaryInteger<Int256>, IMinMaxValue<Int256>, ISignedNumber<Int256>
 {
     private const ulong SignBit = 0x8000_0000_0000_0000;
 
@@ -71,6 +71,54 @@ public readonly partial struct Int256 : INumber<Int256>, IMinMaxValue<Int256>, I
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool operator >=(in Int256 a, in Int256 b) => !(a < b);
+
+    public static Int256 operator &(in Int256 a, in Int256 b)
+    {
+        And(in a, in b, out Int256 res);
+        return res;
+    }
+
+    public static Int256 operator |(in Int256 a, in Int256 b)
+    {
+        Or(in a, in b, out Int256 res);
+        return res;
+    }
+
+    public static Int256 operator ^(in Int256 a, in Int256 b)
+    {
+        Xor(in a, in b, out Int256 res);
+        return res;
+    }
+
+    public static Int256 operator ~(in Int256 a)
+    {
+        Not(in a, out Int256 res);
+        return res;
+    }
+
+    /// <summary>Shifts left; a count of 256 or more gives zero.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Int256 operator <<(in Int256 a, int n)
+    {
+        LeftShift(in a, n, out Int256 res);
+        return res;
+    }
+
+    /// <summary>Shifts right arithmetically; a count of 256 or more gives 0 or -1 by the sign.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Int256 operator >>(in Int256 a, int n)
+    {
+        Rsh(in a, n, out Int256 res);
+        return res;
+    }
+
+    /// <summary>Shifts right logically, filling with zeros; a count of 256 or more gives zero.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Int256 operator >>>(in Int256 a, int n)
+    {
+        UInt256.Rsh(in a._value, n, out UInt256 res);
+        return new Int256(res);
+    }
 
     private static Int256 MinValueLiteral => new(new UInt256(0, 0, 0, SignBit));
 
@@ -298,6 +346,103 @@ public readonly partial struct Int256 : INumber<Int256>, IMinMaxValue<Int256>, I
     static Int256 INumber<Int256>.MinNumber(Int256 x, Int256 y) => y < x ? y : x;
 
     static int INumber<Int256>.Sign(Int256 value) => value.Sign;
+
+    // IBinaryInteger. Shifts keep the public operators' EVM semantics (see UInt256); rotation is modular.
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    static Int256 IBitwiseOperators<Int256, Int256, Int256>.operator &(Int256 left, Int256 right) => left & right;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    static Int256 IBitwiseOperators<Int256, Int256, Int256>.operator |(Int256 left, Int256 right) => left | right;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    static Int256 IBitwiseOperators<Int256, Int256, Int256>.operator ^(Int256 left, Int256 right) => left ^ right;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    static Int256 IBitwiseOperators<Int256, Int256, Int256>.operator ~(Int256 value) => ~value;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    static Int256 IShiftOperators<Int256, int, Int256>.operator <<(Int256 value, int shiftAmount) => value << shiftAmount;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    static Int256 IShiftOperators<Int256, int, Int256>.operator >>(Int256 value, int shiftAmount) => value >> shiftAmount;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    static Int256 IShiftOperators<Int256, int, Int256>.operator >>>(Int256 value, int shiftAmount) => value >>> shiftAmount;
+
+    static Int256 IBinaryNumber<Int256>.AllBitsSet => new(new UInt256(ulong.MaxValue, ulong.MaxValue, ulong.MaxValue, ulong.MaxValue));
+
+    static bool IBinaryNumber<Int256>.IsPow2(Int256 value) => !value.IsNegative && UInt256.PopCount(in value._value) == 1;
+
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="value"/> is negative.</exception>
+    static Int256 IBinaryNumber<Int256>.Log2(Int256 value)
+    {
+        if (value.IsNegative) ThrowNegativeLog2();
+        return new Int256(new UInt256((ulong)(value.IsZero ? 0 : value._value.BitLen - 1)));
+    }
+
+    /// <summary>One division of the magnitudes; the quotient wraps as <c>/</c> does, and the remainder takes the dividend's sign.</summary>
+    static (Int256 Quotient, Int256 Remainder) IBinaryInteger<Int256>.DivRem(Int256 left, Int256 right)
+    {
+        UInt256.DivRem(Magnitude(in left), Magnitude(in right), out UInt256 q, out UInt256 r);
+        Int256 quotient = new(q);
+        Int256 remainder = new(r);
+        return (left.IsNegative != right.IsNegative ? -quotient : quotient, left.IsNegative ? -remainder : remainder);
+    }
+
+    static Int256 IBinaryInteger<Int256>.LeadingZeroCount(Int256 value) => new(new UInt256((ulong)(256 - value._value.BitLen)));
+
+    static Int256 IBinaryInteger<Int256>.PopCount(Int256 value) => new(new UInt256((ulong)UInt256.PopCount(in value._value)));
+
+    static Int256 IBinaryInteger<Int256>.TrailingZeroCount(Int256 value) => new(new UInt256((ulong)UInt256.TrailingZeroCount(in value._value)));
+
+    static Int256 IBinaryInteger<Int256>.RotateLeft(Int256 value, int rotateAmount) => new(UInt256.RotateLeft(in value._value, rotateAmount));
+
+    static Int256 IBinaryInteger<Int256>.RotateRight(Int256 value, int rotateAmount) => new(UInt256.RotateLeft(in value._value, -rotateAmount));
+
+    int IBinaryInteger<Int256>.GetByteCount() => 32;
+
+    // As Int128 counts: the sign bit is included, so 0 needs 0 bits, 1 needs 1 and -1 needs 1.
+    int IBinaryInteger<Int256>.GetShortestBitLength() => IsNegative ? (~this)._value.BitLen + 1 : _value.BitLen;
+
+    static bool IBinaryInteger<Int256>.TryReadBigEndian(ReadOnlySpan<byte> source, bool isUnsigned, out Int256 value)
+    {
+        bool read = UInt256.TryReadBytes(source, isBigEndian: true, isUnsigned, signedTarget: true, out UInt256 bits);
+        value = new Int256(bits);
+        return read;
+    }
+
+    static bool IBinaryInteger<Int256>.TryReadLittleEndian(ReadOnlySpan<byte> source, bool isUnsigned, out Int256 value)
+    {
+        bool read = UInt256.TryReadBytes(source, isBigEndian: false, isUnsigned, signedTarget: true, out UInt256 bits);
+        value = new Int256(bits);
+        return read;
+    }
+
+    bool IBinaryInteger<Int256>.TryWriteBigEndian(Span<byte> destination, out int bytesWritten) =>
+        UInt256.TryWriteBytes(in _value, destination, isBigEndian: true, out bytesWritten);
+
+    bool IBinaryInteger<Int256>.TryWriteLittleEndian(Span<byte> destination, out int bytesWritten) =>
+        UInt256.TryWriteBytes(in _value, destination, isBigEndian: false, out bytesWritten);
+
+    // The interface's instance defaults would box a struct receiver, so the writers are implemented here.
+
+    int IBinaryInteger<Int256>.WriteBigEndian(byte[] destination) => UInt256.WriteBytes(in _value, destination, isBigEndian: true);
+
+    int IBinaryInteger<Int256>.WriteBigEndian(byte[] destination, int startIndex) =>
+        UInt256.WriteBytes(in _value, destination.AsSpan(startIndex), isBigEndian: true);
+
+    int IBinaryInteger<Int256>.WriteBigEndian(Span<byte> destination) => UInt256.WriteBytes(in _value, destination, isBigEndian: true);
+
+    int IBinaryInteger<Int256>.WriteLittleEndian(byte[] destination) => UInt256.WriteBytes(in _value, destination, isBigEndian: false);
+
+    int IBinaryInteger<Int256>.WriteLittleEndian(byte[] destination, int startIndex) =>
+        UInt256.WriteBytes(in _value, destination.AsSpan(startIndex), isBigEndian: false);
+
+    int IBinaryInteger<Int256>.WriteLittleEndian(Span<byte> destination) => UInt256.WriteBytes(in _value, destination, isBigEndian: false);
+
+    [DoesNotReturn, StackTraceHidden]
+    private static void ThrowNegativeLog2() => throw new ArgumentOutOfRangeException("value", "Log2 is undefined for negative values.");
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool IsMinValue(in Int256 value) =>

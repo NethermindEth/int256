@@ -641,6 +641,208 @@ public class NumericsTests
     private static bool TryParseString<T>(string? s) where T : INumber<T> =>
         T.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, out _);
 
+    // IBinaryInteger
+
+    private static readonly int[] ShiftCounts = [0, 1, 7, 63, 64, 65, 127, 128, 129, 191, 192, 200, 255, 256, 257, 300, 512];
+
+    private static T Shl<T>(T a, int n) where T : IBinaryInteger<T> => a << n;
+    private static T Shr<T>(T a, int n) where T : IBinaryInteger<T> => a >> n;
+    private static T ShrLogical<T>(T a, int n) where T : IBinaryInteger<T> => a >>> n;
+    private static T And<T>(T a, T b) where T : IBinaryInteger<T> => a & b;
+    private static T Or<T>(T a, T b) where T : IBinaryInteger<T> => a | b;
+    private static T Xor<T>(T a, T b) where T : IBinaryInteger<T> => a ^ b;
+    private static T Not<T>(T a) where T : IBinaryInteger<T> => ~a;
+    private static (T, T) DivRem<T>(T a, T b) where T : IBinaryInteger<T> => T.DivRem(a, b);
+    private static T RotateLeft<T>(T a, int n) where T : IBinaryInteger<T> => T.RotateLeft(a, n);
+    private static T RotateRight<T>(T a, int n) where T : IBinaryInteger<T> => T.RotateRight(a, n);
+
+    private static T BPopCount<T>(T a) where T : IBinaryInteger<T> => T.PopCount(a);
+    private static T BTrailingZeroCount<T>(T a) where T : IBinaryInteger<T> => T.TrailingZeroCount(a);
+    private static T BLeadingZeroCount<T>(T a) where T : IBinaryInteger<T> => T.LeadingZeroCount(a);
+    private static T BLog2<T>(T a) where T : IBinaryInteger<T> => T.Log2(a);
+    private static bool BIsPow2<T>(T a) where T : IBinaryInteger<T> => T.IsPow2(a);
+    private static T ReadBig<T>(byte[] source, bool isUnsigned) where T : IBinaryInteger<T> => T.ReadBigEndian(source, isUnsigned);
+
+    private static BigInteger Rotate(BigInteger bits, int amount)
+    {
+        int n = ((amount % 256) + 256) % 256;
+        return Wrap((bits << n) | (bits >> (256 - n)), 256, false);
+    }
+
+    private static int TrailingZeros(BigInteger bits)
+    {
+        if (bits.IsZero) return 256;
+        int count = 0;
+        while (bits.IsEven)
+        {
+            bits >>= 1;
+            count++;
+        }
+
+        return count;
+    }
+
+    private static int PopCountOf(BigInteger bits) =>
+        bits.ToByteArray(isUnsigned: true).Sum(b => BitOperations.PopCount(b));
+
+    [TestCaseSource(nameof(UnsignedValues))]
+    public void UInt256_binary_integer(BigInteger a)
+    {
+        UInt256 x = U(a);
+        foreach (int n in ShiftCounts)
+        {
+            Assert.That((BigInteger)Shl(x, n), Is.EqualTo(n < 256 ? Wrap(a << n, 256, false) : 0), $"<< {n}");
+            Assert.That((BigInteger)Shr(x, n), Is.EqualTo(n < 256 ? a >> n : 0), $">> {n}");
+            Assert.That((BigInteger)ShrLogical(x, n), Is.EqualTo(n < 256 ? a >> n : 0), $">>> {n}");
+        }
+
+        foreach (int n in new[] { 0, 1, 63, 64, 100, 255, 256, 257, -1, -64, -300 })
+        {
+            Assert.That((BigInteger)RotateLeft(x, n), Is.EqualTo(Rotate(a, n)), $"rotl {n}");
+            Assert.That((BigInteger)RotateRight(x, n), Is.EqualTo(Rotate(a, -n)), $"rotr {n}");
+        }
+
+        Assert.That((BigInteger)Not(x), Is.EqualTo(UInt256Max - a));
+        Assert.That((BigInteger)BPopCount(x), Is.EqualTo((BigInteger)PopCountOf(a)));
+        Assert.That((BigInteger)BTrailingZeroCount(x), Is.EqualTo((BigInteger)TrailingZeros(a)));
+        Assert.That((BigInteger)BLeadingZeroCount(x), Is.EqualTo((BigInteger)(256 - (long)a.GetBitLength())));
+        Assert.That((BigInteger)BLog2(x), Is.EqualTo(a.IsZero ? 0 : (BigInteger)(a.GetBitLength() - 1)));
+        Assert.That(BIsPow2(x), Is.EqualTo(a.IsPowerOfTwo));
+        Assert.That(((IBinaryInteger<UInt256>)x).GetShortestBitLength(), Is.EqualTo((int)a.GetBitLength()));
+        Assert.That(((IBinaryInteger<UInt256>)x).GetByteCount(), Is.EqualTo(32));
+        AssertBytesRoundTrip(x, a, isUnsigned: true);
+    }
+
+    [TestCaseSource(nameof(SignedValues))]
+    public void Int256_binary_integer(BigInteger a)
+    {
+        Int256 x = S(a);
+        BigInteger bits = Wrap(a, 256, false);
+        foreach (int n in ShiftCounts)
+        {
+            Assert.That((BigInteger)Shl(x, n), Is.EqualTo(n < 256 ? Wrap(a << n, 256, true) : 0), $"<< {n}");
+            Assert.That((BigInteger)Shr(x, n), Is.EqualTo(n < 256 ? a >> n : a.Sign < 0 ? -1 : 0), $">> {n}");
+            Assert.That((BigInteger)ShrLogical(x, n), Is.EqualTo(n < 256 ? Wrap(bits >> n, 256, true) : 0), $">>> {n}");
+        }
+
+        foreach (int n in new[] { 0, 1, 63, 64, 100, 255, 256, 257, -1, -64, -300 })
+        {
+            Assert.That((BigInteger)RotateLeft(x, n), Is.EqualTo(Wrap(Rotate(bits, n), 256, true)), $"rotl {n}");
+            Assert.That((BigInteger)RotateRight(x, n), Is.EqualTo(Wrap(Rotate(bits, -n), 256, true)), $"rotr {n}");
+        }
+
+        Assert.That((BigInteger)Not(x), Is.EqualTo(-a - 1));
+        Assert.That((BigInteger)BPopCount(x), Is.EqualTo((BigInteger)PopCountOf(bits)));
+        Assert.That((BigInteger)BTrailingZeroCount(x), Is.EqualTo((BigInteger)TrailingZeros(bits)));
+        Assert.That((BigInteger)BLeadingZeroCount(x), Is.EqualTo((BigInteger)(256 - (long)bits.GetBitLength())));
+        Assert.That(BIsPow2(x), Is.EqualTo(a.Sign > 0 && a.IsPowerOfTwo));
+        if (a.Sign < 0)
+        {
+            Assert.Throws<ArgumentOutOfRangeException>(() => BLog2(x));
+        }
+        else
+        {
+            Assert.That((BigInteger)BLog2(x), Is.EqualTo(a.IsZero ? 0 : (BigInteger)(a.GetBitLength() - 1)));
+        }
+
+        // Int128 counts the sign bit for negative values only; BigInteger never does.
+        int shortest = (int)a.GetBitLength() + (a.Sign < 0 ? 1 : 0);
+        Assert.That(((IBinaryInteger<Int256>)x).GetShortestBitLength(), Is.EqualTo(shortest));
+        if (a >= long.MinValue && a <= long.MaxValue)
+        {
+            Assert.That(shortest, Is.EqualTo(((IBinaryInteger<Int128>)(Int128)(long)a).GetShortestBitLength()));
+        }
+
+        AssertBytesRoundTrip(x, a, isUnsigned: false);
+    }
+
+    [TestCaseSource(nameof(UnsignedPairs))]
+    public void UInt256_bitwise_and_DivRem((BigInteger A, BigInteger B) test)
+    {
+        (BigInteger a, BigInteger b) = test;
+        UInt256 x = U(a), y = U(b);
+        Assert.That((BigInteger)And(x, y), Is.EqualTo(a & b));
+        Assert.That((BigInteger)Or(x, y), Is.EqualTo(a | b));
+        Assert.That((BigInteger)Xor(x, y), Is.EqualTo(a ^ b));
+        if (b.IsZero)
+        {
+            Assert.Throws<DivideByZeroException>(() => DivRem(x, y));
+            return;
+        }
+
+        (UInt256 q, UInt256 r) = DivRem(x, y);
+        Assert.That(((BigInteger)q, (BigInteger)r), Is.EqualTo((a / b, a % b)));
+    }
+
+    [TestCaseSource(nameof(SignedPairs))]
+    public void Int256_bitwise_and_DivRem((BigInteger A, BigInteger B) test)
+    {
+        (BigInteger a, BigInteger b) = test;
+        Int256 x = S(a), y = S(b);
+        Assert.That((BigInteger)And(x, y), Is.EqualTo(a & b));
+        Assert.That((BigInteger)Or(x, y), Is.EqualTo(a | b));
+        Assert.That((BigInteger)Xor(x, y), Is.EqualTo(a ^ b));
+        if (b.IsZero)
+        {
+            Assert.Throws<DivideByZeroException>(() => DivRem(x, y));
+            return;
+        }
+
+        // The quotient wraps MinValue / -1 like the division operator.
+        (Int256 q, Int256 r) = DivRem(x, y);
+        Assert.That(((BigInteger)q, (BigInteger)r), Is.EqualTo((Wrap(BigInteger.Divide(a, b), 256, true), BigInteger.Remainder(a, b))));
+    }
+
+    private static void AssertBytesRoundTrip<T>(T value, BigInteger big, bool isUnsigned) where T : IBinaryInteger<T>
+    {
+        byte[] bigEndian = new byte[32];
+        Assert.That(value.TryWriteBigEndian(bigEndian, out int written), Is.True);
+        Assert.That(written, Is.EqualTo(32));
+        byte[] expected = Wrap(big, 256, false).ToByteArray(isUnsigned: true, isBigEndian: true);
+        Assert.That(bigEndian[(32 - expected.Length)..], Is.EqualTo(expected));
+        Assert.That(ToBig(T.ReadBigEndian(bigEndian, isUnsigned)), Is.EqualTo(big));
+
+        byte[] littleEndian = new byte[34];
+        Assert.That(value.WriteLittleEndian(littleEndian, 1), Is.EqualTo(32));
+        Assert.That(littleEndian.AsSpan(1, 32).ToArray(), Is.EqualTo(bigEndian.Reverse().ToArray()));
+        Assert.That(ToBig(T.ReadLittleEndian(littleEndian.AsSpan(1, 32), isUnsigned)), Is.EqualTo(big));
+
+        // The shortest two's complement form reads back, sign-extended for signed sources.
+        byte[] minimal = big.ToByteArray(isUnsigned, isBigEndian: true);
+        Assert.That(ToBig(T.ReadBigEndian(minimal, isUnsigned)), Is.EqualTo(big));
+        Assert.That(value.TryWriteBigEndian(new byte[31], out written), Is.False);
+        Assert.Throws<ArgumentException>(() => value.WriteBigEndian(new byte[31]));
+    }
+
+    [Test]
+    public void Reads_reject_values_that_do_not_fit()
+    {
+        byte[] minusOne = [0xFF];
+        Assert.That((BigInteger)ReadBig<UInt256>(minusOne, isUnsigned: true), Is.EqualTo((BigInteger)255));
+        Assert.Throws<OverflowException>(() => ReadBig<UInt256>(minusOne, isUnsigned: false));
+        Assert.That((BigInteger)ReadBig<Int256>(minusOne, isUnsigned: false), Is.EqualTo(BigInteger.MinusOne));
+        Assert.That((BigInteger)ReadBig<Int256>(minusOne, isUnsigned: true), Is.EqualTo((BigInteger)255));
+
+        byte[] wide = new byte[33];
+        wide[1] = 0x80;
+        Assert.That((BigInteger)ReadBig<UInt256>(wide, isUnsigned: true), Is.EqualTo(BigInteger.One << 255));
+        Assert.Throws<OverflowException>(() => ReadBig<Int256>(wide, isUnsigned: true));
+        wide[0] = 1;
+        Assert.Throws<OverflowException>(() => ReadBig<UInt256>(wide, isUnsigned: true));
+
+        byte[] minValue = new byte[32];
+        minValue[0] = 0x80;
+        Assert.That((BigInteger)ReadBig<Int256>(minValue, isUnsigned: false), Is.EqualTo(Int256Min));
+        Assert.Throws<OverflowException>(() => ReadBig<Int256>(minValue, isUnsigned: true));
+
+        // Sign fill beyond 32 bytes is accepted only when bit 255 carries the same sign.
+        byte[] extended = [0xFF, .. minValue];
+        Assert.That((BigInteger)ReadBig<Int256>(extended, isUnsigned: false), Is.EqualTo(Int256Min));
+        extended[1] = 0x7F;
+        Assert.Throws<OverflowException>(() => ReadBig<Int256>(extended, isUnsigned: false));
+        Assert.That((BigInteger)ReadBig<UInt256>([], isUnsigned: true), Is.EqualTo(BigInteger.Zero));
+    }
+
     // Sums through the interface, the shape generic library code takes.
     private static T Sum<T>(IEnumerable<T> values) where T : INumber<T>
     {
