@@ -209,7 +209,7 @@ public readonly partial struct UInt256
         return TryParseViaBigInteger(value, style, provider, out result);
     }
 
-    private static bool TryParseHex(ReadOnlySpan<char> value, out UInt256 result)
+    internal static bool TryParseHex(ReadOnlySpan<char> value, out UInt256 result)
     {
         value = TrimWhiteSpace(value);
 
@@ -246,7 +246,7 @@ public readonly partial struct UInt256
         return true;
     }
 
-    private static bool TryParseDecimal(ReadOnlySpan<char> value, out UInt256 result)
+    internal static bool TryParseDecimal(ReadOnlySpan<char> value, out UInt256 result)
     {
         value = TrimWhiteSpace(value);
         if (value.Length == 0)
@@ -432,7 +432,7 @@ public readonly partial struct UInt256
         }
     }
 
-    private static ReadOnlySpan<char> TrimWhiteSpace(ReadOnlySpan<char> value)
+    internal static ReadOnlySpan<char> TrimWhiteSpace(ReadOnlySpan<char> value)
     {
         int start = 0;
         while (start < value.Length && char.IsWhiteSpace(value[start]))

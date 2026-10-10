@@ -1500,8 +1500,17 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     public override string ToString()
     {
         Span<char> buffer = stackalloc char[MaxDecimalDigits];
-        int position = MaxDecimalDigits;
-        ulong l0 = u0, l1 = u1, l2 = u2, l3 = u3;
+        int position = WriteDecimalDigits(in this, buffer);
+        return new string(buffer[position..]);
+    }
+
+    /// <summary>Writes the digits right-aligned into <paramref name="buffer"/> and returns where they start.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static int WriteDecimalDigits<TChar>(in UInt256 value, Span<TChar> buffer)
+        where TChar : unmanaged, IBinaryInteger<TChar>
+    {
+        int position = buffer.Length;
+        ulong l0 = value.u0, l1 = value.u1, l2 = value.u2, l3 = value.u3;
 
         // Interior chunks keep their leading zeros; only the most significant one is trimmed.
         while ((l1 | l2 | l3) != 0)
@@ -1509,19 +1518,19 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
             ulong chunk = DivideByChunk(ref l0, ref l1, ref l2, ref l3);
             for (int i = 0; i < DecimalChunkDigits; i++)
             {
-                buffer[--position] = (char)('0' + (int)(chunk % 10));
+                buffer[--position] = TChar.CreateTruncating('0' + (int)(chunk % 10));
                 chunk /= 10;
             }
         }
 
         do
         {
-            buffer[--position] = (char)('0' + (int)(l0 % 10));
+            buffer[--position] = TChar.CreateTruncating('0' + (int)(l0 % 10));
             l0 /= 10;
         }
         while (l0 != 0);
 
-        return new string(buffer[position..]);
+        return position;
     }
 
     /// <summary>Divides the limbs by <see cref="DecimalChunk"/> in place and returns the remainder.</summary>
