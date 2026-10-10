@@ -6,8 +6,8 @@ using BenchmarkDotNet.Attributes;
 namespace Nethermind.Int256.Benchmark;
 
 /// <summary>
-/// Platform-neutral benchmark for the 32-byte big-endian read/write paths
-/// (AVX2/AVX-512 on x86, AdvSimd on ARM64, scalar otherwise).
+/// Platform-neutral benchmark for the 32-byte big- and little-endian read/write paths
+/// (AVX/AVX2/AVX-512 on x86, AdvSimd on ARM64, scalar otherwise).
 /// </summary>
 /// <remarks>
 /// Unlike <c>ToBigEndianAB</c>, whose setup throws without AVX2, this class runs on every ISA,
@@ -49,6 +49,26 @@ public class ByteSwapBench
         for (int i = 0; i < N; i++)
         {
             _value.ToBigEndian(_target);
+        }
+    }
+
+    [Benchmark(OperationsPerInvoke = N)]
+    public UInt256 FromLittleEndian()
+    {
+        UInt256 acc = default;
+        for (int i = 0; i < N; i++)
+        {
+            acc ^= new UInt256(_bigEndian);
+        }
+        return acc;
+    }
+
+    [Benchmark(OperationsPerInvoke = N)]
+    public void ToLittleEndian()
+    {
+        for (int i = 0; i < N; i++)
+        {
+            _value.ToLittleEndian(_target);
         }
     }
 }
