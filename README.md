@@ -115,4 +115,6 @@ Thanks to everyone who helps maintain and improve Int256.
 
 ## License
 
-[MIT](https://github.com/NethermindEth/int256/blob/main/LICENSE). See [NOTICE](https://github.com/NethermindEth/int256/blob/main/NOTICE) for third-party notices.
+This project is licensed under the [MIT](https://github.com/NethermindEth/int256/blob/main/LICENSE) license.
+
+Portions of `UInt256` incorporate material from [uint256](https://github.com/holiman/uint256), used under BSD-3-Clause. See [THIRD-PARTY-NOTICES](https://github.com/NethermindEth/int256/blob/main/THIRD-PARTY-NOTICES) for the full text.

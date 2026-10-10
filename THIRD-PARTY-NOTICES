@@ -1,8 +1,20 @@
-This software incorporates material from third-party
-located at https://github.com/holiman/uint256
-and covered by the following copyright and permission notice:
+Nethermind.Numerics.Int256 Third-Party Notices
+==============================================
 
-BSD 3-Clause License
+Nethermind.Numerics.Int256 itself is licensed under the MIT license; see the
+LICENSE file in the source repository. This file reproduces the licenses of the
+third-party software it incorporates.
+
+  1. uint256 ............. BSD-3-Clause
+
+--------------------------------------------------------------------------------
+1. uint256
+
+https://github.com/holiman/uint256
+
+Portions of the UInt256 implementation incorporate material from uint256.
+
+BSD-3-Clause
 
 Copyright 2020 uint256 Authors
 
