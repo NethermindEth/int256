@@ -18,6 +18,7 @@ High-performance 256-bit integer types for .NET. See [global.json](./global.json
 - Add tests for new code and bug fixes; cover boundary values.
 - Use conventional commits; keep scoped and imperative.
 - Keep the standard (`*.std.cs`) and RISC-V zkVM (`*.zkevm.cs`) variants in sync; [Directory.Build.targets](./src/Directory.Build.targets) selects one per build and the package ships both.
+- Treat Arm64 as a first-class target alongside x64: hardware-accelerated paths must cover both architectures, unless benchmarks show acceleration is slower on one of them.
 - Keep the software fallbacks correct; CI also runs the tests with hardware intrinsics disabled.
 - Back performance changes with reproducible before/after benchmarks.
 - Prefer the latest versions of GitHub Actions and runners.
