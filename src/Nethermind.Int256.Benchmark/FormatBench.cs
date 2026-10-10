@@ -74,7 +74,7 @@ public class FormatBench
     public int UInt256InterpolationLegacy()
     {
         int length = 0;
-        for (int i = 0; i < OperationCount; i++) length += $"value {_unsigned[i].ToString()}".Length;
+        for (int i = 0; i < OperationCount; i++) length += $"value {new LegacyUnsigned(_unsigned[i])}".Length;
         return length;
     }
 
@@ -119,7 +119,7 @@ public class FormatBench
     public int Int256InterpolationLegacy()
     {
         int length = 0;
-        for (int i = 0; i < OperationCount; i++) length += $"value {LegacyToString(in _signed[i])}".Length;
+        for (int i = 0; i < OperationCount; i++) length += $"value {new LegacySigned(_signed[i])}".Length;
         return length;
     }
 
@@ -129,6 +129,20 @@ public class FormatBench
         int length = 0;
         for (int i = 0; i < OperationCount; i++) length += $"value {_signed[i]}".Length;
         return length;
+    }
+
+    /// <summary>
+    /// What interpolation saw before these types were formattable: the handler calls <c>ToString()</c> and copies
+    /// the string in. Interpolating a string expression instead would compile to <c>string.Concat</c>.
+    /// </summary>
+    private readonly struct LegacyUnsigned(UInt256 value)
+    {
+        public override string ToString() => LegacyToString(in value);
+    }
+
+    private readonly struct LegacySigned(Int256 value)
+    {
+        public override string ToString() => LegacyToString(in value);
     }
 
     /// <summary>The digit loop <see cref="UInt256.ToString()"/> ran before it moved to the shared generic writer.</summary>
