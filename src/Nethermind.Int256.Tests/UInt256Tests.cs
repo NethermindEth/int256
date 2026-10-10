@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 
 using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Numerics;
@@ -1249,6 +1250,28 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
         ((BigInteger)value).Should().Be(expected);
         new UInt256(value.ToLittleEndian()).Should().Be(value);
         new UInt256(value.ToBigEndian(), isBigEndian: true).Should().Be(value);
+    }
+
+    // Distinct bytes catch a swapped half or reversed lane in the 16-byte (ARM) and 32-byte (x64) copies.
+    [Test]
+    public void LittleEndian_32Bytes_MatchesLimbLayout()
+    {
+        byte[] bytes = new byte[32];
+        for (int i = 0; i < bytes.Length; i++)
+        {
+            bytes[i] = (byte)(0xC0 + i);
+        }
+
+        UInt256 value = new(bytes);
+        value.u0.Should().Be(BinaryPrimitives.ReadUInt64LittleEndian(bytes.AsSpan(0, 8)));
+        value.u1.Should().Be(BinaryPrimitives.ReadUInt64LittleEndian(bytes.AsSpan(8, 8)));
+        value.u2.Should().Be(BinaryPrimitives.ReadUInt64LittleEndian(bytes.AsSpan(16, 8)));
+        value.u3.Should().Be(BinaryPrimitives.ReadUInt64LittleEndian(bytes.AsSpan(24, 8)));
+
+        byte[] written = new byte[32];
+        value.ToLittleEndian(written);
+        written.Should().Equal(bytes);
+        value.ToLittleEndian().Should().Equal(bytes);
     }
 
     public static IEnumerable<(UInt256 A, ulong A4, ulong D)> Remainder257By64BitsCases
