@@ -56,6 +56,7 @@ public class ByteSwapChainBench
             ProdToBE(in v, prod);
             ScalarToBE(in v, replica);
             if (!prod.SequenceEqual(replica)) throw new InvalidOperationException($"ToBE mismatch at {i}");
+            if (!ProdFromBE(src).Equals(ScalarFromBE(src))) throw new InvalidOperationException($"FromBE mismatch at {i}");
         }
     }
 
@@ -95,6 +96,17 @@ public class ByteSwapChainBench
             BinaryPrimitives.ReadUInt64LittleEndian(bytes.Slice(8, 8)),
             BinaryPrimitives.ReadUInt64LittleEndian(bytes.Slice(16, 8)),
             BinaryPrimitives.ReadUInt64LittleEndian(bytes.Slice(24, 8)));
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static UInt256 ProdFromBE(ReadOnlySpan<byte> src) => new(src, isBigEndian: true);
+
+    // The pre-AdvSimd ARM64 body of the big-endian UInt256(ReadOnlySpan<byte>, true) ctor.
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static UInt256 ScalarFromBE(ReadOnlySpan<byte> bytes)
+        => new(BinaryPrimitives.ReadUInt64BigEndian(bytes.Slice(24, 8)),
+            BinaryPrimitives.ReadUInt64BigEndian(bytes.Slice(16, 8)),
+            BinaryPrimitives.ReadUInt64BigEndian(bytes.Slice(8, 8)),
+            BinaryPrimitives.ReadUInt64BigEndian(bytes.Slice(0, 8)));
 
     // Multiply stores its product as four 8-byte limbs on ARM64: the worst case for a 16-byte reload.
     [Benchmark(Baseline = true, OperationsPerInvoke = N)]
@@ -265,6 +277,146 @@ public class ByteSwapChainBench
         {
             UInt256 v = ProdFromLE(bytes.AsSpan(i * 32, 32));
             acc += (v.u0 | v.u1) ^ (v.u2 | v.u3);
+        }
+        return acc;
+    }
+
+    // ByteSwapBench's shape, without wrappers: the JIT decides inlining as for a direct caller.
+    [Benchmark(OperationsPerInvoke = N)]
+    public UInt256 FromLEXor_Scalar()
+    {
+        byte[] bytes = _bytes;
+        UInt256 acc = default;
+        for (int i = 0; i < N; i++)
+        {
+            ReadOnlySpan<byte> s = bytes.AsSpan(i * 32, 32);
+            acc ^= new UInt256(BinaryPrimitives.ReadUInt64LittleEndian(s.Slice(0, 8)),
+                BinaryPrimitives.ReadUInt64LittleEndian(s.Slice(8, 8)),
+                BinaryPrimitives.ReadUInt64LittleEndian(s.Slice(16, 8)),
+                BinaryPrimitives.ReadUInt64LittleEndian(s.Slice(24, 8)));
+        }
+        return acc;
+    }
+
+    [Benchmark(OperationsPerInvoke = N)]
+    public UInt256 FromLEXor_Prod()
+    {
+        byte[] bytes = _bytes;
+        UInt256 acc = default;
+        for (int i = 0; i < N; i++)
+        {
+            acc ^= new UInt256(bytes.AsSpan(i * 32, 32));
+        }
+        return acc;
+    }
+
+    // The existing AdvSimd big-endian read (#102) stores its result the same way as the LE read.
+    [Benchmark(OperationsPerInvoke = N)]
+    public ulong WriteFromBE_Scalar()
+    {
+        UInt256[] a = _a;
+        byte[] buf = _dst;
+        ulong acc = 0;
+        for (int i = 0; i < N; i++)
+        {
+            Span<byte> slot = buf.AsSpan(i * 32, 32);
+            ScalarToBE(in a[i], slot);
+            UInt256 v = ScalarFromBE(slot);
+            acc += v.u0 ^ v.u3;
+        }
+        return acc;
+    }
+
+    [Benchmark(OperationsPerInvoke = N)]
+    public ulong WriteFromBE_Prod()
+    {
+        UInt256[] a = _a;
+        byte[] buf = _dst;
+        ulong acc = 0;
+        for (int i = 0; i < N; i++)
+        {
+            Span<byte> slot = buf.AsSpan(i * 32, 32);
+            ScalarToBE(in a[i], slot);
+            UInt256 v = ProdFromBE(slot);
+            acc += v.u0 ^ v.u3;
+        }
+        return acc;
+    }
+
+    [Benchmark(OperationsPerInvoke = N)]
+    public void FromBEAdd_Scalar()
+    {
+        UInt256[] b = _b, r = _r;
+        byte[] bytes = _bytes;
+        for (int i = 0; i < N; i++)
+        {
+            UInt256 v = ScalarFromBE(bytes.AsSpan(i * 32, 32));
+            UInt256.Add(in v, in b[i], out r[i]);
+        }
+    }
+
+    [Benchmark(OperationsPerInvoke = N)]
+    public void FromBEAdd_Prod()
+    {
+        UInt256[] b = _b, r = _r;
+        byte[] bytes = _bytes;
+        for (int i = 0; i < N; i++)
+        {
+            UInt256 v = ProdFromBE(bytes.AsSpan(i * 32, 32));
+            UInt256.Add(in v, in b[i], out r[i]);
+        }
+    }
+
+    [Benchmark(OperationsPerInvoke = N)]
+    public ulong FromBELimbs_Scalar()
+    {
+        byte[] bytes = _bytes;
+        ulong acc = 0;
+        for (int i = 0; i < N; i++)
+        {
+            UInt256 v = ScalarFromBE(bytes.AsSpan(i * 32, 32));
+            acc += (v.u0 | v.u1) ^ (v.u2 | v.u3);
+        }
+        return acc;
+    }
+
+    [Benchmark(OperationsPerInvoke = N)]
+    public ulong FromBELimbs_Prod()
+    {
+        byte[] bytes = _bytes;
+        ulong acc = 0;
+        for (int i = 0; i < N; i++)
+        {
+            UInt256 v = ProdFromBE(bytes.AsSpan(i * 32, 32));
+            acc += (v.u0 | v.u1) ^ (v.u2 | v.u3);
+        }
+        return acc;
+    }
+
+    [Benchmark(OperationsPerInvoke = N)]
+    public UInt256 FromBEXor_Scalar()
+    {
+        byte[] bytes = _bytes;
+        UInt256 acc = default;
+        for (int i = 0; i < N; i++)
+        {
+            ReadOnlySpan<byte> s = bytes.AsSpan(i * 32, 32);
+            acc ^= new UInt256(BinaryPrimitives.ReadUInt64BigEndian(s.Slice(24, 8)),
+                BinaryPrimitives.ReadUInt64BigEndian(s.Slice(16, 8)),
+                BinaryPrimitives.ReadUInt64BigEndian(s.Slice(8, 8)),
+                BinaryPrimitives.ReadUInt64BigEndian(s.Slice(0, 8)));
+        }
+        return acc;
+    }
+
+    [Benchmark(OperationsPerInvoke = N)]
+    public UInt256 FromBEXor_Prod()
+    {
+        byte[] bytes = _bytes;
+        UInt256 acc = default;
+        for (int i = 0; i < N; i++)
+        {
+            acc ^= new UInt256(bytes.AsSpan(i * 32, 32), isBigEndian: true);
         }
         return acc;
     }
