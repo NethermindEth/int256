@@ -108,8 +108,7 @@ public readonly partial struct UInt256
                     Unsafe.SkipInit(out u1);
                     Unsafe.SkipInit(out u2);
                     Unsafe.SkipInit(out u3);
-                    // ARM64 is little-endian, so the bytes are already the limbs: two 16-byte copies,
-                    // stored the same way as the big-endian read above.
+                    // ARM64 is little-endian: the bytes are already the limbs.
                     ref byte src = ref MemoryMarshal.GetReference(bytes);
                     Unsafe.As<ulong, Vector128<byte>>(ref u0) = Vector128.LoadUnsafe(ref src);
                     Unsafe.As<ulong, Vector128<byte>>(ref u2) = Vector128.LoadUnsafe(ref src, 16);

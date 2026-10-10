@@ -1252,7 +1252,7 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
         new UInt256(value.ToBigEndian(), isBigEndian: true).Should().Be(value);
     }
 
-    // Distinct bytes catch a swapped half or reversed lane in the 16-byte (ARM) and 32-byte (x64) copies.
+    // Distinct bytes expose a swapped half or reversed lane.
     [Test]
     public void LittleEndian_32Bytes_MatchesLimbLayout()
     {

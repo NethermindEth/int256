@@ -11,24 +11,14 @@ using BenchmarkDotNet.Jobs;
 
 namespace Nethermind.Int256.Benchmark;
 
-/// <summary>
-/// NEON candidates for the paths that stay scalar on ARM64 only because their SIMD guard is x86-specific
-/// (AVX2/AVX-512) or requires an accelerated <see cref="Vector256"/>, which ARM64 does not have.
-/// </summary>
-/// <remarks>
-/// None of these shipped: on Neoverse N2 / .NET 10 the scalar paths won every dependent shape (see the
-/// comments at the call sites in UInt256.std.cs). Kept so the decision can be re-measured on newer cores
-/// and runtimes; the setups throw off ARM64 and check every candidate against production first.
-/// </remarks>
+/// <summary>NEON candidates for paths that are scalar on ARM64; kept to re-measure on newer cores and runtimes.</summary>
 internal static class NeonCandidates
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static ref Vector128<ulong> Halves(in UInt256 value)
         => ref Unsafe.As<UInt256, Vector128<ulong>>(ref Unsafe.AsRef(in value));
 
-    // cmhi gives native unsigned 64-bit lane compares (AVX2 has to emulate them). Two uzp1 steps pack the four
-    // lane masks into 16-bit fields, limb 3 highest: the highest differing limb sets exactly one of lt/gt with
-    // nothing set above it, so a < b exactly when the packed lt exceeds the packed gt.
+    // Lane masks packed to 16 bits, limb 3 highest: a < b iff packed lt > packed gt.
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool LessThan(in UInt256 a, in UInt256 b)
     {
@@ -45,7 +35,7 @@ internal static class NeonCandidates
         return packed.GetElement(0) > packed.GetElement(1);
     }
 
-    // Same packing for x and y against one m; both 64-bit verdicts reduce with one uminv.
+    // Same packing for x and y; one uminv reduces both verdicts.
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool LessThanBoth(in UInt256 x, in UInt256 y, in UInt256 m)
     {
@@ -149,10 +139,7 @@ public enum ArmCmpCase
     Mixed,
 }
 
-/// <summary>
-/// Production <c>&lt;</c> (scalar on ARM64) versus the NEON candidate, as an independent predicate and as a
-/// dependent select chain whose next comparison depends on the previous outcome.
-/// </summary>
+/// <summary>Production <c>&lt;</c> versus NEON, standalone and in a dependent select chain.</summary>
 [Config(typeof(ArmAbConfig))]
 public class ArmCompareAB
 {
@@ -209,7 +196,7 @@ public class ArmCompareAB
         return acc;
     }
 
-    // A/A control: identical to the baseline, so its spread bounds what counts as a real difference.
+    // A/A control.
     [Benchmark(OperationsPerInvoke = ArmAbData.N)]
     public int Lt_ScalarAA()
     {
@@ -267,10 +254,7 @@ public enum ArmBothCase
     Mixed,
 }
 
-/// <summary>
-/// The AddMod gate <c>x &lt; m &amp;&amp; y &lt; m</c>: production's two scalar compares on ARM64 versus the
-/// NEON candidate that shares the m load and reduces both verdicts together.
-/// </summary>
+/// <summary>The AddMod gate <c>x &lt; m &amp;&amp; y &lt; m</c>: production versus NEON.</summary>
 [Config(typeof(ArmAbConfig))]
 public class ArmLessThanBothAB
 {
@@ -297,7 +281,7 @@ public class ArmLessThanBothAB
             switch (c)
             {
                 case ArmBothCase.InRange:
-                    // Same top limb as m, lower below: the compare has to look past limb 3.
+                    // Equal top limb: the compare must look past limb 3.
                     x = new UInt256((ulong)rnd.NextInt64(), (ulong)rnd.NextInt64(), m.u2 >> 1, m.u3);
                     y = new UInt256((ulong)rnd.NextInt64(), (ulong)rnd.NextInt64(), (ulong)rnd.NextInt64(), m.u3 >> 1);
                     break;
@@ -330,7 +314,7 @@ public class ArmLessThanBothAB
         }
     }
 
-    // What UInt256.LessThanBoth runs on ARM64 today: neither AVX2 nor an accelerated Vector256.
+    // What UInt256.LessThanBoth runs on ARM64.
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool Production(in UInt256 x, in UInt256 y, in UInt256 m)
         => UInt256.LessThanScalar(in x, in m) && UInt256.LessThanScalar(in y, in m);
@@ -372,10 +356,7 @@ public class ArmLessThanBothAB
     }
 }
 
-/// <summary>
-/// Production bitwise ops (scalar limbs on ARM64) versus 2x128-bit NEON, in producer/consumer chains where
-/// store-to-load forwarding between limb stores and 16-byte vector accesses decides the outcome.
-/// </summary>
+/// <summary>Production bitwise ops versus NEON, standalone and in producer/consumer chains.</summary>
 [Config(typeof(ArmAbConfig))]
 public class ArmBitwiseAB
 {
@@ -397,7 +378,7 @@ public class ArmBitwiseAB
         {
             _a[i] = ArmAbData.Wide(rnd);
             _b[i] = ArmAbData.Wide(rnd);
-            // Every fourth mask is disjoint from a so the IsZero consumer sees both outcomes.
+            // Every fourth mask is disjoint from a, so IsZero sees both outcomes.
             _c[i] = (i & 3) == 0 ? new UInt256(~_a[i].u0, ~_a[i].u1, ~_a[i].u2, ~_a[i].u3) : ArmAbData.Wide(rnd);
         }
 
@@ -513,7 +494,7 @@ public class ArmBitwiseAB
         return acc;
     }
 
-    // Each result is the next iteration's input through memory: a store-to-load dependency chain.
+    // Each result feeds the next iteration through memory.
     [Benchmark(OperationsPerInvoke = ArmAbData.N - 1)]
     public void XorChain_Scalar()
     {

@@ -8,15 +8,9 @@ using BenchmarkDotNet.Attributes;
 namespace Nethermind.Int256.Benchmark;
 
 /// <summary>
-/// The 32-byte conversions in the shapes callers use them: right after a value is computed, reading bytes just
-/// written, and with the decoded value consumed at once. <see cref="ByteSwapBench"/> only converts idle values.
+/// The 32-byte conversions in caller shapes: <c>Prod</c> is <see cref="UInt256"/>, <c>Cur</c>/<c>Old</c> are the
+/// ByteSwapCopies.cs copies with and without AdvSimd. Prod = Cur checks the copies; Cur vs Old is the AdvSimd effect.
 /// </summary>
-/// <remarks>
-/// Every shape has three arms. <c>Prod</c> calls <see cref="UInt256"/>. <c>Cur</c> and <c>Old</c> call the
-/// verbatim copies in ByteSwapCopies.cs: as shipped, and with the AdvSimd branches removed (what ARM64 ran before).
-/// Prod matching Cur within the A/A spread shows the copies are faithful; Cur against Old is the AdvSimd effect.
-/// On x64 Cur and Old run the same AVX code and act as a further A/A control.
-/// </remarks>
 public class ByteSwapChainBench
 {
     private const int N = 512;
@@ -73,7 +67,7 @@ public class ByteSwapChainBench
         }
     }
 
-    // ---- Writes of a value just computed. Multiply stores its product as four 8-byte limbs on ARM64.
+    // Writes right after Multiply, which stores 8-byte limbs on ARM64.
 
     [Benchmark(Baseline = true, OperationsPerInvoke = N)]
     public void MulToLE_Prod()
@@ -87,7 +81,7 @@ public class ByteSwapChainBench
         }
     }
 
-    // A/A control for the baseline above.
+    // A/A control.
     [Benchmark(OperationsPerInvoke = N)]
     public void MulToLE_ProdAA()
     {
@@ -124,7 +118,7 @@ public class ByteSwapChainBench
         }
     }
 
-    // ARM64 Add stores wide results as 16-byte halves.
+    // Add stores 16-byte halves on ARM64.
     [Benchmark(OperationsPerInvoke = N)]
     public void AddToLE_Prod()
     {
@@ -161,7 +155,7 @@ public class ByteSwapChainBench
         }
     }
 
-    // Idle values, for comparison with ByteSwapBench.
+    // Idle values.
     [Benchmark(OperationsPerInvoke = N)]
     public void IdleToLE_Prod()
     {
@@ -246,7 +240,7 @@ public class ByteSwapChainBench
         for (int i = 0; i < N; i++) Unsafe.As<UInt256, U256Old>(ref a[i]).ToBigEndian(dst.AsSpan(i * 32, 32));
     }
 
-    // ---- Reads consumed as limbs straight away, the ctor inlined (or not) as the JIT decides for a direct caller.
+    // Reads consumed as limbs by a direct caller.
 
     [Benchmark(OperationsPerInvoke = N)]
     public ulong FromLE_Prod()
@@ -326,7 +320,7 @@ public class ByteSwapChainBench
         return x0 ^ x1 ^ x2 ^ x3;
     }
 
-    // ---- Reads of bytes just written by 8-byte stores (the old scalar writer), as an encoder's buffer is decoded.
+    // Reads of bytes just written by 8-byte stores.
 
     [Benchmark(OperationsPerInvoke = N)]
     public ulong WriteFromLE_Prod()
@@ -424,7 +418,7 @@ public class ByteSwapChainBench
         return acc;
     }
 
-    // ---- Reads returned from a non-inlined decoder and fed straight to Add (16-byte reloads on ARM64).
+    // Non-inlined decode, then Add.
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static UInt256 ProdFromLE(ReadOnlySpan<byte> s) => new(s);
@@ -516,7 +510,7 @@ public class ByteSwapChainBench
         }
     }
 
-    // ---- The same non-inlined decoder, its result read back as 8-byte limbs.
+    // Non-inlined decode, then limb reads.
 
     [Benchmark(OperationsPerInvoke = N)]
     public ulong DecodeLELimbs_Prod()

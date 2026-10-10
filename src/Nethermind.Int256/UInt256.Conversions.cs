@@ -167,7 +167,7 @@ public readonly partial struct UInt256
             }
             else if (AdvSimd.Arm64.IsSupported)
             {
-                // Mirror of the little-endian read ctor: the limbs are already in byte order, two 16-byte copies.
+                // The limbs are already in byte order.
                 ref byte dst = ref MemoryMarshal.GetReference(target);
                 Unsafe.As<ulong, Vector128<byte>>(ref Unsafe.AsRef(in u0)).StoreUnsafe(ref dst);
                 Unsafe.As<ulong, Vector128<byte>>(ref Unsafe.AsRef(in u2)).StoreUnsafe(ref dst, 16);

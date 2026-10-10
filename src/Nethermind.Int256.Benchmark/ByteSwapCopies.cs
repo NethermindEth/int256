@@ -1,9 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Demerzel Solutions Limited
 // SPDX-License-Identifier: LGPL-3.0-only
 
-// GENERATED from UInt256.Ctors.cs (span ctor + Create) and UInt256.Conversions.cs (ToBigEndian, ToLittleEndian)
-// by copying the bodies verbatim. Current = as shipped; Old = the same with every AdvSimd.Arm64 branch removed,
-// i.e. what ARM64 ran before #102 and this change. Layout-identical to UInt256 for in-place reinterpretation.
+// Generated: the span ctor and To*Endian bodies copied verbatim from UInt256 (Current) and without AdvSimd (Old).
 
 using System;
 using System.Buffers.Binary;
@@ -93,8 +91,7 @@ internal readonly struct U256Current
                     Unsafe.SkipInit(out u1);
                     Unsafe.SkipInit(out u2);
                     Unsafe.SkipInit(out u3);
-                    // ARM64 is little-endian, so the bytes are already the limbs: two 16-byte copies,
-                    // stored the same way as the big-endian read above.
+                    // ARM64 is little-endian: the bytes are already the limbs.
                     ref byte src = ref MemoryMarshal.GetReference(bytes);
                     Unsafe.As<ulong, Vector128<byte>>(ref u0) = Vector128.LoadUnsafe(ref src);
                     Unsafe.As<ulong, Vector128<byte>>(ref u2) = Vector128.LoadUnsafe(ref src, 16);
@@ -246,7 +243,7 @@ internal readonly struct U256Current
             }
             else if (AdvSimd.Arm64.IsSupported)
             {
-                // Mirror of the little-endian read ctor: the limbs are already in byte order, two 16-byte copies.
+                // The limbs are already in byte order.
                 ref byte dst = ref MemoryMarshal.GetReference(target);
                 Unsafe.As<ulong, Vector128<byte>>(ref Unsafe.AsRef(in u0)).StoreUnsafe(ref dst);
                 Unsafe.As<ulong, Vector128<byte>>(ref Unsafe.AsRef(in u2)).StoreUnsafe(ref dst, 16);
