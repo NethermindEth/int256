@@ -143,31 +143,38 @@ public readonly partial struct Int256 : IBinaryInteger<Int256>, IMinMaxValue<Int
     // Operators
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    static Int256 IAdditionOperators<Int256, Int256, Int256>.operator +(Int256 left, Int256 right) => left + right;
+    static Int256 IAdditionOperators<Int256, Int256, Int256>.operator +(Int256 left, Int256 right) => AddValues(in left, in right);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     static Int256 IAdditionOperators<Int256, Int256, Int256>.operator checked +(Int256 left, Int256 right)
     {
-        Int256 res = left + right;
+        Int256 res = AddValues(in left, in right);
         // Overflow when both operands share a sign the result does not.
         if ((long)((left._value.u3 ^ res._value.u3) & (right._value.u3 ^ res._value.u3)) < 0) UInt256.ThrowOverflowException();
         return res;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    static Int256 ISubtractionOperators<Int256, Int256, Int256>.operator -(Int256 left, Int256 right) => left - right;
+    static Int256 ISubtractionOperators<Int256, Int256, Int256>.operator -(Int256 left, Int256 right) => SubtractValues(in left, in right);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     static Int256 ISubtractionOperators<Int256, Int256, Int256>.operator checked -(Int256 left, Int256 right)
     {
-        Int256 res = left - right;
+        Int256 res = SubtractValues(in left, in right);
         // Overflow when the operand signs differ and the result's sign is not the left operand's.
         if ((long)((left._value.u3 ^ right._value.u3) & (left._value.u3 ^ res._value.u3)) < 0) UInt256.ThrowOverflowException();
         return res;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    static Int256 IMultiplyOperators<Int256, Int256, Int256>.operator *(Int256 left, Int256 right) => left * right;
+    static Int256 IMultiplyOperators<Int256, Int256, Int256>.operator *(Int256 left, Int256 right)
+    {
+        // Truncated multiplication is sign-agnostic; rebuilding from limbs keeps the by-value copies in registers.
+        UInt256 x = new(left._value.u0, left._value.u1, left._value.u2, left._value.u3);
+        UInt256 y = new(right._value.u0, right._value.u1, right._value.u2, right._value.u3);
+        UInt256.MultiplyValues(in x, in y, out UInt256 res);
+        return new Int256(res);
+    }
 
     static Int256 IMultiplyOperators<Int256, Int256, Int256>.operator checked *(Int256 left, Int256 right)
     {
@@ -451,6 +458,21 @@ public readonly partial struct Int256 : IBinaryInteger<Int256>, IMinMaxValue<Int
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool IsMaxValue(in Int256 value) =>
         value._value.u3 == SignBit - 1 && (value._value.u0 & value._value.u1 & value._value.u2) == ulong.MaxValue;
+
+    // By-value operands: see UInt256.AddValues.
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Int256 AddValues(in Int256 a, in Int256 b)
+    {
+        UInt256.AddValues(in a._value, in b._value, out UInt256 res, detectOverflow: false);
+        return new Int256(res);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Int256 SubtractValues(in Int256 a, in Int256 b)
+    {
+        UInt256.SubtractValues(in a._value, in b._value, out UInt256 res);
+        return new Int256(res);
+    }
 
     /// <summary>The absolute value as unsigned, so <c>MinValue</c> gives 2^255.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

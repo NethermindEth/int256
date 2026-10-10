@@ -7,6 +7,8 @@ using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using System.Runtime.Intrinsics.Arm;
+using System.Runtime.Intrinsics.X86;
 
 namespace Nethermind.Int256;
 
@@ -59,20 +61,33 @@ public readonly partial struct UInt256 : IBinaryInteger<UInt256>, IMinMaxValue<U
     // call the unchecked operators: those already throw on underflow or a zero divisor.
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    static UInt256 IAdditionOperators<UInt256, UInt256, UInt256>.operator +(UInt256 left, UInt256 right) => left + right;
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    static UInt256 IAdditionOperators<UInt256, UInt256, UInt256>.operator checked +(UInt256 left, UInt256 right)
+    static UInt256 IAdditionOperators<UInt256, UInt256, UInt256>.operator +(UInt256 left, UInt256 right)
     {
-        if (AddOverflow(in left, in right, out UInt256 res)) ThrowOverflowException();
+        AddValues(in left, in right, out UInt256 res, detectOverflow: false);
         return res;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    static UInt256 ISubtractionOperators<UInt256, UInt256, UInt256>.operator -(UInt256 left, UInt256 right) => left - right;
+    static UInt256 IAdditionOperators<UInt256, UInt256, UInt256>.operator checked +(UInt256 left, UInt256 right)
+    {
+        if (AddValues(in left, in right, out UInt256 res, detectOverflow: true)) ThrowOverflowException();
+        return res;
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    static UInt256 IMultiplyOperators<UInt256, UInt256, UInt256>.operator *(UInt256 left, UInt256 right) => left * right;
+    static UInt256 ISubtractionOperators<UInt256, UInt256, UInt256>.operator -(UInt256 left, UInt256 right)
+    {
+        if (SubtractValues(in left, in right, out UInt256 res)) ThrowOverflowException();
+        return res;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    static UInt256 IMultiplyOperators<UInt256, UInt256, UInt256>.operator *(UInt256 left, UInt256 right)
+    {
+        UInt256 x = new(left.u0, left.u1, left.u2, left.u3), y = new(right.u0, right.u1, right.u2, right.u3);
+        MultiplyValues(in x, in y, out UInt256 res);
+        return res;
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     static UInt256 IMultiplyOperators<UInt256, UInt256, UInt256>.operator checked *(UInt256 left, UInt256 right)
@@ -276,6 +291,57 @@ public readonly partial struct UInt256 : IBinaryInteger<UInt256>, IMinMaxValue<U
         WriteBytes(in this, destination.AsSpan(startIndex), isBigEndian: false);
 
     int IBinaryInteger<UInt256>.WriteLittleEndian(Span<byte> destination) => WriteBytes(in this, destination, isBigEndian: false);
+
+    // Operands that arrive by value are copies the JIT can keep in registers, but only while every read of them takes
+    // one shape. A kernel that reads both limbs and vectors puts them on the stack, and the vector store there does
+    // not forward to the limb loads. AVX2 reads each operand as one Vector256 already; the 128-bit kernels and the
+    // narrow-operand dispatch in front of them mix the two.
+
+    /// <summary>Adds by-value operands; returns the carry out when <paramref name="detectOverflow"/>.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static bool AddValues(in UInt256 a, in UInt256 b, out UInt256 res, bool detectOverflow)
+    {
+        if (!Avx2.IsSupported && (AdvSimd.IsSupported || Sse42.IsSupported))
+        {
+            return AddVector128(in a, in b, out res, detectOverflow, vectorOnly: true);
+        }
+
+        if (detectOverflow) return AddOverflow(in a, in b, out res);
+        res = a + b;
+        return false;
+    }
+
+    /// <summary>Subtracts by-value operands, wrapping; returns whether it borrowed out.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static bool SubtractValues(in UInt256 a, in UInt256 b, out UInt256 res) =>
+        !Avx2.IsSupported && (AdvSimd.IsSupported || Sse42.IsSupported)
+            ? SubtractVector128(in a, in b, out res, vectorOnly: true)
+            : SubtractUnderflow(in a, in b, out res);
+
+    /// <summary>
+    /// <see cref="Multiply(in UInt256, in UInt256, out UInt256)"/> for operands that arrive by value. Reading them
+    /// only as limbs lets the JIT keep the copies in registers; the vector top-limb step would put them on the
+    /// stack, where its 32-byte store does not forward to the limb loads.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static void MultiplyValues(in UInt256 x, in UInt256 y, out UInt256 res)
+    {
+        ulong xTop = x.u2 | x.u3;
+        ulong yTop = y.u2 | y.u3;
+        ulong xHigh = x.u1 | xTop;
+        ulong yHigh = y.u1 | yTop;
+        if ((xHigh | yHigh) == 0)
+        {
+            ulong high = Multiply64(x.u0, y.u0, out ulong low);
+            StoreProduct(out res, low, high, 0, 0);
+        }
+        else if (yHigh == 0) MultiplyByUInt64(in x, y.u0, out res);
+        else if (xHigh == 0) MultiplyByUInt64(in y, x.u0, out res);
+        else if ((xTop | yTop) == 0) MultiplyLimbs2x2(in x, in y, out res);
+        else if (xTop == 0) MultiplyLimbs2x4(in x, in y, out res);
+        else if (yTop == 0) MultiplyLimbs2x4(in y, in x, out res);
+        else MultiplyLimbs4x4(in x, in y, out res, scalarTop: true);
+    }
 
     /// <summary>Sets <paramref name="quotient"/> and <paramref name="remainder"/> from one division.</summary>
     /// <exception cref="DivideByZeroException"><paramref name="y"/> is zero.</exception>

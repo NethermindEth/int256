@@ -29,6 +29,12 @@ public class NumericsTests
         BigInteger.One << 255,
         (BigInteger.One << 255) - 1,
         TestNumbers.TwoTo64 + 1,
+        // Carries and borrows that ripple across whole limbs.
+        TestNumbers.TwoTo128,
+        TestNumbers.UInt128Max,
+        TestNumbers.TwoTo192,
+        TestNumbers.UInt192Max,
+        TestNumbers.TwoTo192 + TestNumbers.TwoTo64 - 1,
     ]).Distinct();
 
     private static IEnumerable<BigInteger> SignedValues => UnaryOps.SignedTestCases.Concat(

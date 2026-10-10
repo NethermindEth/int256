@@ -6,6 +6,8 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Configs;
+using BenchmarkDotNet.Diagnosers;
+using BenchmarkDotNet.Jobs;
 
 namespace Nethermind.Int256.Benchmark;
 
@@ -15,9 +17,8 @@ namespace Nethermind.Int256.Benchmark;
 /// what its direct twin does. Portable, so it is safe for the ARM benchmark CI suite
 /// (<c>--filter '*GenericMath*'</c>).
 /// </summary>
-[WarmupCount(3)]
-[IterationCount(10)]
-[MemoryDiagnoser]
+[SimpleJob(RuntimeMoniker.Net10_0, launchCount: 3, warmupCount: 3, iterationCount: 10)]
+[DisassemblyDiagnoser(maxDepth: 3, printSource: false, exportCombinedDisassemblyReport: true)]
 [GroupBenchmarksBy(BenchmarkLogicalGroupRule.ByCategory)]
 [CategoriesColumn]
 public class GenericMathBench

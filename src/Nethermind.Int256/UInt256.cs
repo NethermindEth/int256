@@ -209,7 +209,8 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
 
     // Same speculation as the 256-bit path on two 128-bit halves; 16-byte stores forward to the NEON readers
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool AddVector128(in UInt256 a, in UInt256 b, out UInt256 res, bool detectOverflow)
+    // vectorOnly reads the fallback limbs from the loaded vectors, so by-value operands are read one way only.
+    private static bool AddVector128(in UInt256 a, in UInt256 b, out UInt256 res, bool detectOverflow, bool vectorOnly = false)
     {
         ref Vector128<ulong> aRef = ref Unsafe.As<UInt256, Vector128<ulong>>(ref Unsafe.AsRef(in a));
         ref Vector128<ulong> bRef = ref Unsafe.As<UInt256, Vector128<ulong>>(ref Unsafe.AsRef(in b));
@@ -280,6 +281,16 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
             // Only the non-ARM path reaches this fallback: the early store is guarded by AdvSimd.
             // No non-ARM store has occurred, so a and b remain intact when res aliases either input.
             ulong carry = 0;
+            if (vectorOnly)
+            {
+                AddWithCarry(aLo.GetElement(0), bLo.GetElement(0), ref carry, out ulong v0);
+                AddWithCarry(aLo.GetElement(1), bLo.GetElement(1), ref carry, out ulong v1);
+                AddWithCarry(aHi.GetElement(0), bHi.GetElement(0), ref carry, out ulong v2);
+                AddWithCarry(aHi.GetElement(1), bHi.GetElement(1), ref carry, out ulong v3);
+                StoreLimbs(out res, v0, v1, v2, v3);
+                return carry != 0;
+            }
+
             AddWithCarry(a.u0, b.u0, ref carry, out ulong r0);
             AddWithCarry(a.u1, b.u1, ref carry, out ulong r1);
             AddWithCarry(a.u2, b.u2, ref carry, out ulong r2);
@@ -474,7 +485,8 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
 
     // Same speculation as the 256-bit path on two 128-bit halves; 16-byte stores forward to the NEON readers
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool SubtractVector128(in UInt256 a, in UInt256 b, out UInt256 res)
+    // vectorOnly reads the fallback limbs from the loaded vectors, so by-value operands are read one way only.
+    private static bool SubtractVector128(in UInt256 a, in UInt256 b, out UInt256 res, bool vectorOnly = false)
     {
         ref Vector128<ulong> aRef = ref Unsafe.As<UInt256, Vector128<ulong>>(ref Unsafe.AsRef(in a));
         ref Vector128<ulong> bRef = ref Unsafe.As<UInt256, Vector128<ulong>>(ref Unsafe.AsRef(in b));
@@ -511,6 +523,16 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         {
             // Nothing has been stored yet, so a and b are intact even when res aliases one of them
             ulong borrow = 0;
+            if (vectorOnly)
+            {
+                SubtractWithBorrow(aLo.GetElement(0), bLo.GetElement(0), ref borrow, out ulong v0);
+                SubtractWithBorrow(aLo.GetElement(1), bLo.GetElement(1), ref borrow, out ulong v1);
+                SubtractWithBorrow(aHi.GetElement(0), bHi.GetElement(0), ref borrow, out ulong v2);
+                SubtractWithBorrow(aHi.GetElement(1), bHi.GetElement(1), ref borrow, out ulong v3);
+                StoreLimbs(out res, v0, v1, v2, v3);
+                return borrow != 0;
+            }
+
             SubtractWithBorrow(a.u0, b.u0, ref borrow, out ulong r0);
             SubtractWithBorrow(a.u1, b.u1, ref borrow, out ulong r1);
             SubtractWithBorrow(a.u2, b.u2, ref borrow, out ulong r2);
@@ -763,7 +785,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
 
     [SkipLocalsInit]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void MultiplyLimbs4x4(in UInt256 x, in UInt256 y, out UInt256 res)
+    private static void MultiplyLimbs4x4(in UInt256 x, in UInt256 y, out UInt256 res, bool scalarTop = false)
     {
         ulong x0 = x.u0;
         ulong y0 = y.u0;
@@ -774,13 +796,13 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
 
         // The top limb only needs low halves; taking them first retires x3 and y3 before the carry columns start.
         ulong r3;
-        if (Avx512DQ.VL.IsSupported)
+        if (Avx512DQ.VL.IsSupported && !scalarTop)
         {
             Vector256<ulong> xv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in x));
             Vector256<ulong> yv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in y));
             r3 = Vector256.Sum(Avx512DQ.VL.MultiplyLow(xv, Avx2.Permute4x64(yv, 0x1B)));
         }
-        else if (Avx2.IsSupported)
+        else if (Avx2.IsSupported && !scalarTop)
         {
             Vector256<ulong> xv = Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in x));
             Vector256<ulong> yv = Avx2.Permute4x64(Unsafe.As<UInt256, Vector256<ulong>>(ref Unsafe.AsRef(in y)), 0x1B);
