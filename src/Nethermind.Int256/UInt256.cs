@@ -1,14 +1,4 @@
-        // The one-limb shortcut of AddScalar for b, decided on the halves: the sum is (aLo + bLo) under aHi unless
-        // limb 0 carries, which is rare and takes the general path. Testing a as well cost more than it saved on ARM.
-        if (vectorOnly && IsOneLimb(bLo, bHi))
-        {
-            Vector128<ulong> low = aLo + bLo;
-            if (low.ToScalar() >= aLo.ToScalar())
-            {
-                StoreHalves(out res, low, aHi);
-                return false;
-            }
-        }// SPDX-FileCopyrightText: 2025 Demerzel Solutions Limited
+// SPDX-FileCopyrightText: 2025 Demerzel Solutions Limited
 // SPDX-License-Identifier: MIT
 
 using System;
@@ -229,19 +219,15 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         Vector128<ulong> bLo = bRef;
         Vector128<ulong> bHi = Unsafe.Add(ref bRef, 1);
 
-        // The one-limb shortcut of AddScalar, decided on the halves: the sum is (aLo + bLo) under the wide operand's
-        // high half unless limb 0 carries, which is rare and takes the general path.
-        if (vectorOnly)
+        // The one-limb shortcut of AddScalar for b, decided on the halves: the sum is (aLo + bLo) under aHi unless
+        // limb 0 carries, which is rare and takes the general path. Testing a as well cost more than it saved on ARM.
+        if (vectorOnly && IsOneLimb(bLo, bHi))
         {
-            bool bNarrow = IsOneLimb(bLo, bHi);
-            if (bNarrow || IsOneLimb(aLo, aHi))
+            Vector128<ulong> low = aLo + bLo;
+            if (low.ToScalar() >= aLo.ToScalar())
             {
-                Vector128<ulong> low = aLo + bLo;
-                if (low.ToScalar() >= aLo.ToScalar())
-                {
-                    StoreHalves(out res, low, bNarrow ? aHi : bHi);
-                    return false;
-                }
+                StoreHalves(out res, low, aHi);
+                return false;
             }
         }
 
