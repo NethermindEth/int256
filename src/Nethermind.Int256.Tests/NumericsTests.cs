@@ -16,7 +16,7 @@ namespace Nethermind.Int256.Test;
 /// call binds to the public <c>in</c> members and would never reach the explicit interface implementations.
 /// </summary>
 [Parallelizable(ParallelScope.All)]
-public class NumericsTests
+public partial class NumericsTests
 {
     private static readonly BigInteger UInt256Max = TestNumbers.UInt256Max;
     private static readonly BigInteger Int256Max = TestNumbers.Int256Max;
@@ -614,7 +614,7 @@ public class NumericsTests
         Assert.That((BigInteger)Parse<UInt256>(big.ToString("x", CultureInfo.InvariantCulture), NumberStyles.HexNumber), Is.EqualTo(big));
         Assert.That((BigInteger)Parse<UInt256>(big.ToString("x", CultureInfo.InvariantCulture), NumberStyles.AllowHexSpecifier), Is.EqualTo(big));
         Assert.That((BigInteger)Parse<UInt256>(big.ToString("N0", CultureInfo.InvariantCulture), NumberStyles.Number), Is.EqualTo(big));
-        Assert.That(value.ToString("X", CultureInfo.InvariantCulture), Is.EqualTo(big.ToString("X", CultureInfo.InvariantCulture)));
+        Assert.That(value.ToString("X", CultureInfo.InvariantCulture), Is.EqualTo(Hex(big)));
     }
 
     [TestCaseSource(nameof(SignedValues))]
@@ -631,7 +631,93 @@ public class NumericsTests
         // Hex is the 256-bit two's complement.
         string hex = Wrap(big, 256, false).ToString("x64", CultureInfo.InvariantCulture)[^64..];
         Assert.That((BigInteger)Parse<Int256>(hex, NumberStyles.HexNumber), Is.EqualTo(big));
-        Assert.That(value.ToString("X", CultureInfo.InvariantCulture), Is.EqualTo(big.ToString("X", CultureInfo.InvariantCulture)));
+        Assert.That(value.ToString("X", CultureInfo.InvariantCulture), Is.EqualTo(Hex(big)));
+    }
+
+    /// <summary>The 256 bits in hex without leading zeros, as <see cref="UInt128"/> writes its 128.</summary>
+    private static string Hex(BigInteger value, string format = "X")
+    {
+        string hex = Wrap(value, 256, false).ToString(format, CultureInfo.InvariantCulture).TrimStart('0');
+        return hex.Length == 0 ? "0" : hex;
+    }
+
+    private static string Binary(BigInteger value)
+    {
+        string bits = Wrap(value, 256, false).ToString("B", CultureInfo.InvariantCulture).TrimStart('0');
+        return bits.Length == 0 ? "0" : bits;
+    }
+
+    private static readonly string[] LimbFormats = ["", "D", "d", "D1", "D40", "G", "g", "X", "x", "X1", "X40", "x70", "B", "b", "B10", "B300"];
+
+    // Values UInt128 and Int128 can hold must format as they do; for Int128, X and B show 128 bits instead of 256.
+    [TestCaseSource(nameof(UnsignedValues))]
+    public void Limb_formats_match_UInt128(BigInteger big)
+    {
+        UInt256 value = U(big);
+        foreach (string format in LimbFormats)
+        {
+            string text = value.ToString(format, CultureInfo.InvariantCulture);
+            if (big <= (BigInteger)UInt128.MaxValue)
+            {
+                Assert.That(text, Is.EqualTo(((UInt128)big).ToString(format, CultureInfo.InvariantCulture)), format);
+            }
+
+            AssertLimbFormat(value, big, format, text);
+        }
+    }
+
+    [TestCaseSource(nameof(SignedValues))]
+    public void Limb_formats_match_Int128(BigInteger big)
+    {
+        Int256 value = S(big);
+        foreach (string format in LimbFormats)
+        {
+            string text = value.ToString(format, CultureInfo.InvariantCulture);
+            bool fits = big >= (BigInteger)Int128.MinValue && big <= (BigInteger)Int128.MaxValue;
+            if (fits && (big >= 0 || format.Length == 0 || char.ToUpperInvariant(format[0]) is 'D' or 'G'))
+            {
+                Assert.That(text, Is.EqualTo(((Int128)big).ToString(format, CultureInfo.InvariantCulture)), format);
+            }
+
+            AssertLimbFormat(value, big, format, text);
+        }
+    }
+
+    // The 256-bit expectation for every value, and the span and UTF-8 writers agreeing with the string one.
+    private static void AssertLimbFormat<T>(T value, BigInteger big, string format, string text) where T : INumber<T>
+    {
+        int precision = format.Length > 1 ? int.Parse(format[1..], CultureInfo.InvariantCulture) : 0;
+        char kind = format.Length == 0 ? 'D' : format[0];
+        string digits = char.ToUpperInvariant(kind) switch
+        {
+            'X' => Hex(big, kind.ToString()),
+            'B' => Binary(big),
+            _ => BigInteger.Abs(big).ToString(CultureInfo.InvariantCulture),
+        };
+        string sign = big < 0 && char.ToUpperInvariant(kind) is 'D' or 'G' ? "-" : "";
+        Assert.That(text, Is.EqualTo(sign + digits.PadLeft(precision, '0')), format);
+
+        Span<char> chars = stackalloc char[400];
+        Assert.That(value.TryFormat(chars, out int written, format, CultureInfo.InvariantCulture), Is.True, format);
+        Assert.That(chars[..written].ToString(), Is.EqualTo(text), format);
+        Assert.That(value.TryFormat(chars[..(text.Length - 1)], out written, format, CultureInfo.InvariantCulture), Is.False, format);
+        Assert.That(written, Is.Zero);
+
+        Span<byte> bytes = stackalloc byte[400];
+        Assert.That(((IUtf8SpanFormattable)value).TryFormat(bytes, out written, format, CultureInfo.InvariantCulture), Is.True, format);
+        Assert.That(Encoding.UTF8.GetString(bytes[..written]), Is.EqualTo(text), format);
+        Assert.That(((IUtf8SpanFormattable)value).TryFormat(bytes[..(text.Length - 1)], out written, format, CultureInfo.InvariantCulture), Is.False, format);
+    }
+
+    [Test]
+    public void Utf8_formatting_writes_a_non_ascii_negative_sign()
+    {
+        CultureInfo culture = (CultureInfo)CultureInfo.InvariantCulture.Clone();
+        culture.NumberFormat.NegativeSign = "−";
+        Span<byte> bytes = stackalloc byte[16];
+        Assert.That(((IUtf8SpanFormattable)S(-42)).TryFormat(bytes, out int written, "D", culture), Is.True);
+        Assert.That(Encoding.UTF8.GetString(bytes[..written]), Is.EqualTo("−42"));
+        Assert.That(((IUtf8SpanFormattable)S(-42)).TryFormat(bytes[..4], out _, "D", culture), Is.False);
     }
 
     private static void AssertFormats<T>(T value, string expected) where T : INumber<T>

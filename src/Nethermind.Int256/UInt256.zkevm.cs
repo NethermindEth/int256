@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Demerzel Solutions Limited
 // SPDX-License-Identifier: MIT
 
+using System;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.Intrinsics;
@@ -190,4 +191,15 @@ public readonly partial struct UInt256
         // Equal operands propagate the incoming borrow; unequal operands generate their own.
         borrow = difference == 0 ? incoming : (a < b ? 1UL : 0UL);
     }
+
+    // The zkEVM build writes D, G, X and B only (UInt256.Numerics.cs): a BigInteger fallback for the culture formats
+    // would link BigInteger's formatting into every guest that interpolates a UInt256.
+    private static bool TryFormatOther(in UInt256 bits, bool signed, Span<char> destination, out int written,
+        ReadOnlySpan<char> format, IFormatProvider? provider) => throw UnsupportedFormat(format);
+
+    private static string FormatOther(in UInt256 bits, bool signed, string? format, IFormatProvider? provider) =>
+        throw UnsupportedFormat(format);
+
+    private static FormatException UnsupportedFormat(ReadOnlySpan<char> format) =>
+        new($"Format '{format}' is not supported in the zkEVM build; use D, G, X or B.");
 }

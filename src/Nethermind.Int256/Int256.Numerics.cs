@@ -623,37 +623,23 @@ public readonly partial struct Int256 : IBinaryInteger<Int256>, IMinMaxValue<Int
     // Formatting
 
     /// <summary>
-    /// Formats the value. An empty format writes a '-' and the digits, as <see cref="ToString()"/> always has;
-    /// <c>"D"</c> and <c>"G"</c> do the same when the culture's negative sign is '-'. Other formats go through
-    /// <see cref="BigInteger"/>.
+    /// Formats the value, as <see cref="UInt256.ToString(string?, IFormatProvider?)"/> does with the bits read as two's
+    /// complement: under <c>D</c> a negative value takes the culture's negative sign, or '-' for an empty format as
+    /// <see cref="ToString()"/> always has; under <c>X</c> and <c>B</c> it shows all 256 bits, as <see cref="Int128"/>
+    /// shows its 128.
     /// </summary>
-    [SkipLocalsInit]
-    public string ToString([StringSyntax(StringSyntaxAttribute.NumericFormat)] string? format, IFormatProvider? provider)
-    {
-        if (!IsPlainDecimal(format, provider)) return ((BigInteger)this).ToString(format, provider);
-
-        Span<char> buffer = stackalloc char[80];
-        UInt256.TryFormatDecimal(Magnitude(in this), buffer, out int written, IsNegative);
-        return new string(buffer[..written]);
-    }
+    public string ToString([StringSyntax(StringSyntaxAttribute.NumericFormat)] string? format, IFormatProvider? provider) =>
+        UInt256.FormatToString(in _value, signed: true, format, provider);
 
     /// <inheritdoc cref="ToString(string?, IFormatProvider?)"/>
     public bool TryFormat(Span<char> destination, out int charsWritten,
         [StringSyntax(StringSyntaxAttribute.NumericFormat)] ReadOnlySpan<char> format = default, IFormatProvider? provider = null) =>
-        IsPlainDecimal(format, provider)
-            ? UInt256.TryFormatDecimal(Magnitude(in this), destination, out charsWritten, IsNegative)
-            : ((BigInteger)this).TryFormat(destination, out charsWritten, format, provider);
+        UInt256.TryFormatCore(in _value, signed: true, destination, out charsWritten, format, provider);
 
     /// <inheritdoc cref="ToString(string?, IFormatProvider?)"/>
     public bool TryFormat(Span<byte> utf8Destination, out int bytesWritten,
         [StringSyntax(StringSyntaxAttribute.NumericFormat)] ReadOnlySpan<char> format = default, IFormatProvider? provider = null) =>
-        IsPlainDecimal(format, provider)
-            ? UInt256.TryFormatDecimal(Magnitude(in this), utf8Destination, out bytesWritten, IsNegative)
-            : ((IUtf8SpanFormattable)(BigInteger)this).TryFormat(utf8Destination, out bytesWritten, format, provider);
-
-    private bool IsPlainDecimal(ReadOnlySpan<char> format, IFormatProvider? provider) =>
-        format.Length == 0
-        || (UInt256.IsDecimalFormat(format) && (!IsNegative || NumberFormatInfo.GetInstance(provider).NegativeSign == "-"));
+        UInt256.TryFormatCore(in _value, signed: true, utf8Destination, out bytesWritten, format, provider);
 
     // Conversions
 

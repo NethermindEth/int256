@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 using System;
+using System.Buffers;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
@@ -9,6 +10,7 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.Intrinsics.Arm;
 using System.Runtime.Intrinsics.X86;
+using System.Text.Unicode;
 
 namespace Nethermind.Int256;
 
@@ -541,81 +543,207 @@ public readonly partial struct UInt256 : IBinaryInteger<UInt256>, IMinMaxValue<U
             ? TryParseHex(s, out result)
             : TryParse(s, style, provider!, out result);
 
-    // Formatting
+    // Formatting. D, G without a precision, X and B are written from the limbs, for both types and both builds. The
+    // culture formats fall back to BigInteger in the standard build only (UInt256.std.cs): interpolation reaches
+    // TryFormat, so anything TryFormat references is linked into an AOT image such as the zkEVM guest's.
 
     /// <summary>
-    /// Formats the value. Empty, <c>"D"</c> and <c>"G"</c> formats write the digits from the limbs, exactly as
-    /// <see cref="ToString()"/>; other formats go through <see cref="BigInteger"/>.
+    /// Formats the value. <c>D</c> (with a minimum digit count), <c>G</c> without a precision, <c>X</c> and <c>B</c> are
+    /// written from the limbs, as <see cref="UInt128"/> writes them; an empty format gives the digits of
+    /// <see cref="ToString()"/>. The culture formats (<c>N</c>, <c>C</c>, <c>E</c>, <c>F</c>, <c>P</c>, <c>G</c> with a
+    /// precision, custom) go through <see cref="BigInteger"/> in the standard build and throw
+    /// <see cref="FormatException"/> in the zkEVM build.
     /// </summary>
     public string ToString([StringSyntax(StringSyntaxAttribute.NumericFormat)] string? format, IFormatProvider? provider) =>
-        IsDecimalFormat(format) ? ToString() : ((BigInteger)this).ToString(format, provider);
+        FormatToString(in this, signed: false, format, provider);
 
     /// <inheritdoc cref="ToString(string?, IFormatProvider?)"/>
     public bool TryFormat(Span<char> destination, out int charsWritten,
         [StringSyntax(StringSyntaxAttribute.NumericFormat)] ReadOnlySpan<char> format = default, IFormatProvider? provider = null) =>
-        IsDecimalFormat(format)
-            ? TryFormatDecimal(in this, destination, out charsWritten, negative: false)
-            : ((BigInteger)this).TryFormat(destination, out charsWritten, format, provider);
+        TryFormatCore(in this, signed: false, destination, out charsWritten, format, provider);
 
     /// <inheritdoc cref="ToString(string?, IFormatProvider?)"/>
     public bool TryFormat(Span<byte> utf8Destination, out int bytesWritten,
         [StringSyntax(StringSyntaxAttribute.NumericFormat)] ReadOnlySpan<char> format = default, IFormatProvider? provider = null) =>
-        IsDecimalFormat(format)
-            ? TryFormatDecimal(in this, utf8Destination, out bytesWritten, negative: false)
-            : ((IUtf8SpanFormattable)(BigInteger)this).TryFormat(utf8Destination, out bytesWritten, format, provider);
+        TryFormatCore(in this, signed: false, utf8Destination, out bytesWritten, format, provider);
 
-    /// <summary>Whether <paramref name="format"/> means plain decimal digits: empty, or <c>D</c> or <c>G</c> without a precision.</summary>
-    internal static bool IsDecimalFormat(ReadOnlySpan<char> format) =>
-        format.Length == 0 || (format.Length == 1 && (char)(format[0] | 0x20) is 'd' or 'g');
-
-    /// <summary>Writes the decimal digits of <paramref name="magnitude"/>, after a '-' when <paramref name="negative"/>.</summary>
-    [SkipLocalsInit]
-    internal static bool TryFormatDecimal(in UInt256 magnitude, Span<char> destination, out int written, bool negative)
+    /// <summary>
+    /// Formats 256 bits, read as two's complement when <paramref name="signed"/>. A negative value takes a sign under
+    /// <c>D</c>, and its full width of bits under <c>X</c> and <c>B</c>.
+    /// </summary>
+    internal static string FormatToString(in UInt256 bits, bool signed, string? format, IFormatProvider? provider)
     {
-        Span<char> buffer = stackalloc char[MaxDecimalDigits + 1];
-        ReadOnlySpan<char> text = FormatDecimal(in magnitude, buffer, negative);
-        if (text.TryCopyTo(destination))
+        if (!TryParseLimbFormat(format, out char kind, out int precision))
         {
-            written = text.Length;
-            return true;
+            return FormatOther(in bits, signed, format, provider);
         }
 
-        written = 0;
-        return false;
+        Span<char> buffer = stackalloc char[LimbFormatDigits];
+        ReadOnlySpan<char> digits = buffer[WriteLimbDigits(in bits, signed, kind, buffer, out bool negative)..];
+        ReadOnlySpan<char> sign = negative ? NegativeSign(format, provider) : default;
+        int length = sign.Length + Math.Max(precision, digits.Length);
+        if (length == digits.Length)
+        {
+            return new string(digits);
+        }
+
+        Span<char> text = length <= 512 ? stackalloc char[length] : new char[length];
+        Compose(text, sign, digits);
+        return new string(text);
     }
 
-    /// <inheritdoc cref="TryFormatDecimal(in UInt256, Span{char}, out int, bool)"/>
-    [SkipLocalsInit]
-    internal static bool TryFormatDecimal(in UInt256 magnitude, Span<byte> destination, out int written, bool negative)
+    /// <inheritdoc cref="FormatToString"/>
+    internal static bool TryFormatCore(in UInt256 bits, bool signed, Span<char> destination, out int written,
+        ReadOnlySpan<char> format, IFormatProvider? provider)
     {
-        Span<char> buffer = stackalloc char[MaxDecimalDigits + 1];
-        ReadOnlySpan<char> text = FormatDecimal(in magnitude, buffer, negative);
-        if (text.Length > destination.Length)
+        if (!TryParseLimbFormat(format, out char kind, out int precision))
+        {
+            return TryFormatOther(in bits, signed, destination, out written, format, provider);
+        }
+
+        Span<char> buffer = stackalloc char[LimbFormatDigits];
+        ReadOnlySpan<char> digits = buffer[WriteLimbDigits(in bits, signed, kind, buffer, out bool negative)..];
+        ReadOnlySpan<char> sign = negative ? NegativeSign(format, provider) : default;
+        int length = sign.Length + Math.Max(precision, digits.Length);
+        if (length > destination.Length)
         {
             written = 0;
             return false;
         }
 
-        // ASCII digits and '-' narrow one to one.
-        for (int i = 0; i < text.Length; i++)
-        {
-            destination[i] = (byte)text[i];
-        }
-
-        written = text.Length;
+        Compose(destination[..length], sign, digits);
+        written = length;
         return true;
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static ReadOnlySpan<char> FormatDecimal(in UInt256 magnitude, Span<char> buffer, bool negative)
+    /// <inheritdoc cref="FormatToString"/>
+    internal static bool TryFormatCore(in UInt256 bits, bool signed, Span<byte> destination, out int written,
+        ReadOnlySpan<char> format, IFormatProvider? provider)
     {
-        int position = WriteDecimalDigits(in magnitude, buffer);
-        if (negative)
+        if (!TryParseLimbFormat(format, out char kind, out int precision))
         {
-            buffer[--position] = '-';
+            // Culture text may hold non-ASCII; these formats are rare enough to go through a string.
+            return Utf8.FromUtf16(FormatOther(in bits, signed, format.ToString(), provider), destination, out _, out written)
+                == OperationStatus.Done || Fail(out written);
         }
 
-        return buffer[position..];
+        Span<char> buffer = stackalloc char[LimbFormatDigits];
+        ReadOnlySpan<char> digits = buffer[WriteLimbDigits(in bits, signed, kind, buffer, out bool negative)..];
+        int signLength = 0;
+        if (negative && Utf8.FromUtf16(NegativeSign(format, provider), destination, out _, out signLength) != OperationStatus.Done)
+        {
+            return Fail(out written);
+        }
+
+        int padding = Math.Max(0, precision - digits.Length);
+        int length = signLength + padding + digits.Length;
+        if (length > destination.Length)
+        {
+            return Fail(out written);
+        }
+
+        destination.Slice(signLength, padding).Fill((byte)'0');
+        Span<byte> tail = destination.Slice(signLength + padding, digits.Length);
+        // Digits are ASCII and narrow one to one.
+        for (int i = 0; i < digits.Length; i++)
+        {
+            tail[i] = (byte)digits[i];
+        }
+
+        written = length;
+        return true;
+    }
+
+    /// <summary>The most digits <see cref="WriteLimbDigits"/> writes: 256 under <c>B</c>.</summary>
+    private const int LimbFormatDigits = 256;
+
+    /// <summary>
+    /// Whether <paramref name="format"/> is written from the limbs, and as which of <c>D</c>, <c>X</c>, <c>x</c> or
+    /// <c>B</c>, with what minimum digit count. <c>G</c> with a precision is not: past it, it turns scientific.
+    /// </summary>
+    private static bool TryParseLimbFormat(ReadOnlySpan<char> format, out char kind, out int precision)
+    {
+        precision = 0;
+        kind = format.IsEmpty ? 'D' : format[0] switch
+        {
+            'D' or 'd' => 'D',
+            'G' or 'g' when format.Length == 1 => 'D',
+            'X' => 'X',
+            'x' => 'x',
+            'B' or 'b' => 'B',
+            _ => '\0',
+        };
+        if (kind == '\0')
+        {
+            return false;
+        }
+
+        foreach (char c in format.IsEmpty ? default : format[1..])
+        {
+            uint digit = (uint)(c - '0');
+            // The precision limit is .NET's: 999,999,999.
+            if (digit > 9 || precision > 99_999_999)
+            {
+                return false;
+            }
+
+            precision = precision * 10 + (int)digit;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Writes the digits right-aligned into <paramref name="buffer"/> and returns where they start.
+    /// <paramref name="negative"/> reports a sign still to write, for <c>D</c> on a negative signed value.
+    /// </summary>
+    private static int WriteLimbDigits(in UInt256 bits, bool signed, char kind, Span<char> buffer, out bool negative)
+    {
+        negative = false;
+        if (kind == 'D')
+        {
+            UInt256 magnitude = bits;
+            if (signed && (long)bits.u3 < 0)
+            {
+                negative = true;
+                Subtract(default, in bits, out magnitude);
+            }
+
+            return WriteDecimalDigits(in magnitude, buffer);
+        }
+
+        // X and B write the bits as they are, so a negative signed value shows its full width.
+        int width = kind == 'B' ? 1 : 4;
+        int mask = (1 << width) - 1;
+        ReadOnlySpan<byte> alphabet = kind == 'x' ? "0123456789abcdef"u8 : "0123456789ABCDEF"u8;
+        int count = Math.Max(1, (bits.BitLen + width - 1) / width);
+        int position = buffer.Length;
+        for (int i = 0; i < count; i++)
+        {
+            int bit = i * width;
+            ulong limb = bit < 64 ? bits.u0 : bit < 128 ? bits.u1 : bit < 192 ? bits.u2 : bits.u3;
+            buffer[--position] = (char)alphabet[(int)(limb >> (bit & 63)) & mask];
+        }
+
+        return position;
+    }
+
+    /// <summary>An empty format writes '-', as <see cref="Int256.ToString()"/> always has; others take the culture's sign.</summary>
+    private static ReadOnlySpan<char> NegativeSign(ReadOnlySpan<char> format, IFormatProvider? provider) =>
+        format.IsEmpty ? "-" : NumberFormatInfo.GetInstance(provider).NegativeSign;
+
+    /// <summary>Fills <paramref name="text"/> with the sign, zero padding, then the digits.</summary>
+    private static void Compose(Span<char> text, ReadOnlySpan<char> sign, ReadOnlySpan<char> digits)
+    {
+        sign.CopyTo(text);
+        text[sign.Length..^digits.Length].Fill('0');
+        digits.CopyTo(text[^digits.Length..]);
+    }
+
+    private static bool Fail(out int written)
+    {
+        written = 0;
+        return false;
     }
 
     // Conversions. The BCL types do not know these types, so both directions cover every primitive here.

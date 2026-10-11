@@ -350,4 +350,15 @@ public readonly partial struct UInt256
     {
         return SubtractImpl(a, b, out res);
     }
+
+    // The culture formats (N, C, E, F, P, G with a precision, custom) for UInt256.Numerics.cs, through BigInteger. The
+    // zkEVM build has no such fallback, which keeps BigInteger out of its image.
+    private static bool TryFormatOther(in UInt256 bits, bool signed, Span<char> destination, out int written,
+        ReadOnlySpan<char> format, IFormatProvider? provider) =>
+        ToBigInteger(in bits, signed).TryFormat(destination, out written, format, provider);
+
+    private static string FormatOther(in UInt256 bits, bool signed, string? format, IFormatProvider? provider) =>
+        ToBigInteger(in bits, signed).ToString(format, provider);
+
+    private static BigInteger ToBigInteger(in UInt256 bits, bool signed) => signed ? (BigInteger)new Int256(bits) : (BigInteger)bits;
 }
