@@ -331,8 +331,9 @@ public readonly partial struct UInt256 : IBinaryInteger<UInt256>, IMinMaxValue<U
 
     // Operands that arrive by value are copies the JIT can keep in registers, but only while every read of them takes
     // one shape. A kernel that reads both limbs and vectors puts them on the stack, and the vector store there does
-    // not forward to the limb loads. AVX2 reads each operand as one Vector256 already; the 128-bit kernels and the
-    // narrow-operand dispatch in front of them mix the two.
+    // not forward to the limb loads. AVX2 reads each operand as one Vector256 already. Without it, the generic path
+    // skips the narrow-operand dispatch, which reads limbs, and goes straight to the 128-bit kernels; those are shared
+    // with the public operators unchanged, since a switch for their rare limb fallback cost the direct path on ARM.
 
     /// <summary>Adds by-value operands; returns the carry out when <paramref name="detectOverflow"/>.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -340,7 +341,7 @@ public readonly partial struct UInt256 : IBinaryInteger<UInt256>, IMinMaxValue<U
     {
         if (!Avx2.IsSupported && (AdvSimd.IsSupported || Sse42.IsSupported))
         {
-            return AddVector128<ValueOperands>(in a, in b, out res, detectOverflow);
+            return AddVector128(in a, in b, out res, detectOverflow);
         }
 
         if (detectOverflow) return AddOverflow(in a, in b, out res);
@@ -352,7 +353,7 @@ public readonly partial struct UInt256 : IBinaryInteger<UInt256>, IMinMaxValue<U
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static bool SubtractValues(in UInt256 a, in UInt256 b, out UInt256 res) =>
         !Avx2.IsSupported && (AdvSimd.IsSupported || Sse42.IsSupported)
-            ? SubtractVector128<ValueOperands>(in a, in b, out res)
+            ? SubtractVector128(in a, in b, out res)
             : SubtractUnderflow(in a, in b, out res);
 
     /// <summary>

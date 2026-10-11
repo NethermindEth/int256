@@ -173,7 +173,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
             ulong small = b.u0;
             if ((b.u1 | b.u2 | b.u3) != 0)
             {
-                if ((a.u1 | a.u2 | a.u3) != 0) return AddVector128<DirectOperands>(in a, in b, out res, detectOverflow);
+                if ((a.u1 | a.u2 | a.u3) != 0) return AddVector128(in a, in b, out res, detectOverflow);
                 large = ref b;
                 small = a.u0;
             }
@@ -194,7 +194,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
 
         if (Sse42.IsSupported)
         {
-            return AddVector128<DirectOperands>(in a, in b, out res, detectOverflow);
+            return AddVector128(in a, in b, out res, detectOverflow);
         }
 
         // Loads stay next to their use: the one-limb paths above share this method's prolog
@@ -207,21 +207,9 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         return carry != 0;
     }
 
-    /// <summary>Kernel switch for the public operators, whose operands are references.</summary>
-    /// <remarks>
-    /// A type argument rather than a bool: it folds per instantiation, where a bool would cost the direct path an
-    /// argument wherever the kernel is not inlined.
-    /// </remarks>
-    private struct DirectOperands;
-
-    /// <summary>Kernel switch for generic math, whose operands arrive by value; see <c>UInt256.Numerics.cs</c>.</summary>
-    private struct ValueOperands;
-
-    // Same speculation as the 256-bit path on two 128-bit halves; 16-byte stores forward to the NEON readers.
-    // ValueOperands reads the fallback limbs from the loaded vectors, so by-value operands are read one way only.
+    // Same speculation as the 256-bit path on two 128-bit halves; 16-byte stores forward to the NEON readers
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool AddVector128<TOperands>(in UInt256 a, in UInt256 b, out UInt256 res, bool detectOverflow)
-        where TOperands : struct
+    private static bool AddVector128(in UInt256 a, in UInt256 b, out UInt256 res, bool detectOverflow)
     {
         ref Vector128<ulong> aRef = ref Unsafe.As<UInt256, Vector128<ulong>>(ref Unsafe.AsRef(in a));
         ref Vector128<ulong> bRef = ref Unsafe.As<UInt256, Vector128<ulong>>(ref Unsafe.AsRef(in b));
@@ -292,16 +280,6 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
             // Only the non-ARM path reaches this fallback: the early store is guarded by AdvSimd.
             // No non-ARM store has occurred, so a and b remain intact when res aliases either input.
             ulong carry = 0;
-            if (typeof(TOperands) == typeof(ValueOperands))
-            {
-                AddWithCarry(aLo.GetElement(0), bLo.GetElement(0), ref carry, out ulong v0);
-                AddWithCarry(aLo.GetElement(1), bLo.GetElement(1), ref carry, out ulong v1);
-                AddWithCarry(aHi.GetElement(0), bHi.GetElement(0), ref carry, out ulong v2);
-                AddWithCarry(aHi.GetElement(1), bHi.GetElement(1), ref carry, out ulong v3);
-                StoreLimbs(out res, v0, v1, v2, v3);
-                return carry != 0;
-            }
-
             AddWithCarry(a.u0, b.u0, ref carry, out ulong r0);
             AddWithCarry(a.u1, b.u1, ref carry, out ulong r1);
             AddWithCarry(a.u2, b.u2, ref carry, out ulong r2);
@@ -481,7 +459,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
 
         if (AdvSimd.IsSupported || Sse42.IsSupported)
         {
-            return SubtractVector128<DirectOperands>(in a, in b, out res);
+            return SubtractVector128(in a, in b, out res);
         }
 
         // Loads stay next to their use: the one-limb path above shares this method's prolog
@@ -494,11 +472,9 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         return borrow != 0;
     }
 
-    // Same speculation as the 256-bit path on two 128-bit halves; 16-byte stores forward to the NEON readers.
-    // ValueOperands reads the fallback limbs from the loaded vectors, so by-value operands are read one way only.
+    // Same speculation as the 256-bit path on two 128-bit halves; 16-byte stores forward to the NEON readers
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool SubtractVector128<TOperands>(in UInt256 a, in UInt256 b, out UInt256 res)
-        where TOperands : struct
+    private static bool SubtractVector128(in UInt256 a, in UInt256 b, out UInt256 res)
     {
         ref Vector128<ulong> aRef = ref Unsafe.As<UInt256, Vector128<ulong>>(ref Unsafe.AsRef(in a));
         ref Vector128<ulong> bRef = ref Unsafe.As<UInt256, Vector128<ulong>>(ref Unsafe.AsRef(in b));
@@ -535,16 +511,6 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         {
             // Nothing has been stored yet, so a and b are intact even when res aliases one of them
             ulong borrow = 0;
-            if (typeof(TOperands) == typeof(ValueOperands))
-            {
-                SubtractWithBorrow(aLo.GetElement(0), bLo.GetElement(0), ref borrow, out ulong v0);
-                SubtractWithBorrow(aLo.GetElement(1), bLo.GetElement(1), ref borrow, out ulong v1);
-                SubtractWithBorrow(aHi.GetElement(0), bHi.GetElement(0), ref borrow, out ulong v2);
-                SubtractWithBorrow(aHi.GetElement(1), bHi.GetElement(1), ref borrow, out ulong v3);
-                StoreLimbs(out res, v0, v1, v2, v3);
-                return borrow != 0;
-            }
-
             SubtractWithBorrow(a.u0, b.u0, ref borrow, out ulong r0);
             SubtractWithBorrow(a.u1, b.u1, ref borrow, out ulong r1);
             SubtractWithBorrow(a.u2, b.u2, ref borrow, out ulong r2);
@@ -795,6 +761,14 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         StoreProduct(out res, r0, r1, r2, r3);
     }
 
+    /// <summary>Selects the public operators' variant of <see cref="MultiplyLimbs4x4{TOperands}"/>.</summary>
+    private struct DirectOperands;
+
+    /// <summary>Selects generic math's variant of <see cref="MultiplyLimbs4x4{TOperands}"/>; see <c>UInt256.Numerics.cs</c>.</summary>
+    private struct ValueOperands;
+
+    // ValueOperands takes the scalar top limb, so by-value operands are read as limbs only. A type argument rather than
+    // a bool: without AVX2 the JIT keeps this kernel out of line, where a bool would cost the direct path an argument.
     [SkipLocalsInit]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void MultiplyLimbs4x4<TOperands>(in UInt256 x, in UInt256 y, out UInt256 res) where TOperands : struct
