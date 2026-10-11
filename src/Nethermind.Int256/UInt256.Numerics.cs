@@ -338,7 +338,7 @@ public readonly partial struct UInt256 : IBinaryInteger<UInt256>, IMinMaxValue<U
     {
         if (!Avx2.IsSupported && (AdvSimd.IsSupported || Sse42.IsSupported))
         {
-            return AddVector128(in a, in b, out res, detectOverflow, vectorOnly: true);
+            return AddVector128<ValueOperands>(in a, in b, out res, detectOverflow);
         }
 
         if (detectOverflow) return AddOverflow(in a, in b, out res);
@@ -350,7 +350,7 @@ public readonly partial struct UInt256 : IBinaryInteger<UInt256>, IMinMaxValue<U
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static bool SubtractValues(in UInt256 a, in UInt256 b, out UInt256 res) =>
         !Avx2.IsSupported && (AdvSimd.IsSupported || Sse42.IsSupported)
-            ? SubtractVector128(in a, in b, out res, vectorOnly: true)
+            ? SubtractVector128<ValueOperands>(in a, in b, out res)
             : SubtractUnderflow(in a, in b, out res);
 
     /// <summary>
@@ -375,7 +375,7 @@ public readonly partial struct UInt256 : IBinaryInteger<UInt256>, IMinMaxValue<U
         else if ((xTop | yTop) == 0) MultiplyLimbs2x2(in x, in y, out res);
         else if (xTop == 0) MultiplyLimbs2x4(in x, in y, out res);
         else if (yTop == 0) MultiplyLimbs2x4(in y, in x, out res);
-        else MultiplyLimbs4x4(in x, in y, out res, scalarTop: true);
+        else MultiplyLimbs4x4<ValueOperands>(in x, in y, out res);
     }
 
     /// <summary>Sets <paramref name="quotient"/> and <paramref name="remainder"/> from one division.</summary>

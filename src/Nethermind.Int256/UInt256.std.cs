@@ -54,7 +54,7 @@ public readonly partial struct UInt256
         if ((power.u1 | power.u2 | power.u3) == 0)
             MultiplyByUInt64(value, power.u0, out result);
         else
-            MultiplyLimbs4x4(value, power, out result);
+            MultiplyLimbs4x4<DirectOperands>(value, power, out result);
     }
 
     // Keep wide multiplication spills off trivial host paths.
