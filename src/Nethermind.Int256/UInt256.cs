@@ -219,6 +219,22 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         Vector128<ulong> bLo = bRef;
         Vector128<ulong> bHi = Unsafe.Add(ref bRef, 1);
 
+        // The one-limb shortcut of AddScalar, decided on the halves: the sum is (aLo + bLo) under the wide operand's
+        // high half unless limb 0 carries, which is rare and takes the general path.
+        if (vectorOnly)
+        {
+            bool bNarrow = IsOneLimb(bLo, bHi);
+            if (bNarrow || IsOneLimb(aLo, aHi))
+            {
+                Vector128<ulong> low = aLo + bLo;
+                if (low.ToScalar() >= aLo.ToScalar())
+                {
+                    StoreHalves(out res, low, bNarrow ? aHi : bHi);
+                    return false;
+                }
+            }
+        }
+
         Vector128<ulong> resultLo = aLo + bLo;
         Vector128<ulong> resultHi = aHi + bHi;
         Vector128<ulong> carryLo = Vector128.LessThan(resultLo, aLo);
@@ -306,6 +322,26 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
             Unsafe.Add(ref resRef, 1) = sumHi;
         }
         return carryHi.GetElement(1) != 0;
+    }
+
+    /// <summary>Whether the value held as <paramref name="lower"/> and <paramref name="upper"/> fits limb 0.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool IsOneLimb(Vector128<ulong> lower, Vector128<ulong> upper)
+    {
+        // Limb 1 shifted down beside limbs 2 and 3.
+        Vector128<ulong> limb1 = AdvSimd.IsSupported
+            ? AdvSimd.ExtractVector128(lower, Vector128<ulong>.Zero, 1)
+            : Sse2.ShiftRightLogical128BitLane(lower, 8);
+        return Vector128.EqualsAll(limb1 | upper, Vector128<ulong>.Zero);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void StoreHalves(out UInt256 res, Vector128<ulong> lower, Vector128<ulong> upper)
+    {
+        Unsafe.SkipInit(out res);
+        ref Vector128<ulong> halves = ref Unsafe.As<UInt256, Vector128<ulong>>(ref res);
+        halves = lower;
+        Unsafe.Add(ref halves, 1) = upper;
     }
 
     // One operand fits in one limb: a carry can only ripple upward through full limbs of the other
@@ -494,6 +530,17 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         Vector128<ulong> aHi = Unsafe.Add(ref aRef, 1);
         Vector128<ulong> bLo = bRef;
         Vector128<ulong> bHi = Unsafe.Add(ref bRef, 1);
+
+        // The one-limb shortcut of SubtractScalar, decided on the halves; a borrow out of limb 0 takes the general path.
+        if (vectorOnly && IsOneLimb(bLo, bHi))
+        {
+            Vector128<ulong> low = aLo - bLo;
+            if (aLo.ToScalar() >= bLo.ToScalar())
+            {
+                StoreHalves(out res, low, aHi);
+                return false;
+            }
+        }
 
         Vector128<ulong> resultLo = aLo - bLo;
         Vector128<ulong> resultHi = aHi - bHi;

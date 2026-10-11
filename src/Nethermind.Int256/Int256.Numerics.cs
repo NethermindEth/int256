@@ -32,10 +32,13 @@ public readonly partial struct Int256 : IBinaryInteger<Int256>, IMinMaxValue<Int
 
     public static Int256 operator +(in Int256 a) => a;
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Int256 operator *(in Int256 a, in Int256 b)
     {
-        Multiply(in a, in b, out Int256 res);
-        return res;
+        // Through Multiply and the Int256 constructor, the extra levels ran out the inline budget and left the
+        // kernel's helpers as calls. Truncated multiplication is sign-agnostic.
+        UInt256.Multiply(in a._value, in b._value, out UInt256 res);
+        return Unsafe.As<UInt256, Int256>(ref res);
     }
 
     /// <summary>Divides, truncating toward zero; <c>MinValue / -1</c> wraps to <c>MinValue</c>.</summary>
