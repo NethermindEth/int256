@@ -1,4 +1,14 @@
-// SPDX-FileCopyrightText: 2025 Demerzel Solutions Limited
+        // The one-limb shortcut of AddScalar for b, decided on the halves: the sum is (aLo + bLo) under aHi unless
+        // limb 0 carries, which is rare and takes the general path. Testing a as well cost more than it saved on ARM.
+        if (vectorOnly && IsOneLimb(bLo, bHi))
+        {
+            Vector128<ulong> low = aLo + bLo;
+            if (low.ToScalar() >= aLo.ToScalar())
+            {
+                StoreHalves(out res, low, aHi);
+                return false;
+            }
+        }// SPDX-FileCopyrightText: 2025 Demerzel Solutions Limited
 // SPDX-License-Identifier: MIT
 
 using System;
