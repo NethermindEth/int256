@@ -849,6 +849,52 @@ public class NumericsTests
         Assert.That((BigInteger)ReadBig<UInt256>([], isUnsigned: true), Is.EqualTo(BigInteger.Zero));
     }
 
+    [Test]
+    public void Little_endian_reads_follow_the_same_rules()
+    {
+        byte[] minusOne = [0xFF];
+        Assert.That((BigInteger)ReadLittle<Int256>(minusOne, isUnsigned: false), Is.EqualTo(BigInteger.MinusOne));
+        Assert.That((BigInteger)ReadLittle<UInt256>(minusOne, isUnsigned: true), Is.EqualTo((BigInteger)255));
+        Assert.Throws<OverflowException>(() => ReadLittle<UInt256>(minusOne, isUnsigned: false));
+
+        // 33 bytes, the most significant last: sign fill reads, anything else overflows.
+        byte[] filled = [.. Enumerable.Repeat((byte)0xFF, 33)];
+        Assert.That((BigInteger)ReadLittle<Int256>(filled, isUnsigned: false), Is.EqualTo(BigInteger.MinusOne));
+        Assert.Throws<OverflowException>(() => ReadLittle<UInt256>(filled, isUnsigned: false));
+        byte[] wide = new byte[33];
+        wide[31] = 0x80;
+        Assert.That((BigInteger)ReadLittle<UInt256>(wide, isUnsigned: true), Is.EqualTo(BigInteger.One << 255));
+        Assert.Throws<OverflowException>(() => ReadLittle<Int256>(wide, isUnsigned: true));
+        wide[32] = 1;
+        Assert.Throws<OverflowException>(() => ReadLittle<UInt256>(wide, isUnsigned: true));
+        Assert.Throws<OverflowException>(() => ReadLittle<Int256>(wide, isUnsigned: false));
+    }
+
+    private static T ReadLittle<T>(byte[] source, bool isUnsigned) where T : IBinaryInteger<T> => T.ReadLittleEndian(source, isUnsigned);
+
+    // Negative counts are neither masked nor rejected: they behave as the public operators always have.
+    [TestCase(-1)]
+    [TestCase(-63)]
+    [TestCase(-64)]
+    [TestCase(-65)]
+    [TestCase(-300)]
+    public void Negative_shift_counts_match_the_public_operators(int n)
+    {
+        foreach (BigInteger big in UnsignedValues)
+        {
+            UInt256 x = U(big);
+            Assert.That(Shl(x, n), Is.EqualTo(x << n));
+            Assert.That(Shr(x, n), Is.EqualTo(x >> n));
+        }
+
+        foreach (BigInteger big in SignedValues)
+        {
+            Int256 x = S(big);
+            Assert.That(Shl(x, n), Is.EqualTo(x << n));
+            Assert.That(Shr(x, n), Is.EqualTo(x >> n));
+        }
+    }
+
     // Sums through the interface, the shape generic library code takes.
     private static T Sum<T>(IEnumerable<T> values) where T : INumber<T>
     {
