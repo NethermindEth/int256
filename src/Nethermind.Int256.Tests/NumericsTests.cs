@@ -177,6 +177,80 @@ public class NumericsTests
         AssertChecked(() => CopySign(x, y), a.Sign != 0 && (a < 0) != (b < 0) ? -a : a, Int256Min, Int256Max);
     }
 
+    // Public checked operators: a checked context on the concrete types binds to them directly.
+
+    [TestCaseSource(nameof(UnsignedPairs))]
+    public void UInt256_checked_operators((BigInteger A, BigInteger B) test)
+    {
+        (BigInteger a, BigInteger b) = test;
+        UInt256 x = U(a), y = U(b);
+        AssertChecked(() => checked(x + y), a + b, 0, UInt256Max);
+        AssertChecked(() => checked(x * y), a * b, 0, UInt256Max);
+        // Outside a checked context the same expressions still wrap.
+        Assert.That((BigInteger)unchecked(x + y), Is.EqualTo(Wrap(a + b, 256, false)));
+        Assert.That((BigInteger)unchecked(x * y), Is.EqualTo(Wrap(a * b, 256, false)));
+
+        if (b <= ulong.MaxValue)
+        {
+            ulong wide = (ulong)b;
+            AssertChecked(() => checked(x * wide), a * b, 0, UInt256Max);
+            AssertChecked(() => checked(wide * x), a * b, 0, UInt256Max);
+            Assert.That((BigInteger)unchecked(x * wide), Is.EqualTo(Wrap(a * b, 256, false)));
+        }
+
+        if (b <= uint.MaxValue)
+        {
+            uint narrow = (uint)b;
+            AssertChecked(() => checked(x * narrow), a * b, 0, UInt256Max);
+            AssertChecked(() => checked(narrow * x), a * b, 0, UInt256Max);
+        }
+    }
+
+    [TestCaseSource(nameof(SignedPairs))]
+    public void Int256_checked_operators((BigInteger A, BigInteger B) test)
+    {
+        (BigInteger a, BigInteger b) = test;
+        Int256 x = S(a), y = S(b);
+        AssertChecked(() => checked(x + y), a + b, Int256Min, Int256Max);
+        AssertChecked(() => checked(x - y), a - b, Int256Min, Int256Max);
+        AssertChecked(() => checked(x * y), a * b, Int256Min, Int256Max);
+        Assert.That((BigInteger)unchecked(x + y), Is.EqualTo(Wrap(a + b, 256, true)));
+        Assert.That((BigInteger)unchecked(x - y), Is.EqualTo(Wrap(a - b, 256, true)));
+        Assert.That((BigInteger)unchecked(x * y), Is.EqualTo(Wrap(a * b, 256, true)));
+        if (b.IsZero)
+        {
+            Assert.Throws<DivideByZeroException>(() => _ = checked(x / y));
+        }
+        else
+        {
+            AssertChecked(() => checked(x / y), BigInteger.Divide(a, b), Int256Min, Int256Max);
+            Assert.That((BigInteger)unchecked(x / y), Is.EqualTo(Wrap(BigInteger.Divide(a, b), 256, true)));
+        }
+    }
+
+    [TestCaseSource(nameof(UnsignedValues))]
+    public void UInt256_checked_increment(BigInteger a)
+    {
+        UInt256 x = U(a);
+        AssertChecked(() => { UInt256 v = x; return checked(++v); }, a + 1, 0, UInt256Max);
+        UInt256 wrapped = x;
+        Assert.That((BigInteger)unchecked(++wrapped), Is.EqualTo(Wrap(a + 1, 256, false)));
+    }
+
+    [TestCaseSource(nameof(SignedValues))]
+    public void Int256_checked_unary_operators_and_conversion(BigInteger a)
+    {
+        Int256 x = S(a);
+        AssertChecked(() => checked(-x), -a, Int256Min, Int256Max);
+        AssertChecked(() => { Int256 v = x; return checked(++v); }, a + 1, Int256Min, Int256Max);
+        AssertChecked(() => { Int256 v = x; return checked(--v); }, a - 1, Int256Min, Int256Max);
+        Assert.That((BigInteger)unchecked(-x), Is.EqualTo(Wrap(-a, 256, true)));
+
+        // The conversion reinterprets the bits unchecked and rejects a negative value checked.
+        Assert.That((BigInteger)unchecked((UInt256)x), Is.EqualTo(Wrap(a, 256, false)));
+        AssertChecked(() => checked((UInt256)x), a, 0, UInt256Max);
+    }
+
     private static T Max<T>(T x, T y) where T : INumber<T> => T.Max(x, y);
     private static T Min<T>(T x, T y) where T : INumber<T> => T.Min(x, y);
     private static T MaxMagnitude<T>(T x, T y) where T : INumber<T> => T.MaxMagnitude(x, y);

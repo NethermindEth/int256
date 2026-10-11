@@ -43,6 +43,45 @@ public readonly partial struct UInt256 : IBinaryInteger<UInt256>, IMinMaxValue<U
         return res;
     }
 
+    // Checked operators: C# picks these in a checked context, where they throw rather than wrap. Subtraction and
+    // decrement need none: they throw on underflow either way.
+
+    /// <exception cref="OverflowException">The sum is at least 2^256.</exception>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static UInt256 operator checked +(in UInt256 a, in UInt256 b)
+    {
+        if (AddOverflow(in a, in b, out UInt256 res)) ThrowOverflowException();
+        return res;
+    }
+
+    /// <exception cref="OverflowException">The product is at least 2^256.</exception>
+    public static UInt256 operator checked *(in UInt256 a, in UInt256 b)
+    {
+        if (MultiplyOverflow(in a, in b, out UInt256 res)) ThrowOverflowException();
+        return res;
+    }
+
+    /// <inheritdoc cref="op_CheckedMultiply(in UInt256, in UInt256)"/>
+    public static UInt256 operator checked *(in UInt256 a, uint b) => checked(a * new UInt256(b));
+
+    /// <inheritdoc cref="op_CheckedMultiply(in UInt256, in UInt256)"/>
+    public static UInt256 operator checked *(uint a, in UInt256 b) => checked(new UInt256(a) * b);
+
+    /// <inheritdoc cref="op_CheckedMultiply(in UInt256, in UInt256)"/>
+    public static UInt256 operator checked *(in UInt256 a, ulong b) => checked(a * new UInt256(b));
+
+    /// <inheritdoc cref="op_CheckedMultiply(in UInt256, in UInt256)"/>
+    public static UInt256 operator checked *(ulong a, in UInt256 b) => checked(new UInt256(a) * b);
+
+    /// <exception cref="OverflowException"><paramref name="a"/> is <see cref="MaxValue"/>.</exception>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static UInt256 operator checked ++(in UInt256 a)
+    {
+        if ((a.u0 & a.u1 & a.u2 & a.u3) == ulong.MaxValue) ThrowOverflowException();
+        UInt256 value = a;
+        return ++value;
+    }
+
     static UInt256 IAdditiveIdentity<UInt256, UInt256>.AdditiveIdentity => default;
 
     static UInt256 IMultiplicativeIdentity<UInt256, UInt256>.MultiplicativeIdentity => new(1ul);
@@ -90,11 +129,7 @@ public readonly partial struct UInt256 : IBinaryInteger<UInt256>, IMinMaxValue<U
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    static UInt256 IMultiplyOperators<UInt256, UInt256, UInt256>.operator checked *(UInt256 left, UInt256 right)
-    {
-        if (MultiplyOverflow(in left, in right, out UInt256 res)) ThrowOverflowException();
-        return res;
-    }
+    static UInt256 IMultiplyOperators<UInt256, UInt256, UInt256>.operator checked *(UInt256 left, UInt256 right) => checked(left * right);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     static UInt256 IDivisionOperators<UInt256, UInt256, UInt256>.operator /(UInt256 left, UInt256 right) => left / right;
@@ -106,11 +141,7 @@ public readonly partial struct UInt256 : IBinaryInteger<UInt256>, IMinMaxValue<U
     static UInt256 IIncrementOperators<UInt256>.operator ++(UInt256 value) => ++value;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    static UInt256 IIncrementOperators<UInt256>.operator checked ++(UInt256 value)
-    {
-        if ((value.u0 & value.u1 & value.u2 & value.u3) == ulong.MaxValue) ThrowOverflowException();
-        return ++value;
-    }
+    static UInt256 IIncrementOperators<UInt256>.operator checked ++(UInt256 value) => checked(++value);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     static UInt256 IDecrementOperators<UInt256>.operator --(UInt256 value) => --value;
