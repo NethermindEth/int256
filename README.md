@@ -76,6 +76,8 @@ In a `checked` context, or a project built with `CheckForOverflowUnderflow`, the
 
 Code written against `INumber<T>` or `IBinaryInteger<T>` gets the same semantics. Shifts follow EVM rules there too: a count of 256 or more gives zero (or the sign fill for `Int256 >>`) rather than being masked to the width.
 
+Both types are `ISpanFormattable` and `IUtf8SpanFormattable`. The `D`, `G`, `X`, and `B` formats are written directly from the limbs, as `UInt128` and `Int128` write them, without allocating when formatting into a span; a negative `Int256` shows all 256 bits under `X` and `B`. The culture formats (`N`, `C`, `E`, `F`, `P`, `G` with a precision, and custom formats) go through `BigInteger` in the standard build and throw `FormatException` in the RISC-V zkVM build, which keeps `BigInteger` out of guest images.
+
 Use `BigInteger` when you need values of unbounded size. Use Int256 when 256 bits are part of your data model and fixed-width behavior matters.
 
 ## Performance
