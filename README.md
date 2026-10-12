@@ -61,6 +61,7 @@ Console.WriteLine(decoded == total); // True
 | Modular addition, multiplication, or exponentiation | `AddMod`, `MultiplyMod`, `ExpMod` |
 | Read or write binary values | Byte-span constructor, `ToBigEndian(Span<byte>)`, `ToLittleEndian(Span<byte>)` |
 | Interoperate with arbitrary-precision code | Explicit conversions to and from `BigInteger` |
+| Write code generic over number types | `INumber<T>` and `IBinaryInteger<T>`, with `CreateChecked`, `CreateSaturating`, and `CreateTruncating` |
 
 The arithmetic has explicit fixed-width semantics. For `UInt256`:
 
@@ -68,6 +69,14 @@ The arithmetic has explicit fixed-width semantics. For `UInt256`:
 - The `-` operator throws on underflow; `Subtract` returns the wrapped result, while `SubtractUnderflow` also reports whether underflow occurred.
 - Division by zero throws `DivideByZeroException`.
 - `AddMod` and `MultiplyMod` preserve the full intermediate value before reduction and throw for a zero modulus. `(a * b) % m` can therefore differ from `MultiplyMod(a, b, m, out result)`.
+
+`Int256` operators wrap in two's complement, including `Int256.MinValue / -1`, which gives `MinValue` as the EVM's `SDIV` does.
+
+In a `checked` context, or a project built with `CheckForOverflowUnderflow`, the operators that would otherwise wrap throw `OverflowException` instead, as they do for `long` and `Int128`. So does the explicit conversion of a negative `Int256` to `UInt256`.
+
+Code written against `INumber<T>` or `IBinaryInteger<T>` gets the same semantics. Shifts follow EVM rules there too: a count of 256 or more gives zero (or the sign fill for `Int256 >>`) rather than being masked to the width.
+
+Both types are `ISpanFormattable` and `IUtf8SpanFormattable`. The `D`, `G`, `X`, and `B` formats are written directly from the limbs, as `UInt128` and `Int128` write them, without allocating when formatting into a span; a negative `Int256` shows all 256 bits under `X` and `B`. The culture formats (`N`, `C`, `E`, `F`, `P`, `G` with a precision, and custom formats) go through `BigInteger` in the standard build and throw `FormatException` in the RISC-V zkVM build, which keeps `BigInteger` out of guest images.
 
 Use `BigInteger` when you need values of unbounded size. Use Int256 when 256 bits are part of your data model and fixed-width behavior matters.
 
