@@ -579,26 +579,37 @@ public readonly partial struct Int256 : IBinaryInteger<Int256>, IMinMaxValue<Int
     static bool INumberBase<Int256>.TryParse(ReadOnlySpan<char> s, NumberStyles style, IFormatProvider? provider, out Int256 result) =>
         TryParseCore(s, style, provider, out result);
 
-    private static Int256 ParseCore(ReadOnlySpan<char> s, NumberStyles style, IFormatProvider? provider) =>
-        TryParseCore(s, style, provider, out Int256 result) ? result : throw new FormatException();
+    private static Int256 ParseCore(ReadOnlySpan<char> s, NumberStyles style, IFormatProvider? provider)
+    {
+        if (!TryParseCore(s, style, provider, out Int256 result, out bool overflow))
+        {
+            UInt256.ThrowParseFailure(overflow);
+        }
 
-    private static bool TryParseCore(ReadOnlySpan<char> s, NumberStyles style, IFormatProvider? provider, out Int256 result)
+        return result;
+    }
+
+    private static bool TryParseCore(ReadOnlySpan<char> s, NumberStyles style, IFormatProvider? provider, out Int256 result) =>
+        TryParseCore(s, style, provider, out result, out _);
+
+    private static bool TryParseCore(ReadOnlySpan<char> s, NumberStyles style, IFormatProvider? provider, out Int256 result, out bool overflow)
     {
         // Hex and binary are the 256-bit two's complement, as Int128 reads them: 64 F's is -1.
         if ((style & (NumberStyles.AllowHexSpecifier | NumberStyles.AllowBinarySpecifier)) != 0)
         {
-            bool parsed = UInt256.TryParseBits(s, style, out UInt256 bits);
+            bool parsed = UInt256.TryParseBits(s, style, out UInt256 bits, out overflow);
             result = new Int256(bits);
             return parsed;
         }
 
+        overflow = false;
         NumberFormatInfo info = NumberFormatInfo.GetInstance(provider);
         if (style == NumberStyles.Integer && info.PositiveSign == "+" && info.NegativeSign == "-")
         {
-            s = UInt256.TrimWhiteSpace(s);
+            ReadOnlySpan<char> trimmed = UInt256.TrimWhiteSpace(s);
             // The digit check keeps "-+1" and "- 1" out: the unsigned parser accepts a sign and trims.
-            bool negative = s.Length > 1 && s[0] == '-' && char.IsAsciiDigit(s[1]);
-            if (UInt256.TryParseDecimal(negative ? s[1..] : s, out UInt256 magnitude)
+            bool negative = trimmed.Length > 1 && trimmed[0] == '-' && char.IsAsciiDigit(trimmed[1]);
+            if (UInt256.TryParseDecimal(negative ? trimmed[1..] : trimmed, out UInt256 magnitude)
                 && (magnitude.u3 < SignBit || (negative && magnitude.u3 == SignBit && (magnitude.u0 | magnitude.u1 | magnitude.u2) == 0)))
             {
                 result = new Int256(magnitude);
@@ -606,14 +617,22 @@ public readonly partial struct Int256 : IBinaryInteger<Int256>, IMinMaxValue<Int
                 return true;
             }
 
-            result = default;
-            return false;
+            // Otherwise BigInteger tells text out of range from malformed text.
         }
 
-        if (BigInteger.TryParse(s, style, provider, out BigInteger big) && big.GetBitLength() <= 255)
+        if (BigInteger.TryParse(s, style, provider, out BigInteger big))
         {
-            result = FromBigIntegerInRange(big);
-            return true;
+            if (big.GetBitLength() <= 255)
+            {
+                result = FromBigIntegerInRange(big);
+                return true;
+            }
+
+            overflow = true;
+        }
+        else
+        {
+            overflow = UInt256.HasFraction(s, style, provider);
         }
 
         result = default;

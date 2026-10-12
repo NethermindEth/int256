@@ -772,12 +772,12 @@ public partial class NumericsTests
 
     [TestCase("")]
     [TestCase(" ")]
-    [TestCase("-1")]
     [TestCase("--1")]
     [TestCase("+-1")]
     [TestCase("1 2")]
     [TestCase("abc")]
-    [TestCase("115792089237316195423570985008687907853269984665640564039457584007913129639936")]
+    [TestCase("-1x")]
+    [TestCase("115792089237316195423570985008687907853269984665640564039457584007913129639936x")]
     public void UInt256_rejects_invalid_text(string text)
     {
         Assert.That(TryParse(text, NumberStyles.Integer, out UInt256 _), Is.False);
@@ -791,12 +791,60 @@ public partial class NumericsTests
     [TestCase("+-1")]
     [TestCase("- 1")]
     [TestCase("1-")]
-    [TestCase("57896044618658097711785492504343953926634992332820282019728792003956564819968")]
-    [TestCase("-57896044618658097711785492504343953926634992332820282019728792003956564819969")]
+    [TestCase("57896044618658097711785492504343953926634992332820282019728792003956564819968x")]
     public void Int256_rejects_invalid_text(string text)
     {
         Assert.That(TryParse(text, NumberStyles.Integer, out Int256 _), Is.False);
         Assert.Throws<FormatException>(() => Parse<Int256>(text, NumberStyles.Integer));
+    }
+
+    [TestCase("-1")]
+    [TestCase(" -5 ")]
+    [TestCase("115792089237316195423570985008687907853269984665640564039457584007913129639936")]
+    [TestCase("1000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")]
+    public void UInt256_rejects_text_out_of_range(string text)
+    {
+        Assert.That(TryParse(text, NumberStyles.Integer, out UInt256 _), Is.False);
+        Assert.Throws<OverflowException>(() => Parse<UInt256>(text, NumberStyles.Integer));
+        Assert.Throws<OverflowException>(() => Parse<UInt256>(text, NumberStyles.Number));
+    }
+
+    [TestCase("57896044618658097711785492504343953926634992332820282019728792003956564819968")]
+    [TestCase("-57896044618658097711785492504343953926634992332820282019728792003956564819969")]
+    [TestCase("1000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")]
+    public void Int256_rejects_text_out_of_range(string text)
+    {
+        Assert.That(TryParse(text, NumberStyles.Integer, out Int256 _), Is.False);
+        Assert.Throws<OverflowException>(() => Parse<Int256>(text, NumberStyles.Integer));
+        Assert.Throws<OverflowException>(() => Parse<Int256>(text, NumberStyles.Number));
+    }
+
+    private static readonly string[] DecimalTexts =
+    [
+        "0", "-0", "00", "5", "+5", "-5", " 5 ", "5\0", "-5\0", "(5)", "5-", "5e2", "5.0", "5.5", "-0.5", "0.5e1", "1.5e-400", "1,000", "1e400", "NaN", "Infinity",
+        "1" + new string('0', 80), "-1" + new string('0', 80), "1" + new string('0', 80) + "x", "", " ", "-", "x", "--5", "- 5",
+    ];
+
+    private static readonly NumberStyles[] DecimalStyles =
+    [
+        NumberStyles.None,
+        NumberStyles.Integer,
+        NumberStyles.AllowLeadingSign,
+        NumberStyles.Integer | NumberStyles.AllowParentheses,
+        NumberStyles.Integer | NumberStyles.AllowTrailingSign,
+        NumberStyles.Number,
+        NumberStyles.Float,
+        NumberStyles.Any,
+    ];
+
+    private static IEnumerable<TestCaseData> DecimalCases() =>
+        from text in DecimalTexts from style in DecimalStyles select new TestCaseData(text, style);
+
+    [TestCaseSource(nameof(DecimalCases))]
+    public void Parses_decimal_as_UInt128_and_Int128_do(string text, NumberStyles style)
+    {
+        Assert.That(ParseOutcome<UInt256>(text, style), Is.EqualTo(ParseOutcome<UInt128>(text, style)));
+        Assert.That(ParseOutcome<Int256>(text, style), Is.EqualTo(ParseOutcome<Int128>(text, style)));
     }
 
     [Test]
@@ -815,6 +863,7 @@ public partial class NumericsTests
     [
         "0", "00", "1", "10", "101", "ff", "FF", "aB", "7f", "G", "102", " FF", "FF ", " 10 ", "\tFF\n", "FF\0", "10\0\0", "FF \0",
         "FF\0 ", "\0FF", "", " ", "\0", "0x1F", "0b10", "-1", "+1", "(1)", "F F", "1 0", " FF", "FF ", "1_0",
+        new string('1', 257), new string('1', 257) + "2", new string('1', 257) + "G",
     ];
 
     private static readonly NumberStyles[] BitsStyles =
@@ -888,6 +937,10 @@ public partial class NumericsTests
         {
             Assert.That(TryParse(text, style, out UInt256 _), Is.False);
             Assert.That(TryParse(text, style, out Int256 _), Is.False);
+            Assert.Throws<OverflowException>(() => Parse<UInt256>(text, style));
+            Assert.Throws<OverflowException>(() => Parse<Int256>(text, style));
+            Assert.Throws<FormatException>(() => Parse<UInt256>(text + "Z", style));
+            Assert.Throws<FormatException>(() => Parse<Int256>(text + "Z", style));
         }
     }
 
