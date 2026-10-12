@@ -102,6 +102,7 @@ public readonly partial struct UInt256
     }
 
     // Vector256 paths live in separate helpers to keep the public bodies small enough to inline.
+    // ARM64 stays scalar: NEON regressed dependent chains (ArmBitwiseAB).
     public bool IsZero
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -189,7 +190,7 @@ public readonly partial struct UInt256
     private static bool LessThan(in UInt256 a, in UInt256 b)
     {
         // Without AVX-512's native unsigned k-mask compare, the short-circuiting scalar limb compare
-        // generally beats the AVX2 sign-flip emulation - see the LessThanPathAB benchmark.
+        // generally beats the AVX2 sign-flip emulation - see the LessThanPathAB benchmark - and NEON (ArmCompareAB).
         if (Avx512F.VL.IsSupported && Avx512DQ.IsSupported)
         {
             return LessThanAvx2(in a, in b);
@@ -208,6 +209,7 @@ public readonly partial struct UInt256
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool LessThanBoth(in UInt256 x, in UInt256 y, in UInt256 m)
     {
+        // ARM64 stays scalar: NEON was slower (ArmLessThanBothAB).
         if (!Avx2.IsSupported && !Vector256.IsHardwareAccelerated)
         {
             return LessThanScalar(in x, in m) && LessThanScalar(in y, in m);
