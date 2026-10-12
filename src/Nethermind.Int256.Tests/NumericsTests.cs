@@ -615,6 +615,8 @@ public partial class NumericsTests
         Assert.That((BigInteger)Parse<UInt256>(big.ToString("x", CultureInfo.InvariantCulture), NumberStyles.AllowHexSpecifier), Is.EqualTo(big));
         Assert.That((BigInteger)Parse<UInt256>(big.ToString("N0", CultureInfo.InvariantCulture), NumberStyles.Number), Is.EqualTo(big));
         Assert.That(value.ToString("X", CultureInfo.InvariantCulture), Is.EqualTo(Hex(big)));
+        Assert.That((BigInteger)Parse<UInt256>(value.ToString("X", CultureInfo.InvariantCulture), NumberStyles.HexNumber), Is.EqualTo(big));
+        Assert.That((BigInteger)Parse<UInt256>(value.ToString("B", CultureInfo.InvariantCulture), NumberStyles.BinaryNumber), Is.EqualTo(big));
     }
 
     [TestCaseSource(nameof(SignedValues))]
@@ -632,6 +634,8 @@ public partial class NumericsTests
         string hex = Wrap(big, 256, false).ToString("x64", CultureInfo.InvariantCulture)[^64..];
         Assert.That((BigInteger)Parse<Int256>(hex, NumberStyles.HexNumber), Is.EqualTo(big));
         Assert.That(value.ToString("X", CultureInfo.InvariantCulture), Is.EqualTo(Hex(big)));
+        Assert.That((BigInteger)Parse<Int256>(value.ToString("X", CultureInfo.InvariantCulture), NumberStyles.HexNumber), Is.EqualTo(big));
+        Assert.That((BigInteger)Parse<Int256>(value.ToString("B", CultureInfo.InvariantCulture), NumberStyles.BinaryNumber), Is.EqualTo(big));
     }
 
     /// <summary>The 256 bits in hex without leading zeros, as <see cref="UInt128"/> writes its 128.</summary>
@@ -806,6 +810,86 @@ public partial class NumericsTests
 
     private static bool TryParseString<T>(string? s) where T : INumber<T> =>
         T.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, out _);
+
+    private static readonly string[] BitsTexts =
+    [
+        "0", "00", "1", "10", "101", "ff", "FF", "aB", "7f", "G", "102", " FF", "FF ", " 10 ", "\tFF\n", "FF\0", "10\0\0", "FF \0",
+        "FF\0 ", "\0FF", "", " ", "\0", "0x1F", "0b10", "-1", "+1", "(1)", "F F", "1 0", " FF", "FF ", "1_0",
+    ];
+
+    private static readonly NumberStyles[] BitsStyles =
+    [
+        NumberStyles.HexNumber,
+        NumberStyles.AllowHexSpecifier,
+        NumberStyles.AllowHexSpecifier | NumberStyles.AllowLeadingWhite,
+        NumberStyles.AllowHexSpecifier | NumberStyles.AllowTrailingWhite,
+        NumberStyles.BinaryNumber,
+        NumberStyles.AllowBinarySpecifier,
+        NumberStyles.AllowBinarySpecifier | NumberStyles.AllowLeadingWhite,
+        NumberStyles.AllowBinarySpecifier | NumberStyles.AllowTrailingWhite,
+        NumberStyles.HexNumber | NumberStyles.AllowLeadingSign,
+        NumberStyles.HexNumber | NumberStyles.AllowDecimalPoint,
+        NumberStyles.BinaryNumber | NumberStyles.AllowParentheses,
+        NumberStyles.AllowHexSpecifier | NumberStyles.AllowBinarySpecifier,
+        NumberStyles.AllowHexSpecifier | (NumberStyles)0x1000,
+    ];
+
+    private static IEnumerable<TestCaseData> BitsCases() =>
+        from text in BitsTexts from style in BitsStyles select new TestCaseData(text, style);
+
+    [TestCaseSource(nameof(BitsCases))]
+    public void Parses_hex_and_binary_as_UInt128_and_Int128_do(string text, NumberStyles style)
+    {
+        Assert.That(ParseOutcome<UInt256>(text, style), Is.EqualTo(ParseOutcome<UInt128>(text, style)));
+        Assert.That(ParseOutcome<Int256>(text, style), Is.EqualTo(ParseOutcome<Int128>(text, style)));
+    }
+
+    /// <summary>What TryParse and Parse give: the value (the texts fit both widths) or the exception thrown.</summary>
+    private static string ParseOutcome<T>(string text, NumberStyles style) where T : struct, INumber<T>
+    {
+        string tryParse, parse;
+        try
+        {
+            tryParse = TryParse(text, style, out T value) ? value.ToString()! : "false";
+        }
+        catch (Exception e)
+        {
+            tryParse = e.GetType().Name;
+        }
+
+        try
+        {
+            parse = Parse<T>(text, style).ToString()!;
+        }
+        catch (Exception e)
+        {
+            parse = e.GetType().Name;
+        }
+
+        return $"{tryParse} {parse}";
+    }
+
+    [Test]
+    public void Parses_hex_and_binary_at_full_width()
+    {
+        string hexOnes = new('F', 64), binaryOnes = new('1', 256);
+        Assert.That((BigInteger)Parse<UInt256>(hexOnes, NumberStyles.HexNumber), Is.EqualTo(UInt256Max));
+        Assert.That((BigInteger)Parse<UInt256>(binaryOnes, NumberStyles.BinaryNumber), Is.EqualTo(UInt256Max));
+        Assert.That((BigInteger)Parse<UInt256>(new string('0', 300) + "1", NumberStyles.BinaryNumber), Is.EqualTo(BigInteger.One));
+
+        Assert.That((BigInteger)Parse<Int256>(hexOnes, NumberStyles.HexNumber), Is.EqualTo(BigInteger.MinusOne));
+        Assert.That((BigInteger)Parse<Int256>(binaryOnes, NumberStyles.BinaryNumber), Is.EqualTo(BigInteger.MinusOne));
+        Assert.That((BigInteger)Parse<Int256>("8" + new string('0', 63), NumberStyles.HexNumber), Is.EqualTo(Int256Min));
+        Assert.That((BigInteger)Parse<Int256>("1" + new string('0', 255), NumberStyles.BinaryNumber), Is.EqualTo(Int256Min));
+        Assert.That((BigInteger)Parse<Int256>("7" + hexOnes[1..], NumberStyles.HexNumber), Is.EqualTo(Int256Max));
+        Assert.That((BigInteger)Parse<Int256>("0" + binaryOnes[1..], NumberStyles.BinaryNumber), Is.EqualTo(Int256Max));
+
+        foreach ((string text, NumberStyles style) in new[] { ("1" + new string('0', 64), NumberStyles.HexNumber), ("1" + new string('0', 256), NumberStyles.BinaryNumber) })
+        {
+            Assert.That(TryParse(text, style, out UInt256 _), Is.False);
+            Assert.That(TryParse(text, style, out Int256 _), Is.False);
+        }
+    }
 
     // IBinaryInteger
 

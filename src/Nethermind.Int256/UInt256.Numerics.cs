@@ -538,11 +538,68 @@ public readonly partial struct UInt256 : IBinaryInteger<UInt256>, IMinMaxValue<U
     private static UInt256 ParseCore(ReadOnlySpan<char> s, NumberStyles style, IFormatProvider? provider) =>
         TryParseCore(s, style, provider, out UInt256 result) ? result : throw new FormatException();
 
-    // Any hex style takes the limb parser: BigInteger would read a leading hex digit above 7 as a sign.
+    // Hex and binary styles take the limb parser: BigInteger would read a leading digit above 7 (or 1) as a sign.
     private static bool TryParseCore(ReadOnlySpan<char> s, NumberStyles style, IFormatProvider? provider, out UInt256 result) =>
-        (style & NumberStyles.AllowHexSpecifier) != 0
-            ? TryParseHex(s, out result)
+        (style & (NumberStyles.AllowHexSpecifier | NumberStyles.AllowBinarySpecifier)) != 0
+            ? TryParseBits(s, style, out result)
             : TryParse(s, style, provider!, out result);
+
+    /// <summary>
+    /// Reads hex or binary digits into the 256 bits, as <see cref="UInt128"/> reads its 128: only the whitespace flags may
+    /// accompany the specifier, there is no sign or prefix, and trailing NUL characters are ignored.
+    /// </summary>
+    internal static bool TryParseBits(ReadOnlySpan<char> s, NumberStyles style, out UInt256 result)
+    {
+        if ((style & ~NumberStyles.HexNumber) != 0 && (style & ~NumberStyles.BinaryNumber) != 0)
+        {
+            ThrowInvalidStyle(style);
+        }
+
+        const string WhiteSpace = "\t\n\v\f\r ";
+        result = default;
+        s = s.TrimEnd('\0');
+        if ((style & NumberStyles.AllowTrailingWhite) != 0) s = s.TrimEnd(WhiteSpace);
+        if ((style & NumberStyles.AllowLeadingWhite) != 0) s = s.TrimStart(WhiteSpace);
+        if (s.IsEmpty) return false;
+
+        s = s.TrimStart('0');
+        bool hex = (style & NumberStyles.AllowHexSpecifier) != 0;
+        int bitsPerDigit = hex ? 4 : 1;
+        if (s.Length > 256 / bitsPerDigit) return false;
+
+        Span<ulong> limbs = stackalloc ulong[4];
+        int bit = 0;
+        for (int i = s.Length - 1; i >= 0; i--, bit += bitsPerDigit)
+        {
+            uint digit = (uint)(s[i] - '0');
+            if (hex)
+            {
+                if (digit > 9)
+                {
+                    // Folds 'A'-'F' onto 'a'-'f'; anything else lands above 15.
+                    digit = (uint)((s[i] | 0x20) - 'a') + 10;
+                    if (digit is < 10 or > 15) return false;
+                }
+            }
+            else if (digit > 1)
+            {
+                return false;
+            }
+
+            limbs[bit >> 6] |= (ulong)digit << (bit & 63);
+        }
+
+        result = new UInt256(limbs[0], limbs[1], limbs[2], limbs[3]);
+        return true;
+    }
+
+    [DoesNotReturn]
+    [StackTraceHidden]
+    private static void ThrowInvalidStyle(NumberStyles style) => throw new ArgumentException(
+        (style & ~(NumberStyles.Any | NumberStyles.AllowHexSpecifier | NumberStyles.AllowBinarySpecifier)) != 0
+            ? "An undefined NumberStyles value is being used."
+            : "With AllowHexSpecifier or AllowBinarySpecifier set, the only other valid flags are AllowLeadingWhite and AllowTrailingWhite.",
+        nameof(style));
 
     // Formatting. D, G without a precision, X and B are written from the limbs, for both types and both builds. The
     // culture formats fall back to BigInteger in the standard build only (UInt256.std.cs): interpolation reaches

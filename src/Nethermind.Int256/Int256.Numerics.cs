@@ -584,10 +584,10 @@ public readonly partial struct Int256 : IBinaryInteger<Int256>, IMinMaxValue<Int
 
     private static bool TryParseCore(ReadOnlySpan<char> s, NumberStyles style, IFormatProvider? provider, out Int256 result)
     {
-        // Hex is the 256-bit two's complement, as Int128 reads it: 64 F's is -1.
-        if ((style & NumberStyles.AllowHexSpecifier) != 0)
+        // Hex and binary are the 256-bit two's complement, as Int128 reads them: 64 F's is -1.
+        if ((style & (NumberStyles.AllowHexSpecifier | NumberStyles.AllowBinarySpecifier)) != 0)
         {
-            bool parsed = UInt256.TryParseHex(s, out UInt256 bits);
+            bool parsed = UInt256.TryParseBits(s, style, out UInt256 bits);
             result = new Int256(bits);
             return parsed;
         }

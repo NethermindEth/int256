@@ -216,7 +216,7 @@ public readonly partial struct UInt256
         return TryParseViaBigInteger(value, style, provider, out result);
     }
 
-    internal static bool TryParseHex(ReadOnlySpan<char> value, out UInt256 result)
+    private static bool TryParseHex(ReadOnlySpan<char> value, out UInt256 result)
     {
         value = TrimWhiteSpace(value);
 
