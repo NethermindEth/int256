@@ -6,12 +6,12 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <Description>A high-performance implementation of 256-bit integer — signed and unsigned</Description>
+    <Description>High-performance signed and unsigned 256-bit integers for .NET</Description>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
     <IncludeSymbols>true</IncludeSymbols>
     <PackageId>Nethermind.Numerics.Int256</PackageId>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageProjectUrl>https://nethermind.io</PackageProjectUrl>
+    <PackageProjectUrl>https://github.com/NethermindEth/int256</PackageProjectUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageTags>int256 uint256</PackageTags>
     <RepositoryType>git</RepositoryType>
