@@ -165,6 +165,13 @@ public readonly partial struct UInt256
             {
                 Unsafe.As<byte, Vector256<ulong>>(ref MemoryMarshal.GetReference(target)) = Unsafe.As<ulong, Vector256<ulong>>(ref Unsafe.AsRef(in u0));
             }
+            else if (AdvSimd.Arm64.IsSupported)
+            {
+                // The limbs are already in byte order.
+                ref byte dst = ref MemoryMarshal.GetReference(target);
+                Unsafe.As<ulong, Vector128<byte>>(ref Unsafe.AsRef(in u0)).StoreUnsafe(ref dst);
+                Unsafe.As<ulong, Vector128<byte>>(ref Unsafe.AsRef(in u2)).StoreUnsafe(ref dst, 16);
+            }
             else
             {
                 BinaryPrimitives.WriteUInt64LittleEndian(target.Slice(0, 8), u0);
