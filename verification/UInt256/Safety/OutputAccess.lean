@@ -30,12 +30,13 @@ theorem CallingConditions.output_limb_address {program : CIL.Program}
     {memory : CIL.Safety.Memory} {inputs outputs : List Reference}
     (call : CallingConditions program memory inputs outputs) {output : Reference}
     (member : output ∈ outputs) (index : Fin 4) :
-    add memory output 8 (BitVec.ofNat 64 index.val) =
+    add memory output 1 (BitVec.ofNat 64 (8 * index.val)) =
       .ok { output with offset := output.offset + 8 * index.val } := by
   obtain ⟨allocation, ready⟩ := access_requirements
     (call.1.2.2 (wordView output) (List.mem_map.mpr ⟨output, member, rfl⟩))
   dsimp only [wordView] at ready
-  exact ready.add_slice call.1.1 8 index.val 8 (by decide) (by omega)
+  simpa only [Nat.one_mul] using
+    ready.add_slice call.1.1 1 (8 * index.val) 8 (by decide) (by omega)
 
 theorem CallingConditions.output_limb_formed {program : CIL.Program}
     {memory : CIL.Safety.Memory} {inputs outputs : List Reference}

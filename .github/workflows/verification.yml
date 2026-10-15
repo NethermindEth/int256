@@ -1,14 +1,22 @@
-name: UInt256 verification contracts
+name: UInt256 verification
 
 on:
   pull_request:
     paths:
       - verification/**
+      - src/**
+      - global.json
+      - NuGet.Config
+      - Directory.Build.*
       - .github/workflows/verification.yml
   push:
     branches: [main]
     paths:
       - verification/**
+      - src/**
+      - global.json
+      - NuGet.Config
+      - Directory.Build.*
       - .github/workflows/verification.yml
   workflow_dispatch:
 
@@ -17,9 +25,9 @@ permissions:
 
 jobs:
   contracts:
-    name: Contracts and supporting theorem audit
+    name: Contracts and scalar Add certificate
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -34,3 +42,9 @@ jobs:
       - name: Build contracts and audit supporting theorems
         shell: pwsh
         run: ./verification/Verify.ps1 -Action Contracts
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+      - name: Verify compiled scalar Add
+        shell: pwsh
+        run: ./verification/Verify.ps1 -Action Verify -Method Add -Profile scalar
