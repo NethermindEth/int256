@@ -1,6 +1,6 @@
 {
   "sourceRevision": "6c56716afa7860771c08815b8348e53313c7f8c8",
-  "status": "Migration inventory only; no compiled-method certificates",
+  "status": "Migration inventory; completed gates are listed in gates.json, extraction alone is not verification",
   "methods": [
     {
       "id": "EqualsInt32",

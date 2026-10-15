@@ -1,0 +1,625 @@
+{
+  "leancilRevision": "3e198554cf3b6af4a24f2804a4ae74886fd41ae2",
+  "assemblySha256": "8f865556c56305c0eab0fb8e828182e08e1b06420eb3e7f59c4d42d7ded328bb",
+  "note": "Extraction checks only; no proof or feature-family coverage is implied.",
+  "scalar": [
+    {
+      "method": "EqualsInt32",
+      "extracted": true
+    },
+    {
+      "method": "EqualsInt64",
+      "extracted": true
+    },
+    {
+      "method": "EqualsUInt256Value",
+      "extracted": true
+    },
+    {
+      "method": "CompareToUInt256Value",
+      "extracted": true
+    },
+    {
+      "method": "CompareToUInt256Ref",
+      "extracted": true
+    },
+    {
+      "method": "EqUInt256Int32",
+      "extracted": true
+    },
+    {
+      "method": "EqInt32UInt256",
+      "extracted": true
+    },
+    {
+      "method": "EqUInt256UInt32",
+      "extracted": true
+    },
+    {
+      "method": "EqUInt32UInt256",
+      "extracted": true
+    },
+    {
+      "method": "EqUInt256Int64",
+      "extracted": true
+    },
+    {
+      "method": "EqInt64UInt256",
+      "extracted": true
+    },
+    {
+      "method": "EqUInt256UInt64",
+      "extracted": true
+    },
+    {
+      "method": "EqUInt64UInt256",
+      "extracted": true
+    },
+    {
+      "method": "NeUInt256Int32",
+      "extracted": true
+    },
+    {
+      "method": "NeInt32UInt256",
+      "extracted": true
+    },
+    {
+      "method": "NeUInt256UInt32",
+      "extracted": true
+    },
+    {
+      "method": "NeUInt32UInt256",
+      "extracted": true
+    },
+    {
+      "method": "NeUInt256Int64",
+      "extracted": true
+    },
+    {
+      "method": "NeInt64UInt256",
+      "extracted": true
+    },
+    {
+      "method": "NeUInt256UInt64",
+      "extracted": true
+    },
+    {
+      "method": "NeUInt64UInt256",
+      "extracted": true
+    },
+    {
+      "method": "OperatorXor",
+      "extracted": true
+    },
+    {
+      "method": "OperatorNot",
+      "extracted": true
+    },
+    {
+      "method": "EqUInt256UInt256",
+      "extracted": true
+    },
+    {
+      "method": "NeUInt256UInt256",
+      "extracted": true
+    },
+    {
+      "method": "LtUInt256UInt256",
+      "extracted": true
+    },
+    {
+      "method": "LtUInt256Int32",
+      "extracted": true
+    },
+    {
+      "method": "LtInt32UInt256",
+      "extracted": true
+    },
+    {
+      "method": "LtUInt256UInt32",
+      "extracted": true
+    },
+    {
+      "method": "LtUInt32UInt256",
+      "extracted": true
+    },
+    {
+      "method": "LtUInt256Int64",
+      "extracted": true
+    },
+    {
+      "method": "LtInt64UInt256",
+      "extracted": true
+    },
+    {
+      "method": "LtUInt256UInt64",
+      "extracted": true
+    },
+    {
+      "method": "LtUInt64UInt256",
+      "extracted": true
+    },
+    {
+      "method": "LeUInt256UInt256",
+      "extracted": true
+    },
+    {
+      "method": "LeUInt256Int32",
+      "extracted": true
+    },
+    {
+      "method": "LeInt32UInt256",
+      "extracted": true
+    },
+    {
+      "method": "LeUInt256UInt32",
+      "extracted": true
+    },
+    {
+      "method": "LeUInt32UInt256",
+      "extracted": true
+    },
+    {
+      "method": "LeUInt256Int64",
+      "extracted": true
+    },
+    {
+      "method": "LeInt64UInt256",
+      "extracted": true
+    },
+    {
+      "method": "LeUInt256UInt64",
+      "extracted": true
+    },
+    {
+      "method": "LeUInt64UInt256",
+      "extracted": true
+    },
+    {
+      "method": "GtUInt256UInt256",
+      "extracted": true
+    },
+    {
+      "method": "GtUInt256Int32",
+      "extracted": true
+    },
+    {
+      "method": "GtInt32UInt256",
+      "extracted": true
+    },
+    {
+      "method": "GtUInt256UInt32",
+      "extracted": true
+    },
+    {
+      "method": "GtUInt32UInt256",
+      "extracted": true
+    },
+    {
+      "method": "GtUInt256Int64",
+      "extracted": true
+    },
+    {
+      "method": "GtInt64UInt256",
+      "extracted": true
+    },
+    {
+      "method": "GtUInt256UInt64",
+      "extracted": true
+    },
+    {
+      "method": "GtUInt64UInt256",
+      "extracted": true
+    },
+    {
+      "method": "GeUInt256UInt256",
+      "extracted": true
+    },
+    {
+      "method": "GeUInt256Int32",
+      "extracted": true
+    },
+    {
+      "method": "GeInt32UInt256",
+      "extracted": true
+    },
+    {
+      "method": "GeUInt256UInt32",
+      "extracted": true
+    },
+    {
+      "method": "GeUInt32UInt256",
+      "extracted": true
+    },
+    {
+      "method": "GeUInt256Int64",
+      "extracted": true
+    },
+    {
+      "method": "GeInt64UInt256",
+      "extracted": true
+    },
+    {
+      "method": "GeUInt256UInt64",
+      "extracted": true
+    },
+    {
+      "method": "GeUInt64UInt256",
+      "extracted": true
+    },
+    {
+      "method": "OperatorOr",
+      "extracted": true
+    },
+    {
+      "method": "OperatorAnd",
+      "extracted": true
+    },
+    {
+      "method": "Not",
+      "extracted": true
+    },
+    {
+      "method": "Or",
+      "extracted": true
+    },
+    {
+      "method": "And",
+      "extracted": true
+    },
+    {
+      "method": "Xor",
+      "extracted": true
+    },
+    {
+      "method": "EqualsUInt32",
+      "extracted": true
+    },
+    {
+      "method": "EqualsUInt64",
+      "extracted": true
+    },
+    {
+      "method": "EqualsUInt256Ref",
+      "extracted": true
+    },
+    {
+      "method": "Multiply",
+      "extracted": false,
+      "issue": 36
+    },
+    {
+      "method": "Lsh",
+      "extracted": false,
+      "issue": 37
+    },
+    {
+      "method": "Rsh",
+      "extracted": false,
+      "issue": 37
+    },
+    {
+      "method": "OperatorMultiplyUInt256UInt32",
+      "extracted": false,
+      "issue": 36
+    },
+    {
+      "method": "OperatorMultiplyUInt32UInt256",
+      "extracted": false,
+      "issue": 36
+    },
+    {
+      "method": "OperatorMultiplyUInt256UInt64",
+      "extracted": false,
+      "issue": 36
+    },
+    {
+      "method": "OperatorMultiplyUInt64UInt256",
+      "extracted": false,
+      "issue": 36
+    },
+    {
+      "method": "OperatorMultiplyUInt256UInt256",
+      "extracted": false,
+      "issue": 36
+    },
+    {
+      "method": "MultiplyInstance",
+      "extracted": false,
+      "issue": 36
+    },
+    {
+      "method": "LeftShift",
+      "extracted": false,
+      "issue": 37
+    },
+    {
+      "method": "RightShift",
+      "extracted": false,
+      "issue": 37
+    },
+    {
+      "method": "OperatorLsh",
+      "extracted": false,
+      "issue": 37
+    },
+    {
+      "method": "OperatorRsh",
+      "extracted": false,
+      "issue": 37
+    },
+    {
+      "method": "AddOverflow",
+      "extracted": true
+    },
+    {
+      "method": "SubtractUnderflow",
+      "extracted": true
+    },
+    {
+      "method": "Add",
+      "extracted": true
+    },
+    {
+      "method": "Subtract",
+      "extracted": true
+    }
+  ],
+  "upstreamIssues": {
+    "36": "Math.BigMul unsigned high/low product",
+    "37": "Unsafe.As aggregate-to-primitive/vector byrefs",
+    "38": "Unsafe.BitCast aggregate/vector values",
+    "39": "Generated translation_valid exceeds default heartbeat budget in fresh consumer verification",
+    "40": "Checked unmanaged-aggregate constructor, local-store and by-value parameter-home contents helpers"
+  },
+  "pendingGates": [
+    {
+      "method": "Subtract",
+      "profile": "scalar",
+      "proof": "proofs/SubtractScalar.lean",
+      "theorem": "UInt256Proof.Subtract.scalar_correctness",
+      "issue": 39,
+      "status": "consumer proof compiles; full verification blocked by generated translation evidence budget"
+    },
+    {
+      "method": "SubtractUnderflow",
+      "profile": "scalar",
+      "proof": "proofs/SubtractUnderflowScalar.lean",
+      "theorem": "UInt256Proof.Subtract.underflow_scalar_correctness",
+      "issue": 39,
+      "status": "consumer proof compiles; full verification blocked by generated translation evidence budget"
+    }
+  ],
+  "blockedGates": [
+    {
+      "method": "EqualsInt32",
+      "profile": "scalar",
+      "issue": 40
+    },
+    {
+      "method": "EqualsInt64",
+      "profile": "scalar",
+      "issue": 40
+    },
+    {
+      "method": "EqualsUInt256Value",
+      "profile": "scalar",
+      "issue": 40
+    },
+    {
+      "method": "CompareToUInt256Value",
+      "profile": "scalar",
+      "issue": 40
+    },
+    {
+      "method": "EqUInt256Int32",
+      "profile": "scalar",
+      "issue": 40
+    },
+    {
+      "method": "EqInt32UInt256",
+      "profile": "scalar",
+      "issue": 40
+    },
+    {
+      "method": "EqUInt256UInt32",
+      "profile": "scalar",
+      "issue": 40
+    },
+    {
+      "method": "EqUInt32UInt256",
+      "profile": "scalar",
+      "issue": 40
+    },
+    {
+      "method": "EqUInt256Int64",
+      "profile": "scalar",
+      "issue": 40
+    },
+    {
+      "method": "EqInt64UInt256",
+      "profile": "scalar",
+      "issue": 40
+    },
+    {
+      "method": "EqUInt256UInt64",
+      "profile": "scalar",
+      "issue": 40
+    },
+    {
+      "method": "EqUInt64UInt256",
+      "profile": "scalar",
+      "issue": 40
+    },
+    {
+      "method": "NeUInt256Int32",
+      "profile": "scalar",
+      "issue": 40
+    },
+    {
+      "method": "NeInt32UInt256",
+      "profile": "scalar",
+      "issue": 40
+    },
+    {
+      "method": "NeUInt256UInt32",
+      "profile": "scalar",
+      "issue": 40
+    },
+    {
+      "method": "NeUInt32UInt256",
+      "profile": "scalar",
+      "issue": 40
+    },
+    {
+      "method": "NeUInt256Int64",
+      "profile": "scalar",
+      "issue": 40
+    },
+    {
+      "method": "NeInt64UInt256",
+      "profile": "scalar",
+      "issue": 40
+    },
+    {
+      "method": "NeUInt256UInt64",
+      "profile": "scalar",
+      "issue": 40
+    },
+    {
+      "method": "NeUInt64UInt256",
+      "profile": "scalar",
+      "issue": 40
+    },
+    {
+      "method": "OperatorXor",
+      "profile": "scalar",
+      "issue": 40
+    },
+    {
+      "method": "OperatorNot",
+      "profile": "scalar",
+      "issue": 40
+    },
+    {
+      "method": "LeUInt64UInt256",
+      "profile": "scalar",
+      "issue": 40
+    },
+    {
+      "method": "OperatorOr",
+      "profile": "scalar",
+      "issue": 40
+    },
+    {
+      "method": "OperatorAnd",
+      "profile": "scalar",
+      "issue": 40
+    },
+    {
+      "method": "Not",
+      "profile": "scalar",
+      "issue": 40
+    },
+    {
+      "method": "Or",
+      "profile": "scalar",
+      "issue": 40
+    },
+    {
+      "method": "And",
+      "profile": "scalar",
+      "issue": 40
+    },
+    {
+      "method": "Xor",
+      "profile": "scalar",
+      "issue": 40
+    },
+    {
+      "method": "EqualsUInt32",
+      "profile": "scalar",
+      "issue": 40
+    },
+    {
+      "method": "EqualsUInt64",
+      "profile": "scalar",
+      "issue": 40
+    },
+    {
+      "method": "Multiply",
+      "profile": "scalar",
+      "issue": 36
+    },
+    {
+      "method": "Lsh",
+      "profile": "scalar",
+      "issue": 37
+    },
+    {
+      "method": "Rsh",
+      "profile": "scalar",
+      "issue": 37
+    },
+    {
+      "method": "OperatorMultiplyUInt256UInt32",
+      "profile": "scalar",
+      "issue": 36
+    },
+    {
+      "method": "OperatorMultiplyUInt32UInt256",
+      "profile": "scalar",
+      "issue": 36
+    },
+    {
+      "method": "OperatorMultiplyUInt256UInt64",
+      "profile": "scalar",
+      "issue": 36
+    },
+    {
+      "method": "OperatorMultiplyUInt64UInt256",
+      "profile": "scalar",
+      "issue": 36
+    },
+    {
+      "method": "OperatorMultiplyUInt256UInt256",
+      "profile": "scalar",
+      "issue": 36
+    },
+    {
+      "method": "MultiplyInstance",
+      "profile": "scalar",
+      "issue": 36
+    },
+    {
+      "method": "LeftShift",
+      "profile": "scalar",
+      "issue": 37
+    },
+    {
+      "method": "RightShift",
+      "profile": "scalar",
+      "issue": 37
+    },
+    {
+      "method": "OperatorLsh",
+      "profile": "scalar",
+      "issue": 37
+    },
+    {
+      "method": "OperatorRsh",
+      "profile": "scalar",
+      "issue": 37
+    },
+    {
+      "method": "SubtractUnderflow",
+      "profile": "scalar",
+      "issue": 39
+    },
+    {
+      "method": "Subtract",
+      "profile": "scalar",
+      "issue": 39
+    }
+  ]
+}

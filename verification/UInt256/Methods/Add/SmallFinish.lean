@@ -133,7 +133,7 @@ theorem small_store_finish (branch : Fin 5) (original entered current : CIL.Safe
     repeat' (conv in storageWordOrder => cbv)
     simp [List.range_succ, List.findIdx, step, checkedValue, numericValue, formValue, formed,
       checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-    exact ⟨rfl, rfl⟩
+    exact ⟨rfl, rfl, rfl⟩
   · exact currentCall
   · intro stored valid outside _ value
     obtain ⟨outputAllocation, outputPresent, _, _⟩ := formed_reference_live _ _ _

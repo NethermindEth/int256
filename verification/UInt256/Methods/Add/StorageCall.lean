@@ -13,7 +13,7 @@ theorem run_store_limbs_readable {method pc : Nat} {body : CIL.Method} {op : CIL
     (post : Memory → List Value → Prop)
     (methodFound : Extracted.program[method]? = some body)
     (instructionFound : body.code[pc]? = some op)
-    (stepped : step body op pc args frame stack memory = .ok (.call Extracted.storeLimbsIndex
+    (stepped : step body op pc args frame stack memory = .ok (.call storageIndex
       (storageArguments output w0 w1 w2 w3) rest updated))
     (call : CallingConditions Extracted.program updated inputs [output])
     (continuation : ∀ stored,
@@ -31,8 +31,6 @@ theorem run_store_limbs_readable {method pc : Nat} {body : CIL.Method} {op : CIL
       post result values := by
   obtain ⟨childFuel, stored, invoked, valid, outside, authority, value, readable⟩ :=
     store_limbs_readable_contract updated inputs output w0 w1 w2 w3 call
-  have selected : storageIndex = Extracted.storeLimbsIndex := by rfl
-  rw [selected] at invoked
   obtain ⟨parentFuel, result, values, resumed, satisfied⟩ := continuation stored valid outside authority value readable
   have resumed' : run Extracted.program parentFuel method (pc + 1) args frame ([] ++ rest) stored =
       .ok (result, values) := resumed
@@ -46,7 +44,7 @@ theorem run_store_limbs {method pc : Nat} {body : CIL.Method} {op : CIL.Op}
     (post : Memory → List Value → Prop)
     (methodFound : Extracted.program[method]? = some body)
     (instructionFound : body.code[pc]? = some op)
-    (stepped : step body op pc args frame stack memory = .ok (.call Extracted.storeLimbsIndex
+    (stepped : step body op pc args frame stack memory = .ok (.call storageIndex
       (storageArguments output w0 w1 w2 w3) rest updated))
     (call : CallingConditions Extracted.program updated inputs [output])
     (continuation : ∀ stored,

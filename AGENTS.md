@@ -24,3 +24,10 @@ High-performance 256-bit integer types for .NET. See [global.json](./global.json
 - Prefer the latest versions of GitHub Actions and runners.
 - Update [THIRD-PARTY-NOTICES](./THIRD-PARTY-NOTICES) when introducing a dependency if needed.
 - Keep [AGENTS.md](./AGENTS.md) in sync with the ongoing development.
+
+## Verification
+
+- Consume pinned LeanCIL from `verification/lakefile.toml`; keep CIL infrastructure upstream.
+- Register completed method/profile proofs in `verification/manifests/gates.json`.
+- Validate gates with `verification/Verify.ps1 -Action Verify -Method <id> -Profile <profile>`; a supporting-library build or successful extraction is not a compiled-method certificate.
+- Preserve independent arithmetic, overlap, finite-return, and caller-memory contracts when porting proofs. Report unsupported extraction or composition upstream instead of changing production C# to suit a proof.
