@@ -1,0 +1,441 @@
+{
+  "sourceRevision": "6c56716afa7860771c08815b8348e53313c7f8c8",
+  "status": "Migration inventory only; no compiled-method certificates",
+  "methods": [
+    {
+      "id": "EqualsInt32",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::Equals(System.Int32)",
+      "family": "Comparison"
+    },
+    {
+      "id": "EqualsInt64",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::Equals(System.Int64)",
+      "family": "Comparison"
+    },
+    {
+      "id": "EqualsUInt256Value",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::Equals(Nethermind.Int256.UInt256)",
+      "family": "Comparison"
+    },
+    {
+      "id": "CompareToUInt256Value",
+      "signature": "System.Int32 Nethermind.Int256.UInt256::CompareTo(Nethermind.Int256.UInt256)",
+      "family": "Comparison"
+    },
+    {
+      "id": "CompareToUInt256Ref",
+      "signature": "System.Int32 Nethermind.Int256.UInt256::CompareTo(Nethermind.Int256.UInt256&)",
+      "family": "Comparison"
+    },
+    {
+      "id": "EqUInt256Int32",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_Equality(Nethermind.Int256.UInt256&,System.Int32)",
+      "family": "Comparison"
+    },
+    {
+      "id": "EqInt32UInt256",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_Equality(System.Int32,Nethermind.Int256.UInt256&)",
+      "family": "Comparison"
+    },
+    {
+      "id": "EqUInt256UInt32",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_Equality(Nethermind.Int256.UInt256&,System.UInt32)",
+      "family": "Comparison"
+    },
+    {
+      "id": "EqUInt32UInt256",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_Equality(System.UInt32,Nethermind.Int256.UInt256&)",
+      "family": "Comparison"
+    },
+    {
+      "id": "EqUInt256Int64",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_Equality(Nethermind.Int256.UInt256&,System.Int64)",
+      "family": "Comparison"
+    },
+    {
+      "id": "EqInt64UInt256",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_Equality(System.Int64,Nethermind.Int256.UInt256&)",
+      "family": "Comparison"
+    },
+    {
+      "id": "EqUInt256UInt64",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_Equality(Nethermind.Int256.UInt256&,System.UInt64)",
+      "family": "Comparison"
+    },
+    {
+      "id": "EqUInt64UInt256",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_Equality(System.UInt64,Nethermind.Int256.UInt256&)",
+      "family": "Comparison"
+    },
+    {
+      "id": "NeUInt256Int32",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_Inequality(Nethermind.Int256.UInt256&,System.Int32)",
+      "family": "Comparison"
+    },
+    {
+      "id": "NeInt32UInt256",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_Inequality(System.Int32,Nethermind.Int256.UInt256&)",
+      "family": "Comparison"
+    },
+    {
+      "id": "NeUInt256UInt32",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_Inequality(Nethermind.Int256.UInt256&,System.UInt32)",
+      "family": "Comparison"
+    },
+    {
+      "id": "NeUInt32UInt256",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_Inequality(System.UInt32,Nethermind.Int256.UInt256&)",
+      "family": "Comparison"
+    },
+    {
+      "id": "NeUInt256Int64",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_Inequality(Nethermind.Int256.UInt256&,System.Int64)",
+      "family": "Comparison"
+    },
+    {
+      "id": "NeInt64UInt256",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_Inequality(System.Int64,Nethermind.Int256.UInt256&)",
+      "family": "Comparison"
+    },
+    {
+      "id": "NeUInt256UInt64",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_Inequality(Nethermind.Int256.UInt256&,System.UInt64)",
+      "family": "Comparison"
+    },
+    {
+      "id": "NeUInt64UInt256",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_Inequality(System.UInt64,Nethermind.Int256.UInt256&)",
+      "family": "Comparison"
+    },
+    {
+      "id": "OperatorXor",
+      "signature": "Nethermind.Int256.UInt256 Nethermind.Int256.UInt256::op_ExclusiveOr(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+      "family": "Bitwise"
+    },
+    {
+      "id": "OperatorNot",
+      "signature": "Nethermind.Int256.UInt256 Nethermind.Int256.UInt256::op_OnesComplement(Nethermind.Int256.UInt256&)",
+      "family": "Bitwise"
+    },
+    {
+      "id": "EqUInt256UInt256",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_Equality(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+      "family": "Comparison"
+    },
+    {
+      "id": "NeUInt256UInt256",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_Inequality(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+      "family": "Comparison"
+    },
+    {
+      "id": "LtUInt256UInt256",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThan(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+      "family": "Comparison"
+    },
+    {
+      "id": "LtUInt256Int32",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThan(Nethermind.Int256.UInt256&,System.Int32)",
+      "family": "Comparison"
+    },
+    {
+      "id": "LtInt32UInt256",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThan(System.Int32,Nethermind.Int256.UInt256&)",
+      "family": "Comparison"
+    },
+    {
+      "id": "LtUInt256UInt32",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThan(Nethermind.Int256.UInt256&,System.UInt32)",
+      "family": "Comparison"
+    },
+    {
+      "id": "LtUInt32UInt256",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThan(System.UInt32,Nethermind.Int256.UInt256&)",
+      "family": "Comparison"
+    },
+    {
+      "id": "LtUInt256Int64",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThan(Nethermind.Int256.UInt256&,System.Int64)",
+      "family": "Comparison"
+    },
+    {
+      "id": "LtInt64UInt256",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThan(System.Int64,Nethermind.Int256.UInt256&)",
+      "family": "Comparison"
+    },
+    {
+      "id": "LtUInt256UInt64",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThan(Nethermind.Int256.UInt256&,System.UInt64)",
+      "family": "Comparison"
+    },
+    {
+      "id": "LtUInt64UInt256",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThan(System.UInt64,Nethermind.Int256.UInt256&)",
+      "family": "Comparison"
+    },
+    {
+      "id": "LeUInt256UInt256",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThanOrEqual(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+      "family": "Comparison"
+    },
+    {
+      "id": "LeUInt256Int32",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThanOrEqual(Nethermind.Int256.UInt256&,System.Int32)",
+      "family": "Comparison"
+    },
+    {
+      "id": "LeInt32UInt256",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThanOrEqual(System.Int32,Nethermind.Int256.UInt256&)",
+      "family": "Comparison"
+    },
+    {
+      "id": "LeUInt256UInt32",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThanOrEqual(Nethermind.Int256.UInt256&,System.UInt32)",
+      "family": "Comparison"
+    },
+    {
+      "id": "LeUInt32UInt256",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThanOrEqual(System.UInt32,Nethermind.Int256.UInt256&)",
+      "family": "Comparison"
+    },
+    {
+      "id": "LeUInt256Int64",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThanOrEqual(Nethermind.Int256.UInt256&,System.Int64)",
+      "family": "Comparison"
+    },
+    {
+      "id": "LeInt64UInt256",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThanOrEqual(System.Int64,Nethermind.Int256.UInt256&)",
+      "family": "Comparison"
+    },
+    {
+      "id": "LeUInt256UInt64",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThanOrEqual(Nethermind.Int256.UInt256&,System.UInt64)",
+      "family": "Comparison"
+    },
+    {
+      "id": "LeUInt64UInt256",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_LessThanOrEqual(System.UInt64,Nethermind.Int256.UInt256)",
+      "family": "Comparison"
+    },
+    {
+      "id": "GtUInt256UInt256",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThan(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+      "family": "Comparison"
+    },
+    {
+      "id": "GtUInt256Int32",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThan(Nethermind.Int256.UInt256&,System.Int32)",
+      "family": "Comparison"
+    },
+    {
+      "id": "GtInt32UInt256",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThan(System.Int32,Nethermind.Int256.UInt256&)",
+      "family": "Comparison"
+    },
+    {
+      "id": "GtUInt256UInt32",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThan(Nethermind.Int256.UInt256&,System.UInt32)",
+      "family": "Comparison"
+    },
+    {
+      "id": "GtUInt32UInt256",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThan(System.UInt32,Nethermind.Int256.UInt256&)",
+      "family": "Comparison"
+    },
+    {
+      "id": "GtUInt256Int64",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThan(Nethermind.Int256.UInt256&,System.Int64)",
+      "family": "Comparison"
+    },
+    {
+      "id": "GtInt64UInt256",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThan(System.Int64,Nethermind.Int256.UInt256&)",
+      "family": "Comparison"
+    },
+    {
+      "id": "GtUInt256UInt64",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThan(Nethermind.Int256.UInt256&,System.UInt64)",
+      "family": "Comparison"
+    },
+    {
+      "id": "GtUInt64UInt256",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThan(System.UInt64,Nethermind.Int256.UInt256&)",
+      "family": "Comparison"
+    },
+    {
+      "id": "GeUInt256UInt256",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThanOrEqual(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+      "family": "Comparison"
+    },
+    {
+      "id": "GeUInt256Int32",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThanOrEqual(Nethermind.Int256.UInt256&,System.Int32)",
+      "family": "Comparison"
+    },
+    {
+      "id": "GeInt32UInt256",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThanOrEqual(System.Int32,Nethermind.Int256.UInt256&)",
+      "family": "Comparison"
+    },
+    {
+      "id": "GeUInt256UInt32",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThanOrEqual(Nethermind.Int256.UInt256&,System.UInt32)",
+      "family": "Comparison"
+    },
+    {
+      "id": "GeUInt32UInt256",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThanOrEqual(System.UInt32,Nethermind.Int256.UInt256&)",
+      "family": "Comparison"
+    },
+    {
+      "id": "GeUInt256Int64",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThanOrEqual(Nethermind.Int256.UInt256&,System.Int64)",
+      "family": "Comparison"
+    },
+    {
+      "id": "GeInt64UInt256",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThanOrEqual(System.Int64,Nethermind.Int256.UInt256&)",
+      "family": "Comparison"
+    },
+    {
+      "id": "GeUInt256UInt64",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThanOrEqual(Nethermind.Int256.UInt256&,System.UInt64)",
+      "family": "Comparison"
+    },
+    {
+      "id": "GeUInt64UInt256",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::op_GreaterThanOrEqual(System.UInt64,Nethermind.Int256.UInt256&)",
+      "family": "Comparison"
+    },
+    {
+      "id": "OperatorOr",
+      "signature": "Nethermind.Int256.UInt256 Nethermind.Int256.UInt256::op_BitwiseOr(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+      "family": "Bitwise"
+    },
+    {
+      "id": "OperatorAnd",
+      "signature": "Nethermind.Int256.UInt256 Nethermind.Int256.UInt256::op_BitwiseAnd(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+      "family": "Bitwise"
+    },
+    {
+      "id": "Not",
+      "signature": "System.Void Nethermind.Int256.UInt256::Not(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+      "family": "Bitwise"
+    },
+    {
+      "id": "Or",
+      "signature": "System.Void Nethermind.Int256.UInt256::Or(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+      "family": "Bitwise"
+    },
+    {
+      "id": "And",
+      "signature": "System.Void Nethermind.Int256.UInt256::And(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+      "family": "Bitwise"
+    },
+    {
+      "id": "Xor",
+      "signature": "System.Void Nethermind.Int256.UInt256::Xor(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+      "family": "Bitwise"
+    },
+    {
+      "id": "EqualsUInt32",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::Equals(System.UInt32)",
+      "family": "Comparison"
+    },
+    {
+      "id": "EqualsUInt64",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::Equals(System.UInt64)",
+      "family": "Comparison"
+    },
+    {
+      "id": "EqualsUInt256Ref",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::Equals(Nethermind.Int256.UInt256&)",
+      "family": "Comparison"
+    },
+    {
+      "id": "Multiply",
+      "signature": "System.Void Nethermind.Int256.UInt256::Multiply(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+      "family": "Multiply"
+    },
+    {
+      "id": "Lsh",
+      "signature": "System.Void Nethermind.Int256.UInt256::Lsh(Nethermind.Int256.UInt256&,System.Int32,Nethermind.Int256.UInt256&)",
+      "family": "Shift"
+    },
+    {
+      "id": "Rsh",
+      "signature": "System.Void Nethermind.Int256.UInt256::Rsh(Nethermind.Int256.UInt256&,System.Int32,Nethermind.Int256.UInt256&)",
+      "family": "Shift"
+    },
+    {
+      "id": "OperatorMultiplyUInt256UInt32",
+      "signature": "Nethermind.Int256.UInt256 Nethermind.Int256.UInt256::op_Multiply(Nethermind.Int256.UInt256&,System.UInt32)",
+      "family": "Multiply"
+    },
+    {
+      "id": "OperatorMultiplyUInt32UInt256",
+      "signature": "Nethermind.Int256.UInt256 Nethermind.Int256.UInt256::op_Multiply(System.UInt32,Nethermind.Int256.UInt256&)",
+      "family": "Multiply"
+    },
+    {
+      "id": "OperatorMultiplyUInt256UInt64",
+      "signature": "Nethermind.Int256.UInt256 Nethermind.Int256.UInt256::op_Multiply(Nethermind.Int256.UInt256&,System.UInt64)",
+      "family": "Multiply"
+    },
+    {
+      "id": "OperatorMultiplyUInt64UInt256",
+      "signature": "Nethermind.Int256.UInt256 Nethermind.Int256.UInt256::op_Multiply(System.UInt64,Nethermind.Int256.UInt256&)",
+      "family": "Multiply"
+    },
+    {
+      "id": "OperatorMultiplyUInt256UInt256",
+      "signature": "Nethermind.Int256.UInt256 Nethermind.Int256.UInt256::op_Multiply(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+      "family": "Multiply"
+    },
+    {
+      "id": "MultiplyInstance",
+      "signature": "System.Void Nethermind.Int256.UInt256::Multiply(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+      "family": "Multiply"
+    },
+    {
+      "id": "LeftShift",
+      "signature": "System.Void Nethermind.Int256.UInt256::LeftShift(System.Int32,Nethermind.Int256.UInt256&)",
+      "family": "Shift"
+    },
+    {
+      "id": "RightShift",
+      "signature": "System.Void Nethermind.Int256.UInt256::RightShift(System.Int32,Nethermind.Int256.UInt256&)",
+      "family": "Shift"
+    },
+    {
+      "id": "OperatorLsh",
+      "signature": "Nethermind.Int256.UInt256 Nethermind.Int256.UInt256::op_LeftShift(Nethermind.Int256.UInt256&,System.Int32)",
+      "family": "Shift"
+    },
+    {
+      "id": "OperatorRsh",
+      "signature": "Nethermind.Int256.UInt256 Nethermind.Int256.UInt256::op_RightShift(Nethermind.Int256.UInt256&,System.Int32)",
+      "family": "Shift"
+    },
+    {
+      "id": "AddOverflow",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::AddOverflow(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+      "family": "Reporting"
+    },
+    {
+      "id": "SubtractUnderflow",
+      "signature": "System.Boolean Nethermind.Int256.UInt256::SubtractUnderflow(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+      "family": "Reporting"
+    },
+    {
+      "id": "Add",
+      "signature": "System.Void Nethermind.Int256.UInt256::Add(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+      "family": "Arithmetic"
+    },
+    {
+      "id": "Subtract",
+      "signature": "System.Void Nethermind.Int256.UInt256::Subtract(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+      "family": "Arithmetic"
+    }
+  ]
+}

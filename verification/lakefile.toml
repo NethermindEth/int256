@@ -1,0 +1,11 @@
+name = "uint256_verification"
+version = "0.1.0"
+defaultTargets = ["UInt256"]
+
+[[require]]
+name = "leancil"
+git = "https://github.com/NethermindEth/LeanCIL.git"
+rev = "3ddec3df17a66bf475000a2c5c15e836ecab7a97"
+
+[[lean_lib]]
+name = "UInt256"
