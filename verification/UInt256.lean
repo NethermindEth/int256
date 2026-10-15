@@ -12,6 +12,7 @@ import UInt256.LookupTable
 import UInt256.Methods.Add.Contract
 import UInt256.Methods.Bitwise.Contract
 import UInt256.Methods.Compare.Contract
+import UInt256.Methods.Compare.PrimitiveLeafContract
 import UInt256.Methods.Equality.Contract
 import UInt256.Methods.Multiply.Contract
 import UInt256.Methods.Multiply.ReturnContract

@@ -74,6 +74,60 @@ Each batch publishes stage timings and command transcripts identifying the metho
 The verifier defaults Lean to two worker threads to bound parallel kernel-replay
 memory; set `LEAN_NUM_THREADS` explicitly to override this locally. CI uses two threads.
 Keep the environment stable within a batch: LeanCIL binds it into cache identities.
+
+The 31 primitive comparison gates share `PrimitiveLeaf.run_template` and
+`PrimitiveLeaf.checked_template`. These theorems do not import `Extracted`:
+they prove the four signed/unsigned and argument-order variants for any program
+and method index whose complete method body matches the expected UInt256 helper.
+Each gate checks that equality against its actual extraction, then composes the
+shared contract with its wrapper proof. Changed instructions, profile or frame
+metadata must satisfy that equality; the template is not an assumed helper contract.
+The independent arithmetic, checked finite return and caller-memory guarantees
+remain part of each public certificate.
+
+LeanCIL's existing authenticated support cache can reuse these compiled theorems
+and their kernel checks across different gates in the same batch. The first gate
+still checks the shared proof; subsequent gates freshly check their extraction,
+binding and wrapper proofs. This differs from an unchanged whole-proof cache hit.
+Portable consumer cache sharing between CI runners remains upstream work.
+
+Local Windows measurements on the same compiled assembly and LeanCIL pin, with
+`LEAN_NUM_THREADS=2` and a pre-certified CIL library:
+
+| Consumer verification | Before | Shared helper proofs |
+| --- | ---: | ---: |
+| First `LtUInt256UInt64` certificate | 298.5 s | 144.8 s |
+| Consumer proof build within that check | 115.3 s | 35.7 s |
+| Kernel replay within that check | 165.7 s | 91.9 s |
+| Subsequent, different `LtInt64UInt256` certificate | — | 65.3 s |
+
+These are single local samples, not CI timing guarantees; short development
+checks overlapped the baseline. Both first-gate runs built and kernel-checked
+consumer proofs without consumer cache reuse. The subsequent gate reused the
+authenticated shared modules, but freshly checked its extraction and public
+proof (`consumer-certified-artifact`, not `consumer-proof-cache`). Its kernel
+replay took 33.5 seconds and excluded the shared helper modules.
+To reproduce, extract the methods once, prepare the certified CIL library with
+upstream `scripts/PrepareLibrary.cs`, and set `LEANCIL_CERTIFIED_LIBRARY` and
+`LEANCIL_CERTIFIED_LIBRARY_SHA256` to its directory and printed manifest digest.
+Set `LEANCIL_CACHE_DIR` to a new directory and `LEAN_NUM_THREADS=2`, then keep
+the environment fixed while running these commands from `verification/`:
+
+```text
+dotnet .lake/packages/leancil/Extractor/bin/Nethermind.LeanCIL.dll verify artifacts/LtUInt256UInt64/scalar --proof proofs/LtUInt256UInt64Scalar.lean --theorem UInt256Proof.Compare.LtUInt256UInt64.scalar_correctness --proof-root .
+dotnet .lake/packages/leancil/Extractor/bin/Nethermind.LeanCIL.dll verify artifacts/LtInt64UInt256/scalar --proof proofs/LtInt64UInt256Scalar.lean --theorem UInt256Proof.Compare.LtInt64UInt256.scalar_correctness --proof-root .
+```
+
+The measurements exclude production/extractor builds and CIL library preparation.
+The complete 31-gate comparison validation took 20 minutes 51 seconds: the first
+two gates ran sequentially to measure reuse, followed by the other 29 at
+concurrency four. All 31 full certificates passed, and their 631 distinct
+source/settings hashes, assembly/extraction identities and allowed axioms were
+audited. The expanded supporting-library audit passed 496 theorems. A direct
+binding negative check rejected replacing the unsigned helper's `ltu` instruction
+with `gtu`; the unchanged instruction passed. Gate selection and runner regression
+checks also passed.
+
 For the same scalar subtraction proof and assembly, local Windows monitoring
 observed about 51 GB peak kernel-replay working set without a thread limit and
 4.7 GB with `LEAN_NUM_THREADS=2`; both full certificates passed. The runs had
@@ -82,7 +136,7 @@ Two unchanged repeats of the bounded subtraction certificate returned
 `consumer-proof-cache` in 3.6 and 3.9 seconds. This measures warm reuse, not the
 cost of proving a changed extraction or changed consumer sources.
 
-Local validation passed all 43 full method certificates against the pinned
+At the initial pin update, local validation passed all 43 full method certificates against the pinned
 revision, checked their 641 distinct source/settings hashes, and audited 409
 supporting theorems. The C# selector and batch-runner regression tests,
 analyzer-enabled builds (including IDE0005), and workflow actionlint also passed.
@@ -114,8 +168,9 @@ the subsequent writes.
 
 The scalar execution proofs were ported from the original branch to fresh
 extraction, including byte-offset field operations, parameter-home setup and
-Boolean return normalization. No generated CIL, custom extractor, or CIL
-semantics were copied into this package.
+Boolean return normalization. Extraction output remains ignored; the expected
+UInt256 helper bodies in `PrimitiveLeaf` are checked against that output by each
+gate. The extractor and CIL semantics remain upstream.
 
 `manifests/migration-status.json` records the extraction inventory and its tested
 LeanCIL revision separately from completed gates. All 87 scalar targets now
