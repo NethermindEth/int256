@@ -1,0 +1,16 @@
+{"version": "1.3.0",
+ "packagesDir": ".lake/packages",
+ "packages":
+ [{"url": "https://github.com/NethermindEth/LeanCIL.git",
+   "type": "git",
+   "subDir": null,
+   "scope": "",
+   "rev": "3ddec3df17a66bf475000a2c5c15e836ecab7a97",
+   "name": "leancil",
+   "manifestFile": "lake-manifest.json",
+   "inputRev": "3ddec3df17a66bf475000a2c5c15e836ecab7a97",
+   "inherited": false,
+   "configFile": "lakefile.toml"}],
+ "name": "uint256_verification",
+ "lakeDir": ".lake",
+ "fixedToolchain": false}
