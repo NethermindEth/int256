@@ -35,8 +35,13 @@ try {
     # A failed fresh extraction must not leave an old certificate available.
     if (Test-Path "$output/verified.json") { Remove-Item -LiteralPath "$output/verified.json" }
     if ($Action -eq 'Verify') {
+        if ($Method -eq 'Add' -and $Profile -eq 'scalar' -and
+            [string]::IsNullOrWhiteSpace($Proof) -and [string]::IsNullOrWhiteSpace($Theorem)) {
+            $Proof = 'proofs/AddScalar.lean'
+            $Theorem = 'UInt256Proof.Add.scalar_correctness'
+        }
         if ([string]::IsNullOrWhiteSpace($Proof) -or [string]::IsNullOrWhiteSpace($Theorem)) {
-            throw 'Verify requires -Proof (relative to verification/) and -Theorem. No compiled-method proof is registered yet.'
+            throw 'No proof is registered for this method/profile. Supply both -Proof (relative to verification/) and -Theorem.'
         }
         if (!(Test-Path -LiteralPath $Proof -PathType Leaf)) { throw "Proof file not found: $Proof" }
     }
