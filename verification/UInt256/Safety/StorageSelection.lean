@@ -1,4 +1,4 @@
-import UInt256.Methods.Add.Bindings
+import Extracted
 import CIL.Safety.InstructionMemory
 
 namespace UInt256Proof.Safety

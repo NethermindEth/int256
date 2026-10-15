@@ -35,10 +35,14 @@ try {
     # A failed fresh extraction must not leave an old certificate available.
     if (Test-Path "$output/verified.json") { Remove-Item -LiteralPath "$output/verified.json" }
     if ($Action -eq 'Verify') {
-        if ($Method -eq 'Add' -and $Profile -eq 'scalar' -and
-            [string]::IsNullOrWhiteSpace($Proof) -and [string]::IsNullOrWhiteSpace($Theorem)) {
-            $Proof = 'proofs/AddScalar.lean'
-            $Theorem = 'UInt256Proof.Add.scalar_correctness'
+        if ([string]::IsNullOrWhiteSpace($Proof) -and [string]::IsNullOrWhiteSpace($Theorem)) {
+            $registered = Get-Content manifests/gates.json -Raw | ConvertFrom-Json
+            $gate = @($registered.gates | Where-Object { $_.method -eq $Method -and $_.profile -eq $Profile })
+            if ($gate.Count -gt 1) { throw "Duplicate verification gate: $Method/$Profile" }
+            if ($gate.Count -eq 1) {
+                $Proof = $gate[0].proof
+                $Theorem = $gate[0].theorem
+            }
         }
         if ([string]::IsNullOrWhiteSpace($Proof) -or [string]::IsNullOrWhiteSpace($Theorem)) {
             throw 'No proof is registered for this method/profile. Supply both -Proof (relative to verification/) and -Theorem.'

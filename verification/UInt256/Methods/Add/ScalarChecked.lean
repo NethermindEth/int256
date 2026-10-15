@@ -131,7 +131,7 @@ theorem scalar_finish (original entered current : CIL.Safety.Memory) (frame : Fr
     repeat' (conv in storageWordOrder => cbv)
     simp [List.range_succ, List.findIdx, step, checkedValue, numericValue, formValue, formed,
       checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-    exact ⟨rfl, rfl⟩
+    exact ⟨rfl, rfl, rfl⟩
   · exact state.call
   · intro stored valid outside authority value
     obtain ⟨outputAllocation, outputPresent, _, _⟩ := formed_reference_live _ _ _

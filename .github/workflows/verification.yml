@@ -2,32 +2,52 @@ name: UInt256 verification
 
 on:
   pull_request:
-    paths:
-      - verification/**
-      - src/**
-      - global.json
-      - NuGet.Config
-      - Directory.Build.*
-      - .github/workflows/verification.yml
   push:
     branches: [main]
-    paths:
-      - verification/**
-      - src/**
-      - global.json
-      - NuGet.Config
-      - Directory.Build.*
-      - .github/workflows/verification.yml
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  contracts:
-    name: Contracts and scalar Add certificate
+  select:
+    name: Select verification gates
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    outputs:
+      contracts: ${{ steps.gates.outputs.contracts }}
+      matrix: ${{ steps.gates.outputs.matrix }}
+      count: ${{ steps.gates.outputs.count }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: gates
+        shell: pwsh
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          ./verification/Test-SelectGates.ps1
+          if ($env:EVENT_NAME -eq 'pull_request') {
+            $changed = @(git diff --name-only "$($env:BASE_SHA)...$($env:HEAD_SHA)")
+            if ($LASTEXITCODE -ne 0) { throw 'Could not determine changed files' }
+            $selected = ./verification/SelectGates.ps1 -ChangedPaths $changed | ConvertFrom-Json
+          } else {
+            $selected = ./verification/SelectGates.ps1 -All | ConvertFrom-Json
+          }
+          "contracts=$($selected.contracts.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+          "matrix=$(@{ include = @($selected.include) } | ConvertTo-Json -Depth 5 -Compress)" >> $env:GITHUB_OUTPUT
+          "count=$(@($selected.include).Count)" >> $env:GITHUB_OUTPUT
+          $selected | ConvertTo-Json -Depth 5
+
+  contracts:
+    name: Contracts and supporting theorem audit
+    needs: select
+    if: needs.select.outputs.contracts == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -42,9 +62,130 @@ jobs:
       - name: Build contracts and audit supporting theorems
         shell: pwsh
         run: ./verification/Verify.ps1 -Action Contracts
+
+  prepare:
+    name: Prepare certified LeanCIL library
+    needs: select
+    if: needs.select.outputs.count != '0'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    outputs:
+      manifest-sha256: ${{ steps.certify.outputs.manifest-sha256 }}
+      artifact-id: ${{ steps.library.outputs.artifact-id }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: leanprover/lean-action@24581d74d674803a25a81b10b059c5c0cdd344c6 # v1.6.2
+        with:
+          lake-package-directory: verification
+          auto-config: false
+          use-github-cache: false
+          use-mathlib-cache: false
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
-      - name: Verify compiled scalar Add
+      - name: Build and kernel-check shared library
+        id: certify
         shell: pwsh
-        run: ./verification/Verify.ps1 -Action Verify -Method Add -Profile scalar
+        working-directory: verification
+        run: |
+          lake update
+          if ($LASTEXITCODE -ne 0) { throw 'Dependency resolution failed' }
+          dotnet run --file .lake/packages/leancil/scripts/PrepareLibrary.cs -- artifacts/certified-library
+          if ($LASTEXITCODE -ne 0) { throw 'Library certification failed' }
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        id: library
+        with:
+          name: certified-library-${{ github.run_id }}-${{ github.run_attempt }}
+          path: verification/artifacts/certified-library
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+
+  verify:
+    name: Certificate (${{ matrix.method }}/${{ matrix.profile }})
+    needs: [select, prepare]
+    if: needs.select.outputs.count != '0'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      LEANCIL_CERTIFIED_LIBRARY: ${{ github.workspace }}/verification/artifacts/certified-library
+      LEANCIL_CERTIFIED_LIBRARY_SHA256: ${{ needs.prepare.outputs.manifest-sha256 }}
+      LEANCIL_TRACE_DIRECTORY: ${{ github.workspace }}/verification/artifacts/verification-traces
+      LEANCIL_SUITE: ${{ matrix.method }}/${{ matrix.profile }}
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix: ${{ fromJSON(needs.select.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Lean toolchain
+        uses: leanprover/lean-action@24581d74d674803a25a81b10b059c5c0cdd344c6 # v1.6.2
+        with:
+          lake-package-directory: verification
+          auto-config: false
+          use-github-cache: false
+          use-mathlib-cache: false
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ needs.prepare.outputs.artifact-id }}
+          path: verification/artifacts/certified-library
+      - name: Verify compiled method
+        id: certificate
+        shell: pwsh
+        env:
+          VERIFY_METHOD: ${{ matrix.method }}
+          VERIFY_PROFILE: ${{ matrix.profile }}
+        run: ./verification/Verify.ps1 -Action Verify -Method $env:VERIFY_METHOD -Profile $env:VERIFY_PROFILE
+      - name: Summarize verification timings
+        if: always() && steps.certificate.outcome != 'skipped'
+        shell: pwsh
+        working-directory: verification
+        run: |
+          dotnet run --file .lake/packages/leancil/scripts/SummarizeVerification.cs -- --root artifacts/verification-traces --output artifacts/timings.json --markdown artifacts/timings.md --github-summary
+          if ($LASTEXITCODE -ne 0) { throw 'Timing summary failed' }
+      - name: Retain timings and command transcripts
+        if: always() && steps.certificate.outcome != 'skipped'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: verification-${{ matrix.method }}-${{ matrix.profile }}-${{ github.run_attempt }}
+          path: |
+            verification/artifacts/verification-traces
+            verification/artifacts/timings.json
+            verification/artifacts/timings.md
+          if-no-files-found: warn
+          retention-days: 7
+
+  verification:
+    name: Verify UInt256
+    needs: [select, contracts, prepare, verify]
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require every selected verification check
+        shell: pwsh
+        env:
+          SELECT_RESULT: ${{ needs.select.result }}
+          CONTRACTS_SELECTED: ${{ needs.select.outputs.contracts }}
+          CONTRACTS_RESULT: ${{ needs.contracts.result }}
+          CERTIFICATE_COUNT: ${{ needs.select.outputs.count }}
+          PREPARE_RESULT: ${{ needs.prepare.result }}
+          VERIFY_RESULT: ${{ needs.verify.result }}
+        run: |
+          if ($env:SELECT_RESULT -ne 'success') { throw 'Gate selection failed' }
+          if ($env:CONTRACTS_SELECTED -eq 'true' -and $env:CONTRACTS_RESULT -ne 'success') {
+            throw 'Contract audit did not pass'
+          }
+          if ([int]$env:CERTIFICATE_COUNT -gt 0 -and $env:VERIFY_RESULT -ne 'success') {
+            throw 'A selected certificate did not pass'
+          }
+          if ([int]$env:CERTIFICATE_COUNT -gt 0 -and $env:PREPARE_RESULT -ne 'success') {
+            throw 'Shared library certification did not pass'
+          }
+          'All selected verification checks passed.'
