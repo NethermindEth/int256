@@ -29,5 +29,6 @@ High-performance 256-bit integer types for .NET. See [global.json](./global.json
 
 - Consume pinned LeanCIL from `verification/lakefile.toml`; keep CIL infrastructure upstream.
 - Register completed method/profile proofs in `verification/manifests/gates.json`.
-- Validate gates with `verification/Verify.ps1 -Action Verify -Method <id> -Profile <profile>`; a supporting-library build or successful extraction is not a compiled-method certificate.
+- Validate gates with `dotnet run --file verification/Verify.cs -- --action verify --method <id> --profile <profile>`; a supporting-library build or successful extraction is not a compiled-method certificate.
+- Repeat `--method` in one invocation to reuse builds and LeanCIL's authenticated local consumer cache; every method still requires its own certificate.
 - Preserve independent arithmetic, overlap, finite-return, and caller-memory contracts when porting proofs. Report unsupported extraction or composition upstream instead of changing production C# to suit a proof.
