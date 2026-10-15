@@ -1,6 +1,18 @@
 {
   "gates": [
     {
+      "method": "Subtract",
+      "profile": "scalar",
+      "proof": "proofs/SubtractScalar.lean",
+      "theorem": "UInt256Proof.Subtract.scalar_correctness"
+    },
+    {
+      "method": "SubtractUnderflow",
+      "profile": "scalar",
+      "proof": "proofs/SubtractUnderflowScalar.lean",
+      "theorem": "UInt256Proof.Subtract.underflow_scalar_correctness"
+    },
+    {
       "method": "Add",
       "profile": "scalar",
       "proof": "proofs/AddScalar.lean",

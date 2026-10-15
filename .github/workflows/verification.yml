@@ -22,6 +22,9 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
       - id: gates
         shell: pwsh
         env:
@@ -29,18 +32,10 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          ./verification/Test-SelectGates.ps1
-          if ($env:EVENT_NAME -eq 'pull_request') {
-            $changed = @(git diff --name-only "$($env:BASE_SHA)...$($env:HEAD_SHA)")
-            if ($LASTEXITCODE -ne 0) { throw 'Could not determine changed files' }
-            $selected = ./verification/SelectGates.ps1 -ChangedPaths $changed | ConvertFrom-Json
-          } else {
-            $selected = ./verification/SelectGates.ps1 -All | ConvertFrom-Json
-          }
-          "contracts=$($selected.contracts.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
-          "matrix=$(@{ include = @($selected.include) } | ConvertTo-Json -Depth 5 -Compress)" >> $env:GITHUB_OUTPUT
-          "count=$(@($selected.include).Count)" >> $env:GITHUB_OUTPUT
-          $selected | ConvertTo-Json -Depth 5
+          dotnet run --file verification/TestVerification.cs
+          if ($LASTEXITCODE -ne 0) { throw 'Verification runner regression checks failed' }
+          dotnet run --file verification/SelectGates.cs -- --event "$env:EVENT_NAME" --base "$env:BASE_SHA" --head "$env:HEAD_SHA" --output "$env:GITHUB_OUTPUT"
+          if ($LASTEXITCODE -ne 0) { throw 'Gate selection failed' }
 
   contracts:
     name: Contracts and supporting theorem audit
@@ -59,9 +54,12 @@ jobs:
           auto-config: false
           use-github-cache: false
           use-mathlib-cache: false
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
       - name: Build contracts and audit supporting theorems
         shell: pwsh
-        run: ./verification/Verify.ps1 -Action Contracts
+        run: dotnet run --file verification/Verify.cs -- --action contracts
 
   prepare:
     name: Prepare certified LeanCIL library
@@ -104,16 +102,17 @@ jobs:
           retention-days: 7
 
   verify:
-    name: Certificate (${{ matrix.method }}/${{ matrix.profile }})
+    name: Certificates (${{ matrix.id }})
     needs: [select, prepare]
     if: needs.select.outputs.count != '0'
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    timeout-minutes: 90
     env:
+      LEAN_NUM_THREADS: 2
       LEANCIL_CERTIFIED_LIBRARY: ${{ github.workspace }}/verification/artifacts/certified-library
       LEANCIL_CERTIFIED_LIBRARY_SHA256: ${{ needs.prepare.outputs.manifest-sha256 }}
       LEANCIL_TRACE_DIRECTORY: ${{ github.workspace }}/verification/artifacts/verification-traces
-      LEANCIL_SUITE: ${{ matrix.method }}/${{ matrix.profile }}
+      LEANCIL_SUITE: ${{ matrix.id }}
     strategy:
       fail-fast: false
       max-parallel: 8
@@ -136,13 +135,13 @@ jobs:
         with:
           artifact-ids: ${{ needs.prepare.outputs.artifact-id }}
           path: verification/artifacts/certified-library
-      - name: Verify compiled method
+      - name: Verify compiled methods
         id: certificate
         shell: pwsh
         env:
-          VERIFY_METHOD: ${{ matrix.method }}
+          VERIFY_METHODS: ${{ toJSON(matrix.methods) }}
           VERIFY_PROFILE: ${{ matrix.profile }}
-        run: ./verification/Verify.ps1 -Action Verify -Method $env:VERIFY_METHOD -Profile $env:VERIFY_PROFILE
+        run: dotnet run --file verification/Verify.cs -- --action verify --methods-json "$env:VERIFY_METHODS" --profile "$env:VERIFY_PROFILE"
       - name: Summarize verification timings
         if: always() && steps.certificate.outcome != 'skipped'
         shell: pwsh
@@ -154,7 +153,7 @@ jobs:
         if: always() && steps.certificate.outcome != 'skipped'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: verification-${{ matrix.method }}-${{ matrix.profile }}-${{ github.run_attempt }}
+          name: verification-${{ matrix.id }}-${{ github.run_attempt }}
           path: |
             verification/artifacts/verification-traces
             verification/artifacts/timings.json
