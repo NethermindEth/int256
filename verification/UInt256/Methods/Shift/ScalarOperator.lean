@@ -1,5 +1,5 @@
 import UInt256.Methods.Shift.ScalarWrapper
-import UInt256.Methods.Bitwise.ReturnSetup
+import UInt256.Safety.AggregateReturnSetup
 import UInt256.Safety.ReadOnlyScalarContract
 
 namespace UInt256Proof.Shift.Safety
@@ -16,9 +16,9 @@ theorem operator_prefix (profile : CIL.FeatureProfile) (callee : Nat)
     (original entered : Memory) (input output : Reference) (count : BitVec 32)
     (call : CallingConditions program entered [input] [output]) :
     run program (fuel + 3) index 0 (scalarArguments input (.i32 count))
-        (UInt256Proof.Bitwise.ReturnSafety.frame original output) [] entered =
+        (UInt256Model.Safety.AggregateReturn.frame original output) [] entered =
       run program fuel index 3 (scalarArguments input (.i32 count))
-        (UInt256Proof.Bitwise.ReturnSafety.frame original output)
+        (UInt256Model.Safety.AggregateReturn.frame original output)
         (shiftArguments input count output).reverse entered := by
   have hl := call.input_formed (reference := input) (by simp)
   have ho := call.output_formed (reference := output) (by simp)
@@ -26,7 +26,7 @@ theorem operator_prefix (profile : CIL.FeatureProfile) (callee : Nat)
     apply Eq.trans
     · apply run_next found (by rfl)
       simp (config := { implicitDefEqProofs := false }) only [step, scalarArguments,
-        UInt256Proof.Bitwise.ReturnSafety.frame, List.getElem?_cons_zero, List.getElem?_cons_succ,
+        UInt256Model.Safety.AggregateReturn.frame, List.getElem?_cons_zero, List.getElem?_cons_succ,
         checkedValue, numericValue, formValue, localAddress, hl, ho, checkedAt, Except.mapError,
         Bind.bind, Except.bind, Pure.pure, Except.pure]
       rfl
@@ -40,11 +40,11 @@ theorem operator_correctness (profile : CIL.FeatureProfile) (direction : Directi
     ReadOnlyScalarContract CIL.Value.i32
       (fun input count => .aggregate (numberBytes (result direction input count).toNat 32)) program index := by
   intro memory input count call
-  obtain ⟨output, entered, entry, childCall, before, fresh⟩ := UInt256Proof.Bitwise.ReturnSafety.setup
+  obtain ⟨output, entered, entry, childCall, before, fresh⟩ := UInt256Model.Safety.AggregateReturn.setup
     (operatorBody profile callee) (scalarArguments input (.i32 count)) rfl rfl rfl rfl program memory [input] call
   obtain ⟨childFuel, childResult, childCert, value, _, ⟨snapshot, loaded⟩, outside⟩ :=
     child entered input count output childCall
-  let frame := UInt256Proof.Bitwise.ReturnSafety.frame memory output
+  let frame := UInt256Model.Safety.AggregateReturn.frame memory output
   let args := scalarArguments input (.i32 count)
   let bits := result direction (inputValue entered input) count
   let bytes := numberBytes bits.toNat 32
@@ -81,7 +81,7 @@ theorem operator_correctness (profile : CIL.FeatureProfile) (direction : Directi
     simpa only [bytes, bits, call.input_value_after_setup entry (by simp : input ∈ [input])] using certificate
   · intro id bound offset
     have after := leaveFrame_preserves_memory_below frame childResult memory.nextIdentity
-      (by intro owned member; simp only [frame, UInt256Proof.Bitwise.ReturnSafety.frame, List.mem_singleton] at member
+      (by intro owned member; simp only [frame, UInt256Model.Safety.AggregateReturn.frame, List.mem_singleton] at member
           rw [member, fresh]; exact Nat.le_refl _)
     have growth := (enterFrame_fresh _ _ _ _ _ entry).1.next
     exact (after.cells id bound offset).trans ((outside id (Nat.lt_of_lt_of_le bound growth) offset

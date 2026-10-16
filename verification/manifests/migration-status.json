@@ -559,6 +559,15 @@
         "OperatorNot": 34.1
       },
       "supportingAuditTheorems": 1014
+    },
+    {
+      "profiles": [
+        "x64-vector256",
+        "x64-sse41"
+      ],
+      "completedCertificates": 34,
+      "authenticatedInputs": 621,
+      "note": "All 28 vector/SSE equality and six vector shift compiled-method certificates passed with family transports. Authenticated source, proof, and settings inputs matched before integration of the next batch."
     }
   ],
   "remainingPorts": [
@@ -592,9 +601,11 @@
     }
   ],
   "pendingValidation": [
-    "Equality: 28 vector/SSE gates and family transports pass fresh binding checks; full method certification and scalar recertification pending.",
-    "Shifts: six vector gates and generic storage composition pass fresh binding checks; full certification and scalar recertification pending.",
-    "Shift regression harness and all six fixture builds pass analyzer validation; full regression execution pending. Positive helper/early-store alternatives remain unported.",
-    "Multiplication helper safety proofs compile; seven public scalar entry proofs and original accelerated profile coverage remain outstanding."
-  ]
+    "Seven scalar multiplication gates and 12 accelerated ordering gates pass fresh extraction bindings; full method certificates pending.",
+    "Equality scalar family additions, generic shift storage, aggregate-return refactoring, and comparison family additions require recertification after integration.",
+    "Shift and bitwise negative fixtures have kernel-checked full-contract refutations; full regression harness runs pending. Positive alternative fixtures remain in progress.",
+    "BMI2/ARM64 widening helper contracts and shared SIMD addition arithmetic compile; complete original accelerated multiplication/Add/Subtract profile coverage remains outstanding.",
+    "Pinned LeanCIL rejects ReadOnlySpan<byte> lookup-table extraction for AVX2/AVX512 Add profiles. Minimal reproducer and issue draft remain local under artifacts/span-repro; production C# is unchanged."
+  ],
+  "supportingAuditTheorems": 1860
 }
