@@ -1,3 +1,4 @@
+import CIL.Safety.ValueBitCasts
 import CIL.Safety.ArgumentHomeValues
 import CIL.Safety.ByteEncoding
 import UInt256.Safety.Calling
@@ -40,4 +41,25 @@ theorem CallingConditions.with_readable_input {program : CIL.Program}
 
 #print axioms CallingConditions.with_readable_input
 
+end UInt256Model.Safety
+
+namespace UInt256Model.Safety
+open CIL.Safety
+theorem input_encoded (program : CIL.Program) (memory : Memory) (inputs outputs : List Reference)
+    (call : CallingConditions program memory inputs outputs) (input : Reference) (member : input ∈ inputs) :
+    read memory input 32 1 = .ok (numberBytes (inputValue memory input).toNat 32) := by
+  have loaded := call.input_snapshot member
+  have decoded : BitVec.ofNat 256 (CIL.Safety.byteNumber
+      ((List.range 32).map fun i => (memory.cells input.allocation (input.offset + i)).bits)) = inputValue memory input := by
+    rw [byteNumber_snapshot (fun offset => (memory.cells input.allocation offset).bits) input.offset 32]
+    rfl
+  have roundtrip := vector256_bytes_roundtrip
+    ((List.range 32).map fun i => (memory.cells input.allocation (input.offset + i)).bits) (by simp)
+  rw [decoded] at roundtrip
+  rw [roundtrip]
+  exact loaded
+
+
+
+#print axioms input_encoded
 end UInt256Model.Safety

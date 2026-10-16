@@ -1,4 +1,5 @@
 import CIL.ExecutionLemmas
+import CIL.Safety.InstructionMemory
 import UInt256.Representation
 
 open CIL UInt256Model
@@ -31,13 +32,13 @@ def NotContract (p : Program) (entry : Nat) (initial : Bytes) (input out : Nat) 
 def ReturnContract (p : Program) (entry : Nat) (operation : Binary)
     (initial : Bytes) (left right : Nat) : Prop :=
   ∃ fuel final, invoke p fuel entry [.object left, .object right] (byteMemory initial) =
-      some (final, [.v256 (applyBinary operation (byteValue initial left)
-        (byteValue initial right))]) ∧
+      some (final, [.aggregate (CIL.Safety.numberBytes (applyBinary operation (byteValue initial left)
+        (byteValue initial right)).toNat 32)]) ∧
     ∀ address, final (.byte address) = (byteMemory initial) (.byte address)
 
 def NotReturnContract (p : Program) (entry : Nat) (initial : Bytes) (input : Nat) : Prop :=
   ∃ fuel final, invoke p fuel entry [.object input] (byteMemory initial) =
-      some (final, [.v256 (~~~byteValue initial input)]) ∧
+      some (final, [.aggregate (CIL.Safety.numberBytes (~~~byteValue initial input).toNat 32)]) ∧
     ∀ address, final (.byte address) = (byteMemory initial) (.byte address)
 
 end UInt256Model.Bitwise

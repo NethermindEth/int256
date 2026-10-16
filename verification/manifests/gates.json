@@ -1,6 +1,24 @@
 {
   "gates": [
     {
+      "method": "And",
+      "profile": "scalar",
+      "proof": "proofs/AndScalar.lean",
+      "theorem": "UInt256Proof.And.scalar_correctness"
+    },
+    {
+      "method": "Or",
+      "profile": "scalar",
+      "proof": "proofs/OrScalar.lean",
+      "theorem": "UInt256Proof.Or.scalar_correctness"
+    },
+    {
+      "method": "Xor",
+      "profile": "scalar",
+      "proof": "proofs/XorScalar.lean",
+      "theorem": "UInt256Proof.Xor.scalar_correctness"
+    },
+    {
       "method": "Subtract",
       "profile": "scalar",
       "proof": "proofs/SubtractScalar.lean",
@@ -257,6 +275,258 @@
       "profile": "scalar",
       "proof": "proofs/EqualityScalar.lean",
       "theorem": "UInt256Proof.Equality.scalar_correctness"
+    },
+    {
+      "method": "Not",
+      "profile": "scalar",
+      "proof": "proofs/NotScalar.lean",
+      "theorem": "UInt256Proof.Not.scalar_correctness"
+    },
+    {
+      "method": "OperatorAnd",
+      "profile": "scalar",
+      "proof": "proofs/OperatorAndScalar.lean",
+      "theorem": "UInt256Proof.OperatorAnd.scalar_correctness"
+    },
+    {
+      "method": "OperatorOr",
+      "profile": "scalar",
+      "proof": "proofs/OperatorOrScalar.lean",
+      "theorem": "UInt256Proof.OperatorOr.scalar_correctness"
+    },
+    {
+      "method": "OperatorXor",
+      "profile": "scalar",
+      "proof": "proofs/OperatorXorScalar.lean",
+      "theorem": "UInt256Proof.OperatorXor.scalar_correctness"
+    },
+    {
+      "method": "OperatorNot",
+      "profile": "scalar",
+      "proof": "proofs/OperatorNotScalar.lean",
+      "theorem": "UInt256Proof.OperatorNot.scalar_correctness"
+    },
+    {
+      "method": "EqualsUInt32",
+      "profile": "scalar",
+      "proof": "proofs/EqualsUInt32Scalar.lean",
+      "theorem": "UInt256Proof.Equality.EqualsUInt32.scalar_correctness"
+    },
+    {
+      "method": "EqualsUInt64",
+      "profile": "scalar",
+      "proof": "proofs/EqualsUInt64Scalar.lean",
+      "theorem": "UInt256Proof.Equality.EqualsUInt64.scalar_correctness"
+    },
+    {
+      "method": "EqualsInt32",
+      "profile": "scalar",
+      "proof": "proofs/EqualsInt32Scalar.lean",
+      "theorem": "UInt256Proof.Equality.EqualsInt32.scalar_correctness"
+    },
+    {
+      "method": "EqualsInt64",
+      "profile": "scalar",
+      "proof": "proofs/EqualsInt64Scalar.lean",
+      "theorem": "UInt256Proof.Equality.EqualsInt64.scalar_correctness"
+    },
+    {
+      "method": "EqualsUInt256Value",
+      "profile": "scalar",
+      "proof": "proofs/EqualsUInt256ValueScalar.lean",
+      "theorem": "UInt256Proof.Equality.EqualsUInt256Value.scalar_correctness"
+    },
+    {
+      "method": "CompareToUInt256Value",
+      "profile": "scalar",
+      "proof": "proofs/CompareToUInt256ValueScalar.lean",
+      "theorem": "UInt256Proof.Compare.CompareToUInt256Value.scalar_correctness"
+    },
+    {
+      "method": "EqUInt256Int32",
+      "profile": "scalar",
+      "proof": "proofs/EqUInt256Int32Scalar.lean",
+      "theorem": "UInt256Proof.Equality.EqUInt256Int32.scalar_correctness"
+    },
+    {
+      "method": "EqInt32UInt256",
+      "profile": "scalar",
+      "proof": "proofs/EqInt32UInt256Scalar.lean",
+      "theorem": "UInt256Proof.Equality.EqInt32UInt256.scalar_correctness"
+    },
+    {
+      "method": "EqUInt256UInt32",
+      "profile": "scalar",
+      "proof": "proofs/EqUInt256UInt32Scalar.lean",
+      "theorem": "UInt256Proof.Equality.EqUInt256UInt32.scalar_correctness"
+    },
+    {
+      "method": "EqUInt32UInt256",
+      "profile": "scalar",
+      "proof": "proofs/EqUInt32UInt256Scalar.lean",
+      "theorem": "UInt256Proof.Equality.EqUInt32UInt256.scalar_correctness"
+    },
+    {
+      "method": "EqUInt256Int64",
+      "profile": "scalar",
+      "proof": "proofs/EqUInt256Int64Scalar.lean",
+      "theorem": "UInt256Proof.Equality.EqUInt256Int64.scalar_correctness"
+    },
+    {
+      "method": "EqInt64UInt256",
+      "profile": "scalar",
+      "proof": "proofs/EqInt64UInt256Scalar.lean",
+      "theorem": "UInt256Proof.Equality.EqInt64UInt256.scalar_correctness"
+    },
+    {
+      "method": "EqUInt256UInt64",
+      "profile": "scalar",
+      "proof": "proofs/EqUInt256UInt64Scalar.lean",
+      "theorem": "UInt256Proof.Equality.EqUInt256UInt64.scalar_correctness"
+    },
+    {
+      "method": "EqUInt64UInt256",
+      "profile": "scalar",
+      "proof": "proofs/EqUInt64UInt256Scalar.lean",
+      "theorem": "UInt256Proof.Equality.EqUInt64UInt256.scalar_correctness"
+    },
+    {
+      "method": "NeUInt256Int32",
+      "profile": "scalar",
+      "proof": "proofs/NeUInt256Int32Scalar.lean",
+      "theorem": "UInt256Proof.Equality.NeUInt256Int32.scalar_correctness"
+    },
+    {
+      "method": "NeInt32UInt256",
+      "profile": "scalar",
+      "proof": "proofs/NeInt32UInt256Scalar.lean",
+      "theorem": "UInt256Proof.Equality.NeInt32UInt256.scalar_correctness"
+    },
+    {
+      "method": "NeUInt256UInt32",
+      "profile": "scalar",
+      "proof": "proofs/NeUInt256UInt32Scalar.lean",
+      "theorem": "UInt256Proof.Equality.NeUInt256UInt32.scalar_correctness"
+    },
+    {
+      "method": "NeUInt32UInt256",
+      "profile": "scalar",
+      "proof": "proofs/NeUInt32UInt256Scalar.lean",
+      "theorem": "UInt256Proof.Equality.NeUInt32UInt256.scalar_correctness"
+    },
+    {
+      "method": "NeUInt256Int64",
+      "profile": "scalar",
+      "proof": "proofs/NeUInt256Int64Scalar.lean",
+      "theorem": "UInt256Proof.Equality.NeUInt256Int64.scalar_correctness"
+    },
+    {
+      "method": "NeInt64UInt256",
+      "profile": "scalar",
+      "proof": "proofs/NeInt64UInt256Scalar.lean",
+      "theorem": "UInt256Proof.Equality.NeInt64UInt256.scalar_correctness"
+    },
+    {
+      "method": "NeUInt256UInt64",
+      "profile": "scalar",
+      "proof": "proofs/NeUInt256UInt64Scalar.lean",
+      "theorem": "UInt256Proof.Equality.NeUInt256UInt64.scalar_correctness"
+    },
+    {
+      "method": "NeUInt64UInt256",
+      "profile": "scalar",
+      "proof": "proofs/NeUInt64UInt256Scalar.lean",
+      "theorem": "UInt256Proof.Equality.NeUInt64UInt256.scalar_correctness"
+    },
+    {
+      "method": "LeUInt64UInt256",
+      "profile": "scalar",
+      "proof": "proofs/LeUInt64UInt256Scalar.lean",
+      "theorem": "UInt256Proof.Compare.LeUInt64UInt256.scalar_correctness"
+    },
+    {
+      "method": "Lsh",
+      "profile": "scalar",
+      "proof": "proofs/LshScalar.lean",
+      "theorem": "UInt256Proof.Lsh.scalar_correctness"
+    },
+    {
+      "method": "Rsh",
+      "profile": "scalar",
+      "proof": "proofs/RshScalar.lean",
+      "theorem": "UInt256Proof.Rsh.scalar_correctness"
+    },
+    {
+      "method": "LeftShift",
+      "profile": "scalar",
+      "proof": "proofs/LeftShiftScalar.lean",
+      "theorem": "UInt256Proof.LeftShift.scalar_correctness"
+    },
+    {
+      "method": "RightShift",
+      "profile": "scalar",
+      "proof": "proofs/RightShiftScalar.lean",
+      "theorem": "UInt256Proof.RightShift.scalar_correctness"
+    },
+    {
+      "method": "OperatorLsh",
+      "profile": "scalar",
+      "proof": "proofs/OperatorLshScalar.lean",
+      "theorem": "UInt256Proof.OperatorLsh.scalar_correctness"
+    },
+    {
+      "method": "OperatorRsh",
+      "profile": "scalar",
+      "proof": "proofs/OperatorRshScalar.lean",
+      "theorem": "UInt256Proof.OperatorRsh.scalar_correctness"
+    },
+    {
+      "method": "And",
+      "profile": "x64-vector256",
+      "proof": "proofs/AndVector.lean",
+      "theorem": "UInt256Proof.And.vector_correctness"
+    },
+    {
+      "method": "Or",
+      "profile": "x64-vector256",
+      "proof": "proofs/OrVector.lean",
+      "theorem": "UInt256Proof.Or.vector_correctness"
+    },
+    {
+      "method": "Xor",
+      "profile": "x64-vector256",
+      "proof": "proofs/XorVector.lean",
+      "theorem": "UInt256Proof.Xor.vector_correctness"
+    },
+    {
+      "method": "Not",
+      "profile": "x64-vector256",
+      "proof": "proofs/NotVector.lean",
+      "theorem": "UInt256Proof.Not.vector_correctness"
+    },
+    {
+      "method": "OperatorAnd",
+      "profile": "x64-vector256",
+      "proof": "proofs/OperatorAndVector.lean",
+      "theorem": "UInt256Proof.OperatorAnd.vector_correctness"
+    },
+    {
+      "method": "OperatorOr",
+      "profile": "x64-vector256",
+      "proof": "proofs/OperatorOrVector.lean",
+      "theorem": "UInt256Proof.OperatorOr.vector_correctness"
+    },
+    {
+      "method": "OperatorXor",
+      "profile": "x64-vector256",
+      "proof": "proofs/OperatorXorVector.lean",
+      "theorem": "UInt256Proof.OperatorXor.vector_correctness"
+    },
+    {
+      "method": "OperatorNot",
+      "profile": "x64-vector256",
+      "proof": "proofs/OperatorNotVector.lean",
+      "theorem": "UInt256Proof.OperatorNot.vector_correctness"
     }
   ],
   "schema": 1
