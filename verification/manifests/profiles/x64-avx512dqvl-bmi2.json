@@ -1,0 +1,21 @@
+{
+  "name": "x64-avx512dqvl-bmi2",
+  "architecture": "x64",
+  "nativeWidth": 64,
+  "littleEndian": true,
+  "advSimd": false,
+  "sse2": true,
+  "ssse3": true,
+  "sse42": true,
+  "avx": true,
+  "avx2": true,
+  "avx512F": true,
+  "avx512FVL": true,
+  "bmi1": false,
+  "sse41": true,
+  "avx512DQ": true,
+  "avx512DQVL": true,
+  "bmi2": true,
+  "armBase64": false,
+  "vector256Accelerated": false
+}
