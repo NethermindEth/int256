@@ -686,6 +686,15 @@
         "SubtractUnderflow/x64-avx512": 421.4,
         "SubtractUnderflow/x64-avx512-bmi1": 603.4
       }
+    },
+    {
+      "fixtureGroups": [
+        "Safety",
+        "SIMD",
+        "Reporting",
+        "Profiles"
+      ],
+      "note": "Safety: 6 positives (valid call, initial-input sum, probe value) and 11 negatives (located fault refutation plus production AddScalar rejection) certified on scalar; AlignedLoad is an extractor rejection mapped upstream. SIMD: Add arm64-advsimd Baseline, Renamed, WrongAlignment and WrongTop certified. Reporting: AddOverflow and SubtractUnderflow scalar Baseline, Renamed and WrongFlag, and AddOverflow arm64-advsimd Baseline, Renamed, WrongFlag, WrongAlignment and WrongTop certified. Remaining cases wait for x64-sse42, AVX and accelerated Subtract gates or for fixture proofs of body-changing refactors (LaneLocals, InlineCarry, ExtractedHelper, ReversedStore, FeatureExpressions, EquivalentMask)."
     }
   ],
   "remainingPorts": [],
@@ -698,7 +707,7 @@
     "Add/Subtract: 8 Add positives (Baseline, Renamed, ReversedStore on the production proof; CarryOr, FullyInlined, StraightLine, ExtractedHelper, ExternalHelper on fixture proofs), 5 Subtract positives (Baseline, Renamed on the production proof; BorrowAlternative, FullyInlined, ExtractedHelper on fixture proofs) and all 4 negatives passed on LeanCIL 70ee207; rerun on 7aec18e pending.",
     "Add/ExpandedHardware: passes extraction validation on 7aec18e; the production Add proof no longer normalizes the excluded entry branch and needs confirmation on this pin.",
     "Add, AddOverflow, Subtract and SubtractUnderflow gates are certified on arm64-advsimd, x64-sse42, x64-avx2, x64-avx2-bmi1, x64-avx512 and x64-avx512-bmi1.",
-    "Comparison, equality, reporting, safety, SIMD and profile fixture groups from the original branch are not yet ported."
+    "Comparison and equality fixture groups from the original branch are not yet ported. Safety, SIMD and Reporting run through SafetyRegression.cs and SimdRegression.cs; SIMD/Reporting cases recorded PENDING before the x64-sse42, AVX and accelerated Subtract/SubtractUnderflow gates landed need a rerun, and body-changing positives need fixture proofs. Profiles is extractor infrastructure mapped to LeanCIL tests and unfiled upstream drafts."
   ],
   "supportingAuditTheorems": 2261
 }
