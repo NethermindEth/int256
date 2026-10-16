@@ -30,6 +30,35 @@ async Task<string> Run(string executable, IEnumerable<string> arguments, bool su
     return output;
 }
 
+string consumer = Path.Combine(work, "consumer");
+Directory.CreateDirectory(consumer);
+void CopySources(string source, string destination)
+{
+    Directory.CreateDirectory(destination);
+    foreach (string file in Directory.EnumerateFiles(source))
+    {
+        string name = Path.GetFileName(file);
+        if (name == "lean-toolchain" || Path.GetExtension(file) is ".lean" or ".json" or ".toml")
+            File.Copy(file, Path.Combine(destination, name), overwrite: true);
+    }
+    foreach (string directory in Directory.EnumerateDirectories(source))
+    {
+        string name = Path.GetFileName(directory);
+        if (name is "artifacts" or ".lake" or ".git" or "bin" or "obj") continue;
+        CopySources(directory, Path.Combine(destination, name));
+    }
+}
+CopySources(root, consumer);
+JsonArray dependencies = JsonNode.Parse(File.ReadAllText(Path.Combine(root, "lake-manifest.json")))!["packages"]!.AsArray();
+foreach (JsonNode? package in dependencies)
+{
+    string name = package!["name"]!.GetValue<string>();
+    string dependency = Path.Combine(consumer, ".lake", "packages", name);
+    if (!Directory.Exists(dependency))
+        await Run("git", ["clone", "--no-hardlinks", "--no-checkout", Path.Combine(root, ".lake", "packages", name), dependency]);
+    await Run("git", ["-C", dependency, "checkout", "--detach", package["rev"]!.GetValue<string>()]);
+}
+List<(string Method, string Mutation, string Extraction, string Proof)> checks = [];
 foreach (var pair in witnesses)
 {
     string mutation = pair.Key;
@@ -54,15 +83,24 @@ foreach (var pair in witnesses)
         string actual = witness["operatorActual"]?.ToString() ?? "0";
         template = template.Replace("@INITIAL_OFFSET@", initialOffset).Replace("@OUTPUT@", witness["outputBase"]!.ToString())
             .Replace("@COUNT@", witness["count"]!.ToString()).Replace("@ACTUAL@", actual).Replace("@DIRECTION@", direction);
-        string proof = Path.Combine(extraction, "Refutation.lean");
+        string proof = Path.Combine(consumer, "proofs", $"Regression{mutation}{method}.lean");
         File.WriteAllText(proof, template);
-        await Run("dotnet", [tool, "verify", extraction, "--proof", proof, "--theorem", "ShiftWitness.refuted", "--proof-root", root]);
-        string suffix = profile == "scalar" ? "Scalar" : "Vector";
-        string theorem = "UInt256Proof." + method + "." + suffix.ToLowerInvariant() + "_correctness";
-        string rejected = await Run("dotnet", [tool, "verify", extraction, "--proof", Path.Combine(root, "proofs", method + suffix + ".lean"),
-            "--theorem", theorem, "--proof-root", root], succeeds: false);
-        if (!rejected.Contains("proof checking", StringComparison.OrdinalIgnoreCase) || File.Exists(Path.Combine(extraction, "verified.json")))
-            throw new InvalidOperationException("Mutation was not rejected during proof checking or retained a stale certificate: " + rejected);
-        Console.WriteLine($"PASS {method}/{profile}/{mutation}: checked full-contract refutation and public proof rejection");
+        checks.Add((method, mutation, extraction, proof));
     }
 }
+foreach (var check in checks)
+{
+    string method = check.Method, mutation = check.Mutation, extraction = check.Extraction;
+    Console.WriteLine($"CHECK {method}/{profile}/{mutation}: certify full-contract refutation");
+    await Run("dotnet", [tool, "verify", extraction, "--proof", check.Proof, "--theorem", "ShiftWitness.refuted", "--proof-root", consumer]);
+    string suffix = profile == "scalar" ? "Scalar" : "Vector";
+    string theorem = "UInt256Proof." + method + "." + suffix.ToLowerInvariant() + "_correctness";
+    Console.WriteLine($"CERTIFIED {method}/{profile}/{mutation}: checking public proof rejection");
+    string rejected = await Run("dotnet", [tool, "verify", extraction, "--proof", Path.Combine(consumer, "proofs", method + suffix + ".lean"),
+        "--theorem", theorem, "--proof-root", consumer], succeeds: false);
+    if (!rejected.Contains("proof checking", StringComparison.OrdinalIgnoreCase) || File.Exists(Path.Combine(extraction, "verified.json")))
+        throw new InvalidOperationException("Mutation was not rejected during proof checking or retained a stale certificate: " + rejected);
+    Console.WriteLine($"PASS {method}/{profile}/{mutation}: checked full-contract refutation and public proof rejection");
+}
+
+

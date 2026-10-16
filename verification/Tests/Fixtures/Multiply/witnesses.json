@@ -1,0 +1,103 @@
+[
+  {
+    "case": "WrongCarry",
+    "profile": "scalar",
+    "leftBase": 0,
+    "rightBase": 64,
+    "outputBase": 128,
+    "address": 144,
+    "actualByte": 1,
+    "expectedByte": 3,
+    "initialBytes": {
+      "0": 255,
+      "1": 255,
+      "2": 255,
+      "3": 255,
+      "4": 255,
+      "5": 255,
+      "6": 255,
+      "7": 255,
+      "8": 1,
+      "64": 255,
+      "65": 255,
+      "66": 255,
+      "67": 255,
+      "68": 255,
+      "69": 255,
+      "70": 255,
+      "71": 255,
+      "72": 1
+    }
+  },
+  {
+    "case": "WrongCrossProduct",
+    "profile": "scalar",
+    "leftBase": 0,
+    "rightBase": 64,
+    "outputBase": 128,
+    "address": 144,
+    "actualByte": 0,
+    "expectedByte": 1,
+    "initialBytes": {
+      "8": 1,
+      "72": 1
+    }
+  },
+  {
+    "case": "WrongHighLow",
+    "profile": "scalar",
+    "leftBase": 0,
+    "rightBase": 64,
+    "outputBase": 128,
+    "address": 128,
+    "actualByte": 1,
+    "expectedByte": 254,
+    "initialBytes": {
+      "0": 255,
+      "1": 255,
+      "2": 255,
+      "3": 255,
+      "4": 255,
+      "5": 255,
+      "6": 255,
+      "7": 255,
+      "64": 2
+    }
+  },
+  {
+    "case": "WrongAliasing",
+    "profile": "scalar",
+    "leftBase": 0,
+    "rightBase": 64,
+    "outputBase": 8,
+    "address": 16,
+    "actualByte": 12,
+    "expectedByte": 10,
+    "initialBytes": {
+      "0": 3,
+      "8": 5,
+      "64": 2
+    }
+  },
+  {
+    "case": "WrongBmiHigh",
+    "profile": "x64-bmi2",
+    "leftBase": 0,
+    "rightBase": 64,
+    "outputBase": 128,
+    "address": 136,
+    "actualByte": 2,
+    "expectedByte": 1,
+    "initialBytes": {
+      "0": 255,
+      "1": 255,
+      "2": 255,
+      "3": 255,
+      "4": 255,
+      "5": 255,
+      "6": 255,
+      "7": 255,
+      "64": 2
+    }
+  }
+]

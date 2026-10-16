@@ -1,0 +1,40 @@
+[
+  {
+    "case": "WrongCarry",
+    "profile": "scalar",
+    "leftBase": 0,
+    "rightBase": 32,
+    "outputBase": 64,
+    "address": 72,
+    "actualByte": 2,
+    "expectedByte": 3,
+    "initialBytes": {
+      "0": 255,
+      "1": 255,
+      "2": 255,
+      "3": 255,
+      "4": 255,
+      "5": 255,
+      "6": 255,
+      "7": 255,
+      "8": 1,
+      "32": 1,
+      "40": 1
+    }
+  },
+  {
+    "case": "WrongAliasing",
+    "profile": "scalar",
+    "leftBase": 0,
+    "rightBase": 32,
+    "outputBase": 8,
+    "address": 16,
+    "actualByte": 0,
+    "expectedByte": 1,
+    "initialBytes": {
+      "0": 42,
+      "8": 1,
+      "32": 1
+    }
+  }
+]

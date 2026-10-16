@@ -86,3 +86,10 @@ import UInt256.Methods.Compare.NativeEntrySafety
 import UInt256.Methods.Multiply.EntryPrimitiveSafety
 import UInt256.Methods.Multiply.ProductStorageVector
 import UInt256.Safety.BinaryForwarder
+import UInt256.Methods.Bitwise.HelperWords
+import UInt256.Methods.Bitwise.HelperUnary
+import UInt256.Methods.Multiply.FullSafetyAvx2Top
+import UInt256.Methods.Multiply.FullSafetyAvx512Top
+import UInt256.Methods.Multiply.WordForwarder
+import UInt256.Safety.ContractRefutation
+import UInt256.Methods.Bitwise.EarlyStore

@@ -10,9 +10,12 @@ this directory contains only UInt256 specifications and proofs.
 
 ## Verification scope
 
-The 43 registered scalar gates in `manifests/gates.json` cover `Add`, `AddOverflow`, `Subtract`, `SubtractUnderflow`,
-reference equality and ordering, `Equals(in UInt256)`, `CompareTo(in UInt256)`,
-and 31 comparisons between UInt256 and primitive integers.
+The 232 registered method/profile gates in `manifests/gates.json` include all
+87 scalar migration targets: addition/subtraction and their reporting variants,
+multiplication, bitwise operations, shifts, equality, and ordering. Accelerated
+gates currently cover vector bitwise operations and shifts, vector/SSE equality,
+vector/AVX2/AVX512 ordering, and all seven multiplication entries on each of
+the 14 multiplication feature profiles.
 The `Add` gate includes its four reachable helpers. `proofs/AddScalar.lean` proves the allocation-aware
 `WrappingBinaryContract`: finite checked execution, addition modulo 2^256 of
 the initial operands, writable output, and preservation of caller bytes outside
@@ -23,12 +26,13 @@ preserves the same wrapping, overlap and caller-memory contracts;
 gates prove results from the initial operands, finite checked return, and
 preservation of caller memory.
 
-The theorem applies to LeanCIL's scalar feature profile and a successfully
-initialized `Nethermind.Int256.UInt256` type. It does not prove the static
-constructor or SIMD paths. The 87 signatures in `manifests/targets.json` are a
-migration inventory, not 87 completed certificates. Other arithmetic and
-profile-transport lemmas remain supporting results; a transported, assumed
-certificate is not a proof of a compiled implementation.
+Each gate applies to its registered LeanCIL feature profile and a successfully
+initialized `Nethermind.Int256.UInt256` type; it does not prove the static
+constructor. All 87 signatures in `manifests/targets.json` have scalar gates,
+but the original accelerated profile and regression-fixture scope is still
+being migrated. Supporting arithmetic and profile-transport lemmas do not
+replace a certificate for the extracted compiled implementation. Changes to
+shared proofs require recertification against the final source snapshot.
 
 ## Run
 
@@ -129,7 +133,7 @@ Earlier helper-only Windows measurements used LeanCIL `0eba3c5` on the same comp
 | First `LtUInt256UInt64` certificate | 298.5 s | 144.8 s |
 | Consumer proof build within that check | 115.3 s | 35.7 s |
 | Kernel replay within that check | 165.7 s | 91.9 s |
-| Subsequent, different `LtInt64UInt256` certificate | — | 65.3 s |
+| Subsequent, different `LtInt64UInt256` certificate | - | 65.3 s |
 
 These are single local samples, not CI timing guarantees; short development
 checks overlapped the baseline. Both first-gate runs built and kernel-checked
@@ -209,12 +213,27 @@ extract. The pinned revision includes the fixes for multiplication (`Math.BigMul
 (#38), generated translation proof composition (#39), aggregate proof helpers
 (#40), and authenticated local consumer reuse (#42).
 
-The two subtraction proof ports can now use the normal full certificate command
-without increasing the generated proof's heartbeat budget. The remaining 44
-scalar targets are listed under `remainingPorts`: their consumer proofs still
-need migration and certification using the new upstream APIs. SIMD profiles
-also require their own proof ports and validation. Closed upstream issues do not
-establish those certificates automatically.
+All scalar ports now have registered certificates, and `remainingPorts` is
+empty. The 98 multiplication profile certificates passed against the current
+Release assembly and proof sources. Remaining work includes accelerated
+Add/Subtract and reporting coverage (AVX2/AVX512 extraction is blocked on
+LeanCIL#53), fixture proofs for structurally different Add/Subtract variants,
+the original comparison/equality/SIMD fixtures, and recertification after
+shared proof changes. `pendingValidation` records these obligations separately
+from scalar port completion.
+
+## Regression fixtures
+
+The original fixture cases run through `BitwiseRegression.cs`,
+`BitwisePositiveRegression.cs`, `ShiftRegression.cs`, `MultiplyRegression.cs`
+and `AddSubtractRegression.cs` (`dotnet run --file verification/<runner>`).
+Each runner freezes a consumer snapshot, certifies positive fixtures, and for
+each mutation certifies a checked contract refutation, then requires the
+unchanged production proof to be rejected without leaving a certificate.
+`AddSubtractRegression.cs` reports fixtures without a proof as PENDING and
+`Add/ExpandedHardware` as BLOCKED (LeanCIL#54), and exits nonzero until both
+are resolved. Extractor rejection fixtures (unsupported instructions, static
+initializers, metadata mutations) are covered by LeanCIL's own tests.
 
 Each public gate must retain independent arithmetic and safety contracts,
 including initial operands under valid overlap, normal finite return,

@@ -2,6 +2,7 @@ import UInt256.Methods.Multiply.EntrySetup
 import UInt256.Safety.OutputCallReturn
 
 namespace UInt256Proof.Multiply.Entry
+variable {alternative : Bool}
 open CIL.Safety UInt256Model.Safety UInt256Proof.Multiply.Calls
 
 private theorem product_padding (lo hi : BitVec 64) :
@@ -10,7 +11,7 @@ private theorem product_padding (lo hi : BitVec 64) :
   simp (config := { implicitDefEqProofs := false }) only
     [show (0 : BitVec 64).toNat = 0 from rfl, Nat.zero_mul, Nat.add_zero]
 
-theorem multiply_small_branch (ctx : Context) (word : WordContract ctx.program ctx.indices.word)
+theorem multiply_small_branch (ctx : Context alternative) (word : WordContract ctx.program ctx.indices.word)
     (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (originalCall : CallingConditions ctx.program original [left, right] [output])
     (enteredWF : entered.WellFormed)
@@ -64,9 +65,10 @@ theorem multiply_small_branch (ctx : Context) (word : WordContract ctx.program c
 end UInt256Proof.Multiply.Entry
 
 namespace UInt256Proof.Multiply.Entry
+variable {alternative : Bool}
 open CIL.Safety UInt256Model.Safety UInt256Proof.Multiply.Calls
 
-theorem multiply_left_two_branch (ctx : Context) (word : WordContract ctx.program ctx.indices.word) (swapped : Bool)
+theorem multiply_left_two_branch (ctx : Context alternative) (word : WordContract ctx.program ctx.indices.word) (swapped : Bool)
     (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (originalCall : CallingConditions ctx.program original [left, right] [output])
     (owned : ∀ id ∈ frame.owned, original.nextIdentity ≤ id)
@@ -125,9 +127,10 @@ theorem multiply_left_two_branch (ctx : Context) (word : WordContract ctx.progra
 end UInt256Proof.Multiply.Entry
 
 namespace UInt256Proof.Multiply.Entry
+variable {alternative : Bool}
 open CIL.Safety UInt256Model.Safety UInt256Proof.Multiply.Calls
 
-theorem multiply_both_two_branch (ctx : Context) (word : WordContract ctx.program ctx.indices.word)
+theorem multiply_both_two_branch (ctx : Context alternative) (word : WordContract ctx.program ctx.indices.word)
     (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (originalCall : CallingConditions ctx.program original [left, right] [output])
     (owned : ∀ id ∈ frame.owned, original.nextIdentity ≤ id)
@@ -170,9 +173,10 @@ theorem multiply_both_two_branch (ctx : Context) (word : WordContract ctx.progra
 end UInt256Proof.Multiply.Entry
 
 namespace UInt256Proof.Multiply.Entry
+variable {alternative : Bool}
 open CIL.Safety UInt256Model.Safety UInt256Proof.Multiply.Calls
 
-theorem multiply_full_branch (ctx : Context) (word : WordContract ctx.program ctx.indices.word) (top : Full.FullTopContract ctx.profile ctx.program ctx.indices.full ctx.indices.word ctx.indices.count ctx.indices.storage)
+theorem multiply_full_branch (ctx : Context alternative) (word : WordContract ctx.program ctx.indices.word) (top : Full.FullTopContract ctx.profile ctx.program ctx.indices.full ctx.indices.word ctx.indices.count ctx.indices.storage)
     (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (originalCall : CallingConditions ctx.program original [left, right] [output])
     (owned : ∀ id ∈ frame.owned, original.nextIdentity ≤ id)
@@ -210,9 +214,10 @@ theorem multiply_full_branch (ctx : Context) (word : WordContract ctx.program ct
 end UInt256Proof.Multiply.Entry
 
 namespace UInt256Proof.Multiply.Entry
+variable {alternative : Bool}
 open CIL.Safety UInt256Model.Safety UInt256Proof.Multiply.Calls
 
-theorem multiply_large_dispatch (ctx : Context) (word : WordContract ctx.program ctx.indices.word) (top : Full.FullTopContract ctx.profile ctx.program ctx.indices.full ctx.indices.word ctx.indices.count ctx.indices.storage)
+theorem multiply_large_dispatch (ctx : Context alternative) (word : WordContract ctx.program ctx.indices.word) (top : Full.FullTopContract ctx.profile ctx.program ctx.indices.full ctx.indices.word ctx.indices.count ctx.indices.storage)
     (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (originalCall : CallingConditions ctx.program original [left, right] [output])
     (owned : ∀ id ∈ frame.owned, original.nextIdentity ≤ id)
@@ -259,9 +264,10 @@ theorem multiply_large_dispatch (ctx : Context) (word : WordContract ctx.program
 end UInt256Proof.Multiply.Entry
 
 namespace UInt256Proof.Multiply.Entry
+variable {alternative : Bool}
 open CIL.Safety UInt256Model.Safety UInt256Proof.Multiply.Calls
 
-theorem multiply_scalar_branch (ctx : Context) (word : WordContract ctx.program ctx.indices.word) (swapped : Bool)
+theorem multiply_scalar_branch (ctx : Context alternative) (word : WordContract ctx.program ctx.indices.word) (swapped : Bool)
     (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (originalCall : CallingConditions ctx.program original [left, right] [output])
     (owned : ∀ id ∈ frame.owned, original.nextIdentity ≤ id)
@@ -322,9 +328,10 @@ theorem multiply_scalar_branch (ctx : Context) (word : WordContract ctx.program 
 end UInt256Proof.Multiply.Entry
 
 namespace UInt256Proof.Multiply.Entry
+variable {alternative : Bool}
 open CIL.Safety UInt256Model.Safety UInt256Proof.Multiply.Calls
 
-theorem multiply_dispatch (ctx : Context) (word : WordContract ctx.program ctx.indices.word) (top : Full.FullTopContract ctx.profile ctx.program ctx.indices.full ctx.indices.word ctx.indices.count ctx.indices.storage)
+theorem multiply_dispatch (ctx : Context alternative) (word : WordContract ctx.program ctx.indices.word) (top : Full.FullTopContract ctx.profile ctx.program ctx.indices.full ctx.indices.word ctx.indices.count ctx.indices.storage)
     (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (originalCall : CallingConditions ctx.program original [left, right] [output])
     (enteredWF : entered.WellFormed)
@@ -373,9 +380,10 @@ theorem multiply_dispatch (ctx : Context) (word : WordContract ctx.program ctx.i
 end UInt256Proof.Multiply.Entry
 
 namespace UInt256Proof.Multiply.Entry
+variable {alternative : Bool}
 open CIL.Safety UInt256Model.Safety UInt256Proof.Multiply.Calls
 
-theorem multiply_invoke (ctx : Context) (word : WordContract ctx.program ctx.indices.word) (top : Full.FullTopContract ctx.profile ctx.program ctx.indices.full ctx.indices.word ctx.indices.count ctx.indices.storage) (memory : Memory) (left right output : Reference)
+theorem multiply_invoke (ctx : Context alternative) (word : WordContract ctx.program ctx.indices.word) (top : Full.FullTopContract ctx.profile ctx.program ctx.indices.full ctx.indices.word ctx.indices.count ctx.indices.storage) (memory : Memory) (left right output : Reference)
     (call : CallingConditions ctx.program memory [left, right] [output]) :
     ∃ fuel final,
       invoke ctx.program fuel ctx.indices.entry (productArgs left right output) memory = .ok (final, []) ∧
@@ -405,3 +413,6 @@ theorem multiply_invoke (ctx : Context) (word : WordContract ctx.program ctx.ind
 
 #print axioms multiply_invoke
 end UInt256Proof.Multiply.Entry
+
+
+

@@ -5,6 +5,7 @@ import UInt256.Methods.Multiply.SingleWord
 import CIL.Safety.ScalarBranch
 
 namespace UInt256Proof.Multiply.Entry
+variable {alternative : Bool}
 open CIL.Safety UInt256Model.Safety UInt256Proof.Multiply.Calls
 structure Indices where
   entry : Nat
@@ -105,12 +106,12 @@ def multiplyBody (profile : CIL.FeatureProfile) (indices : Indices) : CIL.Method
   .arg 2,
   .call indices.full 3,
   .ret] }
-structure Context where
+structure Context (alternative : Bool := false) where
   indices : Indices
   profile : CIL.FeatureProfile
   program : CIL.Program
   entry : program[indices.entry]? = some (multiplyBody profile indices)
-  full : program[indices.full]? = some (Full.fullBody profile indices.word indices.count indices.storage)
+  full : program[indices.full]? = some (Full.fullBody profile indices.word indices.count indices.storage alternative)
   leftTwo : program[indices.leftTwo]? = some (LeftTwo.leftTwoBody profile indices.word indices.count indices.storage)
   bothTwo : program[indices.bothTwo]? = some (BothTwo.bothTwoBody profile indices.word indices.count indices.storage)
   count : program[indices.count]? = some (CountSafety.body profile)
@@ -120,13 +121,13 @@ structure Context where
 def scalarContext (indices : Indices) (profile : CIL.FeatureProfile) (program : CIL.Program)
     (scalar : profile.vector256Accelerated = false)
     (entry : program[indices.entry]? = some (multiplyBody profile indices))
-    (full : program[indices.full]? = some (Full.fullBody profile indices.word indices.count indices.storage))
+    (full : program[indices.full]? = some (Full.fullBody profile indices.word indices.count indices.storage alternative))
     (leftTwo : program[indices.leftTwo]? = some (LeftTwo.leftTwoBody profile indices.word indices.count indices.storage))
     (bothTwo : program[indices.bothTwo]? = some (BothTwo.bothTwoBody profile indices.word indices.count indices.storage))
     (count : program[indices.count]? = some (CountSafety.body profile))
     (single : program[indices.single]? = some (ScalarSafety.scalarBody profile indices.word indices.storage))
     (storage : program[indices.storage]? = some (ProductStorage.body profile indices.limbs))
-    (limbs : program[indices.limbs]? = some (LimbStorage.body profile)) : Context :=
+    (limbs : program[indices.limbs]? = some (LimbStorage.body profile)) : Context alternative :=
   ⟨indices, profile, program, entry, full, leftTwo, bothTwo, count, single,
     ProductStorage.scalar_contract profile scalar program indices.storage indices.limbs storage limbs⟩
 def productArgs (left right output : Reference) : List Value :=
@@ -134,8 +135,9 @@ def productArgs (left right output : Reference) : List Value :=
 abbrev ProductResult := BothTwo.ProductResult
 end UInt256Proof.Multiply.Entry
 namespace UInt256Proof.Multiply.Entry
+variable {alternative : Bool}
 open CIL.Safety UInt256Model.Safety
-theorem multiply_frame_setup (ctx : Context) (memory : Memory) (left right output : Reference)
+theorem multiply_frame_setup (ctx : Context alternative) (memory : Memory) (left right output : Reference)
     (call : CallingConditions ctx.program memory [left, right] [output]) :
     ∃ frame entered,
       enterFrame (multiplyBody ctx.profile ctx.indices) (productArgs left right output) memory = .ok (frame, entered) ∧
@@ -150,7 +152,7 @@ theorem multiply_frame_setup (ctx : Context) (memory : Memory) (left right outpu
 def multiplyLowInputs (original : Memory) (left right : Reference) :=
   rememberWord (rememberWord (fun _ => none) 0 (inputLimb original left 0)) 1 (inputLimb original right 0)
 
-theorem multiply_low_inputs (ctx : Context) (original entered current : Memory) (left right output : Reference) (frame : Frame)
+theorem multiply_low_inputs (ctx : Context alternative) (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (originalCall : CallingConditions ctx.program original [left, right] [output])
     (enteredWF : entered.WellFormed)
     (homes : WritableHomes entered original.nextIdentity (multiplyBody ctx.profile ctx.indices).localKinds frame.locals)
@@ -178,12 +180,13 @@ theorem multiply_low_inputs (ctx : Context) (original entered current : Memory) 
 end UInt256Proof.Multiply.Entry
 
 namespace UInt256Proof.Multiply.Entry
+variable {alternative : Bool}
 open CIL.Safety UInt256Model.Safety
 
 def inputUpper (memory : Memory) (input : Reference) :=
   inputLimb memory input 2 ||| inputLimb memory input 3
 
-theorem multiply_upper_mask (ctx : Context) (rightSide : Bool)
+theorem multiply_upper_mask (ctx : Context alternative) (rightSide : Bool)
     (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (known : Nat → Option (BitVec 64))
     (originalCall : CallingConditions ctx.program original [left, right] [output])
@@ -225,7 +228,7 @@ theorem multiply_upper_mask (ctx : Context) (rightSide : Bool)
 def inputTail (memory : Memory) (input : Reference) :=
   inputLimb memory input 1 ||| inputUpper memory input
 
-theorem multiply_tail_mask (ctx : Context) (rightSide : Bool)
+theorem multiply_tail_mask (ctx : Context alternative) (rightSide : Bool)
     (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (known : Nat → Option (BitVec 64))
     (originalCall : CallingConditions ctx.program original [left, right] [output])
@@ -273,6 +276,7 @@ theorem multiply_tail_mask (ctx : Context) (rightSide : Bool)
 end UInt256Proof.Multiply.Entry
 
 namespace UInt256Proof.Multiply.Entry
+variable {alternative : Bool}
 open CIL.Safety UInt256Model.Safety
 
 def multiplyUpperInputs (original : Memory) (left right : Reference) :=
@@ -283,7 +287,7 @@ def multiplyInputs (original : Memory) (left right : Reference) :=
   rememberWord (rememberWord (multiplyUpperInputs original left right)
     4 (inputTail original left)) 5 (inputTail original right)
 
-theorem multiply_prepare (ctx : Context) (original entered current : Memory) (left right output : Reference) (frame : Frame)
+theorem multiply_prepare (ctx : Context alternative) (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (originalCall : CallingConditions ctx.program original [left, right] [output])
     (enteredWF : entered.WellFormed)
     (homes : WritableHomes entered original.nextIdentity (multiplyBody ctx.profile ctx.indices).localKinds frame.locals)
@@ -313,6 +317,7 @@ theorem multiply_prepare (ctx : Context) (original entered current : Memory) (le
 end UInt256Proof.Multiply.Entry
 
 namespace UInt256Proof.Multiply.Entry
+variable {alternative : Bool}
 open CIL.Safety UInt256Model.Safety
 
 theorem input_upper_zero (memory : Memory) (input : Reference)
@@ -342,3 +347,6 @@ theorem small_product_value (memory : Memory) (left right : Reference)
 #print axioms input_tail_single
 #print axioms small_product_value
 end UInt256Proof.Multiply.Entry
+
+
+

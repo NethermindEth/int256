@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 #:property PublishAot=false
 using System.Diagnostics;
+using System.Security.Cryptography;
 using System.Text.Json.Nodes;
 
 string root = Path.GetFullPath(args.Length > 0 ? args[0] : "verification");
@@ -13,17 +14,48 @@ if (args.Length > 2 || profile is not ("scalar" or "x64-vector256"))
 string work = Path.Combine(root, "artifacts/bitwise-regressions", profile);
 string tool = Path.Combine(root, ".lake/packages/leancil/Extractor/bin/Nethermind.LeanCIL.dll");
 string profileArgument = profile == "scalar" ? profile : "@" + Path.Combine(root, "manifests/profiles", profile + ".json");
+string consumer = Path.Combine(work, "consumer");
+List<(string Extraction, string Proof, string Id, string Mutation)> jobs = [];
 JsonArray targets = JsonNode.Parse(File.ReadAllText(Path.Combine(root, "manifests/targets.json")))!["methods"]!.AsArray();
-async Task<string> Run(string executable, IEnumerable<string> arguments, bool succeeds = true)
+async Task<string> Run(string executable, IEnumerable<string> arguments, bool succeeds = true, bool disableIntrinsics = false)
 {
     ProcessStartInfo start = new(executable) { WorkingDirectory = root, RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
     foreach (string argument in arguments) start.ArgumentList.Add(argument);
+    if (disableIntrinsics) start.Environment["DOTNET_EnableHWIntrinsic"] = "0";
     using Process process = Process.Start(start) ?? throw new InvalidOperationException(executable);
     Task<string> stdout = process.StandardOutput.ReadToEndAsync(), stderr = process.StandardError.ReadToEndAsync();
     await process.WaitForExitAsync();
     string output = await stdout + await stderr;
     if ((process.ExitCode == 0) != succeeds || output.Contains("IDE0005", StringComparison.Ordinal)) throw new InvalidOperationException(output);
     return output;
+}
+void CopySources(string source, string destination)
+{
+    Directory.CreateDirectory(destination);
+    foreach (string file in Directory.EnumerateFiles(source))
+        if (Path.GetExtension(file) is ".lean" or ".json" or ".toml" || Path.GetFileName(file) == "lean-toolchain")
+            File.Copy(file, Path.Combine(destination, Path.GetFileName(file)), true);
+    foreach (string directory in Directory.EnumerateDirectories(source))
+    {
+        string name = Path.GetFileName(directory);
+        if (name is ".lake" or ".git" or "artifacts" or "generated" or "bin" or "obj" or ".work") continue;
+        if ((File.GetAttributes(directory) & FileAttributes.ReparsePoint) != 0)
+            throw new InvalidOperationException("Source snapshot cannot contain links: " + directory);
+        CopySources(directory, Path.Combine(destination, name));
+    }
+}
+CopySources(root, consumer);
+JsonArray packages = JsonNode.Parse(File.ReadAllText(Path.Combine(root, "lake-manifest.json")))!["packages"]!.AsArray();
+foreach (JsonNode? package in packages)
+{
+    string name = package!["name"]!.GetValue<string>();
+    string destination = Path.Combine(consumer, ".lake/packages", name);
+    if (!Directory.Exists(destination))
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+        await Run("git", ["clone", "--no-hardlinks", Path.Combine(root, ".lake/packages", name), destination]);
+    }
+    await Run("git", ["-C", destination, "checkout", "--detach", package["rev"]!.GetValue<string>()]);
 }
 foreach (bool early in new[] { false, true })
 {
@@ -33,6 +65,17 @@ foreach (bool early in new[] { false, true })
         "-p:FixtureCase=" + mutation, "-p:BaseOutputPath=" + Path.Combine(build, "bin") + Path.DirectorySeparatorChar,
         "-p:BaseIntermediateOutputPath=" + Path.Combine(build, "obj") + Path.DirectorySeparatorChar,
         "-p:EnforceCodeStyleInBuild=true", "-p:GenerateDocumentationFile=true", "-v:q"]);
+    string nativeBuild = Path.Combine(build, "native");
+    await Run("dotnet", ["build", Path.Combine(fixtures, "NativeWitness.csproj"), "-c", "Release",
+        "-p:FixtureAssembly=" + Path.Combine(build, "bin/Release/net10.0/Nethermind.Int256.dll"),
+        "-p:BaseOutputPath=" + Path.Combine(nativeBuild, "bin") + Path.DirectorySeparatorChar,
+        "-p:BaseIntermediateOutputPath=" + Path.Combine(nativeBuild, "obj") + Path.DirectorySeparatorChar,
+        "-p:EnforceCodeStyleInBuild=true", "-p:GenerateDocumentationFile=true", "-v:q"]);
+    byte[] expectedAssembly = SHA256.HashData(File.ReadAllBytes(Path.Combine(build, "bin/Release/net10.0/Nethermind.Int256.dll")));
+    byte[] loadedAssembly = SHA256.HashData(File.ReadAllBytes(Path.Combine(nativeBuild, "bin/Release/net10.0/Nethermind.Int256.dll")));
+    if (!expectedAssembly.AsSpan().SequenceEqual(loadedAssembly)) throw new InvalidOperationException("Native witness resolved a different fixture assembly");
+    Console.Write(await Run("dotnet", [Path.Combine(nativeBuild, "bin/Release/net10.0/NativeWitness.dll"), mutation]));
+    Console.Write(await Run("dotnet", [Path.Combine(nativeBuild, "bin/Release/net10.0/NativeWitness.dll"), mutation], disableIntrinsics: true));
     foreach (string operation in new[] { "And", "Or", "Xor", "Not" })
     foreach (bool returned in new[] { false, true })
     {
@@ -66,14 +109,18 @@ foreach (bool early in new[] { false, true })
             .Replace("@REFERENCES@", "⟨0,16⟩" + (unary ? "" : " ⟨0,64⟩") + (returned ? "" : $" ⟨0,{output}⟩"))
             .Replace("@ACTUAL@", returned ? $"(numberBytes {value} 32)" : $"(BitVec.ofNat 256 {value})");
         if (returned) proof = proof.Replace("  · intro output member\n    simp only [List.map_cons, List.map_nil, List.mem_cons, List.not_mem_nil, or_false] at member\n    ", "  · intro output member\n    simp only [List.map_nil, List.not_mem_nil] at member\n");
-        string proofPath = Path.Combine(extraction, "Proof.lean");
+        string proofPath = Path.Combine(consumer, "proofs", mutation + id + "Refutation.lean");
         File.WriteAllText(proofPath, proof);
-        await Run("dotnet", [tool, "verify", extraction, "--proof", proofPath, "--theorem", "BitwiseWitness.refuted", "--proof-root", root]);
-        string suffix = profile == "scalar" ? "Scalar" : "Vector";
-        string rejected = await Run("dotnet", [tool, "verify", extraction, "--proof", Path.Combine(root, "proofs", id + suffix + ".lean"),
-            "--theorem", "UInt256Proof." + id + "." + suffix.ToLowerInvariant() + "_correctness", "--proof-root", root], succeeds: false);
-        if (!rejected.Contains("proof checking", StringComparison.OrdinalIgnoreCase) || File.Exists(Path.Combine(extraction, "verified.json")))
-            throw new InvalidOperationException("Mutation was not rejected during proof checking or retained a stale certificate: " + rejected);
-        Console.WriteLine($"PASS {id}/{profile}/{mutation}: checked contract refutation");
+        jobs.Add((extraction, proofPath, id, mutation));
     }
+}
+foreach (var job in jobs)
+{
+    await Run("dotnet", [tool, "verify", job.Extraction, "--proof", job.Proof, "--theorem", "BitwiseWitness.refuted", "--proof-root", consumer]);
+    string suffix = profile == "scalar" ? "Scalar" : "Vector";
+    string rejected = await Run("dotnet", [tool, "verify", job.Extraction, "--proof", Path.Combine(consumer, "proofs", job.Id + suffix + ".lean"),
+        "--theorem", "UInt256Proof." + job.Id + "." + suffix.ToLowerInvariant() + "_correctness", "--proof-root", consumer], succeeds: false);
+    if (!rejected.Contains("proof checking", StringComparison.OrdinalIgnoreCase) || File.Exists(Path.Combine(job.Extraction, "verified.json")))
+        throw new InvalidOperationException("Mutation was not rejected during proof checking or retained a stale certificate: " + rejected);
+    Console.WriteLine($"PASS {job.Id}/{profile}/{job.Mutation}: checked contract refutation");
 }

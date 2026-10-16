@@ -56,16 +56,34 @@ def InitializedBinaryResult (operation : BitVec 256 → BitVec 256 → BitVec 25
       ∀ id, id < memory.nextIdentity → ∀ offset, OutsideOutput output id offset →
         final.cells id offset = memory.cells id offset
 
-theorem binary_checked (operation : BitVec 256 → BitVec 256 → BitVec 256) (profile : CIL.FeatureProfile)
+theorem fresh_disjoint {program : CIL.Program} {memory : Memory} {inputs : List Reference} {output : Reference}
+    (call : CallingConditions program memory inputs []) (fresh : output.allocation = memory.nextIdentity)
+    (input : Reference) (member : input ∈ inputs) : output.allocation ≠ input.allocation := by
+  obtain ⟨allocation, present, _, _⟩ := formed_reference_live _ _ _ (call.input_formed member)
+  have old : input.allocation < memory.nextIdentity := (call.1.1.1 _ _ present).1
+  rw [fresh]
+  exact Ne.symm (Nat.ne_of_lt old)
+def DisjointInitializedBinaryResult (operation : BitVec 256 → BitVec 256 → BitVec 256)
+    (program : CIL.Program) (index : Nat) : Prop :=
+  ∀ memory left right output, CallingConditions program memory [left, right] [output] →
+    output.allocation ≠ left.allocation → output.allocation ≠ right.allocation →
+    ∃ fuel final, InvocationCertificate program index (binaryArguments left right output) memory fuel final [] ∧
+      read final output 32 1 = .ok (numberBytes (operation (inputValue memory left) (inputValue memory right)).toNat 32) ∧
+      access final output 32 1 true = .ok () ∧
+      ∀ id, id < memory.nextIdentity → ∀ offset, OutsideOutput output id offset →
+        final.cells id offset = memory.cells id offset
+
+theorem binary_disjoint_checked (operation : BitVec 256 → BitVec 256 → BitVec 256) (profile : CIL.FeatureProfile)
     (program : CIL.Program) (index callee : Nat)
     (found : program[index]? = some (binaryBody profile callee))
-    (child : InitializedBinaryResult operation program callee) :
+    (child : DisjointInitializedBinaryResult operation program callee) :
     BinaryContract operation program index := by
   intro memory left right call
   obtain ⟨output, entered, entry, childCall, before, fresh⟩ := setup
     (binaryBody profile callee) (binaryArgs left right) rfl rfl rfl rfl program memory [left, right] call
   obtain ⟨childFuel, childResult, childCert, readback, _, outside⟩ :=
     child entered left right output childCall
+      (fresh_disjoint call fresh left (by simp)) (fresh_disjoint call fresh right (by simp))
   let bits := operation (inputValue entered left) (inputValue entered right)
   let bytes := numberBytes bits.toNat 32
   have hl := childCall.input_formed (reference := left) (by simp)
@@ -106,6 +124,12 @@ theorem binary_checked (operation : BitVec 256 → BitVec 256 → BitVec 256) (p
     exact (after.cells id bound offset).trans ((outside id (Nat.lt_of_lt_of_le bound growth) offset
       (Or.inl (by rw [fresh]; exact Nat.ne_of_lt bound))).trans (before.cells id bound offset))
 
+theorem binary_checked (operation : BitVec 256 → BitVec 256 → BitVec 256) (profile : CIL.FeatureProfile)
+    (program : CIL.Program) (index callee : Nat)
+    (found : program[index]? = some (binaryBody profile callee))
+    (child : InitializedBinaryResult operation program callee) : BinaryContract operation program index :=
+  binary_disjoint_checked operation profile program index callee found
+    (fun memory left right output call _ _ => child memory left right output call)
 #print axioms binary_checked
 #print axioms binary_prefix
 end UInt256Model.Safety.AggregateReturn
@@ -159,16 +183,26 @@ def InitializedUnaryResult (operation : BitVec 256 → BitVec 256)
       ∀ id, id < memory.nextIdentity → ∀ offset, OutsideOutput output id offset →
         final.cells id offset = memory.cells id offset
 
-theorem unary_checked (operation : BitVec 256 → BitVec 256) (profile : CIL.FeatureProfile)
+def DisjointInitializedUnaryResult (operation : BitVec 256 → BitVec 256)
+    (program : CIL.Program) (index : Nat) : Prop :=
+  ∀ memory input output, CallingConditions program memory [input] [output] →
+    output.allocation ≠ input.allocation →
+    ∃ fuel final, InvocationCertificate program index (unaryArguments input output) memory fuel final [] ∧
+      read final output 32 1 = .ok (numberBytes (operation (inputValue memory input)).toNat 32) ∧
+      access final output 32 1 true = .ok () ∧
+      ∀ id, id < memory.nextIdentity → ∀ offset, OutsideOutput output id offset →
+        final.cells id offset = memory.cells id offset
+
+theorem unary_disjoint_checked (operation : BitVec 256 → BitVec 256) (profile : CIL.FeatureProfile)
     (program : CIL.Program) (index callee : Nat)
     (found : program[index]? = some (unaryBody profile callee))
-    (child : InitializedUnaryResult operation program callee) :
+    (child : DisjointInitializedUnaryResult operation program callee) :
     UnaryContract operation program index := by
   intro memory input call
   obtain ⟨output, entered, entry, childCall, before, fresh⟩ := setup
     (unaryBody profile callee) (unaryArgs input) rfl rfl rfl rfl program memory [input] call
   obtain ⟨childFuel, childResult, childCert, readback, _, outside⟩ :=
-    child entered input output childCall
+    child entered input output childCall (fresh_disjoint call fresh input (by simp))
   let bits := operation (inputValue entered input)
   let bytes := numberBytes bits.toNat 32
   have hl := childCall.input_formed (reference := input) (by simp)
@@ -207,6 +241,14 @@ theorem unary_checked (operation : BitVec 256 → BitVec 256) (profile : CIL.Fea
     exact (after.cells id bound offset).trans ((outside id (Nat.lt_of_lt_of_le bound growth) offset
       (Or.inl (by rw [fresh]; exact Nat.ne_of_lt bound))).trans (before.cells id bound offset))
 
+
+theorem unary_checked (operation : BitVec 256 → BitVec 256) (profile : CIL.FeatureProfile)
+    (program : CIL.Program) (index callee : Nat)
+    (found : program[index]? = some (unaryBody profile callee))
+    (child : InitializedUnaryResult operation program callee) : UnaryContract operation program index :=
+  unary_disjoint_checked operation profile program index callee found
+    (fun memory input output call _ => child memory input output call)
 #print axioms unary_checked
 #print axioms unary_prefix
 end UInt256Model.Safety.AggregateReturn
+

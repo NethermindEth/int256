@@ -1,0 +1,10 @@
+<Project>
+  <ItemGroup>
+    <Compile Include="../Common/Support.cs" />
+    <Compile Include="../Common/Subtract/Subtract.cs" Condition="'$(FixtureCase)' == 'Baseline' Or '$(FixtureCase)' == 'BorrowAlternative' Or '$(FixtureCase)' == 'ExtractedHelper' Or '$(FixtureCase)' == 'WrongBorrow'" />
+    <Compile Include="../Common/Subtract/SubtractScalar.cs" Condition="'$(FixtureCase)' == 'Baseline' Or '$(FixtureCase)' == 'BorrowAlternative' Or '$(FixtureCase)' == 'ExtractedHelper' Or '$(FixtureCase)' == 'WrongBorrow'" />
+    <Compile Include="../Common/Subtract/SubtractScalarUInt64.cs" Condition="'$(FixtureCase)' == 'Baseline' Or '$(FixtureCase)' == 'BorrowAlternative' Or '$(FixtureCase)' == 'ExtractedHelper' Or '$(FixtureCase)' == 'WrongBorrow'" />
+    <Compile Include="../Common/Subtract/SubtractWithBorrow.cs" Condition="'$(FixtureCase)' == 'Baseline' Or '$(FixtureCase)' == 'WrongAliasing'" />
+    <Compile Include="../Common/Subtract/StoreLimbs.cs" Condition="'$(FixtureCase)' == 'Baseline' Or '$(FixtureCase)' == 'BorrowAlternative' Or '$(FixtureCase)' == 'ExtractedHelper' Or '$(FixtureCase)' == 'WrongBorrow'" />
+  </ItemGroup>
+</Project>

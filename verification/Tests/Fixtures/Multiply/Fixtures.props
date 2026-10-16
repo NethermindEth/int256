@@ -1,0 +1,14 @@
+<Project>
+  <ItemGroup>
+    <Compile Include="../Common/Multiply/Representation.cs" />
+    <Compile Include="../Common/Multiply/Multiply.cs" Condition="'$(FixtureCase)' == 'AlternativeOrder' Or '$(FixtureCase)' == 'WrongCarry' Or '$(FixtureCase)' == 'WrongCrossProduct' Or '$(FixtureCase)' == 'WrongAliasing' Or '$(FixtureCase)' == 'WrongBmiHigh'" />
+    <Compile Include="../Common/Multiply/StoreProduct.cs" Condition="'$(FixtureCase)' == 'Baseline' Or '$(FixtureCase)' == 'AlternativeOrder' Or '$(FixtureCase)' == 'ExtractedHelper' Or '$(FixtureCase)' == 'WrongCarry' Or '$(FixtureCase)' == 'WrongCrossProduct' Or '$(FixtureCase)' == 'WrongAliasing' Or '$(FixtureCase)' == 'WrongHighLow' Or '$(FixtureCase)' == 'WrongBmiHigh'" />
+    <Compile Include="../Common/Multiply/MultiplyByUInt64.cs" Condition="'$(FixtureCase)' == 'Baseline' Or '$(FixtureCase)' == 'AlternativeOrder' Or '$(FixtureCase)' == 'WrongCarry' Or '$(FixtureCase)' == 'WrongCrossProduct' Or '$(FixtureCase)' == 'WrongHighLow' Or '$(FixtureCase)' == 'WrongBmiHigh'" />
+    <Compile Include="../Common/Multiply/MultiplyLimbs2x2.cs" Condition="'$(FixtureCase)' == 'Baseline' Or '$(FixtureCase)' == 'AlternativeOrder' Or '$(FixtureCase)' == 'WrongCarry' Or '$(FixtureCase)' == 'WrongAliasing' Or '$(FixtureCase)' == 'WrongHighLow' Or '$(FixtureCase)' == 'WrongBmiHigh'" />
+    <Compile Include="../Common/Multiply/MultiplyLimbs2x4.cs" Condition="'$(FixtureCase)' == 'Baseline' Or '$(FixtureCase)' == 'AlternativeOrder' Or '$(FixtureCase)' == 'WrongCarry' Or '$(FixtureCase)' == 'WrongAliasing' Or '$(FixtureCase)' == 'WrongHighLow' Or '$(FixtureCase)' == 'WrongBmiHigh'" />
+    <Compile Include="../Common/Multiply/MultiplyLimbs4x4.cs" Condition="'$(FixtureCase)' == 'Baseline' Or '$(FixtureCase)' == 'WrongCarry' Or '$(FixtureCase)' == 'WrongAliasing' Or '$(FixtureCase)' == 'WrongHighLow' Or '$(FixtureCase)' == 'WrongBmiHigh'" />
+    <Compile Include="../Common/Multiply/AddAndCountCarry.cs" Condition="'$(FixtureCase)' == 'Baseline' Or '$(FixtureCase)' == 'AlternativeOrder' Or '$(FixtureCase)' == 'ExtractedHelper' Or '$(FixtureCase)' == 'WrongCrossProduct' Or '$(FixtureCase)' == 'WrongAliasing' Or '$(FixtureCase)' == 'WrongHighLow' Or '$(FixtureCase)' == 'WrongBmiHigh'" />
+    <Compile Include="../Common/Multiply/Multiply64.cs" Condition="'$(FixtureCase)' == 'Baseline' Or '$(FixtureCase)' == 'AlternativeOrder' Or '$(FixtureCase)' == 'ExtractedHelper' Or '$(FixtureCase)' == 'WrongCarry' Or '$(FixtureCase)' == 'WrongCrossProduct' Or '$(FixtureCase)' == 'WrongAliasing' Or '$(FixtureCase)' == 'WrongHighLow'" />
+    <Compile Include="../Common/Multiply/StoreLimbs.cs" Condition="'$(FixtureCase)' == 'Baseline' Or '$(FixtureCase)' == 'AlternativeOrder' Or '$(FixtureCase)' == 'ExtractedHelper' Or '$(FixtureCase)' == 'WrongCarry' Or '$(FixtureCase)' == 'WrongCrossProduct' Or '$(FixtureCase)' == 'WrongHighLow' Or '$(FixtureCase)' == 'WrongBmiHigh'" />
+  </ItemGroup>
+</Project>

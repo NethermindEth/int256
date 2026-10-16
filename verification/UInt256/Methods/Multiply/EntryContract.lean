@@ -3,9 +3,10 @@ import UInt256.Safety.AggregateReturn
 import UInt256.Safety.ArgumentValues
 
 namespace UInt256Proof.Multiply.Entry
+variable {alternative : Bool}
 open CIL.Safety UInt256Model.Safety UInt256Proof.Multiply.Calls
 
-theorem multiply_checked_result (ctx : Context) (word : WordContract ctx.program ctx.indices.word)
+theorem multiply_checked_result (ctx : Context alternative) (word : WordContract ctx.program ctx.indices.word)
     (top : Full.FullTopContract ctx.profile ctx.program ctx.indices.full ctx.indices.word ctx.indices.count ctx.indices.storage)
     (memory : Memory) (left right output : Reference)
     (call : CallingConditions ctx.program memory [left, right] [output]) :
@@ -28,7 +29,7 @@ theorem multiply_checked_result (ctx : Context) (word : WordContract ctx.program
     simpa only [invoke, found, checked, setup, Except.mapError, Bind.bind, Except.bind] using invoked
   exact ⟨fuel, final, certify_invocation _ _ _ _ _ _ _ _ _ _ found checked setup live ran, result⟩
 
-theorem multiply_checked_contract (ctx : Context) (word : WordContract ctx.program ctx.indices.word)
+theorem multiply_checked_contract (ctx : Context alternative) (word : WordContract ctx.program ctx.indices.word)
     (top : Full.FullTopContract ctx.profile ctx.program ctx.indices.full ctx.indices.word ctx.indices.count ctx.indices.storage) :
     WrappingBinaryContract (· * ·) ctx.program ctx.indices.entry := by
   intro memory left right output call
@@ -39,15 +40,16 @@ theorem multiply_checked_contract (ctx : Context) (word : WordContract ctx.progr
 end UInt256Proof.Multiply.Entry
 
 namespace UInt256Proof.Multiply.Entry
+variable {alternative : Bool}
 open CIL.Safety UInt256Model.Safety
 
-theorem scalar_correctness (ctx : Context)
+theorem scalar_correctness (ctx : Context alternative)
     (wordFound : ctx.program[ctx.indices.word]? = some (scalarWordBody ctx.profile))
     (bmi : ctx.profile.bmi2 = false) (arm : ctx.profile.armBase64 = false)
     (avx512 : ctx.profile.avx512DQVL = false) (avx2 : ctx.profile.avx2 = false) :
     WrappingBinaryContract (· * ·) ctx.program ctx.indices.entry := by
   apply multiply_checked_contract ctx ?_
-    (Full.scalar_top_contract ctx.profile ctx.program ctx.indices.full ctx.indices.word ctx.indices.count ctx.indices.storage ctx.full avx512 avx2)
+    (Full.scalar_top_contract_order ctx.profile ctx.program ctx.indices.full ctx.indices.word ctx.indices.count ctx.indices.storage ctx.full avx512 avx2)
   intro memory a b output wf writable
   obtain ⟨final, invoked, valid, loaded, authority, outside⟩ :=
     scalar_word_invoke ctx.profile bmi arm ctx.program ctx.indices.word wordFound memory a b output wf writable
@@ -55,6 +57,7 @@ theorem scalar_correctness (ctx : Context)
 #print axioms scalar_correctness
 end UInt256Proof.Multiply.Entry
 namespace UInt256Proof.Multiply.Entry
+variable {alternative : Bool}
 open CIL.Safety UInt256Model.Safety
 
 theorem output_encoded (memory : Memory) (output : Reference) (value : BitVec 256)
@@ -69,7 +72,7 @@ theorem output_encoded (memory : Memory) (output : Reference) (value : BitVec 25
   rw [roundtrip]
   exact loaded
 
-theorem initialized_result (ctx : Context) (word : Calls.WordContract ctx.program ctx.indices.word)
+theorem initialized_result (ctx : Context alternative) (word : Calls.WordContract ctx.program ctx.indices.word)
     (top : Full.FullTopContract ctx.profile ctx.program ctx.indices.full ctx.indices.word ctx.indices.count ctx.indices.storage) :
     UInt256Model.Safety.AggregateReturn.InitializedBinaryResult (· * ·) ctx.program ctx.indices.entry := by
   intro memory left right output call
@@ -82,9 +85,10 @@ theorem initialized_result (ctx : Context) (word : Calls.WordContract ctx.progra
 end UInt256Proof.Multiply.Entry
 
 namespace UInt256Proof.Multiply.Entry
+variable {alternative : Bool}
 open CIL.Safety UInt256Model.Safety
 
-theorem scalar_word_contract (ctx : Context)
+theorem scalar_word_contract (ctx : Context alternative)
     (wordFound : ctx.program[ctx.indices.word]? = some (scalarWordBody ctx.profile))
     (bmi : ctx.profile.bmi2 = false) (arm : ctx.profile.armBase64 = false) :
     Calls.WordContract ctx.program ctx.indices.word := by
@@ -93,12 +97,15 @@ theorem scalar_word_contract (ctx : Context)
     scalar_word_invoke ctx.profile bmi arm ctx.program ctx.indices.word wordFound memory a b output wf writable
   exact ⟨9, final, invoked, valid, loaded, authority, fun id _ offset bound => outside id offset bound⟩
 
-theorem scalar_initialized_result (ctx : Context)
+theorem scalar_initialized_result (ctx : Context alternative)
     (wordFound : ctx.program[ctx.indices.word]? = some (scalarWordBody ctx.profile))
     (bmi : ctx.profile.bmi2 = false) (arm : ctx.profile.armBase64 = false)
     (avx512 : ctx.profile.avx512DQVL = false) (avx2 : ctx.profile.avx2 = false) :
     UInt256Model.Safety.AggregateReturn.InitializedBinaryResult (· * ·) ctx.program ctx.indices.entry :=
   initialized_result ctx (scalar_word_contract ctx wordFound bmi arm)
-    (Full.scalar_top_contract ctx.profile ctx.program ctx.indices.full ctx.indices.word ctx.indices.count ctx.indices.storage ctx.full avx512 avx2)
+    (Full.scalar_top_contract_order ctx.profile ctx.program ctx.indices.full ctx.indices.word ctx.indices.count ctx.indices.storage ctx.full avx512 avx2)
 #print axioms scalar_initialized_result
 end UInt256Proof.Multiply.Entry
+
+
+

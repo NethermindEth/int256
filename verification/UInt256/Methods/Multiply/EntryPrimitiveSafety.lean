@@ -283,30 +283,44 @@ theorem conversion_prefix32 (ctx : PrimitiveContext) (narrow : ctx.narrow = true
     first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
   exact continuation
 
+theorem primitive64_with_contracts (ctx : PrimitiveContext) (narrow : ctx.narrow = false)
+    (wordContract : Calls.WordContract ctx.program ctx.indices.word)
+    (top : Full.FullTopContract ctx.profile ctx.program ctx.indices.full ctx.indices.word ctx.indices.count ctx.indices.storage) :
+    OrderedScalarContract ctx.firstScalar CIL.Value.i64
+      (fun input word => encoded (input * BitVec.ofNat 256 word.toNat)) ctx.program ctx.wrapperIndex := by
+  intro memory input word call
+  exact primitive_checked ctx wordContract top
+    ctx.firstScalar memory input (.i64 word) word rfl (conversion_prefix64 ctx narrow word)
+    (by rfl) (by rfl) (by rfl) call
+
+theorem primitive32_with_contracts (ctx : PrimitiveContext) (narrow : ctx.narrow = true)
+    (wordContract : Calls.WordContract ctx.program ctx.indices.word)
+    (top : Full.FullTopContract ctx.profile ctx.program ctx.indices.full ctx.indices.word ctx.indices.count ctx.indices.storage) :
+    OrderedScalarContract ctx.firstScalar CIL.Value.i32
+      (fun input word => encoded (input * BitVec.ofNat 256 word.toNat)) ctx.program ctx.wrapperIndex := by
+  intro memory input word call
+  have result := primitive_checked ctx wordContract top
+    ctx.firstScalar memory input (.i32 word) (word.setWidth 64) rfl (conversion_prefix32 ctx narrow word)
+    (by rfl) (by rfl) (by rfl) call
+  simpa only [BitVec.toNat_setWidth, Nat.mod_eq_of_lt (Nat.lt_trans word.isLt (by decide : 2^32 < 2^64))] using result
 theorem primitive64_correctness (ctx : PrimitiveContext) (narrow : ctx.narrow = false)
     (wordFound : ctx.program[ctx.indices.word]? = some (scalarWordBody ctx.profile))
     (bmi : ctx.profile.bmi2 = false) (arm : ctx.profile.armBase64 = false)
     (avx512 : ctx.profile.avx512DQVL = false) (avx2 : ctx.profile.avx2 = false) :
     OrderedScalarContract ctx.firstScalar CIL.Value.i64
-      (fun input word => encoded (input * BitVec.ofNat 256 word.toNat)) ctx.program ctx.wrapperIndex := by
-  intro memory input word call
-  exact primitive_checked ctx (scalar_word_contract ctx.toContext wordFound bmi arm)
+      (fun input word => encoded (input * BitVec.ofNat 256 word.toNat)) ctx.program ctx.wrapperIndex :=
+  primitive64_with_contracts ctx narrow (scalar_word_contract ctx.toContext wordFound bmi arm)
     (Full.scalar_top_contract ctx.profile ctx.program ctx.indices.full ctx.indices.word ctx.indices.count ctx.indices.storage ctx.full avx512 avx2)
-    ctx.firstScalar memory input (.i64 word) word rfl (conversion_prefix64 ctx narrow word)
-    (by rfl) (by rfl) (by rfl) call
 
 theorem primitive32_correctness (ctx : PrimitiveContext) (narrow : ctx.narrow = true)
     (wordFound : ctx.program[ctx.indices.word]? = some (scalarWordBody ctx.profile))
     (bmi : ctx.profile.bmi2 = false) (arm : ctx.profile.armBase64 = false)
     (avx512 : ctx.profile.avx512DQVL = false) (avx2 : ctx.profile.avx2 = false) :
     OrderedScalarContract ctx.firstScalar CIL.Value.i32
-      (fun input word => encoded (input * BitVec.ofNat 256 word.toNat)) ctx.program ctx.wrapperIndex := by
-  intro memory input word call
-  have result := primitive_checked ctx (scalar_word_contract ctx.toContext wordFound bmi arm)
+      (fun input word => encoded (input * BitVec.ofNat 256 word.toNat)) ctx.program ctx.wrapperIndex :=
+  primitive32_with_contracts ctx narrow (scalar_word_contract ctx.toContext wordFound bmi arm)
     (Full.scalar_top_contract ctx.profile ctx.program ctx.indices.full ctx.indices.word ctx.indices.count ctx.indices.storage ctx.full avx512 avx2)
-    ctx.firstScalar memory input (.i32 word) (word.setWidth 64) rfl (conversion_prefix32 ctx narrow word)
-    (by rfl) (by rfl) (by rfl) call
-  simpa only [BitVec.toNat_setWidth, Nat.mod_eq_of_lt (Nat.lt_trans word.isLt (by decide : 2^32 < 2^64))] using result
+
 #print axioms conversion_prefix64
 #print axioms conversion_prefix32
 #print axioms primitive64_correctness

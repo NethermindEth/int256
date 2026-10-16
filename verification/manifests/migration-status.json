@@ -1,7 +1,7 @@
 {
   "leancilRevision": "0eba3c565c075a233772786dd3cbe7af6c14797b",
   "assemblySha256": "7d44ec9be3b6cfa4b853ad25cec8d246c1ada781866e04b7f9d6dfd4c2266e4e",
-  "note": "All scalar targets extract. Extraction is not a compiled-method certificate. Remaining proof ports are consumer work; upstream issues 36–40 and 42 are resolved.",
+  "note": "All scalar targets extract. Extraction is not a compiled-method certificate. Remaining proof ports are consumer work; upstream issues 36-40 and 42 are resolved; 53 and 54 are open.",
   "scalar": [
     {
       "method": "EqualsInt32",
@@ -568,44 +568,46 @@
       "completedCertificates": 34,
       "authenticatedInputs": 621,
       "note": "All 28 vector/SSE equality and six vector shift compiled-method certificates passed with family transports. Authenticated source, proof, and settings inputs matched before integration of the next batch."
+    },
+    {
+      "completedCertificates": 22,
+      "authenticatedInputs": 869,
+      "extractionRevision": "70ee20782980f35ff19b26e5fdff2f25c6e760e9",
+      "assemblySha256": "2d844a96b480caa91311eedd89c45e7115664067aadc83f72efdede18ee9c185",
+      "note": "Seven scalar multiplication, twelve accelerated ordering, and three BMI2/ARM64/vector-storage multiplication certificates passed. All authenticated inputs matched before integration. All 87 scalar targets now have registered gates; original accelerated profile and fixture migration remains incomplete."
+    },
+    {
+      "note": "98 multiplication profile certificates (7 entries x 14 profiles) passed against Release assembly 2d844a96 with proof sources identical to the current tree; the 10 earlier per-method multiplication proofs were replaced by the uniform profile proofs. Add/AddOverflow/Subtract/SubtractUnderflow scalar gates recertified after helper signature pins were removed from the bindings.",
+      "assemblySha256": "2d844a96b480caa91311eedd89c45e7115664067aadc83f72efdede18ee9c185",
+      "methods": [
+        "Multiply",
+        "MultiplyInstance",
+        "OperatorMultiplyUInt256UInt256",
+        "OperatorMultiplyUInt256UInt32",
+        "OperatorMultiplyUInt32UInt256",
+        "OperatorMultiplyUInt256UInt64",
+        "OperatorMultiplyUInt64UInt256"
+      ],
+      "completedCertificates": 98,
+      "recertifiedScalarGates": [
+        "Add",
+        "AddOverflow",
+        "Subtract",
+        "SubtractUnderflow"
+      ]
     }
   ],
-  "remainingPorts": [
-    {
-      "method": "Multiply",
-      "profile": "scalar"
-    },
-    {
-      "method": "OperatorMultiplyUInt256UInt32",
-      "profile": "scalar"
-    },
-    {
-      "method": "OperatorMultiplyUInt32UInt256",
-      "profile": "scalar"
-    },
-    {
-      "method": "OperatorMultiplyUInt256UInt64",
-      "profile": "scalar"
-    },
-    {
-      "method": "OperatorMultiplyUInt64UInt256",
-      "profile": "scalar"
-    },
-    {
-      "method": "OperatorMultiplyUInt256UInt256",
-      "profile": "scalar"
-    },
-    {
-      "method": "MultiplyInstance",
-      "profile": "scalar"
-    }
-  ],
+  "remainingPorts": [],
   "pendingValidation": [
-    "Seven scalar multiplication gates and 12 accelerated ordering gates pass fresh extraction bindings; full method certificates pending.",
-    "Equality scalar family additions, generic shift storage, aggregate-return refactoring, and comparison family additions require recertification after integration.",
-    "Shift and bitwise negative fixtures have kernel-checked full-contract refutations; full regression harness runs pending. Positive alternative fixtures remain in progress.",
-    "BMI2/ARM64 widening helper contracts and shared SIMD addition arithmetic compile; complete original accelerated multiplication/Add/Subtract profile coverage remains outstanding.",
-    "Pinned LeanCIL rejects ReadOnlySpan<byte> lookup-table extraction for AVX2/AVX512 Add profiles. Minimal reproducer and issue draft remain local under artifacts/span-repro; production C# is unchanged."
+    "Integrated equality/shift/aggregate-return/comparison, bitwise EarlyStore and multiplication supporting changes require one recertification of all 232 gates against the final source snapshot.",
+    "Bitwise: 24 negative, 16 helper positive and 8 EarlyStore positive certificates passed; the native-integrated runner still needs a run after promotion.",
+    "Shift: 11 scalar and 11 vector negatives and 8 positive fixtures (4 scalar, 4 vector) passed.",
+    "Multiply: all 8 original fixtures passed (3 positive, 5 negative) with the uniform profile proofs.",
+    "Add/Subtract: Baseline, Renamed and ReversedStore positives and all 4 negatives passed. CarryOr, FullyInlined, StraightLine, ExtractedHelper, ExternalHelper (Add) and BorrowAlternative, FullyInlined, ExtractedHelper (Subtract) need fixture-specific proofs.",
+    "Add/ExpandedHardware: generated parameter/feature validation exceeds the default heartbeat budget (LeanCIL#54); raising the budget is not an accepted fix.",
+    "AVX2/AVX512 Add/Subtract/AddOverflow/SubtractUnderflow extraction rejects ReadOnlySpan<byte> lookup-table metadata (LeanCIL#53). Production C# is unchanged.",
+    "Reporting feature-class coverage (arm64-advsimd, x64-sse42) and accelerated Add/Subtract gates remain outstanding; an ARM Add contract draft compiles but is not promoted.",
+    "Comparison, equality, reporting, safety, SIMD and profile fixture groups from the original branch are not yet ported."
   ],
-  "supportingAuditTheorems": 1860
+  "supportingAuditTheorems": 1971
 }
