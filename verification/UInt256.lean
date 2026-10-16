@@ -95,4 +95,5 @@ import UInt256.Safety.ContractRefutation
 import UInt256.Methods.Bitwise.EarlyStore
 import UInt256.Methods.Add.ARMContract
 import UInt256.Methods.Add.ARMOverflowContract
+import UInt256.Methods.Add.SSEContract
 import UInt256.Safety.PrivateWordSteps

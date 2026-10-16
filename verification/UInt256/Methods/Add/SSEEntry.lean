@@ -271,7 +271,7 @@ theorem vector128_sse_entry (program : CIL.Program) (body : CIL.Method) (method 
     (flag : BitVec 32) (flagFit : CIL.NarrowKind.unsigned8.extend flag = flag) (flagArg : args[3]? = some (.scalar (.i32 flag)))
     : ∃ fuel final returned,
       run program fuel method 0 args frame [] entered = .ok (final, returned) ∧
-      (∃ returnedFlag : BitVec 32, returned = [.scalar (.i32 returnedFlag)] ∧
+      (∃ returnedFlag : BitVec 32, returned = [.scalar (.i32 returnedFlag)] ∧ CIL.NarrowKind.unsigned8.extend returnedFlag = returnedFlag ∧
         (flag ≠ BitVec.ofNat 32 0 → returnedFlag =
           if 2^256 ≤ (inputValue original left).toNat + (inputValue original right).toNat then 1 else 0)) ∧
       inputValue final output = inputValue original left + inputValue original right ∧
@@ -283,10 +283,10 @@ theorem vector128_sse_entry (program : CIL.Program) (body : CIL.Method) (method 
   · obtain ⟨fuel, final, returned, executed, scalar, result, writable, outside⟩ :=
       vector128_fast_entry program body method specs found startTail incomingTail leading correctionTail startCode incomingCode leadingLength correctionCodeFound firstFourteen sse ssse earlyLeading earlyTail earlyLength earlyCode propLeading propTail propLength propCode decisionLeading decisionTail decisionLength decisionCodeFound fastLeading fastTail fastLength fastCode returns original entered [left, right] [output] left right output frame slots args
         call setup layout homes (by simp) (by simp) (by simp) leftArg rightArg outputArg flag flagFit flagArg fast
-    exact ⟨fuel, final, returned, executed, ⟨_, scalar, fun reporting => vector128_snapshot_fast_flag body.profile.advSimd original left right flag reporting fast⟩,
+    exact ⟨fuel, final, returned, executed, ⟨_, scalar, (by split <;> rfl), fun reporting => vector128_snapshot_fast_flag body.profile.advSimd original left right flag reporting fast⟩,
       result, writable, outside⟩
   · let post : Memory → List Value → Prop := fun final returned =>
-      (∃ returnedFlag : BitVec 32, returned = [.scalar (.i32 returnedFlag)] ∧
+      (∃ returnedFlag : BitVec 32, returned = [.scalar (.i32 returnedFlag)] ∧ CIL.NarrowKind.unsigned8.extend returnedFlag = returnedFlag ∧
         (flag ≠ BitVec.ofNat 32 0 → returnedFlag =
           if 2^256 ≤ (inputValue original left).toNat + (inputValue original right).toNat then 1 else 0)) ∧
       inputValue final output = inputValue original left + inputValue original right ∧
@@ -308,7 +308,7 @@ theorem vector128_sse_entry (program : CIL.Program) (body : CIL.Method) (method 
     obtain ⟨fuel, final, values, executed, result⟩ := vector128_sse_finish program body method found repairLeading repairTail repairLength
       carry storage repairCode storageFound returns original after (vector128SavedFrame frame slots right)
       left right output carryHome results args outputArg call (fun id member => (fresh.2 id member).1) state
-    exact ⟨fuel, final, values, executed, ⟨_, result.flag, fun _ => rfl⟩, result.value, result.writable,
+    exact ⟨fuel, final, values, executed, ⟨_, result.flag, (by unfold UInt256Proof.Safety.addOverflow; split <;> rfl), fun _ => rfl⟩, result.value, result.writable,
       fun id offset bound untouched => result.footprint id bound offset untouched⟩
 
 #print axioms vector128_sse_entry
@@ -352,6 +352,7 @@ theorem checked_vector128_sse_contract (program : CIL.Program) (body : CIL.Metho
       InvocationCertificate program method (vector128Arguments left right output flag)
         memory fuel final [.scalar (.i32 returned)] ∧
       inputValue final output = inputValue memory left + inputValue memory right ∧
+      CIL.NarrowKind.unsigned8.extend returned = returned ∧
       (flag ≠ BitVec.ofNat 32 0 → returned =
         if 2^256 ≤ (inputValue memory left).toNat + (inputValue memory right).toNat then 1 else 0) ∧
       access final output 32 1 true = .ok () ∧
@@ -363,7 +364,7 @@ theorem checked_vector128_sse_contract (program : CIL.Program) (body : CIL.Metho
   obtain ⟨fuel, final, returned, executed, scalar, result, writable, footprint⟩ :=
     vector128_sse_entry program body method specs found startTail incomingTail leading correctionTail startCode incomingCode leadingLength correctionCodeFound firstFourteen sse ssse earlyLeading earlyTail earlyLength earlyCode propLeading propTail propLength propCode decisionLeading decisionTail decisionLength decisionCodeFound fastLeading fastTail fastLength fastCode returns repairDispatchLeading repairDispatchTail repairDispatchLength repairDispatchCode repairLeading repairTail repairLength carry storage repairCode carryFound storageFound wordSpecs disabled memory entered left right output frame slots args
       call setup layout homes rfl rfl rfl flag flagFit rfl
-  obtain ⟨returnedValue, rfl, overflow⟩ := scalar
+  obtain ⟨returnedValue, rfl, returnedFit, overflow⟩ := scalar
   have checked : args.mapM (checkedValue memory) = .ok args := by
     have fl := call.input_formed (reference := left) (by simp)
     have fr := call.input_formed (reference := right) (by simp)
@@ -374,7 +375,7 @@ theorem checked_vector128_sse_contract (program : CIL.Program) (body : CIL.Metho
   exact ⟨fuel, final, returnedValue,
     certify_invocation program method body args memory frame entered
       fuel final [.scalar (.i32 returnedValue)] found checked setup live executed,
-    result, overflow, writable, footprint⟩
+    result, returnedFit, overflow, writable, footprint⟩
 
 #print axioms checked_vector128_sse_contract
 end UInt256Proof.Add.Safety
@@ -400,6 +401,7 @@ theorem sse_helper_checked (profile : CIL.FeatureProfile) (disabled : profile.ad
       InvocationCertificate program method (vector128Arguments left right output flag)
         memory fuel final [.scalar (.i32 returned)] ∧
       inputValue final output = inputValue memory left + inputValue memory right ∧
+      CIL.NarrowKind.unsigned8.extend returned = returned ∧
       (flag ≠ BitVec.ofNat 32 0 → returned =
         if 2^256 ≤ (inputValue memory left).toNat + (inputValue memory right).toNat then 1 else 0) ∧
       access final output 32 1 true = .ok () ∧

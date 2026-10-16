@@ -217,6 +217,18 @@
       "theorem": "UInt256Proof.Add.overflow_profile_correctness"
     },
     {
+      "method": "Add",
+      "profile": "x64-sse42",
+      "proof": "proofs/AddProfile_x64_sse42.lean",
+      "theorem": "UInt256Proof.Add.sse_profile_correctness"
+    },
+    {
+      "method": "AddOverflow",
+      "profile": "x64-sse42",
+      "proof": "proofs/AddOverflowProfile_x64_sse42.lean",
+      "theorem": "UInt256Proof.Add.sse_overflow_profile_correctness"
+    },
+    {
       "method": "LeUInt32UInt256",
       "profile": "scalar",
       "proof": "proofs/LeUInt32UInt256Scalar.lean",
