@@ -8,6 +8,7 @@ namespace Extracted
 @[cil_code] def entryIndex : Nat := 0
 abbrev entryBody := method0
 bind_callee addScalarIndex addScalarBody := entryBody with 4
+bind_call_site entryScalarCall := entryBody with 4
 bind_callee addWithCarryIndex addWithCarryBody := addScalarBody with 4
 bind_callee addScalarUInt64Index addScalarUInt64Body := addScalarBody with 3
 bind_callee storeLimbsIndex storeLimbsBody := addScalarBody with 5

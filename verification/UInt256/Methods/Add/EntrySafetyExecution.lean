@@ -5,16 +5,11 @@ namespace UInt256Proof.Safety
 
 open CIL.Safety UInt256Model.Safety
 
-def entryScalarCall : Nat :=
-  Extracted.entryBody.code.findIdx fun op => match op with
-    | .call callee _ => callee == Extracted.addScalarIndex
-    | _ => false
-
 theorem entry_scalar_prefix (left right output : Reference) (frame : Frame) (memory : CIL.Safety.Memory)
     (call : CallingConditions Extracted.program memory [left, right] [output])
     (post : CIL.Safety.Memory → List Value → Prop)
     (continuation : ∃ fuel final values,
-      run Extracted.program fuel Extracted.entryIndex entryScalarCall (binaryArguments left right output)
+      run Extracted.program fuel Extracted.entryIndex Extracted.entryScalarCall (binaryArguments left right output)
         frame [.scalar (.i32 0), .reference (.address output), .reference (.address right),
           .reference (.address left)] memory = .ok (final, values) ∧ post final values) :
     ∃ fuel final values,
@@ -23,7 +18,7 @@ theorem entry_scalar_prefix (left right output : Reference) (frame : Frame) (mem
   have fl := call.input_formed (reference := left) (by simp)
   have fr := call.input_formed (reference := right) (by simp)
   have fo := call.output_formed (reference := output) (by simp)
-  conv at continuation in entryScalarCall => cbv
+  simp only [Extracted.entryScalarCall] at continuation
   repeat'
     first
     | exact continuation
@@ -38,10 +33,9 @@ theorem entry_scalar_prefix (left right output : Reference) (frame : Frame) (mem
         first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
 
 theorem entry_scalar_return (args : List Value) (flag : BitVec 32) (frame : Frame) (memory : CIL.Safety.Memory) :
-    run Extracted.program 2 Extracted.entryIndex (entryScalarCall + 1) args frame [.scalar (.i32 flag)] memory =
+    run Extracted.program 2 Extracted.entryIndex (Extracted.entryScalarCall + 1) args frame [.scalar (.i32 flag)] memory =
       .ok (leaveFrame frame memory, []) := by
-  conv in entryScalarCall => cbv
-  simp only [Nat.reduceAdd]
+  simp only [Extracted.entryScalarCall, Nat.reduceAdd]
   apply Eq.trans
   · apply run_next
     · simp only [cil_code]; rfl
@@ -75,10 +69,9 @@ theorem entry_run_checked (contract : CarryHelperContract) (memory entered : CIL
     obtain ⟨childFuel, after, values, invoked, result⟩ := scalar_checked contract entered left right output enteredCall
     rw [result.flag] at invoked
     have mf : Extracted.program[Extracted.entryIndex]? = some Extracted.entryBody := by simp only [cil_code]
-    have fetched : Extracted.entryBody.code[entryScalarCall]? = some (.call Extracted.addScalarIndex 4) := by
-      conv in entryScalarCall => cbv
+    have fetched : Extracted.entryBody.code[Extracted.entryScalarCall]? = some (.call Extracted.addScalarIndex 4) := by
       simp only [cil_code]
-    have stepped : step Extracted.entryBody (.call Extracted.addScalarIndex 4) entryScalarCall
+    have stepped : step Extracted.entryBody (.call Extracted.addScalarIndex 4) Extracted.entryScalarCall
         (binaryArguments left right output) frame
         [.scalar (.i32 0), .reference (.address output), .reference (.address right), .reference (.address left)]
         entered = .ok (.call Extracted.addScalarIndex (scalarArguments left right output) [] entered) := by

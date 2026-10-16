@@ -69,7 +69,8 @@ theorem SmallCarryState.nonzero_prefix {original current : CIL.Safety.Memory} {f
         (smallArguments input output word) frame [.scalar (.i64 (words ⟨segment.val + 1, by omega⟩))]
         current = .ok (result, returned) ∧ post result returned := by
   unfold storageArguments at continuation
-  conv at continuation in storageWordOrder => cbv
+  rw [small_storage_word_order] at continuation
+  conv at continuation in (List.filterMap _ _) => cbv
   simp [List.range_succ, List.findIdx] at continuation
   have formed := state.call.output_formed (by simp : output ∈ [output])
   have s1 := state.slots 1
@@ -120,7 +121,8 @@ theorem SmallCarryState.overflow_prefix {original current : CIL.Safety.Memory} {
       run Extracted.program fuel Extracted.addScalarUInt64Index (smallIncrementStart 3)
         (smallArguments input output word) frame [] current = .ok (result, returned) ∧ post result returned := by
   unfold storageArguments at continuation
-  conv at continuation in storageWordOrder => cbv
+  rw [small_storage_word_order] at continuation
+  conv at continuation in (List.filterMap _ _) => cbv
   simp [List.range_succ, List.findIdx] at continuation
   have formed := state.call.output_formed (by simp : output ∈ [output])
   have slot := state.sumSlot

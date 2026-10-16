@@ -20,6 +20,14 @@ def storageBody : CIL.Method := Extracted.program[storageIndex]?.getD
 def storageWordOrder : List Nat := storageBody.code.filterMap fun op =>
   match op with | .arg (index + 1) => some index | _ => none
 
+/-- The word order read from a body fetched by a checked index, so evaluating it never scans
+    unrelated methods. -/
+theorem storageWordOrder_of_found {index : Nat} {body : CIL.Method}
+    (selected : storageIndex = index) (found : Extracted.program[index]? = some body) :
+    storageWordOrder = body.code.filterMap fun op =>
+      match op with | .arg (index + 1) => some index | _ => none := by
+  simp only [storageWordOrder, storageBody, selected, found, Option.getD_some]
+
 def storageArguments (output : CIL.Safety.Reference) (w0 w1 w2 w3 : BitVec 64) :
     List CIL.Safety.Value :=
   .reference (.address output) :: (List.range 4).map fun index =>
