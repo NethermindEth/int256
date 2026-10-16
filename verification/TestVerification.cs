@@ -5,6 +5,9 @@
 #:include VerificationSupport.cs
 #:include VerificationSelection.cs
 #:include VerificationRunner.cs
+#:include ConsumerSupportSelection.cs
+
+using System.Text.Json;
 
 string root = VerificationSupport.Root;
 string[] allMethods = VerificationSupport.Gates(root).Select(gate => gate.Method).ToArray();
@@ -33,6 +36,25 @@ SelectionCheck(["verification/manifests/gates.json"], allMethods, true);
 SelectionCheck(["verification/VerificationRunner.cs"], allMethods, true);
 SelectionCheck([], allMethods, true, all: true);
 Console.WriteLine("Verification gate selection checks passed.");
+
+using (JsonDocument runs = JsonDocument.Parse("""
+    {"workflow_runs":[
+      {"id":1,"event":"pull_request","head_branch":"main","conclusion":"success","head_repository":{"full_name":"owner/repo"}},
+      {"id":2,"event":"push","head_branch":"main","conclusion":"success","head_repository":{"full_name":"fork/repo"}},
+      {"id":3,"event":"push","head_branch":"main","conclusion":"failure","head_repository":{"full_name":"owner/repo"}},
+      {"id":4,"event":"push","head_branch":"feature","conclusion":"success","head_repository":{"full_name":"owner/repo"}},
+      {"id":5,"event":"push","head_branch":"main","conclusion":"success","head_repository":{"full_name":"owner/repo"}}]}
+    """))
+    Require(ConsumerSupportSelection.TrustedRun(runs.RootElement, "owner/repo") == 5, "Only successful main pushes in this repository may certify support");
+string digest = new('a', 64);
+using (JsonDocument artifacts = JsonDocument.Parse($$"""
+    {"artifacts":[
+      {"id":1,"name":"consumer-support-scalar-0-1-{{digest}}","expired":true},
+      {"id":2,"name":"consumer-support-scalar-0-1-untrusted","expired":false},
+      {"id":3,"name":"consumer-support-scalar-0-1-{{digest}}","expired":false}]}
+    """))
+    Require(ConsumerSupportSelection.Select(5, artifacts.RootElement) == new ConsumerSupport(5, 3, digest), "Support requires a live artifact and a digest from trusted metadata");
+Console.WriteLine("Consumer support provenance checks passed.");
 
 string version = (await VerificationSupport.Run(root, "dotnet", ["--version"], true)).Trim();
 TextWriter previousOutput = Console.Out;

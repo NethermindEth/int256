@@ -3,7 +3,8 @@
 This migration starts from `verification/uint256-memory-safety`
 (`6c56716afa7860771c08815b8348e53313c7f8c8`), based on int256 `main`
 (`5fa8d77429c0440754bbfc851788d1ae37aba07f`). It consumes LeanCIL at
-`0eba3c565c075a233772786dd3cbe7af6c14797b` through a pinned Lake dependency.
+`ad6e1d503a2991bff0a3459227959c63a465c09d` through a pinned Lake dependency
+([consumer replay and portable support changes](https://github.com/NethermindEth/LeanCIL/pull/50)).
 CIL semantics, extraction, and verification infrastructure belong to LeanCIL;
 this directory contains only UInt256 specifications and proofs.
 
@@ -66,8 +67,7 @@ batches running concurrently. Each batch builds
 the extractor and production assembly once, then certifies its selected methods
 sequentially. LeanCIL authenticates and reuses extraction-independent consumer
 modules locally on that runner. Unchanged successful proofs can also be reused;
-changed extraction and proof inputs are checked by the upstream verifier. No
-consumer cache is distributed between jobs. Every selected method still needs
+changed extraction and proof inputs are checked by the upstream verifier. Every selected method still needs
 its own certificate, and any failure fails the batch while allowing the other
 methods to report their results.
 Each batch publishes stage timings and command transcripts identifying the methods.
@@ -75,12 +75,14 @@ The verifier defaults Lean to two worker threads to bound parallel kernel-replay
 memory; set `LEAN_NUM_THREADS` explicitly to override this locally. CI uses two threads.
 Keep the environment stable within a batch: LeanCIL binds it into cache identities.
 
-The 31 primitive comparison gates share `PrimitiveLeaf.run_template` and
-`PrimitiveLeaf.checked_template`. These theorems do not import `Extracted`:
+The 31 primitive comparison gates share `PrimitiveLeaf.run_template`,
+`PrimitiveLeaf.checked_template`, and `PrimitiveWrapper.checked32`/`checked64`.
+These theorems do not import `Extracted`:
 they prove the four signed/unsigned and argument-order variants for any program
 and method index whose complete method body matches the expected UInt256 helper.
-Each gate checks that equality against its actual extraction, then composes the
-shared contract with its wrapper proof. Changed instructions, profile or frame
+Each gate checks complete helper and wrapper method equalities against its actual
+extraction. The shared wrapper covers operand reversal, signed/unsigned widening,
+Boolean negation, the helper call and return. Changed instructions, profile or frame
 metadata must satisfy that equality; the template is not an assumed helper contract.
 The independent arithmetic, checked finite return and caller-memory guarantees
 remain part of each public certificate.
@@ -88,10 +90,37 @@ remain part of each public certificate.
 LeanCIL's existing authenticated support cache can reuse these compiled theorems
 and their kernel checks across different gates in the same batch. The first gate
 still checks the shared proof; subsequent gates freshly check their extraction,
-binding and wrapper proofs. This differs from an unchanged whole-proof cache hit.
-Portable consumer cache sharing between CI runners remains upstream work.
+bindings and public proof. This differs from an unchanged whole-proof cache hit.
+Successful main-branch runs also export portable support manifests. On later
+runs, `FindConsumerSupport.cs` discovers an artifact from the latest successful
+push to this repository's `main` branch and obtains its digest from GitHub's
+artifact metadata. PR artifacts cannot provide that trust anchor. Certificate
+jobs download the manifest and give the digest separately to LeanCIL. Missing
+or expired artifacts fall back to normal verification; a downloaded manifest
+with an incorrect digest fails verification.
 
-Local Windows measurements on the same compiled assembly and LeanCIL pin, with
+Receivers still build their source proofs. Kernel replay is reused only for
+modules whose complete compiled import closure, source snapshot, verifier,
+toolchain and pinned dependencies match. Changes invalidate the affected
+dependency closure, and `verified.json` records the support manifest digest.
+No machine-local signing secret is exported. Publishing during existing main
+batches avoids adding a producer gate to every PR's critical path. The first
+main run, or a changed proof snapshot, performs normal kernel replay.
+Some comparison helper artifacts embed their absolute temporary source filename,
+so fresh sessions produce different bytes and conservatively replay those helpers.
+Other byte-stable support modules can be reused. This limitation is tracked in
+[LeanCIL #51](https://github.com/NethermindEth/LeanCIL/issues/51); machine-local
+reuse of the actual certified artifacts remains effective for those helpers.
+
+The wrapper refactor removes the extraction-dependent `PrimitiveSafetyLeaf` and
+`PrimitiveSafetyContract` adapter modules. The supporting audit now checks 505
+theorems. Binding checks distinguish reversed operands, signed versus unsigned
+widening, and negation, so the reusable wrapper cannot silently accept those
+instruction changes. A serial per-module profile of `LtUInt256UInt64` fell from
+86.5 to 58.3 seconds with shared wrappers. These diagnostic timings include
+repeated import loading and do not predict parallel end-to-end verification.
+
+Earlier helper-only Windows measurements used LeanCIL `0eba3c5` on the same compiled assembly, with
 `LEAN_NUM_THREADS=2` and a pre-certified CIL library:
 
 | Consumer verification | Before | Shared helper proofs |
