@@ -75,3 +75,14 @@ import UInt256.Methods.Multiply.FullSafety
 import UInt256.Methods.Multiply.ScalarSafety
 import UInt256.Methods.Multiply.SingleWord
 import UInt256.Safety.OutputCallReturn
+import UInt256.Methods.Multiply.WordHardwareSafety
+import UInt256.Methods.Add.SIMD128Arithmetic
+import UInt256.Methods.Add.VectorCarryFlags
+import UInt256.Methods.Add.Vector128FastArithmetic
+import UInt256.Methods.Add.ScalarReportingResult
+import UInt256.Methods.Bitwise.SafetyRefutation
+import UInt256.Methods.Compare.PortableSafetyContract
+import UInt256.Methods.Compare.NativeEntrySafety
+import UInt256.Methods.Multiply.EntryPrimitiveSafety
+import UInt256.Methods.Multiply.ProductStorageVector
+import UInt256.Safety.BinaryForwarder

@@ -1,5 +1,5 @@
 import UInt256.Methods.Multiply.LimbStorage
-import UInt256.Methods.Bitwise.ScalarPrefix
+import UInt256.Methods.Multiply.ProductStorageContract
 import CIL.Safety.CallComposition
 
 namespace UInt256Proof.Multiply.ProductStorage
@@ -60,15 +60,22 @@ theorem store_product_contract (profile : CIL.FeatureProfile) (scalar : profile.
     simp [step, args, checkedValue, numericValue, formValue, formed, checkedAt,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   obtain ⟨tailFuel, tail⟩ := run_call_exists found (by rfl) stepped ⟨childFuel, invoked⟩ ⟨1, resume⟩
+  have disabled (pc : Nat) (stack : List Value) :
+      step (body profile callee) (.feature .vector256Accelerated) pc args frame stack memory =
+        .ok (.next (pc + 1) (.scalar (.i32 0) :: stack) frame memory) := by
+    change Except.ok (FrameAction.next (pc + 1)
+      (.scalar (.i32 (if profile.vector256Accelerated then 1 else 0)) :: stack) frame memory) = _
+    rw [scalar]
+    rfl
   have started : ∃ fuel result returned,
       run program fuel index 0 args frame [] memory = .ok (result, returned) ∧
       result = stored ∧ returned = [] := by
     iterate 7
       apply run_next_exists (fun result returned => result = stored ∧ returned = []) found (by rfl)
       first
-      | exact UInt256Proof.Bitwise.feature_disabled (body profile callee) scalar _ _ _ _ _
-      | exact UInt256Proof.Bitwise.scalar_branch _ _ _ _ _ _ _
-      | simp only [step, args, List.getElem?_cons_zero, List.getElem?_cons_succ,
+      | exact disabled _ _
+      | rfl
+      | simp only [step, args, List.getElem?_cons_zero,
           checkedValue, formValue, formed, checkedAt, Except.mapError,
           Bind.bind, Except.bind, Pure.pure, Except.pure]
         rfl
@@ -78,5 +85,13 @@ theorem store_product_contract (profile : CIL.FeatureProfile) (scalar : profile.
   change invoke program fuel index args memory = _
   exact invoke_of_run found checked setup ran
 
+theorem scalar_contract (profile : CIL.FeatureProfile) (scalar : profile.vector256Accelerated = false)
+    (program : CIL.Program) (index callee : Nat)
+    (found : program[index]? = some (body profile callee))
+    (childFound : program[callee]? = some (LimbStorage.body profile)) : Contract program index :=
+  store_product_contract profile scalar program index callee found childFound
+
+
+#print axioms scalar_contract
 #print axioms store_product_contract
 end UInt256Proof.Multiply.ProductStorage

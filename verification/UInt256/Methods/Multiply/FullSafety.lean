@@ -681,10 +681,8 @@ end UInt256Proof.Multiply.Full
 namespace UInt256Proof.Multiply.Full
 open CIL.Safety UInt256Model.Safety UInt256Proof.Multiply.Calls UInt256Proof.Multiply.BothTwo
 
-theorem full_output (profile : CIL.FeatureProfile) (program : CIL.Program) (methodIndex wordIndex countIndex storageIndex : Nat)
-    (limbIndex : Nat) (scalar : profile.vector256Accelerated = false)
-    (storageFound : program[storageIndex]? = some (ProductStorage.body profile limbIndex))
-    (limbsFound : program[limbIndex]? = some (LimbStorage.body profile))
+theorem full_output_with_storage (profile : CIL.FeatureProfile) (program : CIL.Program) (methodIndex wordIndex countIndex storageIndex : Nat)
+    (storage : ProductStorage.Contract program storageIndex)
     (found : program[methodIndex]? = some (fullBody profile wordIndex countIndex storageIndex))
     (_countFound : program[countIndex]? = some (CountSafety.body profile)) (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (originalCall : CallingConditions program original [left, right] [output])
@@ -711,7 +709,7 @@ theorem full_output (profile : CIL.FeatureProfile) (program : CIL.Program) (meth
   apply run_next_exists post found (by rfl) (load 15 (words 2) (localWord_known _ _ (by rfl)) _ _)
   apply run_next_exists post found (by rfl) (load 6 (words 3) (localWord_known _ _ (by rfl)) _ _)
   obtain ⟨childFuel, result, invoked, valid, outside, _, value, readable⟩ :=
-    ProductStorage.store_product_contract profile scalar program storageIndex limbIndex storageFound limbsFound current [left, right] output (words 0) (words 1) (words 2) (words 3) state.call
+    storage current [left, right] output (words 0) (words 1) (words 2) (words 3) state.call
   have stepped : step (fullBody profile wordIndex countIndex storageIndex) (.call storageIndex 5) 188 (productArgs left right output) frame
       [.scalar (.i64 (words 3)), .scalar (.i64 (words 2)), .scalar (.i64 (words 1)), .scalar (.i64 (words 0)),
         .reference (.address output)] current =
@@ -731,16 +729,28 @@ theorem full_output (profile : CIL.FeatureProfile) (program : CIL.Program) (meth
     output _ frame originalCall valid owned state.caller
     (packed.trans (full_words_correct original left right)) readable outside⟩
 
+theorem full_output (profile : CIL.FeatureProfile) (program : CIL.Program) (methodIndex wordIndex countIndex storageIndex : Nat)
+    (limbIndex : Nat) (scalar : profile.vector256Accelerated = false)
+    (storageFound : program[storageIndex]? = some (ProductStorage.body profile limbIndex))
+    (limbsFound : program[limbIndex]? = some (LimbStorage.body profile))
+    (found : program[methodIndex]? = some (fullBody profile wordIndex countIndex storageIndex))
+    (_countFound : program[countIndex]? = some (CountSafety.body profile)) (original entered current : Memory) (left right output : Reference) (frame : Frame)
+    (originalCall : CallingConditions program original [left, right] [output])
+    (owned : ∀ id ∈ frame.owned, original.nextIdentity ≤ id)
+    (state : PrivateWords program original entered current [left, right] [output] frame
+      (fullFinalWords original left right)) :
+    ∃ fuel final returned,
+      run program fuel methodIndex 183 (productArgs left right output) frame [] current =
+        .ok (final, returned) ∧ ProductResult original final left right output returned :=
+  full_output_with_storage profile program methodIndex wordIndex countIndex storageIndex (ProductStorage.scalar_contract profile scalar program storageIndex limbIndex storageFound limbsFound) found _countFound original entered current left right output frame originalCall owned state
 #print axioms full_output
 end UInt256Proof.Multiply.Full
 
 namespace UInt256Proof.Multiply.Full
 open CIL.Safety UInt256Model.Safety UInt256Proof.Multiply.Calls UInt256Proof.Multiply.BothTwo
 
-theorem full_invoke (profile : CIL.FeatureProfile) (program : CIL.Program) (methodIndex wordIndex countIndex storageIndex : Nat)
-    (limbIndex : Nat) (scalar : profile.vector256Accelerated = false)
-    (storageFound : program[storageIndex]? = some (ProductStorage.body profile limbIndex))
-    (limbsFound : program[limbIndex]? = some (LimbStorage.body profile))
+theorem full_invoke_with_storage (profile : CIL.FeatureProfile) (program : CIL.Program) (methodIndex wordIndex countIndex storageIndex : Nat)
+    (storage : ProductStorage.Contract program storageIndex)
     (found : program[methodIndex]? = some (fullBody profile wordIndex countIndex storageIndex))
     (countFound : program[countIndex]? = some (CountSafety.body profile)) (contract : WordContract program wordIndex) (top : FullTopContract profile program methodIndex wordIndex countIndex storageIndex) (memory : Memory) (left right output : Reference)
     (call : CallingConditions program memory [left, right] [output]) :
@@ -768,7 +778,7 @@ theorem full_invoke (profile : CIL.FeatureProfile) (program : CIL.Program) (meth
     intro m5 state5
     apply full_final profile program methodIndex wordIndex countIndex storageIndex found countFound contract memory entered m5 left right output frame call enteredWF homes state5 post
     intro m6 state6
-    exact full_output profile program methodIndex wordIndex countIndex storageIndex limbIndex scalar storageFound limbsFound found countFound memory entered m6 left right output frame call owned state6
+    exact full_output_with_storage profile program methodIndex wordIndex countIndex storageIndex storage found countFound memory entered m6 left right output frame call owned state6
   obtain ⟨fuel, final, returned, ran, result⟩ := body
   have returns := result.returns
   subst returned
@@ -781,6 +791,17 @@ theorem full_invoke (profile : CIL.FeatureProfile) (program : CIL.Program) (meth
   refine ⟨fuel, final, ?_, result⟩
   exact invoke_of_run found checked setup ran
 
+theorem full_invoke (profile : CIL.FeatureProfile) (program : CIL.Program) (methodIndex wordIndex countIndex storageIndex : Nat)
+    (limbIndex : Nat) (scalar : profile.vector256Accelerated = false)
+    (storageFound : program[storageIndex]? = some (ProductStorage.body profile limbIndex))
+    (limbsFound : program[limbIndex]? = some (LimbStorage.body profile))
+    (found : program[methodIndex]? = some (fullBody profile wordIndex countIndex storageIndex))
+    (countFound : program[countIndex]? = some (CountSafety.body profile)) (contract : WordContract program wordIndex) (top : FullTopContract profile program methodIndex wordIndex countIndex storageIndex) (memory : Memory) (left right output : Reference)
+    (call : CallingConditions program memory [left, right] [output]) :
+    ∃ fuel final,
+      invoke program fuel methodIndex (productArgs left right output) memory = .ok (final, []) ∧
+      ProductResult memory final left right output [] :=
+  full_invoke_with_storage profile program methodIndex wordIndex countIndex storageIndex (ProductStorage.scalar_contract profile scalar program storageIndex limbIndex storageFound limbsFound) found countFound contract top memory left right output call
 #print axioms full_invoke
 end UInt256Proof.Multiply.Full
 namespace UInt256Proof.Multiply.Full

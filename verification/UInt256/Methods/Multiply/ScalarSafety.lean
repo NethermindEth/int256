@@ -442,10 +442,8 @@ abbrev ScalarResult (original final : Memory) (input output : Reference)
     (word : BitVec 64) (returned : List Value) : Prop :=
   OutputResult original final output (inputValue original input * BitVec.ofNat 256 word.toNat) returned
 
-theorem scalar_output (profile : CIL.FeatureProfile) (program : CIL.Program) (methodIndex wordIndex storageIndex : Nat)
-    (limbIndex : Nat) (scalar : profile.vector256Accelerated = false)
-    (storageFound : program[storageIndex]? = some (ProductStorage.body profile limbIndex))
-    (limbsFound : program[limbIndex]? = some (LimbStorage.body profile))
+theorem scalar_output_with_storage (profile : CIL.FeatureProfile) (program : CIL.Program) (methodIndex wordIndex storageIndex : Nat)
+    (storage : ProductStorage.Contract program storageIndex)
     (found : program[methodIndex]? = some (scalarBody profile wordIndex storageIndex)) (original entered current : Memory) (input output : Reference)
     (word : BitVec 64) (frame : Frame)
     (originalCall : CallingConditions program original [input] [output])
@@ -502,7 +500,7 @@ theorem scalar_output (profile : CIL.FeatureProfile) (program : CIL.Program) (me
         Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
       first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
   obtain ⟨childFuel, result, invoked, valid, outside, _, value, readable⟩ :=
-    ProductStorage.store_product_contract profile scalar program storageIndex limbIndex storageFound limbsFound prepared [input] output (words 0) (words 1) (words 2) (words 3) preparedState.call
+    storage prepared [input] output (words 0) (words 1) (words 2) (words 3) preparedState.call
   have stepped : step (scalarBody profile wordIndex storageIndex) (.call storageIndex 5) 76 (scalarArgs input word output) frame
       [.scalar (.i64 (words 3)), .scalar (.i64 (words 2)), .scalar (.i64 (words 1)), .scalar (.i64 (words 0)),
         .reference (.address output)] prepared =
@@ -524,16 +522,31 @@ theorem scalar_output (profile : CIL.FeatureProfile) (program : CIL.Program) (me
   exact ⟨fuel, leaveFrame frame result, [], ran, output_result_of_storage original prepared result [input] output _ frame
     originalCall valid owned preparedState.caller (packed.trans mathematical) readable outside⟩
 
+theorem scalar_output (profile : CIL.FeatureProfile) (program : CIL.Program) (methodIndex wordIndex storageIndex : Nat)
+    (limbIndex : Nat) (scalar : profile.vector256Accelerated = false)
+    (storageFound : program[storageIndex]? = some (ProductStorage.body profile limbIndex))
+    (limbsFound : program[limbIndex]? = some (LimbStorage.body profile))
+    (found : program[methodIndex]? = some (scalarBody profile wordIndex storageIndex)) (original entered current : Memory) (input output : Reference)
+    (word : BitVec 64) (frame : Frame)
+    (originalCall : CallingConditions program original [input] [output])
+    (enteredWF : entered.WellFormed)
+    (homes : WritableHomes entered original.nextIdentity (scalarBody profile wordIndex storageIndex).localKinds frame.locals)
+    (owned : ∀ id ∈ frame.owned, original.nextIdentity ≤ id)
+    (state : PrivateWords program original entered current [input] [output] frame
+      (scalarProducts original input word)) :
+    ∃ fuel final returned,
+      run program fuel methodIndex 66 (scalarArgs input word output) frame
+        [.scalar (.i64 (inputLimb original input 3))] current = .ok (final, returned) ∧
+      ScalarResult original final input output word returned :=
+  scalar_output_with_storage profile program methodIndex wordIndex storageIndex (ProductStorage.scalar_contract profile scalar program storageIndex limbIndex storageFound limbsFound) found original entered current input output word frame originalCall enteredWF homes owned state
 #print axioms scalar_output
 end UInt256Proof.Multiply.ScalarSafety
 namespace UInt256Proof.Multiply.ScalarSafety
 open CIL.Safety UInt256Model.Safety UInt256Proof.Multiply.Calls
 
-theorem scalar_zero (profile : CIL.FeatureProfile) (program : CIL.Program) (methodIndex wordIndex storageIndex limbIndex : Nat)
-    (scalar : profile.vector256Accelerated = false)
-    (found : program[methodIndex]? = some (scalarBody profile wordIndex storageIndex))
-    (storageFound : program[storageIndex]? = some (ProductStorage.body profile limbIndex))
-    (limbsFound : program[limbIndex]? = some (LimbStorage.body profile)) (original entered current : Memory) (input output : Reference)
+theorem scalar_zero_with_storage (profile : CIL.FeatureProfile) (program : CIL.Program) (methodIndex wordIndex storageIndex : Nat)
+    (storage : ProductStorage.Contract program storageIndex)
+    (found : program[methodIndex]? = some (scalarBody profile wordIndex storageIndex)) (original entered current : Memory) (input output : Reference)
     (frame : Frame) (known : Nat → Option (BitVec 64))
     (originalCall : CallingConditions program original [input] [output])
     (owned : ∀ id ∈ frame.owned, original.nextIdentity ≤ id)
@@ -551,7 +564,7 @@ theorem scalar_zero (profile : CIL.FeatureProfile) (program : CIL.Program) (meth
       Bind.bind, Except.bind, Pure.pure, Except.pure]
     first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
   obtain ⟨childFuel, result, invoked, valid, outside, _, value, readable⟩ :=
-    ProductStorage.store_product_contract profile scalar program storageIndex limbIndex storageFound limbsFound current [input] output 0 0 0 0 state.call
+    storage current [input] output 0 0 0 0 state.call
   have stepped : step (scalarBody profile wordIndex storageIndex) (.call storageIndex 5) 15 (scalarArgs input 0 output) frame
       [.scalar (.i64 0), .scalar (.i64 0), .scalar (.i64 0), .scalar (.i64 0),
         .reference (.address output)] current =
@@ -571,11 +584,22 @@ theorem scalar_zero (profile : CIL.FeatureProfile) (program : CIL.Program) (meth
       state.caller ?_ readable outside⟩
   simpa using value
 
-theorem scalar_one (profile : CIL.FeatureProfile) (program : CIL.Program) (methodIndex wordIndex storageIndex limbIndex : Nat)
-    (_scalar : profile.vector256Accelerated = false)
+theorem scalar_zero (profile : CIL.FeatureProfile) (program : CIL.Program) (methodIndex wordIndex storageIndex limbIndex : Nat)
+    (scalar : profile.vector256Accelerated = false)
     (found : program[methodIndex]? = some (scalarBody profile wordIndex storageIndex))
-    (_storageFound : program[storageIndex]? = some (ProductStorage.body profile limbIndex))
-    (_limbsFound : program[limbIndex]? = some (LimbStorage.body profile)) (original entered current : Memory) (input output : Reference)
+    (storageFound : program[storageIndex]? = some (ProductStorage.body profile limbIndex))
+    (limbsFound : program[limbIndex]? = some (LimbStorage.body profile)) (original entered current : Memory) (input output : Reference)
+    (frame : Frame) (known : Nat → Option (BitVec 64))
+    (originalCall : CallingConditions program original [input] [output])
+    (owned : ∀ id ∈ frame.owned, original.nextIdentity ≤ id)
+    (state : PrivateWords program original entered current [input] [output] frame known) :
+    ∃ fuel final returned,
+      run program fuel methodIndex 6 (scalarArgs input 0 output) frame [] current =
+        .ok (final, returned) ∧ ScalarResult original final input output 0 returned :=
+  scalar_zero_with_storage profile program methodIndex wordIndex storageIndex (ProductStorage.scalar_contract profile scalar program storageIndex limbIndex storageFound limbsFound) found original entered current input output frame known originalCall owned state
+theorem scalar_one_with_storage (profile : CIL.FeatureProfile) (program : CIL.Program) (methodIndex wordIndex storageIndex : Nat)
+    (_storage : ProductStorage.Contract program storageIndex)
+    (found : program[methodIndex]? = some (scalarBody profile wordIndex storageIndex)) (original entered current : Memory) (input output : Reference)
     (frame : Frame) (known : Nat → Option (BitVec 64))
     (originalCall : CallingConditions program original [input] [output])
     (owned : ∀ id ∈ frame.owned, original.nextIdentity ≤ id)
@@ -623,18 +647,29 @@ theorem scalar_one (profile : CIL.FeatureProfile) (program : CIL.Program) (metho
   simpa using
     (inputValue_of_encoded_read readback).trans same
 
-#print axioms scalar_zero
+#print axioms scalar_zero_with_storage
+theorem scalar_one (profile : CIL.FeatureProfile) (program : CIL.Program) (methodIndex wordIndex storageIndex limbIndex : Nat)
+    (_scalar : profile.vector256Accelerated = false)
+    (found : program[methodIndex]? = some (scalarBody profile wordIndex storageIndex))
+    (_storageFound : program[storageIndex]? = some (ProductStorage.body profile limbIndex))
+    (_limbsFound : program[limbIndex]? = some (LimbStorage.body profile)) (original entered current : Memory) (input output : Reference)
+    (frame : Frame) (known : Nat → Option (BitVec 64))
+    (originalCall : CallingConditions program original [input] [output])
+    (owned : ∀ id ∈ frame.owned, original.nextIdentity ≤ id)
+    (state : PrivateWords program original entered current [input] [output] frame known) :
+    ∃ fuel final returned,
+      run program fuel methodIndex 17 (scalarArgs input 1 output) frame [] current =
+        .ok (final, returned) ∧ ScalarResult original final input output 1 returned :=
+  scalar_one_with_storage profile program methodIndex wordIndex storageIndex (ProductStorage.scalar_contract profile _scalar program storageIndex limbIndex _storageFound _limbsFound) found original entered current input output frame known originalCall owned state
 #print axioms scalar_one
 end UInt256Proof.Multiply.ScalarSafety
 
 namespace UInt256Proof.Multiply.ScalarSafety
 open CIL.Safety UInt256Model.Safety UInt256Proof.Multiply.Calls
 
-theorem scalar_invoke (profile : CIL.FeatureProfile) (program : CIL.Program) (methodIndex wordIndex storageIndex limbIndex : Nat)
-    (scalar : profile.vector256Accelerated = false)
-    (found : program[methodIndex]? = some (scalarBody profile wordIndex storageIndex))
-    (storageFound : program[storageIndex]? = some (ProductStorage.body profile limbIndex))
-    (limbsFound : program[limbIndex]? = some (LimbStorage.body profile)) (contract : WordContract program wordIndex) (memory : Memory) (input output : Reference)
+theorem scalar_invoke_with_storage (profile : CIL.FeatureProfile) (program : CIL.Program) (methodIndex wordIndex storageIndex : Nat)
+    (storage : ProductStorage.Contract program storageIndex)
+    (found : program[methodIndex]? = some (scalarBody profile wordIndex storageIndex)) (contract : WordContract program wordIndex) (memory : Memory) (input output : Reference)
     (word : BitVec 64) (call : CallingConditions program memory [input] [output]) :
     ∃ fuel final,
       invoke program fuel methodIndex (scalarArgs input word output) memory = .ok (final, []) ∧
@@ -660,7 +695,7 @@ theorem scalar_invoke (profile : CIL.FeatureProfile) (program : CIL.Program) (me
       simp only [greater, ite_true]
       apply scalar_products profile program methodIndex wordIndex storageIndex found contract memory entered entered input output word frame call enteredWF homes state post
       intro current currentState
-      exact scalar_output profile program methodIndex wordIndex storageIndex limbIndex scalar storageFound limbsFound found memory entered current input output word frame call enteredWF homes owned currentState
+      exact scalar_output_with_storage profile program methodIndex wordIndex storageIndex storage found memory entered current input output word frame call enteredWF homes owned currentState
     · have unit : word = 0 ∨ word = 1 := by
         have cases : word.toNat = 0 ∨ word.toNat = 1 := by omega
         rcases cases with zero | one
@@ -673,8 +708,8 @@ theorem scalar_invoke (profile : CIL.FeatureProfile) (program : CIL.Program) (me
           simp [step, scalarArgs, checkedValue, numericValue, pureArity, scalars, CIL.step.eq_def,
             Bind.bind, Except.bind, Pure.pure, Except.pure]
           first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
-      · exact scalar_zero profile program methodIndex wordIndex storageIndex limbIndex scalar found storageFound limbsFound memory entered entered input output frame _ call owned state
-      · exact scalar_one profile program methodIndex wordIndex storageIndex limbIndex scalar found storageFound limbsFound memory entered entered input output frame _ call owned state
+      · exact scalar_zero_with_storage profile program methodIndex wordIndex storageIndex storage found memory entered entered input output frame _ call owned state
+      · exact scalar_one_with_storage profile program methodIndex wordIndex storageIndex storage found memory entered entered input output frame _ call owned state
   obtain ⟨fuel, final, returned, ran, result⟩ := started
   have returns := result.returns
   subst returned
@@ -686,5 +721,15 @@ theorem scalar_invoke (profile : CIL.FeatureProfile) (program : CIL.Program) (me
   refine ⟨fuel, final, ?_, result⟩
   exact invoke_of_run found checked setup ran
 
+theorem scalar_invoke (profile : CIL.FeatureProfile) (program : CIL.Program) (methodIndex wordIndex storageIndex limbIndex : Nat)
+    (scalar : profile.vector256Accelerated = false)
+    (found : program[methodIndex]? = some (scalarBody profile wordIndex storageIndex))
+    (storageFound : program[storageIndex]? = some (ProductStorage.body profile limbIndex))
+    (limbsFound : program[limbIndex]? = some (LimbStorage.body profile)) (contract : WordContract program wordIndex) (memory : Memory) (input output : Reference)
+    (word : BitVec 64) (call : CallingConditions program memory [input] [output]) :
+    ∃ fuel final,
+      invoke program fuel methodIndex (scalarArgs input word output) memory = .ok (final, []) ∧
+      ScalarResult memory final input output word [] :=
+  scalar_invoke_with_storage profile program methodIndex wordIndex storageIndex (ProductStorage.scalar_contract profile scalar program storageIndex limbIndex storageFound limbsFound) found contract memory input output word call
 #print axioms scalar_invoke
 end UInt256Proof.Multiply.ScalarSafety
