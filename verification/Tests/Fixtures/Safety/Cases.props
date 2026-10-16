@@ -1,0 +1,23 @@
+<Project>
+  <!-- Fault/FaultMethod/FaultInstruction locate a negative's fault; ProbeValue is what a positive probe returns; InputSize/InputBase place the caller input. -->
+  <ItemGroup>
+    <SafetyCase Include="Interior" Source="Interior.cs" Suite="positive" ProbeValue="1" />
+    <SafetyCase Include="EndThenInterior" Source="EndThenInterior.cs" Suite="positive" ProbeValue="1" />
+    <SafetyCase Include="AggregateHome" Source="AggregateHome.cs" Suite="positive" ProbeValue="17" />
+    <SafetyCase Include="StaticLookup" Source="StaticLookup.cs" Suite="positive" ProbeValue="42" />
+    <SafetyCase Include="InitializedVector" Source="InitializedVector.cs" Suite="positive" ProbeValue="7" />
+    <SafetyCase Include="UnalignedVector" Source="UnalignedVector.cs" Suite="positive" ProbeValue="1" InputSize="40" InputBase="8" />
+    <SafetyCase Include="Overread" Source="Overread.cs" Suite="negative" FaultMethod="Probe" FaultInstruction="5" Fault=".memory .outsideAllocation (.address ⟨0, 32⟩) 8" />
+    <SafetyCase Include="InvalidThenRepaired" Source="InvalidThenRepaired.cs" Suite="negative" FaultMethod="Probe" FaultInstruction="4" Fault=".memory .invalidReference (.address ⟨0, 0⟩) 0" />
+    <SafetyCase Include="AggregateOverread" Source="AggregateOverread.cs" Suite="negative" FaultMethod="ReadSnapshot" FaultInstruction="5" Fault=".memory .outsideAllocation (.address ⟨3, 32⟩) 8" />
+    <SafetyCase Include="StaticOverread" Source="StaticOverread.cs" Suite="negative" FaultMethod="Probe" FaultInstruction="3" Fault=".memory .outsideAllocation (.address ⟨2, 0⟩) 32" />
+    <SafetyCase Include="UninitializedVector" Source="UninitializedVector.cs" Suite="negative" FaultMethod="Probe" FaultInstruction="12" Fault=".invalidState" />
+    <SafetyCase Include="MaskedVectorOverread" Source="MaskedVectorOverread.cs" Suite="negative" FaultMethod="Probe" FaultInstruction="6" Fault=".memory .outsideAllocation (.address ⟨0, 8⟩) 32" />
+    <SafetyCase Include="VectorOutsideView" Source="MaskedVectorOverread.cs" Suite="negative" FaultMethod="Probe" FaultInstruction="6" Fault=".memory .unreadable (.address ⟨0, 8⟩) 32" InputSize="40" />
+    <SafetyCase Include="WriteThenRestore" Source="WriteThenRestore.cs" Suite="negative" FaultMethod="Probe" FaultInstruction="11" Fault=".memory .unwritable (.address ⟨0, 0⟩) 8" />
+    <SafetyCase Include="InvalidNativeOffset" Source="InvalidNativeOffset.cs" Suite="negative" FaultMethod="Probe" FaultInstruction="6" Fault=".memory .invalidReference (.address ⟨0, 0⟩) 0" />
+    <SafetyCase Include="EscapedLocal" Source="EscapedLocal.cs" Suite="negative" FaultMethod="Expired" FaultInstruction="5" Fault=".memory .expiredLifetime (.address ⟨2, 0⟩) 0" />
+    <SafetyCase Include="ReusedLocal" Source="ReusedLocal.cs" Suite="negative" FaultMethod="Expired" FaultInstruction="5" Fault=".memory .expiredLifetime (.address ⟨2, 0⟩) 0" />
+    <SafetyCase Include="AlignedLoad" Source="AlignedLoad.cs" Suite="upstream" />
+  </ItemGroup>
+</Project>
