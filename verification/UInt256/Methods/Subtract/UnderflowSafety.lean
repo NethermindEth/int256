@@ -4,9 +4,9 @@ import UInt256.Methods.Subtract.UnderflowSafetyCommon
 namespace UInt256Proof.Subtract.Safety
 open UInt256Model.Safety
 
-theorem checked_underflow_contract : ReportingBinaryContract (· - ·)
+theorem checked_underflow_contract (contract : BorrowHelperContract) : ReportingBinaryContract (· - ·)
     (fun a b => decide (a.toNat < b.toNat)) Extracted.program Extracted.entryIndex :=
-  underflow_contract_of_reporting checked_dispatch_contract
+  underflow_contract_of_reporting (checked_dispatch_contract contract)
 
 #print axioms checked_underflow_contract
 end UInt256Proof.Subtract.Safety

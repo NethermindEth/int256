@@ -58,7 +58,7 @@ structure PublicAddResult (original final : CIL.Safety.Memory) (left right outpu
   footprint : ∀ id, id < original.nextIdentity → ∀ offset, OutsideOutput output id offset →
     final.cells id offset = original.cells id offset
 
-theorem entry_run_checked (memory entered : CIL.Safety.Memory) (frame : Frame) (left right output : Reference)
+theorem entry_run_checked (contract : CarryHelperContract) (memory entered : CIL.Safety.Memory) (frame : Frame) (left right output : Reference)
     (call : CallingConditions Extracted.program memory [left, right] [output])
     (setup : enterFrame Extracted.entryBody (binaryArguments left right output) memory = .ok (frame, entered)) :
     ∃ fuel final,
@@ -72,7 +72,7 @@ theorem entry_run_checked (memory entered : CIL.Safety.Memory) (frame : Frame) (
       run Extracted.program fuel Extracted.entryIndex 0 (binaryArguments left right output) frame [] entered =
         .ok (final, values) ∧ post final values := by
     apply entry_scalar_prefix left right output frame entered enteredCall post
-    obtain ⟨childFuel, after, values, invoked, result⟩ := scalar_checked entered left right output enteredCall
+    obtain ⟨childFuel, after, values, invoked, result⟩ := scalar_checked contract entered left right output enteredCall
     rw [result.flag] at invoked
     have mf : Extracted.program[Extracted.entryIndex]? = some Extracted.entryBody := by simp only [cil_code]
     have fetched : Extracted.entryBody.code[entryScalarCall]? = some (.call Extracted.addScalarIndex 4) := by

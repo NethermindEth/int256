@@ -7,12 +7,12 @@ open CIL.Safety UInt256Model.Safety
 
 /-- The actual scalar body does not read detectOverflow. Its previously checked
     result already includes the mathematical carry out for every operand pair. -/
-theorem overflow_scalar_checked (memory : CIL.Safety.Memory) (left right output : Reference)
+theorem overflow_scalar_checked (contract : CarryHelperContract) (memory : CIL.Safety.Memory) (left right output : Reference)
     (call : CallingConditions Extracted.program memory [left, right] [output]) :
     ∃ fuel final values,
       invoke Extracted.program fuel Extracted.addScalarIndex (overflowScalarArguments left right output) memory =
         .ok (final, values) ∧ AddResult memory final values left right output := by
-  obtain ⟨fuel, final, values, invoked, result⟩ := scalar_checked memory left right output call
+  obtain ⟨fuel, final, values, invoked, result⟩ := scalar_checked contract memory left right output call
   have lookup : Extracted.program[Extracted.addScalarIndex]? = some Extracted.addScalarBody := by
     simp only [cil_code]
   have indices : ∀ index narrow, CIL.Op.arg index narrow ∈ Extracted.addScalarBody.code → index < 3 := by

@@ -57,7 +57,7 @@ theorem scalar_carry_prefix (args : List Value) (frame : Frame) (before after : 
           first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
 
 /-- Bind the first discovered parent call to the checked carry contract. -/
-theorem scalar_first_carry (args : List Value) (frame : Frame) (memory : Memory)
+theorem scalar_first_carry (contract : CarryHelperContract) (args : List Value) (frame : Frame) (memory : Memory)
     (a b : BitVec 64) (carryHome resultHome : Reference)
     (wellFormed : memory.WellFormed)
     (carryRead : read memory carryHome 8 1 = .ok (numberBytes 0 8))
@@ -75,7 +75,7 @@ theorem scalar_first_carry (args : List Value) (frame : Frame) (memory : Memory)
         memory = .ok (result, returned) ∧ post result returned := by
   have carryFormed := access_reference_valid _ _ _ _ _ carryWrite
   have resultFormed := access_reference_valid _ _ _ _ _ resultWrite
-  apply run_carry_call a b 0 carryHome resultHome post (body := Extracted.addScalarBody)
+  apply run_carry_call contract a b 0 carryHome resultHome post (body := Extracted.addScalarBody)
     (op := .call Extracted.addWithCarryIndex 4)
   · simp only [cil_code]
   · conv in scalarFirstCarryCall => cbv
@@ -154,7 +154,7 @@ theorem scalar_carry_segment (segment : Fin 3) (left right output : Reference) (
 #print axioms scalar_carry_segment
 
 /-- Every discovered scalar carry call uses the checked arithmetic contract. -/
-theorem scalar_indexed_carry (index : Fin 4) (args : List Value) (frame : Frame) (memory : Memory)
+theorem scalar_indexed_carry (contract : CarryHelperContract) (index : Fin 4) (args : List Value) (frame : Frame) (memory : Memory)
     (a b c : BitVec 64) (carryHome resultHome : Reference)
     (wellFormed : memory.WellFormed) (incoming : c.toNat ≤ 1)
     (carryRead : read memory carryHome 8 1 = .ok (numberBytes c.toNat 8))
@@ -172,7 +172,7 @@ theorem scalar_indexed_carry (index : Fin 4) (args : List Value) (frame : Frame)
         memory = .ok (result, returned) ∧ post result returned := by
   have carryFormed := access_reference_valid _ _ _ _ _ carryWrite
   have resultFormed := access_reference_valid _ _ _ _ _ resultWrite
-  apply run_carry_call a b c carryHome resultHome post (body := Extracted.addScalarBody)
+  apply run_carry_call contract a b c carryHome resultHome post (body := Extracted.addScalarBody)
     (op := .call Extracted.addWithCarryIndex 4)
   · simp only [cil_code]
   · obtain ⟨index, bound⟩ := index
@@ -198,7 +198,7 @@ open UInt256Model.Safety
 
 /-- Valid caller views discharge both field loads for each remaining limb;
     checked home accesses discharge address formation and the mathematical call. -/
-theorem scalar_carry_segment_checked (segment : Fin 3) (left right output : Reference) (extra : List Value)
+theorem scalar_carry_segment_checked (contract : CarryHelperContract) (segment : Fin 3) (left right output : Reference) (extra : List Value)
     (frame : Frame) (memory : CIL.Safety.Memory) (c : BitVec 64) (carryHome resultHome : Reference)
     (call : CallingConditions Extracted.program memory [left, right] [output])
     (carrySlot : frame.locals[2]? = some (.bytes .word64 carryHome))
@@ -223,7 +223,7 @@ theorem scalar_carry_segment_checked (segment : Fin 3) (left right output : Refe
     (fun rest => call.input_field_instruction (reference := left) (by simp) ⟨segment.val + 1, by omega⟩ rest)
     (fun rest => call.input_field_instruction (reference := right) (by simp) ⟨segment.val + 1, by omega⟩ rest) carrySlot resultSlot
     (access_reference_valid _ _ _ _ _ carryWrite) (access_reference_valid _ _ _ _ _ resultWrite) post
-  exact scalar_indexed_carry ⟨segment.val + 1, by omega⟩ (binaryArguments left right output ++ extra)
+  exact scalar_indexed_carry contract ⟨segment.val + 1, by omega⟩ (binaryArguments left right output ++ extra)
     frame memory _ _ c carryHome resultHome call.1.1 incoming carryRead carryWrite resultWrite disjoint post continuation
 
 #print axioms scalar_carry_segment_checked

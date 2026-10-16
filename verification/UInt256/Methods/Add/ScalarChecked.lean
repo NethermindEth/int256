@@ -169,7 +169,7 @@ theorem ScalarResult.modular_sum {original final : CIL.Safety.Memory} {values : 
 
 /-- Complete finite checked execution on the both-large branch, including
     initial-input modular arithmetic, exact carry flag and caller footprint. -/
-theorem scalar_general_checked (memory : CIL.Safety.Memory) (left right output : Reference)
+theorem scalar_general_checked (contract : CarryHelperContract) (memory : CIL.Safety.Memory) (left right output : Reference)
     (call : CallingConditions Extracted.program memory [left, right] [output])
     (largeRight : inputLimb memory right 1 ||| inputLimb memory right 2 |||
       inputLimb memory right 3 ≠ BitVec.ofNat 64 0)
@@ -178,7 +178,7 @@ theorem scalar_general_checked (memory : CIL.Safety.Memory) (left right output :
     ∃ fuel final values,
       invoke Extracted.program fuel Extracted.addScalarIndex (scalarArguments left right output) memory =
         .ok (final, values) ∧ ScalarResult memory final values left right output := by
-  apply scalar_general_carries memory left right output call largeRight largeLeft
+  apply scalar_general_carries contract memory left right output call largeRight largeLeft
     (fun final values => ScalarResult memory final values left right output)
   intro frame entered carryHome results after setup state
   exact scalar_finish memory entered after frame left right output carryHome results call setup state
@@ -261,7 +261,7 @@ theorem ScalarResult.as_add {original final : CIL.Safety.Memory} {values : List 
 
 /-- All scalar helper branches: actual finite execution, initial-operand sum,
     mathematical overflow and caller storage preservation under valid overlap. -/
-theorem scalar_checked (memory : CIL.Safety.Memory) (left right output : Reference)
+theorem scalar_checked (contract : CarryHelperContract) (memory : CIL.Safety.Memory) (left right output : Reference)
     (call : CallingConditions Extracted.program memory [left, right] [output]) :
     ∃ fuel final values,
       invoke Extracted.program fuel Extracted.addScalarIndex (scalarArguments left right output) memory =
@@ -273,7 +273,7 @@ theorem scalar_checked (memory : CIL.Safety.Memory) (left right output : Referen
         inputLimb memory left 3 = BitVec.ofNat 64 0
     · exact scalar_left_small_checked memory left right output call rightSmall leftSmall
     · obtain ⟨fuel, final, values, invoked, result⟩ :=
-        scalar_general_checked memory left right output call rightSmall leftSmall
+        scalar_general_checked contract memory left right output call rightSmall leftSmall
       exact ⟨fuel, final, values, invoked, result.as_add⟩
 
 #print axioms ScalarResult.as_add

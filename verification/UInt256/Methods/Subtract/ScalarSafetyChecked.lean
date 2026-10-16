@@ -162,7 +162,7 @@ open CIL.Safety UInt256Model.Safety
 
 /-- Complete checked invocation of the large-right scalar branch, including
     initial-input arithmetic, the exact borrow and caller storage preservation. -/
-theorem scalar_general_checked (memory : Memory) (left right output : Reference)
+theorem scalar_general_checked (contract : BorrowHelperContract) (memory : Memory) (left right output : Reference)
     (call : CallingConditions Extracted.program memory [left, right] [output])
     (large : inputLimb memory right 1 ||| inputLimb memory right 2 |||
       inputLimb memory right 3 ≠ BitVec.ofNat 64 0) :
@@ -171,7 +171,7 @@ theorem scalar_general_checked (memory : Memory) (left right output : Reference)
         .ok (final, values) ∧ ScalarResult memory final values left right output := by
   obtain ⟨frame, entered, setup, homes, _, _⟩ :=
     scalar_frame_setup memory (binaryArguments left right output) call.1.1
-  obtain ⟨fuel, final, values, finished, satisfied⟩ := scalar_general_borrows memory entered left right output
+  obtain ⟨fuel, final, values, finished, satisfied⟩ := scalar_general_borrows contract memory entered left right output
     frame call setup homes large (fun final values => ScalarResult memory final values left right output)
     (fun borrowHome results current state =>
       scalar_finish memory entered current frame left right output borrowHome results call setup state)
@@ -200,7 +200,7 @@ theorem ScalarResult.as_subtract {original final : Memory} {values : List Value}
     by simpa only [scalar_flag_underflow, subtractUnderflow] using result.flag,
     result.writable, result.footprint⟩
 
-theorem scalar_checked (memory : Memory) (left right output : Reference)
+theorem scalar_checked (contract : BorrowHelperContract) (memory : Memory) (left right output : Reference)
     (call : CallingConditions Extracted.program memory [left, right] [output]) :
     ∃ fuel final values,
       invoke Extracted.program fuel scalarIndex (binaryArguments left right output) memory =
@@ -208,7 +208,7 @@ theorem scalar_checked (memory : Memory) (left right output : Reference)
   by_cases small : inputLimb memory right 1 ||| inputLimb memory right 2 |||
       inputLimb memory right 3 = BitVec.ofNat 64 0
   · exact scalar_right_small_checked memory left right output call small
-  · obtain ⟨fuel, final, values, executed, result⟩ := scalar_general_checked memory left right output call small
+  · obtain ⟨fuel, final, values, executed, result⟩ := scalar_general_checked contract memory left right output call small
     exact ⟨fuel, final, values, executed, result.as_subtract⟩
 
 #print axioms ScalarResult.as_subtract

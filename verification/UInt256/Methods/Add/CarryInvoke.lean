@@ -1,6 +1,6 @@
 import UInt256.Methods.Add.Bindings
 import CIL.Safety.WordLocals
-import UInt256.Methods.Add.CarryMemory
+import UInt256.Methods.Add.CarryBody
 import CIL.Safety.ReturnMemory
 
 namespace UInt256Proof.Safety
@@ -50,7 +50,8 @@ open CIL.Safety
 
 /-- A total checked invocation from ordinary caller permissions, including
     setup, body and teardown. Caller carry/output overlap is permitted. -/
-theorem carry_invoke_succeeds (a b c : BitVec 64) (carry output : Reference) (memory : Memory)
+theorem carry_invoke_succeeds (cw : BitVec 64 → BitVec 64 → BitVec 64 → BitVec 64) (runs : CarryRun cw)
+    (a b c : BitVec 64) (carry output : Reference) (memory : Memory)
     (wellFormed : memory.WellFormed)
     (carryReadable : read memory carry 8 1 = .ok (numberBytes c.toNat 8))
     (carryWritable : access memory carry 8 1 true = .ok ())
@@ -60,12 +61,12 @@ theorem carry_invoke_succeeds (a b c : BitVec 64) (carry output : Reference) (me
         [.scalar (.i64 a), .scalar (.i64 b), .reference (.address carry), .reference (.address output)]
         memory = .ok (result, []) ∧
       loadValue result (.address output) 8 = .ok (.i64 (a + b + c)) ∧
-      (WordsDisjoint carry output → loadValue result (.address carry) 8 = .ok (.i64 (carryWord a b c))) ∧
+      (WordsDisjoint carry output → loadValue result (.address carry) 8 = .ok (.i64 (cw a b c))) ∧
       (∀ id offset, id < memory.nextIdentity → OutsideWord carry id offset → OutsideWord output id offset →
         result.cells id offset = memory.cells id offset) ∧
       AccessBelow memory.nextIdentity memory result ∧
       read result output 8 1 = .ok (numberBytes (a + b + c).toNat 8) ∧
-      (WordsDisjoint carry output → read result carry 8 1 = .ok (numberBytes (carryWord a b c).toNat 8)) := by
+      (WordsDisjoint carry output → read result carry 8 1 = .ok (numberBytes (cw a b c).toNat 8)) := by
   let args := [Value.scalar (.i64 a), .scalar (.i64 b), .reference (.address carry), .reference (.address output)]
   have fc := access_reference_valid _ _ _ _ _ carryWritable
   have fo := access_reference_valid _ _ _ _ _ outputWritable
@@ -84,7 +85,7 @@ theorem carry_invoke_succeeds (a b c : BitVec 64) (carry output : Reference) (me
     rw [preserved.access carry carryOld 8 1 true]; exact carryWritable
   have writeOutput : access enteredMemory output 8 1 true = .ok () := by
     rw [preserved.access output outputOld 8 1 true]; exact outputWritable
-  obtain ⟨stored, executed, outputRead, carryRead, footprint, retainedAccess⟩ := carry_body_succeeds a b c carry output first second
+  obtain ⟨stored, executed, outputRead, carryRead, footprint, retainedAccess⟩ := carry_body_succeeds cw runs a b c carry output first second
     frame enteredMemory locals distinct (Nat.ne_of_lt (Nat.lt_of_lt_of_le carryOld firstNew))
     (Nat.ne_of_lt (Nat.lt_of_lt_of_le carryOld secondNew))
     firstWritable secondWritable readCarry writeCarry writeOutput

@@ -6,7 +6,7 @@ import UInt256.Methods.Subtract.ScalarSafetyPrefix
 namespace UInt256Proof.Subtract.Safety
 open CIL.Safety UInt256Model.Safety
 
-theorem ScalarBorrowState.run_next {original before : CIL.Safety.Memory} {frame : Frame}
+theorem ScalarBorrowState.run_next (contract : BorrowHelperContract) {original before : CIL.Safety.Memory} {frame : Frame}
     {left right output borrowHome : Reference} {results : Fin 4 → Reference} (segment : Fin 3)
     (state : ScalarBorrowState original before frame left right output borrowHome results (segment.val + 1))
     (post : CIL.Safety.Memory → List Value → Prop)
@@ -21,7 +21,7 @@ theorem ScalarBorrowState.run_next {original before : CIL.Safety.Memory} {frame 
   let index : Fin 4 := ⟨segment.val + 1, by omega⟩
   have slot : frame.locals[segment.val + 3]? = some (.bytes .word64 (results index)) := by
     simpa only [index, Nat.add_assoc] using state.resultSlots index
-  apply scalar_borrow_segment_checked segment left right output frame before
+  apply scalar_borrow_segment_checked contract segment left right output frame before
     (scalarBorrowValue original left right (segment.val + 1)) borrowHome (results index) state.call
     state.borrowSlot slot state.borrowBound state.borrowRead state.borrowWrite (state.resultWrites index)
     (Or.inl (Ne.symm (state.borrowSeparate index))) post
@@ -37,7 +37,7 @@ theorem ScalarBorrowState.run_next {original before : CIL.Safety.Memory} {frame 
 
 /-- Compose all three remaining extracted calls; the final continuation receives
     all four exact result words and the mathematical final borrow. -/
-theorem ScalarBorrowState.run_remaining {original before : CIL.Safety.Memory} {frame : Frame}
+theorem ScalarBorrowState.run_remaining (contract : BorrowHelperContract) {original before : CIL.Safety.Memory} {frame : Frame}
     {left right output borrowHome : Reference} {results : Fin 4 → Reference}
     (state : ScalarBorrowState original before frame left right output borrowHome results 1)
     (post : CIL.Safety.Memory → List Value → Prop)
@@ -49,11 +49,11 @@ theorem ScalarBorrowState.run_remaining {original before : CIL.Safety.Memory} {f
     ∃ fuel result returned,
       run Extracted.program fuel scalarIndex (scalarBorrowCall 0 + 1)
         (binaryArguments left right output) frame [] before = .ok (result, returned) ∧ post result returned := by
-  apply state.run_next 0 post
+  apply state.run_next contract 0 post
   intro _ second
-  apply second.run_next 1 post
+  apply second.run_next contract 1 post
   intro _ third
-  exact third.run_next 2 post continuation
+  exact third.run_next contract 2 post continuation
 
 #print axioms ScalarBorrowState.run_next
 #print axioms ScalarBorrowState.run_remaining
@@ -218,7 +218,7 @@ theorem scalar_borrow_prefix (left right output : Reference) (frame : Frame) (be
 #print axioms scalar_borrow_prefix
 /-- Execute the scalar body through its complete large-operand borrow chain.
     The continuation receives the four checked result words before output stores. -/
-theorem scalar_general_borrows (original entered : Memory) (left right output : Reference) (frame : Frame)
+theorem scalar_general_borrows (contract : BorrowHelperContract) (original entered : Memory) (left right output : Reference) (frame : Frame)
     (call : CallingConditions Extracted.program original [left, right] [output])
     (setup : enterFrame scalarBody (binaryArguments left right output) original = .ok (frame, entered))
     (homes : WordHomes entered original.nextIdentity scalarLocalSpecs frame.locals)
@@ -251,13 +251,13 @@ theorem scalar_general_borrows (original entered : Memory) (left right output : 
     (state.call.input_formed (by simp)) leftRead rightSlot state.borrowSlot (state.resultSlots 0)
     savedRight (access_reference_valid _ _ _ _ _ state.borrowWrite)
     (access_reference_valid _ _ _ _ _ (state.resultWrites 0)) stored post
-  apply scalar_indexed_borrow 0 (binaryArguments left right output) frame prepared
+  apply scalar_indexed_borrow contract 0 (binaryArguments left right output) frame prepared
     (inputLimb original left 0) (inputLimb original right 0)
     (scalarBorrowValue original left right 0) borrowHome (results 0)
     state.call.1.1 state.borrowBound state.borrowRead state.borrowWrite (state.resultWrites 0)
     (Or.inl (Ne.symm (state.borrowSeparate 0))) post
   intro after math
-  exact (state.advance 0 math).run_remaining post (fun final completed =>
+  exact (state.advance 0 math).run_remaining contract post (fun final completed =>
     continuation borrowHome results final completed)
 
 #print axioms scalar_general_borrows
