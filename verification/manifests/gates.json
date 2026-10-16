@@ -31,6 +31,30 @@
       "theorem": "UInt256Proof.Subtract.underflow_scalar_correctness"
     },
     {
+      "method": "Subtract",
+      "profile": "arm64-advsimd",
+      "proof": "proofs/SubtractProfile_arm64_advsimd.lean",
+      "theorem": "UInt256Proof.Subtract.profile_correctness"
+    },
+    {
+      "method": "SubtractUnderflow",
+      "profile": "arm64-advsimd",
+      "proof": "proofs/SubtractUnderflowProfile_arm64_advsimd.lean",
+      "theorem": "UInt256Proof.Subtract.underflow_profile_correctness"
+    },
+    {
+      "method": "Subtract",
+      "profile": "x64-sse42",
+      "proof": "proofs/SubtractProfile_x64_sse42.lean",
+      "theorem": "UInt256Proof.Subtract.sse_profile_correctness"
+    },
+    {
+      "method": "SubtractUnderflow",
+      "profile": "x64-sse42",
+      "proof": "proofs/SubtractUnderflowProfile_x64_sse42.lean",
+      "theorem": "UInt256Proof.Subtract.sse_underflow_profile_correctness"
+    },
+    {
       "method": "Add",
       "profile": "scalar",
       "proof": "proofs/AddScalar.lean",
