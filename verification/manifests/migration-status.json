@@ -610,6 +610,15 @@
         "Add": 342.3,
         "AddOverflow": 192.9
       }
+    },
+    {
+      "fixtureGroups": [
+        "Safety",
+        "SIMD",
+        "Reporting",
+        "Profiles"
+      ],
+      "note": "Safety: 6 positives (valid call, initial-input sum, probe value) and 11 negatives (located fault refutation plus production AddScalar rejection) certified on scalar; AlignedLoad is an extractor rejection mapped upstream. SIMD: Add arm64-advsimd Baseline, Renamed, WrongAlignment and WrongTop certified. Reporting: AddOverflow and SubtractUnderflow scalar Baseline, Renamed and WrongFlag, and AddOverflow arm64-advsimd Baseline, Renamed, WrongFlag, WrongAlignment and WrongTop certified. Remaining cases wait for x64-sse42, AVX and accelerated Subtract gates or for fixture proofs of body-changing refactors (LaneLocals, InlineCarry, ExtractedHelper, ReversedStore, FeatureExpressions, EquivalentMask)."
     }
   ],
   "remainingPorts": [],
@@ -623,7 +632,7 @@
     "Add/ExpandedHardware: passes extraction validation on 7aec18e; the production Add proof no longer normalizes the excluded entry branch and needs confirmation on this pin.",
     "Add/AddOverflow arm64-advsimd gates are certified. x64-sse42 Add/AddOverflow, accelerated Subtract/SubtractUnderflow and AVX2/AVX512 Add gates remain outstanding.",
     "AVX2/AVX512 Add/Subtract/AddOverflow/SubtractUnderflow now pass extraction (LeanCIL#53); their contract proofs are not written.",
-    "Comparison, equality, reporting, safety, SIMD and profile fixture groups from the original branch are not yet ported."
+    "Comparison and equality fixture groups from the original branch are not yet ported. Safety, SIMD and Reporting run through SafetyRegression.cs and SimdRegression.cs; SIMD/Reporting cases on ungated profiles (x64-sse42, AVX, accelerated Subtract/SubtractUnderflow) and body-changing positives without fixture proofs are PENDING. Profiles is extractor infrastructure mapped to LeanCIL tests and unfiled upstream drafts."
   ],
   "supportingAuditTheorems": 2261
 }

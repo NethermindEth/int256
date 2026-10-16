@@ -243,6 +243,17 @@ unchanged production proof to be rejected without leaving a certificate.
 exits nonzero until each has one. Extractor rejection fixtures (unsupported instructions, static
 initializers, metadata mutations) are covered by LeanCIL's own tests.
 
+`SimdRegression.cs` runs the SIMD (Add/Subtract) and Reporting
+(AddOverflow/SubtractUnderflow) groups per profile; cases on a profile without a
+production gate, and refactors that change a method body without their own
+fixture proof, are PENDING. `SafetyRegression.cs` runs the compiled memory-safety
+probes: each negative certifies a checked refutation of the public Add contract
+from a fault pinned to its method, instruction, rule, reference and width, and each
+positive certifies a valid call and
+the probe's own value. The Profiles group is extractor infrastructure only. Each
+group's `Tests/Fixtures/<group>/README.md` maps every original case to a runner
+case, the LeanCIL test that covers it, or an unfiled upstream issue draft.
+
 Each public gate must retain independent arithmetic and safety contracts,
 including initial operands under valid overlap, normal finite return,
 caller-byte preservation, and its claimed feature coverage. Re-run the original
