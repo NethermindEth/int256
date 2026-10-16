@@ -11,14 +11,16 @@ this directory contains only UInt256 specifications and proofs.
 
 ## Verification scope
 
-The 240 registered method/profile gates in `manifests/gates.json` include all
+The 256 registered method/profile gates in `manifests/gates.json` include all
 87 scalar migration targets: addition/subtraction and their reporting variants,
 multiplication, bitwise operations, shifts, equality, and ordering. Accelerated
 gates currently cover vector bitwise operations and shifts, vector/SSE equality,
 vector/AVX2/AVX512 ordering, all seven multiplication entries on each of
-the 14 multiplication feature profiles, `Add`/`AddOverflow` on `arm64-advsimd` and `x64-sse42`,
-and `Subtract`/`SubtractUnderflow` on `arm64-advsimd` and `x64-sse42` (one profile-parametric proof
-in `UInt256/Methods/Subtract/{BorrowHelper,SmallHelper,Vector128*,ScalarDispatch,AcceleratedContract}.lean`).
+the 14 multiplication feature profiles, and `Add`/`AddOverflow`/`Subtract`/`SubtractUnderflow`
+on `arm64-advsimd`, `x64-sse42`, `x64-avx2`, `x64-avx2-bmi1`, `x64-avx512` and `x64-avx512-bmi1`.
+The Vector128 Subtract gates share one profile-parametric proof
+(`UInt256/Methods/Subtract/{BorrowHelper,SmallHelper,Vector128*,ScalarDispatch,AcceleratedContract}.lean`);
+the AVX2/AVX512 contracts (`UInt256/Methods/{Add,Subtract}/Vector256*.lean`) bind every reachable body by `rfl`.
 The `arm64-advsimd` gates cover the public entry, the `AddScalar` dispatcher, the
 AdvSimd `AddVector128` helper, `AddScalarUInt64` and `StoreLimbs`. Their contracts
 (`UInt256/Methods/Add/{Vector128,ARM}*.lean`, `UInt256/Methods/AddSubtract/` and
@@ -225,8 +227,7 @@ static lookup tables (#53) and linear per-site evidence checks (#54).
 
 All scalar ports now have registered certificates, and `remainingPorts` is
 empty. The 98 multiplication profile certificates passed against the current
-Release assembly and proof sources. Remaining work includes AVX2/AVX512 Add/Subtract proofs (these
-profiles now extract), fixture proofs for structurally different Add/Subtract variants,
+Release assembly and proof sources. Remaining work includes
 the original comparison/equality/SIMD fixtures, and recertification after
 shared proof changes. `pendingValidation` records these obligations separately
 from scalar port completion.

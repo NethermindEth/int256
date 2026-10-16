@@ -1439,6 +1439,102 @@
       "profile": "x64-vector256",
       "proof": "proofs/OperatorMultiplyUInt64UInt256Profile_x64_vector256.lean",
       "theorem": "UInt256Proof.OperatorMultiplyUInt64UInt256.profile_correctness"
+    },
+    {
+      "method": "Subtract",
+      "profile": "x64-avx2",
+      "proof": "proofs/SubtractProfile_x64_avx2.lean",
+      "theorem": "UInt256Proof.Subtract.profile_correctness"
+    },
+    {
+      "method": "Subtract",
+      "profile": "x64-avx2-bmi1",
+      "proof": "proofs/SubtractProfile_x64_avx2_bmi1.lean",
+      "theorem": "UInt256Proof.Subtract.profile_correctness"
+    },
+    {
+      "method": "Subtract",
+      "profile": "x64-avx512",
+      "proof": "proofs/SubtractProfile_x64_avx512.lean",
+      "theorem": "UInt256Proof.Subtract.profile_correctness"
+    },
+    {
+      "method": "Subtract",
+      "profile": "x64-avx512-bmi1",
+      "proof": "proofs/SubtractProfile_x64_avx512_bmi1.lean",
+      "theorem": "UInt256Proof.Subtract.profile_correctness"
+    },
+    {
+      "method": "SubtractUnderflow",
+      "profile": "x64-avx2",
+      "proof": "proofs/SubtractUnderflowProfile_x64_avx2.lean",
+      "theorem": "UInt256Proof.Subtract.underflow_profile_correctness"
+    },
+    {
+      "method": "SubtractUnderflow",
+      "profile": "x64-avx2-bmi1",
+      "proof": "proofs/SubtractUnderflowProfile_x64_avx2_bmi1.lean",
+      "theorem": "UInt256Proof.Subtract.underflow_profile_correctness"
+    },
+    {
+      "method": "SubtractUnderflow",
+      "profile": "x64-avx512",
+      "proof": "proofs/SubtractUnderflowProfile_x64_avx512.lean",
+      "theorem": "UInt256Proof.Subtract.underflow_profile_correctness"
+    },
+    {
+      "method": "SubtractUnderflow",
+      "profile": "x64-avx512-bmi1",
+      "proof": "proofs/SubtractUnderflowProfile_x64_avx512_bmi1.lean",
+      "theorem": "UInt256Proof.Subtract.underflow_profile_correctness"
+    },
+    {
+      "method": "Add",
+      "profile": "x64-avx2",
+      "proof": "proofs/AddProfile_x64_avx2.lean",
+      "theorem": "UInt256Proof.Add.profile_correctness"
+    },
+    {
+      "method": "Add",
+      "profile": "x64-avx2-bmi1",
+      "proof": "proofs/AddProfile_x64_avx2_bmi1.lean",
+      "theorem": "UInt256Proof.Add.profile_correctness"
+    },
+    {
+      "method": "Add",
+      "profile": "x64-avx512",
+      "proof": "proofs/AddProfile_x64_avx512.lean",
+      "theorem": "UInt256Proof.Add.profile_correctness"
+    },
+    {
+      "method": "Add",
+      "profile": "x64-avx512-bmi1",
+      "proof": "proofs/AddProfile_x64_avx512_bmi1.lean",
+      "theorem": "UInt256Proof.Add.profile_correctness"
+    },
+    {
+      "method": "AddOverflow",
+      "profile": "x64-avx2",
+      "proof": "proofs/AddOverflowProfile_x64_avx2.lean",
+      "theorem": "UInt256Proof.Add.overflow_profile_correctness"
+    },
+    {
+      "method": "AddOverflow",
+      "profile": "x64-avx2-bmi1",
+      "proof": "proofs/AddOverflowProfile_x64_avx2_bmi1.lean",
+      "theorem": "UInt256Proof.Add.overflow_profile_correctness"
+    },
+    {
+      "method": "AddOverflow",
+      "profile": "x64-avx512",
+      "proof": "proofs/AddOverflowProfile_x64_avx512.lean",
+      "theorem": "UInt256Proof.Add.overflow_profile_correctness"
+    },
+    {
+      "method": "AddOverflow",
+      "profile": "x64-avx512-bmi1",
+      "proof": "proofs/AddOverflowProfile_x64_avx512_bmi1.lean",
+      "theorem": "UInt256Proof.Add.overflow_profile_correctness"
     }
   ],
   "schema": 1

@@ -98,3 +98,5 @@ import UInt256.Methods.Add.ARMOverflowContract
 import UInt256.Methods.Add.SSEContract
 import UInt256.Methods.Subtract.AcceleratedContract
 import UInt256.Safety.PrivateWordSteps
+import UInt256.Methods.Subtract.Vector256Entry
+import UInt256.Methods.Add.Vector256Entry
