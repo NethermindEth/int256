@@ -1,0 +1,13 @@
+<Project>
+  <ItemGroup>
+    <ReportingCase Include="Baseline" Symbol="" Suite="positive" />
+    <ReportingCase Include="Renamed" Symbol="RENAMED" Suite="positive" />
+    <ReportingCase Include="EquivalentMask" Symbol="EQUIVALENT_MASK" Suite="positive" />
+    <ReportingCase Include="ExtractedHelper" Symbol="EXTRACTED_HELPER" Suite="positive" />
+    <ReportingCase Include="ReversedStore" Symbol="REVERSED_STORE" Suite="positive" />
+    <ReportingCase Include="WrongFlag" Symbol="WRONG_REPORTING_FLAG" Suite="negative" />
+    <ReportingCase Include="WrongAlignment" Symbol="WRONG_ALIGNMENT" Suite="negative" />
+    <ReportingCase Include="WrongTop" Symbol="WRONG_TOP" Suite="negative" />
+    <ReportingCase Include="EarlyReread" Symbol="EARLY_REREAD" Suite="negative" />
+  </ItemGroup>
+</Project>
