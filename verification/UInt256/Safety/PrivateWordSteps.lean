@@ -215,8 +215,8 @@ theorem run_if {program : CIL.Program} {method : Nat} {condition : Prop} [Decida
       run program fuel method (if condition then taken else skipped) args frame stack memory =
         .ok (result, returned) ∧ post result returned := by
   by_cases h : condition
-  · rw [if_pos h]; exact yes h
-  · rw [if_neg h]; exact no h
+  · simpa only [h, ite_true] using yes h
+  · simpa only [h, ite_false] using no h
 
 set_option hygiene false in
 /-- Execute one instruction of a binary `left right output` method over private
