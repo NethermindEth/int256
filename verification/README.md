@@ -18,8 +18,9 @@ vector/AVX2/AVX512 ordering, all seven multiplication entries on each of
 the 14 multiplication feature profiles, and `Add`/`AddOverflow` on the built-in
 `arm64-advsimd` profile.
 The `arm64-advsimd` gates cover the public entry, the `AddScalar` dispatcher, the
-AdvSimd `AddVector128` helper, `AddScalarUInt64` and `StoreLimbs`. Their contracts in
-`UInt256/Methods/Add/ARM*.lean` do not import `Extracted`; each proof binds all five
+AdvSimd `AddVector128` helper, `AddScalarUInt64` and `StoreLimbs`. Their contracts
+(`UInt256/Methods/Add/{Vector128,ARM}*.lean`, `UInt256/Methods/AddSubtract/` and
+`UInt256/Safety/{HalfValue,OutputHalves}.lean`) do not import `Extracted`; each proof binds all five
 extracted method bodies by `rfl`. `Add` proves `WrappingBinaryContract`; `AddOverflow`
 proves `ReportingBinaryContract` with the exact unsigned carry flag.
 The `Add` gate includes its four reachable helpers. `proofs/AddScalar.lean` proves the allocation-aware
