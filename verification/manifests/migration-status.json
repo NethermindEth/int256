@@ -610,6 +610,41 @@
         "Add": 342.3,
         "AddOverflow": 192.9
       }
+    },
+    {
+      "profile": "x64-sse42",
+      "methods": [
+        "Add",
+        "AddOverflow"
+      ],
+      "completedCertificates": 2,
+      "extractionRevision": "7aec18ee49eaa33255a980ca688cfd816492be97",
+      "assemblySha256": "b251406c5895d907d410496f4609320dc0c322bac122b9e5c31ecc56df420d85",
+      "note": "Add and AddOverflow certified on x64-sse42: public entry, AddScalar dispatcher (right/left small tests, SSE4.2 guard), SSE AddVector128 with its scalar carry repair, AddWithCarry, the portable AddScalarUInt64 and StoreLimbs, each bound by rfl to extraction-independent contracts.",
+      "verificationSeconds": {
+        "Add": 1490.3,
+        "AddOverflow": 314.8
+      }
+    },
+    {
+      "profiles": [
+        "x64-sse42",
+        "arm64-advsimd"
+      ],
+      "methods": [
+        "Subtract",
+        "SubtractUnderflow"
+      ],
+      "completedCertificates": 4,
+      "extractionRevision": "7aec18ee49eaa33255a980ca688cfd816492be97",
+      "assemblySha256": "05075b6db3dcc781ccc38f92ae59c42d09031cd099282219c8c63b38e4c9de97",
+      "note": "Subtract and SubtractUnderflow certified on x64-sse42 and arm64-advsimd by one profile-parametric proof: public entries, SubtractImpl with AVX2 disabled, SubtractScalar dispatcher, SubtractVector128 (speculative path and SubtractWithBorrow repair), SubtractScalarUInt64 and StoreLimbs, each bound by rfl. SubtractUnderflow proves the exact borrow flag.",
+      "verificationSeconds": {
+        "Subtract/x64-sse42": 1718.3,
+        "SubtractUnderflow/x64-sse42": 775.5,
+        "Subtract/arm64-advsimd": 612.1,
+        "SubtractUnderflow/arm64-advsimd": 603.3
+      }
     }
   ],
   "remainingPorts": [],
@@ -621,7 +656,7 @@
     "Multiply: all 8 original fixtures passed (3 positive, 5 negative) with the uniform profile proofs.",
     "Add/Subtract: 8 Add positives (Baseline, Renamed, ReversedStore on the production proof; CarryOr, FullyInlined, StraightLine, ExtractedHelper, ExternalHelper on fixture proofs), 5 Subtract positives (Baseline, Renamed on the production proof; BorrowAlternative, FullyInlined, ExtractedHelper on fixture proofs) and all 4 negatives passed on LeanCIL 70ee207; rerun on 7aec18e pending.",
     "Add/ExpandedHardware: passes extraction validation on 7aec18e; the production Add proof no longer normalizes the excluded entry branch and needs confirmation on this pin.",
-    "Add/AddOverflow arm64-advsimd gates are certified. x64-sse42 Add/AddOverflow, accelerated Subtract/SubtractUnderflow and AVX2/AVX512 Add gates remain outstanding.",
+    "Add/AddOverflow (arm64-advsimd, x64-sse42) and Subtract/SubtractUnderflow (arm64-advsimd, x64-sse42) gates are certified. AVX2/AVX512 Add/Subtract gates remain outstanding.",
     "AVX2/AVX512 Add/Subtract/AddOverflow/SubtractUnderflow now pass extraction (LeanCIL#53); their contract proofs are not written.",
     "Comparison, equality, reporting, safety, SIMD and profile fixture groups from the original branch are not yet ported."
   ],
