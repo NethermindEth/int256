@@ -3,8 +3,8 @@
 This migration starts from `verification/uint256-memory-safety`
 (`6c56716afa7860771c08815b8348e53313c7f8c8`), based on int256 `main`
 (`5fa8d77429c0440754bbfc851788d1ae37aba07f`). It consumes LeanCIL at
-`ad6e1d503a2991bff0a3459227959c63a465c09d` through a pinned Lake dependency
-([consumer replay and portable support changes](https://github.com/NethermindEth/LeanCIL/pull/50)).
+`70ee20782980f35ff19b26e5fdff2f25c6e760e9` through a pinned Lake dependency
+([portable fingerprint fix](https://github.com/NethermindEth/LeanCIL/pull/52)).
 CIL semantics, extraction, and verification infrastructure belong to LeanCIL;
 this directory contains only UInt256 specifications and proofs.
 
@@ -106,11 +106,12 @@ dependency closure, and `verified.json` records the support manifest digest.
 No machine-local signing secret is exported. Publishing during existing main
 batches avoids adding a producer gate to every PR's critical path. The first
 main run, or a changed proof snapshot, performs normal kernel replay.
-Some comparison helper artifacts embed their absolute temporary source filename,
-so fresh sessions produce different bytes and conservatively replay those helpers.
-Other byte-stable support modules can be reused. This limitation is tracked in
-[LeanCIL #51](https://github.com/NethermindEth/LeanCIL/issues/51); machine-local
-reuse of the actual certified artifacts remains effective for those helpers.
+Schema 2 portable fingerprints exclude only Lean's persisted linter diagnostics,
+whose temporary source filenames previously prevented comparison-helper reuse.
+Declarations, semantic path strings, imports and all other extensions remain
+covered, including private module parts. Original compiled artifacts retain
+their raw-byte stability checks. Older manifests fall back to normal replay;
+the next successful main run exports manifests for the new verifier and pin.
 
 The wrapper refactor removes the extraction-dependent `PrimitiveSafetyLeaf` and
 `PrimitiveSafetyContract` adapter modules. The supporting audit now checks 505
