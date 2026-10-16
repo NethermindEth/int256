@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   select:
@@ -17,6 +18,9 @@ jobs:
       contracts: ${{ steps.gates.outputs.contracts }}
       matrix: ${{ steps.gates.outputs.matrix }}
       count: ${{ steps.gates.outputs.count }}
+      support-run: ${{ steps.support.outputs.run-id }}
+      support-artifact: ${{ steps.support.outputs.artifact-id }}
+      support-sha256: ${{ steps.support.outputs.sha256 }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -36,6 +40,12 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Verification runner regression checks failed' }
           dotnet run --file verification/SelectGates.cs -- --event "$env:EVENT_NAME" --base "$env:BASE_SHA" --head "$env:HEAD_SHA" --output "$env:GITHUB_OUTPUT"
           if ($LASTEXITCODE -ne 0) { throw 'Gate selection failed' }
+      - name: Find certified support from a successful main run
+        id: support
+        if: steps.gates.outputs.count != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: dotnet run --file verification/FindConsumerSupport.cs
 
   contracts:
     name: Contracts and supporting theorem audit
@@ -113,6 +123,7 @@ jobs:
       LEANCIL_CERTIFIED_LIBRARY_SHA256: ${{ needs.prepare.outputs.manifest-sha256 }}
       LEANCIL_TRACE_DIRECTORY: ${{ github.workspace }}/verification/artifacts/verification-traces
       LEANCIL_SUITE: ${{ matrix.id }}
+      LEANCIL_EXPORT_CONSUMER_SUPPORT: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && format('{0}/verification/artifacts/consumer-support-export', github.workspace) || '' }}
     strategy:
       fail-fast: false
       max-parallel: 8
@@ -135,13 +146,33 @@ jobs:
         with:
           artifact-ids: ${{ needs.prepare.outputs.artifact-id }}
           path: verification/artifacts/certified-library
+      - name: Download previous certified consumer support
+        id: support
+        if: needs.select.outputs.support-artifact != ''
+        continue-on-error: true
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ needs.select.outputs.support-artifact }}
+          run-id: ${{ needs.select.outputs.support-run }}
+          github-token: ${{ github.token }}
+          path: verification/artifacts/consumer-support-import
       - name: Verify compiled methods
         id: certificate
         shell: pwsh
         env:
           VERIFY_METHODS: ${{ toJSON(matrix.methods) }}
           VERIFY_PROFILE: ${{ matrix.profile }}
+          LEANCIL_CONSUMER_SUPPORT: ${{ steps.support.outcome == 'success' && format('{0}/verification/artifacts/consumer-support-import/{1}.json', github.workspace, needs.select.outputs.support-sha256) || '' }}
+          LEANCIL_CONSUMER_SUPPORT_SHA256: ${{ steps.support.outcome == 'success' && needs.select.outputs.support-sha256 || '' }}
         run: dotnet run --file verification/Verify.cs -- --action verify --methods-json "$env:VERIFY_METHODS" --profile "$env:VERIFY_PROFILE"
+      - name: Publish certified consumer support for future runs
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.certificate.outputs.consumer-support-sha256 != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: consumer-support-${{ matrix.id }}-${{ github.run_attempt }}-${{ steps.certificate.outputs.consumer-support-sha256 }}
+          path: verification/artifacts/consumer-support-export
+          if-no-files-found: error
+          retention-days: 7
       - name: Summarize verification timings
         if: always() && steps.certificate.outcome != 'skipped'
         shell: pwsh
