@@ -610,6 +610,47 @@
         "Add": 342.3,
         "AddOverflow": 192.9
       }
+    },
+    {
+      "profiles": [
+        "x64-avx2",
+        "x64-avx2-bmi1",
+        "x64-avx512",
+        "x64-avx512-bmi1"
+      ],
+      "methods": [
+        "Add",
+        "AddOverflow",
+        "Subtract",
+        "SubtractUnderflow"
+      ],
+      "completedCertificates": 16,
+      "extractionRevision": "7aec18ee49eaa33255a980ca688cfd816492be97",
+      "assemblySha256ByMethod": {
+        "Add": "500d4309786c245287fb904c184e556ad0df71ba505e58e9f799267414925987",
+        "AddOverflow": "500d4309786c245287fb904c184e556ad0df71ba505e58e9f799267414925987",
+        "Subtract": "9da502dcf08fe78ac4cf97cff6b134cddd46e55b74d00790579ccec5860fc248",
+        "SubtractUnderflow": "9da502dcf08fe78ac4cf97cff6b134cddd46e55b74d00790579ccec5860fc248"
+      },
+      "note": "Add, AddOverflow, Subtract and SubtractUnderflow certified on the four AVX2/AVX512 profiles. Extraction-independent contracts in UInt256/Methods/{Add,Subtract}/Vector256*.lean and UInt256/Safety/ScratchCells.lean bind every reachable body (entry, SubtractImpl or PrepareAdd/FinishAdd, and the BroadcastLookup getter) by rfl. Add/Subtract prove WrappingBinaryContract; AddOverflow/SubtractUnderflow prove ReportingBinaryContract with the exact carry/borrow flag. No previously certified proof module changed. The two assembly hashes differ only by the git commit embedded in InformationalVersion (Subtract certified at 48115c7, Add at 360078e; no src change between them). The first gate of each batch (Add/x64-avx2, Subtract/x64-avx2) includes the consumer library build.",
+      "verificationSeconds": {
+        "Add/x64-avx2": 2221.0,
+        "Add/x64-avx2-bmi1": 637.7,
+        "Add/x64-avx512": 468.5,
+        "Add/x64-avx512-bmi1": 435.5,
+        "AddOverflow/x64-avx2": 448.8,
+        "AddOverflow/x64-avx2-bmi1": 458.2,
+        "AddOverflow/x64-avx512": 429.4,
+        "AddOverflow/x64-avx512-bmi1": 352.5,
+        "Subtract/x64-avx2": 1067.7,
+        "Subtract/x64-avx2-bmi1": 483.1,
+        "Subtract/x64-avx512": 453.6,
+        "Subtract/x64-avx512-bmi1": 501.3,
+        "SubtractUnderflow/x64-avx2": 139.0,
+        "SubtractUnderflow/x64-avx2-bmi1": 406.1,
+        "SubtractUnderflow/x64-avx512": 421.4,
+        "SubtractUnderflow/x64-avx512-bmi1": 603.4
+      }
     }
   ],
   "remainingPorts": [],
@@ -621,8 +662,7 @@
     "Multiply: all 8 original fixtures passed (3 positive, 5 negative) with the uniform profile proofs.",
     "Add/Subtract: 8 Add positives (Baseline, Renamed, ReversedStore on the production proof; CarryOr, FullyInlined, StraightLine, ExtractedHelper, ExternalHelper on fixture proofs), 5 Subtract positives (Baseline, Renamed on the production proof; BorrowAlternative, FullyInlined, ExtractedHelper on fixture proofs) and all 4 negatives passed on LeanCIL 70ee207; rerun on 7aec18e pending.",
     "Add/ExpandedHardware: passes extraction validation on 7aec18e; the production Add proof no longer normalizes the excluded entry branch and needs confirmation on this pin.",
-    "Add/AddOverflow arm64-advsimd gates are certified. x64-sse42 Add/AddOverflow, accelerated Subtract/SubtractUnderflow and AVX2/AVX512 Add gates remain outstanding.",
-    "AVX2/AVX512 Add/Subtract/AddOverflow/SubtractUnderflow now pass extraction (LeanCIL#53); their contract proofs are not written.",
+    "Add/AddOverflow arm64-advsimd gates and Add/AddOverflow/Subtract/SubtractUnderflow AVX2/AVX512 gates are certified. x64-sse42 Add/AddOverflow and the remaining accelerated Subtract/SubtractUnderflow profiles remain outstanding.",
     "Comparison, equality, reporting, safety, SIMD and profile fixture groups from the original branch are not yet ported."
   ],
   "supportingAuditTheorems": 2261
