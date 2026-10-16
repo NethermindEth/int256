@@ -1,4 +1,4 @@
-import UInt256.Methods.Subtract.BorrowCaller
+import UInt256.Methods.Subtract.BorrowPost
 
 namespace UInt256Proof.Subtract.Safety
 
@@ -61,14 +61,15 @@ theorem ScalarBorrowState.advance {original before after : CIL.Safety.Memory} {f
     state.callerSeparate, state.borrowSeparate, state.resultSeparate,
     state.borrowFresh, state.resultsFresh, ?_, ?_⟩
   · intro reference member
-    exact (math.private_input_bytes reference (separate reference member).1
+    obtain ⟨allocation, present, _, _⟩ := formed_reference_live _ _ _ (state.call.input_formed member)
+    exact (math.private_input_bytes reference (state.call.1.1.1 _ _ present).1 (separate reference member).1
       (separate reference member).2).trans (state.inputBytes reference member)
   · simpa only [scalarBorrowValue, dite_eq_left index.isLt] using math.borrowBytes
   · simpa only [scalarBorrowValue, dite_eq_left index.isLt] using math.borrowBound
   · intro id old offset
     have belowBorrow := Nat.lt_of_lt_of_le old state.borrowFresh
     have belowResult := Nat.lt_of_lt_of_le old (state.resultsFresh index)
-    exact (math.footprint id offset
+    exact (math.footprint id offset (Nat.lt_trans belowBorrow borrowOld)
       (Or.inl (Nat.ne_of_lt belowBorrow)) (Or.inl (Nat.ne_of_lt belowResult))).trans
       (state.callerCells id old offset)
   · intro i done
@@ -80,7 +81,7 @@ theorem ScalarBorrowState.advance {original before after : CIL.Safety.Memory} {f
         omega
       apply math.access.read_eq (state.completed i earlier) (resultOld i)
       intro offset _
-      exact math.footprint _ _ (Or.inl (state.borrowSeparate i))
+      exact math.footprint _ _ (resultOld i) (Or.inl (state.borrowSeparate i))
         (Or.inl (state.resultSeparate i index same))
 
 #print axioms ScalarBorrowState.advance

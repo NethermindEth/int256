@@ -7,6 +7,11 @@ namespace UInt256Proof.Safety
 
 open CIL.Safety
 
+theorem small_storage_word_order : storageWordOrder =
+    Extracted.storeLimbsBody.code.filterMap fun op =>
+      match op with | .arg (index + 1) => some index | _ => none :=
+  storageWordOrder_of_found (index := Extracted.storeLimbsIndex) (by rfl) (by rfl)
+
 def smallStoreCall : Nat → Nat
   | 0 => Extracted.addScalarUInt64Body.code.findIdx fun op => match op with
       | .call callee _ => callee == Extracted.storeLimbsIndex
@@ -61,7 +66,8 @@ theorem small_no_carry_prefix (input output sumHome : Reference) (word : BitVec 
         [.scalar (.i64 (words 0)), .scalar (.i64 (words 0 + word))] memory = .ok (result, returned) ∧
       post result returned := by
   unfold storageArguments at continuation
-  conv at continuation in storageWordOrder => cbv
+  rw [small_storage_word_order] at continuation
+  conv at continuation in (List.filterMap _ _) => cbv
   simp [List.range_succ, List.findIdx] at continuation
   conv in smallCarryDecision => cbv
   conv at continuation in (smallStoreCall _) => cbv
@@ -130,7 +136,8 @@ theorem small_store_finish (branch : Fin 5) (original entered current : CIL.Safe
     all_goals conv in (smallStoreCall _) => cbv
     all_goals simp only [cil_code]
   · unfold storageArguments
-    repeat' (conv in storageWordOrder => cbv)
+    rw [small_storage_word_order]
+    repeat' (conv in (List.filterMap _ Extracted.storeLimbsBody.code) => cbv)
     simp [List.range_succ, List.findIdx, step, checkedValue, numericValue, formValue, formed,
       checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     exact ⟨rfl, rfl, rfl⟩

@@ -1,4 +1,8 @@
 import Extracted
+import UInt256.Methods.CalleeBinding
+
+-- Names for the freshly extracted scalar Subtract/SubtractUnderflow call graph. Only the entry
+-- signature is pinned; helpers are found by call arity, so inserted helpers stay verifiable.
 
 namespace Extracted
 @[cil_code] def entryIndex : Nat := 0
@@ -9,19 +13,10 @@ example : method0Signature = "System.Void Nethermind.Int256.UInt256::Subtract(Ne
     | exact Or.inl rfl
     | exact Or.inr rfl
 
-@[cil_code] def subtractVector256Index : Nat := 1
-abbrev subtractVector256Body := method1
-
-@[cil_code] def subtractScalarIndex : Nat := 2
-abbrev subtractScalarBody := method2
-
-@[cil_code] def subtractWithBorrowIndex : Nat := 3
-abbrev subtractWithBorrowBody := method3
-
-@[cil_code] def subtractScalarUInt64Index : Nat := 4
-abbrev subtractScalarUInt64Body := method4
-
-@[cil_code] def storeLimbsIndex : Nat := 5
-abbrev storeLimbsBody := method5
+bind_callee subtractVector256Index subtractVector256Body := entryBody with 3
+bind_callee subtractScalarIndex subtractScalarBody := subtractVector256Body with 3
+bind_callee subtractWithBorrowIndex subtractWithBorrowBody := subtractScalarBody with 4
+bind_callee subtractScalarUInt64Index subtractScalarUInt64Body := subtractScalarBody with 3
+bind_callee storeLimbsIndex storeLimbsBody := subtractScalarBody with 5
 
 end Extracted

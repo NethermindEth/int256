@@ -1,4 +1,4 @@
-import UInt256.Methods.Subtract.BorrowCaller
+import UInt256.Methods.Subtract.BorrowPost
 import UInt256.Methods.Subtract.ScalarSafetySetup
 
 namespace UInt256Proof.Subtract.Safety
@@ -11,7 +11,7 @@ def scalarBorrowCalls : List Nat := scalarBody.code.zipIdx.filterMap fun (op, pc
 
 def scalarBorrowCall (index : Nat) : Nat := scalarBorrowCalls[index]?.getD 0
 
-theorem scalar_indexed_borrow (index : Fin 4) (args : List Value) (frame : Frame) (memory : Memory)
+theorem scalar_indexed_borrow (contract : BorrowHelperContract) (index : Fin 4) (args : List Value) (frame : Frame) (memory : Memory)
     (a b c : BitVec 64) (borrowHome resultHome : Reference)
     (wellFormed : memory.WellFormed) (incoming : c.toNat ≤ 1)
     (borrowRead : read memory borrowHome 8 1 = .ok (numberBytes c.toNat 8))
@@ -28,7 +28,7 @@ theorem scalar_indexed_borrow (index : Fin 4) (args : List Value) (frame : Frame
         memory = .ok (result, returned) ∧ post result returned := by
   have fb := access_reference_valid _ _ _ _ _ borrowWrite
   have fr := access_reference_valid _ _ _ _ _ resultWrite
-  apply run_borrow_call a b c borrowHome resultHome post (body := scalarBody)
+  apply run_borrow_call contract a b c borrowHome resultHome post (body := scalarBody)
     (op := .call Extracted.subtractWithBorrowIndex 4)
   · rfl
   · obtain ⟨index, bound⟩ := index
@@ -45,7 +45,7 @@ theorem scalar_indexed_borrow (index : Fin 4) (args : List Value) (frame : Frame
   · exact disjoint
   · exact continuation
 
-theorem scalar_borrow_segment_checked (segment : Fin 3) (left right output : Reference)
+theorem scalar_borrow_segment_checked (contract : BorrowHelperContract) (segment : Fin 3) (left right output : Reference)
     (frame : Frame) (memory : Memory) (c : BitVec 64) (borrowHome resultHome : Reference)
     (call : CallingConditions Extracted.program memory [left, right] [output])
     (borrowSlot : frame.locals[1]? = some (.bytes .word64 borrowHome))
@@ -63,7 +63,7 @@ theorem scalar_borrow_segment_checked (segment : Fin 3) (left right output : Ref
     ∃ fuel result returned,
       run Extracted.program fuel scalarIndex (scalarBorrowCall segment.val + 1)
         (binaryArguments left right output) frame [] memory = .ok (result, returned) ∧ post result returned := by
-  have tail := scalar_indexed_borrow ⟨segment.val + 1, by omega⟩ (binaryArguments left right output) frame memory
+  have tail := scalar_indexed_borrow contract ⟨segment.val + 1, by omega⟩ (binaryArguments left right output) frame memory
     (inputLimb memory left ⟨segment.val + 1, by omega⟩) (inputLimb memory right ⟨segment.val + 1, by omega⟩)
     c borrowHome resultHome call.1.1 incoming borrowRead borrowWrite resultWrite disjoint post continuation
   have fl := call.input_formed (reference := left) (by simp)

@@ -1,12 +1,12 @@
 import CIL.Safety.CallComposition
-import UInt256.Methods.Add.CarryContract
+import UInt256.Methods.Add.CarryPost
 
 namespace UInt256Proof.Safety
 
 open CIL.Safety
 
 /-- Compose a fetched carry call using the actual checked mathematical contract. -/
-theorem run_carry_call {method pc : Nat} {body : CIL.Method} {op : CIL.Op}
+theorem run_carry_call (contract : CarryHelperContract) {method pc : Nat} {body : CIL.Method} {op : CIL.Op}
     {args stack rest : List Value} {frame : Frame} {memory updated : Memory}
     (a b c : BitVec 64) (carryRef output : Reference) (post : Memory → List Value → Prop)
     (methodFound : Extracted.program[method]? = some body)
@@ -25,7 +25,7 @@ theorem run_carry_call {method pc : Nat} {body : CIL.Method} {op : CIL.Op}
     ∃ fuel result values,
       run Extracted.program fuel method pc args frame stack memory = .ok (result, values) ∧
       post result values := by
-  obtain ⟨childFuel, stored, invoked, guarantees⟩ := carry_checked_contract a b c carryRef output updated
+  obtain ⟨childFuel, stored, invoked, guarantees⟩ := contract a b c carryRef output updated
     wellFormed incoming carryReadable carryWritable outputWritable disjoint
   obtain ⟨parentFuel, result, values, resumed, satisfied⟩ := continuation stored guarantees
   have resumed' : run Extracted.program parentFuel method (pc + 1) args frame ([] ++ rest) stored =

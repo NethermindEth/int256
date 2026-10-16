@@ -65,7 +65,7 @@ theorem scalar_carry_store (memory entered before : CIL.Safety.Memory)
 
 /-- Execute the both-large prefix and its first mathematical carry call from
     the state established by the two operand prefixes. -/
-theorem scalar_first_carry_checked (memory entered before : CIL.Safety.Memory)
+theorem scalar_first_carry_checked (contract : CarryHelperContract) (memory entered before : CIL.Safety.Memory)
     (left right output rightHome leftHome : Reference) (args : List Value) (frame : Frame)
     (call : CallingConditions Extracted.program memory [left, right] [output])
     (enteredWF : entered.WellFormed)
@@ -92,7 +92,7 @@ theorem scalar_first_carry_checked (memory entered before : CIL.Safety.Memory)
     ready.lowWords.leftRead ready.lowWords.rightRead
     (access_reference_valid _ _ _ _ _ ready.carryWrite)
     (access_reference_valid _ _ _ _ _ ready.resultWrite) stored post
-  exact scalar_first_carry args frame prepared (inputLimb memory left 0) (inputLimb memory right 0)
+  exact scalar_first_carry contract args frame prepared (inputLimb memory left 0) (inputLimb memory right 0)
     carryHome resultHome ready.lowWords.call.1.1 ready.carryRead ready.carryWrite ready.resultWrite
     ready.disjoint post (fun after math => continuation carryHome resultHome prepared after ready math)
 
@@ -104,7 +104,7 @@ namespace UInt256Proof.Safety
 
 open CIL.Safety UInt256Model.Safety
 
-theorem ScalarCarryState.run_next {original before : CIL.Safety.Memory} {frame : Frame}
+theorem ScalarCarryState.run_next (contract : CarryHelperContract) {original before : CIL.Safety.Memory} {frame : Frame}
     {left right output carryHome : Reference} {results : Fin 4 → Reference} (segment : Fin 3)
     (state : ScalarCarryState original before frame left right output carryHome results (segment.val + 1))
     (extra : List Value) (post : CIL.Safety.Memory → List Value → Prop)
@@ -119,7 +119,7 @@ theorem ScalarCarryState.run_next {original before : CIL.Safety.Memory} {frame :
   let index : Fin 4 := ⟨segment.val + 1, by omega⟩
   have slot : frame.locals[segment.val + 4]? = some (.bytes .word64 (results index)) := by
     simpa only [index, Nat.add_assoc] using state.resultSlots index
-  apply scalar_carry_segment_checked segment left right output extra frame before
+  apply scalar_carry_segment_checked contract segment left right output extra frame before
     (scalarCarryValue original left right (segment.val + 1)) carryHome (results index) state.call
     state.carrySlot slot state.carryBound state.carryRead state.carryWrite (state.resultWrites index)
     (Or.inl (Ne.symm (state.carrySeparate index))) post
@@ -130,7 +130,7 @@ theorem ScalarCarryState.run_next {original before : CIL.Safety.Memory} {frame :
 
 /-- Compose all three remaining extracted calls; the final continuation receives
     all four exact result words and the mathematical final carry. -/
-theorem ScalarCarryState.run_remaining {original before : CIL.Safety.Memory} {frame : Frame}
+theorem ScalarCarryState.run_remaining (contract : CarryHelperContract) {original before : CIL.Safety.Memory} {frame : Frame}
     {left right output carryHome : Reference} {results : Fin 4 → Reference}
     (state : ScalarCarryState original before frame left right output carryHome results 1)
     (extra : List Value) (post : CIL.Safety.Memory → List Value → Prop)
@@ -142,11 +142,11 @@ theorem ScalarCarryState.run_remaining {original before : CIL.Safety.Memory} {fr
     ∃ fuel result returned,
       run Extracted.program fuel Extracted.addScalarIndex (scalarCarryCall 0 + 1)
         (binaryArguments left right output ++ extra) frame [] before = .ok (result, returned) ∧ post result returned := by
-  apply state.run_next 0 extra post
+  apply state.run_next contract 0 extra post
   intro _ second
-  apply second.run_next 1 extra post
+  apply second.run_next contract 1 extra post
   intro _ third
-  exact third.run_next 2 extra post continuation
+  exact third.run_next contract 2 extra post continuation
 
 #print axioms ScalarCarryState.run_next
 #print axioms ScalarCarryState.run_remaining
@@ -216,7 +216,7 @@ theorem ScalarCarryReady.initial_state {original entered current : CIL.Safety.Me
 
 /-- Execute the actual scalar invocation through all four carry calls on the
     both-large branch. Only final storage, flag production and return remain. -/
-theorem scalar_general_carries (memory : CIL.Safety.Memory) (left right output : Reference)
+theorem scalar_general_carries (contract : CarryHelperContract) (memory : CIL.Safety.Memory) (left right output : Reference)
     (call : CallingConditions Extracted.program memory [left, right] [output])
     (largeRight : inputLimb memory right 1 ||| inputLimb memory right 2 |||
       inputLimb memory right 3 ≠ BitVec.ofNat 64 0)
@@ -235,7 +235,7 @@ theorem scalar_general_carries (memory : CIL.Safety.Memory) (left right output :
   apply scalar_large_right_prefix memory left right output call largeRight post
   intro frame entered rightHome leftHome before setup homes lowWords
   have enteredWF := enterFrame_preserves_wellFormed _ _ _ _ _ call.1.1 setup
-  apply scalar_first_carry_checked memory entered before left right output rightHome leftHome
+  apply scalar_first_carry_checked contract memory entered before left right output rightHome leftHome
     (scalarArguments left right output) frame call enteredWF homes lowWords largeLeft post
   intro carryHome resultHome prepared after ready math
   obtain ⟨results, first, initial⟩ := ready.initial_state call enteredWF homes
@@ -243,7 +243,7 @@ theorem scalar_general_carries (memory : CIL.Safety.Memory) (left right output :
       (scalarCarryValue memory left right 0) carryHome (results 0) prepared after := by
     simpa only [scalarCarryValue, first] using math
   have firstDone := initial.advance 0 math'
-  exact firstDone.run_remaining [.scalar (.i32 0)] post
+  exact firstDone.run_remaining contract [.scalar (.i32 0)] post
     (fun final completed => continuation frame entered carryHome results final setup completed)
 
 #print axioms scalar_general_carries

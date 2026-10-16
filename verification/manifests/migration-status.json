@@ -619,11 +619,11 @@
     "Bitwise: 24 negative, 16 helper positive and 8 EarlyStore positive certificates passed; the native-integrated runner still needs a run after promotion.",
     "Shift: 11 scalar and 11 vector negatives and 8 positive fixtures (4 scalar, 4 vector) passed.",
     "Multiply: all 8 original fixtures passed (3 positive, 5 negative) with the uniform profile proofs.",
-    "Add/Subtract: Baseline, Renamed and ReversedStore positives and all 4 negatives passed. CarryOr, FullyInlined, StraightLine, ExtractedHelper, ExternalHelper (Add) and BorrowAlternative, FullyInlined, ExtractedHelper (Subtract) need fixture-specific proofs.",
+    "Add/Subtract: 8 Add positives (Baseline, Renamed, ReversedStore on the production proof; CarryOr, FullyInlined, StraightLine, ExtractedHelper, ExternalHelper on fixture proofs), 5 Subtract positives (Baseline, Renamed on the production proof; BorrowAlternative, FullyInlined, ExtractedHelper on fixture proofs) and all 4 negatives passed on LeanCIL 70ee207; rerun on 7aec18e pending.",
+    "Add/ExpandedHardware: passes extraction validation on 7aec18e; the production Add proof no longer normalizes the excluded entry branch and needs confirmation on this pin.",
     "Add/AddOverflow arm64-advsimd gates are certified. x64-sse42 Add/AddOverflow, accelerated Subtract/SubtractUnderflow and AVX2/AVX512 Add gates remain outstanding.",
-    "Comparison, equality, reporting, safety, SIMD and profile fixture groups from the original branch are not yet ported.",
     "AVX2/AVX512 Add/Subtract/AddOverflow/SubtractUnderflow now pass extraction (LeanCIL#53); their contract proofs are not written.",
-    "Add/ExpandedHardware passes extraction validation on 7aec18e, but the production Add proof hits maxRecDepth in UInt256/Methods/Add/SmallFinish.lean (cbv reduces through the whole extracted program, including the excluded AVX2 branch). Fix by binding helper bodies through checked program-index equalities, not by raising limits."
+    "Comparison, equality, reporting, safety, SIMD and profile fixture groups from the original branch are not yet ported."
   ],
-  "supportingAuditTheorems": 2248
+  "supportingAuditTheorems": 2261
 }
