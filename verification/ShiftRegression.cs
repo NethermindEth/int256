@@ -54,6 +54,7 @@ foreach (JsonNode? package in dependencies)
 {
     string name = package!["name"]!.GetValue<string>();
     string dependency = Path.Combine(consumer, ".lake", "packages", name);
+    await DropStaleClone(dependency, package["rev"]!.GetValue<string>());
     if (!Directory.Exists(dependency))
         await Run("git", ["clone", "--no-hardlinks", "--no-checkout", Path.Combine(root, ".lake", "packages", name), dependency]);
     await Run("git", ["-C", dependency, "checkout", "--detach", package["rev"]!.GetValue<string>()]);
@@ -103,4 +104,15 @@ foreach (var check in checks)
     Console.WriteLine($"PASS {method}/{profile}/{mutation}: checked full-contract refutation and public proof rejection");
 }
 
-
+// Re-clone when a reused snapshot predates a pin change; the package source is a partial clone and cannot serve fetches.
+static async Task DropStaleClone(string repository, string revision)
+{
+    if (!Directory.Exists(repository)) return;
+    ProcessStartInfo start = new("git") { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
+    foreach (string argument in new[] { "-C", repository, "cat-file", "-e", revision + "^{commit}" }) start.ArgumentList.Add(argument);
+    using Process probe = Process.Start(start) ?? throw new InvalidOperationException("git");
+    await Task.WhenAll(probe.StandardOutput.ReadToEndAsync(), probe.StandardError.ReadToEndAsync(), probe.WaitForExitAsync());
+    if (probe.ExitCode == 0) return;
+    foreach (string file in Directory.EnumerateFiles(repository, "*", SearchOption.AllDirectories)) File.SetAttributes(file, FileAttributes.Normal);
+    Directory.Delete(repository, true);
+}

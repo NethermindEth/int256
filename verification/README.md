@@ -3,8 +3,9 @@
 This migration starts from `verification/uint256-memory-safety`
 (`6c56716afa7860771c08815b8348e53313c7f8c8`), based on int256 `main`
 (`5fa8d77429c0440754bbfc851788d1ae37aba07f`). It consumes LeanCIL at
-`70ee20782980f35ff19b26e5fdff2f25c6e760e9` through a pinned Lake dependency
-([portable fingerprint fix](https://github.com/NethermindEth/LeanCIL/pull/52)).
+`7aec18ee49eaa33255a980ca688cfd816492be97` through a pinned Lake dependency
+([ReadOnlySpan<byte> lookup tables](https://github.com/NethermindEth/LeanCIL/pull/55) and
+[lockstep evidence checks](https://github.com/NethermindEth/LeanCIL/pull/56)).
 CIL semantics, extraction, and verification infrastructure belong to LeanCIL;
 this directory contains only UInt256 specifications and proofs.
 
@@ -218,13 +219,14 @@ LeanCIL revision separately from completed gates. All 87 scalar targets now
 extract. The pinned revision includes the fixes for multiplication (`Math.BigMul`,
 #36), unmanaged aggregate byref operations (#37), aggregate/vector bitcasts
 (#38), generated translation proof composition (#39), aggregate proof helpers
-(#40), and authenticated local consumer reuse (#42).
+(#40), authenticated local consumer reuse (#42), `ReadOnlySpan<byte>`
+static lookup tables (#53) and linear per-site evidence checks (#54).
 
 All scalar ports now have registered certificates, and `remainingPorts` is
 empty. The 98 multiplication profile certificates passed against the current
 Release assembly and proof sources. Remaining work includes x64-sse42 Add/AddOverflow,
-accelerated Subtract/SubtractUnderflow (AVX2/AVX512 extraction is blocked on
-LeanCIL#53), fixture proofs for structurally different Add/Subtract variants,
+accelerated Subtract/SubtractUnderflow, AVX2/AVX512 Add/Subtract proofs (these
+profiles now extract), fixture proofs for structurally different Add/Subtract variants,
 the original comparison/equality/SIMD fixtures, and recertification after
 shared proof changes. `pendingValidation` records these obligations separately
 from scalar port completion.
@@ -238,8 +240,7 @@ Each runner freezes a consumer snapshot, certifies positive fixtures, and for
 each mutation certifies a checked contract refutation, then requires the
 unchanged production proof to be rejected without leaving a certificate.
 `AddSubtractRegression.cs` reports fixtures without a proof as PENDING and
-`Add/ExpandedHardware` as BLOCKED (LeanCIL#54), and exits nonzero until both
-are resolved. Extractor rejection fixtures (unsupported instructions, static
+exits nonzero until each has one. Extractor rejection fixtures (unsupported instructions, static
 initializers, metadata mutations) are covered by LeanCIL's own tests.
 
 Each public gate must retain independent arithmetic and safety contracts,

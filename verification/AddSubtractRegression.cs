@@ -12,10 +12,8 @@ string work = Path.Combine(root, "artifacts/add-subtract-regressions");
 string consumer = Path.Combine(work, "consumer");
 string tool = Path.Combine(root, ".lake/packages/leancil/Extractor/bin/Nethermind.LeanCIL.dll");
 JsonArray targets = JsonNode.Parse(File.ReadAllText(Path.Combine(root, "manifests/targets.json")))!["methods"]!.AsArray();
-// Generated parameter/feature validation for its large excluded branch exceeds the default budget (LeanCIL#54).
-HashSet<string> blocked = ["Add/ExpandedHardware"];
 // The production proofs follow the production call graph; structurally different fixtures need their own proof.
-HashSet<string> production = ["Baseline", "Renamed", "ReversedStore"];
+HashSet<string> production = ["Baseline", "Renamed", "ReversedStore", "ExpandedHardware"];
 List<string> incomplete = [];
 (string Method, string Operation, string[] Positives)[] groups =
 [
@@ -56,6 +54,7 @@ foreach (JsonNode? package in packages)
 {
     string name = package!["name"]!.GetValue<string>();
     string destination = Path.Combine(consumer, ".lake/packages", name);
+    await DropStaleClone(destination, package["rev"]!.GetValue<string>());
     if (!Directory.Exists(destination))
     {
         Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
@@ -77,9 +76,9 @@ foreach (var (method, operation, positives) in groups)
         string name = method + "/" + fixture;
         string fixtureProof = Path.Combine(consumer, "Tests/Fixtures", method, fixture + ".lean");
         bool negative = witnesses.Any(value => value!["case"]!.GetValue<string>() == fixture);
-        if (blocked.Contains(name) || (!negative && !production.Contains(fixture) && !File.Exists(fixtureProof)))
+        if (!negative && !production.Contains(fixture) && !File.Exists(fixtureProof))
         {
-            Console.WriteLine(blocked.Contains(name) ? $"BLOCKED {name}: generated validation exceeds the default budget (LeanCIL#54)" : $"PENDING {name}: no fixture proof yet");
+            Console.WriteLine($"PENDING {name}: no fixture proof yet");
             incomplete.Add(name);
             continue;
         }
@@ -113,22 +112,44 @@ foreach (var (method, operation, positives) in groups)
     }
 }
 // Freeze the complete consumer source snapshot before issuing any certificates.
+List<string> failed = [];
 foreach (var job in jobs)
 {
-    await Run("dotnet", [tool, "verify", job.Extraction, "--proof", job.Proof, "--theorem", job.Theorem, "--proof-root", consumer]);
-    if (job.Production is null)
+    string log = Path.Combine(work, job.Name.Replace('/', '-') + ".log");
+    try
     {
-        Console.WriteLine($"PASS {job.Name}/scalar: checked wrapping contract");
-        continue;
+        await Run("dotnet", [tool, "verify", job.Extraction, "--proof", job.Proof, "--theorem", job.Theorem, "--proof-root", consumer]);
+        if (job.Production is null)
+        {
+            Console.WriteLine($"PASS {job.Name}/scalar: checked wrapping contract");
+            continue;
+        }
+        string method = job.Name[..job.Name.IndexOf('/')];
+        string rejected = await Run("dotnet", [tool, "verify", job.Extraction, "--proof", job.Production, "--theorem", $"UInt256Proof.{method}.scalar_correctness", "--proof-root", consumer], succeeds: false);
+        if (!rejected.Contains("proof checking", StringComparison.OrdinalIgnoreCase) || File.Exists(Path.Combine(job.Extraction, "verified.json")))
+            throw new InvalidOperationException("Mutation was not rejected during proof checking or retained a stale certificate: " + rejected);
+        Console.WriteLine($"PASS {job.Name}/scalar: checked contract refutation and production proof rejection");
     }
-    string method = job.Name[..job.Name.IndexOf('/')];
-    string rejected = await Run("dotnet", [tool, "verify", job.Extraction, "--proof", job.Production, "--theorem", $"UInt256Proof.{method}.scalar_correctness", "--proof-root", consumer], succeeds: false);
-    if (!rejected.Contains("proof checking", StringComparison.OrdinalIgnoreCase) || File.Exists(Path.Combine(job.Extraction, "verified.json")))
-        throw new InvalidOperationException("Mutation was not rejected during proof checking or retained a stale certificate: " + rejected);
-    Console.WriteLine($"PASS {job.Name}/scalar: checked contract refutation and production proof rejection");
+    catch (InvalidOperationException exception)
+    {
+        File.WriteAllText(log, exception.Message);
+        failed.Add(job.Name);
+        Console.WriteLine($"FAIL {job.Name}/scalar: see {log}");
+    }
 }
-if (incomplete.Count != 0)
+if (incomplete.Count != 0) Console.WriteLine("INCOMPLETE: " + string.Join(", ", incomplete));
+if (failed.Count != 0) Console.WriteLine("FAILED: " + string.Join(", ", failed));
+Environment.ExitCode = incomplete.Count == 0 && failed.Count == 0 ? 0 : 1;
+
+// Re-clone when a reused snapshot predates a pin change; the package source is a partial clone and cannot serve fetches.
+static async Task DropStaleClone(string repository, string revision)
 {
-    Console.WriteLine("INCOMPLETE: " + string.Join(", ", incomplete));
-    Environment.ExitCode = 1;
+    if (!Directory.Exists(repository)) return;
+    ProcessStartInfo start = new("git") { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
+    foreach (string argument in new[] { "-C", repository, "cat-file", "-e", revision + "^{commit}" }) start.ArgumentList.Add(argument);
+    using Process probe = Process.Start(start) ?? throw new InvalidOperationException("git");
+    await Task.WhenAll(probe.StandardOutput.ReadToEndAsync(), probe.StandardError.ReadToEndAsync(), probe.WaitForExitAsync());
+    if (probe.ExitCode == 0) return;
+    foreach (string file in Directory.EnumerateFiles(repository, "*", SearchOption.AllDirectories)) File.SetAttributes(file, FileAttributes.Normal);
+    Directory.Delete(repository, true);
 }

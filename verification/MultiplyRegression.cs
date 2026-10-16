@@ -48,6 +48,7 @@ foreach (JsonNode? package in packages)
 {
     string name = package!["name"]!.GetValue<string>();
     string destination = Path.Combine(consumer, ".lake/packages", name);
+    await DropStaleClone(destination, package["rev"]!.GetValue<string>());
     if (!Directory.Exists(destination))
     {
         Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
@@ -106,3 +107,15 @@ foreach (var job in jobs)
     Console.WriteLine($"PASS {job.Fixture}/{job.Profile}: checked contract refutation and production proof rejection");
 }
 
+// Re-clone when a reused snapshot predates a pin change; the package source is a partial clone and cannot serve fetches.
+static async Task DropStaleClone(string repository, string revision)
+{
+    if (!Directory.Exists(repository)) return;
+    ProcessStartInfo start = new("git") { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
+    foreach (string argument in new[] { "-C", repository, "cat-file", "-e", revision + "^{commit}" }) start.ArgumentList.Add(argument);
+    using Process probe = Process.Start(start) ?? throw new InvalidOperationException("git");
+    await Task.WhenAll(probe.StandardOutput.ReadToEndAsync(), probe.StandardError.ReadToEndAsync(), probe.WaitForExitAsync());
+    if (probe.ExitCode == 0) return;
+    foreach (string file in Directory.EnumerateFiles(repository, "*", SearchOption.AllDirectories)) File.SetAttributes(file, FileAttributes.Normal);
+    Directory.Delete(repository, true);
+}
