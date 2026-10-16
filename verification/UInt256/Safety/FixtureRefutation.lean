@@ -4,7 +4,7 @@ import UInt256.Safety.ReportingContract
 namespace UInt256Model.Safety.ContractRefutation
 open CIL.Safety UInt256Model.Safety
 
-/-- A semantic fault from a valid call refutes the checked wrapping contract for every fuel. -/
+/-- A located non-fuel fault from a valid call refutes the checked wrapping contract for every fuel. -/
 theorem checked_binary_fault_refuted (program : CIL.Program) (entry observedFuel : Nat)
     (operation : BitVec 256 → BitVec 256 → BitVec 256) (memory : Memory)
     (left right output : Reference) (fault : LocatedFault)
@@ -16,48 +16,6 @@ theorem checked_binary_fault_refuted (program : CIL.Program) (entry observedFuel
   obtain ⟨fuel, final, certificate, _⟩ := contract memory left right output call
   exact invoke_fault_refutes_success program observedFuel entry _ memory fault semantic witness
     fuel (final, []) certificate.1
-
-/-- The memory rule of a located memory fault; any other outcome has none. -/
-def memoryRule : Except LocatedFault (Memory × List Value) → Option Fault
-  | .error ⟨_, _, .memory rule _ _⟩ => some rule
-  | _ => none
-
-/-- A valid call that stops on a memory rule refutes the checked wrapping contract for every fuel. -/
-theorem checked_binary_memory_fault_refuted (program : CIL.Program) (entry observedFuel : Nat)
-    (operation : BitVec 256 → BitVec 256 → BitVec 256) (memory : Memory)
-    (left right output : Reference) (rule : Fault)
-    (call : CallingConditions program memory [left, right] [output])
-    (witness : memoryRule (invoke program observedFuel entry (binaryArguments left right output) memory) = some rule) :
-    ¬ WrappingBinaryContract operation program entry := by
-  cases execution : invoke program observedFuel entry (binaryArguments left right output) memory with
-  | ok outcome => simp [execution, memoryRule] at witness
-  | error located =>
-    obtain ⟨method, pc, fault⟩ := located
-    cases fault with
-    | memory found reference width =>
-      exact checked_binary_fault_refuted program entry observedFuel operation memory left right output
-        ⟨method, pc, .memory found reference width⟩ call (by simp) execution
-    | _ => simp [execution, memoryRule] at witness
-
-/-- The fault of a located failure; a returned outcome has none. -/
-def executionFault : Except LocatedFault (Memory × List Value) → Option ExecutionFault
-  | .error located => some located.fault
-  | .ok _ => none
-
-/-- A valid call that stops on a non-fuel fault refutes the checked wrapping contract for every fuel. -/
-theorem checked_binary_execution_fault_refuted (program : CIL.Program) (entry observedFuel : Nat)
-    (operation : BitVec 256 → BitVec 256 → BitVec 256) (memory : Memory)
-    (left right output : Reference) (fault : ExecutionFault)
-    (call : CallingConditions program memory [left, right] [output])
-    (semantic : fault ≠ .fuelExhausted)
-    (witness : executionFault (invoke program observedFuel entry (binaryArguments left right output) memory) = some fault) :
-    ¬ WrappingBinaryContract operation program entry := by
-  cases execution : invoke program observedFuel entry (binaryArguments left right output) memory with
-  | ok outcome => simp [execution, executionFault] at witness
-  | error located =>
-    simp only [execution, executionFault, Option.some.injEq] at witness
-    exact checked_binary_fault_refuted program entry observedFuel operation memory left right output
-      located call (witness ▸ semantic) execution
 
 /-- A wrong returned flag refutes the checked reporting contract. -/
 theorem checked_reporting_flag_refuted (program : CIL.Program) (entry observedFuel : Nat)
@@ -94,8 +52,6 @@ theorem checked_reporting_byte_refuted (program : CIL.Program) (entry observedFu
   exact different observation.symm
 
 #print axioms checked_binary_fault_refuted
-#print axioms checked_binary_memory_fault_refuted
-#print axioms checked_binary_execution_fault_refuted
 #print axioms checked_reporting_flag_refuted
 #print axioms checked_reporting_byte_refuted
 end UInt256Model.Safety.ContractRefutation
