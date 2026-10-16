@@ -9,12 +9,12 @@ using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 
-if (args.Length > 2) throw new ArgumentException("Usage: EqualityRegression.cs [verification-directory] [all|scalar|x64-vector256|x64-sse41]");
+const string Usage = "Usage: EqualityRegression.cs [verification-directory] [all|scalar|x64-vector256|x64-sse41] [all|<case>]";
+if (args.Length > 3) throw new ArgumentException(Usage);
 string root = Path.GetFullPath(args.Length > 0 ? args[0] : "verification");
-string selected = args.Length > 1 ? args[1] : "all";
-if (selected is not ("all" or "scalar" or "x64-vector256" or "x64-sse41"))
-    throw new ArgumentException("Usage: EqualityRegression.cs [verification-directory] [all|scalar|x64-vector256|x64-sse41]");
-string work = Path.Combine(root, "artifacts/equality-regressions", selected);
+string selected = args.Length > 1 ? args[1] : "all", selectedCase = args.Length > 2 ? args[2] : "all";
+if (selected is not ("all" or "scalar" or "x64-vector256" or "x64-sse41")) throw new ArgumentException(Usage);
+string work = Path.Combine(root, "artifacts/equality-regressions", selectedCase == "all" ? selected : selected + "-" + selectedCase);
 string consumer = Path.Combine(work, "consumer");
 string fixtures = Path.Combine(root, "Tests/Fixtures/Equality");
 string tool = Path.Combine(root, ".lake/packages/leancil/Extractor/bin/Nethermind.LeanCIL.dll");
@@ -22,6 +22,8 @@ JsonArray targets = JsonNode.Parse(File.ReadAllText(Path.Combine(root, "manifest
 JsonArray gates = JsonNode.Parse(File.ReadAllText(Path.Combine(root, "manifests/gates.json")))!["gates"]!.AsArray();
 JsonObject negatives = JsonNode.Parse(File.ReadAllText(Path.Combine(fixtures, "witnesses.json")))!["negativeCases"]!.AsObject();
 string[] cases = XDocument.Load(Path.Combine(fixtures, "Cases.props")).Descendants("EqualityCase").Select(item => (string)item.Attribute("Include")!).ToArray();
+if (selectedCase != "all" && !cases.Contains(selectedCase)) throw new ArgumentException(Usage);
+if (selectedCase != "all") cases = [selectedCase];
 string[] references = ["EqUInt256UInt256", "NeUInt256UInt256", "EqualsUInt256Ref", "EqualsUInt256Value"];
 List<string> incomplete = [], failed = [];
 
