@@ -106,3 +106,4 @@ import UInt256.Methods.Subtract.Vector256Guarded
 import UInt256.Methods.Subtract.Vector256Blended
 import UInt256.Methods.Subtract.Vector256Helper
 import UInt256.Methods.Add.Vector256Masked
+import UInt256.Methods.Add.Vector256Guarded
