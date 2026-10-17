@@ -29,8 +29,7 @@ theorem call : CallingConditions Extracted.program memory @INPUTS@ @OUTPUTS@ := 
   · intro output member
     simp only [List.map_cons, List.map_nil, List.mem_cons, List.not_mem_nil, or_false] at member
     @OUTPUT_CASE@
-  · change StaticWorldValid [] memory
-    simp [StaticWorldValid, memory]
+  · exact empty_static_world_valid _ memory (by decide) (by decide) rfl
 theorem refuted : ¬ @CONTRACT@ @ARGUMENTS@ Extracted.program 0 := by
   apply UInt256Model.Safety.ContractRefutation.@LEMMA@ Extracted.program 0 1024 @ARGUMENTS@
     memory @REFERENCES@ @WITNESS@ call
