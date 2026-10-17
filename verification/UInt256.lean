@@ -103,3 +103,5 @@ import UInt256.Methods.Subtract.Vector256Entry
 import UInt256.Methods.Add.Vector256Entry
 import UInt256.Methods.Add.Vector256FinishHelper
 import UInt256.Methods.Subtract.Vector128RepeatedGuard
+import UInt256.Methods.Subtract.Vector128Helpers
+import UInt256.Methods.Subtract.Vector128ExtractedHelpers
