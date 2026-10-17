@@ -271,8 +271,58 @@ end UInt256Proof.Add.Safety
 namespace UInt256Proof.Add.Safety
 open CIL.Safety UInt256Model.Safety
 
+/-- Caller guarantees of the SSE vector helper invoked by the scalar dispatcher. -/
+def SSEHelperContract (program : CIL.Program) (vectorIndex : Nat) : Prop :=
+  ∀ (memory : Memory) (left right output : Reference) (flag : BitVec 32),
+    CIL.NarrowKind.unsigned8.extend flag = flag →
+    CallingConditions program memory [left, right] [output] →
+    ∃ fuel final returned,
+      InvocationCertificate program vectorIndex (vector128Arguments left right output flag)
+        memory fuel final [.scalar (.i32 returned)] ∧
+      inputValue final output = inputValue memory left + inputValue memory right ∧
+      CIL.NarrowKind.unsigned8.extend returned = returned ∧
+      (flag ≠ BitVec.ofNat 32 0 → returned =
+        if 2^256 ≤ (inputValue memory left).toNat + (inputValue memory right).toNat then 1 else 0) ∧
+      access final output 32 1 true = .ok () ∧
+      (∀ id offset, id < memory.nextIdentity → OutsideOutput output id offset →
+        final.cells id offset = memory.cells id offset)
+
+/-- Caller guarantees of the portable small-operand helper. -/
+def PortableSmallContract (program : CIL.Program) (smallIndex : Nat) : Prop :=
+  ∀ (memory : Memory) (input output : Reference) (word : BitVec 64),
+    CallingConditions program memory [input] [output] →
+    ∃ fuel final returned,
+      InvocationCertificate program smallIndex (armSmallArguments input output word) memory fuel final returned ∧
+      ARMSmallPost memory final returned input output word
+
+/-- The extracted SSE helper body meets the helper contract. -/
+theorem sse_helper_contract (profile : CIL.FeatureProfile) (disabled : profile.advSimd = false)
+    (sse2 : profile.sse2 = true) (ssse3 : profile.ssse3 = true)
+    (program : CIL.Program) (vectorIndex carry storage : Nat)
+    (vectorFound : program[vectorIndex]? = some (sseBody profile carry storage))
+    (carryFound : program[carry]? = some (UInt256Proof.Add.CarrySafety.carryBody profile))
+    (storageFound : program[storage]? = some (UInt256Proof.Multiply.LimbStorage.body profile)) :
+    SSEHelperContract program vectorIndex := fun memory left right output flag flagFit call =>
+  sse_helper_checked profile disabled sse2 ssse3 program vectorIndex carry storage vectorFound carryFound storageFound
+    memory left right output flag flagFit call
+
+/-- The extracted portable small body meets the small-helper contract. -/
+theorem portable_small_contract (program : CIL.Program) (smallIndex storage : Nat) (profile : CIL.FeatureProfile)
+    (smallFound : program[smallIndex]? = some (portableSmallBody profile storage))
+    (storageFound : program[storage]? = some (UInt256Proof.Multiply.LimbStorage.body profile))
+    (disabled : profile.advSimd = false) : PortableSmallContract program smallIndex :=
+  fun memory input output word call =>
+    checked_portable_small_contract program smallIndex storage profile smallFound storageFound disabled memory input output word call
+
+#print axioms sse_helper_contract
+#print axioms portable_small_contract
+end UInt256Proof.Add.Safety
+
+namespace UInt256Proof.Add.Safety
+open CIL.Safety UInt256Model.Safety
+
 /-- The selected small route calls the certified portable helper and forwards its byte flag. -/
-theorem sse_scalar_small_call (program : CIL.Program) (method vectorIndex smallIndex storage : Nat) (profile : CIL.FeatureProfile) (found : program[method]? = some (sseScalarBody profile vectorIndex smallIndex)) (smallFound : program[smallIndex]? = some (portableSmallBody profile storage)) (storageFound : program[storage]? = some (UInt256Proof.Multiply.LimbStorage.body profile)) (disabled : profile.advSimd = false)
+theorem sse_scalar_small_call (program : CIL.Program) (method vectorIndex smallIndex : Nat) (profile : CIL.FeatureProfile) (found : program[method]? = some (sseScalarBody profile vectorIndex smallIndex)) (smallContract : PortableSmallContract program smallIndex)
     (swapped : Bool) (memory : Memory) (frame : Frame) (args : List Value) (source output home : Reference) (word : BitVec 64)
     (slot : frame.locals[if swapped then 1 else 0]? = some (.bytes .word64 home))
     (loaded : read memory home 8 1 = .ok (numberBytes word.toNat 8))
@@ -289,7 +339,7 @@ theorem sse_scalar_small_call (program : CIL.Program) (method vectorIndex smallI
       run program fuel method (sseSaveStart swapped + 12) args frame [] memory =
         .ok (final, returned) ∧ post final returned := by
   obtain ⟨childFuel, final, returned, certified, result⟩ :=
-    checked_portable_small_contract program smallIndex storage profile smallFound storageFound disabled memory source output word call
+    smallContract memory source output word call
   have fi := call.input_formed (reference := source) (by simp)
   have fo := call.output_formed (reference := output) (by simp)
   have stepped : ∀ pc, step (sseScalarBody profile vectorIndex smallIndex) (.call smallIndex 3) pc args frame
@@ -323,7 +373,7 @@ theorem sse_scalar_small_call (program : CIL.Program) (method vectorIndex smallI
             try (first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)))
 
 /-- The small route reaches the shared scalar reporting postcondition for either operand order. -/
-theorem sse_scalar_small_finish (program : CIL.Program) (method vectorIndex smallIndex storage : Nat) (profile : CIL.FeatureProfile) (found : program[method]? = some (sseScalarBody profile vectorIndex smallIndex)) (smallFound : program[smallIndex]? = some (portableSmallBody profile storage)) (storageFound : program[storage]? = some (UInt256Proof.Multiply.LimbStorage.body profile)) (disabled : profile.advSimd = false)
+theorem sse_scalar_small_finish (program : CIL.Program) (method vectorIndex smallIndex : Nat) (profile : CIL.FeatureProfile) (found : program[method]? = some (sseScalarBody profile vectorIndex smallIndex)) (smallContract : PortableSmallContract program smallIndex)
     (swapped : Bool) (original current : Memory) (frame : Frame)
     (left right output home : Reference) (flag : BitVec 32)
     (call : CallingConditions program original [left, right] [output])
@@ -338,7 +388,7 @@ theorem sse_scalar_small_finish (program : CIL.Program) (method vectorIndex smal
       run program fuel method (sseSaveStart swapped + 12) (vector128Arguments left right output flag) frame [] current =
         .ok (final, returned) ∧ ARMScalarReportingPost original final returned left right output flag := by
   have sums := arm_scalar_small_values program swapped original current left right output call preserved small
-  apply sse_scalar_small_call program method vectorIndex smallIndex storage profile found smallFound storageFound disabled swapped current frame
+  apply sse_scalar_small_call program method vectorIndex smallIndex profile found smallContract swapped current frame
     (vector128Arguments left right output flag) (if swapped then right else left) output home _ slot loaded
     (by cases swapped <;> rfl) rfl
     (arm_scalar_select_input program current [left, right] _ output currentCall (by cases swapped <;> simp))
@@ -349,11 +399,8 @@ theorem sse_scalar_small_finish (program : CIL.Program) (method vectorIndex smal
   simpa only [sums.2] using result.flag
 
 /-- With SSE4.2 enabled the dispatcher calls the certified vector helper and forwards its flag. -/
-theorem sse_scalar_vector_finish (program : CIL.Program) (method vectorIndex smallIndex carry storage : Nat) (profile : CIL.FeatureProfile) (found : program[method]? = some (sseScalarBody profile vectorIndex smallIndex))
-    (vectorFound : program[vectorIndex]? = some (sseBody profile carry storage))
-    (carryFound : program[carry]? = some (UInt256Proof.Add.CarrySafety.carryBody profile))
-    (storageFound : program[storage]? = some (UInt256Proof.Multiply.LimbStorage.body profile))
-    (disabled : profile.advSimd = false) (sse2 : profile.sse2 = true) (ssse3 : profile.ssse3 = true) (sse42 : profile.sse42 = true)
+theorem sse_scalar_vector_finish (program : CIL.Program) (method vectorIndex smallIndex : Nat) (profile : CIL.FeatureProfile) (found : program[method]? = some (sseScalarBody profile vectorIndex smallIndex))
+    (helper : SSEHelperContract program vectorIndex) (sse42 : profile.sse42 = true)
     (original current : Memory) (frame : Frame) (left right output : Reference) (flag : BitVec 32) (flagFit : CIL.NarrowKind.unsigned8.extend flag = flag)
     (call : CallingConditions program original [left, right] [output])
     (currentCall : CallingConditions program current [left, right] [output])
@@ -365,8 +412,7 @@ theorem sse_scalar_vector_finish (program : CIL.Program) (method vectorIndex sma
         frame [] current = .ok (final, returned) ∧ ARMScalarReportingPost original final returned left right output flag := by
   let post := fun final returned => ARMScalarReportingPost original final returned left right output flag
   obtain ⟨childFuel, final, returnedFlag, certified, result, returnedFit, overflow, writable, footprint⟩ :=
-    sse_helper_checked profile disabled sse2 ssse3 program vectorIndex carry storage vectorFound carryFound storageFound
-      current left right output flag flagFit currentCall
+    helper current left right output flag flagFit currentCall
   have fl := currentCall.input_formed (reference := left) (by simp)
   have fr := currentCall.input_formed (reference := right) (by simp)
   have fo := currentCall.output_formed (reference := output) (by simp)
@@ -427,13 +473,10 @@ theorem sse_input_limb_kept {program : CIL.Program} {original current : Memory} 
   simp only [inputLimb, call.input_bytes_of_memory_below preserved member]
 
 /-- Complete SSE dispatcher execution: both small-operand routes and the SSE4.2 vector route. -/
-theorem sse_scalar_entry (program : CIL.Program) (method vectorIndex smallIndex carry storage : Nat) (profile : CIL.FeatureProfile)
+theorem sse_scalar_entry (program : CIL.Program) (method vectorIndex smallIndex : Nat) (profile : CIL.FeatureProfile)
     (found : program[method]? = some (sseScalarBody profile vectorIndex smallIndex))
-    (vectorFound : program[vectorIndex]? = some (sseBody profile carry storage))
-    (smallFound : program[smallIndex]? = some (portableSmallBody profile storage))
-    (carryFound : program[carry]? = some (UInt256Proof.Add.CarrySafety.carryBody profile))
-    (storageFound : program[storage]? = some (UInt256Proof.Multiply.LimbStorage.body profile))
-    (disabled : profile.advSimd = false) (sse2 : profile.sse2 = true) (ssse3 : profile.ssse3 = true) (sse42 : profile.sse42 = true)
+    (helper : SSEHelperContract program vectorIndex) (small : PortableSmallContract program smallIndex)
+    (disabled : profile.advSimd = false) (sse42 : profile.sse42 = true)
     (original entered : Memory) (left right output : Reference) (flag : BitVec 32) (flagFit : CIL.NarrowKind.unsigned8.extend flag = flag) (frame : Frame)
     (call : CallingConditions program original [left, right] [output])
     (setup : enterFrame (sseScalarBody profile vectorIndex smallIndex) (vector128Arguments left right output flag) original =
@@ -465,7 +508,7 @@ theorem sse_scalar_entry (program : CIL.Program) (method vectorIndex smallIndex 
     have kept : inputLimb entered right 0 = inputLimb after right 0 := by
       rw [sse_input_limb_kept call setupPreserved (by simp), sse_input_limb_kept call afterPreserved (by simp)]
     rw [kept] at loaded
-    exact sse_scalar_small_finish program method vectorIndex smallIndex storage profile found smallFound storageFound disabled false
+    exact sse_scalar_small_finish program method vectorIndex smallIndex profile found small false
       original after frame left right output home flag call afterCall afterPreserved afterNext owned slot loaded rightSmall
   · simp only [rightSmall, ite_false]
     apply sse_scalar_save_low program method vectorIndex smallIndex profile found true original.nextIdentity entered after
@@ -482,11 +525,37 @@ theorem sse_scalar_entry (program : CIL.Program) (method vectorIndex smallIndex 
       have kept : inputLimb after left 0 = inputLimb later left 0 := by
         rw [sse_input_limb_kept call afterPreserved (by simp), sse_input_limb_kept call allPreserved (by simp)]
       rw [kept] at leftLoaded
-      exact sse_scalar_small_finish program method vectorIndex smallIndex storage profile found smallFound storageFound disabled true
+      exact sse_scalar_small_finish program method vectorIndex smallIndex profile found small true
         original later frame left right output leftHome flag call laterCall allPreserved laterNext owned leftSlot leftLoaded leftSmall
     · simp only [leftSmall, ite_false]
-      exact sse_scalar_vector_finish program method vectorIndex smallIndex carry storage profile found vectorFound carryFound storageFound
-        disabled sse2 ssse3 sse42 original later frame left right output flag flagFit call laterCall allPreserved laterNext owned
+      exact sse_scalar_vector_finish program method vectorIndex smallIndex profile found helper sse42 original later frame left right output flag flagFit call laterCall allPreserved laterNext owned
+
+/-- Certify the complete SSE dispatcher from its helper contracts. -/
+theorem checked_sse_scalar_contract_of (program : CIL.Program) (method vectorIndex smallIndex : Nat) (profile : CIL.FeatureProfile)
+    (found : program[method]? = some (sseScalarBody profile vectorIndex smallIndex))
+    (helper : SSEHelperContract program vectorIndex) (small : PortableSmallContract program smallIndex)
+    (disabled : profile.advSimd = false) (sse42 : profile.sse42 = true)
+    (memory : Memory) (left right output : Reference) (flag : BitVec 32) (flagFit : CIL.NarrowKind.unsigned8.extend flag = flag)
+    (call : CallingConditions program memory [left, right] [output]) :
+    ∃ fuel final returned,
+      InvocationCertificate program method
+        (vector128Arguments left right output flag) memory fuel final returned ∧
+      ARMScalarReportingPost memory final returned left right output flag := by
+  let args := vector128Arguments left right output flag
+  obtain ⟨frame, entered, setup, homes, _, _⟩ := sse_scalar_frame_setup profile vectorIndex smallIndex memory args call.1.1
+  obtain ⟨fuel, final, returned, executed, result⟩ :=
+    sse_scalar_entry program method vectorIndex smallIndex profile found helper small
+      disabled sse42 memory entered left right output flag flagFit frame call setup homes
+  have checked : args.mapM (checkedValue memory) = .ok args := by
+    have fl := call.input_formed (reference := left) (by simp)
+    have fr := call.input_formed (reference := right) (by simp)
+    have fo := call.output_formed (reference := output) (by simp)
+    simp [args, vector128Arguments, checkedValue, numericValue, formValue, fl, fr, fo,
+      checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
+  have live := checked_entry_live_state _ _ _ _ _ _ _ call.1.1 call.2 checked setup
+  exact ⟨fuel, final, returned,
+    certify_invocation program method (sseScalarBody profile vectorIndex smallIndex)
+      args memory frame entered fuel final returned found checked setup live executed, result⟩
 
 /-- Certify the complete SSE dispatcher and all visited states from ordinary caller views. -/
 theorem checked_sse_scalar_contract (program : CIL.Program) (method vectorIndex smallIndex carry storage : Nat) (profile : CIL.FeatureProfile)
@@ -501,24 +570,14 @@ theorem checked_sse_scalar_contract (program : CIL.Program) (method vectorIndex 
     ∃ fuel final returned,
       InvocationCertificate program method
         (vector128Arguments left right output flag) memory fuel final returned ∧
-      ARMScalarReportingPost memory final returned left right output flag := by
-  let args := vector128Arguments left right output flag
-  obtain ⟨frame, entered, setup, homes, _, _⟩ := sse_scalar_frame_setup profile vectorIndex smallIndex memory args call.1.1
-  obtain ⟨fuel, final, returned, executed, result⟩ :=
-    sse_scalar_entry program method vectorIndex smallIndex carry storage profile found vectorFound smallFound carryFound storageFound
-      disabled sse2 ssse3 sse42 memory entered left right output flag flagFit frame call setup homes
-  have checked : args.mapM (checkedValue memory) = .ok args := by
-    have fl := call.input_formed (reference := left) (by simp)
-    have fr := call.input_formed (reference := right) (by simp)
-    have fo := call.output_formed (reference := output) (by simp)
-    simp [args, vector128Arguments, checkedValue, numericValue, formValue, fl, fr, fo,
-      checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-  have live := checked_entry_live_state _ _ _ _ _ _ _ call.1.1 call.2 checked setup
-  exact ⟨fuel, final, returned,
-    certify_invocation program method (sseScalarBody profile vectorIndex smallIndex)
-      args memory frame entered fuel final returned found checked setup live executed, result⟩
+      ARMScalarReportingPost memory final returned left right output flag :=
+  checked_sse_scalar_contract_of program method vectorIndex smallIndex profile found
+    (sse_helper_contract profile disabled sse2 ssse3 program vectorIndex carry storage vectorFound carryFound storageFound)
+    (portable_small_contract program smallIndex storage profile smallFound storageFound disabled)
+    disabled sse42 memory left right output flag flagFit call
 
 #print axioms sse_input_limb_kept
 #print axioms sse_scalar_entry
+#print axioms checked_sse_scalar_contract_of
 #print axioms checked_sse_scalar_contract
 end UInt256Proof.Add.Safety
