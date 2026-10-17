@@ -136,3 +136,5 @@ import UInt256.Methods.Add.SSEShapes.InlineCarry
 import UInt256.Methods.Add.SSEShapes.DoubledEntry
 import UInt256.Methods.Add.SSEShapes.ShiftedSmall
 import UInt256.Methods.Add.SSEShapes.FeatureExpressions
+import UInt256.Safety.CodeExpansion
+import UInt256.Methods.Add.ARMExpansion
