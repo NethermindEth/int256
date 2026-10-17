@@ -12,17 +12,23 @@ def edits : Nat → List (Nat × Edit)
   | 3 => [(12, .dup)]
   | _ => []
 
-theorem expansion : Expansion (armProgram Extracted.profile) Extracted.program id edits where
+theorem expansion : Expansion (armProgram Extracted.profile) Extracted.program id edits (fun _ => []) where
   body m b found := by
     rcases m with _ | _ | _ | _ | _ | m <;> simp only [armProgram, List.getElem?_cons_zero,
       List.getElem?_cons_succ, List.getElem?_nil, Option.some.injEq, reduceCtorEq] at found <;> subst found <;>
       exact body_of_code rfl rfl (by decide +kernel)
   static m b found := by
     rcases m with _ | _ | _ | _ | _ | m <;> simp only [armProgram, List.getElem?_cons_zero,
-      List.getElem?_cons_succ, List.getElem?_nil, Option.some.injEq, reduceCtorEq] at found <;> subst found <;> rfl
+      List.getElem?_cons_succ, List.getElem?_nil, Option.some.injEq, reduceCtorEq] at found <;> subst found <;>
+      rfl
+  frames m b found := by
+    rcases m with _ | _ | _ | _ | _ | m <;> simp only [armProgram, List.getElem?_cons_zero,
+      List.getElem?_cons_succ, List.getElem?_nil, Option.some.injEq, reduceCtorEq] at found <;> subst found <;>
+      exact ⟨rfl, rfl⟩
   checked m b found := by
     rcases m with _ | _ | _ | _ | _ | m <;> simp only [armProgram, List.getElem?_cons_zero,
-      List.getElem?_cons_succ, List.getElem?_nil, Option.some.injEq, reduceCtorEq] at found <;> subst found <;> decide +kernel
+      List.getElem?_cons_succ, List.getElem?_nil, Option.some.injEq, reduceCtorEq] at found <;> subst found <;>
+      decide +kernel
   calls m b found pc h member := by
     rcases m with _ | _ | _ | _ | _ | m <;> simp [edits] at member
   folds m b found pc h member := by
@@ -31,7 +37,7 @@ theorem expansion : Expansion (armProgram Extracted.profile) Extracted.program i
 /-- Duplicated feature tests keep the production AdvSimd Add contract. -/
 theorem correctness :
     UInt256Model.Safety.WrappingBinaryContract (· + ·) Extracted.program 0 :=
-  wrapping_transfer expansion rfl (arm_program_contract Extracted.profile rfl rfl)
+  wrapping_transfer expansion rfl rfl (arm_program_contract Extracted.profile rfl rfl)
 
 #print axioms correctness
 end UInt256Proof.Fixture.SIMD.Add_arm64_advsimd_FeatureExpressions

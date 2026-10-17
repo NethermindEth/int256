@@ -12,17 +12,23 @@ def edits : Nat → List (Nat × Edit)
   | 2 => [(46, .fold 4), (47, .skip), (100, .call 3)]
   | _ => []
 
-theorem expansion : Expansion (armReportingProgram Extracted.profile) Extracted.program remap edits where
+theorem expansion : Expansion (armReportingProgram Extracted.profile) Extracted.program remap edits (fun _ => []) where
   body m b found := by
     rcases m with _ | _ | _ | _ | _ | m <;> simp only [armReportingProgram, List.getElem?_cons_zero,
       List.getElem?_cons_succ, List.getElem?_nil, Option.some.injEq, reduceCtorEq] at found <;> subst found <;>
       exact body_of_code rfl rfl (by decide +kernel)
   static m b found := by
     rcases m with _ | _ | _ | _ | _ | m <;> simp only [armReportingProgram, List.getElem?_cons_zero,
-      List.getElem?_cons_succ, List.getElem?_nil, Option.some.injEq, reduceCtorEq] at found <;> subst found <;> rfl
+      List.getElem?_cons_succ, List.getElem?_nil, Option.some.injEq, reduceCtorEq] at found <;> subst found <;>
+      rfl
+  frames m b found := by
+    rcases m with _ | _ | _ | _ | _ | m <;> simp only [armReportingProgram, List.getElem?_cons_zero,
+      List.getElem?_cons_succ, List.getElem?_nil, Option.some.injEq, reduceCtorEq] at found <;> subst found <;>
+      exact ⟨rfl, rfl⟩
   checked m b found := by
     rcases m with _ | _ | _ | _ | _ | m <;> simp only [armReportingProgram, List.getElem?_cons_zero,
-      List.getElem?_cons_succ, List.getElem?_nil, Option.some.injEq, reduceCtorEq] at found <;> subst found <;> decide +kernel
+      List.getElem?_cons_succ, List.getElem?_nil, Option.some.injEq, reduceCtorEq] at found <;> subst found <;>
+      decide +kernel
   calls m b found pc h member := by
     rcases m with _ | _ | _ | _ | _ | m <;> simp [edits] at member
     obtain ⟨rfl, rfl⟩ := member
@@ -40,7 +46,7 @@ theorem expansion : Expansion (armReportingProgram Extracted.profile) Extracted.
 theorem correctness :
     UInt256Model.Safety.ReportingBinaryContract (fun left right => left + right)
       (fun left right => decide (2^256 ≤ left.toNat + right.toNat)) Extracted.program 0 :=
-  reporting_transfer expansion rfl (arm_reporting_program_contract Extracted.profile rfl rfl)
+  reporting_transfer expansion rfl rfl (arm_reporting_program_contract Extracted.profile rfl rfl)
 
 #print axioms correctness
 end UInt256Proof.Fixture.Reporting.AddOverflow_arm64_advsimd_ExtractedHelper
