@@ -315,4 +315,32 @@ theorem prepare_invoke (program : CIL.Program) (method : Nat) (profile : CIL.Fea
     authority, footprint, result, cells⟩
 
 #print axioms prepare_invoke
+
+/-- What a compiled `PrepareAdd` guarantees its caller, independent of its body. -/
+def PrepareContract (program : CIL.Program) (method : Nat) : Prop :=
+  ∀ (original memory : Memory) (left right output s0 s1 s2 s3 : Reference),
+    CallingConditions program original [left, right] [output] →
+    CallingConditions program memory [left, right] [output] →
+    original.nextIdentity ≤ memory.nextIdentity →
+    (∀ id, id < original.nextIdentity → ∀ offset, memory.cells id offset = original.cells id offset) →
+    ScratchLayout original.nextIdentity memory.nextIdentity [s0, s1, s2, s3] →
+    ScratchCells memory [s0, s1, s2, s3] (fun _ => none) →
+    ∃ fuel after,
+      invoke program fuel method (prepareArguments left right output s0 s1 s2 s3) memory = .ok (after, []) ∧
+      CallingConditions program after [left, right] [output] ∧
+      memory.nextIdentity ≤ after.nextIdentity ∧ AccessBelow memory.nextIdentity memory after ∧
+      (∀ id, id < original.nextIdentity → ∀ offset, OutsideOutput output id offset →
+        after.cells id offset = original.cells id offset) ∧
+      CIL.Safety.read after output 32 1 =
+        .ok (numberBytes (fastSum (inputValue original left) (inputValue original right)).toNat 32) ∧
+      ScratchCells after [s0, s1, s2, s3] (preparedCells (inputValue original left) (inputValue original right))
+
+theorem prepare_contract (program : CIL.Program) (method : Nat) (profile : CIL.FeatureProfile) (avx512 : Bool)
+    (found : program[method]? = some (prepareAddBody profile avx512)) (features : AddProfile profile avx512) :
+    PrepareContract program method :=
+  fun original memory left right output s0 s1 s2 s3 originalCall call grown same layout scratch =>
+    prepare_invoke program method profile avx512 found features original memory left right output s0 s1 s2 s3
+      originalCall call grown same layout scratch
+
+#print axioms prepare_contract
 end UInt256Proof.Add.Vector256

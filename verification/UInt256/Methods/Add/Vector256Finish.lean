@@ -219,7 +219,26 @@ theorem finish_invoke (program : CIL.Program) (method lookup : Nat) (profile : C
   refine ⟨fuel, final, ?_, value, access, footprint⟩
   simpa only [invoke, found, checked, setup, Except.mapError, Bind.bind, Except.bind] using ran
 
+/-- What a compiled `FinishAdd` guarantees its caller, independent of its body. -/
+def FinishContract (program : CIL.Program) (method : Nat) : Prop :=
+  ∀ (memory : Memory) (output : Reference), CallingConditions program memory [] [output] →
+    ∀ sum carry propagation : BitVec 256, ∃ fuel after,
+      invoke program fuel method (finishArguments sum carry propagation output) memory =
+        .ok (after, [.scalar (.i32 (finishFlag carry propagation))]) ∧
+      CIL.Safety.read after output 32 1 = .ok (numberBytes (finishSum sum carry propagation).toNat 32) ∧
+      access after output 32 1 true = .ok () ∧
+      ∀ id, id < memory.nextIdentity → ∀ offset, OutsideOutput output id offset →
+        after.cells id offset = memory.cells id offset
+
+theorem finish_contract (program : CIL.Program) (method lookup : Nat) (profile : CIL.FeatureProfile)
+    (avx512 : Bool) (found : program[method]? = some (finishAddBody profile lookup))
+    (lookupFound : program[lookup]? = some (UInt256Proof.AddSubtract.Vector256.lookupBody profile))
+    (features : AddProfile profile avx512) : FinishContract program method :=
+  fun memory output call sum carry propagation =>
+    finish_invoke program method lookup profile avx512 found lookupFound features memory output call sum carry propagation
+
 #print axioms finish_index
 #print axioms finish_tail
 #print axioms finish_invoke
+#print axioms finish_contract
 end UInt256Proof.Add.Vector256

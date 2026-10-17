@@ -49,7 +49,7 @@ theorem entry_prepare (program : CIL.Program) (method prepare : Nat) (body : CIL
     (f4 : body.code[4]? = some (.arg 2)) (f5 : body.code[5]? = some (.localAddr 0))
     (f6 : body.code[6]? = some (.localAddr 1)) (f7 : body.code[7]? = some (.localAddr 2))
     (f8 : body.code[8]? = some (.localAddr 3)) (f9 : body.code[9]? = some (.call prepare 7))
-    (prepareFound : program[prepare]? = some (prepareAddBody profile avx512))
+    (prepareContract : PrepareContract program prepare)
     (features : AddProfile profile avx512)
     (memory entered : Memory) (left right output : Reference) (frame : Frame)
     (call : CallingConditions program memory [left, right] [output])
@@ -95,7 +95,7 @@ theorem entry_prepare (program : CIL.Program) (method prepare : Nat) (body : CIL
       ⟨ready0, fun _ none => by cases none⟩ ⟨ready1, fun _ none => by cases none⟩
       ⟨ready2, fun _ none => by cases none⟩ ⟨ready3, fun _ none => by cases none⟩
   obtain ⟨childFuel, after, invoked, conditions, grown, authority, footprint, result, cells⟩ :=
-    prepare_invoke program prepare profile avx512 prepareFound features memory entered left right output
+    prepareContract memory entered left right output
       h0 h1 h2 h3 call state.call state.enteredBound (fun id old offset => state.caller id old offset (Or.inl rfl))
       layout scratch
   have defined : ∀ (index : Nat) (value : BitVec 256),
@@ -171,10 +171,9 @@ def AddPost (memory : Memory) (left right output : Reference) (final : Memory) :
       final.cells id offset = memory.cells id offset
 
 /-- The `Add` entry after `PrepareAdd`: the fast return or the `FinishAdd` correction. -/
-theorem add_tail (program : CIL.Program) (profile : CIL.FeatureProfile) (avx512 : Bool)
-    (found : program[0]? = some (addEntryBody profile 1 3))
-    (finishFound : program[1]? = some (finishAddBody profile 2))
-    (lookupFound : program[2]? = some (UInt256Proof.AddSubtract.Vector256.lookupBody profile))
+theorem add_tail (program : CIL.Program) (profile : CIL.FeatureProfile) (avx512 : Bool) (finish prepare : Nat)
+    (found : program[0]? = some (addEntryBody profile finish prepare))
+    (finishContract : FinishContract program finish)
     (features : AddProfile profile avx512)
     (memory entered after : Memory) (left right output : Reference) (frame : Frame)
     (call : CallingConditions program memory [left, right] [output])
@@ -185,10 +184,10 @@ theorem add_tail (program : CIL.Program) (profile : CIL.FeatureProfile) (avx512 
     ∃ fuel final values,
       run program fuel 0 10 (binaryArguments left right output) frame [] after = .ok (final, values) ∧
         values = [] ∧ AddPost memory left right output final := by
-  have profileEq : (addEntryBody profile 1 3).profile = profile := rfl
+  have profileEq : (addEntryBody profile finish prepare).profile = profile := rfl
   let post : Memory → List Value → Prop := fun final values => values = [] ∧ AddPost memory left right output final
-  have returns : (addEntryBody profile 1 3).returnsValue = false := rfl
-  have retFetch : (addEntryBody profile 1 3).code[24]? = some .ret := rfl
+  have returns : (addEntryBody profile finish prepare).returnsValue = false := rfl
+  have retFetch : (addEntryBody profile finish prepare).code[24]? = some .ret := rfl
   generalize ha : inputValue memory left = a at state
   generalize hb : inputValue memory right = b at state
   entry_load
@@ -216,17 +215,16 @@ theorem add_tail (program : CIL.Program) (profile : CIL.FeatureProfile) (avx512 
     entry_pure
     let sum := CIL.Vector.zip256 (· + ·) a b
     have formedOutput := state.call.output_formed (reference := output) (by simp)
-    have stepped : step (addEntryBody profile 1 3) (.call 1 4) 22 (binaryArguments left right output) frame
+    have stepped : step (addEntryBody profile finish prepare) (.call finish 4) 22 (binaryArguments left right output) frame
         [.reference (.address output), .scalar (.v256 (propagationMask sum)),
          .scalar (.v256 (generatedCarry a b)), .scalar (.v256 sum)] after =
-        .ok (.call 1 (finishArguments sum (generatedCarry a b) (propagationMask sum) output) [] after) := by
+        .ok (.call finish (finishArguments sum (generatedCarry a b) (propagationMask sum) output) [] after) := by
       simp [step, finishArguments, checkedValue, numericValue, formValue, formedOutput, checkedAt,
         Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     obtain ⟨childFuel, finished, invoked, result, writable, footprint⟩ :=
-      finish_invoke program 1 2 profile avx512 finishFound lookupFound features after output
-        state.call.without_inputs sum (generatedCarry a b) (propagationMask sum)
+      finishContract after output state.call.without_inputs sum (generatedCarry a b) (propagationMask sum)
     obtain ⟨value, access, kept⟩ := state.finish_child call owned result writable footprint
-    have popFetch : (addEntryBody profile 1 3).code[23]? = some .pop := rfl
+    have popFetch : (addEntryBody profile finish prepare).code[23]? = some .pop := rfl
     have tail : run program 2 0 23 (binaryArguments left right output) frame
         ([.scalar (.i32 (finishFlag (generatedCarry a b) (propagationMask sum)))] ++ []) finished =
         .ok (leaveFrame frame finished, []) := by
@@ -241,10 +239,9 @@ theorem add_tail (program : CIL.Program) (profile : CIL.FeatureProfile) (avx512 
 def overflowFlag (memory : Memory) (left right : Reference) : BitVec 32 :=
   if 2^256 ≤ (inputValue memory left).toNat + (inputValue memory right).toNat then 1 else 0
 
-theorem overflow_tail (program : CIL.Program) (profile : CIL.FeatureProfile) (avx512 : Bool)
-    (found : program[0]? = some (addOverflowEntryBody profile 1 3))
-    (finishFound : program[1]? = some (finishAddBody profile 2))
-    (lookupFound : program[2]? = some (UInt256Proof.AddSubtract.Vector256.lookupBody profile))
+theorem overflow_tail (program : CIL.Program) (profile : CIL.FeatureProfile) (avx512 : Bool) (finish prepare : Nat)
+    (found : program[0]? = some (addOverflowEntryBody profile finish prepare))
+    (finishContract : FinishContract program finish)
     (features : AddProfile profile avx512)
     (memory entered after : Memory) (left right output : Reference) (frame : Frame)
     (call : CallingConditions program memory [left, right] [output])
@@ -255,14 +252,14 @@ theorem overflow_tail (program : CIL.Program) (profile : CIL.FeatureProfile) (av
     ∃ fuel final values,
       run program fuel 0 10 (binaryArguments left right output) frame [] after = .ok (final, values) ∧
         values = [.scalar (.i32 (overflowFlag memory left right))] ∧ AddPost memory left right output final := by
-  have profileEq : (addOverflowEntryBody profile 1 3).profile = profile := rfl
+  have profileEq : (addOverflowEntryBody profile finish prepare).profile = profile := rfl
   let post : Memory → List Value → Prop := fun final values =>
     values = [.scalar (.i32 (overflowFlag memory left right))] ∧ AddPost memory left right output final
-  have returns : (addOverflowEntryBody profile 1 3).returnsValue = true := rfl
+  have returns : (addOverflowEntryBody profile finish prepare).returnsValue = true := rfl
   generalize ha : inputValue memory left = a at state
   generalize hb : inputValue memory right = b at state
   have retEq : ∀ (pc : Nat) (flag : BitVec 32),
-      (addOverflowEntryBody profile 1 3).code[pc]? = some (.ret (some .unsigned8)) →
+      (addOverflowEntryBody profile finish prepare).code[pc]? = some (.ret (some .unsigned8)) →
       CIL.NarrowKind.unsigned8.extend flag = flag → ∀ m : Memory,
       run program 1 0 pc (binaryArguments left right output) frame [.scalar (.i32 flag)] m =
         .ok (leaveFrame frame m, [.scalar (.i32 flag)]) := by
@@ -297,15 +294,14 @@ theorem overflow_tail (program : CIL.Program) (profile : CIL.FeatureProfile) (av
     entry_pure
     let sum := CIL.Vector.zip256 (· + ·) a b
     have formedOutput := state.call.output_formed (reference := output) (by simp)
-    have stepped : step (addOverflowEntryBody profile 1 3) (.call 1 4) 18 (binaryArguments left right output) frame
+    have stepped : step (addOverflowEntryBody profile finish prepare) (.call finish 4) 18 (binaryArguments left right output) frame
         [.reference (.address output), .scalar (.v256 (propagationMask sum)),
          .scalar (.v256 (generatedCarry a b)), .scalar (.v256 sum)] after =
-        .ok (.call 1 (finishArguments sum (generatedCarry a b) (propagationMask sum) output) [] after) := by
+        .ok (.call finish (finishArguments sum (generatedCarry a b) (propagationMask sum) output) [] after) := by
       simp [step, finishArguments, checkedValue, numericValue, formValue, formedOutput, checkedAt,
         Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     obtain ⟨childFuel, finished, invoked, result, writable, footprint⟩ :=
-      finish_invoke program 1 2 profile avx512 finishFound lookupFound features after output
-        state.call.without_inputs sum (generatedCarry a b) (propagationMask sum)
+      finishContract after output state.call.without_inputs sum (generatedCarry a b) (propagationMask sum)
     obtain ⟨value, access, kept⟩ := state.finish_child call owned result writable footprint
     have normalized : CIL.NarrowKind.unsigned8.extend (finishFlag (generatedCarry a b) (propagationMask sum)) =
         finishFlag (generatedCarry a b) (propagationMask sum) := by
@@ -329,6 +325,55 @@ theorem binary_checked {program : CIL.Program} {memory : Memory} {left right out
   simp [binaryArguments, checkedValue, formValue, fl, fr, fo, checkedAt,
     Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
+/-- Public AVX2 `Add` from the callee contracts: wrapped sum, checked return, writable output, caller bytes kept. -/
+theorem add_contract_of_callees (program : CIL.Program) (profile : CIL.FeatureProfile) (avx512 : Bool)
+    (finish prepare : Nat)
+    (entryFound : program[0]? = some (addEntryBody profile finish prepare))
+    (finishContract : FinishContract program finish) (prepareContract : PrepareContract program prepare)
+    (features : AddProfile profile avx512) :
+    WrappingBinaryContract (· + ·) program 0 := by
+  intro memory left right output call
+  obtain ⟨frame, entered, setup, live, homes, owned⟩ := entry_setup program (addEntryBody profile finish prepare)
+    memory left right output call rfl rfl rfl rfl
+  have finished : ∃ fuel final values,
+      run program fuel 0 0 (binaryArguments left right output) frame [] entered = .ok (final, values) ∧
+        values = [] ∧ AddPost memory left right output final := by
+    apply entry_prepare program 0 prepare (addEntryBody profile finish prepare) profile avx512 25 entryFound rfl
+      rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl prepareContract features memory entered left right output frame
+      call setup homes
+    intro after state
+    exact add_tail program profile avx512 finish prepare entryFound finishContract features memory entered after
+      left right output frame call owned state
+  obtain ⟨fuel, final, values, ran, empty, value, access, footprint⟩ := finished
+  subst empty
+  exact ⟨fuel, final, certify_invocation program 0 _ _ memory frame entered fuel final [] entryFound
+    (binary_checked call) setup live ran, value, access, footprint⟩
+
+/-- Public AVX2 `AddOverflow` from the callee contracts: exact carry, wrapped sum, caller bytes kept. -/
+theorem add_overflow_contract_of_callees (program : CIL.Program) (profile : CIL.FeatureProfile) (avx512 : Bool)
+    (finish prepare : Nat)
+    (entryFound : program[0]? = some (addOverflowEntryBody profile finish prepare))
+    (finishContract : FinishContract program finish) (prepareContract : PrepareContract program prepare)
+    (features : AddProfile profile avx512) :
+    ReportingBinaryContract (· + ·) (fun left right => decide (2^256 ≤ left.toNat + right.toNat)) program 0 := by
+  intro memory left right output call
+  obtain ⟨frame, entered, setup, live, homes, owned⟩ := entry_setup program
+    (addOverflowEntryBody profile finish prepare) memory left right output call rfl rfl rfl rfl
+  have finished : ∃ fuel final values,
+      run program fuel 0 0 (binaryArguments left right output) frame [] entered = .ok (final, values) ∧
+        values = [.scalar (.i32 (overflowFlag memory left right))] ∧ AddPost memory left right output final := by
+    apply entry_prepare program 0 prepare (addOverflowEntryBody profile finish prepare) profile avx512 28
+      entryFound rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl prepareContract features memory entered left right
+      output frame call setup homes
+    intro after state
+    exact overflow_tail program profile avx512 finish prepare entryFound finishContract features memory entered
+      after left right output frame call owned state
+  obtain ⟨fuel, final, values, ran, flag, value, access, footprint⟩ := finished
+  subst flag
+  refine ⟨fuel, final, ?_, value, access, footprint⟩
+  simpa only [overflowFlag, decide_eq_true_eq] using certify_invocation program 0 _ _ memory frame entered fuel
+    final _ entryFound (binary_checked call) setup live ran
+
 /-- Public AVX2 `Add`: wrapped sum of the initial operands, checked return, writable output, caller bytes kept. -/
 theorem add_contract (program : CIL.Program) (profile : CIL.FeatureProfile) (avx512 : Bool)
     (entryFound : program[0]? = some (addEntryBody profile 1 3))
@@ -336,23 +381,10 @@ theorem add_contract (program : CIL.Program) (profile : CIL.FeatureProfile) (avx
     (lookupFound : program[2]? = some (UInt256Proof.AddSubtract.Vector256.lookupBody profile))
     (prepareFound : program[3]? = some (prepareAddBody profile avx512))
     (features : AddProfile profile avx512) :
-    WrappingBinaryContract (· + ·) program 0 := by
-  intro memory left right output call
-  obtain ⟨frame, entered, setup, live, homes, owned⟩ := entry_setup program (addEntryBody profile 1 3) memory
-    left right output call rfl rfl rfl rfl
-  have finished : ∃ fuel final values,
-      run program fuel 0 0 (binaryArguments left right output) frame [] entered = .ok (final, values) ∧
-        values = [] ∧ AddPost memory left right output final := by
-    apply entry_prepare program 0 3 (addEntryBody profile 1 3) profile avx512 25 entryFound rfl
-      rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl prepareFound features memory entered left right output frame
-      call setup homes
-    intro after state
-    exact add_tail program profile avx512 entryFound finishFound lookupFound features memory entered after
-      left right output frame call owned state
-  obtain ⟨fuel, final, values, ran, empty, value, access, footprint⟩ := finished
-  subst empty
-  exact ⟨fuel, final, certify_invocation program 0 _ _ memory frame entered fuel final [] entryFound
-    (binary_checked call) setup live ran, value, access, footprint⟩
+    WrappingBinaryContract (· + ·) program 0 :=
+  add_contract_of_callees program profile avx512 1 3 entryFound
+    (finish_contract program 1 2 profile avx512 finishFound lookupFound features)
+    (prepare_contract program 3 profile avx512 prepareFound features) features
 
 /-- Public AVX2 `AddOverflow`: exact initial-operand carry, wrapped sum, writable output, caller bytes kept. -/
 theorem add_overflow_contract (program : CIL.Program) (profile : CIL.FeatureProfile) (avx512 : Bool)
@@ -361,25 +393,13 @@ theorem add_overflow_contract (program : CIL.Program) (profile : CIL.FeatureProf
     (lookupFound : program[2]? = some (UInt256Proof.AddSubtract.Vector256.lookupBody profile))
     (prepareFound : program[3]? = some (prepareAddBody profile avx512))
     (features : AddProfile profile avx512) :
-    ReportingBinaryContract (· + ·) (fun left right => decide (2^256 ≤ left.toNat + right.toNat)) program 0 := by
-  intro memory left right output call
-  obtain ⟨frame, entered, setup, live, homes, owned⟩ := entry_setup program (addOverflowEntryBody profile 1 3)
-    memory left right output call rfl rfl rfl rfl
-  have finished : ∃ fuel final values,
-      run program fuel 0 0 (binaryArguments left right output) frame [] entered = .ok (final, values) ∧
-        values = [.scalar (.i32 (overflowFlag memory left right))] ∧ AddPost memory left right output final := by
-    apply entry_prepare program 0 3 (addOverflowEntryBody profile 1 3) profile avx512 28 entryFound rfl
-      rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl prepareFound features memory entered left right output frame
-      call setup homes
-    intro after state
-    exact overflow_tail program profile avx512 entryFound finishFound lookupFound features memory entered after
-      left right output frame call owned state
-  obtain ⟨fuel, final, values, ran, flag, value, access, footprint⟩ := finished
-  subst flag
-  refine ⟨fuel, final, ?_, value, access, footprint⟩
-  simpa only [overflowFlag, decide_eq_true_eq] using certify_invocation program 0 _ _ memory frame entered fuel
-    final _ entryFound (binary_checked call) setup live ran
+    ReportingBinaryContract (· + ·) (fun left right => decide (2^256 ≤ left.toNat + right.toNat)) program 0 :=
+  add_overflow_contract_of_callees program profile avx512 1 3 entryFound
+    (finish_contract program 1 2 profile avx512 finishFound lookupFound features)
+    (prepare_contract program 3 profile avx512 prepareFound features) features
 
+#print axioms add_contract_of_callees
+#print axioms add_overflow_contract_of_callees
 #print axioms add_contract
 #print axioms add_overflow_contract
 end UInt256Proof.Add.Vector256
