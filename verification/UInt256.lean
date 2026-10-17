@@ -120,3 +120,6 @@ import UInt256.Methods.Add.SSEShapes.ReversedStore
 import UInt256.Methods.Add.SSEShapes.Scalar
 import UInt256.Methods.Add.SSEShapes.InlineRepair
 import UInt256.Methods.Add.SSEShapes.InlineCarry
+import UInt256.Methods.Add.SSEShapes.DoubledEntry
+import UInt256.Methods.Add.SSEShapes.ShiftedSmall
+import UInt256.Methods.Add.SSEShapes.FeatureExpressions
