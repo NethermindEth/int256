@@ -227,9 +227,8 @@ static lookup tables (#53) and linear per-site evidence checks (#54).
 
 All scalar ports now have registered certificates, and `remainingPorts` is
 empty. The 98 multiplication profile certificates passed against the current
-Release assembly and proof sources. Remaining work includes
-the original comparison/equality/SIMD fixtures, and recertification after
-shared proof changes. `pendingValidation` records these obligations separately
+Release assembly and proof sources. Remaining work includes the original
+comparison/equality/SIMD fixtures, and recertification after shared proof changes. `pendingValidation` records these obligations separately
 from scalar port completion.
 
 ## Regression fixtures
