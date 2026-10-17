@@ -102,3 +102,14 @@ import UInt256.Safety.PrivateWordSteps
 import UInt256.Methods.Subtract.Vector256Entry
 import UInt256.Methods.Add.Vector256Entry
 import UInt256.Methods.Add.Vector256FinishHelper
+import UInt256.Methods.Add.SSEShapes.Segments
+import UInt256.Methods.Add.SSEShapes.Relocated
+import UInt256.Methods.Add.SSEShapes.Incoming
+import UInt256.Methods.Add.SSEShapes.Decision
+import UInt256.Methods.Add.SSEShapes.Fast
+import UInt256.Methods.Add.SSEShapes.ReversedStorage
+import UInt256.Methods.Add.SSEShapes.Repair
+import UInt256.Methods.Add.SSEShapes.Entry
+import UInt256.Methods.Add.SSEShapes.Composite
+import UInt256.Methods.Add.SSEShapes.Helper
+import UInt256.Methods.Add.SSEShapes.ExtractedHelper
