@@ -107,3 +107,11 @@ import UInt256.Methods.Subtract.Vector256Blended
 import UInt256.Methods.Subtract.Vector256Helper
 import UInt256.Methods.Add.Vector256Masked
 import UInt256.Methods.Add.Vector256Guarded
+import UInt256.Methods.Subtract.Vector128RepeatedGuard
+import UInt256.Methods.Subtract.Vector128Helpers
+import UInt256.Methods.Subtract.Vector128ExtractedHelpers
+import UInt256.Methods.Subtract.ReversedStorage
+import UInt256.Methods.Subtract.ReversedSmallHelper
+import UInt256.Methods.Subtract.Vector128ReversedStore
+import UInt256.Methods.Subtract.Vector128InlineCarry
+import UInt256.Methods.Subtract.Vector128LaneLocals
