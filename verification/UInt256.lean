@@ -117,3 +117,6 @@ import UInt256.Methods.Add.SSEShapes.LaneStart
 import UInt256.Methods.Add.SSEShapes.LaneLocals
 import UInt256.Methods.Add.SSEShapes.ReversedSmall
 import UInt256.Methods.Add.SSEShapes.ReversedStore
+import UInt256.Methods.Add.SSEShapes.Scalar
+import UInt256.Methods.Add.SSEShapes.InlineRepair
+import UInt256.Methods.Add.SSEShapes.InlineCarry
