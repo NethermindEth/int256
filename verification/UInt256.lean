@@ -113,3 +113,5 @@ import UInt256.Methods.Add.SSEShapes.Entry
 import UInt256.Methods.Add.SSEShapes.Composite
 import UInt256.Methods.Add.SSEShapes.Helper
 import UInt256.Methods.Add.SSEShapes.ExtractedHelper
+import UInt256.Methods.Add.SSEShapes.LaneStart
+import UInt256.Methods.Add.SSEShapes.LaneLocals
