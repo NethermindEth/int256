@@ -99,12 +99,12 @@ theorem cil_feature (x : CIL.Feature) (pc pc' : Nat) (f : Nat → Nat) (next : f
       (CIL.step (.feature x) false pc [] 0 vs (fun _ => none) p).map (actionRelabel f) := by
   cil_case
 
-theorem cil_branch (t : Nat) (pc pc' : Nat) (f : Nat → Nat) (next : f (pc + 1) = pc' + 1) (vs : List CIL.Value)
+theorem cil_branch (t : Nat) (pc pc' : Nat) (f : Nat → Nat) (_next : f (pc + 1) = pc' + 1) (vs : List CIL.Value)
     (p : CIL.FeatureProfile) :
     CIL.step (.branch (f t)) false pc' [] 0 vs (fun _ => none) p =
       (CIL.step (.branch t) false pc [] 0 vs (fun _ => none) p).map (actionRelabel f) := by
   rcases vs with _ | ⟨v, _ | ⟨w, rest⟩⟩ <;> simp only [CIL.step] <;> (try cases CIL.truth v) <;>
-    simp [actionRelabel, Bind.bind, Option.bind, Pure.pure] <;> (try split) <;> simp_all
+    simp [actionRelabel, Pure.pure] <;> (try split) <;> simp_all
 
 theorem cil_brzero (t : Nat) (pc pc' : Nat) (f : Nat → Nat) (next : f (pc + 1) = pc' + 1) (vs : List CIL.Value)
     (p : CIL.FeatureProfile) :
@@ -126,8 +126,8 @@ theorem cil_bgeu (t : Nat) (pc pc' : Nat) (f : Nat → Nat) (next : f (pc + 1) =
       (CIL.step (.bgeu t) false pc [] 0 vs (fun _ => none) p).map (actionRelabel f) := by
   rcases vs with _ | ⟨v, _ | ⟨w, rest⟩⟩ <;> simp only [CIL.step]
   all_goals (try rfl)
-  all_goals cases v <;> cases w <;> simp only [CIL.step] <;>
-    simp [actionRelabel, Bind.bind, Option.bind, Pure.pure] <;> (try split) <;> simp_all
+  all_goals cases v <;> cases w <;>
+    simp [actionRelabel, Pure.pure] <;> (try split) <;> simp_all
 
 theorem static_nil (b b' : CIL.Method) (static : b.staticSites = []) (static' : b'.staticSites = [])
     (pc pc' : Nat) (operation : CIL.MemoryOp) (stack : List Value) (m : Memory) :
@@ -146,14 +146,14 @@ theorem step_relabel (b b' : CIL.Method) (profile : b'.profile = b.profile)
   all_goals simp only [supported, Bool.false_eq_true] at plain
   all_goals simp only [relabel]
   all_goals unfold step at h ⊢
-  all_goals simp only [profile, returns, pureArity, static_nil b b' static static' pc pc', Functor.map, Except.map,
+  all_goals simp only [profile, returns, pureArity, static_nil b b' static static' pc pc',
       Bind.bind, Except.bind, Pure.pure, Except.pure, moved] at h ⊢
   all_goals
     rcases stack with _ | ⟨v, rest⟩ <;> (try simp only at h ⊢) <;> (repeat' split at h) <;> (try simp only [Except.ok.injEq] at h) <;> (try subst_vars) <;>
       simp_all [FrameAction.relabel, cil_add pc pc' f next, cil_band pc pc' f next, cil_bor pc pc' f next,
         cil_convI8 pc pc' f next, cil_eq pc pc' f next, cil_gtu pc pc' f next, cil_feature _ pc pc' f next,
         cil_branch _ pc pc' f next, cil_brzero _ pc pc' f next, cil_brnonzero _ pc pc' f next, cil_bgeu _ pc pc' f next,
-        actionRelabel, moved]
+        actionRelabel]
 
 /-- How one source instruction is rewritten in the expanded body. -/
 inductive Edit where
@@ -208,7 +208,7 @@ theorem chunk_length (edits : List (Nat × Edit)) (μ σ : Nat → Nat) (pc : Na
 theorem position_mono (edits : List (Nat × Edit)) (s n : Nat) : position edits s ≤ position edits (s + n) := by
   induction n with
   | zero => simp
-  | succ n ih => exact Nat.le_trans ih (by simp [← Nat.add_assoc, position])
+  | succ n ih => exact Nat.le_trans ih (by simp [position])
 
 theorem expandFrom_fetch (edits : List (Nat × Edit)) (μ σ : Nat → Nat) (op : CIL.Op) (k : Nat) :
     ∀ (code : List CIL.Op) (s pc : Nat), code[pc]? = some op → k < (editAt edits (s + pc)).size →
@@ -396,7 +396,7 @@ theorem step_target (b : CIL.Method) (static : b.staticSites = []) (op : CIL.Op)
   simp only [FrameAction.relabel, Except.ok.injEq, FrameAction.next.injEq] at moved
   by_cases c : t = pc + 1 ∨ t ∈ targets op
   · exact c
-  · simp only [f, c, if_false] at moved
+  · simp only [f, c, ite_false] at moved
     exact Or.inl moved.1
 
 theorem feature_step (b : CIL.Method) (x : CIL.Feature) (pc : Nat) (args : List Value) (frame : Frame)
@@ -465,7 +465,7 @@ theorem fold_helper_invoke {Q : CIL.Program} {h : Nat} {profile : CIL.FeaturePro
   have enter : enterFrame (foldHelper profile c i) [.scalar x, .scalar y] m = .ok (⟨m.nextIdentity, [], [], []⟩, m) := by
     simp [enterFrame, foldHelper, makeLocals, makeArgumentHomes, makeParameterHomes, Bind.bind, Except.bind,
       Pure.pure, Except.pure]
-  simp only [invoke, helper, List.mapM_cons, List.mapM_nil, checkedValue, nx, ny, if_true, enter,
+  simp only [invoke, helper, List.mapM_cons, List.mapM_nil, checkedValue, nx, ny, ite_true, enter,
     Bind.bind, Except.bind, Pure.pure, Except.pure, Except.mapError]
   rw [run_next (pc := 0) helper rfl (by simp [step, checkedValue, nx, Bind.bind, Except.bind, Pure.pure, Except.pure]; exact ⟨rfl, rfl, rfl, rfl⟩)]
   rw [run_next (pc := 1) helper rfl (by simp [step, checkedValue, ny, Bind.bind, Except.bind, Pure.pure, Except.pure]; exact ⟨rfl, rfl, rfl, rfl⟩)]
@@ -731,15 +731,15 @@ theorem reversal_entry (argc count i : Nat) (fits : count ≤ argc) :
   · rw [List.getElem?_append_left (by simpa using first)]
     simp [first]
   · rw [List.getElem?_append_right (by simp; omega)]
-    simp only [List.length_range, first, if_false]
+    simp only [List.length_range, first, ite_false]
     by_cases second : i < argc
-    · simp only [second, if_true, List.getElem?_map]
+    · simp only [second, ite_true, List.getElem?_map]
       rw [List.getElem?_reverse (by simp; omega)]
       simp only [List.length_range]
       rw [List.getElem?_range (by omega)]
       simp only [Option.map_some, Option.some.injEq]
       omega
-    · simp only [second, if_false]
+    · simp only [second, ite_false]
       rw [List.getElem?_eq_none (by simp; omega)]
 
 theorem reversal_moves (x y : List Value) (argc : Nat) (total : x.length + y.length = argc) :
@@ -748,16 +748,16 @@ theorem reversal_moves (x y : List Value) (argc : Nat) (total : x.length + y.len
   have entry := reversal_entry argc y.length i (by omega)
   simp only [argMap, List.getD_eq_getElem?_getD, entry]
   by_cases first : i < x.length
-  · simp only [show i < argc - y.length by omega, if_true, Option.getD_some]
+  · simp only [show i < argc - y.length by omega, ite_true, Option.getD_some]
     rw [List.getElem?_append_left first, List.getElem?_append_left first]
-  · simp only [show ¬ i < argc - y.length by omega, if_false]
+  · simp only [show ¬ i < argc - y.length by omega, ite_false]
     by_cases second : i < argc
-    · simp only [second, if_true, Option.getD_some]
+    · simp only [second, ite_true, Option.getD_some]
       rw [List.getElem?_append_right (by omega), List.getElem?_append_right (by omega),
         List.getElem?_reverse (by omega)]
       congr 1
       omega
-    · simp only [second, if_false, Option.getD_none]
+    · simp only [second, ite_false, Option.getD_none]
       rw [List.getElem?_eq_none (by simp; omega), List.getElem?_eq_none (by simp; omega)]
 
 theorem enterFrame_args (b : CIL.Method) (vectors : b.vectorArgs = []) (parameters : b.parameterHomes = [])
