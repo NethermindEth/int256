@@ -138,3 +138,7 @@ import UInt256.Methods.Add.SSEShapes.ShiftedSmall
 import UInt256.Methods.Add.SSEShapes.FeatureExpressions
 import UInt256.Safety.CodeExpansion
 import UInt256.Methods.Add.ARMExpansion
+import UInt256.Methods.Add.ARMLanes.Incoming
+import UInt256.Methods.Add.ARMLanes.Start
+import UInt256.Methods.Add.ARMLanes.Chain
+import UInt256.Methods.Add.ARMLanes.Helper
