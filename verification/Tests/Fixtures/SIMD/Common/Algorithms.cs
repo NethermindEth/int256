@@ -57,12 +57,20 @@ public readonly partial struct UInt256
 #endif
                 out Vector256<ulong> carryIn, out Vector256<ulong> fullLanes);
             if (!Avx.TestZ(fullLanes, carryIn))
-#if RENAMED
+#if RENAMED && WRONG_REPORTING_FLAG
+                return !RepairSum256(result, carryMask, fullLanes, out res);
+#elif RENAMED
                 return RepairSum256(result, carryMask, fullLanes, out res);
+#elif WRONG_REPORTING_FLAG
+                return !FinishAdd(result, carryMask, fullLanes, out res);
 #else
                 return FinishAdd(result, carryMask, fullLanes, out res);
 #endif
+#if WRONG_REPORTING_FLAG
+            return (Avx.MoveMask(carryMask.AsDouble()) & 0b1000) == 0;
+#else
             return (Avx.MoveMask(carryMask.AsDouble()) & 0b1000) != 0;
+#endif
         }
 #if WRONG_REPORTING_FLAG
         return !AddScalar(in a, in b, out res, true);
