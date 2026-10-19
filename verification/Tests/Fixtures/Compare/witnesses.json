@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "positiveCases": {
+    "ComparisonAlternative": {
+      "method": "LtUInt256UInt256",
+      "profiles": ["scalar", "x64-vector256", "x64-avx2"]
+    }
+  },
+  "negativeCases": {
+    "ComparisonLowFirst": {
+      "method": "LtUInt256UInt256",
+      "profiles": ["scalar", "x64-vector256", "x64-avx2"],
+      "leftBase": 16,
+      "rightBase": 64,
+      "initialBytes": { "24": 1, "64": 1 },
+      "actualResult": 1
+    },
+    "ComparisonSigned": {
+      "method": "LtUInt256UInt256",
+      "profiles": ["scalar", "x64-vector256", "x64-avx2"],
+      "leftBase": 16,
+      "rightBase": 64,
+      "initialBytes": { "47": 128 },
+      "actualResult": 1
+    },
+    "ComparisonWrongLane": {
+      "method": "LtUInt256UInt256",
+      "profiles": ["x64-vector256"],
+      "leftBase": 16,
+      "rightBase": 64,
+      "initialBytes": { "24": 1, "64": 1 },
+      "actualResult": 1
+    },
+    "ThreeWayAlternative": {
+      "method": "CompareToUInt256Ref",
+      "profiles": ["scalar"],
+      "leftBase": 16,
+      "rightBase": 64,
+      "initialBytes": { "64": 1 },
+      "actualResult": -7
+    }
+  }
+}

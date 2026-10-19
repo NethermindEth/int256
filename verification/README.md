@@ -254,6 +254,28 @@ the probe's own value. The Profiles group is extractor infrastructure only. Each
 group's `Tests/Fixtures/<group>/README.md` maps every original case to a runner
 case, the LeanCIL test that covers it, or an unfiled upstream issue draft.
 
+`EqualityRegression.cs [dir] [all|scalar|x64-vector256|x64-sse41] [all|<case>]`
+covers the equality gates. Baseline and Renamed are checked against the
+production proof or a renamed copy of it; EquivalentScalar (short-circuit limb
+ladder) and EquivalentReduction (xor-to-zero vector leaf, scalar-direct vector
+primitive, high-half-first SSE reduction) are checked by fixture proofs under
+`Tests/Fixtures/Equality/<Case>/` that state the production contract verbatim.
+WrongLane, WrongReduction, WrongReceiver, WrongSnapshot, WrongSignedEmbedding
+and WrongPolarity each get a checked refutation from `witnesses.json`.
+
+`CompareRegression.cs [dir] [all|<profile>]` covers `op<` on scalar,
+x64-vector256, x64-avx2 and x64-avx512, and `CompareTo(in UInt256)` on scalar.
+ComparisonAlternative is proved per profile under
+`Tests/Fixtures/Compare/ComparisonAlternative/`; ComparisonLowFirst,
+ComparisonSigned, ComparisonWrongLane and ThreeWayAlternative are refuted.
+Differences from the original group: ThreeWayAlternative (returns -7/9) is a
+refutation because the CompareTo contract is the exact -1/0/1 result; the
+vector mutations use `Vector256.LessThan` on sign-flipped lanes and
+`GetElement` because the extractor rejects `Vector256.LessThan<long>` and
+`Vector256.GreaterThan`; x64-avx512 runs Baseline only because its native
+`op<` path is not touched by any mutation, which the runner checks by
+requiring an unchanged extraction for every inapplicable case.
+
 Each public gate must retain independent arithmetic and safety contracts,
 including initial operands under valid overlap, normal finite return,
 caller-byte preservation, and its claimed feature coverage. Re-run the original

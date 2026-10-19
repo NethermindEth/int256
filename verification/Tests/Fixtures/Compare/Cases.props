@@ -1,0 +1,10 @@
+<Project>
+  <ItemGroup>
+    <CompareCase Include="Baseline" Symbol="" />
+    <CompareCase Include="ComparisonAlternative" Symbol="COMPARISON_ALTERNATIVE" />
+    <CompareCase Include="ComparisonLowFirst" Symbol="COMPARISON_LOW_FIRST" />
+    <CompareCase Include="ComparisonSigned" Symbol="COMPARISON_SIGNED" />
+    <CompareCase Include="ComparisonWrongLane" Symbol="COMPARISON_WRONG_LANE" />
+    <CompareCase Include="ThreeWayAlternative" Symbol="THREE_WAY_ALTERNATIVE" />
+  </ItemGroup>
+</Project>
