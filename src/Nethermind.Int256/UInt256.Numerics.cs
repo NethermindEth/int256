@@ -539,7 +539,7 @@ public readonly partial struct UInt256 : IBinaryInteger<UInt256>, IMinMaxValue<U
     {
         if (!TryParseCore(s, style, provider, out UInt256 result, out bool overflow))
         {
-            ThrowParseFailure(overflow);
+            ThrowParseFailure(s, style, provider, overflow);
         }
 
         return result;
@@ -557,16 +557,16 @@ public readonly partial struct UInt256 : IBinaryInteger<UInt256>, IMinMaxValue<U
         }
 
         overflow = false;
-        if (TryParse(s, style, provider!, out result))
+        result = default;
+        NumberFormatInfo info = NumberFormatInfo.GetInstance(provider);
+        if (style == NumberStyles.Integer && info.PositiveSign == "+" && info.NegativeSign == "-"
+            && TryParseDecimal(s, out result))
         {
             return true;
         }
 
-        // The public parser doesn't say why it failed. BigInteger tells text out of range from malformed text, and
-        // accepts what UInt128 also does, such as "-0".
         if (!BigInteger.TryParse(s, style, provider, out BigInteger big))
         {
-            overflow = HasFraction(s, style, provider);
             return false;
         }
 
@@ -579,10 +579,6 @@ public readonly partial struct UInt256 : IBinaryInteger<UInt256>, IMinMaxValue<U
         overflow = true;
         return false;
     }
-
-    /// <summary>Whether text BigInteger rejected is a well-formed number with a nonzero fraction, which UInt128 reports as out of range.</summary>
-    internal static bool HasFraction(ReadOnlySpan<char> s, NumberStyles style, IFormatProvider? provider) =>
-        (style & NumberStyles.AllowDecimalPoint) != 0 && double.TryParse(s, style, provider, out double value) && double.IsFinite(value);
 
     // Nested so UInt256's static constructor doesn't build them.
     private static class Digits
@@ -637,14 +633,15 @@ public readonly partial struct UInt256 : IBinaryInteger<UInt256>, IMinMaxValue<U
 
     [DoesNotReturn]
     [StackTraceHidden]
-    internal static void ThrowParseFailure(bool overflow)
+    internal static void ThrowParseFailure(ReadOnlySpan<char> s, NumberStyles style, IFormatProvider? provider, bool overflow)
     {
-        if (overflow)
+        if (!overflow)
         {
-            throw new OverflowException();
+            // BigInteger.TryParse conflates malformed text and non-integral values; UInt128.Parse distinguishes them.
+            _ = UInt128.Parse(s, style, provider);
         }
 
-        throw new FormatException();
+        throw new OverflowException();
     }
 
     [DoesNotReturn]

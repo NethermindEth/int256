@@ -583,7 +583,7 @@ public readonly partial struct Int256 : IBinaryInteger<Int256>, IMinMaxValue<Int
     {
         if (!TryParseCore(s, style, provider, out Int256 result, out bool overflow))
         {
-            UInt256.ThrowParseFailure(overflow);
+            UInt256.ThrowParseFailure(s, style, provider, overflow);
         }
 
         return result;
@@ -629,10 +629,6 @@ public readonly partial struct Int256 : IBinaryInteger<Int256>, IMinMaxValue<Int
             }
 
             overflow = true;
-        }
-        else
-        {
-            overflow = UInt256.HasFraction(s, style, provider);
         }
 
         result = default;

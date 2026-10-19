@@ -823,6 +823,7 @@ public partial class NumericsTests
     [
         "0", "-0", "00", "5", "+5", "-5", " 5 ", "5\0", "-5\0", "(5)", "5-", "5e2", "5.0", "5.5", "-0.5", "0.5e1", "1.5e-400", "1,000", "1e400", "NaN", "Infinity",
         "1" + new string('0', 80), "-1" + new string('0', 80), "1" + new string('0', 80) + "x", "", " ", "-", "x", "--5", "- 5",
+        "1e-1", "1e-400", new string('9', 400) + ".5", new string('9', 400) + ".5x",
     ];
 
     private static readonly NumberStyles[] DecimalStyles =
@@ -830,6 +831,7 @@ public partial class NumericsTests
         NumberStyles.None,
         NumberStyles.Integer,
         NumberStyles.AllowLeadingSign,
+        NumberStyles.AllowExponent,
         NumberStyles.Integer | NumberStyles.AllowParentheses,
         NumberStyles.Integer | NumberStyles.AllowTrailingSign,
         NumberStyles.Number,
