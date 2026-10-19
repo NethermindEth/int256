@@ -1,13 +1,14 @@
 // SPDX-FileCopyrightText: 2026 Demerzel Solutions Limited
 // SPDX-License-Identifier: MIT
 
+using System;
 using BenchmarkDotNet.Attributes;
 
 namespace Nethermind.Int256.Benchmark;
 
 /// <summary>
 /// Platform-neutral benchmark for the 32-byte big- and little-endian read/write paths
-/// (AVX/AVX2/AVX-512 on x86, AdvSimd on ARM64, scalar otherwise).
+/// (AVX/AVX2/AVX-512 on x86, AdvSimd on ARM64, scalar otherwise) and the 20-byte (address) write.
 /// </summary>
 /// <remarks>
 /// Unlike <c>ToBigEndianAB</c>, whose setup throws without AVX2, this class runs on every ISA,
@@ -49,6 +50,15 @@ public class ByteSwapBench
         for (int i = 0; i < N; i++)
         {
             _value.ToBigEndian(_target);
+        }
+    }
+
+    [Benchmark(OperationsPerInvoke = N)]
+    public void ToBigEndianAddress()
+    {
+        for (int i = 0; i < N; i++)
+        {
+            _value.ToBigEndian(_target.AsSpan(0, 20));
         }
     }
 
