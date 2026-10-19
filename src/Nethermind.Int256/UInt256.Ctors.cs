@@ -3,6 +3,7 @@
 
 using System;
 using System.Buffers.Binary;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
@@ -134,7 +135,15 @@ public readonly partial struct UInt256
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static partial void ReadBigEndianLimbs(ReadOnlySpan<byte> bytes, out ulong u0, out ulong u1, out ulong u2, out ulong u3);
+    private static void ReadBigEndianLimbs(ReadOnlySpan<byte> bytes, out ulong u0, out ulong u1, out ulong u2, out ulong u3)
+    {
+        Debug.Assert(bytes.Length >= 32);
+        ref byte source = ref MemoryMarshal.GetReference(bytes);
+        u3 = ReadUInt64BigEndian(ref source);
+        u2 = ReadUInt64BigEndian(ref Unsafe.Add(ref source, 8));
+        u1 = ReadUInt64BigEndian(ref Unsafe.Add(ref source, 16));
+        u0 = ReadUInt64BigEndian(ref Unsafe.Add(ref source, 24));
+    }
 
     private static void Create(in ReadOnlySpan<byte> bytes, out ulong u0, out ulong u1, out ulong u2, out ulong u3)
     {
