@@ -86,10 +86,7 @@ public readonly partial struct UInt256
                 }
                 else
                 {
-                    u3 = BinaryPrimitives.ReadUInt64BigEndian(bytes.Slice(0, 8));
-                    u2 = BinaryPrimitives.ReadUInt64BigEndian(bytes.Slice(8, 8));
-                    u1 = BinaryPrimitives.ReadUInt64BigEndian(bytes.Slice(16, 8));
-                    u0 = BinaryPrimitives.ReadUInt64BigEndian(bytes.Slice(24, 8));
+                    ReadBigEndianLimbs(bytes, out u0, out u1, out u2, out u3);
                 }
             }
             else
@@ -127,6 +124,9 @@ public readonly partial struct UInt256
             Create(bytes, out u0, out u1, out u2, out u3);
         }
     }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static partial void ReadBigEndianLimbs(ReadOnlySpan<byte> bytes, out ulong u0, out ulong u1, out ulong u2, out ulong u3);
 
     private static void Create(in ReadOnlySpan<byte> bytes, out ulong u0, out ulong u1, out ulong u2, out ulong u3)
     {

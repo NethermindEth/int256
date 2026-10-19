@@ -2026,8 +2026,9 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
 
     // 32 distinct byte values make any within-limb reversal or half/lane swap in the vectorized
     // big-endian read/write paths (AVX2/AVX-512 on x86, AdvSimd on ARM64) visible byte-by-byte.
+    // Every offset within a word covers the unaligned accesses of the scalar paths.
     [Test]
-    public void BigEndian_Ctor_And_ToBigEndian_RoundTrip_Distinct_Bytes()
+    public void BigEndian_Ctor_And_ToBigEndian_RoundTrip_Distinct_Bytes([Range(0, 7)] int offset)
     {
         byte[] bigEndian = new byte[32];
         for (int i = 0; i < bigEndian.Length; i++)
@@ -2035,14 +2036,19 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
             bigEndian[i] = (byte)(0xC0 + i);
         }
 
-        UInt256 value = new(bigEndian, isBigEndian: true);
+        byte[] source = new byte[offset + 32];
+        bigEndian.CopyTo(source, offset);
+        UInt256 value = new(source.AsSpan(offset, 32), isBigEndian: true);
 
         BigInteger expected = new(bigEndian, isUnsigned: true, isBigEndian: true);
         ((BigInteger)value).Should().Be(expected);
 
-        Span<byte> written = stackalloc byte[32];
-        value.ToBigEndian(written);
-        written.ToArray().Should().Equal(bigEndian);
+        byte[] written = new byte[offset + 33];
+        written.AsSpan().Fill(0xAA);
+        byte[] expectedWritten = (byte[])written.Clone();
+        bigEndian.CopyTo(expectedWritten, offset);
+        value.ToBigEndian(written.AsSpan(offset, 32));
+        written.Should().Equal(expectedWritten);
     }
 
     // The 20-byte (address) overload writes the low 20 bytes of the 32-byte big-endian form.
