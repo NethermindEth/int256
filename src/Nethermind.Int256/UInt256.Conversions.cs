@@ -143,10 +143,7 @@ public readonly partial struct UInt256
             }
             else
             {
-                BinaryPrimitives.WriteUInt64BigEndian(target.Slice(0, 8), u3);
-                BinaryPrimitives.WriteUInt64BigEndian(target.Slice(8, 8), u2);
-                BinaryPrimitives.WriteUInt64BigEndian(target.Slice(16, 8), u1);
-                BinaryPrimitives.WriteUInt64BigEndian(target.Slice(24, 8), u0);
+                WriteBigEndianLimbs(in this, target);
             }
         }
         else if (target.Length == 20)
@@ -156,6 +153,9 @@ public readonly partial struct UInt256
             BinaryPrimitives.WriteUInt64BigEndian(target.Slice(12, 8), u0);
         }
     }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static partial void WriteBigEndianLimbs(in UInt256 value, Span<byte> target);
 
     public void ToLittleEndian(Span<byte> target)
     {

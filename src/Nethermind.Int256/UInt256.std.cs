@@ -353,6 +353,22 @@ public readonly partial struct UInt256
         return SubtractImpl(a, b, out res);
     }
 
+    private static partial void ReadBigEndianLimbs(ReadOnlySpan<byte> bytes, out ulong u0, out ulong u1, out ulong u2, out ulong u3)
+    {
+        u3 = BinaryPrimitives.ReadUInt64BigEndian(bytes.Slice(0, 8));
+        u2 = BinaryPrimitives.ReadUInt64BigEndian(bytes.Slice(8, 8));
+        u1 = BinaryPrimitives.ReadUInt64BigEndian(bytes.Slice(16, 8));
+        u0 = BinaryPrimitives.ReadUInt64BigEndian(bytes.Slice(24, 8));
+    }
+
+    private static partial void WriteBigEndianLimbs(in UInt256 value, Span<byte> target)
+    {
+        BinaryPrimitives.WriteUInt64BigEndian(target.Slice(0, 8), value.u3);
+        BinaryPrimitives.WriteUInt64BigEndian(target.Slice(8, 8), value.u2);
+        BinaryPrimitives.WriteUInt64BigEndian(target.Slice(16, 8), value.u1);
+        BinaryPrimitives.WriteUInt64BigEndian(target.Slice(24, 8), value.u0);
+    }
+
     // The culture formats (N, C, E, F, P, G with a precision, custom) for UInt256.Numerics.cs, through BigInteger. The
     // zkEVM build has no such fallback, which keeps BigInteger out of its image.
     private static bool TryFormatOther(in UInt256 bits, bool signed, Span<char> destination, out int written,

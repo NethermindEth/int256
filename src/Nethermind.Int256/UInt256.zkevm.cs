@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: MIT
 
 using System;
+using System.Buffers.Binary;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
 using Arm = System.Runtime.Intrinsics.Arm;
 using x64 = System.Runtime.Intrinsics.X86;
@@ -190,6 +192,62 @@ public readonly partial struct UInt256
         res = difference - incoming;
         // Equal operands propagate the incoming borrow; unequal operands generate their own.
         borrow = difference == 0 ? incoming : (a < b ? 1UL : 0UL);
+    }
+
+    /// <summary>Whether the guest's zkVM reverses a word's bytes in one instruction (Zbb's <c>rev8</c>).</summary>
+    /// <remarks>
+    /// False here, for the zkVMs that decode rv64im only. A guest whose zkVM has Zbb substitutes true in its ILC
+    /// substitutions, which folds every branch on it away. Without Zbb, <see cref="BinaryPrimitives.ReverseEndianness(ulong)"/>
+    /// is a ~30-instruction software sequence, and those zkVMs also reject misaligned accesses, so an unaligned word
+    /// is loaded byte by byte anyway; gathering the bytes in big-endian order drops the reversal on top of it.
+    /// </remarks>
+    private static bool HasByteReverse => false;
+
+    private static partial void ReadBigEndianLimbs(ReadOnlySpan<byte> bytes, out ulong u0, out ulong u1, out ulong u2, out ulong u3)
+    {
+        ref byte source = ref MemoryMarshal.GetReference(bytes);
+        u3 = ReadUInt64BigEndian(ref source);
+        u2 = ReadUInt64BigEndian(ref Unsafe.Add(ref source, 8));
+        u1 = ReadUInt64BigEndian(ref Unsafe.Add(ref source, 16));
+        u0 = ReadUInt64BigEndian(ref Unsafe.Add(ref source, 24));
+    }
+
+    private static partial void WriteBigEndianLimbs(in UInt256 value, Span<byte> target)
+    {
+        ref byte destination = ref MemoryMarshal.GetReference(target);
+        WriteUInt64BigEndian(ref destination, value.u3);
+        WriteUInt64BigEndian(ref Unsafe.Add(ref destination, 8), value.u2);
+        WriteUInt64BigEndian(ref Unsafe.Add(ref destination, 16), value.u1);
+        WriteUInt64BigEndian(ref Unsafe.Add(ref destination, 24), value.u0);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static ulong ReadUInt64BigEndian(ref byte source)
+    {
+        if (HasByteReverse) return BinaryPrimitives.ReverseEndianness(Unsafe.ReadUnaligned<ulong>(ref source));
+        return ((ulong)source << 56) | ((ulong)Unsafe.Add(ref source, 1) << 48) |
+            ((ulong)Unsafe.Add(ref source, 2) << 40) | ((ulong)Unsafe.Add(ref source, 3) << 32) |
+            ((ulong)Unsafe.Add(ref source, 4) << 24) | ((ulong)Unsafe.Add(ref source, 5) << 16) |
+            ((ulong)Unsafe.Add(ref source, 6) << 8) | Unsafe.Add(ref source, 7);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void WriteUInt64BigEndian(ref byte destination, ulong value)
+    {
+        if (HasByteReverse)
+        {
+            Unsafe.WriteUnaligned(ref destination, BinaryPrimitives.ReverseEndianness(value));
+            return;
+        }
+
+        destination = (byte)(value >> 56);
+        Unsafe.Add(ref destination, 1) = (byte)(value >> 48);
+        Unsafe.Add(ref destination, 2) = (byte)(value >> 40);
+        Unsafe.Add(ref destination, 3) = (byte)(value >> 32);
+        Unsafe.Add(ref destination, 4) = (byte)(value >> 24);
+        Unsafe.Add(ref destination, 5) = (byte)(value >> 16);
+        Unsafe.Add(ref destination, 6) = (byte)(value >> 8);
+        Unsafe.Add(ref destination, 7) = (byte)value;
     }
 
     // The zkEVM build writes D, G, X and B only (UInt256.Numerics.cs): a BigInteger fallback for the culture formats
