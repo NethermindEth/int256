@@ -2089,6 +2089,20 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
         value.Should().Be(expected);
     }
 
+    // Pins the existing contract: any length other than 32 is read big-endian whatever isBigEndian says,
+    // zero-extended when shorter and keeping the last 32 bytes when longer. Callers rely on it.
+    [Test]
+    public void Ctor_OtherLengths_AreBigEndian(
+        [Values(0, 1, 7, 8, 9, 20, 31, 33, 64)] int length,
+        [Values] bool isBigEndian)
+    {
+        byte[] bytes = DistinctBytes(length);
+        BigInteger expected = new(bytes.AsSpan(Math.Max(0, length - 32)), isUnsigned: true, isBigEndian: true);
+
+        ((BigInteger)new UInt256(bytes, isBigEndian)).Should().Be(expected);
+        ((BigInteger)new Int256(bytes, isBigEndian)).Should().Be(expected);
+    }
+
     private static byte[] DistinctBytes(int length)
     {
         byte[] bytes = new byte[length];
