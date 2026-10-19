@@ -130,11 +130,11 @@ public readonly partial struct UInt256
         }
         else if (Vector256.IsHardwareAccelerated)
         {
-            CreateVector(in bytes, out this);
+            CreateVector(ref MemoryMarshal.GetReference(bytes), bytes.Length, out this);
         }
         else
         {
-            Create(bytes, out u0, out u1, out u2, out u3);
+            Create(ref MemoryMarshal.GetReference(bytes), bytes.Length, out u0, out u1, out u2, out u3);
         }
     }
 
@@ -142,7 +142,12 @@ public readonly partial struct UInt256
     private static void ReadBigEndianLimbs(ReadOnlySpan<byte> bytes, out ulong u0, out ulong u1, out ulong u2, out ulong u3)
     {
         Debug.Assert(bytes.Length >= 32);
-        ref byte source = ref MemoryMarshal.GetReference(bytes);
+        ReadBigEndianLimbs(ref MemoryMarshal.GetReference(bytes), out u0, out u1, out u2, out u3);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void ReadBigEndianLimbs(ref byte source, out ulong u0, out ulong u1, out ulong u2, out ulong u3)
+    {
         u3 = ReadUInt64BigEndian(ref source);
         u2 = ReadUInt64BigEndian(ref Unsafe.Add(ref source, 8));
         u1 = ReadUInt64BigEndian(ref Unsafe.Add(ref source, 16));
@@ -150,28 +155,27 @@ public readonly partial struct UInt256
     }
 
     // Stores the limbs as one vector: a caller's 32-byte load of four 8-byte stores can't be store-forwarded. Not
-    // inlined, and the span comes by reference, so the constructor keeps no frame for the 32-byte paths. Create takes
-    // it by value: two registers on ARM64 and SysV x64.
+    // inlined, so the constructor keeps no frame for the 32-byte paths.
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void CreateVector(in ReadOnlySpan<byte> bytes, out UInt256 value)
+    private static void CreateVector(ref byte source, int length, out UInt256 value)
     {
-        Create(bytes, out ulong u0, out ulong u1, out ulong u2, out ulong u3);
+        Create(ref source, length, out ulong u0, out ulong u1, out ulong u2, out ulong u3);
         Unsafe.SkipInit(out value);
         Unsafe.As<UInt256, Vector256<ulong>>(ref value) = Vector256.Create(u0, u1, u2, u3);
     }
 
     // Any length other than 32 is read big-endian (see the constructor): the whole words from the end, then the
-    // leading partial word byte by byte. A longer span keeps its last 32 bytes.
-    private static void Create(ReadOnlySpan<byte> bytes, out ulong u0, out ulong u1, out ulong u2, out ulong u3)
+    // leading partial word byte by byte. A longer span keeps its last 32 bytes. The span comes as a reference and a
+    // length: passing the struct reloads its 4-byte length with an 8-byte load, which can't be store-forwarded.
+    private static void Create(ref byte source, int length, out ulong u0, out ulong u1, out ulong u2, out ulong u3)
     {
-        if (bytes.Length >= 32)
+        if (length >= 32)
         {
-            ReadBigEndianLimbs(bytes[^32..], out u0, out u1, out u2, out u3);
+            ReadBigEndianLimbs(ref Unsafe.Add(ref source, length - 32), out u0, out u1, out u2, out u3);
             return;
         }
 
-        ref byte source = ref MemoryMarshal.GetReference(bytes);
-        int head = bytes.Length & 7;
+        int head = length & 7;
         ulong partial = 0;
         for (int i = 0; i < head; i++)
         {
@@ -180,7 +184,7 @@ public readonly partial struct UInt256
 
         // The whole words follow the partial one, most significant first.
         ref byte words = ref Unsafe.Add(ref source, head);
-        switch (bytes.Length >> 3)
+        switch (length >> 3)
         {
             case 0:
                 (u0, u1, u2, u3) = (partial, 0, 0, 0);
