@@ -249,4 +249,15 @@ public readonly partial struct UInt256
         Unsafe.Add(ref destination, 6) = (byte)(value >> 8);
         Unsafe.Add(ref destination, 7) = (byte)value;
     }
+
+    // The zkEVM build writes D, G, X and B only (UInt256.Numerics.cs): a BigInteger fallback for the culture formats
+    // would link BigInteger's formatting into every guest that interpolates a UInt256.
+    private static bool TryFormatOther(in UInt256 bits, bool signed, Span<char> destination, out int written,
+        ReadOnlySpan<char> format, IFormatProvider? provider) => throw UnsupportedFormat(format);
+
+    private static string FormatOther(in UInt256 bits, bool signed, string? format, IFormatProvider? provider) =>
+        throw UnsupportedFormat(format);
+
+    private static FormatException UnsupportedFormat(ReadOnlySpan<char> format) =>
+        new($"Format '{format}' is not supported in the zkEVM build; use D, G, X or B.");
 }

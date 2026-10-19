@@ -476,7 +476,7 @@ public readonly partial struct UInt256
             if ((factor.u1 | factor.u2 | factor.u3) == 0)
                 MultiplyByUInt64(val, factor.u0, out val);
             else
-                MultiplyLimbs4x4(val, factor, out val);
+                MultiplyLimbs4x4<DirectOperands>(val, factor, out val);
             i = low - 1;
         }
         result = val;
