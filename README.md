@@ -3,29 +3,23 @@
 [![Tests / Publish](https://github.com/nethermindeth/int256/actions/workflows/test-publish.yml/badge.svg)](https://github.com/nethermindeth/int256/actions/workflows/test-publish.yml)
 [![Nethermind.Numerics.Int256](https://img.shields.io/nuget/v/Nethermind.Numerics.Int256)](https://www.nuget.org/packages/Nethermind.Numerics.Int256)
 
-**The fastest 256-bit arithmetic for .NET.**
+**High-performance 256-bit arithmetic for .NET.**
 
-Int256 provides `UInt256` and `Int256`: unsigned and signed 256-bit value types used by the [Nethermind Ethereum execution client](https://github.com/NethermindEth/nethermind). It brings the arithmetic behind EVM execution to your own .NET applications, from blockchain tooling to binary protocols and numeric workloads that need more than 128 bits.
+Int256 provides `UInt256` and `Int256`: unsigned and signed 256-bit value types used by the [Nethermind Ethereum execution client](https://github.com/NethermindEth/nethermind). Bring the arithmetic behind EVM execution to your own .NET applications, from blockchain tooling to binary protocols and numeric workloads that need up to 256 bits.
 
 ## Why Int256?
 
 - **256 bits, stored inline.** Readonly structs with a 32-byte representation. Core arithmetic works directly on fixed-width limbs without allocating a backing array for each result.
-- **Modular arithmetic that keeps the intermediate bits.** `UInt256.AddMod` and `UInt256.MultiplyMod` reduce the full sum or product, including products up to 512 bits wide.
+- **Full-width modular arithmetic.** `UInt256.AddMod` and `UInt256.MultiplyMod` preserve the intermediate sum or product before reduction, including products up to 512 bits wide.
 - **Optimized for the hardware you run.** Specialized x64 and ARM64 paths use hardware intrinsics where available, with software fallbacks. A separate RISC-V zkVM build tunes execution for guest workloads.
 - **Made for hot paths.** `in`/`out` arithmetic APIs and span-based byte conversion let callers control copies and buffers.
-- **Continuously maintained and optimized.** Ongoing development improves arithmetic algorithms and tunes performance for evolving .NET runtimes, CPU architectures, and RISC-V zkVM workloads.
 - **Correctness you can inspect.** Tests compare arithmetic against `System.Numerics.BigInteger`, and CI exercises Windows, Linux, macOS, ARM64, and configurations with hardware intrinsics disabled.
-- **MIT licensed.** Use it in open-source or commercial projects.
 
 ## Get started
-
-Requires **.NET 10**.
 
 ```sh
 dotnet add package Nethermind.Numerics.Int256
 ```
-
-The package name is `Nethermind.Numerics.Int256`; the C# namespace is `Nethermind.Int256`.
 
 ```csharp
 using System;
@@ -56,7 +50,6 @@ Console.WriteLine(decoded == total); // True
 | --- | --- |
 | Unsigned values from 0 to 2²⁵⁶ − 1 | `UInt256` |
 | Signed values from −2²⁵⁵ to 2²⁵⁵ − 1 | `Int256` |
-| Arithmetic, comparisons, bitwise operations, and shifts | Operators and named methods; see [`UInt256`](https://github.com/NethermindEth/int256/blob/main/src/Nethermind.Int256/UInt256.cs) and [`Int256`](https://github.com/NethermindEth/int256/blob/main/src/Nethermind.Int256/Int256.cs) |
 | Detect unsigned overflow or underflow | `UInt256.AddOverflow` / `UInt256.SubtractUnderflow` |
 | Modular addition, multiplication, or exponentiation | `AddMod`, `MultiplyMod`, `ExpMod` |
 | Read or write binary values | Byte-span constructor, `ToBigEndian(Span<byte>)`, `ToLittleEndian(Span<byte>)` |
@@ -68,9 +61,11 @@ The arithmetic has explicit fixed-width semantics. For `UInt256`:
 - `+` and `*` retain the low 256 bits on overflow.
 - The `-` operator throws on underflow; `Subtract` returns the wrapped result, while `SubtractUnderflow` also reports whether underflow occurred.
 - Division by zero throws `DivideByZeroException`.
-- `AddMod` and `MultiplyMod` preserve the full intermediate value before reduction and throw for a zero modulus. `(a * b) % m` can therefore differ from `MultiplyMod(a, b, m, out result)`.
+- `AddMod` and `MultiplyMod` throw for a zero modulus, and `(a * b) % m` can differ from `MultiplyMod(a, b, m, out result)`.
 
 `Int256` operators wrap in two's complement, including `Int256.MinValue / -1`, which gives `MinValue` as the EVM's `SDIV` does.
+
+`Divide` truncates toward zero and `Mod` takes the sign of the dividend. Both throw `DivideByZeroException` for a zero divisor.
 
 In a `checked` context, or a project built with `CheckForOverflowUnderflow`, the operators that would otherwise wrap throw `OverflowException` instead, as they do for `long` and `Int128`. So does the explicit conversion of a negative `Int256` to `UInt256`.
 
@@ -78,7 +73,7 @@ Code written against `INumber<T>` or `IBinaryInteger<T>` gets the same semantics
 
 Both types are `ISpanFormattable` and `IUtf8SpanFormattable`. The `D`, `G`, `X`, and `B` formats are written directly from the limbs, as `UInt128` and `Int128` write them, without allocating when formatting into a span; a negative `Int256` shows all 256 bits under `X` and `B`. The culture formats (`N`, `C`, `E`, `F`, `P`, `G` with a precision, and custom formats) go through `BigInteger` in the standard build and throw `FormatException` in the RISC-V zkVM build, which keeps `BigInteger` out of guest images.
 
-Use `BigInteger` when you need values of unbounded size. Use Int256 when 256 bits are part of your data model and fixed-width behavior matters.
+See [`UInt256`](https://github.com/NethermindEth/int256/blob/main/src/Nethermind.Int256/UInt256.cs) and [`Int256`](https://github.com/NethermindEth/int256/blob/main/src/Nethermind.Int256/Int256.cs) for the full API.
 
 ## Performance
 
@@ -91,19 +86,17 @@ dotnet run -c Release --project src/Nethermind.Int256.Benchmark -- --list flat
 dotnet run -c Release --project src/Nethermind.Int256.Benchmark -- --filter '*MultiplyModUnsigned*'
 ```
 
-Results depend on operand size, CPU instruction support, and runtime version. When sharing measurements, include those details, the commit, and the benchmark command so others can reproduce them.
+Results depend on operand size, CPU instruction support, and runtime version.
 
 ## RISC-V zkVM variant
 
-The NuGet package includes standard and RISC-V zkVM implementations with the same assembly identity. The standard implementation is selected by default. To select the RISC-V zkVM implementation, set the existing `EnableZkEvm` property in your project or shared `Directory.Build.props`:
+The NuGet package includes standard and RISC-V zkVM implementations with the same assembly identity, selected at build time. The standard implementation is the default. For RISC-V zkVM guest workloads, set `EnableZkEvm` in your project or a shared `Directory.Build.props`:
 
 ```xml
 <PropertyGroup>
   <EnableZkEvm>true</EnableZkEvm>
 </PropertyGroup>
 ```
-
-This is a build-time choice for RISC-V zkVM guest workloads; ordinary .NET applications can use the default.
 
 ## Build and contribute
 
@@ -114,13 +107,7 @@ dotnet build src/Nethermind.Int256/Nethermind.Int256.csproj -c Release
 dotnet test --project src/Nethermind.Int256.Tests/Nethermind.Int256.Tests.csproj -c Release
 ```
 
-Bug reports, regression tests, and performance improvements are welcome. For arithmetic bugs, include the operands, operation, expected result, and actual result. For optimizations, include reproducible before/after benchmarks and coverage for boundary values.
-
-## Contributors
-
-Thanks to everyone who helps maintain and improve Int256.
-
-[![Int256 contributors](https://contrib.rocks/image?repo=NethermindEth/int256)](https://github.com/NethermindEth/int256/graphs/contributors)
+Bug reports, regression tests, and performance improvements are welcome. For arithmetic bugs, include the operands, operation, expected result, and actual result. For optimizations, include before/after benchmarks with the hardware, runtime version, commit, and benchmark command, plus coverage for boundary values.
 
 ## License
 
