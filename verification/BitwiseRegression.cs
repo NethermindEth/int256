@@ -99,7 +99,7 @@ foreach (bool early in new[] { false, true })
         initialTerm += "False then 0 else 0";
         string value = $"({actual[0]} + {actual[1]} * 2^64 + {actual[2]} * 2^128 + {actual[3]} * 2^192)";
         string refutation = "checked_" + (unary ? "unary" : "binary") + (returned ? "_return" : "") + "_refuted";
-        string contract = returned ? "UInt256Proof.Bitwise.ReturnSafety." + (unary ? "UnaryContract" : "BinaryContract") : unary ? "WrappingUnaryContract" : "WrappingBinaryContract";
+        string contract = returned ? "UInt256Model.Safety.AggregateReturn." + (unary ? "UnaryContract" : "BinaryContract") : unary ? "WrappingUnaryContract" : "WrappingBinaryContract";
         string output = early ? "24" : "104";
         string proof = File.ReadAllText(Path.Combine(fixtures, "CheckedRefutationTemplate.lean.in"))
             .Replace("@INITIAL@", initialTerm).Replace("@INPUTS@", unary ? "[⟨0,16⟩]" : "[⟨0,16⟩,⟨0,64⟩]")
