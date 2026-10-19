@@ -1,4 +1,5 @@
 import Extracted
+import UInt256.Safety.ProfileContracts
 import UInt256.Methods.Compare.PrimitiveValue
 
 theorem UInt256Proof.Compare.LeUInt64UInt256.scalar_correctness :

@@ -1,4 +1,5 @@
 import Extracted
+import UInt256.Safety.ProfileContracts
 import UInt256.Methods.Compare.ThreeWayValue
 
 theorem UInt256Proof.Compare.CompareToUInt256Value.scalar_correctness :
