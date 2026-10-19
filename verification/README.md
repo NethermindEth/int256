@@ -234,14 +234,26 @@ from scalar port completion.
 ## Regression fixtures
 
 The original fixture cases run through `BitwiseRegression.cs`,
-`BitwisePositiveRegression.cs`, `ShiftRegression.cs`, `MultiplyRegression.cs`
-and `AddSubtractRegression.cs` (`dotnet run --file verification/<runner>`).
+`BitwisePositiveRegression.cs`, `ShiftRegression.cs`, `ShiftPositiveRegression.cs`,
+`MultiplyRegression.cs` and `AddSubtractRegression.cs` (`dotnet run --file verification/<runner>`).
 Each runner freezes a consumer snapshot, certifies positive fixtures, and for
 each mutation certifies a checked contract refutation, then requires the
 unchanged production proof to be rejected without leaving a certificate.
 `AddSubtractRegression.cs` reports fixtures without a proof as PENDING and
 exits nonzero until each has one. Extractor rejection fixtures (unsupported instructions, static
 initializers, metadata mutations) are covered by LeanCIL's own tests.
+
+`ShiftPositiveRegression.cs [dir] [all|scalar|x64-vector256]` (default `all`) certifies
+the original positive shift fixtures: `LshHelper` (count computed by a compiled helper)
+for `Lsh`, `LeftShift` and `op<<`, and `LshEarlyStore` (output limb zeroed before the
+input is read) for `op<<` only; on the by-reference methods it is an aliasing negative
+in `ShiftRegression.cs`. Each case must extract differently from Baseline and is proved
+against the production gate contract by `Tests/Fixtures/Shift/<Case>/<Method>_<profile>.lean`.
+The proofs bind the changed bodies by `program[i]? = some body` and reuse the canonical
+proof through checked-run transport of the relocated suffix (`UInt256/Safety/Region*.lean`);
+that transport is CIL-generic and belongs upstream in LeanCIL. `Shift/CountPrefix.lean`
+restates the canonical count lemmas over a shared prefix and `Shift/DisjointContract.lean`
+the wrapper/operator composition for disjoint outputs; the production gates still use the originals.
 
 `SimdRegression.cs` runs the SIMD (Add/Subtract) and Reporting
 (AddOverflow/SubtractUnderflow) groups per profile; cases on a profile without a
