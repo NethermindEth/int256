@@ -143,22 +143,21 @@ public readonly partial struct UInt256
             }
             else
             {
-                // The target may overlap this value, so every limb is read before the first store.
-                (ulong r0, ulong r1, ulong r2, ulong r3) = (u0, u1, u2, u3);
-                BinaryPrimitives.WriteUInt64BigEndian(target.Slice(0, 8), r3);
-                BinaryPrimitives.WriteUInt64BigEndian(target.Slice(8, 8), r2);
-                BinaryPrimitives.WriteUInt64BigEndian(target.Slice(16, 8), r1);
-                BinaryPrimitives.WriteUInt64BigEndian(target.Slice(24, 8), r0);
+                WriteBigEndianLimbs(in this, target);
             }
         }
         else if (target.Length == 20)
         {
+            // The target may overlap this value, so every limb is read before the first store.
             (ulong r0, ulong r1, uint r2) = (u0, u1, (uint)u2);
             BinaryPrimitives.WriteUInt32BigEndian(target.Slice(0, 4), r2);
             BinaryPrimitives.WriteUInt64BigEndian(target.Slice(4, 8), r1);
             BinaryPrimitives.WriteUInt64BigEndian(target.Slice(12, 8), r0);
         }
     }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static partial void WriteBigEndianLimbs(in UInt256 value, Span<byte> target);
 
     public void ToLittleEndian(Span<byte> target)
     {
