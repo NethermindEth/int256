@@ -130,7 +130,20 @@ public readonly partial struct UInt256
         }
         else
         {
-            Create(bytes, out u0, out u1, out u2, out u3);
+            Create(bytes, out ulong r0, out ulong r1, out ulong r2, out ulong r3);
+            if (Vector256.IsHardwareAccelerated)
+            {
+                // One 32-byte store: a caller's vector load of four 8-byte stores can't be store-forwarded.
+                Unsafe.SkipInit(out u0);
+                Unsafe.SkipInit(out u1);
+                Unsafe.SkipInit(out u2);
+                Unsafe.SkipInit(out u3);
+                Unsafe.As<ulong, Vector256<ulong>>(ref u0) = Vector256.Create(r0, r1, r2, r3);
+            }
+            else
+            {
+                (u0, u1, u2, u3) = (r0, r1, r2, r3);
+            }
         }
     }
 
