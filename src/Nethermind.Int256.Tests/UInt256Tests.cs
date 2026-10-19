@@ -2075,13 +2075,13 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
     }
 
     [Test]
-    public void Ctor_Overlapping_Source([Values] bool isBigEndian, [Range(-30, 30, 3)] int shift)
+    public void Ctor_Overlapping_Source([Values] bool isBigEndian, [Values(9, 20, 32, 40)] int length, [Range(-30, 30, 3)] int shift)
     {
-        byte[] buffer = DistinctBytes(96);
-        UInt256 expected = new(buffer.AsSpan(32 + shift, 32).ToArray(), isBigEndian);
+        byte[] buffer = DistinctBytes(128);
+        UInt256 expected = new(buffer.AsSpan(32 + shift, length).ToArray(), isBigEndian);
 
         ref UInt256 value = ref MemoryMarshal.AsRef<UInt256>(buffer.AsSpan(32, 32));
-        value = new UInt256(buffer.AsSpan(32 + shift, 32), isBigEndian);
+        value = new UInt256(buffer.AsSpan(32 + shift, length), isBigEndian);
         value.Should().Be(expected);
     }
 
@@ -2097,16 +2097,25 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
 
     // Pins the existing contract: any length other than 32 is read big-endian whatever isBigEndian says,
     // zero-extended when shorter and keeping the last 32 bytes when longer. Callers rely on it.
-    [Test]
-    public void Ctor_OtherLengths_AreBigEndian(
-        [Values(0, 1, 7, 8, 9, 20, 31, 33, 64)] int length,
-        [Values] bool isBigEndian)
+    [TestCaseSource(nameof(OtherLengthCases))]
+    public void Ctor_OtherLengths_AreBigEndian(int length, bool isBigEndian)
     {
         byte[] bytes = DistinctBytes(length);
         BigInteger expected = new(bytes.AsSpan(Math.Max(0, length - 32)), isUnsigned: true, isBigEndian: true);
 
         ((BigInteger)new UInt256(bytes, isBigEndian)).Should().Be(expected);
         ((BigInteger)new Int256(bytes, isBigEndian)).Should().Be(expected);
+    }
+
+    // Every length up to a word and a half past 32, so each count of whole words meets each partial-word length.
+    private static IEnumerable<TestCaseData> OtherLengthCases()
+    {
+        for (int length = 0; length <= 48; length++)
+        {
+            if (length == 32) continue;
+            yield return new TestCaseData(length, false);
+            yield return new TestCaseData(length, true);
+        }
     }
 
     private static byte[] DistinctBytes(int length)

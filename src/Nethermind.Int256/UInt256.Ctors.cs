@@ -145,75 +145,42 @@ public readonly partial struct UInt256
         u0 = ReadUInt64BigEndian(ref Unsafe.Add(ref source, 24));
     }
 
-    private static void Create(in ReadOnlySpan<byte> bytes, out ulong u0, out ulong u1, out ulong u2, out ulong u3)
+    // Any length other than 32 is read big-endian (see the constructor): the whole words from the end, then the
+    // leading partial word byte by byte. A longer span keeps its last 32 bytes.
+    private static void Create(ReadOnlySpan<byte> bytes, out ulong u0, out ulong u1, out ulong u2, out ulong u3)
     {
-        int byteCount = bytes.Length;
-        int unalignedBytes = byteCount % 8;
-        int dwordCount = byteCount / 8 + (unalignedBytes == 0 ? 0 : 1);
-
-        ulong cs0 = 0;
-        ulong cs1 = 0;
-        ulong cs2 = 0;
-        ulong cs3 = 0;
-
-        if (dwordCount == 0)
+        if (bytes.Length >= 32)
         {
-            u0 = u1 = u2 = u3 = 0;
+            ReadBigEndianLimbs(bytes[^32..], out u0, out u1, out u2, out u3);
             return;
         }
 
-        if (dwordCount >= 1)
+        ref byte source = ref MemoryMarshal.GetReference(bytes);
+        int head = bytes.Length & 7;
+        ulong partial = 0;
+        for (int i = 0; i < head; i++)
         {
-            for (int j = 8; j > 0; j--)
-            {
-                cs0 <<= 8;
-                if (j <= byteCount)
-                {
-                    cs0 |= bytes[byteCount - j];
-                }
-            }
+            partial = (partial << 8) | Unsafe.Add(ref source, i);
         }
 
-        if (dwordCount >= 2)
+        // The whole words follow the partial one, most significant first.
+        ref byte words = ref Unsafe.Add(ref source, head);
+        switch (bytes.Length >> 3)
         {
-            for (int j = 16; j > 8; j--)
-            {
-                cs1 <<= 8;
-                if (j <= byteCount)
-                {
-                    cs1 |= bytes[byteCount - j];
-                }
-            }
+            case 0:
+                (u0, u1, u2, u3) = (partial, 0, 0, 0);
+                break;
+            case 1:
+                (u0, u1, u2, u3) = (ReadUInt64BigEndian(ref words), partial, 0, 0);
+                break;
+            case 2:
+                (u0, u1, u2, u3) = (ReadUInt64BigEndian(ref Unsafe.Add(ref words, 8)), ReadUInt64BigEndian(ref words), partial, 0);
+                break;
+            default:
+                (u0, u1, u2, u3) = (ReadUInt64BigEndian(ref Unsafe.Add(ref words, 16)),
+                    ReadUInt64BigEndian(ref Unsafe.Add(ref words, 8)), ReadUInt64BigEndian(ref words), partial);
+                break;
         }
-
-        if (dwordCount >= 3)
-        {
-            for (int j = 24; j > 16; j--)
-            {
-                cs2 <<= 8;
-                if (j <= byteCount)
-                {
-                    cs2 |= bytes[byteCount - j];
-                }
-            }
-        }
-
-        if (dwordCount >= 4)
-        {
-            for (int j = 32; j > 24; j--)
-            {
-                cs3 <<= 8;
-                if (j <= byteCount)
-                {
-                    cs3 |= bytes[byteCount - j];
-                }
-            }
-        }
-
-        u0 = cs0;
-        u1 = cs1;
-        u2 = cs2;
-        u3 = cs3;
     }
 
     public UInt256(in ReadOnlySpan<ulong> data, bool isBigEndian = false)
