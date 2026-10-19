@@ -6,6 +6,7 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Numerics;
+using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
 using FluentAssertions;
 using NUnit.Framework;
@@ -2043,6 +2044,60 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
         Span<byte> written = stackalloc byte[32];
         value.ToBigEndian(written);
         written.ToArray().Should().Equal(bigEndian);
+    }
+
+    // The bytes may overlap the value itself, so every path must read all of the input before it
+    // writes any of the output. The shifts cover full, partial and no overlap at odd and even offsets.
+    [Test]
+    public void ToBigEndian_ToLittleEndian_Overlapping_Target([Values(32, 20, -32)] int length, [Range(-30, 30, 3)] int shift)
+    {
+        byte[] buffer = DistinctBytes(96);
+        ref UInt256 value = ref MemoryMarshal.AsRef<UInt256>(buffer.AsSpan(32, 32));
+        UInt256 copy = value;
+
+        byte[] expected = (byte[])buffer.Clone();
+        Write(copy, expected.AsSpan(32 + shift, Math.Abs(length)), length);
+        Write(value, buffer.AsSpan(32 + shift, Math.Abs(length)), length);
+        buffer.Should().Equal(expected);
+
+        // A negative length selects the little-endian write.
+        static void Write(in UInt256 value, Span<byte> target, int length)
+        {
+            if (length < 0) value.ToLittleEndian(target);
+            else value.ToBigEndian(target);
+        }
+    }
+
+    [Test]
+    public void Ctor_Overlapping_Source([Values] bool isBigEndian, [Range(-30, 30, 3)] int shift)
+    {
+        byte[] buffer = DistinctBytes(96);
+        UInt256 expected = new(buffer.AsSpan(32 + shift, 32).ToArray(), isBigEndian);
+
+        ref UInt256 value = ref MemoryMarshal.AsRef<UInt256>(buffer.AsSpan(32, 32));
+        value = new UInt256(buffer.AsSpan(32 + shift, 32), isBigEndian);
+        value.Should().Be(expected);
+    }
+
+    [Test]
+    public void Ctor_From_Own_Bytes([Values] bool isBigEndian)
+    {
+        UInt256 value = new(DistinctBytes(32), isBigEndian: false);
+        UInt256 expected = new(MemoryMarshal.AsBytes(new ReadOnlySpan<UInt256>(in value)).ToArray(), isBigEndian);
+
+        value = new UInt256(MemoryMarshal.AsBytes(MemoryMarshal.CreateSpan(ref value, 1)), isBigEndian);
+        value.Should().Be(expected);
+    }
+
+    private static byte[] DistinctBytes(int length)
+    {
+        byte[] bytes = new byte[length];
+        for (int i = 0; i < bytes.Length; i++)
+        {
+            bytes[i] = (byte)(0x40 + i);
+        }
+
+        return bytes;
     }
 
     // The 20-byte (address) overload writes the low 20 bytes of the 32-byte big-endian form.

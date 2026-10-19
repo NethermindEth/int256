@@ -143,17 +143,20 @@ public readonly partial struct UInt256
             }
             else
             {
-                BinaryPrimitives.WriteUInt64BigEndian(target.Slice(0, 8), u3);
-                BinaryPrimitives.WriteUInt64BigEndian(target.Slice(8, 8), u2);
-                BinaryPrimitives.WriteUInt64BigEndian(target.Slice(16, 8), u1);
-                BinaryPrimitives.WriteUInt64BigEndian(target.Slice(24, 8), u0);
+                // The target may overlap this value, so every limb is read before the first store.
+                (ulong r0, ulong r1, ulong r2, ulong r3) = (u0, u1, u2, u3);
+                BinaryPrimitives.WriteUInt64BigEndian(target.Slice(0, 8), r3);
+                BinaryPrimitives.WriteUInt64BigEndian(target.Slice(8, 8), r2);
+                BinaryPrimitives.WriteUInt64BigEndian(target.Slice(16, 8), r1);
+                BinaryPrimitives.WriteUInt64BigEndian(target.Slice(24, 8), r0);
             }
         }
         else if (target.Length == 20)
         {
-            BinaryPrimitives.WriteUInt32BigEndian(target.Slice(0, 4), (uint)u2);
-            BinaryPrimitives.WriteUInt64BigEndian(target.Slice(4, 8), u1);
-            BinaryPrimitives.WriteUInt64BigEndian(target.Slice(12, 8), u0);
+            (ulong r0, ulong r1, uint r2) = (u0, u1, (uint)u2);
+            BinaryPrimitives.WriteUInt32BigEndian(target.Slice(0, 4), r2);
+            BinaryPrimitives.WriteUInt64BigEndian(target.Slice(4, 8), r1);
+            BinaryPrimitives.WriteUInt64BigEndian(target.Slice(12, 8), r0);
         }
     }
 
@@ -167,17 +170,21 @@ public readonly partial struct UInt256
             }
             else if (AdvSimd.Arm64.IsSupported)
             {
-                // The limbs are already in byte order.
+                // The limbs are already in byte order. Both halves load before the first store, as the
+                // target may overlap this value.
                 ref byte dst = ref MemoryMarshal.GetReference(target);
-                Unsafe.As<ulong, Vector128<byte>>(ref Unsafe.AsRef(in u0)).StoreUnsafe(ref dst);
-                Unsafe.As<ulong, Vector128<byte>>(ref Unsafe.AsRef(in u2)).StoreUnsafe(ref dst, 16);
+                Vector128<byte> lower = Unsafe.As<ulong, Vector128<byte>>(ref Unsafe.AsRef(in u0));
+                Vector128<byte> upper = Unsafe.As<ulong, Vector128<byte>>(ref Unsafe.AsRef(in u2));
+                lower.StoreUnsafe(ref dst);
+                upper.StoreUnsafe(ref dst, 16);
             }
             else
             {
-                BinaryPrimitives.WriteUInt64LittleEndian(target.Slice(0, 8), u0);
-                BinaryPrimitives.WriteUInt64LittleEndian(target.Slice(8, 8), u1);
-                BinaryPrimitives.WriteUInt64LittleEndian(target.Slice(16, 8), u2);
-                BinaryPrimitives.WriteUInt64LittleEndian(target.Slice(24, 8), u3);
+                (ulong r0, ulong r1, ulong r2, ulong r3) = (u0, u1, u2, u3);
+                BinaryPrimitives.WriteUInt64LittleEndian(target.Slice(0, 8), r0);
+                BinaryPrimitives.WriteUInt64LittleEndian(target.Slice(8, 8), r1);
+                BinaryPrimitives.WriteUInt64LittleEndian(target.Slice(16, 8), r2);
+                BinaryPrimitives.WriteUInt64LittleEndian(target.Slice(24, 8), r3);
             }
         }
         else
