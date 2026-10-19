@@ -363,10 +363,12 @@ public readonly partial struct UInt256
 
     private static partial void WriteBigEndianLimbs(in UInt256 value, Span<byte> target)
     {
-        BinaryPrimitives.WriteUInt64BigEndian(target.Slice(0, 8), value.u3);
-        BinaryPrimitives.WriteUInt64BigEndian(target.Slice(8, 8), value.u2);
-        BinaryPrimitives.WriteUInt64BigEndian(target.Slice(16, 8), value.u1);
-        BinaryPrimitives.WriteUInt64BigEndian(target.Slice(24, 8), value.u0);
+        // The target may overlap the value, so every limb is read before the first store.
+        (ulong u0, ulong u1, ulong u2, ulong u3) = (value.u0, value.u1, value.u2, value.u3);
+        BinaryPrimitives.WriteUInt64BigEndian(target.Slice(0, 8), u3);
+        BinaryPrimitives.WriteUInt64BigEndian(target.Slice(8, 8), u2);
+        BinaryPrimitives.WriteUInt64BigEndian(target.Slice(16, 8), u1);
+        BinaryPrimitives.WriteUInt64BigEndian(target.Slice(24, 8), u0);
     }
 
     // The culture formats (N, C, E, F, P, G with a precision, custom) for UInt256.Numerics.cs, through BigInteger. The

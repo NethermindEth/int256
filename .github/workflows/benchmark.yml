@@ -19,6 +19,14 @@ on:
         description: BenchmarkDotNet --filter glob. Keep the suite small — ARM runners have 4 vCPUs. (ToBigEndianAB is x86-only.)
         default: '*ByteSwapBench*'
         type: string
+      intrinsics:
+        description: Hardware intrinsics; disabled runs the scalar fallbacks the RISC-V zkVM guests take
+        default: enabled
+        type: choice
+        options:
+          - enabled
+          - disabled
+          - both
       max-minutes:
         description: Kill the job after this many minutes if it has not finished
         default: 10
@@ -26,7 +34,7 @@ on:
 
 jobs:
   benchmark:
-    name: Benchmark (${{ matrix.os }})
+    name: Benchmark (${{ matrix.os }}, intrinsics ${{ matrix.intrinsics }})
     runs-on: ${{ matrix.os }}
     # Inputs are empty on push events; fall back to the dispatch defaults. `gh workflow run` passes the
     # number input as a string, and timeout-minutes needs a number, hence fromJSON.
@@ -35,6 +43,9 @@ jobs:
       fail-fast: false
       matrix:
         os: ${{ fromJSON((inputs.runner || 'both') == 'both' && '["ubuntu-latest","ubuntu-26.04-arm"]' || format('["{0}"]', inputs.runner)) }}
+        intrinsics: ${{ fromJSON((inputs.intrinsics || 'enabled') == 'both' && '["enabled","disabled"]' || format('["{0}"]', inputs.intrinsics || 'enabled')) }}
+    env:
+      DOTNET_EnableHWIntrinsic: ${{ matrix.intrinsics == 'disabled' && '0' || '1' }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -58,7 +69,7 @@ jobs:
         if: always()
         working-directory: src/Nethermind.Int256.Benchmark
         run: |
-          echo "## Benchmark results (${{ matrix.os }})" >> "$GITHUB_STEP_SUMMARY"
+          echo "## Benchmark results (${{ matrix.os }}, intrinsics ${{ matrix.intrinsics }})" >> "$GITHUB_STEP_SUMMARY"
           if compgen -G "BenchmarkDotNet.Artifacts/results/*-report-github.md" > /dev/null; then
             cat BenchmarkDotNet.Artifacts/results/*-report-github.md >> "$GITHUB_STEP_SUMMARY"
           else
@@ -69,6 +80,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: benchmark-results-${{ matrix.os }}
+          name: benchmark-results-${{ matrix.os }}-intrinsics-${{ matrix.intrinsics }}
           path: src/Nethermind.Int256.Benchmark/BenchmarkDotNet.Artifacts/results/
           if-no-files-found: ignore

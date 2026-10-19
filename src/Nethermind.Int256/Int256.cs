@@ -24,6 +24,12 @@ public readonly partial struct Int256 : IEquatable<Int256>, IComparable, ICompar
 
     internal readonly UInt256 _value;
 
+    /// <summary>Reads a value from its two's complement bytes.</summary>
+    /// <param name="bytes">
+    /// The bytes, read as <see cref="UInt256(in ReadOnlySpan{byte}, bool)"/> reads them: any length other than 32 is
+    /// read big-endian and zero-extended, whatever <paramref name="isBigEndian"/> says.
+    /// </param>
+    /// <param name="isBigEndian">Whether a 32-byte span is big-endian.</param>
     public Int256(ReadOnlySpan<byte> bytes, bool isBigEndian)
     {
         _value = new UInt256(bytes, isBigEndian);

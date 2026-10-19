@@ -214,11 +214,13 @@ public readonly partial struct UInt256
 
     private static partial void WriteBigEndianLimbs(in UInt256 value, Span<byte> target)
     {
+        // The target may overlap the value, so every limb is read before the first store.
+        (ulong u0, ulong u1, ulong u2, ulong u3) = (value.u0, value.u1, value.u2, value.u3);
         ref byte destination = ref MemoryMarshal.GetReference(target);
-        WriteUInt64BigEndian(ref destination, value.u3);
-        WriteUInt64BigEndian(ref Unsafe.Add(ref destination, 8), value.u2);
-        WriteUInt64BigEndian(ref Unsafe.Add(ref destination, 16), value.u1);
-        WriteUInt64BigEndian(ref Unsafe.Add(ref destination, 24), value.u0);
+        WriteUInt64BigEndian(ref destination, u3);
+        WriteUInt64BigEndian(ref Unsafe.Add(ref destination, 8), u2);
+        WriteUInt64BigEndian(ref Unsafe.Add(ref destination, 16), u1);
+        WriteUInt64BigEndian(ref Unsafe.Add(ref destination, 24), u0);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
