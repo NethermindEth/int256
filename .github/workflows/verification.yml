@@ -123,7 +123,7 @@ jobs:
       LEANCIL_CERTIFIED_LIBRARY_SHA256: ${{ needs.prepare.outputs.manifest-sha256 }}
       LEANCIL_TRACE_DIRECTORY: ${{ github.workspace }}/verification/artifacts/verification-traces
       LEANCIL_SUITE: ${{ matrix.id }}
-      LEANCIL_EXPORT_CONSUMER_SUPPORT: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && format('{0}/verification/artifacts/consumer-support-export', github.workspace) || '' }}
+      LEANCIL_EXPORT_CONSUMER_SUPPORT: ${{ matrix.export && github.event_name == 'push' && github.ref == 'refs/heads/main' && format('{0}/verification/artifacts/consumer-support-export', github.workspace) || '' }}
     strategy:
       fail-fast: false
       max-parallel: 8
@@ -160,11 +160,10 @@ jobs:
         id: certificate
         shell: pwsh
         env:
-          VERIFY_METHODS: ${{ toJSON(matrix.methods) }}
-          VERIFY_PROFILE: ${{ matrix.profile }}
+          VERIFY_GROUPS: ${{ toJSON(matrix.groups) }}
           LEANCIL_CONSUMER_SUPPORT: ${{ steps.support.outcome == 'success' && format('{0}/verification/artifacts/consumer-support-import/{1}.json', github.workspace, needs.select.outputs.support-sha256) || '' }}
           LEANCIL_CONSUMER_SUPPORT_SHA256: ${{ steps.support.outcome == 'success' && needs.select.outputs.support-sha256 || '' }}
-        run: dotnet run --file verification/Verify.cs -- --action verify --methods-json "$env:VERIFY_METHODS" --profile "$env:VERIFY_PROFILE"
+        run: dotnet run --file verification/Verify.cs -- --action verify --groups-json "$env:VERIFY_GROUPS"
       - name: Publish certified consumer support for future runs
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.certificate.outputs.consumer-support-sha256 != ''
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

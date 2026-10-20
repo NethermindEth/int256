@@ -14,6 +14,7 @@ string action = "contracts", profile = "scalar";
 string? proof = null, theorem = null;
 int? parallel = null;
 List<string> methods = [];
+BatchGroup[]? groups = null;
 bool methodsSpecified = false;
 for (int index = 0; index < args.Length; index++)
 {
@@ -24,6 +25,7 @@ for (int index = 0; index < args.Length; index++)
         case "--action": action = args[index].ToLowerInvariant(); break;
         case "--method": methodsSpecified = true; methods.Add(args[index]); break;
         case "--methods-json": methodsSpecified = true; methods.AddRange(JsonSerializer.Deserialize<string[]>(args[index])!); break;
+        case "--groups-json": groups = JsonSerializer.Deserialize<BatchGroup[]>(args[index], VerificationSupport.Json)!; break;
         case "--profile": profile = args[index]; break;
         case "--proof": proof = args[index]; break;
         case "--theorem": theorem = args[index]; break;
@@ -31,6 +33,7 @@ for (int index = 0; index < args.Length; index++)
         default: throw new ArgumentException($"Unknown option: {option}");
     }
 }
+if (groups is not null && methodsSpecified) throw new ArgumentException("Use either --groups-json or --method");
 if (!methodsSpecified) methods.Add("Add");
-await VerificationRunner.Run(VerificationSupport.Root, new(action, methods.ToArray(), profile, proof, theorem, parallel),
+await VerificationRunner.Run(VerificationSupport.Root, new(action, methods.ToArray(), profile, proof, theorem, parallel, groups),
     async (command, arguments) => { await VerificationSupport.Run(VerificationSupport.Root, command, arguments); });

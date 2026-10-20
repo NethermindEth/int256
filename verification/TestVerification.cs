@@ -20,10 +20,16 @@ void SelectionCheck(string[] paths, string[] expected, bool contracts, bool all 
     Selection selected = VerificationSelection.Select(root, paths, all);
     Require(selected.Contracts == contracts, "Incorrect contract selection");
     Require(selected.Include.Select(gate => gate.Method).Order().SequenceEqual(expected.Order()), "Incorrect gate selection");
-    Require(selected.Batches.SelectMany(batch => batch.Methods).Order().SequenceEqual(expected.Order()), "Batches lost or duplicated gates");
-    Require(selected.Batches.GroupBy(batch => batch.Profile).All(group => group.Count() <= 8), "Each profile should use at most eight batches");
-    foreach (Batch batch in selected.Batches)
-        Require(batch.Methods.All(method => selected.Include.Any(gate => gate.Method == method && gate.Profile == batch.Profile)), "Incorrect batch profile");
+    string[] Pairs(IEnumerable<(string Method, string Profile)> gates) => [.. gates.Select(gate => gate.Method + "/" + gate.Profile).Order(StringComparer.Ordinal)];
+    Require(Pairs(selected.Batches.SelectMany(batch => batch.Groups.SelectMany(group => group.Methods.Select(method => (method, group.Profile)))))
+        .SequenceEqual(Pairs(selected.Include.Select(gate => (gate.Method, gate.Profile)))), "Batches lost, duplicated or moved gates between profiles");
+    Require(selected.Batches.Length <= VerificationSelection.Jobs, "Each job pays the support build, so the job count must stay bounded");
+    Require(selected.Batches.All(batch => batch.Groups.Length > 0 && batch.Groups.All(group => group.Methods.Length > 0)), "Empty jobs waste a runner");
+    Require(selected.Batches.All(batch => batch.Groups.Select(group => group.Profile).Distinct().Count() == batch.Groups.Length),
+        "A profile repeated within a job would split one batch session");
+    Require(selected.Batches.Count(batch => batch.Export) == (selected.Include.Length > 0 ? 1 : 0) &&
+        (selected.Batches.Length == 0 || (selected.Batches[0].Export && selected.Batches[0].Id == "job-0")),
+        "Exactly one job exports support, and provenance selection expects it to be job-0");
 }
 SelectionCheck(["README.md", "verification/README.md", "LICENSE"], [], false);
 SelectionCheck(["verification/proofs/AddScalar.lean"], ["Add"], true);
@@ -35,6 +41,21 @@ SelectionCheck(["src/Nethermind.Int256/UInt256.cs"], allMethods, true);
 SelectionCheck(["verification/manifests/gates.json"], allMethods, true);
 SelectionCheck(["verification/VerificationRunner.cs"], allMethods, true);
 SelectionCheck([], allMethods, true, all: true);
+{
+    Selection full = VerificationSelection.Select(root, [], all: true);
+    Require(full.Batches.Length == VerificationSelection.Jobs, "A full run should use every parallel job");
+    // One session per profile and job: only profiles larger than a job may be split.
+    foreach (IGrouping<string, Gate> profile in full.Include.GroupBy(gate => gate.Profile).Where(group => group.Count() <= VerificationSelection.Jobs))
+        Require(full.Batches.Count(batch => batch.Groups.Any(group => group.Profile == profile.Key)) == 1, "Small profile split across jobs: " + profile.Key);
+    BatchGroup exportedGroup = full.Batches[0].Groups[^1];
+    Gate exported = full.Include.Single(gate => gate.Method == exportedGroup.Methods[^1] && gate.Profile == exportedGroup.Profile);
+    var costs = VerificationSelection.Costs(root, full.Include);
+    Require(costs[exported].Support == costs.Values.Max(cost => cost.Support),
+        "Support export covers only the exporting request's closure, so the widest gate must export");
+    Gate add = full.Include.Single(gate => gate.Method == "Add" && gate.Profile == "scalar");
+    Gate and = full.Include.Single(gate => gate.Method == "And" && gate.Profile == "scalar");
+    Require(costs[add].Weight > costs[and].Weight, "Modules importing Extracted are rebuilt per extraction and must weigh in");
+}
 Console.WriteLine("Verification gate selection checks passed.");
 
 using (JsonDocument runs = JsonDocument.Parse("""
@@ -49,9 +70,10 @@ using (JsonDocument runs = JsonDocument.Parse("""
 string digest = new('a', 64);
 using (JsonDocument artifacts = JsonDocument.Parse($$"""
     {"artifacts":[
-      {"id":1,"name":"consumer-support-scalar-0-1-{{digest}}","expired":true},
-      {"id":2,"name":"consumer-support-scalar-0-1-untrusted","expired":false},
-      {"id":3,"name":"consumer-support-scalar-0-1-{{digest}}","expired":false}]}
+      {"id":1,"name":"consumer-support-job-0-1-{{digest}}","expired":true},
+      {"id":2,"name":"consumer-support-job-0-1-untrusted","expired":false},
+      {"id":4,"name":"consumer-support-job-1-1-{{digest}}","expired":false},
+      {"id":3,"name":"consumer-support-job-0-1-{{digest}}","expired":false}]}
     """))
     Require(ConsumerSupportSelection.Select(5, artifacts.RootElement) == new ConsumerSupport(5, 3, digest), "Support requires a live artifact and a digest from trusted metadata");
 Console.WriteLine("Consumer support provenance checks passed.");
@@ -141,6 +163,48 @@ try
         if (failure == "export") Require(singles[0][4] == "Second.lean" && singles[0][6] == "second", "Export used the wrong proof");
         Require(Environment.GetEnvironmentVariable(export) == (failure == "export" ? temporary : null), "Support export setting was not restored");
     }
+    // A job spans several profiles: one build, one session per profile, and one export from the last group.
+    File.WriteAllText(Path.Combine(temporary, "manifests/targets.json"), """
+        {"methods":[{"id":"First","signature":"first"},{"id":"Second","signature":"second"},{"id":"Third","signature":"third"}]}
+        """);
+    File.WriteAllText(Path.Combine(temporary, "manifests/gates.json"), """
+        {"gates":[{"method":"First","profile":"scalar","proof":"First.lean","theorem":"first"},
+                  {"method":"Second","profile":"scalar","proof":"Second.lean","theorem":"second"},
+                  {"method":"Third","profile":"x64-avx2","proof":"Third.lean","theorem":"third"}]}
+        """);
+    File.WriteAllText(Path.Combine(temporary, "Third.lean"), "");
+    foreach (bool exporting in new[] { false, true })
+    {
+        List<string[]> calls = [];
+        List<string> sessions = [];
+        Task Command(string command, string[] arguments)
+        {
+            if (command == "dotnet") calls.Add(arguments);
+            if (arguments.Contains("verify-batch"))
+            {
+                Require(Environment.GetEnvironmentVariable(export) is null, "Support export leaked into a batch");
+                using JsonDocument manifest = JsonDocument.Parse(File.ReadAllText(arguments[2]));
+                JsonElement[] requests = [.. manifest.RootElement.GetProperty("requests").EnumerateArray()];
+                sessions.Add(string.Join(",", requests.Select(request => request.GetProperty("theorem").GetString())));
+                File.WriteAllText(arguments[4], JsonSerializer.Serialize(requests.Select(_ => new { status = "verified", stage = "", error = "" })));
+            }
+            return Task.CompletedTask;
+        }
+        Environment.SetEnvironmentVariable(export, exporting ? temporary : null);
+        await VerificationRunner.Run(temporary, new("verify", [], "scalar",
+            Groups: [new("scalar", ["First", "Second"]), new("x64-avx2", ["Third"])]), Command);
+        Require(calls.Count(call => call[0] == "build") == 2, "A multi-profile job must build the tools once");
+        Require(sessions.SequenceEqual(exporting ? ["first,second"] : ["first,second", "third"]), "Each profile needs its own batch session");
+        string[][] singles = [.. calls.Where(call => call.Contains("verify"))];
+        Require(singles.Length == (exporting ? 1 : 0) && (!exporting || (singles[0][2] == "artifacts/Third/x64-avx2" && singles[0][6] == "third")),
+            "Only the last group's last method may export support");
+        Require(calls.Where(call => call.Contains("extract")).Select(call => call[4]).SequenceEqual(
+            ["artifacts/First/scalar", "artifacts/Second/scalar", "artifacts/Third/x64-avx2"]), "Methods were extracted under the wrong profile");
+    }
+    bool rejected = false;
+    try { await VerificationRunner.Run(temporary, new("verify", [], "scalar", Groups: [new("scalar", ["First"]), new("scalar", ["Second"])]), (_, _) => Task.CompletedTask); }
+    catch (ArgumentException) { rejected = true; }
+    Require(rejected, "A repeated profile would overwrite its batch manifest");
     Environment.SetEnvironmentVariable(export, previousExport);
     Console.WriteLine("Verification batch checks passed.");
 }

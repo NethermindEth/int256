@@ -21,7 +21,7 @@ internal static class ConsumerSupportSelection
         {
             if (artifact.GetProperty("expired").GetBoolean()) continue;
             Match name = Regex.Match(artifact.GetProperty("name").GetString()!,
-                @"\Aconsumer-support-scalar-\d+-\d+-([a-f0-9]{64})\z");
+                @"\Aconsumer-support-job-0-\d+-([a-f0-9]{64})\z");
             if (name.Success) return new(run, artifact.GetProperty("id").GetInt64(), name.Groups[1].Value);
         }
         return null;

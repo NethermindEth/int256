@@ -51,5 +51,6 @@ internal static class VerificationSupport
 }
 
 internal sealed record Gate(string Method, string Profile, string Proof, string Theorem);
-internal sealed record Batch(string Id, string Profile, string[] Methods);
+internal sealed record BatchGroup(string Profile, string[] Methods);
+internal sealed record Batch(string Id, bool Export, BatchGroup[] Groups);
 internal sealed record Selection(bool Contracts, Gate[] Include, Batch[] Batches);

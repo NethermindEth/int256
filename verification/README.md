@@ -78,11 +78,14 @@ changes skip the expensive jobs; the stable `Verify UInt256` check still runs
 and requires every selected check to pass. CI builds and kernel-checks the shared
 LeanCIL library once per run; certificate jobs validate the producer's manifest
 digest before reusing it. Consumer proof checks remain separate for every gate.
-Gates are divided into at most eight batches per profile, with up to eight
-batches running concurrently. Each batch builds
-the extractor and production assembly once, then certifies its selected methods
-sequentially. LeanCIL authenticates and reuses extraction-independent consumer
-modules locally on that runner. Unchanged successful proofs can also be reused;
+Gates are divided into at most eight jobs, all running concurrently, because
+every job pays the shared support build once. `VerificationSelection.cs`
+balances jobs by a per-gate weight (a fixed per-extraction cost plus the proof
+modules that import `Extracted`, which every extraction rebuilds) and splits a
+profile only when it outweighs a job. Each job builds the extractor and
+production assembly once, then runs one `verify-batch` session per profile
+(`Verify.cs --groups-json`). LeanCIL authenticates and reuses
+extraction-independent consumer modules locally on that runner, across profiles. Unchanged successful proofs can also be reused;
 changed extraction and proof inputs are checked by the upstream verifier. Every selected method still needs
 its own certificate, and any failure fails the batch while allowing the other
 methods to report their results.
@@ -107,8 +110,9 @@ LeanCIL's existing authenticated support cache can reuse these compiled theorems
 and their kernel checks across different gates in the same batch. The first gate
 still checks the shared proof; subsequent gates freshly check their extraction,
 bindings and public proof. This differs from an unchanged whole-proof cache hit.
-Successful main-branch runs also export portable support manifests. On later
-runs, `FindConsumerSupport.cs` discovers an artifact from the latest successful
+Successful main-branch runs also export a portable support manifest from
+`job-0`, whose last request is the gate with the widest extraction-independent
+closure. On later runs, `FindConsumerSupport.cs` discovers that artifact from the latest successful
 push to this repository's `main` branch and obtains its digest from GitHub's
 artifact metadata. PR artifacts cannot provide that trust anchor. Certificate
 jobs download the manifest and give the digest separately to LeanCIL. Missing

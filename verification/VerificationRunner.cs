@@ -7,7 +7,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 
 internal sealed record VerificationOptions(string Action, string[] Methods, string Profile, string? Proof = null, string? Theorem = null,
-    int? Parallel = null);
+    int? Parallel = null, BatchGroup[]? Groups = null);
 
 internal static class VerificationRunner
 {
@@ -22,18 +22,33 @@ internal static class VerificationRunner
             return;
         }
         if (options.Action is not ("verify" or "extract")) throw new ArgumentException("Expected contracts, extract or verify");
-        if (options.Methods.Length == 0) throw new ArgumentException("Select at least one method");
-        if (options.Methods.Length > 1 && (options.Proof is not null || options.Theorem is not null))
+        BatchGroup[] groups = options.Groups ?? [new(options.Profile, options.Methods)];
+        if (groups.Length == 0 || groups.Any(group => group.Methods.Length == 0)) throw new ArgumentException("Select at least one method");
+        if ((groups.Length > 1 || groups[0].Methods.Length > 1) && (options.Proof is not null || options.Theorem is not null))
             throw new ArgumentException("Explicit proofs require a single method");
-        if (!Regex.IsMatch(options.Profile, @"\A[a-zA-Z0-9-]+\z")) throw new ArgumentException("Expected a profile name");
+        if (groups.Any(group => !Regex.IsMatch(group.Profile, @"\A[a-zA-Z0-9-]+\z"))) throw new ArgumentException("Expected a profile name");
+        if (groups.Select(group => group.Profile).Distinct(StringComparer.Ordinal).Count() != groups.Length)
+            throw new ArgumentException("Each profile may appear in only one group");
         using JsonDocument inventory = JsonDocument.Parse(File.ReadAllText(Path.Combine(root, "manifests/targets.json")));
         Gate[] gates = VerificationSupport.Gates(root);
         await command("dotnet", ["build", ".lake/packages/leancil/Extractor", "-c", "Release"]);
         await command("dotnet", ["build", "../src/Nethermind.Int256/Nethermind.Int256.csproj", "-c", "Release"]);
         List<string> failures = [];
-        List<Request> ready = [];
         const string tool = ".lake/packages/leancil/Extractor/bin/Nethermind.LeanCIL.dll";
         Stopwatch elapsed = Stopwatch.StartNew();
+        // Later profiles restore the support the first one built from the local cache.
+        for (int index = 0; index < groups.Length; index++)
+            await RunGroup(root, options with { Profile = groups[index].Profile, Methods = groups[index].Methods },
+                index == groups.Length - 1, inventory, gates, failures, command, tool);
+        int total = groups.Sum(group => group.Methods.Length);
+        Console.WriteLine($"{options.Action} finished in {elapsed.Elapsed.TotalSeconds:F1}s: {total - failures.Count} passed, {failures.Count} failed");
+        if (failures.Count > 0) throw new InvalidOperationException(string.Join(Environment.NewLine, failures));
+    }
+
+    static async Task RunGroup(string root, VerificationOptions options, bool lastGroup, JsonDocument inventory, Gate[] gates,
+        List<string> failures, Func<string, string[], Task> command, string tool)
+    {
+        List<Request> ready = [];
         foreach (string method in options.Methods)
         {
             Console.WriteLine($"START extract {method}/{options.Profile}");
@@ -72,9 +87,11 @@ internal static class VerificationRunner
             }
         }
         // Support export needs a single-request verify, and a batch success-cache hit would skip the export.
-        bool exporting = !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(ExportVariable));
+        // A job exports once, from its last group, so it publishes a single manifest.
+        bool exporting = lastGroup && !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(ExportVariable));
+        bool hidden = !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(ExportVariable));
         List<Request> batch = exporting && ready.Count > 0 ? ready[..^1] : ready;
-        if (batch.Count > 0) await VerifyBatch(root, options, batch, failures, command, tool, hideExport: exporting);
+        if (batch.Count > 0) await VerifyBatch(root, options, batch, failures, command, tool, hideExport: hidden);
         if (exporting && ready.Count > 0)
         {
             Request last = ready[^1];
@@ -89,8 +106,6 @@ internal static class VerificationRunner
                 Console.Error.WriteLine(failures[^1]);
             }
         }
-        Console.WriteLine($"{options.Action} finished in {elapsed.Elapsed.TotalSeconds:F1}s: {options.Methods.Length - failures.Count} passed, {failures.Count} failed");
-        if (failures.Count > 0) throw new InvalidOperationException(string.Join(Environment.NewLine, failures));
     }
 
     const string ExportVariable = "LEANCIL_EXPORT_CONSUMER_SUPPORT";

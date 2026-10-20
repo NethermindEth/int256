@@ -37,7 +37,7 @@ Console.WriteLine(JsonSerializer.Serialize(selection, VerificationSupport.Json))
 if (output is not null)
 {
     // A placeholder keeps GitHub's matrix valid when the entire job is skipped.
-    Batch[] batches = selection.Batches.Length == 0 ? [new("none", "scalar", [])] : selection.Batches;
+    Batch[] batches = selection.Batches.Length == 0 ? [new("none", false, [new("scalar", [])])] : selection.Batches;
     File.AppendAllText(output, $"contracts={selection.Contracts.ToString().ToLowerInvariant()}\n" +
         $"count={selection.Include.Length}\n" +
         "matrix=" + JsonSerializer.Serialize(new { include = batches }, VerificationSupport.Json) + "\n");
