@@ -12,6 +12,7 @@ if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("LEAN_NUM_THREADS"))
 
 string action = "contracts", profile = "scalar";
 string? proof = null, theorem = null;
+int? parallel = null;
 List<string> methods = [];
 bool methodsSpecified = false;
 for (int index = 0; index < args.Length; index++)
@@ -26,9 +27,10 @@ for (int index = 0; index < args.Length; index++)
         case "--profile": profile = args[index]; break;
         case "--proof": proof = args[index]; break;
         case "--theorem": theorem = args[index]; break;
+        case "--parallel": parallel = int.Parse(args[index], System.Globalization.CultureInfo.InvariantCulture); break;
         default: throw new ArgumentException($"Unknown option: {option}");
     }
 }
 if (!methodsSpecified) methods.Add("Add");
-await VerificationRunner.Run(VerificationSupport.Root, new(action, methods.ToArray(), profile, proof, theorem),
+await VerificationRunner.Run(VerificationSupport.Root, new(action, methods.ToArray(), profile, proof, theorem, parallel),
     async (command, arguments) => { await VerificationSupport.Run(VerificationSupport.Root, command, arguments); });

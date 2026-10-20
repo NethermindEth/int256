@@ -83,31 +83,65 @@ try
         """);
     File.WriteAllText(Path.Combine(temporary, "First.lean"), "");
     File.WriteAllText(Path.Combine(temporary, "Second.lean"), "");
-    foreach (string? failure in new string?[] { null, "extract", "verify" })
+    const string export = "LEANCIL_EXPORT_CONSUMER_SUPPORT";
+    string? previousExport = Environment.GetEnvironmentVariable(export);
+    foreach (string? failure in new string?[] { null, "extract", "verify", "crash", "export" })
     {
         List<string[]> calls = [];
+        List<string[]> batches = [];
         string stale = Path.Combine(temporary, "artifacts/First/scalar/verified.json");
         Directory.CreateDirectory(Path.GetDirectoryName(stale)!);
         File.WriteAllText(stale, "old certificate");
         Task Command(string command, string[] arguments)
         {
             if (command == "dotnet") calls.Add(arguments);
-            if ((failure == "verify" && arguments.Contains("verify") && arguments.Contains("artifacts/First/scalar")) ||
-                (failure == "extract" && arguments.Contains("extract") && arguments.Contains("first")))
+            if (failure == "extract" && arguments.Contains("extract") && arguments.Contains("first"))
                 throw new InvalidOperationException("Expected test failure");
+            if (arguments.Contains("verify-batch"))
+            {
+                Require(Environment.GetEnvironmentVariable(export) is null, "Support export leaked into a batch");
+                using JsonDocument manifest = JsonDocument.Parse(File.ReadAllText(arguments[2]));
+                string[][] requests = [.. manifest.RootElement.GetProperty("requests").EnumerateArray()
+                    .Select(request => new[] { request.GetProperty("output").GetString()!, Path.GetFileName(request.GetProperty("proof").GetString()!), request.GetProperty("theorem").GetString()! })];
+                batches.AddRange(requests);
+                if (failure == "crash") throw new InvalidOperationException("Expected test failure");
+                File.WriteAllText(arguments[4], JsonSerializer.Serialize(requests.Select(request => new
+                {
+                    status = failure == "verify" && request[2] == "first" ? "failed" : "verified",
+                    stage = "proof checking",
+                    error = "Expected test failure",
+                })));
+                if (failure == "verify") throw new InvalidOperationException("Expected test failure");
+            }
             return Task.CompletedTask;
         }
-        bool failed = false;
+        Environment.SetEnvironmentVariable(export, failure == "export" ? temporary : null);
+        string? message = null;
         try { await VerificationRunner.Run(temporary, new("verify", ["First", "Second"], "scalar"), Command); }
-        catch (InvalidOperationException) { failed = true; }
-        Require(failed == (failure is not null), "Batch did not propagate failure");
+        catch (InvalidOperationException exception) { message = exception.Message; }
+        Require((message is null) == failure is null or "export", "Batch did not propagate failure");
+        Require(failure is not ("extract" or "verify") || (message!.Contains("First/scalar") && !message.Contains("Second/scalar")),
+            "A failure was attributed to the wrong method");
+        Require(failure != "crash" || (message!.Contains("First/scalar") && message.Contains("Second/scalar")),
+            "Requests without results must fail");
         Require(!File.Exists(stale), "A stale certificate survived fresh extraction");
         Require(calls.Count(call => call[0] == "build") == 2, "Builds must run once per batch");
-        string[][] verifies = calls.Where(call => call.Contains("verify")).ToArray();
-        Require(verifies.Length == (failure == "extract" ? 1 : 2), "Incorrect number of verification attempts");
-        Require(verifies[^1][4] == "Second.lean" && verifies[^1][6] == "second", "Proof selection leaked between methods");
-        if (failure != "extract") Require(verifies[0][4] == "First.lean", "First method used the wrong proof");
+        Require(calls.Count(call => call.Contains("verify-batch")) == 1, "Verification must share one batch session");
+        string[][] expected = failure switch
+        {
+            "extract" => [["second", "Second.lean"]],
+            "export" => [["first", "First.lean"]],
+            _ => [["first", "First.lean"], ["second", "Second.lean"]],
+        };
+        Require(batches.Select(request => request[2] + "/" + request[1]).SequenceEqual(expected.Select(pair => pair[0] + "/" + pair[1])),
+            "Proof selection leaked between methods");
+        Require(batches.All(request => Path.IsPathRooted(request[0])), "Batch outputs must not depend on the tool directory");
+        string[][] singles = [.. calls.Where(call => call.Contains("verify"))];
+        Require(singles.Length == (failure == "export" ? 1 : 0), "Only the exported method may use a single-request verify");
+        if (failure == "export") Require(singles[0][4] == "Second.lean" && singles[0][6] == "second", "Export used the wrong proof");
+        Require(Environment.GetEnvironmentVariable(export) == (failure == "export" ? temporary : null), "Support export setting was not restored");
     }
+    Environment.SetEnvironmentVariable(export, previousExport);
     Console.WriteLine("Verification batch checks passed.");
 }
 finally
