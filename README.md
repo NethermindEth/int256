@@ -98,6 +98,18 @@ The NuGet package includes standard and RISC-V zkVM implementations with the sam
 </PropertyGroup>
 ```
 
+A guest whose zkVM has Zbb's `rev8` and performs misaligned word accesses natively can switch big-endian conversion to a word load plus `rev8` by stubbing `UInt256.get_HasByteReverse` to `true` in its ILC substitutions:
+
+```xml
+<assembly fullname="Nethermind.Int256">
+  <type fullname="Nethermind.Int256.UInt256">
+    <method signature="System.Boolean get_HasByteReverse()" body="stub" value="true" />
+  </type>
+</assembly>
+```
+
+The substitution matches the property by name, so it must not be renamed.
+
 ## Build and contribute
 
 Use the SDK specified in [`global.json`](https://github.com/NethermindEth/int256/blob/main/global.json). From the repository root:

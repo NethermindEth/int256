@@ -3,6 +3,7 @@
 
 using System;
 using System.Buffers.Binary;
+using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -196,15 +197,19 @@ public readonly partial struct UInt256
 
     /// <summary>Whether the guest's zkVM reverses a word's bytes in one instruction (Zbb's <c>rev8</c>).</summary>
     /// <remarks>
-    /// False here, for the zkVMs that decode rv64im only. A guest whose zkVM has Zbb substitutes true in its ILC
-    /// substitutions, which folds every branch on it away. Without Zbb, <see cref="BinaryPrimitives.ReverseEndianness(ulong)"/>
-    /// is a ~30-instruction software sequence, and those zkVMs also reject misaligned accesses, so an unaligned word
-    /// is loaded byte by byte anyway; gathering the bytes in big-endian order drops the reversal on top of it.
+    /// False here, for the zkVMs that decode rv64im only. A guest whose zkVM has Zbb and also performs misaligned word
+    /// accesses natively substitutes true in its ILC substitutions, which folds every branch on it away. With Zbb but
+    /// split misaligned accesses, every word would be byte loads plus <c>rev8</c>, so the byte gather stays cheaper. Without
+    /// Zbb, <see cref="BinaryPrimitives.ReverseEndianness(ulong)"/> is a ~30-instruction software sequence, and those
+    /// zkVMs also reject misaligned accesses, so an unaligned word is loaded byte by byte anyway; gathering the bytes in
+    /// big-endian order drops the reversal on top of it. The substitution targets <c>get_HasByteReverse</c> by name, so
+    /// renaming the property or making it a constant silently stops it from applying.
     /// </remarks>
     private static bool HasByteReverse => false;
 
     private static partial void ReadBigEndianLimbs(ReadOnlySpan<byte> bytes, out ulong u0, out ulong u1, out ulong u2, out ulong u3)
     {
+        Debug.Assert(bytes.Length >= 32);
         ref byte source = ref MemoryMarshal.GetReference(bytes);
         u3 = ReadUInt64BigEndian(ref source);
         u2 = ReadUInt64BigEndian(ref Unsafe.Add(ref source, 8));
@@ -216,6 +221,7 @@ public readonly partial struct UInt256
     {
         // The target may overlap the value, so every limb is read before the first store.
         (ulong u0, ulong u1, ulong u2, ulong u3) = (value.u0, value.u1, value.u2, value.u3);
+        Debug.Assert(target.Length >= 32);
         ref byte destination = ref MemoryMarshal.GetReference(target);
         WriteUInt64BigEndian(ref destination, u3);
         WriteUInt64BigEndian(ref Unsafe.Add(ref destination, 8), u2);
