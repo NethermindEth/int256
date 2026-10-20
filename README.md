@@ -101,14 +101,24 @@ The NuGet package includes standard and RISC-V zkVM implementations with the sam
 A guest whose zkVM has Zbb's `rev8` and performs misaligned word accesses natively can switch big-endian conversion to a word load plus `rev8` by stubbing `UInt256.get_HasByteReverse` to `true` in its ILC substitutions:
 
 ```xml
-<assembly fullname="Nethermind.Int256">
-  <type fullname="Nethermind.Int256.UInt256">
-    <method signature="System.Boolean get_HasByteReverse()" body="stub" value="true" />
-  </type>
-</assembly>
+<linker>
+  <assembly fullname="Nethermind.Int256">
+    <type fullname="Nethermind.Int256.UInt256">
+      <method signature="System.Boolean get_HasByteReverse()" body="stub" value="true" />
+    </type>
+  </assembly>
+</linker>
 ```
 
-The substitution matches the property by name, so it must not be renamed.
+Pass the file to ILC from the guest project:
+
+```xml
+<ItemGroup>
+  <IlcArg Include="--substitution:$(MSBuildProjectDirectory)/ILLink.Substitutions.xml" />
+</ItemGroup>
+```
+
+ILC ignores a file without the `<linker>` root and warns IL2009 if the method is not found.
 
 ## Build and contribute
 
