@@ -3,9 +3,10 @@
 This migration starts from `verification/uint256-memory-safety`
 (`6c56716afa7860771c08815b8348e53313c7f8c8`), based on int256 `main`
 (`5fa8d77429c0440754bbfc851788d1ae37aba07f`). It consumes LeanCIL at
-`7aec18ee49eaa33255a980ca688cfd816492be97` through a pinned Lake dependency
-([ReadOnlySpan<byte> lookup tables](https://github.com/NethermindEth/LeanCIL/pull/55) and
-[lockstep evidence checks](https://github.com/NethermindEth/LeanCIL/pull/56)).
+`a33214567ef48f9a586d2129880fdfd028a9d07b` through a pinned Lake dependency
+([ReadOnlySpan<byte> lookup tables](https://github.com/NethermindEth/LeanCIL/pull/55),
+[lockstep evidence checks](https://github.com/NethermindEth/LeanCIL/pull/56) and
+[shared consumer support with joint kernel replay](https://github.com/NethermindEth/LeanCIL/pull/58)).
 CIL semantics, extraction, and verification infrastructure belong to LeanCIL;
 this directory contains only UInt256 specifications and proofs.
 
@@ -191,6 +192,15 @@ To verify several methods with one build locally, invoke the single-file C# app:
 ```powershell
 dotnet run --file verification/Verify.cs -- --action verify --method Subtract --method SubtractUnderflow --profile scalar
 ```
+
+The runner extracts every selected method, then checks them in one LeanCIL
+`verify-batch` session, which builds and replays the shared support once;
+`--parallel <n>` bounds its concurrent workspaces (LeanCIL default: processor
+count / 8). Each method still receives its own certificate. When
+`LEANCIL_EXPORT_CONSUMER_SUPPORT` is set, the last method runs as a single
+`verify` because support export requires one request. The regression runners
+likewise submit each refutation and its `expect: rejected` production proof
+through one batch (`RegressionBatch.cs`).
 
 `SelectGates.cs`, `Verify.cs`, and `TestVerification.cs` are single-file C# apps;
 their shared source files are included with `#:include`, as in LeanCIL.
