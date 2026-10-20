@@ -14,6 +14,8 @@ public class ByteSwapBenchShortSpans
     private const int N = 16;
 
     private byte[] _bytes = [];
+    private byte[] _target = [];
+    private UInt256 _value;
 
     [Params(1, 8, 9, 20, 31)]
     public int Length { get; set; }
@@ -26,6 +28,8 @@ public class ByteSwapBenchShortSpans
         {
             _bytes[i] = (byte)(0xC0 + i);
         }
+        _target = new byte[Length];
+        _value = new UInt256(0xC0C1C2C3C4C5C6C7, 0xC8C9CACBCCCDCECF, 0xD0D1D2D3D4D5D6D7, 0xD8D9DADBDCDDDEDF);
     }
 
     [Benchmark(OperationsPerInvoke = N)]
@@ -37,5 +41,14 @@ public class ByteSwapBenchShortSpans
             acc ^= new UInt256(_bytes, isBigEndian: true);
         }
         return acc;
+    }
+
+    [Benchmark(OperationsPerInvoke = N)]
+    public void WritePaddedBytes()
+    {
+        for (int i = 0; i < N; i++)
+        {
+            _value.WritePaddedBytes(_target);
+        }
     }
 }
