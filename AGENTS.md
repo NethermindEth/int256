@@ -23,7 +23,10 @@ High-performance 256-bit integer types for .NET. See [global.json](./global.json
 - Keep the standard (`*.std.cs`) and RISC-V zkVM (`*.zkevm.cs`) variants in sync; [Directory.Build.targets](./src/Directory.Build.targets) selects one per build and the package ships both.
 - Treat ARM64 as a first-class target alongside x64: hardware-accelerated paths must cover both architectures, unless benchmarks show acceleration is slower on one of them.
 - Keep the software fallbacks correct; CI also runs the tests with hardware intrinsics disabled.
-- Implement generic math (`INumber<T>`, `*.numerics.cs`) as explicit interface members that forward to the public `in` operators; a public by-value overload would rebind existing callers. Unchecked members keep the public operators' semantics (`UInt256` subtraction throws on underflow), and checked members throw on any overflow. The interfaces pass operands by value; the JIT keeps those copies off the stack only while each is read one way (all limbs or all vectors), so check the generic path's disassembly, not just the direct one, when touching shared kernels. Keep `BigInteger` off any path an AOT guest can reach from formatting or interpolation, such as `TryFormat`: the zkVM image links whatever those reference.
+- Implement generic math (`INumber<T>`, `*.numerics.cs`) as explicit interface members that forward to the public `in` operators; a public by-value overload would rebind existing callers.
+  - Unchecked members keep the public operators' semantics (`UInt256` subtraction throws on underflow); checked members throw on any overflow.
+  - The interfaces pass operands by value; the JIT keeps those copies off the stack only while each is read one way (all limbs or all vectors). When touching shared kernels, check the generic path's disassembly, not just the direct one.
+- Keep `BigInteger` off any path an AOT guest can reach from formatting or interpolation, such as `TryFormat`: the zkVM image links whatever those reference.
 - Back performance changes with reproducible before/after benchmarks.
 - Prefer the latest versions of GitHub Actions and runners.
 - Update [THIRD-PARTY-NOTICES](./THIRD-PARTY-NOTICES) when introducing a dependency if needed.
