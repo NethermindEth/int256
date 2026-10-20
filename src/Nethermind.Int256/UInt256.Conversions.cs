@@ -67,27 +67,53 @@ public readonly partial struct UInt256
     /// zeroed, matching the <see cref="PaddedBytes(int)"/> array overload.
     /// </summary>
     /// <param name="target">The destination span; fully overwritten.</param>
-    [SkipLocalsInit]
     public void WritePaddedBytes(Span<byte> target)
     {
         int n = target.Length;
         if (n is 32 or 20)
         {
-            // ToBigEndian writes these widths directly, skipping the staging buffer and copy.
             ToBigEndian(target);
             return;
         }
 
-        Span<byte> be = stackalloc byte[32];
-        WriteBigEndianLimbs(in this, be);
-
-        int copy = Math.Min(32, n);
-        if (n > copy)
+        // The target may overlap this value, so every limb is read before the first store.
+        (ulong r0, ulong r1, ulong r2, ulong r3) = (u0, u1, u2, u3);
+        ref byte destination = ref MemoryMarshal.GetReference(target);
+        if (n > 32)
         {
-            target.Slice(0, n - copy).Clear();
+            target.Slice(0, n - 32).Clear();
+            ref byte word = ref Unsafe.Add(ref destination, n - 32);
+            WriteUInt64BigEndian(ref word, r3);
+            WriteUInt64BigEndian(ref Unsafe.Add(ref word, 8), r2);
+            WriteUInt64BigEndian(ref Unsafe.Add(ref word, 16), r1);
+            WriteUInt64BigEndian(ref Unsafe.Add(ref word, 24), r0);
+            return;
         }
 
-        be.Slice(32 - copy, copy).CopyTo(target.Slice(n - copy, copy));
+        // Whole words from the right, then the leading partial word.
+        ref byte end = ref Unsafe.Add(ref destination, n);
+        if (n >= 8) WriteUInt64BigEndian(ref Unsafe.Subtract(ref end, 8), r0);
+        if (n >= 16) WriteUInt64BigEndian(ref Unsafe.Subtract(ref end, 16), r1);
+        if (n >= 24) WriteUInt64BigEndian(ref Unsafe.Subtract(ref end, 24), r2);
+
+        int partial = n & 7;
+        if (partial == 0) return;
+
+        ulong high = (n >> 3) switch { 0 => r0, 1 => r1, 2 => r2, _ => r3 };
+        if (n > 8)
+        {
+            // One word at the start: the partial bytes, then the next word's leading bytes, which rewrites
+            // bytes already stored with the same values.
+            ulong low = (n >> 3) switch { 1 => r0, 2 => r1, _ => r2 };
+            WriteUInt64BigEndian(ref destination, (high << (8 * (8 - partial))) | (low >> (8 * partial)));
+            return;
+        }
+
+        for (int i = partial - 1; i >= 0; i--)
+        {
+            Unsafe.Add(ref destination, i) = (byte)high;
+            high >>= 8;
+        }
     }
 
     public byte[] ToBigEndian()

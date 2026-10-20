@@ -1323,7 +1323,7 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
     [Test]
     public void PaddedBytes_Matches_BigEndian_RightAligned(
         [ValueSource(nameof(PaddedBytesValues))] BigInteger value,
-        [Values(0, 1, 8, 20, 31, 32, 33, 64)] int n)
+        [Range(0, 48)] int n)
     {
         UInt256 v = (UInt256)value;
 
@@ -2072,6 +2072,19 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
             if (length < 0) value.ToLittleEndian(target);
             else value.ToBigEndian(target);
         }
+    }
+
+    [Test]
+    public void WritePaddedBytes_Overlapping_Target([Values(7, 9, 24, 31, 40)] int length, [Range(-30, 30, 3)] int shift)
+    {
+        byte[] buffer = DistinctBytes(112);
+        ref UInt256 value = ref MemoryMarshal.AsRef<UInt256>(buffer.AsSpan(32, 32));
+        UInt256 copy = value;
+
+        byte[] expected = (byte[])buffer.Clone();
+        copy.WritePaddedBytes(expected.AsSpan(32 + shift, length));
+        value.WritePaddedBytes(buffer.AsSpan(32 + shift, length));
+        buffer.Should().Equal(expected);
     }
 
     [Test]
