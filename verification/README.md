@@ -3,10 +3,12 @@
 This migration starts from `verification/uint256-memory-safety`
 (`6c56716afa7860771c08815b8348e53313c7f8c8`), based on int256 `main`
 (`5fa8d77429c0440754bbfc851788d1ae37aba07f`). It consumes LeanCIL at
-`a33214567ef48f9a586d2129880fdfd028a9d07b` through a pinned Lake dependency
+`412e0cf10898929352d9a6446f06c4b6943fe1ac` through a pinned Lake dependency
 ([ReadOnlySpan<byte> lookup tables](https://github.com/NethermindEth/LeanCIL/pull/55),
-[lockstep evidence checks](https://github.com/NethermindEth/LeanCIL/pull/56) and
-[shared consumer support with joint kernel replay](https://github.com/NethermindEth/LeanCIL/pull/58)).
+[lockstep evidence checks](https://github.com/NethermindEth/LeanCIL/pull/56),
+[shared consumer support with joint kernel replay](https://github.com/NethermindEth/LeanCIL/pull/58),
+[extraction-dependent modules cached by program text](https://github.com/NethermindEth/LeanCIL/pull/61) and
+[compiled portable support with batch export](https://github.com/NethermindEth/LeanCIL/pull/62)).
 CIL semantics, extraction, and verification infrastructure belong to LeanCIL;
 this directory contains only UInt256 specifications and proofs.
 
