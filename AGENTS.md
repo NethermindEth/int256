@@ -38,6 +38,7 @@ High-performance 256-bit integer types for .NET. See [global.json](./global.json
 - Match the file's naming style; use NUnit `Assert.That` constraints and no Arrange/Act/Assert comments.
 - Do not leave tests disabled or commented out.
 - Run from `src/Nethermind.Int256.Tests` with `dotnet test`; add `-p:EnableZkEvm=true` for the zkVM variant and set `DOTNET_EnableHWIntrinsic=0` for the software fallbacks. When filtering, check the run count to confirm tests actually ran.
+
 ## Verification
 
 - Consume pinned LeanCIL from `verification/lakefile.toml`; keep CIL infrastructure upstream.
