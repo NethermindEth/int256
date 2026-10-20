@@ -2027,7 +2027,7 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
 
     // 32 distinct byte values make any within-limb reversal or half/lane swap in the vectorized
     // big-endian read/write paths (AVX2/AVX-512 on x86, AdvSimd on ARM64) visible byte-by-byte.
-    // Every offset within a word covers the unaligned accesses of the scalar paths.
+    // Every offset within a word checks the scalar paths' offset handling.
     [Test]
     public void BigEndian_Ctor_And_ToBigEndian_RoundTrip_Distinct_Bytes([Range(0, 7)] int offset)
     {

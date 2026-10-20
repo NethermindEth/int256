@@ -78,6 +78,12 @@ jobs:
             intrinsics: NoHWIntrinsics
             avx2: NoAvx2
             variant: zkevm
+          # Debug runs the asserts on the software paths that zkVM guests take.
+          - os: ubuntu-latest
+            build-config: debug
+            intrinsics: NoHWIntrinsics
+            avx2: NoAvx2
+            variant: zkevm
 
           # linux-arm64: validates the AdvSimd paths on the production ARM target
           # (the AVX2/AVX-512 env toggles are no-ops there).

@@ -194,14 +194,19 @@ public readonly partial struct UInt256
         borrow = difference == 0 ? incoming : (a < b ? 1UL : 0UL);
     }
 
-    /// <summary>Whether the guest's zkVM reverses a word's bytes in one instruction (Zbb's <c>rev8</c>).</summary>
+    /// <summary>
+    /// Whether the guest's zkVM reverses a word's bytes in one instruction (Zbb's <c>rev8</c>) and accesses misaligned
+    /// words natively.
+    /// </summary>
     /// <remarks>
     /// False here, for the zkVMs that decode rv64im only. A guest whose zkVM has Zbb substitutes true in its ILC
     /// substitutions, which folds every branch on it away. Without Zbb, <see cref="BinaryPrimitives.ReverseEndianness(ulong)"/>
     /// is a ~30-instruction software sequence, and those zkVMs also reject misaligned accesses, so an unaligned word
     /// is loaded byte by byte anyway; gathering the bytes in big-endian order drops the reversal on top of it.
     /// Substitute true only where the zkVM also handles misaligned word access natively: the true form loads and
-    /// stores whole words, which a zkVM without it splits into bytes before the reversal.
+    /// stores whole words, which a zkVM without it splits into bytes before the reversal. The substitution targets
+    /// <c>get_HasByteReverse</c> by name, so renaming the property or making it a constant stops it from applying;
+    /// ILC then warns IL2009.
     /// </remarks>
     private static bool HasByteReverse => false;
 
