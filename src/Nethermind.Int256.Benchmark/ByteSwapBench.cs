@@ -8,7 +8,7 @@ namespace Nethermind.Int256.Benchmark;
 
 /// <summary>
 /// Platform-neutral benchmark for the 32-byte big- and little-endian read/write paths
-/// (AVX/AVX2/AVX-512 on x86, AdvSimd on ARM64, scalar otherwise) and the 20-byte (address) write.
+/// (AVX/AVX2/AVX-512 on x86, AdvSimd on ARM64, scalar otherwise), the 20-byte (address) write and a padded write.
 /// </summary>
 /// <remarks>
 /// Unlike <c>ToBigEndianAB</c>, whose setup throws without AVX2, this class runs on every ISA,
@@ -59,6 +59,16 @@ public class ByteSwapBench
         for (int i = 0; i < N; i++)
         {
             _value.ToBigEndian(_target.AsSpan(0, 20));
+        }
+    }
+
+    // A width other than 20 or 32 stages the 32-byte big-endian form on the stack.
+    [Benchmark(OperationsPerInvoke = N)]
+    public void WritePaddedBytes()
+    {
+        for (int i = 0; i < N; i++)
+        {
+            _value.WritePaddedBytes(_target.AsSpan(0, 24));
         }
     }
 
