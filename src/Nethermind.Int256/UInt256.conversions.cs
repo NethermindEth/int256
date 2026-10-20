@@ -137,7 +137,7 @@ public readonly partial struct UInt256
             if (Avx2.IsSupported)
             {
                 // Full 32-byte reversal is an involution, so this reuses the shuffle constant of the
-                // big-endian read ctor (UInt256.Ctors.cs).
+                // big-endian read ctor (UInt256.ctors.cs).
                 Vector256<byte> data = Unsafe.As<ulong, Vector256<byte>>(ref Unsafe.AsRef(in u0));
                 Vector256<byte> shuffle = Vector256.Create(
                     0x18191a1b1c1d1e1ful,
