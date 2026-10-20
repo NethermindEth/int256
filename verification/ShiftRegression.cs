@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Demerzel Solutions Limited
 // SPDX-License-Identifier: MIT
 #:property PublishAot=false
+#:include RegressionBatch.cs
 
 using System.Diagnostics;
 using System.Text.Json.Nodes;
@@ -18,7 +19,7 @@ JsonObject witnesses = JsonNode.Parse(File.ReadAllText(Path.Combine(fixtures, "W
 JsonArray targets = JsonNode.Parse(File.ReadAllText(Path.Combine(root, "manifests/targets.json")))!["methods"]!.AsArray();
 string[] methods = ["Lsh", "Rsh", "LeftShift", "RightShift", "OperatorLsh", "OperatorRsh"];
 
-async Task<string> Run(string executable, IEnumerable<string> arguments, bool succeeds = true)
+async Task<string> Run(string executable, IEnumerable<string> arguments)
 {
     ProcessStartInfo start = new(executable) { WorkingDirectory = root, RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
     foreach (string argument in arguments) start.ArgumentList.Add(argument);
@@ -26,7 +27,7 @@ async Task<string> Run(string executable, IEnumerable<string> arguments, bool su
     Task<string> stdout = process.StandardOutput.ReadToEndAsync(), stderr = process.StandardError.ReadToEndAsync();
     await process.WaitForExitAsync();
     string output = await stdout + await stderr;
-    if ((process.ExitCode == 0) != succeeds) throw new InvalidOperationException(output);
+    if (process.ExitCode != 0) throw new InvalidOperationException(output);
     return output;
 }
 
@@ -89,20 +90,11 @@ foreach (var pair in witnesses)
         checks.Add((method, mutation, extraction, proof));
     }
 }
-foreach (var check in checks)
-{
-    string method = check.Method, mutation = check.Mutation, extraction = check.Extraction;
-    Console.WriteLine($"CHECK {method}/{profile}/{mutation}: certify full-contract refutation");
-    await Run("dotnet", [tool, "verify", extraction, "--proof", check.Proof, "--theorem", "ShiftWitness.refuted", "--proof-root", consumer]);
-    string suffix = profile == "scalar" ? "Scalar" : "Vector";
-    string theorem = "UInt256Proof." + method + "." + suffix.ToLowerInvariant() + "_correctness";
-    Console.WriteLine($"CERTIFIED {method}/{profile}/{mutation}: checking public proof rejection");
-    string rejected = await Run("dotnet", [tool, "verify", extraction, "--proof", Path.Combine(consumer, "proofs", method + suffix + ".lean"),
-        "--theorem", theorem, "--proof-root", consumer], succeeds: false);
-    if (!rejected.Contains("proof checking", StringComparison.OrdinalIgnoreCase) || File.Exists(Path.Combine(extraction, "verified.json")))
-        throw new InvalidOperationException("Mutation was not rejected during proof checking or retained a stale certificate: " + rejected);
-    Console.WriteLine($"PASS {method}/{profile}/{mutation}: checked full-contract refutation and public proof rejection");
-}
+string suffix = profile == "scalar" ? "Scalar" : "Vector";
+List<string> failed = await RegressionBatch.Verify(root, tool, work, consumer, [.. checks.Select(check => new RegressionCheck($"{check.Method}/{profile}/{check.Mutation}",
+    check.Extraction, check.Proof, "ShiftWitness.refuted", "checked full-contract refutation and public proof rejection",
+    Path.Combine(consumer, "proofs", check.Method + suffix + ".lean"), "UInt256Proof." + check.Method + "." + suffix.ToLowerInvariant() + "_correctness"))]);
+if (failed.Count != 0) throw new InvalidOperationException("FAILED: " + string.Join(", ", failed));
 
 // Re-clone when a reused snapshot predates a pin change; the package source is a partial clone and cannot serve fetches.
 static async Task DropStaleClone(string repository, string revision)

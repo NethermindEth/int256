@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Demerzel Solutions Limited
 // SPDX-License-Identifier: MIT
 #:property PublishAot=false
+#:include RegressionBatch.cs
 using System.Diagnostics;
 using System.Text.Json.Nodes;
 using System.Xml.Linq;
@@ -27,7 +28,7 @@ XElement[] registry = XDocument.Load(Path.Combine(fixtures, "Cases.props")).Desc
 if (selected is not null && registry.All(entry => (string)entry.Attribute("Include")! != selected)) throw new ArgumentException("Unknown safety case: " + selected);
 List<string> failed = [];
 
-async Task<string> Run(string executable, IEnumerable<string> arguments, bool succeeds = true)
+async Task<string> Run(string executable, IEnumerable<string> arguments)
 {
     ProcessStartInfo start = new(executable) { WorkingDirectory = root, RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
     foreach (string argument in arguments) start.ArgumentList.Add(argument);
@@ -35,7 +36,7 @@ async Task<string> Run(string executable, IEnumerable<string> arguments, bool su
     Task<string> stdout = process.StandardOutput.ReadToEndAsync(), stderr = process.StandardError.ReadToEndAsync();
     await process.WaitForExitAsync();
     string output = await stdout + await stderr;
-    if ((process.ExitCode == 0) != succeeds || output.Contains("IDE0005", StringComparison.Ordinal)) throw new InvalidOperationException(output);
+    if (process.ExitCode != 0 || output.Contains("IDE0005", StringComparison.Ordinal)) throw new InvalidOperationException(output);
     return output;
 }
 
@@ -127,29 +128,9 @@ foreach (XElement entry in registry)
     jobs.Add((name, extraction, proof, negative ? "SafetyWitness.refuted" : "SafetyWitness.accepted", negative));
 }
 // The consumer snapshot is complete before any certificate is issued.
-foreach (var job in jobs)
-{
-    string log = Path.Combine(work, job.Name + ".log");
-    try
-    {
-        await Run("dotnet", [tool, "verify", job.Extraction, "--proof", job.Proof, "--theorem", job.Theorem, "--proof-root", consumer]);
-        if (!job.Negative)
-        {
-            Console.WriteLine($"PASS Safety/{job.Name}: checked valid call returns the initial-input sum");
-            continue;
-        }
-        string rejected = await Run("dotnet", [tool, "verify", job.Extraction, "--proof", productionProof, "--theorem", productionTheorem, "--proof-root", consumer], succeeds: false);
-        if (!rejected.Contains("proof checking", StringComparison.OrdinalIgnoreCase) || File.Exists(Path.Combine(job.Extraction, "verified.json")))
-            throw new InvalidOperationException("Probe was not rejected during proof checking or retained a stale certificate: " + rejected);
-        Console.WriteLine($"PASS Safety/{job.Name}: checked fault refutation and production proof rejection");
-    }
-    catch (InvalidOperationException exception)
-    {
-        File.WriteAllText(log, exception.Message);
-        failed.Add(job.Name);
-        Console.WriteLine($"FAIL Safety/{job.Name}: see {log}");
-    }
-}
+failed.AddRange(await RegressionBatch.Verify(root, tool, work, consumer, [.. jobs.Select(job => new RegressionCheck("Safety/" + job.Name, job.Extraction, job.Proof, job.Theorem,
+    job.Negative ? "checked fault refutation and production proof rejection" : "checked valid call returns the initial-input sum",
+    job.Negative ? productionProof : null, job.Negative ? productionTheorem : null))]));
 if (failed.Count != 0) Console.WriteLine("FAILED: " + string.Join(", ", failed));
 Environment.ExitCode = failed.Count == 0 ? 0 : 1;
 

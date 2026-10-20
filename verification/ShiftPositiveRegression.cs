@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Demerzel Solutions Limited
 // SPDX-License-Identifier: MIT
 #:property PublishAot=false
+#:include RegressionBatch.cs
 
 using System.Diagnostics;
 using System.Text.Json.Nodes;
@@ -96,6 +97,7 @@ static string ProgramText(string extraction) => string.Join('\n', File.ReadAllLi
     .Where(line => !line.StartsWith("def assemblySha256", StringComparison.Ordinal)));
 
 List<string> failed = [], incomplete = [];
+List<RegressionCheck> checks = [];
 foreach (string profile in profiles)
 foreach (var (fixture, method) in cases)
 {
@@ -109,18 +111,12 @@ foreach (var (fixture, method) in cases)
         incomplete.Add(name);
         continue;
     }
-    Stopwatch clock = Stopwatch.StartNew();
     try
     {
         string extraction = await Extract(fixture, method, profile);
         if (ProgramText(await Extract("Baseline", method, profile)) == ProgramText(extraction))
             throw new InvalidOperationException("Fixture extraction does not differ from Baseline: " + extraction);
-        Console.WriteLine($"CHECK {name}: full positive certificate");
-        string output = await Run("dotnet", [tool, "verify", extraction, "--proof", proof, "--theorem", "UInt256Proof.Shift.Fixture.correctness", "--proof-root", consumer]);
-        if (!File.Exists(Path.Combine(extraction, "verified.json")))
-            throw new InvalidOperationException("Verification succeeded without a certificate: " + output);
-        File.WriteAllText(log, output);
-        Console.WriteLine($"PASS {name}: full positive certificate ({clock.Elapsed.TotalSeconds:F1} s)");
+        checks.Add(new(name, extraction, proof, "UInt256Proof.Shift.Fixture.correctness", "full positive certificate"));
     }
     catch (InvalidOperationException exception)
     {
@@ -129,6 +125,7 @@ foreach (var (fixture, method) in cases)
         Console.WriteLine($"FAIL {name}: see {log}");
     }
 }
+failed.AddRange(await RegressionBatch.Verify(root, tool, work, consumer, checks));
 if (incomplete.Count != 0) Console.WriteLine("INCOMPLETE: " + string.Join(", ", incomplete));
 if (failed.Count != 0) Console.WriteLine("FAILED: " + string.Join(", ", failed));
 Environment.ExitCode = incomplete.Count == 0 && failed.Count == 0 ? 0 : 1;

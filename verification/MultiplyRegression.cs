@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Demerzel Solutions Limited
 // SPDX-License-Identifier: MIT
 #:property PublishAot=false
+#:include RegressionBatch.cs
 using System.Diagnostics;
 using System.Text.Json.Nodes;
 
@@ -15,7 +16,7 @@ JsonArray targets = JsonNode.Parse(File.ReadAllText(Path.Combine(root, "manifest
 string signature = targets.Single(target => target!["id"]!.GetValue<string>() == "Multiply")!["signature"]!.GetValue<string>();
 JsonArray witnesses = JsonNode.Parse(File.ReadAllText(Path.Combine(fixtures, "witnesses.json")))!.AsArray();
 
-async Task<string> Run(string executable, IEnumerable<string> arguments, bool succeeds = true)
+async Task<string> Run(string executable, IEnumerable<string> arguments)
 {
     ProcessStartInfo start = new(executable) { WorkingDirectory = root, RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
     foreach (string argument in arguments) start.ArgumentList.Add(argument);
@@ -23,7 +24,7 @@ async Task<string> Run(string executable, IEnumerable<string> arguments, bool su
     Task<string> stdout = process.StandardOutput.ReadToEndAsync(), stderr = process.StandardError.ReadToEndAsync();
     await process.WaitForExitAsync();
     string output = await stdout + await stderr;
-    if ((process.ExitCode == 0) != succeeds || output.Contains("IDE0005", StringComparison.Ordinal)) throw new InvalidOperationException(output);
+    if (process.ExitCode != 0 || output.Contains("IDE0005", StringComparison.Ordinal)) throw new InvalidOperationException(output);
     return output;
 }
 
@@ -91,21 +92,11 @@ foreach (string fixture in new[] { "Baseline", "AlternativeOrder", "ExtractedHel
     jobs.Add((fixture, profile, extraction, proofPath, "FixtureWitness.refuted", true));
 }
 // Freeze the complete consumer source snapshot before issuing any certificates.
-foreach (var job in jobs)
-{
-    await Run("dotnet", [tool, "verify", job.Extraction, "--proof", job.Proof, "--theorem", job.Theorem, "--proof-root", consumer]);
-    if (!job.Negative)
-    {
-        Console.WriteLine($"PASS {job.Fixture}/{job.Profile}: checked multiplication contract");
-        continue;
-    }
-    string expectedProof = Path.Combine(consumer, "proofs", "MultiplyProfile_" + job.Profile.Replace('-', '_') + ".lean");
-    const string expectedTheorem = "UInt256Proof.Multiply.profile_correctness";
-    string rejected = await Run("dotnet", [tool, "verify", job.Extraction, "--proof", expectedProof, "--theorem", expectedTheorem, "--proof-root", consumer], succeeds: false);
-    if (!rejected.Contains("proof checking", StringComparison.OrdinalIgnoreCase) || File.Exists(Path.Combine(job.Extraction, "verified.json")))
-        throw new InvalidOperationException("Mutation was not rejected during proof checking or retained a stale certificate: " + rejected);
-    Console.WriteLine($"PASS {job.Fixture}/{job.Profile}: checked contract refutation and production proof rejection");
-}
+List<string> failed = await RegressionBatch.Verify(root, tool, work, consumer, [.. jobs.Select(job => new RegressionCheck(job.Fixture + "/" + job.Profile, job.Extraction, job.Proof, job.Theorem,
+    job.Negative ? "checked contract refutation and production proof rejection" : "checked multiplication contract",
+    job.Negative ? Path.Combine(consumer, "proofs", "MultiplyProfile_" + job.Profile.Replace('-', '_') + ".lean") : null,
+    job.Negative ? "UInt256Proof.Multiply.profile_correctness" : null))]);
+if (failed.Count != 0) throw new InvalidOperationException("FAILED: " + string.Join(", ", failed));
 
 // Re-clone when a reused snapshot predates a pin change; the package source is a partial clone and cannot serve fetches.
 static async Task DropStaleClone(string repository, string revision)

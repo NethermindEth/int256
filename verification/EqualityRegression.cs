@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Demerzel Solutions Limited
 // SPDX-License-Identifier: MIT
 #:property PublishAot=false
+#:include RegressionBatch.cs
 using System.Diagnostics;
 using System.Globalization;
 using System.Numerics;
@@ -27,7 +28,7 @@ if (selectedCase != "all") cases = [selectedCase];
 string[] references = ["EqUInt256UInt256", "NeUInt256UInt256", "EqualsUInt256Ref", "EqualsUInt256Value"];
 List<string> incomplete = [], failed = [];
 
-async Task<string> Run(string executable, IEnumerable<string> arguments, bool succeeds = true)
+async Task<string> Run(string executable, IEnumerable<string> arguments)
 {
     ProcessStartInfo start = new(executable) { WorkingDirectory = root, RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
     foreach (string argument in arguments) start.ArgumentList.Add(argument);
@@ -35,7 +36,7 @@ async Task<string> Run(string executable, IEnumerable<string> arguments, bool su
     Task<string> stdout = process.StandardOutput.ReadToEndAsync(), stderr = process.StandardError.ReadToEndAsync();
     await process.WaitForExitAsync();
     string output = await stdout + await stderr;
-    if ((process.ExitCode == 0) != succeeds || output.Contains("IDE0005", StringComparison.Ordinal)) throw new InvalidOperationException(output);
+    if (process.ExitCode != 0 || output.Contains("IDE0005", StringComparison.Ordinal)) throw new InvalidOperationException(output);
     return output;
 }
 
@@ -220,30 +221,8 @@ foreach (JsonNode? gate in gates)
     }
 }
 // Freeze the complete consumer source snapshot before issuing any certificates.
-// Each verify builds in its own fresh session, so independent jobs may run concurrently.
-await Parallel.ForEachAsync(jobs, new ParallelOptions { MaxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount / 4) }, async (job, _) =>
-{
-    string log = Path.Combine(work, job.Name.Replace('/', '-') + ".log");
-    try
-    {
-        await Run("dotnet", [tool, "verify", job.Extraction, "--proof", job.Proof, "--theorem", job.Theorem, "--proof-root", consumer]);
-        if (job.Production is null)
-        {
-            Console.WriteLine($"PASS {job.Name}: checked production contract");
-            return;
-        }
-        string rejected = await Run("dotnet", [tool, "verify", job.Extraction, "--proof", job.Production, "--theorem", job.ProductionTheorem!, "--proof-root", consumer], succeeds: false);
-        if (!rejected.Contains("proof checking", StringComparison.OrdinalIgnoreCase) || File.Exists(Path.Combine(job.Extraction, "verified.json")))
-            throw new InvalidOperationException("Mutation was not rejected during proof checking or retained a stale certificate: " + rejected);
-        Console.WriteLine($"PASS {job.Name}: checked contract refutation and production proof rejection");
-    }
-    catch (InvalidOperationException exception)
-    {
-        File.WriteAllText(log, exception.Message);
-        lock (failed) failed.Add(job.Name);
-        Console.WriteLine($"FAIL {job.Name}: see {log}");
-    }
-});
+failed.AddRange(await RegressionBatch.Verify(root, tool, work, consumer, [.. jobs.Select(job => new RegressionCheck(job.Name, job.Extraction, job.Proof, job.Theorem,
+    job.Production is null ? "checked production contract" : "checked contract refutation and production proof rejection", job.Production, job.ProductionTheorem))]));
 Console.WriteLine($"SUMMARY: {jobs.Count - failed.Count(jobs.Select(job => job.Name).Contains)} passed, {failed.Count} failed, {incomplete.Count} pending");
 if (incomplete.Count != 0) Console.WriteLine("INCOMPLETE: " + string.Join(", ", incomplete));
 if (failed.Count != 0) Console.WriteLine("FAILED: " + string.Join(", ", failed.Order(StringComparer.Ordinal)));

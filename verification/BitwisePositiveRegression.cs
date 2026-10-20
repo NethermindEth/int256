@@ -1,5 +1,6 @@
 #!/usr/bin/env dotnet
 #:property PublishAot=false
+#:include RegressionBatch.cs
 using System.Diagnostics;
 using System.Text.Json.Nodes;
 
@@ -101,12 +102,9 @@ foreach (bool returned in early ? new[] { true } : new[] { false, true })
     jobs.Add((extraction, proofPath, id, profile));
 }
 Console.WriteLine($"Prepared {jobs.Count} positive {fixture} checks with a stable consumer snapshot.");
-foreach (var job in jobs)
-{
-    Console.WriteLine($"CHECK {job.Id}/{job.Profile}/{fixture}");
-    await Run("dotnet", [tool, "verify", job.Directory, "--proof", job.Proof, "--theorem", "HelperFixture.correct", "--proof-root", consumer]);
-    Console.WriteLine($"PASS {job.Id}/{job.Profile}/{fixture}: full-contract certificate");
-}
+List<string> failed = await RegressionBatch.Verify(root, tool, work, consumer, [.. jobs.Select(job => new RegressionCheck($"{job.Id}/{job.Profile}/{fixture}",
+    job.Directory, job.Proof, "HelperFixture.correct", "full-contract certificate"))]);
+if (failed.Count != 0) throw new InvalidOperationException("FAILED: " + string.Join(", ", failed));
 
 // Re-clone when a reused snapshot predates a pin change; the package source is a partial clone and cannot serve fetches.
 static async Task DropStaleClone(string repository, string revision)
