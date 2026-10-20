@@ -91,6 +91,26 @@ using (StringWriter forwarded = new())
     finally { Console.SetOut(previousOutput); }
     Require(forwarded.ToString().Trim() == version && version.Length > 0, "Child command output was lost");
 }
+// The forwarded diagnosis must reach the failure summary; an empty reason hid an extractor rejection.
+using (StringWriter forwarded = new())
+{
+    TextWriter previousError = Console.Error;
+    string? reason = null;
+    try
+    {
+        Console.SetOut(forwarded);
+        Console.SetError(forwarded);
+        await VerificationSupport.Run(root, "dotnet", ["uint256-missing-tool.dll"]);
+    }
+    catch (InvalidOperationException exception) { reason = exception.Message; }
+    finally
+    {
+        Console.SetOut(previousOutput);
+        Console.SetError(previousError);
+    }
+    Require(reason is not null && reason.Contains("uint256-missing-tool.dll", StringComparison.Ordinal),
+        "A failed child command must report its last output lines");
+}
 Console.WriteLine("Verification command output checks passed.");
 
 string temporary = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "uint256-batch-" + Guid.NewGuid().ToString("N")));

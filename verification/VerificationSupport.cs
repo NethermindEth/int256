@@ -26,23 +26,33 @@ internal static class VerificationSupport
         };
         foreach (string argument in arguments) start.ArgumentList.Add(argument);
         using Process process = Process.Start(start) ?? throw new InvalidOperationException($"Could not start {command}");
-        Task<string> stdout = capture ? process.StandardOutput.ReadToEndAsync() : Forward(process.StandardOutput, Console.Out);
-        Task<string> stderr = capture ? process.StandardError.ReadToEndAsync() : Forward(process.StandardError, Console.Error);
+        Queue<string> tail = new();
+        Task<string> stdout = capture ? process.StandardOutput.ReadToEndAsync() : Forward(process.StandardOutput, Console.Out, tail);
+        Task<string> stderr = capture ? process.StandardError.ReadToEndAsync() : Forward(process.StandardError, Console.Error, tail);
         await process.WaitForExitAsync();
         string output = await stdout;
         string error = await stderr;
-        if (process.ExitCode != 0) throw new InvalidOperationException($"{command} failed with exit code {process.ExitCode}: {error}");
+        // Forwarded output is not captured, so the failure names the tool's last lines, where its diagnosis is.
+        if (process.ExitCode != 0)
+            throw new InvalidOperationException($"{command} failed with exit code {process.ExitCode}: " +
+                (capture ? error : string.Join(Environment.NewLine, tail)));
         return output;
     }
 
-    private static async Task<string> Forward(StreamReader reader, TextWriter writer)
+    const int FailureTailLines = 8;
+
+    private static async Task<string> Forward(StreamReader reader, TextWriter writer, Queue<string> tail)
     {
-        char[] buffer = new char[4096];
-        int count;
-        while ((count = await reader.ReadAsync(buffer)) > 0)
+        while (await reader.ReadLineAsync() is string line)
         {
-            await writer.WriteAsync(buffer.AsMemory(0, count));
+            await writer.WriteLineAsync(line);
             await writer.FlushAsync();
+            if (line.Trim().Length == 0) continue;
+            lock (tail)
+            {
+                tail.Enqueue(line);
+                if (tail.Count > FailureTailLines) tail.Dequeue();
+            }
         }
         return "";
     }
