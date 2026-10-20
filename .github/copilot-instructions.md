@@ -152,8 +152,7 @@ public readonly ulong u0; // Little-endian: LSB first
 - **Test Categories**: Organized by operation type (Binary, Unary, Ternary, Convertibles)
 - **Hardware Intrinsics Testing**: Tests run with both enabled and disabled intrinsics
 - **Template Pattern**: Uses `UInt256TestsTemplate<T>` for shared test logic
-- **FluentAssertions**: Uses FluentAssertions for readable test assertions
-- **NUnit Framework**: All tests use NUnit attributes and framework
+- **NUnit Framework**: All tests use NUnit attributes and constraint-model assertions (`Assert.That`)
 
 ### Test Naming
 ```csharp
@@ -161,8 +160,7 @@ public readonly ulong u0; // Little-endian: LSB first
 public void OperationName_Scenario_ExpectedResult()
 {
     // Arrange, Act, Assert pattern
-    // Use FluentAssertions for readable assertions
-    result.Should().Be(expected);
+    Assert.That(result, Is.EqualTo(expected));
 }
 
 [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
