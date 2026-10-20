@@ -27,9 +27,8 @@ void SelectionCheck(string[] paths, string[] expected, bool contracts, bool all 
     Require(selected.Batches.All(batch => batch.Groups.Length > 0 && batch.Groups.All(group => group.Methods.Length > 0)), "Empty jobs waste a runner");
     Require(selected.Batches.All(batch => batch.Groups.Select(group => group.Profile).Distinct().Count() == batch.Groups.Length),
         "A profile repeated within a job would split one batch session");
-    Require(selected.Batches.Count(batch => batch.Export) == (selected.Include.Length > 0 ? 1 : 0) &&
-        (selected.Batches.Length == 0 || (selected.Batches[0].Export && selected.Batches[0].Id == "job-0")),
-        "Exactly one job exports support, and provenance selection expects it to be job-0");
+    Require(selected.Batches.Select((batch, index) => batch.Id == $"job-{index}").All(match => match),
+        "Provenance selection reads job artifacts by their job-<n> names");
 }
 SelectionCheck(["README.md", "verification/README.md", "LICENSE"], [], false);
 SelectionCheck(["verification/proofs/AddScalar.lean"], ["Add"], true);
@@ -47,11 +46,10 @@ SelectionCheck([], allMethods, true, all: true);
     // One session per profile and job: only profiles larger than a job may be split.
     foreach (IGrouping<string, Gate> profile in full.Include.GroupBy(gate => gate.Profile).Where(group => group.Count() <= VerificationSelection.Jobs))
         Require(full.Batches.Count(batch => batch.Groups.Any(group => group.Profile == profile.Key)) == 1, "Small profile split across jobs: " + profile.Key);
-    BatchGroup exportedGroup = full.Batches[0].Groups[^1];
-    Gate exported = full.Include.Single(gate => gate.Method == exportedGroup.Methods[^1] && gate.Profile == exportedGroup.Profile);
     var costs = VerificationSelection.Costs(root, full.Include);
-    Require(costs[exported].Support == costs.Values.Max(cost => cost.Support),
-        "Support export covers only the exporting request's closure, so the widest gate must export");
+    int Shareable(BatchGroup group) => group.Methods.Sum(method => costs[full.Include.Single(gate => gate.Method == method && gate.Profile == group.Profile)].Support);
+    Require(full.Batches.All(batch => batch.Groups.All(group => Shareable(group) <= Shareable(batch.Groups[^1]))),
+        "Only a job's last group exports support, so it must be the group with the most shareable modules");
     Gate add = full.Include.Single(gate => gate.Method == "Add" && gate.Profile == "scalar");
     Gate and = full.Include.Single(gate => gate.Method == "And" && gate.Profile == "scalar");
     Require(costs[add].Weight > costs[and].Weight, "Modules importing Extracted are rebuilt per extraction and must weigh in");
@@ -67,15 +65,18 @@ using (JsonDocument runs = JsonDocument.Parse("""
       {"id":5,"event":"push","head_branch":"main","conclusion":"success","head_repository":{"full_name":"owner/repo"}}]}
     """))
     Require(ConsumerSupportSelection.TrustedRun(runs.RootElement, "owner/repo") == 5, "Only successful main pushes in this repository may certify support");
-string digest = new('a', 64);
+string digest = new('a', 64), other = new('b', 64);
 using (JsonDocument artifacts = JsonDocument.Parse($$"""
     {"artifacts":[
       {"id":1,"name":"consumer-support-job-0-1-{{digest}}","expired":true},
       {"id":2,"name":"consumer-support-job-0-1-untrusted","expired":false},
-      {"id":4,"name":"consumer-support-job-1-1-{{digest}}","expired":false},
-      {"id":3,"name":"consumer-support-job-0-1-{{digest}}","expired":false}]}
+      {"id":3,"name":"consumer-support-job-0-1-{{digest}}","expired":false},
+      {"id":4,"name":"consumer-support-job-1-1-{{other}}","expired":false},
+      {"id":5,"name":"consumer-support-job-1-2-{{other}}","expired":false},
+      {"id":6,"name":"consumer-support-scalar-0-1-{{other}}","expired":false}]}
     """))
-    Require(ConsumerSupportSelection.Select(5, artifacts.RootElement) == new ConsumerSupport(5, 3, digest), "Support requires a live artifact and a digest from trusted metadata");
+    Require(ConsumerSupportSelection.Select(5, artifacts.RootElement).SequenceEqual([new ConsumerSupport(5, 3, digest), new ConsumerSupport(5, 4, other)]),
+        "Every job's live artifact counts once, with its digest from trusted metadata");
 Console.WriteLine("Consumer support provenance checks passed.");
 
 string version = (await VerificationSupport.Run(root, "dotnet", ["--version"], true)).Trim();
@@ -121,7 +122,8 @@ try
                 throw new InvalidOperationException("Expected test failure");
             if (arguments.Contains("verify-batch"))
             {
-                Require(Environment.GetEnvironmentVariable(export) is null, "Support export leaked into a batch");
+                Require(Environment.GetEnvironmentVariable(export) == (failure == "export" ? temporary : null),
+                    "The only group's batch must see the support export");
                 using JsonDocument manifest = JsonDocument.Parse(File.ReadAllText(arguments[2]));
                 string[][] requests = [.. manifest.RootElement.GetProperty("requests").EnumerateArray()
                     .Select(request => new[] { request.GetProperty("output").GetString()!, Path.GetFileName(request.GetProperty("proof").GetString()!), request.GetProperty("theorem").GetString()! })];
@@ -152,18 +154,16 @@ try
         string[][] expected = failure switch
         {
             "extract" => [["second", "Second.lean"]],
-            "export" => [["first", "First.lean"]],
             _ => [["first", "First.lean"], ["second", "Second.lean"]],
         };
         Require(batches.Select(request => request[2] + "/" + request[1]).SequenceEqual(expected.Select(pair => pair[0] + "/" + pair[1])),
             "Proof selection leaked between methods");
         Require(batches.All(request => Path.IsPathRooted(request[0])), "Batch outputs must not depend on the tool directory");
         string[][] singles = [.. calls.Where(call => call.Contains("verify"))];
-        Require(singles.Length == (failure == "export" ? 1 : 0), "Only the exported method may use a single-request verify");
-        if (failure == "export") Require(singles[0][4] == "Second.lean" && singles[0][6] == "second", "Export used the wrong proof");
+        Require(singles.Length == 0, "Batch sessions export support themselves; no request is split out");
         Require(Environment.GetEnvironmentVariable(export) == (failure == "export" ? temporary : null), "Support export setting was not restored");
     }
-    // A job spans several profiles: one build, one session per profile, and one export from the last group.
+    // A job spans several profiles: one build, one session per profile, and only the last group exports.
     File.WriteAllText(Path.Combine(temporary, "manifests/targets.json"), """
         {"methods":[{"id":"First","signature":"first"},{"id":"Second","signature":"second"},{"id":"Third","signature":"third"}]}
         """);
@@ -182,7 +182,9 @@ try
             if (command == "dotnet") calls.Add(arguments);
             if (arguments.Contains("verify-batch"))
             {
-                Require(Environment.GetEnvironmentVariable(export) is null, "Support export leaked into a batch");
+                bool last = arguments[2].EndsWith("verify-batch-x64-avx2.json", StringComparison.Ordinal);
+                Require(Environment.GetEnvironmentVariable(export) == (exporting && last ? temporary : null),
+                    "Only the last group's session may export, since one artifact name carries one digest");
                 using JsonDocument manifest = JsonDocument.Parse(File.ReadAllText(arguments[2]));
                 JsonElement[] requests = [.. manifest.RootElement.GetProperty("requests").EnumerateArray()];
                 sessions.Add(string.Join(",", requests.Select(request => request.GetProperty("theorem").GetString())));
@@ -194,10 +196,8 @@ try
         await VerificationRunner.Run(temporary, new("verify", [], "scalar",
             Groups: [new("scalar", ["First", "Second"]), new("x64-avx2", ["Third"])]), Command);
         Require(calls.Count(call => call[0] == "build") == 2, "A multi-profile job must build the tools once");
-        Require(sessions.SequenceEqual(exporting ? ["first,second"] : ["first,second", "third"]), "Each profile needs its own batch session");
-        string[][] singles = [.. calls.Where(call => call.Contains("verify"))];
-        Require(singles.Length == (exporting ? 1 : 0) && (!exporting || (singles[0][2] == "artifacts/Third/x64-avx2" && singles[0][6] == "third")),
-            "Only the last group's last method may export support");
+        Require(sessions.SequenceEqual(["first,second", "third"]), "Each profile needs its own batch session");
+        Require(!calls.Any(call => call.Contains("verify")), "Batch sessions export support themselves; no request is split out");
         Require(calls.Where(call => call.Contains("extract")).Select(call => call[4]).SequenceEqual(
             ["artifacts/First/scalar", "artifacts/Second/scalar", "artifacts/Third/x64-avx2"]), "Methods were extracted under the wrong profile");
     }

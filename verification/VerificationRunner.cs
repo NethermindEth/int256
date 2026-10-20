@@ -86,26 +86,10 @@ internal static class VerificationRunner
                 Console.Error.WriteLine(failures[^1]);
             }
         }
-        // Support export needs a single-request verify, and a batch success-cache hit would skip the export.
-        // A job exports once, from its last group, so it publishes a single manifest.
-        bool exporting = lastGroup && !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(ExportVariable));
-        bool hidden = !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(ExportVariable));
-        List<Request> batch = exporting && ready.Count > 0 ? ready[..^1] : ready;
-        if (batch.Count > 0) await VerifyBatch(root, options, batch, failures, command, tool, hideExport: hidden);
-        if (exporting && ready.Count > 0)
-        {
-            Request last = ready[^1];
-            try
-            {
-                await command("dotnet", [tool, "verify", last.Output, "--proof", last.Proof, "--theorem", last.Theorem, "--proof-root", root]);
-                Console.WriteLine($"PASS verify {last.Method}/{options.Profile}");
-            }
-            catch (Exception exception)
-            {
-                failures.Add($"{last.Method}/{options.Profile}: {exception.Message}");
-                Console.Error.WriteLine(failures[^1]);
-            }
-        }
+        // The artifact name carries one trusted digest, so only the job's last group exports; its
+        // session writes the union of its workspaces' support.
+        bool hidden = !lastGroup && !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(ExportVariable));
+        if (ready.Count > 0) await VerifyBatch(root, options, ready, failures, command, tool, hideExport: hidden);
     }
 
     const string ExportVariable = "LEANCIL_EXPORT_CONSUMER_SUPPORT";

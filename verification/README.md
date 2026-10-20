@@ -112,16 +112,20 @@ LeanCIL's existing authenticated support cache can reuse these compiled theorems
 and their kernel checks across different gates in the same batch. The first gate
 still checks the shared proof; subsequent gates freshly check their extraction,
 bindings and public proof. This differs from an unchanged whole-proof cache hit.
-Successful main-branch runs also export a portable support manifest from
-`job-0`, whose last request is the gate with the widest extraction-independent
-closure. On later runs, `FindConsumerSupport.cs` discovers that artifact from the latest successful
-push to this repository's `main` branch and obtains its digest from GitHub's
+Successful main-branch runs also export portable support: each job's last
+profile group, ordered to hold the most shareable modules, writes one manifest
+covering every workspace of its batch session, with the compiled artifacts
+beside it. On later runs, `FindConsumerSupport.cs` discovers every job's artifact from the latest successful
+push to this repository's `main` branch and obtains their digests from GitHub's
 artifact metadata. PR artifacts cannot provide that trust anchor. Certificate
-jobs download the manifest and give the digest separately to LeanCIL. Missing
+jobs download the manifests and give the digests separately to LeanCIL. Missing
 or expired artifacts fall back to normal verification; a downloaded manifest
 with an incorrect digest fails verification.
 
-Receivers still build their source proofs. Kernel replay is reused only for
+Receivers set `LEANCIL_RESTORE_CONSUMER_SUPPORT=true`, so Lake reuses the
+producer's compiled support instead of rebuilding it when the sources, toolchain,
+tools and bound environment match; every restored file is checked against its
+manifest hash. Kernel replay is reused only for
 modules whose complete compiled import closure, source snapshot, verifier,
 toolchain and pinned dependencies match. Changes invalidate the affected
 dependency closure, and `verified.json` records the support manifest digest.

@@ -15,7 +15,7 @@ if (!Regex.IsMatch(repository, @"\A[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\z"))
 
 // Only successful pushes to this repository's trusted main branch may certify
 // support for another run. PR artifacts never supply the trusted digest.
-ConsumerSupport? support = null;
+ConsumerSupport[] support = [];
 try
 {
     string runsJson = await VerificationSupport.Run(VerificationSupport.Root, "gh",
@@ -33,5 +33,7 @@ catch (Exception error) when (error is InvalidOperationException or JsonExceptio
 {
     Console.WriteLine("Previous consumer support unavailable; verification will check fresh proofs.");
 }
-File.AppendAllText(output, $"run-id={support?.Run}\nartifact-id={support?.Artifact}\nsha256={support?.Digest}\n");
-Console.WriteLine(support is null ? "No reusable main-branch artifact found." : $"Consumer support from main run {support.Run}, artifact {support.Artifact}.");
+File.AppendAllText(output, $"run-id={support.FirstOrDefault()?.Run}\nartifact-ids={string.Join(",", support.Select(item => item.Artifact))}\n" +
+    $"sha256={string.Join(",", support.Select(item => item.Digest))}\n");
+Console.WriteLine(support.Length == 0 ? "No reusable main-branch artifact found." :
+    $"Consumer support from main run {support[0].Run}, artifacts {string.Join(", ", support.Select(item => item.Artifact))}.");

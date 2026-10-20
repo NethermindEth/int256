@@ -33,20 +33,18 @@ internal static class VerificationSelection
         if (selected.Length == 0) return [];
         Dictionary<Gate, (int Weight, int Support)> cost = Costs(root, selected);
         int Weight(IEnumerable<Gate> gates) => gates.Sum(gate => cost[gate].Weight);
-        // The exported manifest covers only its request's closure; export the widest one.
-        Gate exported = selected.OrderByDescending(gate => cost[gate].Support)
-            .ThenBy(gate => gate.Profile, StringComparer.Ordinal).ThenBy(gate => gate.Method, StringComparer.Ordinal).First();
         double target = (double)Weight(selected) / Math.Min(Jobs, selected.Length);
         List<List<Gate>> chunks = [];
         foreach (IGrouping<string, Gate> profile in selected.GroupBy(gate => gate.Profile).OrderBy(group => group.Key, StringComparer.Ordinal))
-            chunks.AddRange(Balance(profile, gate => cost[gate].Weight, (int)Math.Ceiling(Weight(profile) / target), null)
+            chunks.AddRange(Balance(profile, gate => cost[gate].Weight, (int)Math.Ceiling(Weight(profile) / target))
                 .Where(chunk => chunk.Count > 0));
-        List<List<Gate>>[] jobs = Balance(chunks, Weight, Math.Min(Jobs, chunks.Count), chunks.Single(chunk => chunk.Contains(exported)));
-        return [.. jobs.Select((job, index) => new Batch($"job-{index}", index == 0,
+        List<List<Gate>>[] jobs = Balance(chunks, Weight, Math.Min(Jobs, chunks.Count));
+        // Only a job's last group exports support, so it is the group with the most shareable modules.
+        return [.. jobs.Select((job, index) => new Batch($"job-{index}",
             [.. job.SelectMany(chunk => chunk).GroupBy(gate => gate.Profile)
-                .OrderBy(group => group.Key == exported.Profile && index == 0)
+                .OrderBy(group => group.Sum(gate => cost[gate].Support))
                 .ThenBy(group => group.Key, StringComparer.Ordinal)
-                .Select(group => new BatchGroup(group.Key, [.. group.OrderBy(gate => gate == exported).Select(gate => gate.Method)]))]))];
+                .Select(group => new BatchGroup(group.Key, [.. group.Select(gate => gate.Method)]))]))];
     }
 
     // Weight: per-extraction cost plus the modules rebuilt per extraction. Support: modules shareable across extractions.
@@ -61,14 +59,12 @@ internal static class VerificationSelection
         });
     }
 
-    // Heaviest first into the lightest bin; the pinned item opens bin 0, and ties keep input order.
-    static List<T>[] Balance<T>(IEnumerable<T> items, Func<T, int> weight, int bins, T? pinned) where T : class
+    // Heaviest first into the lightest bin; ties keep input order.
+    static List<T>[] Balance<T>(IEnumerable<T> items, Func<T, int> weight, int bins)
     {
         List<T>[] result = [.. Enumerable.Range(0, Math.Max(1, bins)).Select(_ => new List<T>())];
         int[] loads = new int[result.Length];
-        IEnumerable<T> ordered = items.OrderByDescending(weight);
-        if (pinned is not null) ordered = ordered.Where(item => !ReferenceEquals(item, pinned)).Prepend(pinned);
-        foreach (T item in ordered)
+        foreach (T item in items.OrderByDescending(weight))
         {
             int bin = Array.IndexOf(loads, loads.Min());
             result[bin].Add(item);

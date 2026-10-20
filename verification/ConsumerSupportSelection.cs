@@ -15,15 +15,18 @@ internal static class ConsumerSupportSelection
             run.GetProperty("head_repository").GetProperty("full_name").GetString() == repository)
         .Select(run => (long?)run.GetProperty("id").GetInt64()).FirstOrDefault();
 
-    internal static ConsumerSupport? Select(long run, JsonElement artifacts)
+    // Every job of the trusted run exports its own manifest; receivers combine them.
+    internal static ConsumerSupport[] Select(long run, JsonElement artifacts)
     {
+        List<ConsumerSupport> selected = [];
         foreach (JsonElement artifact in artifacts.GetProperty("artifacts").EnumerateArray())
         {
             if (artifact.GetProperty("expired").GetBoolean()) continue;
             Match name = Regex.Match(artifact.GetProperty("name").GetString()!,
-                @"\Aconsumer-support-job-0-\d+-([a-f0-9]{64})\z");
-            if (name.Success) return new(run, artifact.GetProperty("id").GetInt64(), name.Groups[1].Value);
+                @"\Aconsumer-support-job-\d+-\d+-([a-f0-9]{64})\z");
+            if (name.Success && selected.All(support => support.Digest != name.Groups[1].Value))
+                selected.Add(new(run, artifact.GetProperty("id").GetInt64(), name.Groups[1].Value));
         }
-        return null;
+        return [.. selected];
     }
 }

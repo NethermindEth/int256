@@ -19,7 +19,7 @@ jobs:
       matrix: ${{ steps.gates.outputs.matrix }}
       count: ${{ steps.gates.outputs.count }}
       support-run: ${{ steps.support.outputs.run-id }}
-      support-artifact: ${{ steps.support.outputs.artifact-id }}
+      support-artifacts: ${{ steps.support.outputs.artifact-ids }}
       support-sha256: ${{ steps.support.outputs.sha256 }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -123,7 +123,7 @@ jobs:
       LEANCIL_CERTIFIED_LIBRARY_SHA256: ${{ needs.prepare.outputs.manifest-sha256 }}
       LEANCIL_TRACE_DIRECTORY: ${{ github.workspace }}/verification/artifacts/verification-traces
       LEANCIL_SUITE: ${{ matrix.id }}
-      LEANCIL_EXPORT_CONSUMER_SUPPORT: ${{ matrix.export && github.event_name == 'push' && github.ref == 'refs/heads/main' && format('{0}/verification/artifacts/consumer-support-export', github.workspace) || '' }}
+      LEANCIL_EXPORT_CONSUMER_SUPPORT: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && format('{0}/verification/artifacts/consumer-support-export', github.workspace) || '' }}
     strategy:
       fail-fast: false
       max-parallel: 8
@@ -148,28 +148,38 @@ jobs:
           path: verification/artifacts/certified-library
       - name: Download previous certified consumer support
         id: support
-        if: needs.select.outputs.support-artifact != ''
+        if: needs.select.outputs.support-artifacts != ''
         continue-on-error: true
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          artifact-ids: ${{ needs.select.outputs.support-artifact }}
+          artifact-ids: ${{ needs.select.outputs.support-artifacts }}
           run-id: ${{ needs.select.outputs.support-run }}
           github-token: ${{ github.token }}
           path: verification/artifacts/consumer-support-import
+          merge-multiple: true
       - name: Verify compiled methods
         id: certificate
         shell: pwsh
         env:
           VERIFY_GROUPS: ${{ toJSON(matrix.groups) }}
-          LEANCIL_CONSUMER_SUPPORT: ${{ steps.support.outcome == 'success' && format('{0}/verification/artifacts/consumer-support-import/{1}.json', github.workspace, needs.select.outputs.support-sha256) || '' }}
-          LEANCIL_CONSUMER_SUPPORT_SHA256: ${{ steps.support.outcome == 'success' && needs.select.outputs.support-sha256 || '' }}
-        run: dotnet run --file verification/Verify.cs -- --action verify --groups-json "$env:VERIFY_GROUPS"
+          SUPPORT_DIGESTS: ${{ steps.support.outcome == 'success' && needs.select.outputs.support-sha256 || '' }}
+          LEANCIL_RESTORE_CONSUMER_SUPPORT: 'true'
+        run: |
+          # Manifests are named by digest; each path pairs with the digest from trusted artifact metadata.
+          if ($env:SUPPORT_DIGESTS) {
+            $directory = "$env:GITHUB_WORKSPACE/verification/artifacts/consumer-support-import"
+            $env:LEANCIL_CONSUMER_SUPPORT = (($env:SUPPORT_DIGESTS -split ',') | ForEach-Object { "$directory/$_.json" }) -join [IO.Path]::PathSeparator
+            $env:LEANCIL_CONSUMER_SUPPORT_SHA256 = $env:SUPPORT_DIGESTS
+          }
+          dotnet run --file verification/Verify.cs -- --action verify --groups-json "$env:VERIFY_GROUPS"
       - name: Publish certified consumer support for future runs
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.certificate.outputs.consumer-support-sha256 != ''
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: consumer-support-${{ matrix.id }}-${{ github.run_attempt }}-${{ steps.certificate.outputs.consumer-support-sha256 }}
           path: verification/artifacts/consumer-support-export
+          # Compiled support lives under .lake paths inside <digest>.files.
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 7
       - name: Summarize verification timings
