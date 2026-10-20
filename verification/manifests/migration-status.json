@@ -1,7 +1,7 @@
 {
   "leancilRevision": "7aec18ee49eaa33255a980ca688cfd816492be97",
   "assemblySha256": "7d44ec9be3b6cfa4b853ad25cec8d246c1ada781866e04b7f9d6dfd4c2266e4e",
-  "note": "All scalar targets extract. Extraction is not a compiled-method certificate. Remaining proof ports are consumer work; upstream issues 36-40, 42, 53 and 54 are resolved.",
+  "note": "All scalar targets extract; every registered gate and regression runner passed on LeanCIL 7aec18e before the final shift-positives merge. Extraction is not a compiled-method certificate; upstream issues 36-40, 42, 53 and 54 are resolved.",
   "scalar": [
     {
       "method": "EqualsInt32",
@@ -699,15 +699,32 @@
   ],
   "remainingPorts": [],
   "pendingValidation": [
-    "LeanCIL pin moved to 7aec18e (#55, #56); every registered gate needs recertification on the new pin.",
-    "Integrated equality/shift/aggregate-return/comparison, bitwise EarlyStore and multiplication supporting changes require one recertification of all 234 gates against the final source snapshot.",
-    "Bitwise: 24 negative, 16 helper positive and 8 EarlyStore positive certificates passed; the native-integrated runner still needs a run after promotion.",
-    "Shift: 11 scalar and 11 vector negatives and 8 positive fixtures (4 scalar, 4 vector) passed.",
-    "Multiply: all 8 original fixtures passed (3 positive, 5 negative) with the uniform profile proofs.",
-    "Add/Subtract: 8 Add positives (Baseline, Renamed, ReversedStore on the production proof; CarryOr, FullyInlined, StraightLine, ExtractedHelper, ExternalHelper on fixture proofs), 5 Subtract positives (Baseline, Renamed on the production proof; BorrowAlternative, FullyInlined, ExtractedHelper on fixture proofs) and all 4 negatives passed on LeanCIL 70ee207; rerun on 7aec18e pending.",
-    "Add/ExpandedHardware: passes extraction validation on 7aec18e; the production Add proof no longer normalizes the excluded entry branch and needs confirmation on this pin.",
-    "Add, AddOverflow, Subtract and SubtractUnderflow gates are certified on arm64-advsimd, x64-sse42, x64-avx2, x64-avx2-bmi1, x64-avx512 and x64-avx512-bmi1.",
-    "Comparison and equality fixture groups from the original branch are not yet ported. Safety, SIMD and Reporting run through SafetyRegression.cs and SimdRegression.cs; SIMD/Reporting cases recorded PENDING before the x64-sse42, AVX and accelerated Subtract/SubtractUnderflow gates landed need a rerun, and body-changing positives need fixture proofs. Profiles is extractor infrastructure mapped to LeanCIL tests and unfiled upstream drafts."
+    "Gates and runners were certified before the shift-positives merge (b07fa2a), which adds supporting library modules; recertify all gates on the final tree.",
+    "Profiles and AlignedLoad fixture groups are extractor infrastructure, mapped to LeanCIL tests rather than ported.",
+    "Three upstream drafts from the original branch are not filed.",
+    "UInt256.Safety.RegionTransport, RegionSteps and RegionSuffix are general memory-region lemmas and candidates for LeanCIL.",
+    "Duplicated helpers to consolidate: Subtract BorrowHelper and SmallHelper, Shift CountPrefix and DisjointContract, DoubledEntry and ShiftedSmall.",
+    "Two deferred API entries remain unported.",
+    "Safety fixture expectations changed under LeanCIL for ReusedLocal and related cases; review them against the original branch."
   ],
-  "supportingAuditTheorems": 2261
+  "supportingAuditTheorems": 3687,
+  "validation": {
+    "leancilRevision": "7aec18ee49eaa33255a980ca688cfd816492be97",
+    "gates": "All 256 registered gates passed; 154 on 07b4691 and 102 on 461622b, which differ only in two proof imports.",
+    "runners": {
+      "EqualityRegression": "234/234",
+      "CompareRegression": "16/16",
+      "MultiplyRegression": "8/8",
+      "BitwiseRegression scalar": "36/36",
+      "BitwiseRegression x64-vector256": "36/36",
+      "BitwisePositiveRegression BitwiseHelper": "16/16",
+      "BitwisePositiveRegression BitwiseEarlyStore": "8/8",
+      "ShiftRegression scalar": "11/11",
+      "ShiftRegression x64-vector256": "11/11",
+      "ShiftPositiveRegression": "8/8",
+      "AddSubtractRegression": "18/18",
+      "SafetyRegression": "17/17",
+      "SimdRegression": "191/191"
+    }
+  }
 }

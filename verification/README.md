@@ -225,11 +225,13 @@ extract. The pinned revision includes the fixes for multiplication (`Math.BigMul
 (#40), authenticated local consumer reuse (#42), `ReadOnlySpan<byte>`
 static lookup tables (#53) and linear per-site evidence checks (#54).
 
-All scalar ports now have registered certificates, and `remainingPorts` is
-empty. The 98 multiplication profile certificates passed against the current
-Release assembly and proof sources. Remaining work includes the original
-comparison/equality/SIMD fixtures, and recertification after shared proof changes. `pendingValidation` records these obligations separately
-from scalar port completion.
+All scalar ports have registered certificates, and `remainingPorts` is empty.
+All 256 gates were recertified on LeanCIL `7aec18e`, and every regression runner
+passed; `migration-status.json` records the per-runner counts. Those runs predate
+the shift-positives merge, so the gates still need one run on the final tree. `BitwiseRegression.cs`
+and `ShiftRegression.cs` take a profile argument (default `scalar`) and
+`BitwisePositiveRegression.cs` a fixture argument (default `BitwiseHelper`), so a
+complete run also passes `x64-vector256` and `BitwiseEarlyStore`.
 
 ## Regression fixtures
 
