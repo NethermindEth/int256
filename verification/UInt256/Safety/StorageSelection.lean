@@ -1,5 +1,7 @@
 import Extracted
 import CIL.Safety.InstructionMemory
+import UInt256.Methods.Add.StorageCall
+import UInt256.Methods.Add.SSEShapes.ReversedStorage
 
 namespace UInt256Proof.Safety
 
@@ -32,5 +34,27 @@ def storageArguments (output : CIL.Safety.Reference) (w0 w1 w2 w3 : BitVec 64) :
     List CIL.Safety.Value :=
   .reference (.address output) :: (List.range 4).map fun index =>
     .scalar (.i64 ([w0, w1, w2, w3][storageWordOrder.findIdx (· == index)]?.getD 0))
+
+/-- The extracted storage helper is the forward or the reversed limb body checked once by
+    `LimbStorage`; the discovered argument order must agree with that body by evaluation. -/
+theorem storage_contract : LimbStorageContract Extracted.program storageIndex storageArguments := by
+  intro memory inputs output w0 w1 w2 w3 call
+  first
+  | have found : Extracted.program[storageIndex]? =
+        some (UInt256Proof.Multiply.LimbStorage.body Extracted.profile) := by rfl
+    have ordered : storageArguments output w0 w1 w2 w3 =
+        UInt256Proof.Multiply.LimbStorage.arguments output w0 w1 w2 w3 := by rfl
+    rw [ordered]
+    exact UInt256Proof.Multiply.LimbStorage.store_limbs_readable_contract Extracted.profile _ _ found
+      memory inputs output w0 w1 w2 w3 call
+  | have found : Extracted.program[storageIndex]? =
+        some (UInt256Proof.Add.SSEShapes.ReversedStorage.body Extracted.profile) := by rfl
+    have ordered : storageArguments output w0 w1 w2 w3 =
+        UInt256Proof.Multiply.LimbStorage.arguments output w3 w2 w1 w0 := by rfl
+    rw [ordered]
+    exact UInt256Proof.Add.SSEShapes.ReversedStorage.store_limbs_readable_contract Extracted.profile _ _ found
+      memory inputs output w0 w1 w2 w3 call
+
+#print axioms storage_contract
 
 end UInt256Proof.Safety

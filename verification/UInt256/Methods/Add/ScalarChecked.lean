@@ -1,5 +1,5 @@
 import UInt256.Methods.Add.ScalarCarryPrefix
-import UInt256.Methods.Add.StorageCall
+import UInt256.Safety.StorageSelection
 import UInt256.Methods.Add.CarryCall
 import UInt256.Methods.Add.ScalarCarryMemory
 import UInt256.Methods.Add.ScalarSmallFacts
@@ -122,7 +122,7 @@ theorem scalar_finish (original entered current : CIL.Safety.Memory) (frame : Fr
   have formed := state.call.output_formed (by simp : output ∈ [output])
   apply scalar_store_prefix left right output [.scalar (.i32 0)] frame current results words
     formed state.resultSlots (fun i => state.completed i i.isLt) post
-  apply run_store_limbs [left, right] output (words 0) (words 1) (words 2) (words 3) post
+  apply run_store_limbs storage_contract [left, right] output (words 0) (words 1) (words 2) (words 3) post
     (body := Extracted.addScalarBody) (op := .call Extracted.storeLimbsIndex 5)
   · simp only [cil_code]
   · conv in scalarStoreCall => cbv

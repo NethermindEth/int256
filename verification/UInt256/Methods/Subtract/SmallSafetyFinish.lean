@@ -1,6 +1,6 @@
 import UInt256.Methods.Subtract.SmallSafetySaved
 import UInt256.Arithmetic.Borrow
-import UInt256.Methods.Add.StorageCall
+import UInt256.Safety.StorageSelection
 import CIL.Safety.ReturnMemory
 import UInt256.Methods.Reporting.Arithmetic
 
@@ -142,7 +142,7 @@ theorem small_finish (original entered current : Memory) (frame : Frame)
   have formed := state.call.output_formed (by simp : output ∈ [output])
   apply small_branch_prefix input output word frame current homes (inputLimb original input)
     formed (fun i => (facts i).1) (fun i => (facts i).2.2) post
-  apply UInt256Proof.Safety.run_store_limbs [input] output (words 0) (words 1) (words 2) (words 3) post
+  apply UInt256Proof.Safety.run_store_limbs UInt256Proof.Safety.storage_contract [input] output (words 0) (words 1) (words 2) (words 3) post
     (body := Extracted.subtractScalarUInt64Body) (op := .call Extracted.storeLimbsIndex 5)
   · simp only [cil_code]
   · change Extracted.subtractScalarUInt64Body.code[smallStoreCall branch.val]? = some _

@@ -309,6 +309,6 @@ caller-byte preservation, and its claimed feature coverage. Re-run the original
 mutation/refutation cases before claiming equivalent verification scope.
 The previous pin's negative check replaced the first `add` in the compiled
 `AddWithCarry` helper with `sub`: the unchanged proof failed in `CarryMemory`
-and emitted no certificate. That check was not the full mutation suite.
+(now the gate's `carryBody` binding) and emitted no certificate. That check was not the full mutation suite.
 Further extraction or proof-composition gaps should be reproduced upstream
 rather than hidden behind consumer copies of CIL infrastructure.

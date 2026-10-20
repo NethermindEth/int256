@@ -1,5 +1,5 @@
 import UInt256.Methods.Add.SmallSum
-import UInt256.Methods.Add.StorageCall
+import UInt256.Safety.StorageSelection
 import UInt256.Arithmetic.Carry
 import CIL.Safety.ReturnMemory
 
@@ -126,7 +126,7 @@ theorem small_store_finish (branch : Fin 5) (original entered current : CIL.Safe
         (storageArguments output (words 0) (words 1) (words 2) (words 3)).reverse current = .ok (final, values) ∧
       SmallResult original final values input output word (smallBranchFlag branch) := by
   have formed := currentCall.output_formed (by simp : output ∈ [output])
-  apply run_store_limbs [input] output (words 0) (words 1) (words 2) (words 3)
+  apply run_store_limbs storage_contract [input] output (words 0) (words 1) (words 2) (words 3)
     (fun final values => SmallResult original final values input output word (smallBranchFlag branch))
     (body := Extracted.addScalarUInt64Body) (op := .call Extracted.storeLimbsIndex 5)
   · simp only [cil_code]

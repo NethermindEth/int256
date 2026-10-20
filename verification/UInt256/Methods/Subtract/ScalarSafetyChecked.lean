@@ -1,7 +1,7 @@
 import UInt256.Methods.Subtract.ScalarBorrowSegments
 import UInt256.Methods.Subtract.BorrowArithmetic
 import UInt256.Methods.Subtract.ScalarBorrowPrefix
-import UInt256.Methods.Add.StorageCall
+import UInt256.Safety.StorageSelection
 import CIL.Safety.ReturnMemory
 import UInt256.Methods.Reporting.Arithmetic
 import UInt256.Methods.Subtract.ScalarSmallChecked
@@ -116,7 +116,7 @@ theorem scalar_finish (original entered current : CIL.Safety.Memory) (frame : Fr
   have formed := state.call.output_formed (by simp : output ∈ [output])
   apply scalar_store_prefix left right output frame current results words
     formed state.resultSlots (fun i => state.completed i i.isLt) post
-  apply UInt256Proof.Safety.run_store_limbs [left, right] output (words 0) (words 1) (words 2) (words 3) post
+  apply UInt256Proof.Safety.run_store_limbs UInt256Proof.Safety.storage_contract [left, right] output (words 0) (words 1) (words 2) (words 3) post
     (body := scalarBody) (op := .call Extracted.storeLimbsIndex 5)
   · rfl
   · rfl
