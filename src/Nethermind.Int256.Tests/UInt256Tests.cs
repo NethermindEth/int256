@@ -8,7 +8,6 @@ using System.Globalization;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
-using FluentAssertions;
 using NUnit.Framework;
 using Arm = System.Runtime.Intrinsics.Arm;
 using x64 = System.Runtime.Intrinsics.X86;
@@ -56,18 +55,18 @@ public abstract class UInt256TestsTemplate<T> where T : IInteger<T>
         a.Add(b, out T res);
         res.Convert(out BigInteger resUInt256);
 
-        resUInt256.Should().Be(resBigInt);
+        Assert.That(resUInt256, Is.EqualTo(resBigInt));
 
         // Test reusing input as output
         a.Add(b, out a);
         a.Convert(out resUInt256);
-        resUInt256.Should().Be(resBigInt);
+        Assert.That(resUInt256, Is.EqualTo(resBigInt));
 
         a = convert(test.A);
 
         a.Add(b, out b);
         b.Convert(out resUInt256);
-        resUInt256.Should().Be(resBigInt);
+        Assert.That(resUInt256, Is.EqualTo(resBigInt));
     }
 
     [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
@@ -85,23 +84,23 @@ public abstract class UInt256TestsTemplate<T> where T : IInteger<T>
         bool overflow = T.AddOverflow(uint256a, uint256b, out T res);
         res.Convert(out resUInt256);
 
-        resUInt256.Should().Be(resBigInt);
-        overflow.Should().Be(expectedOverflow);
+        Assert.That(resUInt256, Is.EqualTo(resBigInt));
+        Assert.That(overflow, Is.EqualTo(expectedOverflow));
 
         // Test reusing input as output
         overflow = T.AddOverflow(uint256a, uint256b, out uint256a);
         uint256a.Convert(out resUInt256);
 
-        resUInt256.Should().Be(resBigInt);
-        overflow.Should().Be(expectedOverflow);
+        Assert.That(resUInt256, Is.EqualTo(resBigInt));
+        Assert.That(overflow, Is.EqualTo(expectedOverflow));
 
         uint256a = convert(test.A);
 
         overflow = T.AddOverflow(uint256a, uint256b, out uint256b);
         uint256b.Convert(out resUInt256);
 
-        resUInt256.Should().Be(resBigInt);
-        overflow.Should().Be(expectedOverflow);
+        Assert.That(resUInt256, Is.EqualTo(resBigInt));
+        Assert.That(overflow, Is.EqualTo(expectedOverflow));
     }
 
     [TestCaseSource(typeof(TernaryOps), nameof(TernaryOps.TestCases))]
@@ -112,8 +111,7 @@ public abstract class UInt256TestsTemplate<T> where T : IInteger<T>
         T uint256m = convert(test.M);
         if (test.M.IsZero)
         {
-            Action act = () => uint256a.AddMod(uint256b, uint256m, out T res);
-            act.Should().Throw<DivideByZeroException>();
+            Assert.Throws<DivideByZeroException>(() => uint256a.AddMod(uint256b, uint256m, out T res));
             return;
         }
         BigInteger resBigInt = (test.A + test.B) % test.M;
@@ -123,27 +121,27 @@ public abstract class UInt256TestsTemplate<T> where T : IInteger<T>
         uint256a.AddMod(uint256b, uint256m, out T res);
         res.Convert(out BigInteger resUInt256);
 
-        resUInt256.Should().Be(resBigInt);
+        Assert.That(resUInt256, Is.EqualTo(resBigInt));
 
         // Test reusing input as output
         uint256a.AddMod(uint256b, uint256m, out uint256a);
         uint256a.Convert(out resUInt256);
 
-        resUInt256.Should().Be(resBigInt);
+        Assert.That(resUInt256, Is.EqualTo(resBigInt));
 
         uint256a = convert(test.A);
 
         uint256a.AddMod(uint256b, uint256m, out uint256b);
         uint256b.Convert(out resUInt256);
 
-        resUInt256.Should().Be(resBigInt);
+        Assert.That(resUInt256, Is.EqualTo(resBigInt));
 
         uint256b = convert(test.B);
 
         uint256a.AddMod(uint256b, uint256m, out uint256m);
         uint256m.Convert(out resUInt256);
 
-        resUInt256.Should().Be(resBigInt);
+        Assert.That(resUInt256, Is.EqualTo(resBigInt));
     }
 
     [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
@@ -163,20 +161,20 @@ public abstract class UInt256TestsTemplate<T> where T : IInteger<T>
         uint256a.Subtract(uint256b, out T res);
         res.Convert(out BigInteger resUInt256);
 
-        resUInt256.Should().Be(resBigInt);
+        Assert.That(resUInt256, Is.EqualTo(resBigInt));
 
         // Test reusing input as output
         uint256a.Subtract(uint256b, out uint256a);
         uint256a.Convert(out resUInt256);
 
-        resUInt256.Should().Be(resBigInt);
+        Assert.That(resUInt256, Is.EqualTo(resBigInt));
 
         uint256a = convert(test.A);
 
         uint256a.Subtract(uint256b, out uint256b);
         uint256b.Convert(out resUInt256);
 
-        resUInt256.Should().Be(resBigInt);
+        Assert.That(resUInt256, Is.EqualTo(resBigInt));
     }
 
     [TestCaseSource(typeof(TernaryOps), nameof(TernaryOps.TestCases))]
@@ -192,8 +190,7 @@ public abstract class UInt256TestsTemplate<T> where T : IInteger<T>
         T uint256m = convert(test.M);
         if (test.M.IsZero)
         {
-            Action act = () => uint256a.SubtractMod(uint256b, uint256m, out T res);
-            act.Should().Throw<DivideByZeroException>();
+            Assert.Throws<DivideByZeroException>(() => uint256a.SubtractMod(uint256b, uint256m, out T res));
             return;
         }
         BigInteger resBigInt = (test.A - test.B) % test.M;
@@ -210,27 +207,27 @@ public abstract class UInt256TestsTemplate<T> where T : IInteger<T>
         uint256a.SubtractMod(uint256b, uint256m, out T res);
         res.Convert(out BigInteger resUInt256);
 
-        resUInt256.Should().Be(resBigInt);
+        Assert.That(resUInt256, Is.EqualTo(resBigInt));
 
         // Test reusing input as output
         uint256a.SubtractMod(uint256b, uint256m, out uint256a);
         uint256a.Convert(out resUInt256);
 
-        resUInt256.Should().Be(resBigInt);
+        Assert.That(resUInt256, Is.EqualTo(resBigInt));
 
         uint256a = convert(test.A);
 
         uint256a.SubtractMod(uint256b, uint256m, out uint256b);
         uint256b.Convert(out resUInt256);
 
-        resUInt256.Should().Be(resBigInt);
+        Assert.That(resUInt256, Is.EqualTo(resBigInt));
 
         uint256b = convert(test.B);
 
         uint256a.SubtractMod(uint256b, uint256m, out uint256m);
         uint256m.Convert(out resUInt256);
 
-        resUInt256.Should().Be(resBigInt);
+        Assert.That(resUInt256, Is.EqualTo(resBigInt));
     }
 
     [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
@@ -266,22 +263,20 @@ public abstract class UInt256TestsTemplate<T> where T : IInteger<T>
                     uint256a.Subtract(uint256b, out res);
                     res.Convert(out resUInt256);
                 }
-                resUInt256.Should().Be(resBigInt);
+                Assert.That(resUInt256, Is.EqualTo(resBigInt));
             }
             else
             {
                 if (uint256a is UInt256 a && uint256b is UInt256 b)
                 {
                     res = default!;
-                    a.Invoking(y => y - b)
-                        .Should().Throw<OverflowException>()
-                        .WithMessage($"Underflow in subtraction {a} - {b}");
+                    Assert.That(() => a - b, Throws.TypeOf<OverflowException>().With.Message.EqualTo($"Underflow in subtraction {a} - {b}"));
                 }
                 else
                 {
                     uint256a.Subtract(uint256b, out res);
                     res.Convert(out resUInt256);
-                    resUInt256.Should().Be(resBigInt);
+                    Assert.That(resUInt256, Is.EqualTo(resBigInt));
                 }
             }
         }
@@ -298,20 +293,20 @@ public abstract class UInt256TestsTemplate<T> where T : IInteger<T>
         uint256a.Multiply(uint256b, out T res);
         res.Convert(out BigInteger resUInt256);
 
-        resUInt256.Should().Be(resBigInt);
+        Assert.That(resUInt256, Is.EqualTo(resBigInt));
 
         // Test reusing input as output
         uint256a.Multiply(uint256b, out uint256a);
         uint256a.Convert(out resUInt256);
 
-        resUInt256.Should().Be(resBigInt);
+        Assert.That(resUInt256, Is.EqualTo(resBigInt));
 
         uint256a = convert(test.A);
 
         uint256a.Multiply(uint256b, out uint256b);
         uint256b.Convert(out resUInt256);
 
-        resUInt256.Should().Be(resBigInt);
+        Assert.That(resUInt256, Is.EqualTo(resBigInt));
     }
 
     [TestCaseSource(typeof(TernaryOps), nameof(TernaryOps.TestCases))]
@@ -323,8 +318,7 @@ public abstract class UInt256TestsTemplate<T> where T : IInteger<T>
 
         if (test.M.IsZero)
         {
-            Action act = () => uint256a.MultiplyMod(uint256b, uint256m, out T res);
-            act.Should().Throw<DivideByZeroException>();
+            Assert.Throws<DivideByZeroException>(() => uint256a.MultiplyMod(uint256b, uint256m, out T res));
             return;
         }
         BigInteger resBigInt = ((test.A * test.B) % test.M) % (BigInteger.One << 256);
@@ -333,25 +327,25 @@ public abstract class UInt256TestsTemplate<T> where T : IInteger<T>
         uint256a.MultiplyMod(uint256b, uint256m, out T res);
         res.Convert(out BigInteger resUInt256);
 
-        resUInt256.Should().Be(resBigInt);
+        Assert.That(resUInt256, Is.EqualTo(resBigInt));
 
         // Test reusing input as output
         uint256a.MultiplyMod(uint256b, uint256m, out uint256a);
         uint256a.Convert(out resUInt256);
 
-        resUInt256.Should().Be(resBigInt);
+        Assert.That(resUInt256, Is.EqualTo(resBigInt));
 
         uint256a = convert(test.A);
         uint256a.MultiplyMod(uint256b, uint256m, out uint256b);
         uint256b.Convert(out resUInt256);
 
-        resUInt256.Should().Be(resBigInt);
+        Assert.That(resUInt256, Is.EqualTo(resBigInt));
 
         uint256b = convert(test.B);
         uint256a.MultiplyMod(uint256b, uint256m, out uint256m);
         uint256m.Convert(out resUInt256);
 
-        resUInt256.Should().Be(resBigInt);
+        Assert.That(resUInt256, Is.EqualTo(resBigInt));
     }
 
     [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
@@ -361,8 +355,7 @@ public abstract class UInt256TestsTemplate<T> where T : IInteger<T>
         T uint256b = convert(test.B);
         if (test.B.IsZero)
         {
-            Action act = () => uint256a.Divide(uint256b, out T res);
-            act.Should().Throw<DivideByZeroException>();
+            Assert.Throws<DivideByZeroException>(() => uint256a.Divide(uint256b, out T res));
             return;
         }
         BigInteger resBigInt = (test.A / test.B) % (BigInteger.One << 256);
@@ -371,19 +364,19 @@ public abstract class UInt256TestsTemplate<T> where T : IInteger<T>
         uint256a.Divide(uint256b, out T res);
         res.Convert(out BigInteger resUInt256);
 
-        resUInt256.Should().Be(resBigInt);
+        Assert.That(resUInt256, Is.EqualTo(resBigInt));
 
         // Test reusing input as output
         uint256a.Divide(uint256b, out uint256a);
         uint256a.Convert(out resUInt256);
 
-        resUInt256.Should().Be(resBigInt);
+        Assert.That(resUInt256, Is.EqualTo(resBigInt));
 
         uint256a = convert(test.A);
         uint256a.Divide(uint256b, out uint256b);
         uint256b.Convert(out resUInt256);
 
-        resUInt256.Should().Be(resBigInt);
+        Assert.That(resUInt256, Is.EqualTo(resBigInt));
     }
 
     [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
@@ -393,8 +386,7 @@ public abstract class UInt256TestsTemplate<T> where T : IInteger<T>
         T uint256b = convert(test.B);
         if (test.B.IsZero)
         {
-            Action act = () => uint256a.Mod(uint256b, out T res);
-            act.Should().Throw<DivideByZeroException>();
+            Assert.Throws<DivideByZeroException>(() => uint256a.Mod(uint256b, out T res));
             return;
         }
         BigInteger resBigInt = (test.A % test.B) % (BigInteger.One << 256);
@@ -403,19 +395,19 @@ public abstract class UInt256TestsTemplate<T> where T : IInteger<T>
         uint256a.Mod(uint256b, out T res);
         res.Convert(out BigInteger resUInt256);
 
-        resUInt256.Should().Be(resBigInt);
+        Assert.That(resUInt256, Is.EqualTo(resBigInt));
 
         // Test reusing input as output
         uint256a.Mod(uint256b, out uint256a);
         uint256a.Convert(out resUInt256);
 
-        resUInt256.Should().Be(resBigInt);
+        Assert.That(resUInt256, Is.EqualTo(resBigInt));
 
         uint256a = convert(test.A);
         uint256a.Mod(uint256b, out uint256b);
         uint256b.Convert(out resUInt256);
 
-        resUInt256.Should().Be(resBigInt);
+        Assert.That(resUInt256, Is.EqualTo(resBigInt));
     }
 
     [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
@@ -429,19 +421,19 @@ public abstract class UInt256TestsTemplate<T> where T : IInteger<T>
         T.And(uint256a, uint256b, out T res);
         res.Convert(out BigInteger resUInt256);
 
-        resUInt256.Should().Be(resBigInt);
+        Assert.That(resUInt256, Is.EqualTo(resBigInt));
 
         // Test reusing input as output
         T.And(uint256a, uint256b, out uint256a);
         uint256a.Convert(out resUInt256);
 
-        resUInt256.Should().Be(resBigInt);
+        Assert.That(resUInt256, Is.EqualTo(resBigInt));
 
         uint256a = convert(test.A);
         T.And(uint256a, uint256b, out uint256b);
         uint256b.Convert(out resUInt256);
 
-        resUInt256.Should().Be(resBigInt);
+        Assert.That(resUInt256, Is.EqualTo(resBigInt));
     }
 
     [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
@@ -455,19 +447,19 @@ public abstract class UInt256TestsTemplate<T> where T : IInteger<T>
         T.Or(uint256a, uint256b, out T res);
         res.Convert(out BigInteger resUInt256);
 
-        resUInt256.Should().Be(resBigInt);
+        Assert.That(resUInt256, Is.EqualTo(resBigInt));
 
         // Test reusing input as output
         T.Or(uint256a, uint256b, out uint256a);
         uint256a.Convert(out resUInt256);
 
-        resUInt256.Should().Be(resBigInt);
+        Assert.That(resUInt256, Is.EqualTo(resBigInt));
 
         uint256a = convert(test.A);
         T.Or(uint256a, uint256b, out uint256b);
         uint256b.Convert(out resUInt256);
 
-        resUInt256.Should().Be(resBigInt);
+        Assert.That(resUInt256, Is.EqualTo(resBigInt));
     }
 
     [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.TestCases))]
@@ -481,20 +473,20 @@ public abstract class UInt256TestsTemplate<T> where T : IInteger<T>
         T.Xor(uint256a, uint256b, out T res);
         res.Convert(out BigInteger resUInt256);
 
-        resUInt256.Should().Be(resBigInt);
+        Assert.That(resUInt256, Is.EqualTo(resBigInt));
 
         // Test reusing input as output
         T.Xor(uint256a, uint256b, out uint256a);
         uint256a.Convert(out resUInt256);
 
-        resUInt256.Should().Be(resBigInt);
+        Assert.That(resUInt256, Is.EqualTo(resBigInt));
 
         uint256a = convert(test.A);
 
         T.Xor(uint256a, uint256b, out uint256b);
         uint256b.Convert(out resUInt256);
 
-        resUInt256.Should().Be(resBigInt);
+        Assert.That(resUInt256, Is.EqualTo(resBigInt));
     }
 
     [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.ShiftTestCases))]
@@ -509,13 +501,13 @@ public abstract class UInt256TestsTemplate<T> where T : IInteger<T>
         uint256a.Exp(convertFromInt(test.n), out T res);
         res.Convert(out BigInteger resUInt256);
 
-        resUInt256.Should().Be(resBigInt);
+        Assert.That(resUInt256, Is.EqualTo(resBigInt));
 
         // Test reusing input as output
         uint256a.Exp(convertFromInt(test.n), out uint256a);
         res.Convert(out resUInt256);
 
-        resUInt256.Should().Be(resBigInt);
+        Assert.That(resUInt256, Is.EqualTo(resBigInt));
     }
 
     [TestCaseSource(typeof(TernaryOps), nameof(TernaryOps.TestCases))]
@@ -526,14 +518,12 @@ public abstract class UInt256TestsTemplate<T> where T : IInteger<T>
         T uint256m = convert(test.M);
         if (test.B < 0)
         {
-            Action act = () => uint256a.ExpMod(uint256b, uint256m, out T res);
-            act.Should().Throw<ArgumentException>();
+            Assert.Throws<ArgumentException>(() => uint256a.ExpMod(uint256b, uint256m, out T res));
             return;
         }
         if (test.M.IsZero)
         {
-            Action act = () => uint256a.ExpMod(uint256b, uint256m, out T res);
-            act.Should().Throw<DivideByZeroException>();
+            Assert.Throws<DivideByZeroException>(() => uint256a.ExpMod(uint256b, uint256m, out T res));
             return;
         }
 
@@ -544,25 +534,25 @@ public abstract class UInt256TestsTemplate<T> where T : IInteger<T>
         uint256a.ExpMod(uint256b, uint256m, out T res);
         res.Convert(out BigInteger resUInt256);
 
-        resUInt256.Should().Be(resBigInt);
+        Assert.That(resUInt256, Is.EqualTo(resBigInt));
 
         // Test reusing input as output
         uint256a.ExpMod(uint256b, uint256m, out uint256a);
         uint256a.Convert(out resUInt256);
 
-        resUInt256.Should().Be(resBigInt);
+        Assert.That(resUInt256, Is.EqualTo(resBigInt));
 
         uint256a = convert(test.A);
         uint256a.ExpMod(uint256b, uint256m, out uint256b);
         uint256b.Convert(out resUInt256);
 
-        resUInt256.Should().Be(resBigInt);
+        Assert.That(resUInt256, Is.EqualTo(resBigInt));
 
         uint256b = convert(test.B);
         uint256a.ExpMod(uint256b, uint256m, out uint256m);
         uint256m.Convert(out resUInt256);
 
-        resUInt256.Should().Be(resBigInt);
+        Assert.That(resUInt256, Is.EqualTo(resBigInt));
     }
 
     [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.ShiftTestCases))]
@@ -580,13 +570,13 @@ public abstract class UInt256TestsTemplate<T> where T : IInteger<T>
         uint256a.LeftShift(test.n, out T res);
         res.Convert(out BigInteger resUInt256);
 
-        resUInt256.Should().Be(resBigInt);
+        Assert.That(resUInt256, Is.EqualTo(resBigInt));
 
         // Test reusing input as output
         uint256a.LeftShift(test.n, out uint256a);
         uint256a.Convert(out resUInt256);
 
-        resUInt256.Should().Be(resBigInt);
+        Assert.That(resUInt256, Is.EqualTo(resBigInt));
     }
 
     [TestCaseSource(typeof(BinaryOps), nameof(BinaryOps.ShiftTestCases))]
@@ -604,13 +594,13 @@ public abstract class UInt256TestsTemplate<T> where T : IInteger<T>
         uint256a.RightShift(test.n, out T res);
         res.Convert(out BigInteger resUInt256);
 
-        resUInt256.Should().Be(resBigInt);
+        Assert.That(resUInt256, Is.EqualTo(resBigInt));
 
         // Test reusing input as output
         uint256a.RightShift(test.n, out uint256a);
         uint256a.Convert(out resUInt256);
 
-        resUInt256.Should().Be(resBigInt);
+        Assert.That(resUInt256, Is.EqualTo(resBigInt));
     }
 
     [TestCaseSource(typeof(UnaryOps), nameof(UnaryOps.TestCases))]
@@ -618,7 +608,7 @@ public abstract class UInt256TestsTemplate<T> where T : IInteger<T>
     {
         T uint256 = convert(test);
         uint256.Convert(out BigInteger res);
-        res.Should().Be(test);
+        Assert.That(res, Is.EqualTo(test));
     }
 
     [TestCaseSource(typeof(UnaryOps), nameof(UnaryOps.TestCases))]
@@ -632,19 +622,19 @@ public abstract class UInt256TestsTemplate<T> where T : IInteger<T>
         T.Not(x, out T res);
         res.Convert(out BigInteger resT);
 
-        resT.Should().Be(resBigInt);
+        Assert.That(resT, Is.EqualTo(resBigInt));
 
         // Test reusing input as output
         T.Not(x, out x);
         x.Convert(out resT);
-        resT.Should().Be(resBigInt);
+        Assert.That(resT, Is.EqualTo(resBigInt));
     }
 
     [TestCaseSource(typeof(UnaryOps), nameof(UnaryOps.TestCases))]
     public virtual void ToString(BigInteger test)
     {
         T uint256 = convert(test);
-        uint256.ToString().Should().Be(test.ToString());
+        Assert.That(uint256.ToString(), Is.EqualTo(test.ToString()));
     }
 }
 
@@ -784,22 +774,22 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
         bool expectedOverflow = sum >= TestNumbers.TwoTo256;
 
         bool overflow = UInt256.AddOverflow(in a, in b, out UInt256 result);
-        ((BigInteger)result).Should().Be(expectedResult);
-        overflow.Should().Be(expectedOverflow);
+        Assert.That(((BigInteger)result), Is.EqualTo(expectedResult));
+        Assert.That(overflow, Is.EqualTo(expectedOverflow));
 
         UInt256.Add(in a, in b, out UInt256 plain);
-        ((BigInteger)plain).Should().Be(expectedResult);
-        ((BigInteger)(a + b)).Should().Be(expectedResult);
+        Assert.That(((BigInteger)plain), Is.EqualTo(expectedResult));
+        Assert.That(((BigInteger)(a + b)), Is.EqualTo(expectedResult));
 
         UInt256 aliasedA = a;
         overflow = UInt256.AddOverflow(in aliasedA, in b, out aliasedA);
-        ((BigInteger)aliasedA).Should().Be(expectedResult);
-        overflow.Should().Be(expectedOverflow);
+        Assert.That(((BigInteger)aliasedA), Is.EqualTo(expectedResult));
+        Assert.That(overflow, Is.EqualTo(expectedOverflow));
 
         UInt256 aliasedB = b;
         overflow = UInt256.AddOverflow(in a, in aliasedB, out aliasedB);
-        ((BigInteger)aliasedB).Should().Be(expectedResult);
-        overflow.Should().Be(expectedOverflow);
+        Assert.That(((BigInteger)aliasedB), Is.EqualTo(expectedResult));
+        Assert.That(overflow, Is.EqualTo(expectedOverflow));
     }
 
     public static IEnumerable<(UInt256 A, ulong B)> SubtractByUInt64Cases =>
@@ -923,21 +913,21 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
         bool expectedUnderflow = difference.Sign < 0;
 
         bool underflow = UInt256.SubtractUnderflow(in a, in b, out UInt256 result);
-        ((BigInteger)result).Should().Be(expectedResult);
-        underflow.Should().Be(expectedUnderflow);
+        Assert.That(((BigInteger)result), Is.EqualTo(expectedResult));
+        Assert.That(underflow, Is.EqualTo(expectedUnderflow));
 
         UInt256.Subtract(in a, in b, out UInt256 plain);
-        ((BigInteger)plain).Should().Be(expectedResult);
+        Assert.That(((BigInteger)plain), Is.EqualTo(expectedResult));
 
         UInt256 aliasedA = a;
         underflow = UInt256.SubtractUnderflow(in aliasedA, in b, out aliasedA);
-        ((BigInteger)aliasedA).Should().Be(expectedResult);
-        underflow.Should().Be(expectedUnderflow);
+        Assert.That(((BigInteger)aliasedA), Is.EqualTo(expectedResult));
+        Assert.That(underflow, Is.EqualTo(expectedUnderflow));
 
         UInt256 aliasedB = b;
         underflow = UInt256.SubtractUnderflow(in a, in aliasedB, out aliasedB);
-        ((BigInteger)aliasedB).Should().Be(expectedResult);
-        underflow.Should().Be(expectedUnderflow);
+        Assert.That(((BigInteger)aliasedB), Is.EqualTo(expectedResult));
+        Assert.That(underflow, Is.EqualTo(expectedUnderflow));
     }
 
     [Test]
@@ -1001,24 +991,24 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
 
             value.Divide(in divisor, out UInt256 quotient);
             value.Mod(in divisor, out UInt256 remainder);
-            ((BigInteger)quotient).Should().Be(expectedQuotient);
-            ((BigInteger)remainder).Should().Be(expectedRemainder);
+            Assert.That(((BigInteger)quotient), Is.EqualTo(expectedQuotient));
+            Assert.That(((BigInteger)remainder), Is.EqualTo(expectedRemainder));
 
             UInt256 aliasedValue = value;
             aliasedValue.Divide(in divisor, out aliasedValue);
-            ((BigInteger)aliasedValue).Should().Be(expectedQuotient);
+            Assert.That(((BigInteger)aliasedValue), Is.EqualTo(expectedQuotient));
 
             aliasedValue = value;
             aliasedValue.Mod(in divisor, out aliasedValue);
-            ((BigInteger)aliasedValue).Should().Be(expectedRemainder);
+            Assert.That(((BigInteger)aliasedValue), Is.EqualTo(expectedRemainder));
 
             UInt256 aliasedDivisor = divisor;
             value.Divide(in aliasedDivisor, out aliasedDivisor);
-            ((BigInteger)aliasedDivisor).Should().Be(expectedQuotient);
+            Assert.That(((BigInteger)aliasedDivisor), Is.EqualTo(expectedQuotient));
 
             aliasedDivisor = divisor;
             value.Mod(in aliasedDivisor, out aliasedDivisor);
-            ((BigInteger)aliasedDivisor).Should().Be(expectedRemainder);
+            Assert.That(((BigInteger)aliasedDivisor), Is.EqualTo(expectedRemainder));
         }
     }
 
@@ -1068,11 +1058,11 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
                 {
                     UInt256 quotient = poison;
                     UInt256.Divide(in dividend, in divisor, out quotient);
-                    quotient.Should().Be(expectedQuotient, $"{dividend} / 2^{k}");
+                    Assert.That(quotient, Is.EqualTo(expectedQuotient), $"{dividend} / 2^{k}");
 
                     UInt256 remainder = poison;
                     UInt256.Mod(in dividend, in divisor, out remainder);
-                    remainder.Should().Be(expectedRemainder, $"{dividend} % 2^{k}");
+                    Assert.That(remainder, Is.EqualTo(expectedRemainder), $"{dividend} % 2^{k}");
                 }
             }
         }
@@ -1164,10 +1154,10 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
             BigInteger divisorBig = (BigInteger)divisor;
 
             UInt256.Divide(in dividend, in divisor, out UInt256 quotient);
-            ((BigInteger)quotient).Should().Be(dividendBig / divisorBig, $"{dividendBig} / {divisorBig}");
+            Assert.That(((BigInteger)quotient), Is.EqualTo(dividendBig / divisorBig), $"{dividendBig} / {divisorBig}");
 
             UInt256.Mod(in dividend, in divisor, out UInt256 remainder);
-            ((BigInteger)remainder).Should().Be(dividendBig % divisorBig, $"{dividendBig} % {divisorBig}");
+            Assert.That(((BigInteger)remainder), Is.EqualTo(dividendBig % divisorBig), $"{dividendBig} % {divisorBig}");
         }
     }
 
@@ -1211,19 +1201,19 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
             BigInteger expected = (BigInteger)x * (BigInteger)y % TestNumbers.UInt256Max;
 
             UInt256.MultiplyMod(in x, in y, in UInt256.MaxValue, out UInt256 result);
-            ((BigInteger)result).Should().Be(expected);
+            Assert.That(((BigInteger)result), Is.EqualTo(expected));
 
             UInt256 left = x;
             UInt256 modulus = UInt256.MaxValue;
             left.MultiplyMod(in y, in modulus, out left);
-            ((BigInteger)left).Should().Be(expected);
+            Assert.That(((BigInteger)left), Is.EqualTo(expected));
 
             UInt256 right = y;
             x.MultiplyMod(in right, in modulus, out right);
-            ((BigInteger)right).Should().Be(expected);
+            Assert.That(((BigInteger)right), Is.EqualTo(expected));
 
             x.MultiplyMod(in y, in modulus, out modulus);
-            ((BigInteger)modulus).Should().Be(expected);
+            Assert.That(((BigInteger)modulus), Is.EqualTo(expected));
         }
     }
 
@@ -1242,15 +1232,15 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
     {
         UInt256 value = new(u0, u1, u2, u3);
 
-        value.u0.Should().Be(u0);
-        value.u1.Should().Be(u1);
-        value.u2.Should().Be(u2);
-        value.u3.Should().Be(u3);
+        Assert.That(value.u0, Is.EqualTo(u0));
+        Assert.That(value.u1, Is.EqualTo(u1));
+        Assert.That(value.u2, Is.EqualTo(u2));
+        Assert.That(value.u3, Is.EqualTo(u3));
 
         BigInteger expected = (BigInteger)u0 + ((BigInteger)u1 << 64) + ((BigInteger)u2 << 128) + ((BigInteger)u3 << 192);
-        ((BigInteger)value).Should().Be(expected);
-        new UInt256(value.ToLittleEndian()).Should().Be(value);
-        new UInt256(value.ToBigEndian(), isBigEndian: true).Should().Be(value);
+        Assert.That(((BigInteger)value), Is.EqualTo(expected));
+        Assert.That(new UInt256(value.ToLittleEndian()), Is.EqualTo(value));
+        Assert.That(new UInt256(value.ToBigEndian(), isBigEndian: true), Is.EqualTo(value));
     }
 
     // Distinct bytes expose a swapped half or reversed lane.
@@ -1264,15 +1254,15 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
         }
 
         UInt256 value = new(bytes);
-        value.u0.Should().Be(BinaryPrimitives.ReadUInt64LittleEndian(bytes.AsSpan(0, 8)));
-        value.u1.Should().Be(BinaryPrimitives.ReadUInt64LittleEndian(bytes.AsSpan(8, 8)));
-        value.u2.Should().Be(BinaryPrimitives.ReadUInt64LittleEndian(bytes.AsSpan(16, 8)));
-        value.u3.Should().Be(BinaryPrimitives.ReadUInt64LittleEndian(bytes.AsSpan(24, 8)));
+        Assert.That(value.u0, Is.EqualTo(BinaryPrimitives.ReadUInt64LittleEndian(bytes.AsSpan(0, 8))));
+        Assert.That(value.u1, Is.EqualTo(BinaryPrimitives.ReadUInt64LittleEndian(bytes.AsSpan(8, 8))));
+        Assert.That(value.u2, Is.EqualTo(BinaryPrimitives.ReadUInt64LittleEndian(bytes.AsSpan(16, 8))));
+        Assert.That(value.u3, Is.EqualTo(BinaryPrimitives.ReadUInt64LittleEndian(bytes.AsSpan(24, 8))));
 
         byte[] written = new byte[32];
         value.ToLittleEndian(written);
-        written.Should().Equal(bytes);
-        value.ToLittleEndian().Should().Equal(bytes);
+        Assert.That(written, Is.EqualTo(bytes));
+        Assert.That(value.ToLittleEndian(), Is.EqualTo(bytes));
     }
 
     public static IEnumerable<(UInt256 A, ulong A4, ulong D)> Remainder257By64BitsCases
@@ -1306,7 +1296,7 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
 
         UInt256.Remainder257By64Bits(in test.A, test.A4, test.D, out UInt256 rem);
 
-        ((BigInteger)rem).Should().Be(expected);
+        Assert.That(((BigInteger)rem), Is.EqualTo(expected));
     }
 
     // PaddedBytes returns the big-endian, right-aligned, left-zero-padded representation of the
@@ -1328,7 +1318,7 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
         UInt256 v = (UInt256)value;
 
         byte[] padded = v.PaddedBytes(n);
-        padded.Length.Should().Be(n);
+        Assert.That(padded.Length, Is.EqualTo(n));
 
         // Expected: the low min(32, n) bytes of the 32-byte big-endian form, right-aligned, with
         // the remaining leading bytes zero.
@@ -1337,7 +1327,7 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
         byte[] expected = new byte[n];
         full.AsSpan(32 - copy, copy).CopyTo(expected.AsSpan(n - copy, copy));
 
-        padded.Should().Equal(expected);
+        Assert.That(padded, Is.EqualTo(expected));
     }
 
     [Test]
@@ -1352,9 +1342,9 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
 
         v.WritePaddedBytes(target);
 
-        for (int i = 0; i < 32; i++) target[i].Should().Be(0x00);
-        target[32].Should().Be(0x01);
-        target[39].Should().Be(0x08);
+        for (int i = 0; i < 32; i++) Assert.That(target[i], Is.EqualTo(0x00));
+        Assert.That(target[32], Is.EqualTo(0x01));
+        Assert.That(target[39], Is.EqualTo(0x08));
     }
 
     [Test]
@@ -1371,7 +1361,7 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
 
         // Low 6 bytes of the big-endian value: 03 04 05 06 07 08 (the 01 02 are truncated).
         byte[] expected = { 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 };
-        target.ToArray().Should().Equal(expected);
+        Assert.That(target.ToArray(), Is.EqualTo(expected));
     }
 
     [TestCase(20)]
@@ -1395,7 +1385,7 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
                0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14,
                0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E,
                0x1F, 0x20];
-        target.ToArray().Should().Equal(expected);
+        Assert.That(target.ToArray(), Is.EqualTo(expected));
     }
 
     // The (UInt256)BigInteger cast is allocation-free: it writes the value into a stackalloc
@@ -1419,18 +1409,16 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
     {
         UInt256 cast = (UInt256)value;
         cast.Convert(out BigInteger actual);
-        actual.Should().Be(value);
+        Assert.That(actual, Is.EqualTo(value));
     }
 
     [TestCase(256)]   // 2^256: smallest 33-byte value
     [TestCase(257)]   // 2^257
     public void Cast_From_BigInteger_Throws_When_Over_256_Bits(int shift)
     {
-        Action exact = () => { _ = (UInt256)(BigInteger.One << shift); };
-        exact.Should().Throw<ArgumentOutOfRangeException>();
+        Assert.Throws<ArgumentOutOfRangeException>(() => { _ = (UInt256)(BigInteger.One << shift); });
 
-        Action plusOne = () => { _ = (UInt256)((BigInteger.One << shift) + 1); };
-        plusOne.Should().Throw<ArgumentOutOfRangeException>();
+        Assert.Throws<ArgumentOutOfRangeException>(() => { _ = (UInt256)((BigInteger.One << shift) + 1); });
     }
 
     [Test]
@@ -1438,8 +1426,7 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
     {
         // BigInteger.GetByteCount(isUnsigned: true) rejects negative values, matching the
         // legacy ToByteArray(true, true) path which also threw OverflowException.
-        Action act = () => { _ = (UInt256)BigInteger.MinusOne; };
-        act.Should().Throw<OverflowException>();
+        Assert.Throws<OverflowException>(() => { _ = (UInt256)BigInteger.MinusOne; });
     }
 
     [TestCaseSource(nameof(CastRoundTripValues))]
@@ -1450,7 +1437,7 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
 
         // The bytes must reconstruct the original value as an unsigned big-endian 256-bit word.
         BigInteger reconstructed = new(bytes, isUnsigned: true, isBigEndian: true);
-        reconstructed.Should().Be(value);
+        Assert.That(reconstructed, Is.EqualTo(value));
     }
 
     [Test]
@@ -1461,46 +1448,46 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
 
         BigInteger.One.ToBytes32(bytes, true);
 
-        bytes[..31].ToArray().Should().OnlyContain(value => value == 0);
-        bytes[31].Should().Be(1);
+        Assert.That(bytes[..31].ToArray(), Has.All.EqualTo(0));
+        Assert.That(bytes[31], Is.EqualTo(1));
     }
 
     [Test]
     public virtual void Zero_is_min_value()
     {
-        convert(1).ZeroValue.Should().Be(UInt256.MinValue);
+        Assert.That(convert(1).ZeroValue, Is.EqualTo(UInt256.MinValue));
     }
 
     [Test]
     public virtual void Zero_is_zero()
     {
-        convert(1).ZeroValue.Should().Be(convert(BigInteger.Zero));
+        Assert.That(convert(1).ZeroValue, Is.EqualTo(convert(BigInteger.Zero)));
     }
 
     [Test]
     public virtual void Is_zero()
     {
-        convert(1).ZeroValue.IsZero.Should().BeTrue();
-        UInt256.One.IsZero.Should().BeFalse();
+        Assert.That(convert(1).ZeroValue.IsZero, Is.True);
+        Assert.That(UInt256.One.IsZero, Is.False);
     }
 
     [Test]
     public virtual void One_is_one()
     {
-        convert(1).OneValue.Should().Be(convert(BigInteger.One));
+        Assert.That(convert(1).OneValue, Is.EqualTo(convert(BigInteger.One)));
     }
 
     [Test]
     public virtual void Is_one()
     {
-        convert(1).OneValue.IsOne.Should().BeTrue();
-        convert(1).ZeroValue.IsOne.Should().BeFalse();
+        Assert.That(convert(1).OneValue.IsOne, Is.True);
+        Assert.That(convert(1).ZeroValue.IsOne, Is.False);
     }
 
     [Test]
     public virtual void Max_value_is_correct()
     {
-        convert(1).MaximalValue.Should().Be(convert(maxValue));
+        Assert.That(convert(1).MaximalValue, Is.EqualTo(convert(maxValue)));
     }
 
     [Test]
@@ -1526,15 +1513,15 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
             BigInteger expected = (BigInteger)x * (BigInteger)y % TestNumbers.TwoTo256;
 
             UInt256.Multiply(in x, in y, out UInt256 result);
-            ((BigInteger)result).Should().Be(expected);
+            Assert.That(((BigInteger)result), Is.EqualTo(expected));
 
             UInt256 left = x;
             left.Multiply(in y, out left);
-            ((BigInteger)left).Should().Be(expected);
+            Assert.That(((BigInteger)left), Is.EqualTo(expected));
 
             UInt256 right = y;
             x.Multiply(in right, out right);
-            ((BigInteger)right).Should().Be(expected);
+            Assert.That(((BigInteger)right), Is.EqualTo(expected));
         }
     }
 
@@ -1554,11 +1541,11 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
                     BigInteger expected = (BigInteger)x * (BigInteger)y % TestNumbers.TwoTo256;
 
                     UInt256.Multiply(in x, in y, out UInt256 result);
-                    ((BigInteger)result).Should().Be(expected);
+                    Assert.That(((BigInteger)result), Is.EqualTo(expected));
 
                     UInt256 alias = x;
                     alias.Multiply(in y, out alias);
-                    ((BigInteger)alias).Should().Be(expected);
+                    Assert.That(((BigInteger)alias), Is.EqualTo(expected));
                 }
             }
         }
@@ -1648,17 +1635,17 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
             BigInteger expected = (BigInteger)x * (BigInteger)y % TestNumbers.TwoTo256;
 
             UInt256.Multiply(in x, in y, out UInt256 result);
-            ((BigInteger)result).Should().Be(expected, $"{x} * {y}");
+            Assert.That(((BigInteger)result), Is.EqualTo(expected), $"{x} * {y}");
 
             UInt256 left = x;
             left.Multiply(in y, out left);
-            ((BigInteger)left).Should().Be(expected, $"{x} * {y} aliased over x");
+            Assert.That(((BigInteger)left), Is.EqualTo(expected), $"{x} * {y} aliased over x");
 
             UInt256 right = y;
             x.Multiply(in right, out right);
-            ((BigInteger)right).Should().Be(expected, $"{x} * {y} aliased over y");
+            Assert.That(((BigInteger)right), Is.EqualTo(expected), $"{x} * {y} aliased over y");
 
-            ((BigInteger)(x * y)).Should().Be(expected, $"{x} * {y} via operator");
+            Assert.That(((BigInteger)(x * y)), Is.EqualTo(expected), $"{x} * {y} via operator");
         }
     }
 
@@ -1666,14 +1653,14 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
     public virtual void ToBigEndian_And_Back()
     {
         byte[] bidEndian = convert(1000000000000000000).ToBigEndian();
-        new UInt256(bidEndian, true).Should().Be(convert(1000000000000000000));
+        Assert.That(new UInt256(bidEndian, true), Is.EqualTo(convert(1000000000000000000)));
     }
 
     [Test]
     public virtual void ToLittleEndian_And_Back()
     {
         byte[] bidEndian = convert(1000000000000000000).ToLittleEndian();
-        new UInt256(bidEndian).Should().Be(convert(1000000000000000000));
+        Assert.That(new UInt256(bidEndian), Is.EqualTo(convert(1000000000000000000)));
     }
 
     [Test]
@@ -1684,13 +1671,13 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13, 224, 182, 179, 167, 100,
             0, 0
         };
-        convert(1000000000000000000).ToBigEndian().Should().BeEquivalentTo(bigEndianRepresentation);
+        Assert.That(convert(1000000000000000000).ToBigEndian(), Is.EqualTo(bigEndianRepresentation));
 
         byte[] littleEndianRepresentation =
         {
             0, 0, 100, 167, 179, 182, 224, 13, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
         };
-        convert(1000000000000000000).ToLittleEndian().Should().BeEquivalentTo(littleEndianRepresentation);
+        Assert.That(convert(1000000000000000000).ToLittleEndian(), Is.EqualTo(littleEndianRepresentation));
     }
 
     [TestCaseSource(typeof(Convertibles), nameof(Convertibles.TestCases))]
@@ -1714,7 +1701,7 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
                 UInt256 item = (UInt256)BigInteger.Parse(valueString);
                 string expected = expectedString ?? Expected(valueString);
                 string convertedValue = Expected(((IFormattable)System.Convert.ChangeType(item, type)).ToString("0.#", null));
-                convertedValue.Should().BeEquivalentTo(expected);
+                Assert.That(convertedValue, Is.EqualTo(expected).IgnoreCase);
             }
             catch (Exception e) when (e.GetType() == expectedException) { }
         }
@@ -1742,10 +1729,10 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
     [TestCaseSource(nameof(ParseTestCases))]
     public void TryParse_ReturnsExpectedValue(string value, BigInteger expected)
     {
-        UInt256.TryParse(value, out UInt256 parsed).Should().BeTrue();
+        Assert.That(UInt256.TryParse(value, out UInt256 parsed), Is.True);
 
         parsed.Convert(out BigInteger actual);
-        actual.Should().Be(expected);
+        Assert.That(actual, Is.EqualTo(expected));
     }
 
     [TestCase("")]
@@ -1755,8 +1742,8 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
     [TestCase("115792089237316195423570985008687907853269984665640564039457584007913129639936")]
     public void TryParse_ReturnsFalseForInvalidValues(string value)
     {
-        UInt256.TryParse(value, out UInt256 parsed).Should().BeFalse();
-        parsed.Should().Be(UInt256.Zero);
+        Assert.That(UInt256.TryParse(value, out UInt256 parsed), Is.False);
+        Assert.That(parsed, Is.EqualTo(UInt256.Zero));
     }
 
     // The direct (non-BigInteger) parsing path introduced on this branch changed behavior for a
@@ -1770,10 +1757,10 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
     [TestCase("0x", false, 0u)]
     public void TryParse_BarePrefixVsZero(string value, bool expectedSuccess, uint expectedValue)
     {
-        UInt256.TryParse(value, out UInt256 parsed).Should().Be(expectedSuccess);
+        Assert.That(UInt256.TryParse(value, out UInt256 parsed), Is.EqualTo(expectedSuccess));
         if (expectedSuccess)
         {
-            parsed.Should().Be((UInt256)expectedValue);
+            Assert.That(parsed, Is.EqualTo((UInt256)expectedValue));
         }
     }
 
@@ -1784,10 +1771,10 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
     [TestCase("0x f f", false, 0u)]
     public void TryParse_HexWhitespaceHandling(string value, bool expectedSuccess, uint expectedValue)
     {
-        UInt256.TryParse(value, out UInt256 parsed).Should().Be(expectedSuccess);
+        Assert.That(UInt256.TryParse(value, out UInt256 parsed), Is.EqualTo(expectedSuccess));
         if (expectedSuccess)
         {
-            parsed.Should().Be((UInt256)expectedValue);
+            Assert.That(parsed, Is.EqualTo((UInt256)expectedValue));
         }
     }
 
@@ -1797,99 +1784,99 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
         UInt256 uint256a = convert(test.A);
         UInt256 uint256b = convert(test.B);
 
-        (uint256a < uint256b).Should().Be(test.A < test.B);
-        (uint256a <= uint256b).Should().Be(test.A <= test.B);
-        (uint256a > uint256b).Should().Be(test.A > test.B);
-        (uint256a >= uint256b).Should().Be(test.A >= test.B);
-        (uint256a == uint256b).Should().Be(test.A == test.B);
+        Assert.That((uint256a < uint256b), Is.EqualTo(test.A < test.B));
+        Assert.That((uint256a <= uint256b), Is.EqualTo(test.A <= test.B));
+        Assert.That((uint256a > uint256b), Is.EqualTo(test.A > test.B));
+        Assert.That((uint256a >= uint256b), Is.EqualTo(test.A >= test.B));
+        Assert.That((uint256a == uint256b), Is.EqualTo(test.A == test.B));
 
         // Test overloads ulong, long, uint, int
         if (test.A <= ulong.MaxValue)
         {
             ulong a = (ulong)test.A;
 
-            (a < uint256b).Should().Be(a < test.B);
-            (a <= uint256b).Should().Be(a <= test.B);
-            (a > uint256b).Should().Be(a > test.B);
-            (a >= uint256b).Should().Be(a >= test.B);
-            (a == uint256b).Should().Be(a == test.B);
+            Assert.That((a < uint256b), Is.EqualTo(a < test.B));
+            Assert.That((a <= uint256b), Is.EqualTo(a <= test.B));
+            Assert.That((a > uint256b), Is.EqualTo(a > test.B));
+            Assert.That((a >= uint256b), Is.EqualTo(a >= test.B));
+            Assert.That((a == uint256b), Is.EqualTo(a == test.B));
         }
 
         if (test.A <= long.MaxValue)
         {
             long a = (long)test.A;
 
-            (a < uint256b).Should().Be(a < test.B);
-            (a <= uint256b).Should().Be(a <= test.B);
-            (a > uint256b).Should().Be(a > test.B);
-            (a >= uint256b).Should().Be(a >= test.B);
-            (a == uint256b).Should().Be(a == test.B);
+            Assert.That((a < uint256b), Is.EqualTo(a < test.B));
+            Assert.That((a <= uint256b), Is.EqualTo(a <= test.B));
+            Assert.That((a > uint256b), Is.EqualTo(a > test.B));
+            Assert.That((a >= uint256b), Is.EqualTo(a >= test.B));
+            Assert.That((a == uint256b), Is.EqualTo(a == test.B));
         }
 
         if (test.A <= uint.MaxValue)
         {
             uint a = (uint)test.A;
 
-            (a < uint256b).Should().Be(a < test.B);
-            (a <= uint256b).Should().Be(a <= test.B);
-            (a > uint256b).Should().Be(a > test.B);
-            (a >= uint256b).Should().Be(a >= test.B);
-            (a == uint256b).Should().Be(a == test.B);
+            Assert.That((a < uint256b), Is.EqualTo(a < test.B));
+            Assert.That((a <= uint256b), Is.EqualTo(a <= test.B));
+            Assert.That((a > uint256b), Is.EqualTo(a > test.B));
+            Assert.That((a >= uint256b), Is.EqualTo(a >= test.B));
+            Assert.That((a == uint256b), Is.EqualTo(a == test.B));
         }
 
         if (test.A <= int.MaxValue)
         {
             int a = (int)test.A;
 
-            (a < uint256b).Should().Be(a < test.B);
-            (a <= uint256b).Should().Be(a <= test.B);
-            (a > uint256b).Should().Be(a > test.B);
-            (a >= uint256b).Should().Be(a >= test.B);
-            (a == uint256b).Should().Be(a == test.B);
+            Assert.That((a < uint256b), Is.EqualTo(a < test.B));
+            Assert.That((a <= uint256b), Is.EqualTo(a <= test.B));
+            Assert.That((a > uint256b), Is.EqualTo(a > test.B));
+            Assert.That((a >= uint256b), Is.EqualTo(a >= test.B));
+            Assert.That((a == uint256b), Is.EqualTo(a == test.B));
         }
 
         if (test.B <= ulong.MaxValue)
         {
             ulong b = (ulong)test.B;
 
-            (uint256a < b).Should().Be(test.A < b);
-            (uint256a <= b).Should().Be(test.A <= b);
-            (uint256a > b).Should().Be(test.A > b);
-            (uint256a >= b).Should().Be(test.A >= b);
-            (uint256a == b).Should().Be(test.A == b);
+            Assert.That((uint256a < b), Is.EqualTo(test.A < b));
+            Assert.That((uint256a <= b), Is.EqualTo(test.A <= b));
+            Assert.That((uint256a > b), Is.EqualTo(test.A > b));
+            Assert.That((uint256a >= b), Is.EqualTo(test.A >= b));
+            Assert.That((uint256a == b), Is.EqualTo(test.A == b));
         }
 
         if (test.B <= long.MaxValue)
         {
             long b = (long)test.B;
 
-            (uint256a < b).Should().Be(test.A < b);
-            (uint256a <= b).Should().Be(test.A <= b);
-            (uint256a > b).Should().Be(test.A > b);
-            (uint256a >= b).Should().Be(test.A >= b);
-            (uint256a == b).Should().Be(test.A == b);
+            Assert.That((uint256a < b), Is.EqualTo(test.A < b));
+            Assert.That((uint256a <= b), Is.EqualTo(test.A <= b));
+            Assert.That((uint256a > b), Is.EqualTo(test.A > b));
+            Assert.That((uint256a >= b), Is.EqualTo(test.A >= b));
+            Assert.That((uint256a == b), Is.EqualTo(test.A == b));
         }
 
         if (test.B <= uint.MaxValue)
         {
             uint b = (uint)test.B;
 
-            (uint256a < b).Should().Be(test.A < b);
-            (uint256a <= b).Should().Be(test.A <= b);
-            (uint256a > b).Should().Be(test.A > b);
-            (uint256a >= b).Should().Be(test.A >= b);
-            (uint256a == b).Should().Be(test.A == b);
+            Assert.That((uint256a < b), Is.EqualTo(test.A < b));
+            Assert.That((uint256a <= b), Is.EqualTo(test.A <= b));
+            Assert.That((uint256a > b), Is.EqualTo(test.A > b));
+            Assert.That((uint256a >= b), Is.EqualTo(test.A >= b));
+            Assert.That((uint256a == b), Is.EqualTo(test.A == b));
         }
 
         if (test.B <= int.MaxValue)
         {
             int b = (int)test.B;
 
-            (uint256a < b).Should().Be(test.A < b);
-            (uint256a <= b).Should().Be(test.A <= b);
-            (uint256a > b).Should().Be(test.A > b);
-            (uint256a >= b).Should().Be(test.A >= b);
-            (uint256a == b).Should().Be(test.A == b);
+            Assert.That((uint256a < b), Is.EqualTo(test.A < b));
+            Assert.That((uint256a <= b), Is.EqualTo(test.A <= b));
+            Assert.That((uint256a > b), Is.EqualTo(test.A > b));
+            Assert.That((uint256a >= b), Is.EqualTo(test.A >= b));
+            Assert.That((uint256a == b), Is.EqualTo(test.A == b));
         }
     }
 
@@ -2022,7 +2009,7 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
         Span<byte> expected = stackalloc byte[32];
         int byteCount = value.GetByteCount(isUnsigned: true);
         value.TryWriteBytes(expected.Slice(32 - byteCount), out _, isUnsigned: true, isBigEndian: true);
-        target.ToArray().Should().Equal(expected.ToArray());
+        Assert.That(target.ToArray(), Is.EqualTo(expected.ToArray()));
     }
 
     // 32 distinct byte values make any within-limb reversal or half/lane swap in the vectorized
@@ -2042,14 +2029,14 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
         UInt256 value = new(source.AsSpan(offset, 32), isBigEndian: true);
 
         BigInteger expected = new(bigEndian, isUnsigned: true, isBigEndian: true);
-        ((BigInteger)value).Should().Be(expected);
+        Assert.That(((BigInteger)value), Is.EqualTo(expected));
 
         byte[] written = new byte[offset + 33];
         written.AsSpan().Fill(0xAA);
         byte[] expectedWritten = (byte[])written.Clone();
         bigEndian.CopyTo(expectedWritten, offset);
         value.ToBigEndian(written.AsSpan(offset, 32));
-        written.Should().Equal(expectedWritten);
+        Assert.That(written, Is.EqualTo(expectedWritten));
     }
 
     // The bytes may overlap the value itself, so every path must read all of the input before it
@@ -2064,7 +2051,7 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
         byte[] expected = (byte[])buffer.Clone();
         Write(copy, expected.AsSpan(32 + shift, Math.Abs(length)), length);
         Write(value, buffer.AsSpan(32 + shift, Math.Abs(length)), length);
-        buffer.Should().Equal(expected);
+        Assert.That(buffer, Is.EqualTo(expected));
 
         // A negative length selects the little-endian write.
         static void Write(in UInt256 value, Span<byte> target, int length)
@@ -2084,7 +2071,7 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
         byte[] expected = (byte[])buffer.Clone();
         copy.WritePaddedBytes(expected.AsSpan(32 + shift, length));
         value.WritePaddedBytes(buffer.AsSpan(32 + shift, length));
-        buffer.Should().Equal(expected);
+        Assert.That(buffer, Is.EqualTo(expected));
     }
 
     [Test]
@@ -2095,7 +2082,7 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
 
         ref UInt256 value = ref MemoryMarshal.AsRef<UInt256>(buffer.AsSpan(32, 32));
         value = new UInt256(buffer.AsSpan(32 + shift, length), isBigEndian);
-        value.Should().Be(expected);
+        Assert.That(value, Is.EqualTo(expected));
     }
 
     [Test]
@@ -2105,7 +2092,7 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
         UInt256 expected = new(MemoryMarshal.AsBytes(new ReadOnlySpan<UInt256>(in value)).ToArray(), isBigEndian);
 
         value = new UInt256(MemoryMarshal.AsBytes(MemoryMarshal.CreateSpan(ref value, 1)), isBigEndian);
-        value.Should().Be(expected);
+        Assert.That(value, Is.EqualTo(expected));
     }
 
     // Pins the existing contract: any length other than 32 is read big-endian whatever isBigEndian says,
@@ -2116,8 +2103,8 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
         byte[] bytes = DistinctBytes(length);
         BigInteger expected = new(bytes.AsSpan(Math.Max(0, length - 32)), isUnsigned: true, isBigEndian: true);
 
-        ((BigInteger)new UInt256(bytes, isBigEndian)).Should().Be(expected);
-        ((BigInteger)new Int256(bytes, isBigEndian)).Should().Be(expected);
+        Assert.That(((BigInteger)new UInt256(bytes, isBigEndian)), Is.EqualTo(expected));
+        Assert.That(((BigInteger)new Int256(bytes, isBigEndian)), Is.EqualTo(expected));
     }
 
     // Every length up to a word and a half past 32, so each count of whole words meets each partial-word length.
@@ -2155,7 +2142,7 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
         target.Fill(0xAA);
         v.ToBigEndian(target);
 
-        target.ToArray().Should().Equal(full.Slice(12, 20).ToArray());
+        Assert.That(target.ToArray(), Is.EqualTo(full.Slice(12, 20).ToArray()));
     }
 
     // The vectorized path must use an unaligned store: serialization targets are not guaranteed to be
@@ -2172,10 +2159,10 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
         v.ToBigEndian(target);
 
         BigInteger reconstructed = new(target, isUnsigned: true, isBigEndian: true);
-        reconstructed.Should().Be(value);
+        Assert.That(reconstructed, Is.EqualTo(value));
 
-        backing.AsSpan(0, 3).ToArray().Should().Equal(new byte[] { 0xCC, 0xCC, 0xCC });
-        backing.AsSpan(35, 5).ToArray().Should().Equal(new byte[] { 0xCC, 0xCC, 0xCC, 0xCC, 0xCC });
+        Assert.That(backing.AsSpan(0, 3).ToArray(), Is.EqualTo(new byte[] { 0xCC, 0xCC, 0xCC }));
+        Assert.That(backing.AsSpan(35, 5).ToArray(), Is.EqualTo(new byte[] { 0xCC, 0xCC, 0xCC, 0xCC, 0xCC }));
     }
 
     // ToBigEndian only handles lengths 32 and 20; any other length is a no-op (matching prior
@@ -2191,6 +2178,6 @@ public partial class UInt256Tests : UInt256TestsTemplate<UInt256>
         target.AsSpan().Fill(0xAA);
         v.ToBigEndian(target);
 
-        target.Should().OnlyContain(b => b == 0xAA);
+        Assert.That(target, Has.All.EqualTo(0xAA));
     }
 }

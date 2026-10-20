@@ -4,7 +4,6 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
-using FluentAssertions;
 using NUnit.Framework;
 
 namespace Nethermind.Int256.Test;
@@ -128,18 +127,18 @@ public partial class UInt256Tests
         input.LeftShift(shift, out UInt256 left);
         input.RightShift(shift, out UInt256 right);
 
-        ((BigInteger)left).Should().Be(ExpectedShift(value, shift, left: true), $"Lsh(0x{value:X}, {shift})");
-        ((BigInteger)right).Should().Be(ExpectedShift(value, shift, left: false), $"Rsh(0x{value:X}, {shift})");
+        Assert.That(((BigInteger)left), Is.EqualTo(ExpectedShift(value, shift, left: true)), $"Lsh(0x{value:X}, {shift})");
+        Assert.That(((BigInteger)right), Is.EqualTo(ExpectedShift(value, shift, left: false)), $"Rsh(0x{value:X}, {shift})");
     }
 
     private static void AssertShiftAliasingMatches(BigInteger value, int shift)
     {
         UInt256 input = (UInt256)value;
         input.LeftShift(shift, out input);
-        ((BigInteger)input).Should().Be(ExpectedShift(value, shift, left: true), $"aliased Lsh(0x{value:X}, {shift})");
+        Assert.That(((BigInteger)input), Is.EqualTo(ExpectedShift(value, shift, left: true)), $"aliased Lsh(0x{value:X}, {shift})");
 
         input = (UInt256)value;
         input.RightShift(shift, out input);
-        ((BigInteger)input).Should().Be(ExpectedShift(value, shift, left: false), $"aliased Rsh(0x{value:X}, {shift})");
+        Assert.That(((BigInteger)input), Is.EqualTo(ExpectedShift(value, shift, left: false)), $"aliased Rsh(0x{value:X}, {shift})");
     }
 }

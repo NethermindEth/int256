@@ -4,7 +4,6 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
-using FluentAssertions;
 using NUnit.Framework;
 
 namespace Nethermind.Int256.Test;
@@ -82,7 +81,7 @@ public class Int256Tests : UInt256TestsTemplate<Int256>
         {
             string expected = expectedString ?? Expected(valueString);
             string convertedValue = Expected(((IFormattable)System.Convert.ChangeType(item, type)).ToString("0.#", null));
-            convertedValue.Should().BeEquivalentTo(expected);
+            Assert.That(convertedValue, Is.EqualTo(expected).IgnoreCase);
         }
         catch (Exception e) when (e.GetType() == expectedException) { }
     }
@@ -105,10 +104,10 @@ public class Int256Tests : UInt256TestsTemplate<Int256>
     public void SignZeroOne_Accessors((string value, int sign, bool isZero, bool isOne) test)
     {
         Int256 v = (Int256)BigInteger.Parse(test.value);
-        v.Sign.Should().Be(test.sign);
-        v.IsZero.Should().Be(test.isZero);
-        v.IsOne.Should().Be(test.isOne);
-        v.IsNegative.Should().Be(test.sign < 0);
+        Assert.That(v.Sign, Is.EqualTo(test.sign));
+        Assert.That(v.IsZero, Is.EqualTo(test.isZero));
+        Assert.That(v.IsOne, Is.EqualTo(test.isOne));
+        Assert.That(v.IsNegative, Is.EqualTo(test.sign < 0));
     }
 
     public static IEnumerable<BigInteger> IsNegativeOracleCases
@@ -141,15 +140,13 @@ public class Int256Tests : UInt256TestsTemplate<Int256>
     {
         Int256 candidate = new(value);
 
-        candidate.IsNegative.Should().Be(value.Sign < 0);
+        Assert.That(candidate.IsNegative, Is.EqualTo(value.Sign < 0));
     }
 
     [Test]
     public void Exp_NegativeExponent_Throws()
     {
-        Action act = () => Int256.One.Exp(Int256.MinusOne, out Int256 _);
-
-        act.Should().Throw<ArgumentException>();
+        Assert.Throws<ArgumentException>(() => Int256.One.Exp(Int256.MinusOne, out Int256 _));
     }
 
     // 0 - Int256.Min is 2**255, the one difference of two Int256 values that is not
@@ -165,7 +162,7 @@ public class Int256Tests : UInt256TestsTemplate<Int256>
         Int256.SubtractMod(Int256.Zero, min, (Int256)BigInteger.Parse(modulus), out Int256 res);
 
         res.Convert(out BigInteger actual);
-        actual.Should().Be(BigInteger.Parse(expected));
+        Assert.That(actual, Is.EqualTo(BigInteger.Parse(expected)));
     }
 
     public static (string a, string b)[] SignedComparePairs { get; } =
@@ -189,13 +186,13 @@ public class Int256Tests : UInt256TestsTemplate<Int256>
         Int256 a = (Int256)ba;
         Int256 b = (Int256)bb;
 
-        (a < b).Should().Be(ba < bb);
-        (a > b).Should().Be(ba > bb);
-        Math.Sign(a.CompareTo(b)).Should().Be(Math.Sign(ba.CompareTo(bb)));
-        Math.Sign(a.CompareTo((object)b)).Should().Be(Math.Sign(ba.CompareTo(bb)));
+        Assert.That((a < b), Is.EqualTo(ba < bb));
+        Assert.That((a > b), Is.EqualTo(ba > bb));
+        Assert.That(Math.Sign(a.CompareTo(b)), Is.EqualTo(Math.Sign(ba.CompareTo(bb))));
+        Assert.That(Math.Sign(a.CompareTo((object)b)), Is.EqualTo(Math.Sign(ba.CompareTo(bb))));
         Int256 same = a;
-        (a < same).Should().BeFalse();
-        a.CompareTo(same).Should().Be(0);
+        Assert.That((a < same), Is.False);
+        Assert.That(a.CompareTo(same), Is.EqualTo(0));
     }
 
     public static IEnumerable<(BigInteger, BigInteger)> CompareBoundaryCases
@@ -221,23 +218,23 @@ public class Int256Tests : UInt256TestsTemplate<Int256>
         Int256 a = new(test.A);
         Int256 b = new(test.B);
 
-        (a < b).Should().Be(test.A < test.B);
-        (a > b).Should().Be(test.A > test.B);
-        Math.Sign(a.CompareTo(b)).Should().Be(Math.Sign(test.A.CompareTo(test.B)));
+        Assert.That((a < b), Is.EqualTo(test.A < test.B));
+        Assert.That((a > b), Is.EqualTo(test.A > test.B));
+        Assert.That(Math.Sign(a.CompareTo(b)), Is.EqualTo(Math.Sign(test.A.CompareTo(test.B))));
     }
 
     [Test]
     public void Is_zero_and_is_one_signed()
     {
-        Int256.Zero.IsZero.Should().BeTrue();
-        Int256.One.IsZero.Should().BeFalse();
-        Int256.MinusOne.IsZero.Should().BeFalse();
-        new Int256(-(BigInteger.One << 255)).IsZero.Should().BeFalse();
+        Assert.That(Int256.Zero.IsZero, Is.True);
+        Assert.That(Int256.One.IsZero, Is.False);
+        Assert.That(Int256.MinusOne.IsZero, Is.False);
+        Assert.That(new Int256(-(BigInteger.One << 255)).IsZero, Is.False);
 
-        Int256.One.IsOne.Should().BeTrue();
-        Int256.Zero.IsOne.Should().BeFalse();
-        Int256.MinusOne.IsOne.Should().BeFalse();
-        Int256.Max.IsOne.Should().BeFalse();
+        Assert.That(Int256.One.IsOne, Is.True);
+        Assert.That(Int256.Zero.IsOne, Is.False);
+        Assert.That(Int256.MinusOne.IsOne, Is.False);
+        Assert.That(Int256.Max.IsOne, Is.False);
     }
 
     [TestCase(0L)]
@@ -248,8 +245,8 @@ public class Int256Tests : UInt256TestsTemplate<Int256>
     public void Long_conversion_agrees_with_the_BigInteger_path(long value)
     {
         // long used to convert through Int256(BigInteger); this pins the direct constructor to it.
-        new Int256(value).Should().Be(new Int256((BigInteger)value));
-        ((Int256)value).Should().Be(new Int256((BigInteger)value));
+        Assert.That(new Int256(value), Is.EqualTo(new Int256((BigInteger)value)));
+        Assert.That(((Int256)value), Is.EqualTo(new Int256((BigInteger)value)));
     }
 
     [Test]
@@ -259,8 +256,8 @@ public class Int256Tests : UInt256TestsTemplate<Int256>
         // those limbs to the value they replaced.
         Int256 expected = new((BigInteger.One << 255) - 1);
 
-        Int256.Max.Should().Be(expected);
-        ((BigInteger)Int256.Max).Should().Be((BigInteger.One << 255) - 1);
+        Assert.That(Int256.Max, Is.EqualTo(expected));
+        Assert.That(((BigInteger)Int256.Max), Is.EqualTo((BigInteger.One << 255) - 1));
     }
 
     [Test]
@@ -272,25 +269,25 @@ public class Int256Tests : UInt256TestsTemplate<Int256>
         const ulong Ones = ulong.MaxValue;
 
         x.RightShift(64, out Int256 res);
-        ((UInt256)res).Should().Be(new UInt256(0x1122334455667788ul, 0x99AABBCCDDEEFF00ul, 0xF000000000000001ul, Ones));
+        Assert.That(((UInt256)res), Is.EqualTo(new UInt256(0x1122334455667788ul, 0x99AABBCCDDEEFF00ul, 0xF000000000000001ul, Ones)));
 
         x.RightShift(128, out res);
-        ((UInt256)res).Should().Be(new UInt256(0x99AABBCCDDEEFF00ul, 0xF000000000000001ul, Ones, Ones));
+        Assert.That(((UInt256)res), Is.EqualTo(new UInt256(0x99AABBCCDDEEFF00ul, 0xF000000000000001ul, Ones, Ones)));
 
         x.RightShift(192, out res);
-        ((UInt256)res).Should().Be(new UInt256(0xF000000000000001ul, Ones, Ones, Ones));
+        Assert.That(((UInt256)res), Is.EqualTo(new UInt256(0xF000000000000001ul, Ones, Ones, Ones)));
 
         x.RightShift(193, out res);
-        ((UInt256)res).Should().Be(new UInt256(0xF800000000000000ul, Ones, Ones, Ones));
+        Assert.That(((UInt256)res), Is.EqualTo(new UInt256(0xF800000000000000ul, Ones, Ones, Ones)));
 
         x.RightShift(256, out res);
-        ((UInt256)res).Should().Be(new UInt256(Ones, Ones, Ones, Ones));
+        Assert.That(((UInt256)res), Is.EqualTo(new UInt256(Ones, Ones, Ones, Ones)));
 
         // The same counts on a positive value must vacate to zero, not to the other operand's sign.
         Int256 p = new Int256(new UInt256(0x0123456789ABCDEFul, 0x1122334455667788ul, 0x99AABBCCDDEEFF00ul, 0x7000000000000001ul));
         p.RightShift(192, out res);
-        ((UInt256)res).Should().Be(new UInt256(0x7000000000000001ul, 0, 0, 0));
+        Assert.That(((UInt256)res), Is.EqualTo(new UInt256(0x7000000000000001ul, 0, 0, 0)));
         p.RightShift(256, out res);
-        ((UInt256)res).Should().Be(UInt256.Zero);
+        Assert.That(((UInt256)res), Is.EqualTo(UInt256.Zero));
     }
 }
