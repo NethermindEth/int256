@@ -3,6 +3,7 @@
 
 using System;
 using System.Buffers.Binary;
+using System.Diagnostics;
 using System.Globalization;
 using System.Numerics;
 using System.Runtime.CompilerServices;
@@ -66,30 +67,53 @@ public readonly partial struct UInt256
     /// zeroed, matching the <see cref="PaddedBytes(int)"/> array overload.
     /// </summary>
     /// <param name="target">The destination span; fully overwritten.</param>
-    [SkipLocalsInit]
     public void WritePaddedBytes(Span<byte> target)
     {
         int n = target.Length;
         if (n is 32 or 20)
         {
-            // ToBigEndian writes these widths directly, skipping the staging buffer and copy.
             ToBigEndian(target);
             return;
         }
 
-        Span<byte> be = stackalloc byte[32];
-        BinaryPrimitives.WriteUInt64BigEndian(be.Slice(0, 8), u3);
-        BinaryPrimitives.WriteUInt64BigEndian(be.Slice(8, 8), u2);
-        BinaryPrimitives.WriteUInt64BigEndian(be.Slice(16, 8), u1);
-        BinaryPrimitives.WriteUInt64BigEndian(be.Slice(24, 8), u0);
-
-        int copy = Math.Min(32, n);
-        if (n > copy)
+        // The target may overlap this value, so every limb is read before the first store.
+        (ulong r0, ulong r1, ulong r2, ulong r3) = (u0, u1, u2, u3);
+        ref byte destination = ref MemoryMarshal.GetReference(target);
+        if (n > 32)
         {
-            target.Slice(0, n - copy).Clear();
+            target.Slice(0, n - 32).Clear();
+            ref byte word = ref Unsafe.Add(ref destination, n - 32);
+            WriteUInt64BigEndian(ref word, r3);
+            WriteUInt64BigEndian(ref Unsafe.Add(ref word, 8), r2);
+            WriteUInt64BigEndian(ref Unsafe.Add(ref word, 16), r1);
+            WriteUInt64BigEndian(ref Unsafe.Add(ref word, 24), r0);
+            return;
         }
 
-        be.Slice(32 - copy, copy).CopyTo(target.Slice(n - copy, copy));
+        // Whole words from the right, then the leading partial word.
+        ref byte end = ref Unsafe.Add(ref destination, n);
+        if (n >= 8) WriteUInt64BigEndian(ref Unsafe.Subtract(ref end, 8), r0);
+        if (n >= 16) WriteUInt64BigEndian(ref Unsafe.Subtract(ref end, 16), r1);
+        if (n >= 24) WriteUInt64BigEndian(ref Unsafe.Subtract(ref end, 24), r2);
+
+        int partial = n & 7;
+        if (partial == 0) return;
+
+        ulong high = (n >> 3) switch { 0 => r0, 1 => r1, 2 => r2, _ => r3 };
+        if (n > 8)
+        {
+            // One word at the start: the partial bytes, then the next word's leading bytes, which rewrites
+            // bytes already stored with the same values.
+            ulong low = (n >> 3) switch { 1 => r0, 2 => r1, _ => r2 };
+            WriteUInt64BigEndian(ref destination, (high << (8 * (8 - partial))) | (low >> (8 * partial)));
+            return;
+        }
+
+        for (int i = partial - 1; i >= 0; i--)
+        {
+            Unsafe.Add(ref destination, i) = (byte)high;
+            high >>= 8;
+        }
     }
 
     public byte[] ToBigEndian()
@@ -150,14 +174,36 @@ public readonly partial struct UInt256
         {
             // The target may overlap this value, so every limb is read before the first store.
             (ulong r0, ulong r1, uint r2) = (u0, u1, (uint)u2);
-            BinaryPrimitives.WriteUInt32BigEndian(target.Slice(0, 4), r2);
-            BinaryPrimitives.WriteUInt64BigEndian(target.Slice(4, 8), r1);
-            BinaryPrimitives.WriteUInt64BigEndian(target.Slice(12, 8), r0);
+            ref byte destination = ref MemoryMarshal.GetReference(target);
+            WriteUInt32BigEndian(ref destination, r2);
+            WriteUInt64BigEndian(ref Unsafe.Add(ref destination, 4), r1);
+            WriteUInt64BigEndian(ref Unsafe.Add(ref destination, 12), r0);
         }
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static partial void WriteBigEndianLimbs(in UInt256 value, Span<byte> target);
+    private static void WriteBigEndianLimbs(in UInt256 value, Span<byte> target)
+    {
+        Debug.Assert(target.Length >= 32);
+        // The target may overlap the value, so every limb is read before the first store.
+        (ulong u0, ulong u1, ulong u2, ulong u3) = (value.u0, value.u1, value.u2, value.u3);
+        ref byte destination = ref MemoryMarshal.GetReference(target);
+        WriteUInt64BigEndian(ref destination, u3);
+        WriteUInt64BigEndian(ref Unsafe.Add(ref destination, 8), u2);
+        WriteUInt64BigEndian(ref Unsafe.Add(ref destination, 16), u1);
+        WriteUInt64BigEndian(ref Unsafe.Add(ref destination, 24), u0);
+    }
+
+    // The big-endian word accesses are the split between the variants: the zkEVM build avoids the software byte
+    // reversal on zkVMs without Zbb (UInt256.zkevm.cs). Callers guarantee the bytes are in range.
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static partial ulong ReadUInt64BigEndian(ref byte source);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static partial void WriteUInt64BigEndian(ref byte destination, ulong value);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static partial void WriteUInt32BigEndian(ref byte destination, uint value);
 
     public void ToLittleEndian(Span<byte> target)
     {
