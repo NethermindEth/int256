@@ -1,6 +1,6 @@
 import UInt256.Methods.Add.ScalarCarryPrefix
 import UInt256.Methods.Add.StorageCall
-import UInt256.Methods.Add.CarryArithmetic
+import UInt256.Methods.Add.CarryCall
 import UInt256.Methods.Add.ScalarCarryMemory
 import UInt256.Methods.Add.ScalarSmallFacts
 
@@ -8,7 +8,7 @@ set_option maxRecDepth 4096
 
 namespace UInt256Proof.Safety
 
-open CIL.Safety
+open CIL.Safety UInt256Proof.Add.CarrySafety
 
 def scalarStoreCall : Nat :=
   Extracted.addScalarBody.code.findIdx fun op => match op with
@@ -95,7 +95,7 @@ end UInt256Proof.Safety
 
 namespace UInt256Proof.Safety
 
-open CIL.Safety UInt256Model.Safety
+open CIL.Safety UInt256Model.Safety UInt256Proof.Add.CarrySafety
 
 structure ScalarResult (original final : CIL.Safety.Memory) (values : List Value)
     (left right output : Reference) : Prop where
@@ -112,7 +112,7 @@ theorem scalar_finish (original entered current : CIL.Safety.Memory) (frame : Fr
     (left right output carryHome : Reference) (results : Fin 4 → Reference)
     (call : CallingConditions Extracted.program original [left, right] [output])
     (setup : enterFrame Extracted.addScalarBody (scalarArguments left right output) original = .ok (frame, entered))
-    (state : ScalarCarryState original current frame left right output carryHome results 4) :
+    (state : ScalarCarryState (program := Extracted.program) original current frame left right output carryHome results 4) :
     ∃ fuel final values,
       run Extracted.program fuel Extracted.addScalarIndex (scalarCarryCall 3 + 1)
         (scalarArguments left right output) frame [] current = .ok (final, values) ∧
@@ -169,7 +169,7 @@ theorem ScalarResult.modular_sum {original final : CIL.Safety.Memory} {values : 
 
 /-- Complete finite checked execution on the both-large branch, including
     initial-input modular arithmetic, exact carry flag and caller footprint. -/
-theorem scalar_general_checked (contract : CarryHelperContract) (memory : CIL.Safety.Memory) (left right output : Reference)
+theorem scalar_general_checked (contract : CarryHelperContract Extracted.program Extracted.addWithCarryIndex) (memory : CIL.Safety.Memory) (left right output : Reference)
     (call : CallingConditions Extracted.program memory [left, right] [output])
     (largeRight : inputLimb memory right 1 ||| inputLimb memory right 2 |||
       inputLimb memory right 3 ≠ BitVec.ofNat 64 0)
@@ -190,7 +190,7 @@ end UInt256Proof.Safety
 
 namespace UInt256Proof.Safety
 
-open CIL.Safety UInt256Model.Safety
+open CIL.Safety UInt256Model.Safety UInt256Proof.Add.CarrySafety
 
 theorem scalar_right_small_checked (memory : CIL.Safety.Memory) (left right output : Reference)
     (call : CallingConditions Extracted.program memory [left, right] [output])
@@ -251,7 +251,7 @@ end UInt256Proof.Safety
 
 namespace UInt256Proof.Safety
 
-open CIL.Safety UInt256Model.Safety
+open CIL.Safety UInt256Model.Safety UInt256Proof.Add.CarrySafety
 
 theorem ScalarResult.as_add {original final : CIL.Safety.Memory} {values : List Value}
     {left right output : Reference} (result : ScalarResult original final values left right output) :
@@ -261,7 +261,7 @@ theorem ScalarResult.as_add {original final : CIL.Safety.Memory} {values : List 
 
 /-- All scalar helper branches: actual finite execution, initial-operand sum,
     mathematical overflow and caller storage preservation under valid overlap. -/
-theorem scalar_checked (contract : CarryHelperContract) (memory : CIL.Safety.Memory) (left right output : Reference)
+theorem scalar_checked (contract : CarryHelperContract Extracted.program Extracted.addWithCarryIndex) (memory : CIL.Safety.Memory) (left right output : Reference)
     (call : CallingConditions Extracted.program memory [left, right] [output]) :
     ∃ fuel final values,
       invoke Extracted.program fuel Extracted.addScalarIndex (scalarArguments left right output) memory =

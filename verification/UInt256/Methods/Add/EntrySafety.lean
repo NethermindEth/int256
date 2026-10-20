@@ -3,11 +3,11 @@ import UInt256.Safety.Contract
 
 namespace UInt256Proof.Safety
 
-open CIL.Safety UInt256Model.Safety
+open CIL.Safety UInt256Model.Safety UInt256Proof.Add.CarrySafety
 
 /-- The selected production entry, with both independent arithmetic and checked
     execution safety. This declaration is specific to the extracted profile. -/
-theorem checked_add_contract (contract : CarryHelperContract) : WrappingBinaryContract (· + ·) Extracted.program Extracted.entryIndex := by
+theorem checked_add_contract (contract : CarryHelperContract Extracted.program Extracted.addWithCarryIndex) : WrappingBinaryContract (· + ·) Extracted.program Extracted.entryIndex := by
   intro memory left right output call
   obtain ⟨frame, entered, setup, live⟩ := checked_entry_setup memory left right output call
   obtain ⟨fuel, final, finished, result⟩ := entry_run_checked contract memory entered frame left right output call setup

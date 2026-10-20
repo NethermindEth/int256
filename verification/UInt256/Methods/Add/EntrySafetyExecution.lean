@@ -3,7 +3,7 @@ import UInt256.Methods.Add.ScalarChecked
 
 namespace UInt256Proof.Safety
 
-open CIL.Safety UInt256Model.Safety
+open CIL.Safety UInt256Model.Safety UInt256Proof.Add.CarrySafety
 
 theorem entry_scalar_prefix (left right output : Reference) (frame : Frame) (memory : CIL.Safety.Memory)
     (call : CallingConditions Extracted.program memory [left, right] [output])
@@ -52,7 +52,7 @@ structure PublicAddResult (original final : CIL.Safety.Memory) (left right outpu
   footprint : ∀ id, id < original.nextIdentity → ∀ offset, OutsideOutput output id offset →
     final.cells id offset = original.cells id offset
 
-theorem entry_run_checked (contract : CarryHelperContract) (memory entered : CIL.Safety.Memory) (frame : Frame) (left right output : Reference)
+theorem entry_run_checked (contract : CarryHelperContract Extracted.program Extracted.addWithCarryIndex) (memory entered : CIL.Safety.Memory) (frame : Frame) (left right output : Reference)
     (call : CallingConditions Extracted.program memory [left, right] [output])
     (setup : enterFrame Extracted.entryBody (binaryArguments left right output) memory = .ok (frame, entered)) :
     ∃ fuel final,

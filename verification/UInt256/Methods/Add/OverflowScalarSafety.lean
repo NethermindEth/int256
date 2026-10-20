@@ -3,11 +3,11 @@ import CIL.Safety.ArgumentEquivalence
 import UInt256.Methods.Add.OverflowEntrySafety
 
 namespace UInt256Proof.Safety
-open CIL.Safety UInt256Model.Safety
+open CIL.Safety UInt256Model.Safety UInt256Proof.Add.CarrySafety
 
 /-- The actual scalar body does not read detectOverflow. Its previously checked
     result already includes the mathematical carry out for every operand pair. -/
-theorem overflow_scalar_checked (contract : CarryHelperContract) (memory : CIL.Safety.Memory) (left right output : Reference)
+theorem overflow_scalar_checked (contract : CarryHelperContract Extracted.program Extracted.addWithCarryIndex) (memory : CIL.Safety.Memory) (left right output : Reference)
     (call : CallingConditions Extracted.program memory [left, right] [output]) :
     ∃ fuel final values,
       invoke Extracted.program fuel Extracted.addScalarIndex (overflowScalarArguments left right output) memory =

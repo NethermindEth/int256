@@ -7,7 +7,7 @@ set_option maxHeartbeats 2000000
 
 namespace UInt256Proof.Safety
 
-open CIL.Safety
+open CIL.Safety UInt256Proof.Add.CarrySafety
 
 def scalarFirstCarryCall : Nat :=
   Extracted.addScalarBody.code.findIdx fun op => match op with
@@ -57,7 +57,7 @@ theorem scalar_carry_prefix (args : List Value) (frame : Frame) (before after : 
           first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
 
 /-- Bind the first discovered parent call to the checked carry contract. -/
-theorem scalar_first_carry (contract : CarryHelperContract) (args : List Value) (frame : Frame) (memory : Memory)
+theorem scalar_first_carry (contract : CarryHelperContract Extracted.program Extracted.addWithCarryIndex) (args : List Value) (frame : Frame) (memory : Memory)
     (a b : BitVec 64) (carryHome resultHome : Reference)
     (wellFormed : memory.WellFormed)
     (carryRead : read memory carryHome 8 1 = .ok (numberBytes 0 8))
@@ -65,7 +65,7 @@ theorem scalar_first_carry (contract : CarryHelperContract) (args : List Value) 
     (resultWrite : access memory resultHome 8 1 true = .ok ())
     (disjoint : WordsDisjoint carryHome resultHome)
     (post : Memory → List Value → Prop)
-    (continuation : ∀ after, CarryPost a b 0 carryHome resultHome memory after →
+    (continuation : ∀ after, CarryPost (program := Extracted.program) a b 0 carryHome resultHome memory after →
       ∃ fuel result returned,
         run Extracted.program fuel Extracted.addScalarIndex (scalarFirstCarryCall + 1) args frame [] after =
           .ok (result, returned) ∧ post result returned) :
@@ -98,7 +98,7 @@ end UInt256Proof.Safety
 
 namespace UInt256Proof.Safety
 
-open CIL.Safety
+open CIL.Safety UInt256Proof.Add.CarrySafety
 
 /-- Discover successive calls to the proved carry helper in extracted order. -/
 def scalarCarryCall : Nat → Nat
@@ -154,7 +154,7 @@ theorem scalar_carry_segment (segment : Fin 3) (left right output : Reference) (
 #print axioms scalar_carry_segment
 
 /-- Every discovered scalar carry call uses the checked arithmetic contract. -/
-theorem scalar_indexed_carry (contract : CarryHelperContract) (index : Fin 4) (args : List Value) (frame : Frame) (memory : Memory)
+theorem scalar_indexed_carry (contract : CarryHelperContract Extracted.program Extracted.addWithCarryIndex) (index : Fin 4) (args : List Value) (frame : Frame) (memory : Memory)
     (a b c : BitVec 64) (carryHome resultHome : Reference)
     (wellFormed : memory.WellFormed) (incoming : c.toNat ≤ 1)
     (carryRead : read memory carryHome 8 1 = .ok (numberBytes c.toNat 8))
@@ -162,7 +162,7 @@ theorem scalar_indexed_carry (contract : CarryHelperContract) (index : Fin 4) (a
     (resultWrite : access memory resultHome 8 1 true = .ok ())
     (disjoint : WordsDisjoint carryHome resultHome)
     (post : Memory → List Value → Prop)
-    (continuation : ∀ after, CarryPost a b c carryHome resultHome memory after →
+    (continuation : ∀ after, CarryPost (program := Extracted.program) a b c carryHome resultHome memory after →
       ∃ fuel result returned,
         run Extracted.program fuel Extracted.addScalarIndex (scalarCarryCall index.val + 1) args frame [] after =
           .ok (result, returned) ∧ post result returned) :
@@ -198,7 +198,7 @@ open UInt256Model.Safety
 
 /-- Valid caller views discharge both field loads for each remaining limb;
     checked home accesses discharge address formation and the mathematical call. -/
-theorem scalar_carry_segment_checked (contract : CarryHelperContract) (segment : Fin 3) (left right output : Reference) (extra : List Value)
+theorem scalar_carry_segment_checked (contract : CarryHelperContract Extracted.program Extracted.addWithCarryIndex) (segment : Fin 3) (left right output : Reference) (extra : List Value)
     (frame : Frame) (memory : CIL.Safety.Memory) (c : BitVec 64) (carryHome resultHome : Reference)
     (call : CallingConditions Extracted.program memory [left, right] [output])
     (carrySlot : frame.locals[2]? = some (.bytes .word64 carryHome))
@@ -210,7 +210,7 @@ theorem scalar_carry_segment_checked (contract : CarryHelperContract) (segment :
     (disjoint : WordsDisjoint carryHome resultHome)
     (post : CIL.Safety.Memory → List Value → Prop)
     (continuation : ∀ after,
-      CarryPost (inputLimb memory left ⟨segment.val + 1, by omega⟩)
+      CarryPost (program := Extracted.program) (inputLimb memory left ⟨segment.val + 1, by omega⟩)
         (inputLimb memory right ⟨segment.val + 1, by omega⟩) c carryHome resultHome memory after →
       ∃ fuel result returned,
         run Extracted.program fuel Extracted.addScalarIndex (scalarCarryCall (segment.val + 1) + 1)

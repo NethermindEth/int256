@@ -9,6 +9,7 @@ import UInt256.Safety.CallerSetup
 import UInt256.Safety.LimbAccess
 import UInt256.Methods.Add.SafetyResult
 import UInt256.Methods.Reporting.Arithmetic
+import UInt256.Methods.Add.CarryRun
 namespace UInt256Proof.Add.CarrySafety
 def carryBody (profile : CIL.FeatureProfile) : CIL.Method := { profile := profile, returnsValue := false, locals := [.i64 0, .i64 0], localKinds := [.word64, .word64], parameterHomes := [], staticSites := [], code := [
   .arg 0,
@@ -35,6 +36,8 @@ def carryBody (profile : CIL.FeatureProfile) : CIL.Method := { profile := profil
   .local 1,
   .store64,
   .ret] }
+
+theorem carryBody_shape {profile : CIL.FeatureProfile} : CarryShape (carryBody profile) := ⟨rfl, rfl, rfl, rfl⟩
 end UInt256Proof.Add.CarrySafety
 
 namespace UInt256Proof.Add.CarrySafety
@@ -114,45 +117,10 @@ theorem carry_body_succeeds (found : program[index]? = some (carryBody profile))
       (∀ id offset, id ≠ first.allocation → id ≠ second.allocation →
         OutsideWord carry id offset → OutsideWord output id offset →
         stored.cells id offset = memory.cells id offset) ∧
-      AccessBelow memory.nextIdentity memory stored := by
-  have length (word : BitVec 64) : (numberBytes word.toNat 8).length = 8 := by simp [numberBytes]
-  obtain ⟨secondAllocation, secondAccess⟩ := access_requirements secondWritable
-  obtain ⟨carryAllocation, carryAccess⟩ := access_requirements carryWritable
-  obtain ⟨outputAllocation, outputAccess⟩ := access_requirements outputWritable
-  obtain ⟨m1, w0, s0, firstRead, firstLoad⟩ := store_local_word64 (a + b) firstWritable
-  have readCarry := write_preserves_disjoint_read w0 carryReadable (Or.inl privateFirst)
-  obtain ⟨m2, w1, s1, secondRead, secondLoad⟩ :=
-    store_local_word64 (a + b + c) (secondAccess.after_write w0).access
-  have retainedFirst := write_preserves_disjoint_read w1 firstRead (Or.inl distinct)
-  have carry1 := (carryAccess.after_write w0).access
-  have carry2 := ((carryAccess.after_write w0).after_write w1).access
-  obtain ⟨m3, wc⟩ := write_succeeds (bytes := numberBytes (carryWord a b c).toNat 8)
-    (by simpa only [length] using carry2)
-  have retainedSecond := write_preserves_disjoint_read wc secondRead (Or.inl (Ne.symm privateSecond))
-  have output3 := (((outputAccess.after_write w0).after_write w1).after_write wc).access
-  obtain ⟨m4, wo⟩ := write_succeeds (bytes := numberBytes (a + b + c).toNat 8)
-    (by simpa only [length] using output3)
-  refine ⟨m4, carry_run_of_memory_steps found a b c carry output first second frame memory m1 m2 m3 m4
-    locals s0 s1 firstLoad (load_word64_of_read readCarry)
-    (load_local_word64_of_read retainedFirst) secondLoad
-    (load_local_word64_of_read retainedSecond)
-    (access_reference_valid _ _ _ _ _ carry1) (access_reference_valid _ _ _ _ _ carry2)
-    (access_reference_valid _ _ _ _ _ output3) wc wo, ?_, ?_, ?_, ?_⟩
-  · simpa only [length] using write_readback _ _ _ _ _ wo
-  · intro disjoint
-    have carryRead : read m3 carry 8 1 = .ok (numberBytes (carryWord a b c).toNat 8) := by
-      simpa only [length] using write_readback _ _ _ _ _ wc
-    exact write_preserves_disjoint_read wo carryRead (by simpa only [WordsDisjoint, length] using disjoint)
-  · intro id offset notFirst notSecond outsideCarry outsideOutput
-    rw [write_word_outside wo id offset outsideOutput,
-      write_word_outside wc id offset outsideCarry,
-      write_word_outside w1 id offset (Or.inl notSecond),
-      write_word_outside w0 id offset (Or.inl notFirst)]
-
-  · exact (write_preserves_access_below w0 memory.nextIdentity).trans
-      ((write_preserves_access_below w1 memory.nextIdentity).trans
-        ((write_preserves_access_below wc memory.nextIdentity).trans
-          (write_preserves_access_below wo memory.nextIdentity)))
+      AccessBelow memory.nextIdentity memory stored :=
+  carry_body_succeeds_of_run carryWord (carry_run_of_memory_steps found) a b c carry output first second
+    frame memory locals distinct privateFirst privateSecond firstWritable secondWritable carryReadable carryWritable
+    outputWritable
 
 #print axioms carry_body_succeeds
 
@@ -175,26 +143,8 @@ theorem carry_frame_setup (memory : Memory) (args : List Value) (wellFormed : me
       read result second 8 1 = .ok (numberBytes 0 8) ∧
       access result first 8 1 true = .ok () ∧
       access result second 8 1 true = .ok () ∧
-      MemoryBelow memory.nextIdentity memory result := by
-  obtain ⟨first, middle, madeFirst, readFirst, writeFirst, _⟩ :=
-    make_local_word64 memory memory.nextIdentity (BitVec.ofNat 64 0) wellFormed
-  have wfMiddle := makeLocal_preserves_wellFormed _ _ _ _ _ _ _ wellFormed madeFirst
-  obtain ⟨second, result, madeSecond, readSecond, writeSecond, preserved⟩ :=
-    make_local_word64 middle memory.nextIdentity (BitVec.ofNat 64 0) wfMiddle
-  have freshFirst := (makeLocal_fresh _ _ _ _ _ _ _ madeFirst).2 first.allocation (by simp)
-  have freshSecond := (makeLocal_fresh _ _ _ _ _ _ _ madeSecond).2 second.allocation (by simp)
-  let frame : Frame := ⟨memory.nextIdentity, [.bytes .word64 first, .bytes .word64 second],
-    [first.allocation, second.allocation], []⟩
-  have entered : enterFrame (carryBody profile) args memory = .ok (frame, result) := by
-    simp [enterFrame, carryBody, makeLocals, madeFirst, madeSecond, makeArgumentHomes, makeParameterHomes,
-      frame, Bind.bind, Except.bind, Pure.pure, Except.pure]
-  refine ⟨first, second, frame, result, entered, rfl, rfl, ?_, ?_, readSecond, ?_, writeSecond,
-    enterFrame_preserves_caller_memory _ _ _ _ _ entered⟩
-  · exact Nat.ne_of_lt (Nat.lt_of_lt_of_le freshFirst.2 freshSecond.1)
-  · rw [preserved.read first freshFirst.2 8 1]
-    exact readFirst
-  · rw [preserved.access first freshFirst.2 8 1 true]
-    exact writeFirst
+      MemoryBelow memory.nextIdentity memory result :=
+  carry_frame_setup_of_shape carryBody_shape memory args wellFormed
 
 #print axioms carry_frame_setup
 
@@ -221,57 +171,9 @@ theorem carry_invoke_succeeds (found : program[index]? = some (carryBody profile
         result.cells id offset = memory.cells id offset) ∧
       AccessBelow memory.nextIdentity memory result ∧
       read result output 8 1 = .ok (numberBytes (a + b + c).toNat 8) ∧
-      (WordsDisjoint carry output → read result carry 8 1 = .ok (numberBytes (carryWord a b c).toNat 8)) := by
-  let args := [Value.scalar (.i64 a), .scalar (.i64 b), .reference (.address carry), .reference (.address output)]
-  have fc := access_reference_valid _ _ _ _ _ carryWritable
-  have fo := access_reference_valid _ _ _ _ _ outputWritable
-  obtain ⟨ca, cp, _, _⟩ := formed_reference_live _ _ _ fc
-  obtain ⟨oa, op, _, _⟩ := formed_reference_live _ _ _ fo
-  have carryOld := (wellFormed.1 _ _ cp).1
-  have outputOld := (wellFormed.1 _ _ op).1
-  obtain ⟨first, second, frame, enteredMemory, entered, locals, owned, distinct,
-    _, _, firstWritable, secondWritable, preserved⟩ := carry_frame_setup (profile := profile) memory args wellFormed
-  have fresh := enterFrame_fresh _ _ _ _ _ entered
-  have firstNew := (fresh.2 first.allocation (by rw [owned]; simp)).1
-  have secondNew := (fresh.2 second.allocation (by rw [owned]; simp)).1
-  have readCarry : read enteredMemory carry 8 1 = .ok (numberBytes c.toNat 8) := by
-    rw [preserved.read carry carryOld 8 1]; exact carryReadable
-  have writeCarry : access enteredMemory carry 8 1 true = .ok () := by
-    rw [preserved.access carry carryOld 8 1 true]; exact carryWritable
-  have writeOutput : access enteredMemory output 8 1 true = .ok () := by
-    rw [preserved.access output outputOld 8 1 true]; exact outputWritable
-  obtain ⟨stored, executed, outputRead, carryRead, footprint, retainedAccess⟩ := carry_body_succeeds found a b c carry output first second
-    frame enteredMemory locals distinct (Nat.ne_of_lt (Nat.lt_of_lt_of_le carryOld firstNew))
-    (Nat.ne_of_lt (Nat.lt_of_lt_of_le carryOld secondNew))
-    firstWritable secondWritable readCarry writeCarry writeOutput
-  have returned := leaveFrame_preserves_memory_below frame stored memory.nextIdentity
-    (fun id member => (fresh.2 id member).1)
-  have outputRead' : read (leaveFrame frame stored) output 8 1 = .ok (numberBytes (a + b + c).toNat 8) := by
-    rw [returned.read output outputOld 8 1]; exact outputRead
-  refine ⟨(carryBody profile).code.length + 1, leaveFrame frame stored, ?_,
-    load_word64_of_read outputRead', ?_, ?_, ?_, outputRead', ?_⟩
-  · have checked : args.mapM (checkedValue memory) = .ok args := by
-      simp [args, checkedValue, numericValue, formValue, fc, fo, checkedAt,
-        Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-    change invoke program _ index args memory = _
-    simpa only [invoke, found, checked, entered, Except.mapError, Bind.bind, Except.bind] using executed
-
-  · intro disjoint
-    apply load_word64_of_read
-    rw [returned.read carry carryOld 8 1]
-    exact carryRead disjoint
-  · intro id offset old outsideCarry outsideOutput
-    rw [returned.cells id old offset,
-      footprint id offset (Nat.ne_of_lt (Nat.lt_of_lt_of_le old firstNew))
-        (Nat.ne_of_lt (Nat.lt_of_lt_of_le old secondNew)) outsideCarry outsideOutput,
-      preserved.cells id old offset]
-
-  · exact preserved.accessBelow.trans
-      ((retainedAccess.weaken fresh.1.next).trans returned.accessBelow)
-
-  · intro disjoint
-    rw [returned.read carry carryOld 8 1]
-    exact carryRead disjoint
+      (WordsDisjoint carry output → read result carry 8 1 = .ok (numberBytes (carryWord a b c).toNat 8)) :=
+  carry_invoke_succeeds_of_run carryWord found carryBody_shape (carry_run_of_memory_steps found) a b c carry output
+    memory wellFormed carryReadable carryWritable outputWritable
 
 #print axioms carry_invoke_succeeds
 
