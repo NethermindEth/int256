@@ -764,7 +764,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     /// <summary>Selects the public operators' variant of <see cref="MultiplyLimbs4x4{TOperands}"/>.</summary>
     private struct DirectOperands;
 
-    /// <summary>Selects generic math's variant of <see cref="MultiplyLimbs4x4{TOperands}"/>; see <c>UInt256.Numerics.cs</c>.</summary>
+    /// <summary>Selects generic math's variant of <see cref="MultiplyLimbs4x4{TOperands}"/>; see <c>UInt256.numerics.cs</c>.</summary>
     private struct ValueOperands;
 
     // ValueOperands takes the scalar top limb, so by-value operands are read as limbs only. A type argument rather than

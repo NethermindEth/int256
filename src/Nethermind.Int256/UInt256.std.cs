@@ -365,7 +365,7 @@ public readonly partial struct UInt256
     private static partial void WriteUInt32BigEndian(ref byte destination, uint value) =>
         Unsafe.WriteUnaligned(ref destination, BitConverter.IsLittleEndian ? BinaryPrimitives.ReverseEndianness(value) : value);
 
-    // The culture formats (N, C, E, F, P, G with a precision, custom) for UInt256.Numerics.cs, through BigInteger. The
+    // The culture formats (N, C, E, F, P, G with a precision, custom) for UInt256.numerics.cs, through BigInteger. The
     // zkEVM build has no such fallback, which keeps BigInteger out of its image.
     private static bool TryFormatOther(in UInt256 bits, bool signed, Span<char> destination, out int written,
         ReadOnlySpan<char> format, IFormatProvider? provider) =>
