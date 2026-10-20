@@ -240,9 +240,8 @@ extract. The pinned revision includes the fixes for multiplication (`Math.BigMul
 static lookup tables (#53) and linear per-site evidence checks (#54).
 
 All scalar ports have registered certificates, and `remainingPorts` is empty.
-All 256 gates were recertified on LeanCIL `7aec18e`, and every regression runner
-passed; `migration-status.json` records the per-runner counts. Those runs predate
-the shift-positives merge, so the gates still need one run on the final tree. `BitwiseRegression.cs`
+All 256 gates were recertified on LeanCIL `a332145` on the final tree, and every
+regression runner passed; `migration-status.json` records the per-runner counts. `BitwiseRegression.cs`
 and `ShiftRegression.cs` take a profile argument (default `scalar`) and
 `BitwisePositiveRegression.cs` a fixture argument (default `BitwiseHelper`), so a
 complete run also passes `x64-vector256` and `BitwiseEarlyStore`.
