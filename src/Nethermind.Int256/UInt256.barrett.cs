@@ -12,8 +12,8 @@ public readonly partial struct UInt256
     private static partial void Remainder512ByFullModulus(in UInt256 lo, in UInt256 hi, in UInt256 m, out UInt256 rem);
 
     // A full-width modulus m (m.u3 != 0) and mu = floor((2^512 - 1) / m), 2^256 < mu < 2^320, as constants, so each
-    // reduction is compiled for its modulus.
-    private interface IBarrettModulus
+    // reduction is compiled for its modulus. Internal so the tests can supply a deliberately wrong mu.
+    internal interface IBarrettModulus
     {
         static abstract ulong M0 { get; }
         static abstract ulong M1 { get; }
@@ -27,7 +27,7 @@ public readonly partial struct UInt256
     }
 
     // BN254 (alt_bn128) scalar field r: MiMC and Poseidon hashing (Tornado Cash, Semaphore), SNARK verifiers.
-    private readonly struct Bn254R : IBarrettModulus
+    internal readonly struct Bn254R : IBarrettModulus
     {
         public const ulong Top = 0x30644E72E131A029UL;
         public static ulong M0 => 0x43E1F593F0000001UL;
@@ -42,7 +42,7 @@ public readonly partial struct UInt256
     }
 
     // BN254 (alt_bn128) base field p: SNARK verifiers.
-    private readonly struct Bn254P : IBarrettModulus
+    internal readonly struct Bn254P : IBarrettModulus
     {
         public const ulong Top = 0x30644E72E131A029UL;
         public static ulong M0 => 0x3C208C16D87CFD47UL;
@@ -57,7 +57,7 @@ public readonly partial struct UInt256
     }
 
     // secp256k1 base field p.
-    private readonly struct Secp256k1P : IBarrettModulus
+    internal readonly struct Secp256k1P : IBarrettModulus
     {
         public const ulong Top = 0xFFFFFFFFFFFFFFFFUL;
         public static ulong M0 => 0xFFFFFFFEFFFFFC2FUL;
@@ -72,7 +72,7 @@ public readonly partial struct UInt256
     }
 
     // secp256k1 group order n.
-    private readonly struct Secp256k1N : IBarrettModulus
+    internal readonly struct Secp256k1N : IBarrettModulus
     {
         public const ulong Top = 0xFFFFFFFFFFFFFFFFUL;
         public static ulong M0 => 0xBFD25E8CD0364141UL;
@@ -87,7 +87,7 @@ public readonly partial struct UInt256
     }
 
     // P-256 (secp256r1) base field p: WebAuthn and passkey verifiers.
-    private readonly struct P256P : IBarrettModulus
+    internal readonly struct P256P : IBarrettModulus
     {
         public const ulong Top = 0xFFFFFFFF00000001UL;
         public static ulong M0 => 0xFFFFFFFFFFFFFFFFUL;
@@ -102,7 +102,7 @@ public readonly partial struct UInt256
     }
 
     // P-256 (secp256r1) group order n.
-    private readonly struct P256N : IBarrettModulus
+    internal readonly struct P256N : IBarrettModulus
     {
         public const ulong Top = 0xFFFFFFFF00000000UL;
         public static ulong M0 => 0xF3B9CAC2FC632551UL;
@@ -115,8 +115,19 @@ public readonly partial struct UInt256
         public static ulong Mu3 => 0x00000000FFFFFFFFUL;
         public static ulong Mu4 => 0x0000000000000001UL;
     }
+
+    // hi:lo mod m for m equal to the modulus of TModulus: the reduction, or the division if its correction overran.
+    // rem may share storage with m: the reduction writes rem only on success, and the division reads m first.
+    [SkipLocalsInit]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool IsModulus<TModulus>(in UInt256 m) where TModulus : struct, IBarrettModulus
+    internal static void Remainder512ByBarrettOrDivide<TModulus>(in UInt256 lo, in UInt256 hi, in UInt256 m, out UInt256 rem)
+        where TModulus : struct, IBarrettModulus
+    {
+        if (Remainder512ByBarrett<TModulus>(in lo, in hi, out rem) < 0) Remainder512By256Bits(in lo, in hi, in m, out rem);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static bool IsModulus<TModulus>(in UInt256 m) where TModulus : struct, IBarrettModulus
         => ((m.u0 ^ TModulus.M0) | (m.u1 ^ TModulus.M1) | (m.u2 ^ TModulus.M2) | (m.u3 ^ TModulus.M3)) == 0;
 
     // Barrett reduction (HAC 14.42) of x = hi:lo < 2^512 by the modulus m of TModulus.
@@ -128,11 +139,11 @@ public readonly partial struct UInt256
     // half to the next column, and the carries of a column are counted apart from its sum, so no add
     // waits on a carry; one add per finished column ripples the counted carries upwards.
     // Returns the number of subtractions (at most one for the moduli above), or -1 without writing rem
-    // when three did not suffice, which only a wrong estimate could cause: the caller then divides, so
-    // the estimate decides the speed and never the result.
+    // when three did not suffice, which only a wrong estimate could cause; the caller then divides. So an
+    // estimate that misses floor(x / m) by less than 2^320 / m - 4 (over 2^64) costs speed, never the result.
     [SkipLocalsInit]
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static int Remainder512ByBarrett<TModulus>(in UInt256 lo, in UInt256 hi, out UInt256 rem)
+    internal static int Remainder512ByBarrett<TModulus>(in UInt256 lo, in UInt256 hi, out UInt256 rem)
         where TModulus : struct, IBarrettModulus
     {
         ulong x3 = lo.u3, x4 = hi.u0, x5 = hi.u1, x6 = hi.u2, x7 = hi.u3;

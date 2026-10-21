@@ -384,7 +384,8 @@ public readonly partial struct UInt256
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static partial void Remainder512ByFullModulus(in UInt256 lo, in UInt256 hi, in UInt256 m, out UInt256 rem)
     {
-        // Below 2^384 the division needs at most two quotient digits and is cheaper than the reduction.
+        // Below 2^384 the division needs at most three quotient digits (two when both operands are below m) and costs
+        // no more than the reduction.
         ulong top = m.u3;
         if ((hi.u2 | hi.u3) != 0 && (top == Bn254R.Top || top == Secp256k1P.Top || top == P256P.Top || top == P256N.Top))
         {
@@ -405,44 +406,44 @@ public readonly partial struct UInt256
             case Bn254R.Top:
                 if (IsModulus<Bn254R>(in m))
                 {
-                    if (Remainder512ByBarrett<Bn254R>(in lo, in hi, out rem) >= 0) return;
-                    break;
+                    Remainder512ByBarrettOrDivide<Bn254R>(in lo, in hi, in m, out rem);
+                    return;
                 }
 
                 if (IsModulus<Bn254P>(in m))
                 {
-                    if (Remainder512ByBarrett<Bn254P>(in lo, in hi, out rem) >= 0) return;
-                    break;
+                    Remainder512ByBarrettOrDivide<Bn254P>(in lo, in hi, in m, out rem);
+                    return;
                 }
 
                 break;
             case Secp256k1P.Top:
                 if (IsModulus<Secp256k1P>(in m))
                 {
-                    if (Remainder512ByBarrett<Secp256k1P>(in lo, in hi, out rem) >= 0) return;
-                    break;
+                    Remainder512ByBarrettOrDivide<Secp256k1P>(in lo, in hi, in m, out rem);
+                    return;
                 }
 
                 if (IsModulus<Secp256k1N>(in m))
                 {
-                    if (Remainder512ByBarrett<Secp256k1N>(in lo, in hi, out rem) >= 0) return;
-                    break;
+                    Remainder512ByBarrettOrDivide<Secp256k1N>(in lo, in hi, in m, out rem);
+                    return;
                 }
 
                 break;
             case P256P.Top:
                 if (IsModulus<P256P>(in m))
                 {
-                    if (Remainder512ByBarrett<P256P>(in lo, in hi, out rem) >= 0) return;
-                    break;
+                    Remainder512ByBarrettOrDivide<P256P>(in lo, in hi, in m, out rem);
+                    return;
                 }
 
                 break;
             case P256N.Top:
                 if (IsModulus<P256N>(in m))
                 {
-                    if (Remainder512ByBarrett<P256N>(in lo, in hi, out rem) >= 0) return;
-                    break;
+                    Remainder512ByBarrettOrDivide<P256N>(in lo, in hi, in m, out rem);
+                    return;
                 }
 
                 break;

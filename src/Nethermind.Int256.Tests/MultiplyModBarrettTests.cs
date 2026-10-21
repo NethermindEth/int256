@@ -97,6 +97,17 @@ public class MultiplyModBarrettTests
         Assert.That((ulong)type.GetField("Top")!.GetValue(null)!, Is.EqualTo((ulong)(m >> 192)));
     }
 
+    [Test]
+    public void Perturbed_reciprocals_differ_from_mu_as_intended()
+    {
+        BigInteger mu = Max512 / Known["Bn254R"];
+        Assert.That(Limbs(typeof(Bn254RMuTooLarge), "Mu") - mu, Is.EqualTo(BigInteger.One << 62));
+        Assert.That(mu - Limbs(typeof(Bn254RMuTooSmall), "Mu"), Is.EqualTo(BigInteger.One << 62));
+        Assert.That(mu - Limbs(typeof(Bn254RMuMinusOne), "Mu"), Is.EqualTo(BigInteger.One));
+        foreach (Type t in new[] { typeof(Bn254RMuTooLarge), typeof(Bn254RMuTooSmall), typeof(Bn254RMuMinusOne) })
+            Assert.That(Limbs(t, "M"), Is.EqualTo(Known["Bn254R"]));
+    }
+
     // Bound on x / m - qhat over all x < 2^512: (1 + (2^512 - 1) mod m) / m from mu, (2^192 - 1) * mu / 2^512 from
     // q1 and the dropped columns. Below one, qhat is at most one below floor(x / m): one correction at most.
     [TestCaseSource(nameof(KnownModuli))]
@@ -143,6 +154,73 @@ public class MultiplyModBarrettTests
         // Both outcomes of the final correction are exercised.
         Assert.That(corrected, Is.GreaterThan(100));
         Assert.That(total - corrected, Is.GreaterThan(100));
+    }
+
+    // Dividends whose q1 * mu lies just around a multiple K * 2^320: q1 = ceil(K * 2^320 / mu) + d. There the floor of the
+    // estimate hinges on the smallest carries of the partial products, which random dividends almost never reach; the
+    // kernel must then need exactly the subtractions the model predicts.
+    [TestCaseSource(nameof(KnownModuli))]
+    public void Barrett_reduction_matches_BigInteger_on_estimate_floor_boundaries(string name)
+    {
+        BigInteger m = Known[name], mu = Max512 / m, scale = BigInteger.One << 320;
+        Random random = new(0xF100);
+        int checkedCount = 0;
+        for (int i = 0; i < 4_000; i++)
+        {
+            // K below 2^320 * 2^320 / mu keeps q1 below 2^320; at least 2^64 * mu / 2^320 keeps x above 2^256.
+            BigInteger k = RandomBits(random, 1 + random.Next((int)mu.GetBitLength() - 1)) + (Two64 * mu >> 320) + 1;
+            BigInteger q1 = (k * scale + mu - 1) / mu + random.Next(-2, 3);
+            BigInteger low = (i % 3) switch { 0 => BigInteger.Zero, 1 => Two192 - 1, _ => RandomBits(random, 192) };
+            BigInteger x = (q1 << 192) + low;
+            if (x < Two256 || x > Max512) continue;
+            Assert.That(Barrett(name, x), Is.EqualTo(x % m), $"x={x:X}");
+            checkedCount++;
+        }
+
+        Assert.That(checkedCount, Is.GreaterThan(3_000));
+    }
+
+    // With a deliberately wrong mu the estimate misses by at least 16 and less than 2^62; the reduction must then give up
+    // without writing the result, and the division must answer, also when the result shares storage with m.
+    [Test]
+    public void Reduction_with_a_wrong_reciprocal_gives_up_and_the_division_answers()
+    {
+        BigInteger m = Known["Bn254R"];
+        Random random = new(0xFA11);
+        UInt256 sentinel = new(0xDEAD, 0xBEEF, 1, 2);
+        for (int i = 0; i < 2_000; i++)
+        {
+            // q1 >= 2^262, so mu off by 2^62 moves the estimate by at least 16 and less than 2^62.
+            BigInteger x = RandomBits(random, 454 + random.Next(59)) | (BigInteger.One << 454);
+            UInt256 lo = FromBig(x & (Two256 - 1)), hi = FromBig(x >> 256);
+            UInt256[] result = [sentinel, sentinel];
+            Assert.That(UInt256.Remainder512ByBarrett<Bn254RMuTooLarge>(in lo, in hi, out result[0]), Is.EqualTo(-1), $"x={x:X}");
+            Assert.That(UInt256.Remainder512ByBarrett<Bn254RMuTooSmall>(in lo, in hi, out result[1]), Is.EqualTo(-1), $"x={x:X}");
+            Assert.That(result, Is.EqualTo(new[] { sentinel, sentinel }));
+
+            UInt256 modulus = FromBig(m);
+            UInt256.Remainder512ByBarrettOrDivide<Bn254RMuTooLarge>(in lo, in hi, in modulus, out modulus);
+            Assert.That(ToBig(modulus), Is.EqualTo(x % m), $"x={x:X}");
+            modulus = FromBig(m);
+            UInt256.Remainder512ByBarrettOrDivide<Bn254RMuTooSmall>(in lo, in hi, in modulus, out modulus);
+            Assert.That(ToBig(modulus), Is.EqualTo(x % m), $"x={x:X}");
+        }
+    }
+
+    // mu one too small leaves the estimate at most one lower: still within the three subtractions, so no fallback.
+    [Test]
+    public void Reduction_with_a_slightly_low_reciprocal_still_reduces()
+    {
+        BigInteger m = Known["Bn254R"];
+        Random random = new(0x10F7);
+        for (int i = 0; i < 2_000; i++)
+        {
+            BigInteger x = RandomBits(random, 257 + random.Next(256));
+            UInt256 lo = FromBig(x & (Two256 - 1)), hi = FromBig(x >> 256);
+            int passes = UInt256.Remainder512ByBarrett<Bn254RMuMinusOne>(in lo, in hi, out UInt256 result);
+            Assert.That(passes, Is.InRange(0, 3), $"x={x:X}");
+            Assert.That(ToBig(result), Is.EqualTo(x % m), $"x={x:X}");
+        }
     }
 
     // The truncated quotient of any modulus >= 2^192 is at most three below floor(x / m), the bound the reduction's
@@ -417,6 +495,46 @@ public class MultiplyModBarrettTests
         BigInteger m = Known[name];
         Assert.That((BigInteger)passes, Is.EqualTo(x / m - TruncatedBarrettQuotient(x, m)), $"x={x:X}");
         return ToBig((UInt256)args[2]!);
+    }
+
+    // BN254 r with mu + 2^62, mu - 2^62 and mu - 1.
+    private readonly struct Bn254RMuTooLarge : UInt256.IBarrettModulus
+    {
+        public static ulong M0 => 0x43E1F593F0000001UL;
+        public static ulong M1 => 0x2833E84879B97091UL;
+        public static ulong M2 => 0xB85045B68181585DUL;
+        public static ulong M3 => 0x30644E72E131A029UL;
+        public static ulong Mu0 => 0x60703A6BE1DE9259UL;
+        public static ulong Mu1 => 0x144852009E880AE6UL;
+        public static ulong Mu2 => 0xB074A58680730147UL;
+        public static ulong Mu3 => 0x4A47462623A04A7AUL;
+        public static ulong Mu4 => 0x0000000000000005UL;
+    }
+
+    private readonly struct Bn254RMuTooSmall : UInt256.IBarrettModulus
+    {
+        public static ulong M0 => 0x43E1F593F0000001UL;
+        public static ulong M1 => 0x2833E84879B97091UL;
+        public static ulong M2 => 0xB85045B68181585DUL;
+        public static ulong M3 => 0x30644E72E131A029UL;
+        public static ulong Mu0 => 0xE0703A6BE1DE9259UL;
+        public static ulong Mu1 => 0x144852009E880AE5UL;
+        public static ulong Mu2 => 0xB074A58680730147UL;
+        public static ulong Mu3 => 0x4A47462623A04A7AUL;
+        public static ulong Mu4 => 0x0000000000000005UL;
+    }
+
+    private readonly struct Bn254RMuMinusOne : UInt256.IBarrettModulus
+    {
+        public static ulong M0 => 0x43E1F593F0000001UL;
+        public static ulong M1 => 0x2833E84879B97091UL;
+        public static ulong M2 => 0xB85045B68181585DUL;
+        public static ulong M3 => 0x30644E72E131A029UL;
+        public static ulong Mu0 => 0x20703A6BE1DE9258UL;
+        public static ulong Mu1 => 0x144852009E880AE6UL;
+        public static ulong Mu2 => 0xB074A58680730147UL;
+        public static ulong Mu3 => 0x4A47462623A04A7AUL;
+        public static ulong Mu4 => 0x0000000000000005UL;
     }
 
     private static BigInteger Hex(string value) => BigInteger.Parse("0" + value, NumberStyles.HexNumber);
