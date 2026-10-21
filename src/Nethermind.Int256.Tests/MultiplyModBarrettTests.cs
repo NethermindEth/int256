@@ -199,6 +199,9 @@ public class MultiplyModBarrettTests
             Assert.That(result, Is.EqualTo(new[] { sentinel, sentinel }));
 
             UInt256 modulus = FromBig(m);
+            UInt256 separate = sentinel;
+            UInt256.Remainder512ByBarrettOrDivide<Bn254RMuTooLarge>(in lo, in hi, in modulus, out separate);
+            Assert.That(ToBig(separate), Is.EqualTo(x % m), $"x={x:X}");
             UInt256.Remainder512ByBarrettOrDivide<Bn254RMuTooLarge>(in lo, in hi, in modulus, out modulus);
             Assert.That(ToBig(modulus), Is.EqualTo(x % m), $"x={x:X}");
             modulus = FromBig(m);
