@@ -13,6 +13,7 @@ namespace UInt256Proof.Compare.ProfileBindings
   -- By name, not conjunct position: upstream adds capability prerequisites to `Valid`.
   have nativeAvx2 (h : profile.avx512FVL = true) : profile.avx2 = true := by simp_all [CIL.FeatureProfile.Valid]
   have nativeAvx (h : profile.avx512FVL = true) : profile.avx = true := by simp_all [CIL.FeatureProfile.Valid]
+  have nativeF (h : profile.avx512FVL = true) : profile.avx512F = true := by simp_all [CIL.FeatureProfile.Valid]
   clear valid
   intro body member
   simp only [Extracted.program, List.mem_cons, List.not_mem_nil, or_false] at member
