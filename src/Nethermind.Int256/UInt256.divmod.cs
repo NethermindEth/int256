@@ -411,7 +411,7 @@ public readonly partial struct UInt256
 
         if (m.u3 != 0)
         {
-            Remainder512By256Bits(in lo, in hi, in m, out res);
+            Remainder512ByFullModulus(in lo, in hi, in m, out res);
         }
         else
         {
@@ -2462,6 +2462,10 @@ public readonly partial struct UInt256
             nd1 = (d1 << shift) | (d0 >> rshift);
             nd2 = (d2 << shift) | (d1 >> rshift);
             nd3 = (d3 << shift) | (d2 >> rshift);
+
+            // The extra top limb holds only the bits shifted out. When it is zero and the next limb is
+            // below nd3, the leading quotient digit is zero, as for the product of two values below d.
+            if (Unsafe.Add(ref unBuf.w0, uLen) == 0 && Unsafe.Add(ref unBuf.w0, uLen - 1) < nd3) uLen--;
         }
 
         ref ulong un0 = ref unBuf.w0;
