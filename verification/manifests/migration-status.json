@@ -1,7 +1,7 @@
 {
-  "leancilRevision": "c464398fc1a17592bf220468ac230c15a9fad97b",
+  "leancilRevision": "81e761713dcc59cc5d954970599e1e7ba5004613",
   "assemblySha256": "7d44ec9be3b6cfa4b853ad25cec8d246c1ada781866e04b7f9d6dfd4c2266e4e",
-  "note": "All scalar targets extract; every registered gate and regression runner passed on LeanCIL c464398 on the final tree. Extraction is not a compiled-method certificate; upstream issues 36-40, 42, 53 and 54 are resolved.",
+  "note": "All scalar targets extract; every registered gate and regression runner passed on LeanCIL 81e7617 on the final tree. Extraction is not a compiled-method certificate; upstream issues 36-40, 42, 53 and 54 are resolved.",
   "scalar": [
     {
       "method": "EqualsInt32",
@@ -706,11 +706,11 @@
     "Two deferred API entries remain unported.",
     "Safety fixture expectations changed under LeanCIL for ReusedLocal and related cases; review them against the original branch."
   ],
-  "supportingAuditTheorems": 2851,
+  "supportingAuditTheorems": 2477,
   "validation": {
-    "leancilRevision": "c464398fc1a17592bf220468ac230c15a9fad97b",
-    "gates": "All 256 registered gates passed on 85c21d0, one verify session per profile (21 sessions; each profile's last gate was rerun alone after a driver error skipped it). The fixture trim leaves every gate's import closure unchanged.",
-    "runnersTree": "c472208; its Lean sources, fixtures and runners match this tree.",
+    "leancilRevision": "81e761713dcc59cc5d954970599e1e7ba5004613",
+    "gates": "All 256 registered gates passed on 5e9772b, one verify session per profile (21 sessions).",
+    "runnersTree": "5e9772b; its Lean sources, fixtures and runners match this tree.",
     "runners": {
       "EqualityRegression": "210/210",
       "CompareRegression": "16/16",
