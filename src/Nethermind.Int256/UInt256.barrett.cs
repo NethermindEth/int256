@@ -127,9 +127,12 @@ public readonly partial struct UInt256
     // Products are taken by diagonal; each adds its low half to the column of its diagonal and its high
     // half to the next column, and the carries of a column are counted apart from its sum, so no add
     // waits on a carry; one add per finished column ripples the counted carries upwards.
+    // Returns the number of subtractions (at most one for the moduli above), or -1 without writing rem
+    // when three did not suffice, which only a wrong estimate could cause: the caller then divides, so
+    // the estimate decides the speed and never the result.
     [SkipLocalsInit]
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void Remainder512ByBarrett<TModulus>(in UInt256 lo, in UInt256 hi, out UInt256 rem)
+    private static int Remainder512ByBarrett<TModulus>(in UInt256 lo, in UInt256 hi, out UInt256 rem)
         where TModulus : struct, IBarrettModulus
     {
         ulong x3 = lo.u3, x4 = hi.u0, x5 = hi.u1, x6 = hi.u2, x7 = hi.u3;
@@ -212,9 +215,15 @@ public readonly partial struct UInt256
         ulong r3 = Sub(x3, p3, ref borrow);
         ulong r4 = x4 - p4 - borrow;
 
-        // r < 4m; at most three passes, nearly always none.
+        int passes = 0;
         while (r4 != 0 || !LessThanModulus(r0, r1, r2, r3))
         {
+            if (++passes > 3)
+            {
+                Unsafe.SkipInit(out rem);
+                return -1;
+            }
+
             borrow = 0;
             r0 = Sub(r0, TModulus.M0, ref borrow);
             r1 = Sub(r1, TModulus.M1, ref borrow);
@@ -224,6 +233,7 @@ public readonly partial struct UInt256
         }
 
         Store4(out rem, r0, r1, r2, r3);
+        return passes;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void MultiplyAccumulate(ulong a, ulong b, ref ulong s, ref ulong k, ref ulong t, ref ulong j)

@@ -408,10 +408,14 @@ public class MultiplyModBarrettTests
         return value;
     }
 
+    // The reduction, checked to need exactly the subtractions the quotient estimate leaves (so a wrong estimate, which
+    // the division fallback would hide from the result, still fails).
     private static BigInteger Barrett(string name, BigInteger x)
     {
         object?[] args = [FromBig(x & (Two256 - 1)), FromBig(x >> 256), null];
-        ReduceBarrett.MakeGenericMethod(ModulusType(name)).Invoke(null, args);
+        int passes = (int)ReduceBarrett.MakeGenericMethod(ModulusType(name)).Invoke(null, args)!;
+        BigInteger m = Known[name];
+        Assert.That((BigInteger)passes, Is.EqualTo(x / m - TruncatedBarrettQuotient(x, m)), $"x={x:X}");
         return ToBig((UInt256)args[2]!);
     }
 

@@ -378,7 +378,8 @@ public readonly partial struct UInt256
 
     // Contracts that reduce in one prime field (MiMC and Poseidon hashing, SNARK verifiers, elliptic-curve arithmetic)
     // repeat a well-known modulus thousands of times. For those moduli Barrett reduction with the reciprocal as a
-    // constant replaces a hardware division per quotient digit; every other modulus divides as before.
+    // constant replaces a hardware division per quotient digit; every other modulus divides as before, and so would
+    // a reduction whose correction overran its bound.
     [SkipLocalsInit]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static partial void Remainder512ByFullModulus(in UInt256 lo, in UInt256 hi, in UInt256 m, out UInt256 rem)
@@ -404,44 +405,44 @@ public readonly partial struct UInt256
             case Bn254R.Top:
                 if (IsModulus<Bn254R>(in m))
                 {
-                    Remainder512ByBarrett<Bn254R>(in lo, in hi, out rem);
-                    return;
+                    if (Remainder512ByBarrett<Bn254R>(in lo, in hi, out rem) >= 0) return;
+                    break;
                 }
 
                 if (IsModulus<Bn254P>(in m))
                 {
-                    Remainder512ByBarrett<Bn254P>(in lo, in hi, out rem);
-                    return;
+                    if (Remainder512ByBarrett<Bn254P>(in lo, in hi, out rem) >= 0) return;
+                    break;
                 }
 
                 break;
             case Secp256k1P.Top:
                 if (IsModulus<Secp256k1P>(in m))
                 {
-                    Remainder512ByBarrett<Secp256k1P>(in lo, in hi, out rem);
-                    return;
+                    if (Remainder512ByBarrett<Secp256k1P>(in lo, in hi, out rem) >= 0) return;
+                    break;
                 }
 
                 if (IsModulus<Secp256k1N>(in m))
                 {
-                    Remainder512ByBarrett<Secp256k1N>(in lo, in hi, out rem);
-                    return;
+                    if (Remainder512ByBarrett<Secp256k1N>(in lo, in hi, out rem) >= 0) return;
+                    break;
                 }
 
                 break;
             case P256P.Top:
                 if (IsModulus<P256P>(in m))
                 {
-                    Remainder512ByBarrett<P256P>(in lo, in hi, out rem);
-                    return;
+                    if (Remainder512ByBarrett<P256P>(in lo, in hi, out rem) >= 0) return;
+                    break;
                 }
 
                 break;
             case P256N.Top:
                 if (IsModulus<P256N>(in m))
                 {
-                    Remainder512ByBarrett<P256N>(in lo, in hi, out rem);
-                    return;
+                    if (Remainder512ByBarrett<P256N>(in lo, in hi, out rem) >= 0) return;
+                    break;
                 }
 
                 break;
