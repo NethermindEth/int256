@@ -5,7 +5,7 @@ defaultTargets = ["UInt256"]
 [[require]]
 name = "leancil"
 git = "https://github.com/NethermindEth/LeanCIL.git"
-rev = "c464398fc1a17592bf220468ac230c15a9fad97b"
+rev = "54e82f9bae3ee87b54b4ad536f0785242feacfa8"
 
 [[lean_lib]]
 name = "UInt256"
