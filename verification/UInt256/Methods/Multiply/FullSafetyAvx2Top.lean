@@ -35,7 +35,7 @@ theorem full_avx2_inputs (profile : CIL.FeatureProfile) (program : CIL.Program)
         (fullInputs original left right) →
       AvxOperands original after frame left right →
       ∃ fuel final returned,
-        run program fuel methodIndex 50 (productArgs left right output) frame [] after =
+        run program fuel methodIndex 56 (productArgs left right output) frame [] after =
           .ok (final, returned) ∧ post final returned) :
     ∃ fuel final returned,
       run program fuel methodIndex 18 (productArgs left right output) frame [] current =
@@ -43,7 +43,7 @@ theorem full_avx2_inputs (profile : CIL.FeatureProfile) (program : CIL.Program)
   have profileEq : (fullBody profile wordIndex countIndex storageIndex).profile = profile := rfl
   have formedLeft := state.call.input_formed (by simp : left ∈ [left, right])
   have loadedLeft := input_vector_snapshot state originalCall left (by simp)
-  iterate 8
+  iterate 14
     apply run_next_exists post found (by change some _ = _; first | (simp only [noAvx512, avx2, Bool.false_eq_true, ↓reduceIte] <;> rfl) | rfl)
     simp (config := { implicitDefEqProofs := false })
       [step, pureArity, productArgs, checkedValue, numericValue, formValue, formedLeft,
@@ -53,7 +53,7 @@ theorem full_avx2_inputs (profile : CIL.FeatureProfile) (program : CIL.Program)
     first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
   obtain ⟨middle, leftHome, leftSlot, storedLeft, middleState, leftRead, _⟩ :=
     state.store_vector enteredWF homes 23 (by rfl) (inputPack original left)
-      42 (productArgs left right output) [] (body := (fullBody profile wordIndex countIndex storageIndex))
+      48 (productArgs left right output) [] (body := (fullBody profile wordIndex countIndex storageIndex))
   apply run_next_exists post found (by change some _ = _; first | (simp only [noAvx512, avx2, Bool.false_eq_true, ↓reduceIte] <;> rfl) | rfl) storedLeft
   have formedRight := middleState.call.input_formed (by simp : right ∈ [left, right])
   have loadedRight := input_vector_snapshot middleState originalCall right (by simp)
@@ -67,7 +67,7 @@ theorem full_avx2_inputs (profile : CIL.FeatureProfile) (program : CIL.Program)
     first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
   obtain ⟨after, rightHome, rightSlot, storedRight, afterState, rightRead, written⟩ :=
     middleState.store_vector enteredWF homes 24 (by rfl) (reverseInputPack original right)
-      49 (productArgs left right output) [] (body := (fullBody profile wordIndex countIndex storageIndex))
+      55 (productArgs left right output) [] (body := (fullBody profile wordIndex countIndex storageIndex))
   have preservedLeft := write_preserves_disjoint_read written leftRead
     (Or.inl (homes.distinct 23 24 .vector256 .vector256 leftHome rightHome (by decide) leftSlot rightSlot))
   exact run_next_exists post found (by change some _ = _; first | (simp only [noAvx512, avx2, Bool.false_eq_true, ↓reduceIte] <;> rfl) | rfl) storedRight
@@ -109,10 +109,10 @@ theorem full_avx2_cross (profile : CIL.FeatureProfile) (program : CIL.Program)
         (fullInputs original left right) →
       AvxCrossState original after frame left right →
       ∃ fuel final returned,
-        run program fuel methodIndex 66 (productArgs left right output) frame [] after =
+        run program fuel methodIndex 72 (productArgs left right output) frame [] after =
           .ok (final, returned) ∧ post final returned) :
     ∃ fuel final returned,
-      run program fuel methodIndex 50 (productArgs left right output) frame [] current =
+      run program fuel methodIndex 56 (productArgs left right output) frame [] current =
         .ok (final, returned) ∧ post final returned := by
   have profileEq : (fullBody profile wordIndex countIndex storageIndex).profile = profile := rfl
   have loadLeft := fun (pc : Nat) (stack : List Value) => step_load_numeric_local
@@ -154,7 +154,7 @@ theorem full_avx2_cross (profile : CIL.FeatureProfile) (program : CIL.Program)
   simp only [digitLow_shift32]
   obtain ⟨after, crossHome, crossSlot, stored, afterState, crossRead, written⟩ :=
     state.store_vector enteredWF homes 25 (by rfl) (avxCrossPack original left right)
-      65 (productArgs left right output) [] (body := (fullBody profile wordIndex countIndex storageIndex))
+      71 (productArgs left right output) [] (body := (fullBody profile wordIndex countIndex storageIndex))
   have leftRead := write_preserves_disjoint_read written operands.leftRead
     (Or.inl (homes.distinct 23 25 .vector256 .vector256 operands.leftHome crossHome
       (by decide) operands.leftSlot crossSlot))
@@ -190,7 +190,7 @@ theorem full_avx2_finish (profile : CIL.FeatureProfile) (program : CIL.Program)
         run program fuel methodIndex 96 (productArgs left right output) frame [] after =
           .ok (final, returned) ∧ post final returned) :
     ∃ fuel final returned,
-      run program fuel methodIndex 66 (productArgs left right output) frame [] current =
+      run program fuel methodIndex 72 (productArgs left right output) frame [] current =
         .ok (final, returned) ∧ post final returned := by
   have profileEq : (fullBody profile wordIndex countIndex storageIndex).profile = profile := rfl
   have loadLeft := fun (pc : Nat) (stack : List Value) => step_load_numeric_local
@@ -227,7 +227,7 @@ theorem full_avx2_finish (profile : CIL.FeatureProfile) (program : CIL.Program)
   · exact step_sum256 _ _ _ _ _ _ _ _ _ _
   simp only [avxCrossWord, narrow_low_correct, lowProduct]
   obtain ⟨after, stored, finalState⟩ := state.store enteredWF homes 6 (by rfl)
-    (fullTop original left right) 76 (productArgs left right output) [] (body := (fullBody profile wordIndex countIndex storageIndex))
+    (fullTop original left right) 82 (productArgs left right output) [] (body := (fullBody profile wordIndex countIndex storageIndex))
   apply run_next_exists post found (by change some _ = _; first | (simp only [noAvx512, avx2, Bool.false_eq_true, ↓reduceIte] <;> rfl) | rfl) stored
   apply run_next_exists post found (by change some _ = _; first | (simp only [noAvx512, avx2, Bool.false_eq_true, ↓reduceIte] <;> rfl) | rfl)
   · simp [step, pureArity, scalars, CIL.step.eq_def, Bind.bind, Except.bind, Pure.pure, Except.pure]

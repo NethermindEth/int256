@@ -21,7 +21,7 @@ theorem full_avx512_top (profile : CIL.FeatureProfile) (program : CIL.Program)
   have formedRight := state.call.input_formed (by simp : right ∈ [left, right])
   have loadedLeft := input_vector_snapshot state originalCall left (by simp)
   have loadedRight := input_vector_snapshot state originalCall right (by simp)
-  iterate 10
+  iterate 16
     apply run_next_exists post found (by rfl)
     simp (config := { implicitDefEqProofs := false })
       [step, pureArity, productArgs, checkedValue, numericValue, formValue, formedLeft, formedRight,
@@ -30,7 +30,7 @@ theorem full_avx512_top (profile : CIL.FeatureProfile) (program : CIL.Program)
         Bind.bind, Except.bind, Pure.pure, Except.pure]
     first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
   obtain ⟨stored, reference, slot, stepped, storedState, readback, _⟩ := state.store_vector enteredWF homes
-    22 (by rfl) rightBits 28 (productArgs left right output) [.scalar (.v256 leftBits)] (body := (fullBody profile wordIndex countIndex storageIndex))
+    22 (by rfl) rightBits 34 (productArgs left right output) [.scalar (.v256 leftBits)] (body := (fullBody profile wordIndex countIndex storageIndex))
   apply run_next_exists post found (by change some _ = _; simp only [enabled, ↓reduceIte] <;> rfl) stepped
   apply run_next_exists post found (by change some _ = _; simp only [enabled, ↓reduceIte] <;> rfl)
     (step_load_numeric_local .vector256 (.v256 rightBits) rightBits.toNat rfl slot readback)
@@ -44,7 +44,7 @@ theorem full_avx512_top (profile : CIL.FeatureProfile) (program : CIL.Program)
   apply run_next_exists post found (by change some _ = _; simp only [enabled, ↓reduceIte] <;> rfl)
     (step_sum256 _ _ _ _ _ _ _ _ _ _)
   obtain ⟨after, storedTop, finalState⟩ := storedState.store enteredWF homes 6 (by rfl)
-    (fullTop original left right) 34 (productArgs left right output) [] (body := (fullBody profile wordIndex countIndex storageIndex))
+    (fullTop original left right) 40 (productArgs left right output) [] (body := (fullBody profile wordIndex countIndex storageIndex))
   apply run_next_exists post found (by change some _ = _; simp only [enabled, ↓reduceIte] <;> rfl) storedTop
   apply run_next_exists post found (by rfl)
   · simp [enabled, step, pureArity, scalars, CIL.step.eq_def, Bind.bind, Except.bind, Pure.pure, Except.pure]
