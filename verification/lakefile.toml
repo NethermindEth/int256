@@ -9,3 +9,6 @@ rev = "c464398fc1a17592bf220468ac230c15a9fad97b"
 
 [[lean_lib]]
 name = "UInt256"
+
+[[lean_lib]]
+name = "Tests.Fixtures.Equality.Shared"

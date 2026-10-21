@@ -301,6 +301,8 @@ production proof or a renamed copy of it; EquivalentScalar (short-circuit limb
 ladder) and EquivalentReduction (xor-to-zero vector leaf, scalar-direct vector
 primitive, high-half-first SSE reduction) are checked by fixture proofs under
 `Tests/Fixtures/Equality/<Case>/` that state the production contract verbatim.
+Their extraction-independent leaf proofs live once in `Tests/Fixtures/Equality/Shared/`, so each
+fixture file only binds its extraction.
 WrongLane, WrongReduction, WrongReceiver, WrongSnapshot, WrongSignedEmbedding
 and WrongPolarity each get a checked refutation from `witnesses.json`.
 
