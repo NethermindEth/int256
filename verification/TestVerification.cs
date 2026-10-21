@@ -43,16 +43,22 @@ SelectionCheck([], allMethods, true, all: true);
 {
     Selection full = VerificationSelection.Select(root, [], all: true);
     Require(full.Batches.Length == VerificationSelection.Jobs, "A full run should use every parallel job");
-    // One session per profile and job: only profiles larger than a job may be split.
-    foreach (IGrouping<string, Gate> profile in full.Include.GroupBy(gate => gate.Profile).Where(group => group.Count() <= VerificationSelection.Jobs))
-        Require(full.Batches.Count(batch => batch.Groups.Any(group => group.Profile == profile.Key)) == 1, "Small profile split across jobs: " + profile.Key);
     var costs = VerificationSelection.Costs(root, full.Include);
+    // Each split repeats the support build, so only a profile heavier than one job's share may be split.
+    double share = full.Include.Sum(gate => costs[gate].Weight) / VerificationSelection.Jobs;
+    foreach (IGrouping<string, Gate> profile in full.Include.GroupBy(gate => gate.Profile).Where(group => group.Sum(gate => costs[gate].Weight) <= share))
+        Require(full.Batches.Count(batch => batch.Groups.Any(group => group.Profile == profile.Key)) == 1, "Light profile split across jobs: " + profile.Key);
     int Shareable(BatchGroup group) => group.Methods.Sum(method => costs[full.Include.Single(gate => gate.Method == method && gate.Profile == group.Profile)].Support);
     Require(full.Batches.All(batch => batch.Groups.All(group => Shareable(group) <= Shareable(batch.Groups[^1]))),
         "Only a job's last group exports support, so it must be the group with the most shareable modules");
     Gate add = full.Include.Single(gate => gate.Method == "Add" && gate.Profile == "scalar");
     Gate and = full.Include.Single(gate => gate.Method == "And" && gate.Profile == "scalar");
-    Require(costs[add].Weight > costs[and].Weight, "Modules importing Extracted are rebuilt per extraction and must weigh in");
+    Require(costs[add].Weight > costs[and].Weight, "Shards balance on measured seconds, so the slower Add gate must outweigh And");
+    // A gate with no sample must not count as free, or one job would collect all of them.
+    Gate unsampled = full.Include.Single(gate => gate.Method == "Multiply" && gate.Profile == "x64-avx512dqvl");
+    Require(!File.ReadAllText(Path.Combine(root, "manifests/gate-seconds.json")).Contains("\"Multiply/x64-avx512dqvl\"", StringComparison.Ordinal),
+        "The fallback check needs a gate without a sample");
+    Require(costs[unsampled].Weight > costs[and].Weight, "An unsampled gate must take its method's measured median");
 }
 Console.WriteLine("Verification gate selection checks passed.");
 

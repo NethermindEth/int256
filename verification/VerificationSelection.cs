@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Demerzel Solutions Limited
 // SPDX-License-Identifier: MIT
 
+using System.Text.Json;
 using System.Text.RegularExpressions;
 
 internal static class VerificationSelection
@@ -24,15 +25,15 @@ internal static class VerificationSelection
             selected, Partition(root, selected));
     }
 
-    internal const int Jobs = 8;
+    internal const int Jobs = 32;
 
     // Every job builds the shared support once, so fewer, balanced jobs beat one job per gate.
     // Each profile in a job is its own batch session, so only profiles heavier than a job are split.
     internal static Batch[] Partition(string root, Gate[] selected)
     {
         if (selected.Length == 0) return [];
-        Dictionary<Gate, (int Weight, int Support)> cost = Costs(root, selected);
-        int Weight(IEnumerable<Gate> gates) => gates.Sum(gate => cost[gate].Weight);
+        Dictionary<Gate, (double Weight, int Support)> cost = Costs(root, selected);
+        double Weight(IEnumerable<Gate> gates) => gates.Sum(gate => cost[gate].Weight);
         double target = (double)Weight(selected) / Math.Min(Jobs, selected.Length);
         List<List<Gate>> chunks = [];
         foreach (IGrouping<string, Gate> profile in selected.GroupBy(gate => gate.Profile).OrderBy(group => group.Key, StringComparer.Ordinal))
@@ -47,23 +48,35 @@ internal static class VerificationSelection
                 .Select(group => new BatchGroup(group.Key, [.. group.Select(gate => gate.Method)]))]))];
     }
 
-    // Weight: per-extraction cost plus the modules rebuilt per extraction. Support: modules shareable across extractions.
-    internal static Dictionary<Gate, (int Weight, int Support)> Costs(string root, Gate[] gates)
+    // Weight: measured CI seconds; module counts did not predict them. Support: modules shareable across extractions.
+    internal static Dictionary<Gate, (double Weight, int Support)> Costs(string root, Gate[] gates)
     {
         Dictionary<string, bool> dependent = new(StringComparer.Ordinal);
+        Func<Gate, double> seconds = MeasuredSeconds(root);
         return gates.ToDictionary(gate => gate, gate =>
         {
             HashSet<string> sources = ProofSources(root, gate.Proof);
-            int rebuilt = sources.Count(source => DependsOnExtraction(root, source, dependent));
-            return (PerExtraction + rebuilt, sources.Count - rebuilt);
+            return (seconds(gate), sources.Count(source => !DependsOnExtraction(root, source, dependent)));
         });
     }
 
+    // A gate without a sample takes its method's median, then the overall median.
+    static Func<Gate, double> MeasuredSeconds(string root)
+    {
+        Dictionary<string, double> samples = JsonSerializer.Deserialize<JsonElement>(File.ReadAllText(Path.Combine(root, "manifests/gate-seconds.json")))
+            .GetProperty("seconds").EnumerateObject().ToDictionary(pair => pair.Name, pair => pair.Value.GetDouble(), StringComparer.Ordinal);
+        double Median(IEnumerable<double> values) => values.Order().ElementAtOrDefault(values.Count() / 2);
+        double overall = Median(samples.Values);
+        return gate => samples.TryGetValue($"{gate.Method}/{gate.Profile}", out double value) ? value
+            : samples.Where(pair => pair.Key.StartsWith(gate.Method + "/", StringComparison.Ordinal)).Select(pair => pair.Value) is var method && method.Any()
+                ? Median(method) : overall;
+    }
+
     // Heaviest first into the lightest bin; ties keep input order.
-    static List<T>[] Balance<T>(IEnumerable<T> items, Func<T, int> weight, int bins)
+    static List<T>[] Balance<T>(IEnumerable<T> items, Func<T, double> weight, int bins)
     {
         List<T>[] result = [.. Enumerable.Range(0, Math.Max(1, bins)).Select(_ => new List<T>())];
-        int[] loads = new int[result.Length];
+        double[] loads = new double[result.Length];
         foreach (T item in items.OrderByDescending(weight))
         {
             int bin = Array.IndexOf(loads, loads.Min());
@@ -72,9 +85,6 @@ internal static class VerificationSelection
         }
         return result;
     }
-
-    // Fixed cost of one extraction (integrity check, certificate and theorem audits), in module builds.
-    const int PerExtraction = 6;
 
     // Modules importing Extracted are rebuilt for every extraction.
     static bool DependsOnExtraction(string root, string source, Dictionary<string, bool> memo)

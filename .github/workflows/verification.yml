@@ -126,7 +126,7 @@ jobs:
       LEANCIL_EXPORT_CONSUMER_SUPPORT: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && format('{0}/verification/artifacts/consumer-support-export', github.workspace) || '' }}
     strategy:
       fail-fast: false
-      max-parallel: 8
+      max-parallel: 32
       matrix: ${{ fromJSON(needs.select.outputs.matrix) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -171,7 +171,8 @@ jobs:
             $env:LEANCIL_CONSUMER_SUPPORT = (($env:SUPPORT_DIGESTS -split ',') | ForEach-Object { "$directory/$_.json" }) -join [IO.Path]::PathSeparator
             $env:LEANCIL_CONSUMER_SUPPORT_SHA256 = $env:SUPPORT_DIGESTS
           }
-          dotnet run --file verification/Verify.cs -- --action verify --groups-json "$env:VERIFY_GROUPS"
+          # Two workspaces at -j2 fill the 4 vCPUs; verify-batch defaults to one per 8 cores.
+          dotnet run --file verification/Verify.cs -- --action verify --groups-json "$env:VERIFY_GROUPS" --parallel 2
       - name: Publish certified consumer support for future runs
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.certificate.outputs.consumer-support-sha256 != ''
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

@@ -88,13 +88,13 @@ changes skip the expensive jobs; the stable `Verify UInt256` check still runs
 and requires every selected check to pass. CI builds and kernel-checks the shared
 LeanCIL library once per run; certificate jobs validate the producer's manifest
 digest before reusing it. Consumer proof checks remain separate for every gate.
-Gates are divided into at most eight jobs, all running concurrently, because
-every job pays the shared support build once. `VerificationSelection.cs`
-balances jobs by a per-gate weight (a fixed per-extraction cost plus the proof
-modules that import `Extracted`, which every extraction rebuilds) and splits a
-profile only when it outweighs a job. Each job builds the extractor and
+Gates are divided into at most 32 jobs, all running concurrently; each job pays
+the shared support build once, which costs about a minute. `VerificationSelection.cs`
+balances jobs by the measured serial seconds per gate in `manifests/gate-seconds.json`
+(module counts did not predict them; an unsampled gate takes its method's median) and
+splits a profile only when it outweighs a job. Each job builds the extractor and
 production assembly once, then runs one `verify-batch` session per profile
-(`Verify.cs --groups-json`). LeanCIL authenticates and reuses
+(`Verify.cs --groups-json`) with two workspaces in parallel. LeanCIL authenticates and reuses
 extraction-independent consumer modules locally on that runner, across profiles. Unchanged successful proofs can also be reused;
 changed extraction and proof inputs are checked by the upstream verifier. Every selected method still needs
 its own certificate, and any failure fails the batch while allowing the other
