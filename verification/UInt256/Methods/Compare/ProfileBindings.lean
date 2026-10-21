@@ -10,9 +10,10 @@ namespace UInt256Proof.Compare.ProfileBindings
     (vector : Extracted.profile.avx512FVL = false → Extracted.profile.avx2 = false →
       Extracted.profile.vector256Accelerated = profile.vector256Accelerated) :
     Extracted.program.ProfileAgreement Extracted.profile profile := by
-  rcases valid with ⟨_, _, _, _, _, _, avx2Avx, fvlF, _, fAvx2, _⟩
-  have nativeAvx2 (h : profile.avx512FVL = true) : profile.avx2 = true := fAvx2 (fvlF h)
-  have nativeAvx (h : profile.avx512FVL = true) : profile.avx = true := avx2Avx (nativeAvx2 h)
+  -- By name, not conjunct position: upstream adds capability prerequisites to `Valid`.
+  have nativeAvx2 (h : profile.avx512FVL = true) : profile.avx2 = true := by simp_all [CIL.FeatureProfile.Valid]
+  have nativeAvx (h : profile.avx512FVL = true) : profile.avx = true := by simp_all [CIL.FeatureProfile.Valid]
+  clear valid
   intro body member
   simp only [Extracted.program, List.mem_cons, List.not_mem_nil, or_false] at member
   repeat' first | subst body | rcases member with rfl | member

@@ -17,5 +17,7 @@
   "avx512DQVL": true,
   "bmi2": false,
   "armBase64": false,
-  "vector256Accelerated": false
+  "vector256Accelerated": false,
+  "x86Base64": true,
+  "vector128Accelerated": true
 }
