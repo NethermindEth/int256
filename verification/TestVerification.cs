@@ -55,10 +55,10 @@ SelectionCheck([], allMethods, true, all: true);
     Gate and = full.Include.Single(gate => gate.Method == "And" && gate.Profile == "scalar");
     Require(costs[add].Weight > costs[and].Weight, "Shards balance on measured seconds, so the slower Add gate must outweigh And");
     // A gate with no sample must not count as free, or one job would collect all of them.
-    Gate unsampled = full.Include.Single(gate => gate.Method == "Multiply" && gate.Profile == "x64-avx512dqvl");
-    Require(!File.ReadAllText(Path.Combine(root, "manifests/gate-seconds.json")).Contains("\"Multiply/x64-avx512dqvl\"", StringComparison.Ordinal),
-        "The fallback check needs a gate without a sample");
-    Require(costs[unsampled].Weight > costs[and].Weight, "An unsampled gate must take its method's measured median");
+    Gate unsampled = full.Include.Single(gate => gate.Method == "Multiply" && gate.Profile == "scalar") with { Profile = "unsampled-profile" };
+    double[] multiply = [.. full.Include.Where(gate => gate.Method == "Multiply").Select(gate => costs[gate].Weight).Order()];
+    Require(VerificationSelection.Costs(root, [unsampled])[unsampled].Weight == multiply[multiply.Length / 2],
+        "An unsampled gate must take its method's measured median");
 }
 Console.WriteLine("Verification gate selection checks passed.");
 
