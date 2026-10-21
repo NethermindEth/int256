@@ -6,9 +6,9 @@
 #:include VerificationSelection.cs
 #:include VerificationRunner.cs
 #:include ConsumerSupportSelection.cs
+#:include RegressionManifest.cs
 
 using System.Text.Json;
-using System.Text.RegularExpressions;
 
 string root = VerificationSupport.Root;
 string[] allMethods = VerificationSupport.Gates(root).Select(gate => gate.Method).ToArray();
@@ -43,9 +43,19 @@ SelectionCheck(["verification/VerificationRunner.cs"], allMethods, true);
 SelectionCheck([], allMethods, true, all: true);
 {
     // A runner missing from CI would let a pin or template change stop refuting its mutants unnoticed.
-    string workflow = File.ReadAllText(Path.Combine(root, "../.github/workflows/verification.yml"));
-    foreach (string runner in Directory.EnumerateFiles(root, "*Regression.cs").Select(Path.GetFileName))
-        Require(Regex.IsMatch(workflow, @"\[" + Regex.Escape(runner!) + @"[,\]]"), "Regression runner missing from the CI matrix: " + runner);
+    string[] files = [.. Directory.EnumerateFiles(root, "*Regression.cs").Select(path => Path.GetFileName(path)!).Order(StringComparer.Ordinal)];
+    RegressionRunner[] runners = RegressionManifest.Runners(root);
+    Require(runners.Select(runner => runner.File).Order(StringComparer.Ordinal).SequenceEqual(files),
+        "manifests/regressions.json must list every *Regression.cs runner exactly once");
+    Require(runners.All(runner => runner.ProfileOption is null || runner.Profiles is { Length: > 0 }), "A profile option needs profiles");
+    string[] Runs(IEnumerable<string[]> runs) => [.. runs.Select(run => string.Join(' ', run)).Order(StringComparer.Ordinal)];
+    string[] expectedRuns = Runs(runners.SelectMany(runner => runner.Profiles is null ? [new[] { runner.File }]
+        : runner.Profiles.Select(profile => runner.ProfileOption is null ? new[] { runner.File, profile } : [runner.File, runner.ProfileOption, profile])));
+    RegressionShard[] shards = RegressionManifest.Shards(root);
+    Require(Runs(shards.SelectMany(shard => shard.Runs)).SequenceEqual(expectedRuns), "Regression shards lost or duplicated a runner profile");
+    Require(shards.Select(shard => shard.Id).Distinct().Count() == shards.Length, "Regression shard ids must be unique");
+    Require(File.ReadAllText(Path.Combine(root, "../.github/workflows/verification.yml")).Contains("fromJSON(needs.select.outputs.regressions)"),
+        "The regression matrix must come from the manifest");
 }
 {
     Selection full = VerificationSelection.Select(root, [], all: true);

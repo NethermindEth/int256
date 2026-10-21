@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 #:property PublishAot=false
 #:include RegressionBatch.cs
+#:include RegressionManifest.cs
 using System.Diagnostics;
 using System.Globalization;
 using System.Numerics;
@@ -10,17 +11,20 @@ using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 
-const string Usage = "Usage: EqualityRegression.cs [verification-directory] [all|scalar|x64-vector256|x64-sse41] [all|<case>]";
+const string Usage = "Usage: EqualityRegression.cs [verification-directory] [all|<profile>] [all|<case>]";
 if (args.Length > 3) throw new ArgumentException(Usage);
 string root = Path.GetFullPath(args.Length > 0 ? args[0] : "verification");
 string selected = args.Length > 1 ? args[1] : "all", selectedCase = args.Length > 2 ? args[2] : "all";
-if (selected is not ("all" or "scalar" or "x64-vector256" or "x64-sse41")) throw new ArgumentException(Usage);
 string work = Path.Combine(root, "artifacts/equality-regressions", selectedCase == "all" ? selected : selected + "-" + selectedCase);
 string consumer = Path.Combine(work, "consumer");
 string fixtures = Path.Combine(root, "Tests/Fixtures/Equality");
 string tool = Path.Combine(root, ".lake/packages/leancil/Extractor/bin/Nethermind.LeanCIL.dll");
 JsonArray targets = JsonNode.Parse(File.ReadAllText(Path.Combine(root, "manifests/targets.json")))!["methods"]!.AsArray();
 JsonArray gates = JsonNode.Parse(File.ReadAllText(Path.Combine(root, "manifests/gates.json")))!["gates"]!.AsArray();
+// Every equality gate profile has fixtures, so the manifest must list exactly those profiles.
+string[] profiles = RegressionManifest.RequireProfiles(root, "EqualityRegression.cs", gates
+    .Where(gate => Regex.IsMatch(gate!["method"]!.GetValue<string>(), "^(Eq|Ne)")).Select(gate => gate!["profile"]!.GetValue<string>()));
+if (selected != "all" && !profiles.Contains(selected)) throw new ArgumentException(Usage + " with a profile from " + string.Join(", ", profiles));
 JsonObject negatives = JsonNode.Parse(File.ReadAllText(Path.Combine(fixtures, "witnesses.json")))!["negativeCases"]!.AsObject();
 string[] cases = XDocument.Load(Path.Combine(fixtures, "Cases.props")).Descendants("EqualityCase").Select(item => (string)item.Attribute("Include")!).ToArray();
 if (selectedCase != "all" && !cases.Contains(selectedCase)) throw new ArgumentException(Usage);

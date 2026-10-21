@@ -4,6 +4,7 @@
 #:property PublishAot=false
 #:include VerificationSupport.cs
 #:include VerificationSelection.cs
+#:include RegressionManifest.cs
 
 using System.Text.Json;
 
@@ -40,5 +41,6 @@ if (output is not null)
     Batch[] batches = selection.Batches.Length == 0 ? [new("none", [new("scalar", [])])] : selection.Batches;
     File.AppendAllText(output, $"contracts={selection.Contracts.ToString().ToLowerInvariant()}\n" +
         $"count={selection.Include.Length}\n" +
-        "matrix=" + JsonSerializer.Serialize(new { include = batches }, VerificationSupport.Json) + "\n");
+        "matrix=" + JsonSerializer.Serialize(new { include = batches }, VerificationSupport.Json) + "\n" +
+        "regressions=" + JsonSerializer.Serialize(new { include = RegressionManifest.Shards(VerificationSupport.Root) }, VerificationSupport.Json) + "\n");
 }

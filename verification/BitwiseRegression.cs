@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 #:property PublishAot=false
 #:include RegressionBatch.cs
+#:include RegressionManifest.cs
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text.Json.Nodes;
@@ -10,7 +11,8 @@ using System.Text.Json.Nodes;
 string root = Path.GetFullPath(args.Length > 0 ? args[0] : "verification");
 string fixtures = Path.Combine(root, "Tests/Fixtures/Bitwise");
 string profile = args.Length > 1 ? args[1] : "scalar";
-if (args.Length > 2 || profile is not ("scalar" or "x64-vector256"))
+string[] profiles = RegressionManifest.RequireProfiles(root, "BitwiseRegression.cs", ["scalar", "x64-vector256"]);
+if (args.Length > 2 || !profiles.Contains(profile))
     throw new ArgumentException("Usage: BitwiseRegression.cs [verification-directory] [scalar|x64-vector256]");
 string work = Path.Combine(root, "artifacts/bitwise-regressions", profile);
 string tool = Path.Combine(root, ".lake/packages/leancil/Extractor/bin/Nethermind.LeanCIL.dll");

@@ -220,8 +220,10 @@ count / 8). Each method still receives its own certificate. When
 likewise submit each refutation and its `expect: rejected` production proof
 through one batch (`RegressionBatch.cs`). CI runs every regression runner,
 sharded by profile, whenever it runs the contract audit: on changes to any
-verification source, the LeanCIL pin or production code. `TestVerification.cs`
-fails if a runner is missing from that matrix.
+verification source, the LeanCIL pin or production code. `SelectGates.cs`
+generates that matrix from `manifests/regressions.json`; each sharded runner
+fails if the manifest's profiles differ from the ones it supports, and
+`TestVerification.cs` fails if a runner is missing from the manifest.
 
 `SelectGates.cs`, `Verify.cs`, and `TestVerification.cs` are single-file C# apps;
 their shared source files are included with `#:include`, as in LeanCIL.

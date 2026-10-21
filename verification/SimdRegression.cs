@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 #:property PublishAot=false
 #:include RegressionBatch.cs
+#:include RegressionManifest.cs
 using System.Diagnostics;
 using System.Globalization;
 using System.Numerics;
@@ -37,6 +38,9 @@ HashSet<string> productionShaped = ["Baseline", "Renamed"];
         ("SubtractUnderflow", "Subtract", "(fun left right => left - right)", "(fun left right => decide (left.toNat < right.toNat))"),
     ], ["scalar", .. simdProfiles]),
 ];
+string[] supported = RegressionManifest.RequireProfiles(root, "SimdRegression.cs", groups.SelectMany(group => group.Profiles));
+if (filters.TryGetValue("profile", out string? filtered) && !supported.Contains(filtered))
+    throw new ArgumentException($"Unknown profile {filtered}; expected one of {string.Join(", ", supported)}");
 List<string> incomplete = [], failed = [];
 
 // Applicability is the original suite's: features each mutation can reach on a profile.

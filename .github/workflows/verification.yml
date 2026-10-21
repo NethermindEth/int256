@@ -17,6 +17,7 @@ jobs:
     outputs:
       contracts: ${{ steps.gates.outputs.contracts }}
       matrix: ${{ steps.gates.outputs.matrix }}
+      regressions: ${{ steps.gates.outputs.regressions }}
       count: ${{ steps.gates.outputs.count }}
       support-run: ${{ steps.support.outputs.run-id }}
       support-artifacts: ${{ steps.support.outputs.artifact-ids }}
@@ -216,29 +217,8 @@ jobs:
       LEANCIL_SUITE: regressions-${{ matrix.id }}
     strategy:
       fail-fast: false
-      # Each run is a runner file and its arguments after the verification directory.
-      matrix:
-        include:
-          - { id: equality-scalar, runs: [[EqualityRegression.cs, scalar]] }
-          - { id: equality-x64-vector256, runs: [[EqualityRegression.cs, x64-vector256]] }
-          - { id: equality-x64-sse41, runs: [[EqualityRegression.cs, x64-sse41]] }
-          - { id: simd-scalar, runs: [[SimdRegression.cs, --profile, scalar]] }
-          - { id: simd-arm64-advsimd, runs: [[SimdRegression.cs, --profile, arm64-advsimd]] }
-          - { id: simd-x64-sse42, runs: [[SimdRegression.cs, --profile, x64-sse42]] }
-          - { id: simd-x64-avx2, runs: [[SimdRegression.cs, --profile, x64-avx2]] }
-          - { id: simd-x64-avx2-bmi1, runs: [[SimdRegression.cs, --profile, x64-avx2-bmi1]] }
-          - { id: simd-x64-avx512, runs: [[SimdRegression.cs, --profile, x64-avx512]] }
-          - { id: simd-x64-avx512-bmi1, runs: [[SimdRegression.cs, --profile, x64-avx512-bmi1]] }
-          - { id: compare-multiply, runs: [[CompareRegression.cs], [MultiplyRegression.cs]] }
-          - { id: add-subtract-safety, runs: [[AddSubtractRegression.cs], [SafetyRegression.cs]] }
-          - id: bitwise-shift
-            runs:
-              - [BitwiseRegression.cs, scalar]
-              - [BitwiseRegression.cs, x64-vector256]
-              - [BitwisePositiveRegression.cs]
-              - [ShiftRegression.cs, scalar]
-              - [ShiftRegression.cs, x64-vector256]
-              - [ShiftPositiveRegression.cs]
+      # Generated from manifests/regressions.json, which each sharded runner checks against its profiles.
+      matrix: ${{ fromJSON(needs.select.outputs.regressions) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

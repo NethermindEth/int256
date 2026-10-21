@@ -3,13 +3,15 @@
 // SPDX-License-Identifier: MIT
 #:property PublishAot=false
 #:include RegressionBatch.cs
+#:include RegressionManifest.cs
 
 using System.Diagnostics;
 using System.Text.Json.Nodes;
 
 string root = Path.GetFullPath(args.Length > 0 ? args[0] : "verification");
 string profile = args.Length > 1 ? args[1] : "scalar";
-if (args.Length > 2 || profile is not ("scalar" or "x64-vector256"))
+string[] profiles = RegressionManifest.RequireProfiles(root, "ShiftRegression.cs", ["scalar", "x64-vector256"]);
+if (args.Length > 2 || !profiles.Contains(profile))
     throw new ArgumentException("Usage: ShiftRegression.cs [verification-directory] [scalar|x64-vector256]");
 string fixtures = Path.Combine(root, "Tests/Fixtures/Shift");
 string work = Path.Combine(root, "artifacts/shift-regressions", profile);
