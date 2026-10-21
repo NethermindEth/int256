@@ -1,4 +1,4 @@
-import UInt256.Safety.StepEquation
+import CIL.Safety.Equations
 import UInt256.Methods.Multiply.LocalArithmeticSafety
 import UInt256.Methods.Multiply.ProductStorage
 import UInt256.Safety.PrivateInputValues

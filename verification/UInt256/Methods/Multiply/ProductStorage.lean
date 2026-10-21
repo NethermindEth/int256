@@ -1,4 +1,4 @@
-import UInt256.Safety.StepEquation
+import CIL.Safety.Equations
 import UInt256.Methods.Multiply.LimbStorage
 import UInt256.Methods.Multiply.ProductStorageContract
 import CIL.Safety.CallComposition

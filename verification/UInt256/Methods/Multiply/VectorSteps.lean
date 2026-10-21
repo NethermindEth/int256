@@ -1,4 +1,4 @@
-import UInt256.Safety.StepEquation
+import CIL.Safety.Equations
 import UInt256.Methods.Multiply.VectorProducts
 import CIL.Safety.Execution
 namespace UInt256Proof.Multiply

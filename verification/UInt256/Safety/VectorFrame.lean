@@ -1,4 +1,4 @@
-import UInt256.Safety.StepEquation
+import CIL.Safety.Equations
 import CIL.Safety.WordSnapshots
 import CIL.Safety.NumericHomes
 import UInt256.Safety.CallerSetup

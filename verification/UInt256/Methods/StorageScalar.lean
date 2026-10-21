@@ -1,4 +1,4 @@
-import UInt256.Safety.StepEquation
+import CIL.Safety.Equations
 import UInt256.Methods.Bitwise.ScalarPrefix
 import UInt256.Safety.FourLimbWrites
 import UInt256.Safety.OutputReadability

@@ -3,7 +3,7 @@
 This migration starts from `verification/uint256-memory-safety`
 (`6c56716afa7860771c08815b8348e53313c7f8c8`), based on int256 `main`
 (`5fa8d77429c0440754bbfc851788d1ae37aba07f`). It consumes LeanCIL at
-`3777f35ce776ea46a1d267a75fac2ae1a4ea1cf2` through a pinned Lake dependency
+`81e761713dcc59cc5d954970599e1e7ba5004613` through a pinned Lake dependency
 ([ReadOnlySpan<byte> lookup tables](https://github.com/NethermindEth/LeanCIL/pull/55),
 [lockstep evidence checks](https://github.com/NethermindEth/LeanCIL/pull/56),
 [shared consumer support with joint kernel replay](https://github.com/NethermindEth/LeanCIL/pull/58),

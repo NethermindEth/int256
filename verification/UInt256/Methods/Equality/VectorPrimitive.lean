@@ -1,7 +1,7 @@
 import CIL.Safety.StepComposition
 import UInt256.Safety.ReadOnlyScalarExecution
 import CIL.SymbolicExecution
-import UInt256.Safety.StepEquation
+import CIL.Safety.Equations
 
 namespace UInt256Proof.Equality.VectorPrimitive
 open CIL.Safety UInt256Model.Safety

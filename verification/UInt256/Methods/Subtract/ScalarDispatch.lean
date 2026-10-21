@@ -1,5 +1,5 @@
-import UInt256.Safety.DispatchEquation
-import UInt256.Safety.StepEquation
+import CIL.StepEquations
+import CIL.Safety.Equations
 import UInt256.Methods.Subtract.Vector128Entry
 import UInt256.Methods.Subtract.SmallHelper
 import CIL.Safety.WordLocals

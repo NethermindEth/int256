@@ -1,4 +1,4 @@
-import UInt256.Safety.StepEquation
+import CIL.Safety.Equations
 import UInt256.Methods.Equality.PrimitiveChecked
 import UInt256.Safety.ScalarOperatorContract
 

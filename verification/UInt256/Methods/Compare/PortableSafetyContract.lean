@@ -1,4 +1,4 @@
-import UInt256.Safety.StepEquation
+import CIL.Safety.Equations
 import UInt256.Methods.Compare.PortableLocals
 import UInt256.Methods.Compare.MaskSafety
 import UInt256.Methods.Compare.VectorMasks

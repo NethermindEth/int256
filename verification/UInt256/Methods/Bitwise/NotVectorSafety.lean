@@ -1,4 +1,4 @@
-import UInt256.Safety.StepEquation
+import CIL.Safety.Equations
 import UInt256.Methods.Bitwise.VectorValues
 import UInt256.Safety.UnaryContract
 

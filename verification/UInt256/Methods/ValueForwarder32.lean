@@ -1,4 +1,4 @@
-import UInt256.Safety.StepEquation
+import CIL.Safety.Equations
 import UInt256.Safety.ReadOnlyContract
 import CIL.Safety.CallComposition
 import CIL.Safety.StepComposition

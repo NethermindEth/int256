@@ -1,4 +1,4 @@
-import UInt256.Safety.StepEquation
+import CIL.Safety.Equations
 import UInt256.Methods.Add.Vector256Finish
 import UInt256.Methods.Add.Vector256Math
 import CIL.Safety.Certificate

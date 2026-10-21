@@ -1,4 +1,4 @@
-import UInt256.Safety.StepEquation
+import CIL.Safety.Equations
 import UInt256.Methods.Equality.UnsignedPrimitive
 
 namespace UInt256Proof.Equality.SignedPrimitive

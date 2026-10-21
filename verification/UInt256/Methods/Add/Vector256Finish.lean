@@ -1,4 +1,4 @@
-import UInt256.Safety.StepEquation
+import CIL.Safety.Equations
 import UInt256.Methods.Add.Vector256Bodies
 import UInt256.Safety.ScratchCells
 import UInt256.Methods.Equality.VectorPrimitive

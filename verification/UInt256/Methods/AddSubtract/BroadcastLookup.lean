@@ -1,4 +1,4 @@
-import UInt256.Safety.StepEquation
+import CIL.Safety.Equations
 import UInt256.Methods.AddSubtract.BroadcastTable
 import UInt256.LookupTable
 import UInt256.Arithmetic.Cascade

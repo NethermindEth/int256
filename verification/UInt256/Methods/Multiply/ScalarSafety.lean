@@ -1,5 +1,5 @@
-import UInt256.Safety.DispatchEquation
-import UInt256.Safety.StepEquation
+import CIL.StepEquations
+import CIL.Safety.Equations
 import UInt256.Safety.PrivateInputValues
 import UInt256.Methods.Multiply.Calls
 import UInt256.Methods.Multiply.ScalarProduct
