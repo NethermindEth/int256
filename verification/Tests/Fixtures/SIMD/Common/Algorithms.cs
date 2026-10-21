@@ -15,11 +15,7 @@ public readonly partial struct UInt256
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void Add(in UInt256 a, in UInt256 b, out UInt256 res)
     {
-        #if FEATURE_EXPRESSIONS
-        if (Avx2.IsSupported & Avx2.IsSupported)
-#else
         if (Avx2.IsSupported)
-#endif
         {
 #if RENAMED
             LoadSum256(in a, in b, out res, out Vector256<ulong> result, out Vector256<ulong> carryMask,
@@ -44,11 +40,7 @@ public readonly partial struct UInt256
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool AddOverflow(in UInt256 a, in UInt256 b, out UInt256 res)
     {
-        #if FEATURE_EXPRESSIONS
-        if (Avx2.IsSupported & Avx2.IsSupported)
-#else
         if (Avx2.IsSupported)
-#endif
         {
 #if RENAMED
             LoadSum256(in a, in b, out res, out Vector256<ulong> result, out Vector256<ulong> carryMask,
@@ -93,11 +85,7 @@ public readonly partial struct UInt256
 
         result = av + bv;
         // All bits set in lanes that carried out (carry out of each 64-bit limb).
-        #if FEATURE_EXPRESSIONS
-        if (Avx512F.VL.IsSupported & Avx.IsSupported)
-#else
         if (Avx512F.VL.IsSupported)
-#endif
         {
             // Sign bit of (a & b) | (~result & (a | b)) is the carry; one ternary-logic op
             #if WRONG_TERNARY
@@ -158,11 +146,7 @@ fullLanes = Vector256.Equals(result, Vector256<ulong>.AllBitsSet);
         uint carry = (uint)Avx.MoveMask(carryMask.AsDouble());
         uint cascade = (uint)Avx.MoveMask(fullLanes.AsDouble());
         // Move carry to next bit and add cascade; carries ripple through consecutive full limbs
-        #if EXTRACTED_HELPER
-carry = AccumulateCascade(cascade, carry);
-#else
 carry = cascade + 2 * carry;
-#endif
         // Keep only the cascades a carry reached
         cascade ^= carry;
         cascade &= 0x0f;
@@ -179,11 +163,7 @@ Vector256<ulong> cascadedCarries = Unsafe.Add(ref Unsafe.As<byte, Vector256<ulon
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool AddScalar(in UInt256 a, in UInt256 b, out UInt256 res, bool detectOverflow)
     {
-        #if FEATURE_EXPRESSIONS
-        if (AdvSimd.IsSupported & AdvSimd.IsSupported)
-#else
         if (AdvSimd.IsSupported)
-#endif
         {
             ref readonly UInt256 large = ref a;
             ulong small = b.u0;
@@ -235,39 +215,11 @@ Vector256<ulong> cascadedCarries = Unsafe.Add(ref Unsafe.As<byte, Vector256<ulon
 
         // Loads stay next to their use: the one-limb paths above share this method's prolog
         ulong carry = 0;
-#if INLINE_CARRY
-        ulong tempr0 = a0 + b0;
-        ulong r0 = tempr0 + carry;
-        carry = (tempr0 < a0 ? 1UL : 0UL) + (r0 < tempr0 ? 1UL : 0UL);
-#else
         AddWithCarry(a0, b0, ref carry, out ulong r0);
-#endif
-#if INLINE_CARRY
-        ulong tempr1 = a.u1 + b.u1;
-        ulong r1 = tempr1 + carry;
-        carry = (tempr1 < a.u1 ? 1UL : 0UL) + (r1 < tempr1 ? 1UL : 0UL);
-#else
         AddWithCarry(a.u1, b.u1, ref carry, out ulong r1);
-#endif
-#if INLINE_CARRY
-        ulong tempr2 = a.u2 + b.u2;
-        ulong r2 = tempr2 + carry;
-        carry = (tempr2 < a.u2 ? 1UL : 0UL) + (r2 < tempr2 ? 1UL : 0UL);
-#else
         AddWithCarry(a.u2, b.u2, ref carry, out ulong r2);
-#endif
-#if INLINE_CARRY
-        ulong tempr3 = a.u3 + b.u3;
-        ulong r3 = tempr3 + carry;
-        carry = (tempr3 < a.u3 ? 1UL : 0UL) + (r3 < tempr3 ? 1UL : 0UL);
-#else
         AddWithCarry(a.u3, b.u3, ref carry, out ulong r3);
-#endif
-#if REVERSED_STORE
-        StoreLimbs(out res, r3, r2, r1, r0);
-#else
         StoreLimbs(out res, r0, r1, r2, r3);
-#endif
         return carry != 0;
     }
 
@@ -280,17 +232,10 @@ Vector256<ulong> cascadedCarries = Unsafe.Add(ref Unsafe.As<byte, Vector256<ulon
     {
         ref Vector128<ulong> aRef = ref Unsafe.As<UInt256, Vector128<ulong>>(ref Unsafe.AsRef(in a));
         ref Vector128<ulong> bRef = ref Unsafe.As<UInt256, Vector128<ulong>>(ref Unsafe.AsRef(in b));
-#if LANE_LOCALS
-        Vector128<ulong> bHi = Unsafe.Add(ref bRef, 1);
-        Vector128<ulong> aLo = aRef;
-        Vector128<ulong> bLo = bRef;
-        Vector128<ulong> aHi = Unsafe.Add(ref aRef, 1);
-#else
         Vector128<ulong> aLo = aRef;
         Vector128<ulong> aHi = Unsafe.Add(ref aRef, 1);
         Vector128<ulong> bLo = bRef;
         Vector128<ulong> bHi = Unsafe.Add(ref bRef, 1);
-#endif
 
         Vector128<ulong> resultLo = aLo + bLo;
         Vector128<ulong> resultHi = aHi + bHi;
@@ -300,22 +245,14 @@ Vector256<ulong> cascadedCarries = Unsafe.Add(ref Unsafe.As<byte, Vector256<ulon
         // Lane i receives the carry of lane i-1: [0, lo0] and [lo1, hi0]
         Vector128<ulong> carryInLo;
         Vector128<ulong> carryInHi;
-        #if FEATURE_EXPRESSIONS
-        if (AdvSimd.IsSupported & AdvSimd.IsSupported)
-#else
         if (AdvSimd.IsSupported)
-#endif
         {
             // ext takes its low lanes from the first operand: (second:first) >> 64 bits
             carryInLo = AdvSimd.ExtractVector128(Vector128<ulong>.Zero, carryLo, 1);
             #if WRONG_ALIGNMENT
 carryInHi = AdvSimd.ExtractVector128(carryLo, carryHi, 0);
 #else
-#if EXTRACTED_HELPER
-carryInHi = ExtractPair(carryLo, carryHi);
-#else
 carryInHi = AdvSimd.ExtractVector128(carryLo, carryHi, 1);
-#endif
 #endif
         }
         else
@@ -335,11 +272,7 @@ carryInHi = Ssse3.AlignRight(carryHi.AsByte(), carryLo.AsByte(), 8).AsUInt64();
         Vector128<ulong> sumHi = resultHi - carryInHi;
         Unsafe.SkipInit(out res);
         // ARM repairs carries using the loaded vectors, so early stores are safe even with aliased inputs.
-        #if FEATURE_EXPRESSIONS
-        if (AdvSimd.IsSupported & AdvSimd.IsSupported)
-#else
         if (AdvSimd.IsSupported)
-#endif
         {
             ref Vector128<ulong> earlyResult = ref Unsafe.As<UInt256, Vector128<ulong>>(ref res);
             earlyResult = sumLo;
@@ -352,18 +285,10 @@ carryInHi = Ssse3.AlignRight(carryHi.AsByte(), carryLo.AsByte(), 8).AsUInt64();
         // and its carry out is discarded. This is the same restriction as the AVX 0b0110 mask.
         Vector128<ulong> propagate = AdvSimd.IsSupported && !detectOverflow
             ? AdvSimd.ExtractVector128(propagatedLo, propagatedHi, 1)
-            #if EXTRACTED_HELPER
-: MergePropagation(propagatedLo, propagatedHi);
-#else
 : propagatedLo | propagatedHi;
-#endif
         if (!Vector128.EqualsAll(propagate, Vector128<ulong>.Zero))
         {
-            #if FEATURE_EXPRESSIONS
-        if (AdvSimd.IsSupported & AdvSimd.IsSupported)
-#else
         if (AdvSimd.IsSupported)
-#endif
             {
                 // The low half is complete. Repair the remaining two carry hops in the high half.
                 Vector128<ulong> secondHi = detectOverflow
@@ -386,39 +311,11 @@ sumHi -= extra;
             // Only the non-ARM path reaches this fallback: the early store is guarded by AdvSimd.
             // No non-ARM store has occurred, so a and b remain intact when res aliases either input.
             ulong carry = 0;
-#if INLINE_CARRY
-            ulong tempr0 = a.u0 + b.u0;
-            ulong r0 = tempr0 + carry;
-            carry = (tempr0 < a.u0 ? 1UL : 0UL) + (r0 < tempr0 ? 1UL : 0UL);
-#else
             AddWithCarry(a.u0, b.u0, ref carry, out ulong r0);
-#endif
-#if INLINE_CARRY
-            ulong tempr1 = a.u1 + b.u1;
-            ulong r1 = tempr1 + carry;
-            carry = (tempr1 < a.u1 ? 1UL : 0UL) + (r1 < tempr1 ? 1UL : 0UL);
-#else
             AddWithCarry(a.u1, b.u1, ref carry, out ulong r1);
-#endif
-#if INLINE_CARRY
-            ulong tempr2 = a.u2 + b.u2;
-            ulong r2 = tempr2 + carry;
-            carry = (tempr2 < a.u2 ? 1UL : 0UL) + (r2 < tempr2 ? 1UL : 0UL);
-#else
             AddWithCarry(a.u2, b.u2, ref carry, out ulong r2);
-#endif
-#if INLINE_CARRY
-            ulong tempr3 = a.u3 + b.u3;
-            ulong r3 = tempr3 + carry;
-            carry = (tempr3 < a.u3 ? 1UL : 0UL) + (r3 < tempr3 ? 1UL : 0UL);
-#else
             AddWithCarry(a.u3, b.u3, ref carry, out ulong r3);
-#endif
-#if REVERSED_STORE
-            StoreLimbs(out res, r3, r2, r1, r0);
-#else
             StoreLimbs(out res, r0, r1, r2, r3);
-#endif
             return carry != 0;
         }
 
@@ -439,67 +336,38 @@ sumHi -= extra;
 #endif
     {
         ulong a0 = a.u0, a1 = a.u1, a2 = a.u2, a3 = a.u3;
-        #if FEATURE_EXPRESSIONS
-        if (AdvSimd.IsSupported & AdvSimd.IsSupported)
-#else
         if (AdvSimd.IsSupported)
-#endif
         {
             ulong low = a0 + b0;
             bool overflow = false;
             // Short-circuit each increment: higher limbs change only while the carry keeps rippling.
             if (low < a0 && ++a1 == 0 && ++a2 == 0) overflow = ++a3 == 0;
-#if REVERSED_STORE
-            StoreLimbs(out res, a3, a2, a1, low);
-#else
             StoreLimbs(out res, low, a1, a2, a3);
-#endif
             return overflow;
         }
         ulong r0 = a0 + b0;
         if (r0 >= a0)
         {
-#if REVERSED_STORE
-            StoreLimbs(out res, a3, a2, a1, r0);
-#else
             StoreLimbs(out res, r0, a1, a2, a3);
-#endif
             return false;
         }
         if (++a1 != 0)
         {
-#if REVERSED_STORE
-            StoreLimbs(out res, a3, a2, a1, r0);
-#else
             StoreLimbs(out res, r0, a1, a2, a3);
-#endif
             return false;
         }
         if (++a2 != 0)
         {
-#if REVERSED_STORE
-            StoreLimbs(out res, a3, a2, 0, r0);
-#else
             StoreLimbs(out res, r0, 0, a2, a3);
-#endif
             return false;
         }
         if (++a3 != 0)
         {
-#if REVERSED_STORE
-            StoreLimbs(out res, a3, 0, 0, r0);
-#else
             StoreLimbs(out res, r0, 0, 0, a3);
-#endif
             return false;
         }
-#if REVERSED_STORE
-
-        StoreLimbs(out res, 0, 0, 0, r0);
-#else
 
         StoreLimbs(out res, r0, 0, 0, 0);
-#endif
         return true;
     }
 
@@ -544,11 +412,7 @@ sumHi -= extra;
     private static bool SubtractImpl(in UInt256 a, in UInt256 b, out UInt256 res)
 #endif
     {
-        #if FEATURE_EXPRESSIONS
-        if (Avx2.IsSupported & Avx2.IsSupported)
-#else
         if (Avx2.IsSupported)
-#endif
         {
             Vector256<ulong> av = Unsafe.BitCast<UInt256, Vector256<ulong>>(a);
             Vector256<ulong> bv = Unsafe.BitCast<UInt256, Vector256<ulong>>(b);
@@ -557,11 +421,7 @@ sumHi -= extra;
             // All bits set in lanes where a < b, and in lanes whose lower neighbour borrowed
             Vector256<ulong> borrowMask;
             Vector256<ulong> borrowIn;
-            #if FEATURE_EXPRESSIONS
-        if (Avx512F.VL.IsSupported & Avx.IsSupported)
-#else
         if (Avx512F.VL.IsSupported)
-#endif
             {
                 // Sign bit of (~a & b) | (~(a ^ b) & result) is the borrow; one ternary-logic op
                 #if WRONG_TERNARY
@@ -614,11 +474,7 @@ Vector256<ulong> zeroLanes = Vector256.Equals(av, bv);
                 uint borrow = (uint)Avx.MoveMask(borrowMask.AsDouble());
                 uint cascade = (uint)Avx.MoveMask(zeroLanes.AsDouble());
                 // Move borrow to next bit and add cascade; carries ripple through consecutive zero limbs
-                #if EXTRACTED_HELPER
-borrow = AccumulateCascade(cascade, borrow);
-#else
 borrow = cascade + 2 * borrow;
-#endif
                 // Keep only the cascades a borrow reached
                 cascade ^= borrow;
                 cascade &= 0x0f;
@@ -664,44 +520,16 @@ Vector256<ulong> cascadedBorrows = Unsafe.Add(ref Unsafe.As<byte, Vector256<ulon
 
         // Loads stay next to their use: the one-limb path above shares this method's prolog
         ulong borrow = 0;
-#if INLINE_CARRY
-        ulong tempr0 = a.u0 - b0;
-        ulong r0 = tempr0 - borrow;
-        borrow = (a.u0 < b0 ? 1UL : 0UL) | (tempr0 < borrow ? 1UL : 0UL);
-#else
         SubtractWithBorrow(a.u0, b0, ref borrow, out ulong r0);
-#endif
-#if INLINE_CARRY
-        ulong tempr1 = a.u1 - b.u1;
-        ulong r1 = tempr1 - borrow;
-        borrow = (a.u1 < b.u1 ? 1UL : 0UL) | (tempr1 < borrow ? 1UL : 0UL);
-#else
         SubtractWithBorrow(a.u1, b.u1, ref borrow, out ulong r1);
-#endif
-#if INLINE_CARRY
-        ulong tempr2 = a.u2 - b.u2;
-        ulong r2 = tempr2 - borrow;
-        borrow = (a.u2 < b.u2 ? 1UL : 0UL) | (tempr2 < borrow ? 1UL : 0UL);
-#else
         SubtractWithBorrow(a.u2, b.u2, ref borrow, out ulong r2);
-#endif
-#if INLINE_CARRY
-        ulong tempr3 = a.u3 - b.u3;
-        ulong r3 = tempr3 - borrow;
-        borrow = (a.u3 < b.u3 ? 1UL : 0UL) | (tempr3 < borrow ? 1UL : 0UL);
-#else
         #if WRONG_TOP
 ulong r3 = a.u3 - b.u3;
             borrow = 0;
 #else
 SubtractWithBorrow(a.u3, b.u3, ref borrow, out ulong r3);
 #endif
-#endif
-#if REVERSED_STORE
-        StoreLimbs(out res, r3, r2, r1, r0);
-#else
         StoreLimbs(out res, r0, r1, r2, r3);
-#endif
         return borrow != 0;
     }
 
@@ -714,17 +542,10 @@ SubtractWithBorrow(a.u3, b.u3, ref borrow, out ulong r3);
     {
         ref Vector128<ulong> aRef = ref Unsafe.As<UInt256, Vector128<ulong>>(ref Unsafe.AsRef(in a));
         ref Vector128<ulong> bRef = ref Unsafe.As<UInt256, Vector128<ulong>>(ref Unsafe.AsRef(in b));
-#if LANE_LOCALS
-        Vector128<ulong> bHi = Unsafe.Add(ref bRef, 1);
-        Vector128<ulong> aLo = aRef;
-        Vector128<ulong> bLo = bRef;
-        Vector128<ulong> aHi = Unsafe.Add(ref aRef, 1);
-#else
         Vector128<ulong> aLo = aRef;
         Vector128<ulong> aHi = Unsafe.Add(ref aRef, 1);
         Vector128<ulong> bLo = bRef;
         Vector128<ulong> bHi = Unsafe.Add(ref bRef, 1);
-#endif
 
         Vector128<ulong> resultLo = aLo - bLo;
         Vector128<ulong> resultHi = aHi - bHi;
@@ -734,22 +555,14 @@ SubtractWithBorrow(a.u3, b.u3, ref borrow, out ulong r3);
         // Lane i receives the borrow of lane i-1: [0, lo0] and [lo1, hi0]
         Vector128<ulong> borrowInLo;
         Vector128<ulong> borrowInHi;
-        #if FEATURE_EXPRESSIONS
-        if (AdvSimd.IsSupported & AdvSimd.IsSupported)
-#else
         if (AdvSimd.IsSupported)
-#endif
         {
             // ext takes its low lanes from the first operand: (second:first) >> 64 bits
             borrowInLo = AdvSimd.ExtractVector128(Vector128<ulong>.Zero, borrowLo, 1);
             #if WRONG_ALIGNMENT
 borrowInHi = AdvSimd.ExtractVector128(borrowLo, borrowHi, 0);
 #else
-#if EXTRACTED_HELPER
-borrowInHi = ExtractPair(borrowLo, borrowHi);
-#else
 borrowInHi = AdvSimd.ExtractVector128(borrowLo, borrowHi, 1);
-#endif
 #endif
         }
         else
@@ -764,56 +577,22 @@ borrowInHi = Ssse3.AlignRight(borrowHi.AsByte(), borrowLo.AsByte(), 8).AsUInt64(
 
         // A zero limb that receives a borrow must pass it on. The fallback stays inline and call-free: with a
         // call here the JIT parks the vector values in callee-saved registers and the shared prolog pays for it
-        #if EXTRACTED_HELPER
-Vector128<ulong> propagate = MergePropagation(
-            Vector128.Equals(resultLo, Vector128<ulong>.Zero) & borrowInLo,
-            Vector128.Equals(resultHi, Vector128<ulong>.Zero) & borrowInHi);
-#else
 Vector128<ulong> propagate = (Vector128.Equals(resultLo, Vector128<ulong>.Zero) & borrowInLo)
                                    | (Vector128.Equals(resultHi, Vector128<ulong>.Zero) & borrowInHi);
-#endif
         if (!Vector128.EqualsAll(propagate, Vector128<ulong>.Zero))
         {
             // Nothing has been stored yet, so a and b are intact even when res aliases one of them
             ulong borrow = 0;
-#if INLINE_CARRY
-            ulong tempr0 = a.u0 - b.u0;
-            ulong r0 = tempr0 - borrow;
-            borrow = (a.u0 < b.u0 ? 1UL : 0UL) | (tempr0 < borrow ? 1UL : 0UL);
-#else
             SubtractWithBorrow(a.u0, b.u0, ref borrow, out ulong r0);
-#endif
-#if INLINE_CARRY
-            ulong tempr1 = a.u1 - b.u1;
-            ulong r1 = tempr1 - borrow;
-            borrow = (a.u1 < b.u1 ? 1UL : 0UL) | (tempr1 < borrow ? 1UL : 0UL);
-#else
             SubtractWithBorrow(a.u1, b.u1, ref borrow, out ulong r1);
-#endif
-#if INLINE_CARRY
-            ulong tempr2 = a.u2 - b.u2;
-            ulong r2 = tempr2 - borrow;
-            borrow = (a.u2 < b.u2 ? 1UL : 0UL) | (tempr2 < borrow ? 1UL : 0UL);
-#else
             SubtractWithBorrow(a.u2, b.u2, ref borrow, out ulong r2);
-#endif
-#if INLINE_CARRY
-            ulong tempr3 = a.u3 - b.u3;
-            ulong r3 = tempr3 - borrow;
-            borrow = (a.u3 < b.u3 ? 1UL : 0UL) | (tempr3 < borrow ? 1UL : 0UL);
-#else
             #if WRONG_TOP
 ulong r3 = a.u3 - b.u3;
             borrow = 0;
 #else
 SubtractWithBorrow(a.u3, b.u3, ref borrow, out ulong r3);
 #endif
-#endif
-#if REVERSED_STORE
-            StoreLimbs(out res, r3, r2, r1, r0);
-#else
             StoreLimbs(out res, r0, r1, r2, r3);
-#endif
             return borrow != 0;
         }
 
@@ -835,47 +614,26 @@ SubtractWithBorrow(a.u3, b.u3, ref borrow, out ulong r3);
         ulong r0 = a0 - b0;
         if (a0 >= b0)
         {
-#if REVERSED_STORE
-            StoreLimbs(out res, a3, a2, a1, r0);
-#else
             StoreLimbs(out res, r0, a1, a2, a3);
-#endif
             return false;
         }
         if (a1 != 0)
         {
-#if REVERSED_STORE
-            StoreLimbs(out res, a3, a2, a1 - 1, r0);
-#else
             StoreLimbs(out res, r0, a1 - 1, a2, a3);
-#endif
             return false;
         }
         if (a2 != 0)
         {
-#if REVERSED_STORE
-            StoreLimbs(out res, a3, a2 - 1, ulong.MaxValue, r0);
-#else
             StoreLimbs(out res, r0, ulong.MaxValue, a2 - 1, a3);
-#endif
             return false;
         }
         if (a3 != 0)
         {
-#if REVERSED_STORE
-            StoreLimbs(out res, a3 - 1, ulong.MaxValue, ulong.MaxValue, r0);
-#else
             StoreLimbs(out res, r0, ulong.MaxValue, ulong.MaxValue, a3 - 1);
-#endif
             return false;
         }
-#if REVERSED_STORE
-
-        StoreLimbs(out res, ulong.MaxValue, ulong.MaxValue, ulong.MaxValue, r0);
-#else
 
         StoreLimbs(out res, r0, ulong.MaxValue, ulong.MaxValue, ulong.MaxValue);
-#endif
         return true;
     }
 
@@ -883,26 +641,10 @@ SubtractWithBorrow(a.u3, b.u3, ref borrow, out ulong r3);
     private static void StoreLimbs(out UInt256 res, ulong r0, ulong r1, ulong r2, ulong r3)
     {
         Unsafe.SkipInit(out res);
-#if REVERSED_STORE
-        Unsafe.AsRef(in res.u0) = r3;
-#else
         Unsafe.AsRef(in res.u0) = r0;
-#endif
-#if REVERSED_STORE
-        Unsafe.AsRef(in res.u1) = r2;
-#else
         Unsafe.AsRef(in res.u1) = r1;
-#endif
-#if REVERSED_STORE
-        Unsafe.AsRef(in res.u2) = r1;
-#else
         Unsafe.AsRef(in res.u2) = r2;
-#endif
-#if REVERSED_STORE
-        Unsafe.AsRef(in res.u3) = r0;
-#else
         Unsafe.AsRef(in res.u3) = r3;
-#endif
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

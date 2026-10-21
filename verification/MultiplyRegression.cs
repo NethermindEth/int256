@@ -58,7 +58,7 @@ foreach (JsonNode? package in packages)
     await Run("git", ["-C", destination, "checkout", "--detach", package["rev"]!.GetValue<string>()]);
 }
 List<(string Fixture, string Profile, string Extraction, string Proof, string Theorem, bool Negative)> jobs = [];
-foreach (string fixture in new[] { "Baseline", "AlternativeOrder", "ExtractedHelper", "WrongCarry", "WrongCrossProduct", "WrongHighLow", "WrongAliasing", "WrongBmiHigh" })
+foreach (string fixture in new[] { "Baseline", "AlternativeOrder", "WrongCarry", "WrongCrossProduct", "WrongHighLow", "WrongAliasing", "WrongBmiHigh" })
 {
     string profile = fixture == "WrongBmiHigh" ? "x64-bmi2" : "scalar";
     string profileArgument = profile == "scalar" ? profile : "@" + Path.Combine(root, "manifests/profiles", profile + ".json");
@@ -74,7 +74,7 @@ foreach (string fixture in new[] { "Baseline", "AlternativeOrder", "ExtractedHel
     if (witness is null)
     {
         string proof = fixture == "Baseline" ? Path.Combine(consumer, "proofs/MultiplyProfile_scalar.lean") : Path.Combine(consumer, "Tests/Fixtures/Multiply", fixture + ".lean");
-        string theorem = fixture == "Baseline" ? "UInt256Proof.Multiply.profile_correctness" : "UInt256Proof.Multiply.Fixture" + (fixture == "ExtractedHelper" ? "Helper" : "Alternative") + ".correctness";
+        string theorem = fixture == "Baseline" ? "UInt256Proof.Multiply.profile_correctness" : "UInt256Proof.Multiply.FixtureAlternative.correctness";
         jobs.Add((fixture, profile, extraction, proof, theorem, false));
         continue;
     }

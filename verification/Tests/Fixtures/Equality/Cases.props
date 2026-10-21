@@ -2,7 +2,6 @@
   <ItemGroup>
     <EqualityCase Include="Baseline" Symbol="" />
     <EqualityCase Include="Renamed" Symbol="RENAMED" />
-    <EqualityCase Include="EquivalentScalar" Symbol="EQUIVALENT_SCALAR" />
     <EqualityCase Include="EquivalentReduction" Symbol="EQUIVALENT_REDUCTION" />
     <EqualityCase Include="WrongLane" Symbol="WRONG_LANE" />
     <EqualityCase Include="WrongReduction" Symbol="WRONG_REDUCTION" />

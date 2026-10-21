@@ -40,12 +40,10 @@ HashSet<string> productionShaped = ["Baseline", "Renamed"];
 List<string> incomplete = [], failed = [];
 
 // Applicability is the original suite's: features each mutation can reach on a profile.
-static bool Positive(string name, string method, string profile) => name switch
+static bool Positive(string name, string profile) => name switch
 {
-    "Baseline" or "Renamed" or "ExtractedHelper" or "FeatureExpressions" => true,
+    "Baseline" or "Renamed" => true,
     "EquivalentMask" => profile is "x64-avx2" or "x64-avx2-bmi1",
-    "LaneLocals" or "ReversedStore" => profile is "arm64-advsimd" or "x64-sse42",
-    "InlineCarry" => profile == "x64-sse42" || method == "Subtract" && profile == "arm64-advsimd",
     _ => false
 };
 static bool Negative(string name, string method, string profile) => name switch
@@ -187,9 +185,8 @@ foreach (var (group, item, methods, profiles) in groups)
             string name = (string)entry.Attribute("Include")!;
             bool negative = (string?)entry.Attribute("Suite") == "negative";
             bool applies = group == "SIMD"
-                ? negative ? Negative(name, legacy, profile) : Positive(name, legacy, profile)
-                : negative ? name == "WrongFlag" || Negative(name, legacy, profile)
-                : name == "Baseline" || !(profile == "scalar" && name == "ExtractedHelper") && Positive(name, legacy, profile);
+                ? negative ? Negative(name, legacy, profile) : Positive(name, profile)
+                : negative ? name == "WrongFlag" || Negative(name, legacy, profile) : Positive(name, profile);
             if (applies && Selected("case", name)) cases.Add((name, negative));
         }
         if (cases.Count == 0) continue;

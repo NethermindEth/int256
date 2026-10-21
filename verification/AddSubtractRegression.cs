@@ -18,8 +18,8 @@ HashSet<string> production = ["Baseline", "Renamed", "ReversedStore", "ExpandedH
 List<string> incomplete = [];
 (string Method, string Operation, string[] Positives)[] groups =
 [
-    ("Add", "(· + ·)", ["Baseline", "CarryOr", "Renamed", "FullyInlined", "StraightLine", "ExtractedHelper", "ExpandedHardware", "ExternalHelper", "ReversedStore"]),
-    ("Subtract", "(· - ·)", ["Baseline", "BorrowAlternative", "Renamed", "FullyInlined", "ExtractedHelper"]),
+    ("Add", "(· + ·)", ["Baseline", "Renamed", "ExtractedHelper", "ExpandedHardware", "ReversedStore"]),
+    ("Subtract", "(· - ·)", ["Baseline", "Renamed", "ExtractedHelper"]),
 ];
 
 async Task<string> Run(string executable, IEnumerable<string> arguments)

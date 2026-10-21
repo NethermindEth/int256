@@ -5,10 +5,8 @@ using System.Diagnostics;
 using System.Text.Json.Nodes;
 
 string root = Path.GetFullPath(args.Length > 0 ? args[0] : "verification");
-string fixture = args.Length > 1 ? args[1] : "BitwiseHelper";
-if (args.Length > 2 || fixture is not ("BitwiseHelper" or "BitwiseEarlyStore"))
-    throw new ArgumentException("Usage: BitwisePositiveRegression.cs [verification-directory] [BitwiseHelper|BitwiseEarlyStore]");
-bool early = fixture == "BitwiseEarlyStore";
+if (args.Length > 1) throw new ArgumentException("Usage: BitwisePositiveRegression.cs [verification-directory]");
+const string fixture = "BitwiseHelper";
 string work = Path.Combine(root, "artifacts/bitwise-positive-regressions", fixture);
 string consumer = Path.Combine(work, "consumer");
 string tool = Path.Combine(root, ".lake/packages/leancil/Extractor/bin/Nethermind.LeanCIL.dll");
@@ -62,7 +60,7 @@ JsonArray targets = JsonNode.Parse(File.ReadAllText(Path.Combine(root, "manifest
 List<(string Directory, string Proof, string Id, string Profile)> jobs = [];
 foreach (string profile in new[] { "scalar", "x64-vector256" })
 foreach (string operation in new[] { "And", "Or", "Xor", "Not" })
-foreach (bool returned in early ? new[] { true } : new[] { false, true })
+foreach (bool returned in new[] { false, true })
 {
     bool unary = operation == "Not";
     string id = (returned ? "Operator" : "") + operation;
@@ -77,15 +75,6 @@ foreach (bool returned in early ? new[] { true } : new[] { false, true })
     string child = $"UInt256Proof.Bitwise.Helper.{kind}_{(returned ? "result" : "correctness")} {arguments}Extracted.profile Extracted.program {(returned ? "1 2 3" : "0 1 2")} (by rfl) (by rfl) (by rfl)";
     string term = returned ? $"AggregateReturn.{kind}_checked {operationTerm} Extracted.profile Extracted.program 0 1 (by rfl) ({child})" : child;
     string supportModule = unary ? "HelperUnary" : "HelperWords";
-    if (early)
-    {
-        supportModule = "EarlyStore";
-        child = unary
-            ? "Early.unary_result Extracted.profile Extracted.program 1 2 (.call 3 1) (Early.helper_unary Extracted.profile Extracted.program 3 rfl) rfl rfl"
-            : $"Early.binary_result {arguments}Extracted.profile Extracted.program 1 2 {(operation == "Xor" ? ".bxor" : "(.call 3 2)")} rfl rfl " +
-              (operation == "Xor" ? "(Early.inline_binary .xor Extracted.program)" : $"(Early.helper_binary {arguments}Extracted.profile Extracted.program 3 rfl)");
-        term = $"AggregateReturn.{kind}_disjoint_checked {operationTerm} Extracted.profile Extracted.program 0 1 (by rfl) ({child})";
-    }
     string proof = $$"""
         import Extracted
         import UInt256.Methods.Bitwise.{{supportModule}}

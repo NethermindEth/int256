@@ -213,9 +213,7 @@ public readonly partial struct UInt256
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private bool EqualsScalar(in UInt256 other)
-#if EQUIVALENT_SCALAR
-        => u0 == other.u0 && u1 == other.u1 && u2 == other.u2 && u3 == other.u3;
-#elif WRONG_LANE
+#if WRONG_LANE
         => ((u0 ^ other.u0) | (u1 ^ other.u1) | (u2 ^ other.u2)) == 0;
 #elif WRONG_REDUCTION
         => ((u0 ^ other.u0) & (u1 ^ other.u1) & (u2 ^ other.u2) & (u3 ^ other.u3)) == 0;

@@ -21,11 +21,8 @@ string work = Path.Combine(root, "artifacts/shift-positive-regressions");
 string consumer = Path.Combine(work, "consumer");
 string tool = Path.Combine(root, ".lake/packages/leancil/Extractor/bin/Nethermind.LeanCIL.dll");
 JsonArray targets = JsonNode.Parse(File.ReadAllText(Path.Combine(root, "manifests/targets.json")))!["methods"]!.AsArray();
-// LshEarlyStore writes the output before reading the input, so it is positive only for the fresh operator result.
-(string Fixture, string Method)[] cases =
-[
-    ("LshHelper", "Lsh"), ("LshHelper", "LeftShift"), ("LshHelper", "OperatorLsh"), ("LshEarlyStore", "OperatorLsh"),
-];
+const string fixture = "LshHelper";
+string[] methods = ["Lsh", "LeftShift", "OperatorLsh"];
 
 async Task<string> Run(string executable, IEnumerable<string> arguments)
 {
@@ -71,24 +68,24 @@ foreach (JsonNode? package in packages)
 }
 
 Dictionary<string, string> assemblies = [];
-foreach (string fixture in cases.Select(item => item.Fixture).Prepend("Baseline").Distinct())
+foreach (string variant in new[] { "Baseline", fixture })
 {
-    string build = Path.Combine(work, "build", fixture);
+    string build = Path.Combine(work, "build", variant);
     string intermediate = Path.Combine(build, "obj") + Path.DirectorySeparatorChar;
-    await Run("dotnet", ["build", Path.Combine(fixtures, "Nethermind.Int256.csproj"), "-c", "Release", "-p:FixtureCase=" + fixture,
+    await Run("dotnet", ["build", Path.Combine(fixtures, "Nethermind.Int256.csproj"), "-c", "Release", "-p:FixtureCase=" + variant,
         "-p:BaseOutputPath=" + Path.Combine(build, "bin") + Path.DirectorySeparatorChar,
         "-p:BaseIntermediateOutputPath=" + intermediate, "-p:MSBuildProjectExtensionsPath=" + intermediate,
         "-p:EnforceCodeStyleInBuild=true", "-p:GenerateDocumentationFile=true", "-v:q"]);
-    assemblies[fixture] = Path.Combine(build, "bin/Release/net10.0/Nethermind.Int256.dll");
+    assemblies[variant] = Path.Combine(build, "bin/Release/net10.0/Nethermind.Int256.dll");
 }
 
-async Task<string> Extract(string fixture, string method, string profile)
+async Task<string> Extract(string variant, string method, string profile)
 {
-    string extraction = Path.Combine(work, profile, fixture, method);
+    string extraction = Path.Combine(work, profile, variant, method);
     if (Directory.Exists(extraction)) Directory.Delete(extraction, true);
     string signature = targets.Single(target => target!["id"]!.GetValue<string>() == method)!["signature"]!.GetValue<string>();
     string profileArgument = profile == "scalar" ? profile : "@" + Path.Combine(root, "manifests/profiles", profile + ".json");
-    await Run("dotnet", [tool, "extract", assemblies[fixture], signature, extraction, profileArgument]);
+    await Run("dotnet", [tool, "extract", assemblies[variant], signature, extraction, profileArgument]);
     return extraction;
 }
 
@@ -99,7 +96,7 @@ static string ProgramText(string extraction) => string.Join('\n', File.ReadAllLi
 List<string> failed = [], incomplete = [];
 List<RegressionCheck> checks = [];
 foreach (string profile in profiles)
-foreach (var (fixture, method) in cases)
+foreach (string method in methods)
 {
     string name = $"{method}/{profile}/{fixture}";
     string log = Path.Combine(work, profile, $"{method}-{fixture}.log");

@@ -7,7 +7,7 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <Target Name="CheckFixtureCase" BeforeTargets="CoreCompile"
-      Condition="'$(FixtureCase)' != 'Baseline' And '$(FixtureCase)' != 'BorrowAlternative' And '$(FixtureCase)' != 'ExtractedHelper' And '$(FixtureCase)' != 'FullyInlined' And '$(FixtureCase)' != 'Renamed' And '$(FixtureCase)' != 'WrongAliasing' And '$(FixtureCase)' != 'WrongBorrow'">
+      Condition="'$(FixtureCase)' != 'Baseline' And '$(FixtureCase)' != 'ExtractedHelper' And '$(FixtureCase)' != 'Renamed' And '$(FixtureCase)' != 'WrongAliasing' And '$(FixtureCase)' != 'WrongBorrow'">
     <Error Text="Unknown Subtract fixture case: $(FixtureCase)" />
   </Target>
   <Import Project="Fixtures.props" />

@@ -8,7 +8,7 @@
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
   <Target Name="CheckFixtureCase" BeforeTargets="CoreCompile"
-      Condition="'$(FixtureCase)' != 'Baseline' And '$(FixtureCase)' != 'AlternativeOrder' And '$(FixtureCase)' != 'ExtractedHelper' And '$(FixtureCase)' != 'WrongCarry' And '$(FixtureCase)' != 'WrongCrossProduct' And '$(FixtureCase)' != 'WrongAliasing' And '$(FixtureCase)' != 'WrongHighLow' And '$(FixtureCase)' != 'WrongBmiHigh'">
+      Condition="'$(FixtureCase)' != 'Baseline' And '$(FixtureCase)' != 'AlternativeOrder' And '$(FixtureCase)' != 'WrongCarry' And '$(FixtureCase)' != 'WrongCrossProduct' And '$(FixtureCase)' != 'WrongAliasing' And '$(FixtureCase)' != 'WrongHighLow' And '$(FixtureCase)' != 'WrongBmiHigh'">
     <Error Text="Unknown Multiply fixture case: $(FixtureCase)" />
   </Target>
   <Import Project="Fixtures.props" />

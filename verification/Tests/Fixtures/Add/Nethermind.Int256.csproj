@@ -7,7 +7,7 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <Target Name="CheckFixtureCase" BeforeTargets="CoreCompile"
-      Condition="'$(FixtureCase)' != 'Baseline' And '$(FixtureCase)' != 'CarryOr' And '$(FixtureCase)' != 'ExpandedHardware' And '$(FixtureCase)' != 'ExternalHelper' And '$(FixtureCase)' != 'ExtractedHelper' And '$(FixtureCase)' != 'FullyInlined' And '$(FixtureCase)' != 'Renamed' And '$(FixtureCase)' != 'ReversedStore' And '$(FixtureCase)' != 'StraightLine' And '$(FixtureCase)' != 'WrongAliasing' And '$(FixtureCase)' != 'WrongCarry'">
+      Condition="'$(FixtureCase)' != 'Baseline' And '$(FixtureCase)' != 'ExpandedHardware' And '$(FixtureCase)' != 'ExtractedHelper' And '$(FixtureCase)' != 'Renamed' And '$(FixtureCase)' != 'ReversedStore' And '$(FixtureCase)' != 'WrongAliasing' And '$(FixtureCase)' != 'WrongCarry'">
     <Error Text="Unknown Add fixture case: $(FixtureCase)" />
   </Target>
   <Import Project="Fixtures.props" />

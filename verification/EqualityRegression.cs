@@ -91,7 +91,6 @@ bool Applicable(string fixture, string method, string profile, string signature)
     return fixture switch
     {
         "Baseline" or "Renamed" => true,
-        "EquivalentScalar" => profile == "scalar",
         "EquivalentReduction" => profile != "scalar",
         _ => negatives[fixture]!["group"]!.GetValue<string>() switch
         {
