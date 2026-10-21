@@ -16,23 +16,25 @@ internal static class VerificationSelection
              Regex.IsMatch(path, @"(^|/)(global\.json|NuGet\.Config|Directory\.(Build|Packages)\..*|\.editorconfig)$") ||
              path == ".github/workflows/verification.yml" ||
              (path.StartsWith("verification/", StringComparison.Ordinal) && !path.EndsWith(".lean", StringComparison.Ordinal))));
+        // Gates share most modules, so each source is read and parsed once per selection.
+        Dictionary<string, string[]> imports = new(StringComparer.Ordinal);
         Gate[] selected = VerificationSupport.Gates(root).Where(gate =>
         {
-            HashSet<string> sources = ProofSources(root, gate.Proof);
+            HashSet<string> sources = ProofSources(root, gate.Proof, imports);
             return full || changed.Any(sources.Contains);
         }).ToArray();
         return new(full || changed.Any(path => path.StartsWith("verification/", StringComparison.Ordinal) && path.EndsWith(".lean", StringComparison.Ordinal)),
-            selected, Partition(root, selected));
+            selected, Partition(root, selected, imports));
     }
 
     internal const int Jobs = 32;
 
     // Every job builds the shared support once, so fewer, balanced jobs beat one job per gate.
     // Each profile in a job is its own batch session, so only profiles heavier than a job are split.
-    internal static Batch[] Partition(string root, Gate[] selected)
+    internal static Batch[] Partition(string root, Gate[] selected, Dictionary<string, string[]>? imports = null)
     {
         if (selected.Length == 0) return [];
-        Dictionary<Gate, (double Weight, int Support)> cost = Costs(root, selected);
+        Dictionary<Gate, (double Weight, int Support)> cost = Costs(root, selected, imports);
         double Weight(IEnumerable<Gate> gates) => gates.Sum(gate => cost[gate].Weight);
         double target = (double)Weight(selected) / Math.Min(Jobs, selected.Length);
         List<List<Gate>> chunks = [];
@@ -49,14 +51,15 @@ internal static class VerificationSelection
     }
 
     // Weight: measured CI seconds; module counts did not predict them. Support: modules shareable across extractions.
-    internal static Dictionary<Gate, (double Weight, int Support)> Costs(string root, Gate[] gates)
+    internal static Dictionary<Gate, (double Weight, int Support)> Costs(string root, Gate[] gates, Dictionary<string, string[]>? imports = null)
     {
+        imports ??= new(StringComparer.Ordinal);
         Dictionary<string, bool> dependent = new(StringComparer.Ordinal);
         Func<Gate, double> seconds = MeasuredSeconds(root);
         return gates.ToDictionary(gate => gate, gate =>
         {
-            HashSet<string> sources = ProofSources(root, gate.Proof);
-            return (seconds(gate), sources.Count(source => !DependsOnExtraction(root, source, dependent)));
+            HashSet<string> sources = ProofSources(root, gate.Proof, imports);
+            return (seconds(gate), sources.Count(source => !DependsOnExtraction(root, source, dependent, imports)));
         });
     }
 
@@ -87,25 +90,25 @@ internal static class VerificationSelection
     }
 
     // Modules importing Extracted are rebuilt for every extraction.
-    static bool DependsOnExtraction(string root, string source, Dictionary<string, bool> memo)
+    static bool DependsOnExtraction(string root, string source, Dictionary<string, bool> memo, Dictionary<string, string[]> imports)
     {
         if (memo.TryGetValue(source, out bool known)) return known;
         memo[source] = false;
         bool result = false;
-        foreach (string module in Imports(Path.GetFullPath(source["verification/".Length..], root)))
+        foreach (string module in Imports(Path.GetFullPath(source["verification/".Length..], root), imports))
         {
             string dependency = module.Replace('.', '/') + ".lean";
             result |= module == "Extracted" ||
-                (File.Exists(Path.Combine(root, dependency)) && DependsOnExtraction(root, "verification/" + dependency, memo));
+                (File.Exists(Path.Combine(root, dependency)) && DependsOnExtraction(root, "verification/" + dependency, memo, imports));
         }
         return memo[source] = result;
     }
 
-    static IEnumerable<string> Imports(string path) =>
-        Regex.Matches(File.ReadAllText(path), @"(?m)^\s*(?:public\s+)?import\s+([^\r\n]+)").SelectMany(import =>
-            import.Groups[1].Value.Split("--")[0].Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+    static string[] Imports(string path, Dictionary<string, string[]> cache) =>
+        cache.TryGetValue(path, out string[]? known) ? known : cache[path] = [.. Regex.Matches(File.ReadAllText(path), @"(?m)^\s*(?:public\s+)?import\s+([^\r\n]+)").SelectMany(import =>
+            import.Groups[1].Value.Split("--")[0].Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))];
 
-    private static HashSet<string> ProofSources(string root, string proof)
+    private static HashSet<string> ProofSources(string root, string proof, Dictionary<string, string[]> imports)
     {
         HashSet<string> seen = new(StringComparer.Ordinal);
         Stack<string> pending = new([proof]);
@@ -116,7 +119,7 @@ internal static class VerificationSelection
             string back = Path.GetRelativePath(root, path);
             if (back == ".." || back.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal) || Path.IsPathRooted(back))
                 throw new InvalidOperationException($"Proof dependency escapes verification/: {relative}");
-            foreach (string module in Imports(path))
+            foreach (string module in Imports(path, imports))
             {
                 string dependency = module.Replace('.', '/') + ".lean";
                 if (File.Exists(Path.Combine(root, dependency))) pending.Push(dependency);
