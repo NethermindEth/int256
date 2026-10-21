@@ -7,7 +7,7 @@ case and its compiler symbol. Run them with
 (`--method`, `--profile` and `--case` narrow the run).
 
 Each positive must change its targeted extracted program (Renamed: method names
-only, identical bodies) and pass the registered production gate. Each negative needs
+only, identical bodies) and pass the registered production gate (EquivalentMask: its fixture proof). Each negative needs
 a kernel-checked refutation of `ReportingBinaryContract` from a concrete witness in
 `../SIMD/witnesses.json`: `WrongFlag` returns the wrong flag for zero operands
 (`checked_reporting_flag_refuted`), the others store a wrong result byte
@@ -19,23 +19,21 @@ reachable on scalar and arm64-advsimd. The original fixture also covered the AVX
 paths; those wait for their gates.
 
 A case is PENDING when its method and profile have no production gate, or when the
-positive changes a method body: production gates bind exact method bodies by `rfl`,
-so such refactors need their own fixture proof.
+positive changes a method body without its own fixture proof: production gates bind
+exact method bodies by `rfl`. EquivalentMask (`<Method>_<profile>_EquivalentMask.lean`
+in this directory) is the one positive refactor fixture kept for this family; the
+original ExtractedHelper and ReversedStore positives were dropped.
 
 Every case is a consumer contract property and is ported as
 `Reporting/<Method>/<profile>/<Case>`. Applicability is the original suite's: the
-SIMD table's profiles plus scalar for Baseline, Renamed and WrongFlag. As in the
-original, ExtractedHelper is not run on scalar, where the extracted helper sits on
-an unreachable vector path and the program would not change.
+SIMD table's profiles plus scalar for Baseline, Renamed and WrongFlag.
 
-| Original case | Kind | Status at LeanCIL 7aec18e |
-| --- | --- | --- |
-| Baseline | positive, production control | PASS AddOverflow and SubtractUnderflow on scalar, AddOverflow on arm64-advsimd; PENDING elsewhere (no gate) |
-| Renamed | positive, helper identities only | PASS AddOverflow and SubtractUnderflow on scalar, AddOverflow on arm64-advsimd; PENDING elsewhere (no gate) |
-| EquivalentMask | positive, body change (AVX2) | PENDING (no gate; needs fixture proof) |
-| ExtractedHelper | positive, body change | PENDING (needs fixture proof) |
-| ReversedStore | positive, body change (ARM, SSE) | PENDING (needs fixture proof) |
-| WrongFlag | negative, flag negated, result kept | PASS AddOverflow and SubtractUnderflow on scalar, AddOverflow on arm64-advsimd; PENDING elsewhere (no gate; the AVX return is not mutated yet) |
-| WrongAlignment | negative, lane alignment (ARM, SSE) | PASS AddOverflow/arm64-advsimd; PENDING elsewhere (no gate) |
-| WrongTop | negative, top-lane propagation (ARM; Subtract SSE) | PASS AddOverflow/arm64-advsimd; PENDING elsewhere (no gate) |
-| EarlyReread | negative, reread after overlapping store (AVX) | PENDING (no gate) |
+| Case | Kind |
+| --- | --- |
+| Baseline | positive, production control |
+| Renamed | positive, helper identities only |
+| EquivalentMask | positive, body change (AVX2) |
+| WrongFlag | negative, flag negated, result kept |
+| WrongAlignment | negative, lane alignment (ARM, SSE) |
+| WrongTop | negative, top-lane propagation (ARM; Subtract SSE) |
+| EarlyReread | negative, reread after overlapping store (AVX) |

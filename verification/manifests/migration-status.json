@@ -694,7 +694,7 @@
         "Reporting",
         "Profiles"
       ],
-      "note": "Safety: 6 positives (valid call, initial-input sum, probe value) and 11 negatives (located fault refutation plus production AddScalar rejection) certified on scalar; AlignedLoad is an extractor rejection mapped upstream. SIMD: Add arm64-advsimd Baseline, Renamed, WrongAlignment and WrongTop certified. Reporting: AddOverflow and SubtractUnderflow scalar Baseline, Renamed and WrongFlag, and AddOverflow arm64-advsimd Baseline, Renamed, WrongFlag, WrongAlignment and WrongTop certified. Remaining cases wait for x64-sse42, AVX and accelerated Subtract gates or for fixture proofs of body-changing refactors (LaneLocals, InlineCarry, ExtractedHelper, ReversedStore, FeatureExpressions, EquivalentMask)."
+      "note": "Safety: 6 positives (valid call, initial-input sum, probe value) and 11 negatives (located fault refutation plus production AddScalar rejection) certified on scalar; AlignedLoad is an extractor rejection mapped upstream. SIMD: Add arm64-advsimd Baseline, Renamed, WrongAlignment and WrongTop certified. Reporting: AddOverflow and SubtractUnderflow scalar Baseline, Renamed and WrongFlag, and AddOverflow arm64-advsimd Baseline, Renamed, WrongFlag, WrongAlignment and WrongTop certified. Each fixture family keeps one positive refactor fixture: SIMD and Reporting keep EquivalentMask; the other original body-changing positives (LaneLocals, InlineCarry, ExtractedHelper, ReversedStore, FeatureExpressions) were dropped."
     }
   ],
   "remainingPorts": [],
@@ -702,7 +702,7 @@
     "Profiles and AlignedLoad fixture groups are extractor infrastructure, mapped to LeanCIL tests rather than ported.",
     "Three upstream drafts from the original branch are not filed.",
     "UInt256.Safety.RegionTransport, RegionSteps and RegionSuffix are general memory-region lemmas and candidates for LeanCIL.",
-    "Duplicated helpers to consolidate: Subtract BorrowHelper and SmallHelper, Shift CountPrefix and DisjointContract, DoubledEntry and ShiftedSmall.",
+    "Duplicated helpers to consolidate: Subtract BorrowHelper and SmallHelper.",
     "Two deferred API entries remain unported.",
     "Safety fixture expectations changed under LeanCIL for ReusedLocal and related cases; review them against the original branch."
   ],
@@ -717,8 +717,7 @@
       "MultiplyRegression": "8/8",
       "BitwiseRegression scalar": "36/36",
       "BitwiseRegression x64-vector256": "36/36",
-      "BitwisePositiveRegression BitwiseHelper": "16/16",
-      "BitwisePositiveRegression BitwiseEarlyStore": "8/8",
+      "BitwisePositiveRegression": "16/16",
       "ShiftRegression scalar": "11/11",
       "ShiftRegression x64-vector256": "11/11",
       "ShiftPositiveRegression": "8/8",

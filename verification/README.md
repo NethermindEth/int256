@@ -256,9 +256,8 @@ static lookup tables (#53) and linear per-site evidence checks (#54).
 All scalar ports have registered certificates, and `remainingPorts` is empty.
 All 256 gates were recertified on LeanCIL `c464398` on the final tree, and every
 regression runner passed; `migration-status.json` records the per-runner counts. `BitwiseRegression.cs`
-and `ShiftRegression.cs` take a profile argument (default `scalar`) and
-`BitwisePositiveRegression.cs` a fixture argument (default `BitwiseHelper`), so a
-complete run also passes `x64-vector256` and `BitwiseEarlyStore`.
+and `ShiftRegression.cs` take a profile argument (default `scalar`), so a
+complete run also passes `x64-vector256`.
 
 ## Regression fixtures
 
@@ -268,21 +267,23 @@ The original fixture cases run through `BitwiseRegression.cs`,
 Each runner freezes a consumer snapshot, certifies positive fixtures, and for
 each mutation certifies a checked contract refutation, then requires the
 unchanged production proof to be rejected without leaving a certificate.
+Besides its Baseline (and, where present, Renamed) control, each kernel family
+keeps one positive refactor fixture, a changed method body proved against the
+production contract: Add and Subtract `ExtractedHelper`, Multiply `AlternativeOrder`,
+Bitwise `BitwiseHelper`, Shift `LshHelper`, SIMD and Reporting `EquivalentMask`,
+Equality `EquivalentReduction` and Compare `ComparisonAlternative`.
 `AddSubtractRegression.cs` reports fixtures without a proof as PENDING and
 exits nonzero until each has one. Extractor rejection fixtures (unsupported instructions, static
 initializers, metadata mutations) are covered by LeanCIL's own tests.
 
 `ShiftPositiveRegression.cs [dir] [all|scalar|x64-vector256]` (default `all`) certifies
-the original positive shift fixtures: `LshHelper` (count computed by a compiled helper)
-for `Lsh`, `LeftShift` and `op<<`, and `LshEarlyStore` (output limb zeroed before the
-input is read) for `op<<` only; on the by-reference methods it is an aliasing negative
-in `ShiftRegression.cs`. Each case must extract differently from Baseline and is proved
-against the production gate contract by `Tests/Fixtures/Shift/<Case>/<Method>_<profile>.lean`.
+`LshHelper` (count computed by a compiled helper) for `Lsh`, `LeftShift` and `op<<`.
+Each case must extract differently from Baseline and is proved against the production
+gate contract by `Tests/Fixtures/Shift/LshHelper/<Method>_<profile>.lean`.
 The proofs bind the changed bodies by `program[i]? = some body` and reuse the canonical
 proof through checked-run transport of the relocated suffix (`UInt256/Safety/Region*.lean`);
-that transport is CIL-generic and belongs upstream in LeanCIL. `Shift/CountPrefix.lean`
-restates the canonical count lemmas over a shared prefix and `Shift/DisjointContract.lean`
-the wrapper/operator composition for disjoint outputs; the production gates still use the originals.
+that transport is CIL-generic and belongs upstream in LeanCIL. `LshEarlyStore` (output
+limb zeroed before the input is read) is an aliasing negative in `ShiftRegression.cs`.
 
 `SimdRegression.cs` runs the SIMD (Add/Subtract) and Reporting
 (AddOverflow/SubtractUnderflow) groups per profile; cases on a profile without a
@@ -297,12 +298,11 @@ case, the LeanCIL test that covers it, or an unfiled upstream issue draft.
 
 `EqualityRegression.cs [dir] [all|scalar|x64-vector256|x64-sse41] [all|<case>]`
 covers the equality gates. Baseline and Renamed are checked against the
-production proof or a renamed copy of it; EquivalentScalar (short-circuit limb
-ladder) and EquivalentReduction (xor-to-zero vector leaf, scalar-direct vector
-primitive, high-half-first SSE reduction) are checked by fixture proofs under
-`Tests/Fixtures/Equality/<Case>/` that state the production contract verbatim.
-Their extraction-independent leaf proofs live once in `Tests/Fixtures/Equality/Shared/`, so each
-fixture file only binds its extraction.
+production proof or a renamed copy of it; EquivalentReduction (xor-to-zero vector
+leaf, scalar-direct vector primitive, high-half-first SSE reduction) is checked on
+the vector profiles by fixture proofs under `Tests/Fixtures/Equality/EquivalentReduction/`
+that state the production contract verbatim. Their extraction-independent leaf proofs
+live once in `Tests/Fixtures/Equality/Shared/`, so each fixture file only binds its extraction.
 WrongLane, WrongReduction, WrongReceiver, WrongSnapshot, WrongSignedEmbedding
 and WrongPolarity each get a checked refutation from `witnesses.json`.
 
