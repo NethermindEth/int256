@@ -1,7 +1,7 @@
 {
-  "leancilRevision": "a33214567ef48f9a586d2129880fdfd028a9d07b",
+  "leancilRevision": "c464398fc1a17592bf220468ac230c15a9fad97b",
   "assemblySha256": "7d44ec9be3b6cfa4b853ad25cec8d246c1ada781866e04b7f9d6dfd4c2266e4e",
-  "note": "All scalar targets extract; every registered gate and regression runner passed on LeanCIL a332145 on the final tree. Extraction is not a compiled-method certificate; upstream issues 36-40, 42, 53 and 54 are resolved.",
+  "note": "All scalar targets extract; every registered gate and regression runner passed on LeanCIL c464398 on the final tree. Extraction is not a compiled-method certificate; upstream issues 36-40, 42, 53 and 54 are resolved.",
   "scalar": [
     {
       "method": "EqualsInt32",
@@ -706,11 +706,11 @@
     "Two deferred API entries remain unported.",
     "Safety fixture expectations changed under LeanCIL for ReusedLocal and related cases; review them against the original branch."
   ],
-  "supportingAuditTheorems": 3687,
+  "supportingAuditTheorems": 3699,
   "validation": {
-    "leancilRevision": "a33214567ef48f9a586d2129880fdfd028a9d07b",
-    "gates": "All 256 registered gates passed on 81b3566, one verify-batch session per profile (21 sessions).",
-    "runnersTree": "104d32d; its proof sources, manifests and src are identical to 81b3566.",
+    "leancilRevision": "c464398fc1a17592bf220468ac230c15a9fad97b",
+    "gates": "All 256 registered gates passed on 85c21d0, one verify session per profile (21 sessions; each profile's last gate was rerun alone after a driver error skipped it).",
+    "runnersTree": "85c21d0",
     "runners": {
       "EqualityRegression": "234/234",
       "CompareRegression": "16/16",
