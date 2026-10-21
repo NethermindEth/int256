@@ -706,24 +706,24 @@
     "Two deferred API entries remain unported.",
     "Safety fixture expectations changed under LeanCIL for ReusedLocal and related cases; review them against the original branch."
   ],
-  "supportingAuditTheorems": 3699,
+  "supportingAuditTheorems": 2851,
   "validation": {
     "leancilRevision": "c464398fc1a17592bf220468ac230c15a9fad97b",
-    "gates": "All 256 registered gates passed on 85c21d0, one verify session per profile (21 sessions; each profile's last gate was rerun alone after a driver error skipped it).",
-    "runnersTree": "85c21d0",
+    "gates": "All 256 registered gates passed on 85c21d0, one verify session per profile (21 sessions; each profile's last gate was rerun alone after a driver error skipped it). The fixture trim leaves every gate's import closure unchanged.",
+    "runnersTree": "c472208; its Lean sources, fixtures and runners match this tree.",
     "runners": {
-      "EqualityRegression": "234/234",
+      "EqualityRegression": "210/210",
       "CompareRegression": "16/16",
-      "MultiplyRegression": "8/8",
+      "MultiplyRegression": "7/7",
       "BitwiseRegression scalar": "36/36",
       "BitwiseRegression x64-vector256": "36/36",
       "BitwisePositiveRegression": "16/16",
       "ShiftRegression scalar": "11/11",
       "ShiftRegression x64-vector256": "11/11",
-      "ShiftPositiveRegression": "8/8",
-      "AddSubtractRegression": "18/18",
+      "ShiftPositiveRegression": "6/6",
+      "AddSubtractRegression": "12/12",
       "SafetyRegression": "17/17",
-      "SimdRegression": "191/191"
+      "SimdRegression": "140/140"
     }
   }
 }
