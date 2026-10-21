@@ -46,7 +46,7 @@ public readonly partial struct UInt256
     /// The bytes. Only a 32-byte span is read in the order <paramref name="isBigEndian"/> selects. Any other length
     /// is read big-endian whatever <paramref name="isBigEndian"/> says: a shorter span is zero-extended and a
     /// longer one keeps its last 32 bytes. For a short little-endian span, use
-    /// <see cref="IBinaryInteger{TSelf}.ReadLittleEndian(ReadOnlySpan{byte}, bool)"/>.
+    /// <see cref="System.Numerics.IBinaryInteger{TSelf}.ReadLittleEndian(ReadOnlySpan{byte}, bool)"/>.
     /// </param>
     /// <param name="isBigEndian">Whether a 32-byte span is big-endian.</param>
     public UInt256(in ReadOnlySpan<byte> bytes, bool isBigEndian = false)
