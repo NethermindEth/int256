@@ -375,4 +375,80 @@ public readonly partial struct UInt256
         ToBigInteger(in bits, signed).ToString(format, provider);
 
     private static BigInteger ToBigInteger(in UInt256 bits, bool signed) => signed ? (BigInteger)new Int256(bits) : (BigInteger)bits;
+
+    // Contracts that reduce in one prime field (MiMC and Poseidon hashing, SNARK verifiers, elliptic-curve arithmetic)
+    // repeat a well-known modulus thousands of times. For those moduli Barrett reduction with the reciprocal as a
+    // constant replaces a hardware division per quotient digit; every other modulus divides as before, and so would
+    // a reduction whose correction overran its bound.
+    [SkipLocalsInit]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static partial void Remainder512ByFullModulus(in UInt256 lo, in UInt256 hi, in UInt256 m, out UInt256 rem)
+    {
+        // Below 2^384 the division needs at most three quotient digits (two when both operands are below m) and costs
+        // no more than the reduction.
+        ulong top = m.u3;
+        if ((hi.u2 | hi.u3) != 0 && (top == Bn254R.Top || top == Secp256k1P.Top || top == P256P.Top || top == P256N.Top))
+        {
+            Remainder512ByKnownModulus(in lo, in hi, in m, out rem);
+            return;
+        }
+
+        Remainder512By256Bits(in lo, in hi, in m, out rem);
+    }
+
+    [SkipLocalsInit]
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void Remainder512ByKnownModulus(in UInt256 lo, in UInt256 hi, in UInt256 m, out UInt256 rem)
+    {
+        // BN254 r and p share their top two limbs, as do secp256k1 p and n.
+        switch (m.u3)
+        {
+            case Bn254R.Top:
+                if (IsModulus<Bn254R>(in m))
+                {
+                    Remainder512ByBarrettOrDivide<Bn254R>(in lo, in hi, in m, out rem);
+                    return;
+                }
+
+                if (IsModulus<Bn254P>(in m))
+                {
+                    Remainder512ByBarrettOrDivide<Bn254P>(in lo, in hi, in m, out rem);
+                    return;
+                }
+
+                break;
+            case Secp256k1P.Top:
+                if (IsModulus<Secp256k1P>(in m))
+                {
+                    Remainder512ByBarrettOrDivide<Secp256k1P>(in lo, in hi, in m, out rem);
+                    return;
+                }
+
+                if (IsModulus<Secp256k1N>(in m))
+                {
+                    Remainder512ByBarrettOrDivide<Secp256k1N>(in lo, in hi, in m, out rem);
+                    return;
+                }
+
+                break;
+            case P256P.Top:
+                if (IsModulus<P256P>(in m))
+                {
+                    Remainder512ByBarrettOrDivide<P256P>(in lo, in hi, in m, out rem);
+                    return;
+                }
+
+                break;
+            case P256N.Top:
+                if (IsModulus<P256N>(in m))
+                {
+                    Remainder512ByBarrettOrDivide<P256N>(in lo, in hi, in m, out rem);
+                    return;
+                }
+
+                break;
+        }
+
+        Remainder512By256Bits(in lo, in hi, in m, out rem);
+    }
 }
