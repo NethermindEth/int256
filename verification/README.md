@@ -3,12 +3,14 @@
 This migration starts from `verification/uint256-memory-safety`
 (`6c56716afa7860771c08815b8348e53313c7f8c8`), based on int256 `main`
 (`5fa8d77429c0440754bbfc851788d1ae37aba07f`). It consumes LeanCIL at
-`412e0cf10898929352d9a6446f06c4b6943fe1ac` through a pinned Lake dependency
+`c464398fc1a17592bf220468ac230c15a9fad97b` through a pinned Lake dependency
 ([ReadOnlySpan<byte> lookup tables](https://github.com/NethermindEth/LeanCIL/pull/55),
 [lockstep evidence checks](https://github.com/NethermindEth/LeanCIL/pull/56),
 [shared consumer support with joint kernel replay](https://github.com/NethermindEth/LeanCIL/pull/58),
-[extraction-dependent modules cached by program text](https://github.com/NethermindEth/LeanCIL/pull/61) and
-[compiled portable support with batch export](https://github.com/NethermindEth/LeanCIL/pull/62)).
+[extraction-dependent modules cached by program text](https://github.com/NethermindEth/LeanCIL/pull/61),
+[compiled portable support with batch export](https://github.com/NethermindEth/LeanCIL/pull/62),
+[method-body embedding modulo dead code](https://github.com/NethermindEth/LeanCIL/pull/67) and
+[folded closed typeof equality tests](https://github.com/NethermindEth/LeanCIL/pull/68)).
 CIL semantics, extraction, and verification infrastructure belong to LeanCIL;
 this directory contains only UInt256 specifications and proofs.
 
@@ -30,6 +32,12 @@ AdvSimd `AddVector128` helper, `AddScalarUInt64` and `StoreLimbs`. Their contrac
 `UInt256/Safety/{HalfValue,OutputHalves}.lean`) do not import `Extracted`; each proof binds all five
 extracted method bodies by `rfl`. `Add` proves `WrappingBinaryContract`; `AddOverflow`
 proves `ReportingBinaryContract` with the exact unsigned carry flag.
+Gates bind each reachable body either by `rfl` or by `cil_embed` modulo dead code. The multiplication
+gates bind the full-width `MultiplyLimbs4x4` body with `cil_embed`, because profile-specific extraction
+inserts unreachable blocks and shifts its branch targets: each gate proves its contract over
+`Extracted.program.set index (Full.fullBody ...)` and transports it with `UInt256/Safety/EmbeddingTransport.lean`,
+which leaves the arithmetic, overlap, finite-return and caller-memory statements unchanged. `fullBody`
+includes the folded `typeof` test (`nop` x4, `const32 1`, `brzero`) on its AVX512DQ.VL and AVX2 paths.
 The `Add` gate includes its four reachable helpers. `proofs/AddScalar.lean` proves the allocation-aware
 `WrappingBinaryContract`: finite checked execution, addition modulo 2^256 of
 the initial operands, writable output, and preservation of caller bytes outside
@@ -140,8 +148,8 @@ their raw-byte stability checks. Older manifests fall back to normal replay;
 the next successful main run exports manifests for the new verifier and pin.
 
 The wrapper refactor removes the extraction-dependent `PrimitiveSafetyLeaf` and
-`PrimitiveSafetyContract` adapter modules. The supporting audit now checks 505
-theorems. Binding checks distinguish reversed operands, signed versus unsigned
+`PrimitiveSafetyContract` adapter modules. The supporting audit then checked 505
+theorems; it now checks 3699. Binding checks distinguish reversed operands, signed versus unsigned
 widening, and negation, so the reusable wrapper cannot silently accept those
 instruction changes. A serial per-module profile of `LtUInt256UInt64` fell from
 86.5 to 58.3 seconds with shared wrappers. These diagnostic timings include
