@@ -294,7 +294,8 @@ from a fault pinned to its method, instruction, rule, reference and width, and e
 positive certifies a valid call and
 the probe's own value. The Profiles group is extractor infrastructure only. Each
 group's `Tests/Fixtures/<group>/README.md` maps every original case to a runner
-case, the LeanCIL test that covers it, or an unfiled upstream issue draft.
+case, the LeanCIL test that covers it, an unfiled upstream issue draft, or names
+it as a dropped positive refactor.
 
 `EqualityRegression.cs [dir] [all|scalar|x64-vector256|x64-sse41] [all|<case>]`
 covers the equality gates. Baseline and Renamed are checked against the
