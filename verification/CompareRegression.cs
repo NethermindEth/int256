@@ -126,7 +126,8 @@ foreach (string fixture in cases)
         "-p:EnforceCodeStyleInBuild=true", "-p:GenerateDocumentationFile=true", "-v:q"]);
     assemblies[fixture] = Path.Combine(build, "bin/Release/net10.0/Nethermind.Int256.dll");
 }
-await Run("dotnet", ["build", Path.Combine(root, "../src/Nethermind.Int256/Nethermind.Int256.csproj"), "-c", "Release", "-v:q"]);
+await Run("dotnet", ["build", Path.Combine(root, "../src/Nethermind.Int256/Nethermind.Int256.csproj"), "-c", "Release", "-v:q",
+    "-p:GenerateDocumentationFile=true", "-p:WarningsNotAsErrors=CS1591", "-nowarn:CS1591"]);
 string production = Path.Combine(root, "../src/artifacts/bin/Nethermind.Int256/release/Nethermind.Int256.dll");
 
 List<(string Name, string Extraction, string Proof, string Theorem, string? Production, string? ProductionTheorem)> jobs = [];

@@ -32,7 +32,9 @@ internal static class VerificationRunner
         using JsonDocument inventory = JsonDocument.Parse(File.ReadAllText(Path.Combine(root, "manifests/targets.json")));
         Gate[] gates = VerificationSupport.Gates(root);
         await command("dotnet", ["build", ".lake/packages/leancil/Extractor", "-c", "Release"]);
-        await command("dotnet", ["build", "../src/Nethermind.Int256/Nethermind.Int256.csproj", "-c", "Release"]);
+        // Docs beside the dll and PDB, from the same compile; the assembly is byte-identical without them.
+        await command("dotnet", ["build", "../src/Nethermind.Int256/Nethermind.Int256.csproj", "-c", "Release",
+            "-p:GenerateDocumentationFile=true", "-p:WarningsNotAsErrors=CS1591", "-nowarn:CS1591"]);
         List<string> failures = [];
         const string tool = ".lake/packages/leancil/Extractor/bin/Nethermind.LeanCIL.dll";
         Stopwatch elapsed = Stopwatch.StartNew();
