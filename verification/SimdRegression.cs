@@ -233,6 +233,8 @@ foreach (var (group, item, methods, profiles) in groups)
         }
     }
 }
+// A mistyped CI shard filter must not pass by checking nothing.
+if (jobs.Count == 0) throw new ArgumentException("No regression check matches the filters. " + usage);
 // The consumer snapshot is complete before any certificate is issued.
 failed.AddRange(await RegressionBatch.Verify(root, tool, work, consumer, [.. jobs.Select(job => new RegressionCheck(job.Name, job.Extraction, job.Proof, job.Theorem,
     job.Production is null ? "checked production contract" : "checked contract refutation and production proof rejection", job.Production?.Proof, job.Production?.Theorem))]));

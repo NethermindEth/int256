@@ -8,6 +8,7 @@
 #:include ConsumerSupportSelection.cs
 
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 string root = VerificationSupport.Root;
 string[] allMethods = VerificationSupport.Gates(root).Select(gate => gate.Method).ToArray();
@@ -40,6 +41,12 @@ SelectionCheck(["src/Nethermind.Int256/UInt256.cs"], allMethods, true);
 SelectionCheck(["verification/manifests/gates.json"], allMethods, true);
 SelectionCheck(["verification/VerificationRunner.cs"], allMethods, true);
 SelectionCheck([], allMethods, true, all: true);
+{
+    // A runner missing from CI would let a pin or template change stop refuting its mutants unnoticed.
+    string workflow = File.ReadAllText(Path.Combine(root, "../.github/workflows/verification.yml"));
+    foreach (string runner in Directory.EnumerateFiles(root, "*Regression.cs").Select(Path.GetFileName))
+        Require(Regex.IsMatch(workflow, @"\[" + Regex.Escape(runner!) + @"[,\]]"), "Regression runner missing from the CI matrix: " + runner);
+}
 {
     Selection full = VerificationSelection.Select(root, [], all: true);
     Require(full.Batches.Length == VerificationSelection.Jobs, "A full run should use every parallel job");

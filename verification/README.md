@@ -218,7 +218,10 @@ count / 8). Each method still receives its own certificate. When
 `LEANCIL_EXPORT_CONSUMER_SUPPORT` is set, the last method runs as a single
 `verify` because support export requires one request. The regression runners
 likewise submit each refutation and its `expect: rejected` production proof
-through one batch (`RegressionBatch.cs`).
+through one batch (`RegressionBatch.cs`). CI runs every regression runner,
+sharded by profile, whenever it runs the contract audit: on changes to any
+verification source, the LeanCIL pin or production code. `TestVerification.cs`
+fails if a runner is missing from that matrix.
 
 `SelectGates.cs`, `Verify.cs`, and `TestVerification.cs` are single-file C# apps;
 their shared source files are included with `#:include`, as in LeanCIL.
