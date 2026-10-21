@@ -40,6 +40,7 @@ import UInt256.RepresentationLemmas
 import UInt256.Safety.CallerExamples
 import UInt256.Safety.Calling
 import UInt256.Safety.Contract
+import UInt256.Safety.EmbeddingTransport
 import UInt256.Safety.OrderedScalarContract
 import UInt256.Safety.OutputAccess
 import UInt256.Safety.ProfileContracts
