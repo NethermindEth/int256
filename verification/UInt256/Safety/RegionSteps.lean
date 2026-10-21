@@ -1,3 +1,4 @@
+import UInt256.Safety.StepEquation
 import UInt256.Safety.RegionTransport
 
 namespace UInt256Proof.Transport
@@ -13,10 +14,12 @@ theorem arg_relocate (body : CIL.Method) (index : Nat) (f : Nat → Nat) (pc : N
     (successor : f (pc + 1) = f pc + 1) :
     step body (.arg index) (f pc) args frame stack memory =
       (step body (.arg index) pc args frame stack memory).map (relocateAction (fun _ => f) 0) := by
-  cases found : args[index]? with
-  | none => simp [step, found, Except.map]
+  delta step
+  dsimp only
+  cases args[index]? with
+  | none => rfl
   | some value =>
-    simp only [step, found, Bind.bind, map_bind, Pure.pure, Except.pure]
+    simp only [Bind.bind, map_bind, Pure.pure, Except.pure]
     congr 1
     funext checked
     simp [Except.map, relocateAction, successor]
@@ -26,10 +29,12 @@ theorem local_relocate (body : CIL.Method) (index : Nat) (f : Nat → Nat) (pc :
     (successor : f (pc + 1) = f pc + 1) :
     step body (.local index) (f pc) args frame stack memory =
       (step body (.local index) pc args frame stack memory).map (relocateAction (fun _ => f) 0) := by
-  cases found : frame.locals[index]? with
-  | none => simp [step, found, Except.map]
+  delta step
+  dsimp only
+  cases frame.locals[index]? with
+  | none => rfl
   | some slot =>
-    simp only [step, found, Bind.bind, map_bind, Pure.pure, Except.pure]
+    simp only [Bind.bind, map_bind, Pure.pure, Except.pure]
     congr 1
     funext loaded
     simp [Except.map, relocateAction, successor]
@@ -42,10 +47,12 @@ theorem setLocal_relocate (body : CIL.Method) (index : Nat) (f : Nat → Nat) (p
   cases stack with
   | nil => rfl
   | cons value rest =>
-    cases found : frame.locals[index]? with
-    | none => simp [step, found, Except.map]
+    delta step
+    dsimp only
+    cases frame.locals[index]? with
+    | none => rfl
     | some slot =>
-      simp only [step, found, Bind.bind, map_bind, Pure.pure, Except.pure]
+      simp only [Bind.bind, map_bind, Pure.pure, Except.pure]
       congr 1
       funext stored
       rcases stored with ⟨slot, updated⟩
@@ -55,7 +62,8 @@ theorem call_relocate (body : CIL.Method) (callee argc : Nat) (f : Nat → Nat) 
     (args : List Value) (frame : Frame) (stack : List Value) (memory : Memory) :
     step body (.call callee argc) (f pc) args frame stack memory =
       (step body (.call callee argc) pc args frame stack memory).map (relocateAction (fun _ => f) 0) := by
-  simp only [step]
+  delta step
+  dsimp only
   split
   · rfl
   · simp only [Bind.bind, map_bind, Pure.pure, Except.pure]
@@ -65,9 +73,10 @@ theorem return_relocate (body : CIL.Method) (f : Nat → Nat) (pc : Nat)
     (args : List Value) (frame : Frame) (stack : List Value) (memory : Memory) :
     step body .ret (f pc) args frame stack memory =
       (step body .ret pc args frame stack memory).map (relocateAction (fun _ => f) 0) := by
-  cases checked : stack.mapM (checkedValue memory) <;> cases returned : body.returnsValue <;>
-    simp only [step, returned, checked, Bool.false_eq_true, ite_true, ite_false]
-  all_goals split <;> rfl
+  delta step
+  dsimp only
+  split <;> split
+  all_goals first | rfl | (cases stack.mapM (checkedValue memory) <;> rfl)
 
 inductive MemoryOp : CIL.Op → Prop where
   | const32 (word : BitVec 32) : MemoryOp (.const32 word)
@@ -115,8 +124,9 @@ theorem binary_pure (op : CIL.Op) (allowed : BinaryOp op) (pc : Nat) (stack : Li
     cases tail with
     | nil => rfl
     | cons left rest =>
-      simp only [CIL.step, binaryStack, Bind.bind, Option.bind, Option.map]
-      split <;> simp_all [Pure.pure]
+      delta CIL.step
+      dsimp only [binaryStack]
+      cases CIL.binary _ left right <;> rfl
 
 theorem binary_form (body : CIL.Method) (op : CIL.Op) (allowed : BinaryOp op) (args : List Value) (frame : Frame) (stack : List Value) (memory : Memory) (pc : Nat) : step body op pc args frame stack memory =
     (if stack.length < 2 then .error .invalidState else do
@@ -125,7 +135,7 @@ theorem binary_form (body : CIL.Method) (op : CIL.Op) (allowed : BinaryOp op) (a
       let checked ← (result.map Value.scalar).mapM (checkedValue memory)
       return .next (pc + 1) (checked ++ stack.drop 2) frame memory) := by
   have raw := binary_pure op allowed pc
-  cases allowed <;> simp only [step, pureArity]
+  cases allowed <;> delta step <;> dsimp only [pureArity]
   all_goals split
   all_goals first
     | rfl
@@ -183,8 +193,10 @@ theorem branch_pure (kind : BranchKind) (target pc : Nat) (stack : List CIL.Valu
     cases stack with
     | nil => rfl
     | cons value rest =>
-      simp only [branchOp, CIL.step, branchTest, Bind.bind, Option.bind, Option.map]
-      split <;> simp_all [Pure.pure]
+      dsimp only [branchOp]
+      delta CIL.step
+      dsimp only [branchTest]
+      cases CIL.truth value <;> rfl
   | ge | ult | ne =>
     cases stack with
     | nil => rfl
@@ -192,7 +204,12 @@ theorem branch_pure (kind : BranchKind) (target pc : Nat) (stack : List CIL.Valu
       cases tail with
       | nil => cases right <;> rfl
       | cons left rest =>
-        cases right <;> cases left <;> simp [branchOp, CIL.step, branchTest]
+        cases right <;> first
+          | rfl
+          | (cases left <;> first
+              | rfl
+              | (dsimp only [branchOp]; delta CIL.step
+                 dsimp only [branchTest, Option.map]; simp only [decide_eq_true_eq]; rfl))
 
 theorem branch_form (body : CIL.Method) (kind : BranchKind) (args : List Value) (frame : Frame) (stack : List Value) (memory : Memory) (target pc : Nat) : step body (branchOp kind target) pc args frame stack memory =
     (if stack.length < branchArity kind then .error .invalidState else do
@@ -201,7 +218,7 @@ theorem branch_form (body : CIL.Method) (kind : BranchKind) (args : List Value) 
       let checked ← (result.map Value.scalar).mapM (checkedValue memory)
       return .next (if selected then target else pc + 1) (checked ++ stack.drop (branchArity kind)) frame memory) := by
   have raw := branch_pure kind target pc
-  cases kind <;> simp only [branchOp, step, pureArity, branchArity]
+  cases kind <;> dsimp only [branchOp] <;> delta step <;> dsimp only [pureArity, branchArity]
   all_goals simp only [branchOp] at raw
   all_goals split <;> simp_all only [ite_true, ite_false]
   all_goals first
@@ -239,7 +256,8 @@ theorem conv_pure (pc : Nat) (stack : List CIL.Value) (profile : CIL.FeatureProf
   cases stack with
   | nil => rfl
   | cons value rest =>
-    simp only [CIL.step, convStack, Bind.bind, Option.bind, Option.map]
+    delta CIL.step
+    dsimp only [convStack]
     cases CIL.unary .convI8 value <;> rfl
 
 theorem conv_form (body : CIL.Method) (args : List Value) (frame : Frame) (stack : List Value) (memory : Memory) (pc : Nat) :
@@ -249,7 +267,8 @@ theorem conv_form (body : CIL.Method) (args : List Value) (frame : Frame) (stack
       let some result := convStack values | .error .invalidState
       let checked ← (result.map Value.scalar).mapM (checkedValue memory)
       return .next (pc + 1) (checked ++ stack.drop 1) frame memory) := by
-  simp only [step, pureArity]
+  delta step
+  dsimp only [pureArity]
   split
   · rfl
   · congr 1; funext values; rw [conv_pure]; cases convStack values <;> rfl
@@ -306,11 +325,11 @@ theorem supported_flow (body : CIL.Method) (op : CIL.Op) (supported : Supported 
     rw [branch_form body kind] at executed
     have targetBound : lower ≤ target := by cases kind <;> exact targets
     clear targets
-  case' arg index => simp only [step] at executed
-  case' localValue index => simp only [step] at executed
-  case' setLocal index => cases stack <;> simp only [step, pureArity] at executed
-  case' call callee argc => simp only [step] at executed
-  case' ret => simp only [step] at executed
+  case' arg index => delta step at executed; dsimp only at executed
+  case' localValue index => delta step at executed; dsimp only at executed
+  case' setLocal index => cases stack <;> delta step at executed <;> dsimp only [pureArity] at executed
+  case' call callee argc => delta step at executed; dsimp only at executed
+  case' ret => delta step at executed; dsimp only at executed
   all_goals simp only [Bind.bind, Except.bind, Pure.pure, Except.pure] at executed
   iterate 14
     all_goals first
@@ -365,7 +384,8 @@ theorem storage_extra_flow (body : CIL.Method) (op : CIL.Op) (supported : Storag
     (pc : Nat) (args : List Value) (frame : Frame) (stack : List Value) (memory : Memory) (action : FrameAction)
     (executed : step body op pc args frame stack memory = .ok action) :
     FlowResult 0 (fun _ => False) action := by
-  cases supported <;> simp only [step, pureArity, Bind.bind, Except.bind, Pure.pure, Except.pure] at executed
+  cases supported <;> delta step at executed <;> dsimp only [pureArity] at executed <;>
+    simp only [Bind.bind, Except.bind, Pure.pure, Except.pure] at executed
   iterate 14
     all_goals first
       | (solve | simp_all [FlowResult])

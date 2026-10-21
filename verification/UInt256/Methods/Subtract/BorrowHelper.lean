@@ -57,6 +57,51 @@ namespace UInt256Proof.Subtract.Profile
 variable {profile : CIL.FeatureProfile} {program : CIL.Program} {index : Nat}
 open CIL.Safety
 
+private theorem step_reference_arg {body : CIL.Method} {pc index : Nat} {args stack : List Value}
+    {frame : Frame} {memory : Memory} {reference : Reference}
+    (found : args[index]? = some (.reference (.address reference)))
+    (formed : form memory reference = .ok reference) :
+    step body (.arg index) pc args frame stack memory =
+      .ok (.next (pc + 1) (.reference (.address reference) :: stack) frame memory) := by
+  simp only [step, found, checkedValue, formValue, formed, checkedAt, Except.mapError,
+    Bind.bind, Except.bind, Pure.pure, Except.pure]
+
+private theorem step_load_word {body : CIL.Method} {pc : Nat} {args rest : List Value}
+    {frame : Frame} {memory : Memory} {reference : Reference} {word : BitVec 64}
+    (loaded : loadValue memory (.address reference) 8 = .ok (.i64 word)) :
+    step body .load64 pc args frame (.reference (.address reference) :: rest) memory =
+      .ok (.next (pc + 1) (.scalar (.i64 word) :: rest) frame memory) := by
+  have loadedInstruction : instruction .load64 (.reference (.address reference) :: rest) memory =
+      .ok (memory, .scalar (.i64 word) :: rest) := by
+    show (loadValue memory (.address reference) 8 >>= fun value =>
+      pure (memory, Value.scalar value :: rest) : ExecutionResult (Memory × List Value)) = _
+    rw [loaded]
+    rfl
+  show (instruction .load64 (.reference (.address reference) :: rest) memory >>= fun result =>
+    pure (FrameAction.next (pc + 1) result.2 frame result.1) : ExecutionResult FrameAction) = _
+  rw [loadedInstruction]
+  rfl
+
+private theorem step_store_word {body : CIL.Method} {pc : Nat} {args rest : List Value}
+    {frame : Frame} {memory after : Memory} {reference : Reference} {word : BitVec 64}
+    (written : write memory reference (numberBytes word.toNat 8) 1 = .ok after) :
+    step body .store64 pc args frame (.scalar (.i64 word) :: .reference (.address reference) :: rest) memory =
+      .ok (.next (pc + 1) rest frame after) := by
+  have stored : storeValue memory (.address reference) (.i64 word) = .ok after := by
+    show checkedAt (.address reference) 8 (write memory reference (numberBytes word.toNat 8) 1) = _
+    rw [written]
+    rfl
+  have storedInstruction : instruction .store64
+      (.scalar (.i64 word) :: .reference (.address reference) :: rest) memory = .ok (after, rest) := by
+    show (storeValue memory (.address reference) (.i64 word) >>= fun result =>
+      pure (result, rest) : ExecutionResult (Memory × List Value)) = _
+    rw [stored]
+    rfl
+  show (instruction .store64 (.scalar (.i64 word) :: .reference (.address reference) :: rest) memory >>=
+    fun result => pure (FrameAction.next (pc + 1) result.2 frame result.1) : ExecutionResult FrameAction) = _
+  rw [storedInstruction]
+  rfl
+
 /-- Symbolic execution of the frameless borrow body over its two checked writes. -/
 theorem borrow_run_of_memory_steps (found : program[index]? = some (borrowBody profile)) (a b c : BitVec 64)
     (borrow output : Reference) (frame : Frame) (memory stored final : Memory)
@@ -69,20 +114,34 @@ theorem borrow_run_of_memory_steps (found : program[index]? = some (borrowBody p
     run program ((borrowBody profile).code.length + 1) index 0
       [.scalar (.i64 a), .scalar (.i64 b), .reference (.address borrow), .reference (.address output)]
       frame [] memory = .ok (leaveFrame frame final, []) := by
-  simp [borrowWord, BitVec.toNat_or, BitVec.toNat_and] at borrowWrite
-  simp [BitVec.toNat_sub] at resultWrite
   change run program 24 index 0 _ frame [] memory = _
-  iterate 22
-    apply Eq.trans
-    · apply run_next found (by rfl)
-      simp (config := { implicitDefEqProofs := false })
-        [step, checkedValue, numericValue, formValue, borrowFormed, outputFormed,
-          borrowStored, beforeRead, afterRead, pureArity, scalars, CIL.step.eq_def, CIL.binary, CIL.unary,
-          instruction, storeValue, referenceAt, resultWrite, borrowWrite, checkedAt,
-          Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-      first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
-  rw [run]
-  simp [found, borrowBody, step, leaveFrame, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
+  have a2 : ([.scalar (.i64 a), .scalar (.i64 b), .reference (.address borrow), .reference (.address output)] :
+    List Value)[2]? = some (.reference (.address borrow)) := rfl
+  have a3 : ([.scalar (.i64 a), .scalar (.i64 b), .reference (.address borrow), .reference (.address output)] :
+    List Value)[3]? = some (.reference (.address output)) := rfl
+  refine (run_next found rfl (step_reference_arg a3 outputFormed)).trans ?_
+  refine (run_next found rfl rfl).trans ?_
+  refine (run_next found rfl rfl).trans ?_
+  refine (run_next found rfl rfl).trans ?_
+  refine (run_next found rfl (step_reference_arg a2 borrowFormed)).trans ?_
+  refine (run_next found rfl (step_load_word beforeRead)).trans ?_
+  refine (run_next found rfl rfl).trans ?_
+  refine (run_next found rfl (step_store_word resultWrite)).trans ?_
+  refine (run_next found rfl (step_reference_arg a2 borrowStored)).trans ?_
+  refine (run_next found rfl rfl).trans ?_
+  refine (run_next found rfl rfl).trans ?_
+  refine (run_next found rfl rfl).trans ?_
+  refine (run_next found rfl rfl).trans ?_
+  refine (run_next found rfl (step_reference_arg a2 borrowStored)).trans ?_
+  refine (run_next found rfl (step_load_word afterRead)).trans ?_
+  refine (run_next found rfl rfl).trans ?_
+  refine (run_next found rfl rfl).trans ?_
+  refine (run_next found rfl rfl).trans ?_
+  refine (run_next found rfl rfl).trans ?_
+  refine (run_next found rfl rfl).trans ?_
+  refine (run_next found rfl rfl).trans ?_
+  refine (run_next found rfl (step_store_word borrowWrite)).trans ?_
+  exact run_return found rfl rfl rfl
 
 #print axioms borrow_run_of_memory_steps
 end UInt256Proof.Subtract.Profile
@@ -135,9 +194,9 @@ theorem borrow_checked_contract (found : program[index]? = some (borrowBody prof
   have invoked : invoke program ((borrowBody profile).code.length + 1) index
       [.scalar (.i64 a), .scalar (.i64 b), .reference (.address borrowRef), .reference (.address output)]
       memory = .ok (final, []) := by
-    simpa [invoke, found, enterFrame, borrowBody, makeLocals, makeArgumentHomes, makeParameterHomes, frame, checkedValue,
-      numericValue, formValue, fb, fo, checkedAt, Except.mapError,
-      Bind.bind, Except.bind, Pure.pure, Except.pure] using run
+    refine invoke_of_run found ?_ rfl run
+    simp [checkedValue, numericValue, formValue, fb, fo, checkedAt, Except.mapError,
+      Bind.bind, Except.bind, Pure.pure, Except.pure]
   refine ⟨_, final, invoked, invoke_preserves_wellFormed _ _ _ _ _ _ _ wellFormed invoked,
     ?_, ?_, UInt256Proof.borrow_bound a b c, UInt256Proof.borrow_word_nat a b c incoming, ?_,
     (write_preserves_access_below resultWrite memory.nextIdentity).trans

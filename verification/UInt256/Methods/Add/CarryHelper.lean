@@ -76,13 +76,12 @@ theorem carry_run_of_memory_steps (found : program[index]? = some (carryBody pro
   iterate 23
     apply Eq.trans
     · apply run_next found (by rfl)
-      simp (config := { implicitDefEqProofs := false })
+      first | rfl | simp
         [step, locals, s0, s1, r0, rc, r1, r2, r3,
-          checkedValue, numericValue, formValue, fc1, fc2, fo3,
-          pureArity, scalars, CIL.step.eq_def, CIL.binary, CIL.unary, instruction, storeValue,
+          checkedValue, formValue, fc1, fc2, fo3,
+          pureArity.eq_def, instruction.eq_def, storeValue,
           referenceAt, wc, wo, checkedAt, Except.mapError,
-          Bind.bind, Except.bind, Pure.pure, Except.pure]
-      first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
+          Bind.bind, Except.bind, Pure.pure, Except.pure] <;> first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
   rw [run]
   simp [found, carryBody, step, leaveFrame, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
 

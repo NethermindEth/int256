@@ -92,8 +92,13 @@ theorem CallingConditions.output_field_instruction {program : CIL.Program}
     have address := ready.add_slice call.1.1 1 (8 * index.val) 8 (by decide)
       (by dsimp [wordView] at ready ⊢; omega)
     simp only [Nat.one_mul, wordView] at address
-    simp [instruction, address, written, ordinaryAccessAlignment,
-      checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
+    show ((Except.ok value.toNat : ExecutionResult Nat) >>= fun number =>
+        checkedAt (.address output) 0 (add memory output 1 (BitVec.ofNat 64 (8 * index.val))) >>=
+          fun target => checkedAt (.address target) 8
+            (write memory target (numberBytes number 8) ordinaryAccessAlignment) >>=
+              fun result => pure (result, rest)) = _
+    simp only [address, ordinaryAccessAlignment, written, checkedAt, Except.mapError, Bind.bind,
+      Except.bind, Pure.pure, Except.pure]
   · simpa only [length] using readback
 
 #print axioms CallingConditions.after_write

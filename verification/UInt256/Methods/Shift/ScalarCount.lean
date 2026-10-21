@@ -9,9 +9,21 @@ variable {profile : CIL.FeatureProfile} {direction : Direction} {storage : Nat}
   (bodyFound : program[index]? = some (scalarBody profile direction storage))
 include bodyFound
 
+omit bodyFound in
+private theorem step_arg_scalar {body : CIL.Method} {pc index : Nat} {args stack : List Value}
+    {frame : Frame} {memory : Memory} {value : CIL.Value}
+    (found : args[index]? = some (.scalar value)) (numeric : numericValue value = true) :
+    step body (.arg index) pc args frame stack memory =
+      .ok (.next (pc + 1) (.scalar value :: stack) frame memory) := by
+  delta step
+  dsimp only
+  rw [found]
+  simp only [checkedValue, numeric, ite_true, Bind.bind, Except.bind, Pure.pure, Except.pure]
+
 macro "shift_pure_step" "[" facts:term,* "]" : tactic =>
   `(tactic| first
     | rfl
+    $[| exact step_arg_scalar $facts:term rfl]*
     | (simp (config := { implicitDefEqProofs := false })
         [step, checkedValue, numericValue, pureArity, scalars, CIL.step, CIL.binary,
           Bind.bind, Except.bind, Pure.pure, Except.pure, $[$facts:term],*]

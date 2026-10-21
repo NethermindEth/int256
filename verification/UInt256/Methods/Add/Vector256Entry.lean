@@ -26,10 +26,10 @@ macro "entry_pure" : tactic => `(tactic|
    have formedOutput := state.call.output_formed (reference := output) (by simp)
    apply run_next_exists post found (by first | assumption | rfl)
    · simp (config := { implicitDefEqProofs := false })
-       [step, pureArity, binaryArguments, checkedValue, numericValue, formValue, formedLeft, formedRight,
+       [step, pureArity.eq_def, binaryArguments, checkedValue, numericValue, formValue, formedLeft, formedRight,
          formedOutput, staticInstruction, memoryInstruction, checkedAt, profileEq, features.avx, features.avx2,
          CIL.FeatureProfile.evaluate, scalars, checkedIntrinsic, CIL.Intrinsic.available, CIL.step.eq_def,
-         CIL.binary, CIL.unary, CIL.truth, instruction, Except.mapError, Bind.bind, Except.bind, Pure.pure,
+         CIL.binary.eq_def, CIL.unary.eq_def, CIL.truth, instruction.eq_def, Except.mapError, Bind.bind, Except.bind, Pure.pure,
          Except.pure]
      try (first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)))
 
@@ -158,10 +158,7 @@ set_option hygiene false in
 /-- A branch step that also rewrites with the decided guard `selected`. -/
 macro "entry_branch" : tactic => `(tactic|
   (apply run_next_exists post found (by rfl)
-   · simp (config := { implicitDefEqProofs := false })
-       [step, pureArity, selected, bne_iff_ne, ne_eq, scalars, CIL.step.eq_def, CIL.binary, CIL.unary, CIL.truth,
-         Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-     try (first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)))
+   · first | (simp only [selected]; rfl) | rfl))
 
 /-- Caller guarantees of the Add entry: wrapped sum, writable output, other caller bytes kept. -/
 def AddPost (memory : Memory) (left right output : Reference) (final : Memory) : Prop :=
@@ -204,9 +201,9 @@ theorem add_tail (program : CIL.Program) (profile : CIL.FeatureProfile) (avx512 
     entry_branch
     obtain ⟨value, access, footprint⟩ := state.finish call owned
     refine ⟨1, _, _, ?_, rfl, by rw [ha, hb]; exact value.trans (fast_sum_value a b guard), access, footprint⟩
-    simp [run, found, retFetch, returns, step, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
+    exact run_return found retFetch rfl rfl
   · have selected : (CIL.Vector.moveMask64 (propagationMask (CIL.Vector.zip256 (· + ·) a b) &&&
-        incomingCarry (generatedCarry a b)) &&& 6#32 != 0#32) = true := bne_iff_ne.mpr guard
+        incomingCarry (generatedCarry a b)) &&& 6#32 != 0) = true := bne_iff_ne.mpr guard
     entry_branch
     simp only [selected, ↓reduceIte]
     entry_load
@@ -227,9 +224,8 @@ theorem add_tail (program : CIL.Program) (profile : CIL.FeatureProfile) (avx512 
     have popFetch : (addEntryBody profile finish prepare).code[23]? = some .pop := rfl
     have tail : run program 2 0 23 (binaryArguments left right output) frame
         ([.scalar (.i32 (finishFlag (generatedCarry a b) (propagationMask sum)))] ++ []) finished =
-        .ok (leaveFrame frame finished, []) := by
-      simp [run, found, popFetch, retFetch, returns, step, pureArity, instruction,
-        Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
+        .ok (leaveFrame frame finished, []) :=
+      (run_next found popFetch rfl).trans (run_return found retFetch rfl rfl)
     obtain ⟨total, ran⟩ := run_call_exists found rfl stepped ⟨childFuel, invoked⟩ ⟨2, tail⟩
     exact ⟨total, _, _, ran, rfl, by rw [ha, hb]; exact value.trans (cascade_sum_value a b), access, kept⟩
 

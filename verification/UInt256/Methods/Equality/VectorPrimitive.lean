@@ -1,6 +1,7 @@
 import CIL.Safety.StepComposition
 import UInt256.Safety.ReadOnlyScalarExecution
 import CIL.SymbolicExecution
+import UInt256.Safety.StepEquation
 
 namespace UInt256Proof.Equality.VectorPrimitive
 open CIL.Safety UInt256Model.Safety
@@ -14,19 +15,43 @@ theorem load_input {program : CIL.Program} {memory : Memory} {inputs outputs : L
     instruction (.loadAggregate 32) (.reference (.address input) :: rest) memory =
       .ok (memory, .scalar (.aggregate (inputBytes memory input)) :: rest) := by
   have loaded := call.input_snapshot member
-  simp [instruction, dereference, ordinaryAccessAlignment, loaded, inputBytes, checkedAt,
-    Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
+  unfold instruction
+  simp only [dereference, ordinaryAccessAlignment, loaded, inputBytes, checkedAt, Except.mapError,
+    Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 theorem cast_input (memory : Memory) (input : Reference) (rest : List Value) :
     memoryInstruction (.bitcastValue (.aggregate 32) .vector256)
       (.scalar (.aggregate (inputBytes memory input)) :: rest) memory =
       .ok (memory, .scalar (.v256 (inputValue memory input)) :: rest) := by
-  simp [memoryInstruction, bitcastValue, valueSnapshot, snapshotValue, CIL.SnapshotShape.width,
-    inputBytes, List.map_map, Function.comp_def, byteNumber_snapshot, inputValue,
-    Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-
-  rw [byteNumber_snapshot (fun offset => (memory.cells input.allocation offset).bits) input.offset 32]
+  have value : inputValue memory input = BitVec.ofNat 256 (byteNumber (inputBytes memory input)) := by
+    rw [inputBytes, byteNumber_snapshot (fun offset => (memory.cells input.allocation offset).bits) input.offset 32]
+    rfl
+  rw [value]
   rfl
+
+private theorem s_arg {body : CIL.Method} {pc i : Nat} {args : List Value} {frame : Frame}
+    {stack : List Value} {m : Memory} {r : Reference}
+    (h : args[i]? = some (.reference (.address r))) (formed : form m r = .ok r) :
+    step body (.arg i) pc args frame stack m = .ok (.next (pc + 1) (.reference (.address r) :: stack) frame m) := by
+  unfold step
+  simp only [h, checkedValue, formValue, formed, checkedAt, Except.mapError, Bind.bind, Except.bind,
+    Pure.pure, Except.pure]
+
+private theorem s_loadAggregate {body : CIL.Method} {pc size : Nat} {args : List Value} {frame : Frame}
+    {stack values : List Value} {m m' : Memory}
+    (h : instruction (.loadAggregate size) stack m = .ok (m', values)) :
+    step body (.loadAggregate size) pc args frame stack m = .ok (.next (pc + 1) values frame m') := by
+  unfold step
+  simp only [show pureArity (.loadAggregate size) = none from rfl, h, Bind.bind, Except.bind, Pure.pure,
+    Except.pure]
+
+private theorem s_bitcast {body : CIL.Method} {pc : Nat} {args : List Value} {frame : Frame}
+    {stack values : List Value} {m m' : Memory} {source target : CIL.SnapshotShape}
+    (h : memoryInstruction (.bitcastValue source target) stack m = .ok (m', values)) :
+    step body (.memory (.bitcastValue source target)) pc args frame stack m =
+      .ok (.next (pc + 1) values frame m') := by
+  unfold step staticInstruction
+  simp only [h, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 def body (narrow : Bool) (profile : CIL.FeatureProfile) : CIL.Method :=
   { profile := profile, returnsValue := true, locals := [], code := [
@@ -60,19 +85,16 @@ theorem run64 (profile : CIL.FeatureProfile) (program : CIL.Program) (index : Na
   have casted := cast_input memory left
   generalize valueEq : inputValue memory left = value at *
   refine ⟨10, ?_⟩
-  iterate 8
-    apply Eq.trans
-    · apply run_next found
-      · simp only [body]; rfl
-      · simp (config := { implicitDefEqProofs := false })
-          [body, step, scalarArguments, checkedValue, numericValue, formValue, formed,
-            loaded, casted, staticInstruction, checkedIntrinsic, pureArity, scalars, CIL.step.eq_def, CIL.Intrinsic.available,
-            eval_scalar32, eval_scalar64, eval_xor, eval_zero, eval_equal,
-            checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-        try exact ⟨rfl, rfl, rfl, rfl⟩
-        done
-  simp [run, found, body, step, checkedValue, numericValue, CIL.NarrowKind.extend,
-    Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
+  refine (run_next found rfl (rfl)).trans ?_
+  refine (run_next found rfl (rfl)).trans ?_
+  refine (run_next found rfl (s_arg (by rfl) formed)).trans ?_
+  refine (run_next found rfl (s_loadAggregate (loaded _))).trans ?_
+  refine (run_next found rfl (s_bitcast (casted _))).trans ?_
+  refine (run_next found rfl (rfl)).trans ?_
+  refine (run_next found rfl (rfl)).trans ?_
+  refine (run_next found rfl (rfl)).trans ?_
+  refine (run_return found rfl rfl rfl).trans ?_
+  simp [leaveFrame, CIL.NarrowKind.extend]
   split <;> rename_i h <;> simp [h, eq_comm]
   exact Ne.symm h
 
@@ -89,19 +111,16 @@ theorem run32 (profile : CIL.FeatureProfile) (program : CIL.Program) (index : Na
   have casted := cast_input memory left
   generalize valueEq : inputValue memory left = value at *
   refine ⟨10, ?_⟩
-  iterate 8
-    apply Eq.trans
-    · apply run_next found
-      · simp only [body]; rfl
-      · simp (config := { implicitDefEqProofs := false })
-          [body, step, scalarArguments, checkedValue, numericValue, formValue, formed,
-            loaded, casted, staticInstruction, checkedIntrinsic, pureArity, scalars, CIL.step.eq_def, CIL.Intrinsic.available,
-            eval_scalar32, eval_scalar64, eval_xor, eval_zero, eval_equal,
-            checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-        try exact ⟨rfl, rfl, rfl, rfl⟩
-        done
-  simp [run, found, body, step, checkedValue, numericValue, CIL.NarrowKind.extend,
-    Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
+  refine (run_next found rfl (rfl)).trans ?_
+  refine (run_next found rfl (rfl)).trans ?_
+  refine (run_next found rfl (s_arg (by rfl) formed)).trans ?_
+  refine (run_next found rfl (s_loadAggregate (loaded _))).trans ?_
+  refine (run_next found rfl (s_bitcast (casted _))).trans ?_
+  refine (run_next found rfl (rfl)).trans ?_
+  refine (run_next found rfl (rfl)).trans ?_
+  refine (run_next found rfl (rfl)).trans ?_
+  refine (run_return found rfl rfl rfl).trans ?_
+  simp [leaveFrame, CIL.NarrowKind.extend]
   split <;> rename_i h <;> simp [h, eq_comm]
   exact Ne.symm h
 

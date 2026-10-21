@@ -5,6 +5,38 @@ namespace UInt256Proof.Multiply.Full
 variable {alternative : Bool}
 open CIL.Safety UInt256Model.Safety UInt256Proof.Multiply.Calls UInt256Proof.Multiply.BothTwo
 
+private theorem s_arg {body : CIL.Method} {pc i : Nat} {args : List Value} {frame : Frame}
+    {stack : List Value} {m : Memory} {r : Reference}
+    (h : args[i]? = some (.reference (.address r))) (formed : form m r = .ok r) :
+    step body (.arg i) pc args frame stack m = .ok (.next (pc + 1) (.reference (.address r) :: stack) frame m) := by
+  unfold step
+  simp only [h, checkedValue, formValue, formed, checkedAt, Except.mapError, Bind.bind, Except.bind,
+    Pure.pure, Except.pure]
+
+private theorem s_fieldAt_of {body : CIL.Method} {pc offset width : Nat} {args : List Value} {frame : Frame}
+    {stack values : List Value} {m m' : Memory}
+    (h : instruction (.fieldAt offset width) stack m = .ok (m', values)) :
+    step body (.fieldAt offset width) pc args frame stack m = .ok (.next (pc + 1) values frame m') := by
+  unfold step
+  simp only [show pureArity (.fieldAt offset width) = none from rfl, h, Bind.bind, Except.bind, Pure.pure,
+    Except.pure]
+
+private theorem s_call5 {body : CIL.Method} {pc callee : Nat} {args : List Value} {frame : Frame} {m : Memory}
+    {r : Reference} {w0 w1 w2 w3 : BitVec 64} (formed : form m r = .ok r) :
+    step body (.call callee 5) pc args frame
+      [.scalar (.i64 w3), .scalar (.i64 w2), .scalar (.i64 w1), .scalar (.i64 w0), .reference (.address r)] m =
+      .ok (.call callee [.reference (.address r), .scalar (.i64 w0), .scalar (.i64 w1), .scalar (.i64 w2),
+        .scalar (.i64 w3)] [] m) := by
+  have hv : checkedValue m (.reference (.address r)) = .ok (.reference (.address r)) := by
+    simp only [checkedValue, formValue, formed, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure,
+      Except.pure]
+  show (do
+    let arguments ← [Value.reference (.address r), .scalar (.i64 w0), .scalar (.i64 w1), .scalar (.i64 w2),
+      .scalar (.i64 w3)].mapM (checkedValue m)
+    return FrameAction.call callee arguments [] m : ExecutionResult FrameAction) = _
+  simp only [List.mapM_cons, List.mapM_nil, hv]
+  rfl
+
 def fullBody (profile : CIL.FeatureProfile) (wordIndex countIndex storageIndex : Nat) (alternative : Bool := false) : CIL.Method := { profile := profile, returnsValue := false, locals := [.unmodeled, .unmodeled, .unmodeled, .unmodeled, .unmodeled, .unmodeled, .unmodeled, .unmodeled, .unmodeled, .unmodeled, .unmodeled, .unmodeled, .unmodeled, .unmodeled, .unmodeled, .unmodeled, .unmodeled, .unmodeled, .unmodeled, .unmodeled, .unmodeled, .unmodeled, .unmodeled, .unmodeled, .unmodeled, .unmodeled], localKinds := [.word64, .word64, .word64, .word64, .word64, .word64, .word64, .word64, .word64, .word64, .word64, .word64, .word64, .word64, .word64, .word64, .word64, .word64, .word64, .word64, .word64, .word64, .vector256, .vector256, .vector256, .vector256], parameterHomes := [], staticSites := [], code := [
   .arg 0,
   .fieldAt 0 8,
@@ -281,12 +313,6 @@ theorem full_scalar_top (profile : CIL.FeatureProfile) (program : CIL.Program) (
     ∃ fuel final returned,
       run program fuel methodIndex 18 (productArgs left right output) frame [] current =
         .ok (final, returned) ∧ post final returned := by
-  have profileEq : (fullBody profile wordIndex countIndex storageIndex alternative).profile = profile := rfl
-  iterate 4
-    apply run_next_exists post found (by rfl)
-    simp [step, profileEq, noAvx512, noAvx2, CIL.FeatureProfile.evaluate,
-      pureArity, scalars, CIL.step.eq_def, numericValue, Bind.bind, Except.bind, Pure.pure, Except.pure]
-    first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
   have formedLeft := state.call.input_formed (by simp : left ∈ [left, right])
   have formedRight := state.call.input_formed (by simp : right ∈ [left, right])
   have readingLeft := state.input_field originalCall left (by simp) 3
@@ -310,25 +336,51 @@ theorem full_scalar_top (profile : CIL.FeatureProfile) (program : CIL.Program) (
   have load5 := fun (pc : Nat) (stack : List Value) => state.snapshots.load
     (body := (fullBody profile wordIndex countIndex storageIndex alternative)) (args := productArgs left right output) (pc := pc) (stack := stack)
     (index := 5) (inputLimb original right 2) (by rfl)
-  iterate 17
-    apply run_next_exists post found (by rfl)
-    try simp only [noAvx512, noAvx2, Bool.false_or, Bool.false_eq_true, ↓reduceIte]
-    first
-    | exact load0 _ _
-    | exact load1 _ _
-    | exact load2 _ _
-    | exact load3 _ _
-    | exact load4 _ _
-    | exact load5 _ _
-    | rfl
-    | simp (config := { implicitDefEqProofs := false })
-        [step, pureArity, productArgs, checkedValue, formValue, formedLeft, formedRight,
-          readingLeft, readingRight, checkedAt,
-          Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-      first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
   obtain ⟨after, stored, next⟩ := state.store enteredWF homes 6 (by rfl) (fullTop original left right)
     95 (productArgs left right output) [] (body := (fullBody profile wordIndex countIndex storageIndex alternative))
-  exact run_next_exists post found (by change some _ = _; simp only [noAvx512, noAvx2, Bool.false_or, Bool.false_eq_true, ↓reduceIte]) stored (continuation after next)
+  obtain ⟨architecture, nativeWidth, littleEndian, advSimd, sse2, ssse3, sse42, avx, avx2, avx512F,
+    avx512FVL, bmi1, sse41, avx512DQ, avx512DQVL, bmi2, armBase64, vector256Accelerated⟩ := profile
+  change avx512DQVL = false at noAvx512
+  change avx2 = false at noAvx2
+  subst noAvx512 noAvx2
+  iterate 4
+    apply run_next_exists post found (by rfl)
+    rfl
+  apply run_next_exists post found (by rfl)
+  exact load0 _ _
+  apply run_next_exists post found (by rfl)
+  exact s_arg (by rfl) formedRight
+  apply run_next_exists post found (by rfl)
+  exact s_fieldAt_of (readingRight _)
+  apply run_next_exists post found (by rfl)
+  exact rfl
+  apply run_next_exists post found (by rfl)
+  exact load2 _ _
+  apply run_next_exists post found (by rfl)
+  exact load5 _ _
+  apply run_next_exists post found (by rfl)
+  exact rfl
+  apply run_next_exists post found (by rfl)
+  exact rfl
+  apply run_next_exists post found (by rfl)
+  exact load4 _ _
+  apply run_next_exists post found (by rfl)
+  exact load3 _ _
+  apply run_next_exists post found (by rfl)
+  exact rfl
+  apply run_next_exists post found (by rfl)
+  exact rfl
+  apply run_next_exists post found (by rfl)
+  exact s_arg (by rfl) formedLeft
+  apply run_next_exists post found (by rfl)
+  exact s_fieldAt_of (readingLeft _)
+  apply run_next_exists post found (by rfl)
+  exact load1 _ _
+  apply run_next_exists post found (by rfl)
+  exact rfl
+  apply run_next_exists post found (by rfl)
+  exact rfl
+  exact run_next_exists post found (by rfl) stored (continuation after next)
 
 #print axioms full_scalar_top
 end UInt256Proof.Multiply.Full
@@ -351,12 +403,12 @@ def fullSecondColumn (original : Memory) (left right : Reference) :=
 
 theorem countCarry_order (a b c : BitVec 64) :
     countCarry (a + b) c (countCarry a b 0) = countCarry (a + c) b (countCarry a c 0) := by
-  apply BitVec.eq_of_toNat_eq
-  simp only [countCarry, BitVec.toNat_add, sumHigh_nat]
-  have ha := a.isLt
-  have hb := b.isLt
-  have hc := c.isLt
-  omega
+  have carry (x z : Nat) : x / 2^64 + (x % 2^64 + z) / 2^64 = (x + z) / 2^64 := by
+    conv => rhs; rw [← Nat.div_add_mod x (2^64), Nat.add_assoc, Nat.mul_add_div (by decide)]
+  have split (x y z : BitVec 64) :
+      sumHigh x y + sumHigh (x + y) z = BitVec.ofNat 64 ((x.toNat + y.toNat + z.toNat) / 2^64) := by
+    simp only [sumHigh, BitVec.ofNat_add_ofNat, BitVec.toNat_add, carry]
+  simp only [countCarry, BitVec.add_assoc, split, Nat.add_right_comm a.toNat b.toNat c.toNat]
 
 theorem second_column_order (known : Nat → Option (BitVec 64)) :
     countWords (countWords (rememberWord known 13 0) 7 12 13 14) 14 10 13 14 =
@@ -417,9 +469,7 @@ theorem full_second_column (profile : CIL.FeatureProfile) (program : CIL.Program
   intro m3 state3
   iterate 2
     apply run_next_exists post found (by rfl)
-    simp [step, pureArity, scalars, CIL.step.eq_def, numericValue,
-      Bind.bind, Except.bind, Pure.pure, Except.pure]
-    first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
+    rfl
   obtain ⟨m4, reset, state4⟩ := state3.store enteredWF homes 13 (by rfl) 0
     113 (productArgs left right output) [] (body := (fullBody profile wordIndex countIndex storageIndex alternative))
   apply run_next_exists post found (by rfl) reset
@@ -498,9 +548,7 @@ theorem full_middle_column (profile : CIL.FeatureProfile) (program : CIL.Program
   apply run_next_exists post found (by rfl) copiedStep
   iterate 2
     apply run_next_exists post found (by rfl)
-    simp [step, pureArity, scalars, CIL.step.eq_def, numericValue,
-      Bind.bind, Except.bind, Pure.pure, Except.pure]
-    first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
+    rfl
   obtain ⟨m0, resetStep, state0⟩ := copiedState.store enteredWF homes 13 (by rfl) 0
     128 (productArgs left right output) [] (body := (fullBody profile wordIndex countIndex storageIndex alternative))
   apply run_next_exists post found (by rfl) resetStep
@@ -592,9 +640,7 @@ theorem full_first_upper (profile : CIL.FeatureProfile) (program : CIL.Program) 
   apply run_next_exists post found (by rfl) (state2.snapshots.load (localWord k2 6) (localWord_known _ _ (by rfl)))
   apply run_next_exists post found (by rfl) (state2.snapshots.load (localWord k2 16) (localWord_known _ _ (by rfl)))
   apply run_next_exists post found (by rfl)
-  · simp [step, pureArity, scalars, numericValue, CIL.step.eq_def, CIL.binary,
-      Bind.bind, Except.bind, Pure.pure, Except.pure]
-    first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
+  · rfl
   obtain ⟨after, stored, next⟩ := state2.store enteredWF homes 6 (by rfl)
     (localWord k2 6 + localWord k2 16) 152 (productArgs left right output) [] (body := (fullBody profile wordIndex countIndex storageIndex alternative))
   exact run_next_exists post found (by rfl) stored (continuation after next)
@@ -644,9 +690,7 @@ theorem full_upper (profile : CIL.FeatureProfile) (program : CIL.Program) (metho
   apply run_next_exists post found (by rfl) (state2.snapshots.load (localWord k2 6) (localWord_known _ _ (by rfl)))
   apply run_next_exists post found (by rfl) (state2.snapshots.load (localWord k2 18) (localWord_known _ _ (by rfl)))
   apply run_next_exists post found (by rfl)
-  · simp [step, pureArity, scalars, numericValue, CIL.step.eq_def, CIL.binary,
-      Bind.bind, Except.bind, Pure.pure, Except.pure]
-    first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
+  · rfl
   obtain ⟨after, stored, next⟩ := state2.store enteredWF homes 6 (by rfl)
     (localWord k2 6 + localWord k2 18) 166 (productArgs left right output) [] (body := (fullBody profile wordIndex countIndex storageIndex alternative))
   exact run_next_exists post found (by rfl) stored (continuation after next)
@@ -702,9 +746,7 @@ theorem full_final (profile : CIL.FeatureProfile) (program : CIL.Program) (metho
   apply run_next_exists post found (by rfl) (state2.snapshots.load (localWord k2 13) (localWord_known _ _ (by rfl)))
   iterate 2
     apply run_next_exists post found (by rfl)
-    simp [step, pureArity, scalars, numericValue, CIL.step.eq_def, CIL.binary,
-      Bind.bind, Except.bind, Pure.pure, Except.pure]
-    first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
+    rfl
   obtain ⟨after, stored, next⟩ := state2.store enteredWF homes 6 (by rfl)
     (localWord k2 6 + (localWord k2 20 + localWord k2 13)) 182 (productArgs left right output) [] (body := (fullBody profile wordIndex countIndex storageIndex alternative))
   exact run_next_exists post found (by rfl) stored (continuation after next)
@@ -725,12 +767,24 @@ theorem full_words_correct (original : Memory) (left right : Reference) :
   have words : fullResultWords original left right = productLimbs (inputLimb original left) (inputLimb original right) := by
     funext ⟨index, bound⟩
     have cases : index = 0 ∨ index = 1 ∨ index = 2 ∨ index = 3 := by omega
-    rcases cases with rfl | rfl | rfl | rfl <;>
-      simp [fullResultWords, fullFinalWords, fullUpperWords, fullFirstUpperWords, fullMiddleWords,
-        fullSecondColumn, fullFirstProducts, fullPrepared, fullInputs, fullTop,
-        localWord, widenWords, countWords, rememberWord,
-        productLimbs, firstColumn, secondColumn, topWords, column, columnStep,
-        countCarry, lowProduct, BitVec.add_assoc]
+    rcases cases with rfl | rfl | rfl | rfl
+    · rfl
+    · rfl
+    · rfl
+    · have top : fullResultWords original left right ⟨3, bound⟩ =
+          (((((lowProduct (inputLimb original left 0) (inputLimb original right 3) +
+            lowProduct (inputLimb original left 1) (inputLimb original right 2)) +
+            lowProduct (inputLimb original left 2) (inputLimb original right 1)) +
+            lowProduct (inputLimb original left 3) (inputLimb original right 0)) +
+            highProduct (inputLimb original left 0) (inputLimb original right 2)) +
+            highProduct (inputLimb original left 1) (inputLimb original right 1)) +
+            (highProduct (inputLimb original left 2) (inputLimb original right 0) +
+              (secondColumn (inputLimb original left) (inputLimb original right)).2) := rfl
+      rw [top]
+      show _ = (topWords _ _).sum
+      simp only [topWords, List.sum_cons, List.sum_nil, BitVec.add_assoc]
+      exact congrArg _ (congrArg _ (congrArg _ (congrArg _ (congrArg _ (congrArg _
+        (congrArg _ (BitVec.add_zero _).symm))))))
   rw [words, product_limbs_correct, input_limbs_value, input_limbs_value]
 
 #print axioms full_words_correct
@@ -760,9 +814,7 @@ theorem full_output_with_storage (profile : CIL.FeatureProfile) (program : CIL.P
       (pc := pc) (stack := stack) (index := index) value present
   change ∃ fuel final returned, _ ∧ post final returned
   apply run_next_exists post found (by rfl)
-  · simp [step, productArgs, checkedValue, formValue, formed, checkedAt,
-      Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-    first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
+  · exact s_arg (by rfl) formed
   apply run_next_exists post found (by rfl) (load 8 (words 0) (localWord_known _ _ (by rfl)) _ _)
   apply run_next_exists post found (by rfl) (load 14 (words 1) (localWord_known _ _ (by rfl)) _ _)
   apply run_next_exists post found (by rfl) (load 15 (words 2) (localWord_known _ _ (by rfl)) _ _)
@@ -773,9 +825,8 @@ theorem full_output_with_storage (profile : CIL.FeatureProfile) (program : CIL.P
       [.scalar (.i64 (words 3)), .scalar (.i64 (words 2)), .scalar (.i64 (words 1)), .scalar (.i64 (words 0)),
         .reference (.address output)] current =
       .ok (.call storageIndex [.reference (.address output), .scalar (.i64 (words 0)),
-        .scalar (.i64 (words 1)), .scalar (.i64 (words 2)), .scalar (.i64 (words 3))] [] current) := by
-    simp [step, checkedValue, numericValue, formValue, formed, checkedAt,
-      Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
+        .scalar (.i64 (words 1)), .scalar (.i64 (words 2)), .scalar (.i64 (words 3))] [] current) :=
+    s_call5 formed
   have finished : run program 1 methodIndex 189 (productArgs left right output) frame [] result =
       .ok (leaveFrame frame result, []) := by
     have fetched : (fullBody profile wordIndex countIndex storageIndex alternative).code[189]? = some .ret := by rfl

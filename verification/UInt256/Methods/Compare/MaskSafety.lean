@@ -1,4 +1,5 @@
 import CIL.Safety.Execution
+import CIL.Safety.StepComposition
 import UInt256.Methods.Compare.MaskLemmas
 namespace UInt256Proof.Compare.Safety
 open CIL.Safety
@@ -18,15 +19,11 @@ def maskResult (equal less : BitVec 32) : BitVec 32 :=
 theorem mask_invoke (profile : CIL.FeatureProfile) (program : CIL.Program) (index : Nat) (found : program[index]? = some (maskBody profile)) (memory : CIL.Safety.Memory) (equal less : BitVec 32) :
     CIL.Safety.invoke program 8 index [.scalar (.i32 equal), .scalar (.i32 less)] memory =
       .ok (memory, [.scalar (.i32 (maskResult equal less))]) := by
-  unfold maskResult
-  split <;> rename_i condition
-  all_goals simp only [BitVec.toNat_add, BitVec.toNat_shiftLeft, Nat.add_mod_mod] at condition
-  all_goals simp only [show (2 : Nat)^32 = 4294967296 from rfl] at condition
-  all_goals simp [CIL.Safety.invoke, CIL.Safety.run, found, maskBody, enterFrame, makeLocals, makeArgumentHomes, makeParameterHomes, leaveFrame,
-    CIL.Safety.step, CIL.Safety.instruction, checkedValue, numericValue, pureArity, scalars,
-    CIL.step, CIL.NarrowKind.extend, condition, CIL.binary, maskResult, BitVec.lt_def,
-    Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-
+  refine invoke_of_run found rfl rfl ?_
+  repeat refine (run_next found rfl rfl).trans ?_
+  refine (run_return found rfl rfl rfl).trans ?_
+  simp [leaveFrame, maskResult, CIL.NarrowKind.extend, BitVec.lt_def]
+  split <;> rfl
 
 theorem mask_result_math (left right : UInt256Model.Limbs) :
     maskResult (BitVec.ofNat 32 (equalityMask left right)) (BitVec.ofNat 32 (lessMask left right)) =

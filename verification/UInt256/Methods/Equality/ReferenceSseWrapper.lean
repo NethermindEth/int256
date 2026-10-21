@@ -1,3 +1,5 @@
+import UInt256.Safety.DispatchEquation
+import UInt256.Safety.StepEquation
 import UInt256.Methods.Equality.SseSafetyContract
 import CIL.Safety.CallComposition
 namespace UInt256Proof.Equality.ReferenceSseWrapper

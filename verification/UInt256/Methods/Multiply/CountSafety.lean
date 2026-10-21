@@ -8,6 +8,30 @@ import CIL.Safety.StepComposition
 namespace UInt256Proof.Multiply.CountSafety
 open CIL.Safety
 
+private theorem s_arg {body : CIL.Method} {pc i : Nat} {args : List Value} {frame : Frame}
+    {stack : List Value} {m : Memory} {r : Reference}
+    (h : args[i]? = some (.reference (.address r))) (formed : form m r = .ok r) :
+    step body (.arg i) pc args frame stack m = .ok (.next (pc + 1) (.reference (.address r) :: stack) frame m) := by
+  unfold step
+  simp only [h, checkedValue, formValue, formed, checkedAt, Except.mapError, Bind.bind, Except.bind,
+    Pure.pure, Except.pure]
+
+private theorem s_load64 {body : CIL.Method} {pc : Nat} {args : List Value} {frame : Frame}
+    {rest : List Value} {m : Memory} {r : ManagedReference} {v : CIL.Value}
+    (loaded : loadValue m r 8 = .ok v) :
+    step body .load64 pc args frame (.reference r :: rest) m = .ok (.next (pc + 1) (.scalar v :: rest) frame m) := by
+  unfold step instruction
+  simp only [show pureArity .load64 = none from rfl, loaded, Bind.bind, Except.bind, Pure.pure, Except.pure]
+
+private theorem s_store64 {body : CIL.Method} {pc : Nat} {args : List Value} {frame : Frame}
+    {rest : List Value} {m m' : Memory} {r : Reference} {bits : BitVec 64}
+    (written : write m r (numberBytes bits.toNat 8) 1 = .ok m') :
+    step body .store64 pc args frame (.scalar (.i64 bits) :: .reference (.address r) :: rest) m =
+      .ok (.next (pc + 1) rest frame m') := by
+  unfold step instruction storeValue
+  simp only [show pureArity .store64 = none from rfl, referenceAt, ordinaryAccessAlignment, written, checkedAt,
+    Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
+
 def body (profile : CIL.FeatureProfile) : CIL.Method :=
   { profile := profile, returnsValue := true, locals := [.i64 0], localKinds := [.word64],
     code := [.arg 0, .arg 1, .add, .setLocal 0, .arg 2, .arg 2, .load64,
@@ -76,20 +100,19 @@ theorem count_carry_invoke (profile : CIL.FeatureProfile) (program : CIL.Program
     have storedOutput : step (body profile) .store64 12 args frame
         [.scalar (.i64 (countCarry a b count)), .reference (.address output)] middle =
         .ok (.next 13 [] frame updated) := by
-      simp only [step, pureArity, instruction, storeValue, referenceAt, outputWritten, checkedAt, Except.mapError,
-        Bind.bind, Except.bind, Pure.pure, Except.pure]
-    iterate 12
-      apply Eq.trans
-      · apply run_next found (by rfl)
-        first
-        | exact stored
-        | exact loadSum _ _
-        | rfl
-        | simp (config := { implicitDefEqProofs := false })
-            [step, args, checkedValue, formValue, formedOutput, checkedAt,
-              pureArity, instruction, loadCount,
-              Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-          first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
+      exact s_store64 outputWritten
+    refine (run_next found rfl (rfl)).trans ?_
+    refine (run_next found rfl (rfl)).trans ?_
+    refine (run_next found rfl (rfl)).trans ?_
+    refine (run_next found rfl (stored)).trans ?_
+    refine (run_next found rfl (s_arg (by rfl) formedOutput)).trans ?_
+    refine (run_next found rfl (s_arg (by rfl) formedOutput)).trans ?_
+    refine (run_next found rfl (s_load64 loadCount)).trans ?_
+    refine (run_next found rfl (loadSum _ _)).trans ?_
+    refine (run_next found rfl (rfl)).trans ?_
+    refine (run_next found rfl (rfl)).trans ?_
+    refine (run_next found rfl (rfl)).trans ?_
+    refine (run_next found rfl (rfl)).trans ?_
     have flag : (BitVec.signExtend 64 (if a + b < a then BitVec.ofNat 32 1 else BitVec.ofNat 32 0)) = sumHigh a b := by
       rw [← sumHigh_flag]
       split <;> rfl

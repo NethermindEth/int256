@@ -9,6 +9,21 @@ namespace UInt256Proof.Equality.ScalarLeaf
 
 open CIL.Safety UInt256Model.Safety
 
+private theorem step_arg_address {body : CIL.Method} {pc i : Nat} {args : List Value} {frame : Frame}
+    {stack : List Value} {m : Memory} {r : Reference}
+    (h : args[i]? = some (.reference (.address r))) (formed : form m r = .ok r) :
+    step body (.arg i) pc args frame stack m = .ok (.next (pc + 1) (.reference (.address r) :: stack) frame m) := by
+  unfold step
+  simp only [h, checkedValue, formValue, formed, checkedAt, Except.mapError, Bind.bind, Except.bind,
+    Pure.pure, Except.pure]
+
+private theorem step_fieldAt_of {body : CIL.Method} {pc offset width : Nat} {args : List Value} {frame : Frame}
+    {stack values : List Value} {m m' : Memory}
+    (h : instruction (.fieldAt offset width) stack m = .ok (m', values)) :
+    step body (.fieldAt offset width) pc args frame stack m = .ok (.next (pc + 1) values frame m') := by
+  unfold step
+  simp only [show pureArity (.fieldAt offset width) = none from rfl, h, Bind.bind, Except.bind, Pure.pure, Except.pure]
+
 def body (profile : CIL.FeatureProfile) : CIL.Method := { profile := profile, returnsValue := true, locals := [], localKinds := [], parameterHomes := [], staticSites := [], code := [
   .arg 0,
   .fieldAt 0 8,
@@ -58,34 +73,35 @@ theorem scalar_run (memory : Memory) (left right : Reference) (frame : Frame)
   have fr := call.input_formed (reference := right) (by simp)
   have hl := fun index rest => call.input_field_instruction (reference := left) (by simp) index rest
   have hr := fun index rest => call.input_field_instruction (reference := right) (by simp) index rest
-  have hc (value : BitVec 32) (rest : List Value) :
-      instruction (.const32 value) rest memory = .ok (memory, .scalar (.i32 value) :: rest) := rfl
-  have hl0 := hl (0 : Fin 4)
-  have hl1 := hl (1 : Fin 4)
-  have hl2 := hl (2 : Fin 4)
-  have hl3 := hl (3 : Fin 4)
-  have hr0 := hr (0 : Fin 4)
-  have hr1 := hr (1 : Fin 4)
-  have hr2 := hr (2 : Fin 4)
-  have hr3 := hr (3 : Fin 4)
-  simp only [Fin.val_zero, Fin.val_one, Fin.val_two, CIL.fin_val_three, Nat.reduceMul] at hl0 hl1 hl2 hl3 hr0 hr1 hr2 hr3
-
   refine ⟨28, ?_⟩
-  -- This is a checked sufficient execution prefix, not an assumed summary:
-  -- every fetched opcode and transition must prove before the final return.
-  iterate 26
-    apply Eq.trans
-    · apply run_next
-      · exact found
-      · simp only [body]; rfl
-      · simp (config := { implicitDefEqProofs := false })
-          [step, readOnlyArguments, checkedValue, numericValue, formValue, fl, fr,
-            hl0, hl1, hl2, hl3, hr0, hr1, hr2, hr3, hc, pureArity, scalars, CIL.step.eq_def, CIL.binary, CIL.unary, checkedAt,
-            Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-        try (exact ⟨rfl, rfl, rfl, rfl⟩)
-        done
-  simp [run, found, body, step, checkedValue, numericValue, scalarDifference, CIL.NarrowKind.extend,
-    Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
+  refine (run_next found rfl (step_arg_address (by rfl) fl)).trans ?_
+  refine (run_next found rfl (step_fieldAt_of (hl 0 _))).trans ?_
+  refine (run_next found rfl (step_arg_address (by rfl) fr)).trans ?_
+  refine (run_next found rfl (step_fieldAt_of (hr 0 _))).trans ?_
+  refine (run_next found rfl rfl).trans ?_
+  refine (run_next found rfl (step_arg_address (by rfl) fl)).trans ?_
+  refine (run_next found rfl (step_fieldAt_of (hl 1 _))).trans ?_
+  refine (run_next found rfl (step_arg_address (by rfl) fr)).trans ?_
+  refine (run_next found rfl (step_fieldAt_of (hr 1 _))).trans ?_
+  refine (run_next found rfl rfl).trans ?_
+  refine (run_next found rfl rfl).trans ?_
+  refine (run_next found rfl (step_arg_address (by rfl) fl)).trans ?_
+  refine (run_next found rfl (step_fieldAt_of (hl 2 _))).trans ?_
+  refine (run_next found rfl (step_arg_address (by rfl) fr)).trans ?_
+  refine (run_next found rfl (step_fieldAt_of (hr 2 _))).trans ?_
+  refine (run_next found rfl rfl).trans ?_
+  refine (run_next found rfl rfl).trans ?_
+  refine (run_next found rfl (step_arg_address (by rfl) fl)).trans ?_
+  refine (run_next found rfl (step_fieldAt_of (hl 3 _))).trans ?_
+  refine (run_next found rfl (step_arg_address (by rfl) fr)).trans ?_
+  refine (run_next found rfl (step_fieldAt_of (hr 3 _))).trans ?_
+  refine (run_next found rfl rfl).trans ?_
+  refine (run_next found rfl rfl).trans ?_
+  refine (run_next found rfl rfl).trans ?_
+  refine (run_next found rfl rfl).trans ?_
+  refine (run_next found rfl rfl).trans ?_
+  refine (run_return found rfl rfl rfl).trans ?_
+  simp [scalarDifference, CIL.NarrowKind.extend]
   split <;> rfl
 #print axioms scalar_run
 

@@ -46,8 +46,11 @@ theorem CallingConditions.input_field_instruction {program : CIL.Program}
     (member : reference ∈ inputs) (index : Fin 4) (rest : List CIL.Safety.Value) :
     instruction (.fieldAt (8 * index.val) 8) (.reference (.address reference) :: rest) memory =
       .ok (memory, .scalar (.i64 (inputLimb memory reference index)) :: rest) := by
-  simp [instruction, call.input_limb_address member index, call.input_limb_load member index,
-    checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
+  show (checkedAt (.address reference) 0 (add memory reference 1 (BitVec.ofNat 64 (8 * index.val))) >>=
+      fun address => loadValue memory (.address address) 8 false >>=
+        fun value => pure (memory, .scalar value :: rest)) = _
+  simp only [checkedAt, call.input_limb_address member index, Except.mapError, Bind.bind,
+    Except.bind, call.input_limb_load member index, Pure.pure, Except.pure]
 
 #print axioms CallingConditions.input_limb_address
 #print axioms CallingConditions.input_limb_load

@@ -88,20 +88,86 @@ private theorem less_step (method : CIL.Method) (pc target : Nat) (args rest : L
       .ok (.next (if left.toNat < right.toNat then target else pc + 1) rest frame memory) := by
   rfl
 
-macro "threeway_leaf_steps" count:num "with" facts:term,* : tactic =>
-  `(tactic| iterate $count:num
-    apply Eq.trans
-    · apply run_next
-      · assumption
-      · simp only [body]; rfl
-      · first
-        | (simp (config := { implicitDefEqProofs := false }) only [equal_step, less_step, $[$facts:term],*]; rfl)
-        | (simp (config := { implicitDefEqProofs := false })
-          [step, readOnlyArguments, checkedValue, numericValue, formValue,
-            pureArity, scalars, BitVec.lt_def, checkedAt,
-            Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure, $[$facts:term],*]
-           try (exact ⟨rfl, rfl, rfl, rfl⟩)
-           done))
+private theorem checked_reference {memory : Memory} {input : Reference}
+    (formed : form memory input = .ok input) :
+    checkedValue memory (.reference (.address input)) = .ok (.reference (.address input)) := by
+  simp only [checkedValue, formValue, formed, checkedAt, Except.mapError, Bind.bind, Except.bind,
+    Pure.pure, Except.pure]
+
+private theorem step_arg_first {method : CIL.Method} {pc : Nat} {rest stack : List Value} {frame : Frame}
+    {memory : Memory} {input : Reference} (formed : form memory input = .ok input) :
+    step method (.arg 0) pc (.reference (.address input) :: rest) frame stack memory =
+      .ok (.next (pc + 1) (.reference (.address input) :: stack) frame memory) := by
+  show (checkedValue memory (.reference (.address input))).bind _ = _
+  rw [checked_reference formed]; rfl
+
+private theorem step_arg_second {method : CIL.Method} {pc : Nat} {first : Value} {rest stack : List Value}
+    {frame : Frame} {memory : Memory} {input : Reference} (formed : form memory input = .ok input) :
+    step method (.arg 1) pc (first :: .reference (.address input) :: rest) frame stack memory =
+      .ok (.next (pc + 1) (.reference (.address input) :: stack) frame memory) := by
+  show (checkedValue memory (.reference (.address input))).bind _ = _
+  rw [checked_reference formed]; rfl
+
+private theorem step_field {method : CIL.Method} {pc offset : Nat} {args rest values : List Value}
+    {frame : Frame} {memory : Memory} {reference : ManagedReference}
+    (loaded : instruction (.fieldAt offset 8) (.reference reference :: rest) memory = .ok (memory, values)) :
+    step method (.fieldAt offset 8) pc args frame (.reference reference :: rest) memory =
+      .ok (.next (pc + 1) values frame memory) := by
+  have unfolded : step method (.fieldAt offset 8) pc args frame (.reference reference :: rest) memory =
+      (instruction (.fieldAt offset 8) (.reference reference :: rest) memory).bind
+        fun result => .ok (.next (pc + 1) result.2 frame result.1) := rfl
+  rw [unfolded, loaded]; rfl
+
+private theorem equal_taken {method : CIL.Method} {pc target : Nat} {args rest : List Value}
+    {frame : Frame} {memory : Memory} {left right : BitVec 64} (equal : left = right) :
+    step method (.beq target) pc args frame (.scalar (.i64 right) :: .scalar (.i64 left) :: rest) memory =
+      .ok (.next target rest frame memory) := by
+  rw [equal_step, ite_eq_left equal]
+
+private theorem equal_skipped {method : CIL.Method} {pc target : Nat} {args rest : List Value}
+    {frame : Frame} {memory : Memory} {left right : BitVec 64} (different : ¬left = right) :
+    step method (.beq target) pc args frame (.scalar (.i64 right) :: .scalar (.i64 left) :: rest) memory =
+      .ok (.next (pc + 1) rest frame memory) := by
+  rw [equal_step, ite_eq_right different]
+
+private theorem less_taken {method : CIL.Method} {pc target : Nat} {args rest : List Value}
+    {frame : Frame} {memory : Memory} {left right : BitVec 64} (less : left.toNat < right.toNat) :
+    step method (.bltu target) pc args frame (.scalar (.i64 right) :: .scalar (.i64 left) :: rest) memory =
+      .ok (.next target rest frame memory) := by
+  rw [less_step, ite_eq_left less]
+
+private theorem less_skipped {method : CIL.Method} {pc target : Nat} {args rest : List Value}
+    {frame : Frame} {memory : Memory} {left right : BitVec 64} (notLess : ¬left.toNat < right.toNat) :
+    step method (.bltu target) pc args frame (.scalar (.i64 right) :: .scalar (.i64 left) :: rest) memory =
+      .ok (.next (pc + 1) rest frame memory) := by
+  rw [less_step, ite_eq_right notLess]
+
+set_option hygiene false in
+/-- One instruction step; failed alternatives stay reducible so they never unfold memory. -/
+macro "threeway_step" : tactic =>
+  `(tactic| refine (run_next found rfl (by
+      first
+        | (with_reducible exact step_arg_first fl)
+        | (with_reducible exact step_arg_second fr)
+        | ((with_reducible apply step_field)
+           first
+             | with_reducible exact hl0 _ | with_reducible exact hl1 _ | with_reducible exact hl2 _
+             | with_reducible exact hl3 _ | with_reducible exact hr0 _ | with_reducible exact hr1 _
+             | with_reducible exact hr2 _ | with_reducible exact hr3 _)
+        | ((with_reducible apply equal_taken); with_reducible assumption)
+        | ((with_reducible apply equal_skipped); with_reducible assumption)
+        | ((with_reducible apply less_taken); with_reducible assumption)
+        | ((with_reducible apply less_skipped); with_reducible assumption)
+        | rfl)).trans ?_)
+
+set_option hygiene false in
+/-- Run to the return, then select the matching result branch. -/
+macro "threeway_finish" "with" facts:term,* : tactic =>
+  `(tactic| (
+    repeat threeway_step
+    refine (run_return found rfl rfl rfl).trans ?_
+    rw [threeWayResult, $[$facts:term],*]
+    rfl))
 
 theorem threeWay_run (profile : CIL.FeatureProfile) (program : CIL.Program) (index : Nat)
     (found : program[index]? = some (body profile)) (memory : Memory) (left right : Reference) (frame : Frame)
@@ -113,9 +179,6 @@ theorem threeWay_run (profile : CIL.FeatureProfile) (program : CIL.Program) (ind
   have fr := call.input_formed (reference := right) (by simp)
   have hl := fun index rest => call.input_field_instruction (reference := left) (by simp) index rest
   have hr := fun index rest => call.input_field_instruction (reference := right) (by simp) index rest
-  have hc (value : BitVec 32) (rest : List Value) :
-      instruction (.const32 value) rest memory = .ok (memory, .scalar (.i32 value) :: rest) := by
-    rfl
   have hl0 := hl (0 : Fin 4)
   have hl1 := hl (1 : Fin 4)
   have hl2 := hl (2 : Fin 4)
@@ -126,33 +189,24 @@ theorem threeWay_run (profile : CIL.FeatureProfile) (program : CIL.Program) (ind
   have hr3 := hr (3 : Fin 4)
   simp only [Fin.val_zero, Fin.val_one, Fin.val_two, CIL.fin_val_three, Nat.reduceMul] at hl0 hl1 hl2 hl3 hr0 hr1 hr2 hr3
   refine ⟨64, ?_⟩
+  simp only [readOnlyArguments, List.map]
   by_cases h3 : inputLimb memory left 3 = inputLimb memory right 3
   · by_cases h2 : inputLimb memory left 2 = inputLimb memory right 2
     · by_cases h1 : inputLimb memory left 1 = inputLimb memory right 1
       · by_cases h0 : inputLimb memory left 0 = inputLimb memory right 0
-        · threeway_leaf_steps 21 with fl, fr, hl0, hl1, hl2, hl3, hr0, hr1, hr2, hr3, hc, h3, h2, h1, h0
-          simp [run, found, body, step, checkedValue, numericValue, threeWayResult, h3, h2, h1, h0,
-            Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
+        · threeway_finish with ite_eq_left h3, ite_eq_left h2, ite_eq_left h1, ite_eq_left h0
         · by_cases lt : (inputLimb memory left 0).toNat < (inputLimb memory right 0).toNat
-          all_goals
-            threeway_leaf_steps 26 with fl, fr, hl0, hl1, hl2, hl3, hr0, hr1, hr2, hr3, hc, h3, h2, h1, h0, lt
-            simp [run, found, body, step, checkedValue, numericValue, threeWayResult, h3, h2, h1, h0, lt,
-              Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
+          · threeway_finish with ite_eq_left h3, ite_eq_left h2, ite_eq_left h1, ite_eq_right h0, ite_eq_left lt
+          · threeway_finish with ite_eq_left h3, ite_eq_left h2, ite_eq_left h1, ite_eq_right h0, ite_eq_right lt
       · by_cases lt : (inputLimb memory left 1).toNat < (inputLimb memory right 1).toNat
-        all_goals
-          threeway_leaf_steps 21 with fl, fr, hl0, hl1, hl2, hl3, hr0, hr1, hr2, hr3, hc, h3, h2, h1, lt
-          simp [run, found, body, step, checkedValue, numericValue, threeWayResult, h3, h2, h1, lt,
-            Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
+        · threeway_finish with ite_eq_left h3, ite_eq_left h2, ite_eq_right h1, ite_eq_left lt
+        · threeway_finish with ite_eq_left h3, ite_eq_left h2, ite_eq_right h1, ite_eq_right lt
     · by_cases lt : (inputLimb memory left 2).toNat < (inputLimb memory right 2).toNat
-      all_goals
-        threeway_leaf_steps 16 with fl, fr, hl0, hl1, hl2, hl3, hr0, hr1, hr2, hr3, hc, h3, h2, lt
-        simp [run, found, body, step, checkedValue, numericValue, threeWayResult, h3, h2, lt,
-          Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
+      · threeway_finish with ite_eq_left h3, ite_eq_right h2, ite_eq_left lt
+      · threeway_finish with ite_eq_left h3, ite_eq_right h2, ite_eq_right lt
   · by_cases lt : (inputLimb memory left 3).toNat < (inputLimb memory right 3).toNat
-    all_goals
-      threeway_leaf_steps 11 with fl, fr, hl0, hl1, hl2, hl3, hr0, hr1, hr2, hr3, hc, h3, lt
-      simp [run, found, body, step, checkedValue, numericValue, threeWayResult, h3, lt,
-        Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
+    · threeway_finish with ite_eq_right h3, ite_eq_left lt
+    · threeway_finish with ite_eq_right h3, ite_eq_right lt
 
 #print axioms threeWay_run
 end UInt256Proof.Compare.ThreeWayLeaf

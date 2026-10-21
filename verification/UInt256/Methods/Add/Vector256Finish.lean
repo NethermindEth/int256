@@ -1,3 +1,4 @@
+import UInt256.Safety.StepEquation
 import UInt256.Methods.Add.Vector256Bodies
 import UInt256.Safety.ScratchCells
 import UInt256.Methods.Equality.VectorPrimitive
@@ -44,10 +45,10 @@ macro "finish_pure" : tactic => `(tactic|
   (have formedOutput := state.call.output_formed (reference := output) (by simp)
    apply run_next_exists post found (by rfl)
    · simp (config := { implicitDefEqProofs := false })
-       [step, pureArity, finishArguments, checkedValue, numericValue, formValue, formedOutput,
+       [step, pureArity.eq_def, finishArguments, checkedValue, numericValue, formValue, formedOutput,
          staticInstruction, memoryInstruction, checkedAt, profileEq, features.avx, features.avx2,
          CIL.FeatureProfile.evaluate, scalars, checkedIntrinsic, CIL.Intrinsic.available, CIL.step.eq_def,
-         CIL.binary, CIL.unary, CIL.truth, instruction, Except.mapError, Bind.bind, Except.bind, Pure.pure,
+         CIL.binary.eq_def, CIL.unary.eq_def, CIL.truth, instruction.eq_def, Except.mapError, Bind.bind, Except.bind, Pure.pure,
          Except.pure]
      try (first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)))
 

@@ -1,3 +1,5 @@
+import UInt256.Safety.DispatchEquation
+import UInt256.Safety.StepEquation
 import UInt256.Methods.Shift.ScalarPrepared
 import UInt256.Methods.Shift.ValueOutputs
 import UInt256.Methods.Shift.Count

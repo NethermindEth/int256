@@ -46,6 +46,132 @@ set_option hygiene false in
 macro "impl_load" : tactic => `(tactic|
   apply VectorFrame.run_load post state found (by rfl) (by rfl))
 
+private theorem step_reference_arg {body : CIL.Method} {pc index : Nat} {args stack : List Value}
+    {frame : Frame} {memory : Memory} {reference : Reference}
+    (found : args[index]? = some (.reference (.address reference)))
+    (formed : form memory reference = .ok reference) :
+    step body (.arg index) pc args frame stack memory =
+      .ok (.next (pc + 1) (.reference (.address reference) :: stack) frame memory) := by
+  simp only [step, found, checkedValue, formValue, formed, checkedAt, Except.mapError,
+    Bind.bind, Except.bind, Pure.pure, Except.pure]
+
+private theorem formed_value {memory : Memory} {reference : Reference}
+    (formed : form memory reference = .ok reference) :
+    formValue memory (.address reference) = .ok (.reference (.address reference)) := by
+  show (checkedAt (.address reference) 0 (form memory reference) >>= fun result =>
+    pure (Value.reference (.address result)) : ExecutionResult Value) = _
+  rw [formed]
+  rfl
+
+private theorem step_instruction {body : CIL.Method} {op : CIL.Op} {pc : Nat} {args stack values : List Value}
+    {frame : Frame} {memory after : Memory}
+    (fallback : step body op pc args frame stack memory =
+      (instruction op stack memory >>= fun result =>
+        pure (FrameAction.next (pc + 1) result.2 frame result.1) : ExecutionResult FrameAction))
+    (executed : instruction op stack memory = .ok (after, values)) :
+    step body op pc args frame stack memory = .ok (.next (pc + 1) values frame after) := by
+  rw [fallback, executed]
+  rfl
+
+private theorem step_memory {body : CIL.Method} {operation : CIL.MemoryOp} {pc : Nat}
+    {args stack values : List Value} {frame : Frame} {memory after : Memory}
+    (executed : memoryInstruction operation stack memory = .ok (after, values))
+    (direct : staticInstruction body pc operation stack memory = memoryInstruction operation stack memory) :
+    step body (.memory operation) pc args frame stack memory = .ok (.next (pc + 1) values frame after) := by
+  show (staticInstruction body pc operation stack memory >>= fun result =>
+    pure (FrameAction.next (pc + 1) result.2 frame result.1) : ExecutionResult FrameAction) = _
+  rw [direct, executed]
+  rfl
+
+private theorem step_skip_init {body : CIL.Method} {pc : Nat} {args rest : List Value}
+    {frame : Frame} {memory : Memory} {reference : Reference}
+    (formed : form memory reference = .ok reference) :
+    step body .skipInit pc args frame (.reference (.address reference) :: rest) memory =
+      .ok (.next (pc + 1) rest frame memory) := by
+  refine step_instruction rfl ?_
+  show (formValue memory (.address reference) >>= fun _ =>
+    pure (memory, rest) : ExecutionResult (Memory × List Value)) = _
+  rw [formed_value formed]
+  rfl
+
+private theorem step_as_ref {body : CIL.Method} {pc : Nat} {args rest : List Value}
+    {frame : Frame} {memory : Memory} {reference : Reference}
+    (formed : form memory reference = .ok reference) :
+    step body (.memory .asRef) pc args frame (.reference (.address reference) :: rest) memory =
+      .ok (.next (pc + 1) (.reference (.address reference) :: rest) frame memory) := by
+  refine step_memory ?_ rfl
+  show (formValue memory (.address reference) >>= fun value =>
+    pure (memory, value :: rest) : ExecutionResult (Memory × List Value)) = _
+  rw [formed_value formed]
+  rfl
+
+private theorem step_add_offset {body : CIL.Method} {pc : Nat} {args rest : List Value}
+    {frame : Frame} {memory : Memory} {reference result : Reference} {offset : BitVec 64}
+    (added : add memory reference 32 (BitVec.ofInt 64 (offset.toNat : Int)) = .ok result) :
+    step body (.memory (.add 32 false)) pc args frame
+      (.scalar (.i64 offset) :: .reference (.address reference) :: rest) memory =
+      .ok (.next (pc + 1) (.reference (.address result) :: rest) frame memory) := by
+  refine step_memory ?_ rfl
+  show (checkedAt (.address reference) 0 (add memory reference 32 (BitVec.ofInt 64 (offset.toNat : Int))) >>=
+    fun address => pure (memory, Value.reference (.address address) :: rest) :
+      ExecutionResult (Memory × List Value)) = _
+  rw [added]
+  rfl
+
+private theorem step_load256 {body : CIL.Method} {pc : Nat} {args rest : List Value}
+    {frame : Frame} {memory : Memory} {reference : Reference} {value : CIL.Value}
+    (loaded : loadValue memory (.address reference) 32 = .ok value) :
+    step body (.memory .load256) pc args frame (.reference (.address reference) :: rest) memory =
+      .ok (.next (pc + 1) (.scalar value :: rest) frame memory) := by
+  refine step_memory ?_ rfl
+  show (loadValue memory (.address reference) 32 >>= fun value =>
+    pure (memory, Value.scalar value :: rest) : ExecutionResult (Memory × List Value)) = _
+  rw [loaded]
+  rfl
+
+private theorem step_byte_bool {body : CIL.Method} {pc : Nat} {args rest : List Value}
+    {frame : Frame} {memory : Memory} {bits : BitVec 32} (small : bits.toNat ≤ 1) :
+    step body (.memory .bitcastByteBool) pc args frame (.scalar (.i32 bits) :: rest) memory =
+      .ok (.next (pc + 1) (.scalar (.i32 bits) :: rest) frame memory) := by
+  refine step_memory ?_ rfl
+  show (if bits.toNat ≤ 1 then pure (memory, Value.scalar (.i32 bits) :: rest)
+    else .error (.unsupported "Noncanonical Boolean representation") :
+      ExecutionResult (Memory × List Value)) = _
+  rw [ite_eq_left_of_eq_true _ _ (eq_true small)]
+  rfl
+
+private theorem step_span_reference {body : CIL.Method} {pc : Nat} {args rest : List Value}
+    {frame : Frame} {memory : Memory} {reference : Reference} {length : Nat}
+    (formed : form memory reference = .ok reference) :
+    step body (.memory .spanReference) pc args frame (.span (.address reference) length :: rest) memory =
+      .ok (.next (pc + 1) (.reference (.address reference) :: rest) frame memory) := by
+  refine step_memory ?_ rfl
+  show (formValue memory (.address reference) >>= fun value =>
+    pure (memory, value :: rest) : ExecutionResult (Memory × List Value)) = _
+  rw [formed_value formed]
+  rfl
+
+set_option hygiene false in
+/-- Replace the profile by its fields so feature and intrinsic checks reduce by `rfl`. -/
+local macro "impl_concrete" : tactic => `(tactic|
+  (obtain ⟨featureAvx, featureAvx2, featureWideF, featureWide, featureBits⟩ := features
+   obtain ⟨architecture, nativeWidth, littleEndian, advSimd, sse2, ssse3, sse42, avx, avx2, avx512F,
+     avx512FVL, bmi1', sse41, avx512DQ, avx512DQVL, bmi2, armBase64, vector256Accelerated⟩ := profile
+   dsimp only at featureAvx featureAvx2 featureWideF featureWide featureBits
+   subst avx avx2 avx512F avx512FVL bmi1'))
+
+set_option hygiene false in
+/-- One pure instruction step closed by definitional unfolding. -/
+local macro "impl_step" : tactic => `(tactic|
+  (apply run_next_exists post found (by rfl)
+   · first
+     | rfl
+     | exact step_reference_arg rfl (state.call.input_formed (reference := left) (by simp))
+     | exact step_reference_arg rfl (state.call.input_formed (reference := right) (by simp))
+     | exact step_reference_arg rfl (state.call.output_formed (reference := output) (by simp))
+     | exact step_skip_init (state.call.output_formed (reference := output) (by simp))
+     | exact step_as_ref (state.call.output_formed (reference := output) (by simp))))
+
 theorem impl_inputs (program : CIL.Program) (method lookup : Nat) (profile : CIL.FeatureProfile)
     (avx512 bmi1 : Bool) (found : program[method]? = some (subtractImplBody profile avx512 bmi1 lookup))
     (features : ImplProfile profile avx512 bmi1)
@@ -64,32 +190,32 @@ theorem impl_inputs (program : CIL.Program) (method lookup : Nat) (profile : CIL
     ∃ fuel final values,
       run program fuel method 0 (binaryArguments left right output) frame [] current =
         .ok (final, values) ∧ post final values := by
-  have profileEq : (subtractImplBody profile avx512 bmi1 lookup).profile = profile := rfl
+  impl_concrete
   have loadLeft := UInt256Proof.Equality.VectorPrimitive.load_input state.call (by simp : left ∈ [left, right])
   have castLeft := UInt256Proof.Equality.VectorPrimitive.cast_input current left
   have sameLeft := state.input_value originalCall (by simp : left ∈ [left, right])
   rw [sameLeft] at castLeft
-  impl_pure
-  impl_pure
-  impl_pure
+  impl_step
+  impl_step
+  impl_step
   apply run_next_exists post found (by rfl)
-  · simp only [step, pureArity, loadLeft]; rfl
+  · exact step_instruction rfl (loadLeft [])
   apply run_next_exists post found (by rfl)
-  · simp only [step, staticInstruction, castLeft]; rfl
+  · exact step_memory (castLeft []) rfl
   impl_store
   have loadRight := UInt256Proof.Equality.VectorPrimitive.load_input state.call (by simp : right ∈ [left, right])
   have castRight := UInt256Proof.Equality.VectorPrimitive.cast_input current right
   have sameRight := state.input_value originalCall (by simp : right ∈ [left, right])
   rw [sameRight] at castRight
-  impl_pure
+  impl_step
   apply run_next_exists post found (by rfl)
-  · simp only [step, pureArity, loadRight]; rfl
+  · exact step_instruction rfl (loadRight [])
   apply run_next_exists post found (by rfl)
-  · simp only [step, staticInstruction, castRight]; rfl
+  · exact step_memory (castRight []) rfl
   impl_store
   impl_load
   impl_load
-  impl_pure
+  impl_step
   impl_store
   exact continuation current state
 
@@ -118,51 +244,59 @@ theorem impl_masks (program : CIL.Program) (method lookup : Nat) (profile : CIL.
     ∃ fuel final values,
       run program fuel method 14 (binaryArguments left right output) frame [] current =
         .ok (final, values) ∧ post final values := by
-  have profileEq : (subtractImplBody profile avx512 bmi1 lookup).profile = profile := rfl
+  impl_concrete
   cases avx512
-  · impl_pure
-    impl_pure
+  · impl_step
+    impl_step
     impl_load
     impl_load
-    impl_pure
+    impl_step
     impl_store
     impl_load
-    impl_pure
-    impl_pure
-    impl_pure
-    impl_pure
-    impl_pure
-    impl_pure
-    impl_pure
-    impl_pure
-    impl_pure
-    impl_pure
-    impl_pure
-    impl_pure
-    rw [show CIL.Vector.zip256 (fun x y => CIL.Vector.mask64 (BitVec.ult x y)) a b = borrowLanes a b from rfl,
-      permute_incoming]
+    impl_step
+    impl_step
+    impl_step
+    impl_step
+    impl_step
+    impl_step
+    impl_step
+    impl_step
+    impl_step
+    impl_step
+    impl_step
+    impl_step
+    show ∃ fuel result returned, run program fuel method _ _ frame [.scalar (.v256 (CIL.Vector.permute4x64 (borrowLanes a b) (BitVec.ofNat 8 144) &&&
+      CIL.Vector.pack256 (BitVec.ofNat 64 0) (BitVec.ofNat 64 18446744073709551615)
+        (BitVec.ofNat 64 18446744073709551615) (BitVec.ofNat 64 18446744073709551615)))] current =
+        .ok (result, returned) ∧ post result returned
+    rw [permute_incoming]
     impl_store
     exact continuation current state
-  · impl_pure
-    impl_pure
+  · impl_step
+    impl_step
     impl_load
     impl_load
     impl_load
-    impl_pure
-    impl_pure
-    impl_pure
-    impl_pure
-    impl_pure
-    impl_pure
+    impl_step
+    impl_step
+    impl_step
+    impl_step
+    impl_step
+    impl_step
+    show ∃ fuel result returned, run program fuel method _ _ frame [.scalar (.v256 (CIL.Vector.map256 (fun x => x.sshiftRight 63)
+      (CIL.Vector.ternaryLogic a b (CIL.Vector.zip256 (· - ·) a b) (BitVec.ofNat 8 142))))] current =
+        .ok (result, returned) ∧ post result returned
     rw [ternary_borrow_lanes]
     impl_store
     impl_load
-    impl_pure
-    impl_pure
-    impl_pure
+    impl_step
+    impl_step
+    impl_step
+    show ∃ fuel result returned, run program fuel method _ _ frame [.scalar (.v256 (CIL.Vector.alignRight64 (borrowLanes a b) (BitVec.ofNat 256 0) 3))] current =
+        .ok (result, returned) ∧ post result returned
     rw [align_incoming]
     impl_store
-    impl_pure
+    impl_step
     exact continuation current state
 
 #print axioms impl_masks
@@ -199,35 +333,34 @@ theorem impl_decision (program : CIL.Program) (method lookup : Nat) (profile : C
     ∃ fuel final values,
       run program fuel method 50 (binaryArguments left right output) frame [] current =
         .ok (final, values) ∧ post final values := by
-  have profileEq : (subtractImplBody profile avx512 bmi1 lookup).profile = profile := rfl
-  impl_pure
-  impl_pure
-  impl_pure
-  impl_pure
+  impl_concrete
+  impl_step
+  impl_step
+  impl_step
+  impl_step
   impl_load
   impl_load
-  impl_pure
+  impl_step
   obtain ⟨stored, storeStep, state⟩ := state.output_store originalCall homes
-    (subtractImplBody profile avx512 bmi1 lookup) 57 (binaryArguments left right output) []
+    _ 57 (binaryArguments left right output) []
     (speculative a b)
   apply run_next_exists post found (by rfl) storeStep
   impl_load
   impl_load
-  impl_pure
+  impl_step
   impl_store
   impl_load
   impl_load
-  impl_pure
+  impl_step
+  show ∃ fuel result returned, run program fuel method _ _ frame
+      [.scalar (.i32 (if (equalLanes a b &&& borrowIncoming (borrowLanes a b) == 0) then 1 else 0))] current =
+        .ok (result, returned) ∧ post result returned
   by_cases decided : equalLanes a b &&& borrowIncoming (borrowLanes a b) = 0
-  · have selected : CIL.Vector.zip256 (fun x y => CIL.Vector.mask64 (x == y)) a b &&&
-        borrowIncoming (borrowLanes a b) = 0#256 := decided
-    simp only [selected, ite_true]
-    impl_pure
+  · rw [beq_iff_eq.mpr decided]
+    impl_step
     exact fast decided current state
-  · have selected : ¬ CIL.Vector.zip256 (fun x y => CIL.Vector.mask64 (x == y)) a b &&&
-        borrowIncoming (borrowLanes a b) = 0#256 := decided
-    simp only [selected, ite_false]
-    impl_pure
+  · rw [beq_eq_false_iff_ne.mpr decided]
+    impl_step
     exact slow decided current state
 
 #print axioms impl_decision
@@ -241,8 +374,11 @@ theorem impl_return (program : CIL.Program) (method lookup : Nat) (profile : CIL
     run program 1 method pc args frame [.scalar (.i32 flag)] memory =
       .ok (leaveFrame frame memory, [.scalar (.i32 flag)]) := by
   have returns : (subtractImplBody profile avx512 bmi1 lookup).returnsValue = true := rfl
-  simp [run, found, fetched, returns, step, normalized, checkedValue, numericValue,
-    Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
+  have stepped : step (subtractImplBody profile avx512 bmi1 lookup) (.ret (some .unsigned8)) pc args frame
+      [.scalar (.i32 flag)] memory =
+      .ok (.returned [.scalar (.i32 (CIL.NarrowKind.unsigned8.extend flag))] memory) := rfl
+  rw [normalized] at stepped
+  exact run_return found fetched stepped rfl
 
 theorem impl_fast_return (program : CIL.Program) (method lookup : Nat) (profile : CIL.FeatureProfile)
     (avx512 bmi1 : Bool) (found : program[method]? = some (subtractImplBody profile avx512 bmi1 lookup))
@@ -256,15 +392,15 @@ theorem impl_fast_return (program : CIL.Program) (method lookup : Nat) (profile 
     ∃ fuel final values,
       run program fuel method 117 (binaryArguments left right output) frame [] current =
         .ok (final, values) ∧ post final values := by
-  have profileEq : (subtractImplBody profile avx512 bmi1 lookup).profile = profile := rfl
+  impl_concrete
   impl_load
-  impl_pure
-  impl_pure
-  impl_pure
-  impl_pure
-  impl_pure
-  impl_pure
-  exact ⟨1, _, _, impl_return program method lookup profile avx512 bmi1 found 124 rfl _ frame current _
+  impl_step
+  impl_step
+  impl_step
+  impl_step
+  impl_step
+  impl_step
+  exact ⟨1, _, _, impl_return program method lookup _ avx512 bmi1 found 124 rfl _ frame current _
     (by split <;> rfl), continuation⟩
 
 #print axioms impl_return
@@ -296,28 +432,28 @@ theorem impl_index (program : CIL.Program) (method lookup : Nat) (profile : CIL.
     ∃ fuel final values,
       run program fuel method 66 (binaryArguments left right output) frame [] current =
         .ok (final, values) ∧ post final values := by
-  have profileEq : (subtractImplBody profile avx512 bmi1 lookup).profile = profile := rfl
+  impl_concrete
   impl_load
-  impl_pure
-  impl_pure
+  impl_step
+  impl_step
   impl_store
   impl_load
-  impl_pure
-  impl_pure
+  impl_step
+  impl_step
   impl_store
   impl_load
-  impl_pure
+  impl_step
   impl_load
-  impl_pure
-  impl_pure
+  impl_step
+  impl_step
   impl_store
   impl_load
   impl_load
-  impl_pure
+  impl_step
   impl_store
   impl_load
-  impl_pure
-  impl_pure
+  impl_step
+  impl_step
   impl_store
   exact continuation current state
 
@@ -355,64 +491,48 @@ theorem impl_slow_tail (program : CIL.Program) (method lookup : Nat) (profile : 
     ∃ fuel final values,
       run program fuel method 88 (binaryArguments left right output) frame [] current =
         .ok (final, values) ∧ post final values := by
-  have profileEq : (subtractImplBody profile avx512 bmi1 lookup).profile = profile := rfl
+  impl_concrete
   apply UInt256Proof.AddSubtract.Vector256.run_lookup post state found (by rfl) lookupFound
   intro current reference state loaded formed
   obtain ⟨added, row⟩ := UInt256Proof.AddSubtract.Vector256.table_row current reference state.call.1.1 loaded
     (UInt256Proof.SIMD.cascadeIndex (CIL.Vector.moveMask64 (borrowLanes a b)) (CIL.Vector.moveMask64 (equalLanes a b)))
     (UInt256Proof.SIMD.cascade_index_bound _ _)
-  apply run_next_exists post found (by rfl)
-  · simp [step, staticInstruction, memoryInstruction, formValue, formed, checkedAt, Except.mapError,
-      Bind.bind, Except.bind, Pure.pure, Except.pure]
-    exact ⟨rfl, rfl, rfl, rfl⟩
-  apply run_next_exists post found (by rfl)
-  · simp [step, staticInstruction, memoryInstruction, formValue, formed, checkedAt, Except.mapError,
-      Bind.bind, Except.bind, Pure.pure, Except.pure]
-    exact ⟨rfl, rfl, rfl, rfl⟩
+  apply run_next_exists post found (by rfl) (step_span_reference formed)
+  apply run_next_exists post found (by rfl) (step_as_ref formed)
   impl_load
-  impl_pure
-  apply run_next_exists post found (by rfl)
-  · simp only [step, staticInstruction, memoryInstruction, referenceAt, CIL.offsetValue, checkedAt,
-      Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-    rw [added]
-  apply run_next_exists post found (by rfl)
-  · simp [step, staticInstruction, memoryInstruction, row,
-      Bind.bind, Except.bind, Pure.pure, Except.pure]
-    try exact ⟨rfl, rfl, rfl, rfl⟩
+  impl_step
+  apply run_next_exists post found (by rfl) (step_add_offset added)
+  apply run_next_exists post found (by rfl) (step_load256 row)
   impl_store
-  impl_pure
-  impl_pure
+  impl_step
+  impl_step
   impl_load
   impl_load
-  impl_pure
+  impl_step
   obtain ⟨stored, storeStep, state⟩ := state.output_store originalCall homes
-    (subtractImplBody profile avx512 bmi1 lookup) 101 (binaryArguments left right output) []
+    _ 101 (binaryArguments left right output) []
     (corrected a b)
   apply run_next_exists post found (by rfl) storeStep
   cases bmi1
-  · impl_pure
-    impl_pure
+  · impl_step
+    impl_step
     impl_load
-    impl_pure
-    impl_pure
-    impl_pure
-    impl_pure
-    exact ⟨1, _, _, impl_return program method lookup profile _ false found 109 rfl _ frame stored _
+    impl_step
+    impl_step
+    impl_step
+    impl_step
+    exact ⟨1, _, _, impl_return program method lookup _ _ false found 109 rfl _ frame stored _
       (by split <;> rfl), continuation stored state⟩
-  · impl_pure
-    impl_pure
+  · impl_step
+    impl_step
     impl_load
-    impl_pure
-    impl_pure
-    impl_pure
-    impl_pure
-    have bit := bextr_bit (CIL.Vector.moveMask64 (equalLanes a b) + 2#32 * CIL.Vector.moveMask64 (borrowLanes a b))
-    simp only [BitVec.toNat_setWidth] at bit
-    apply run_next_exists post found (by rfl)
-    · simp [step, staticInstruction, memoryInstruction, bit,
-        Bind.bind, Except.bind, Pure.pure, Except.pure]
-      try exact ⟨rfl, rfl, rfl, rfl⟩
-    exact ⟨1, _, _, impl_return program method lookup profile _ true found 116 rfl _ frame stored _
+    impl_step
+    impl_step
+    impl_step
+    impl_step
+    apply run_next_exists post found (by rfl) (step_byte_bool (bextr_bit
+      (CIL.Vector.moveMask64 (equalLanes a b) + 2#32 * CIL.Vector.moveMask64 (borrowLanes a b))))
+    exact ⟨1, _, _, impl_return program method lookup _ _ true found 116 rfl _ frame stored _
       (by simp [CIL.NarrowKind.extend]), continuation stored state⟩
 
 end UInt256Proof.Subtract.Vector256

@@ -8,6 +8,46 @@ namespace UInt256Proof.Multiply.LimbStorage
 open CIL.Safety UInt256Model.Safety
 set_option maxRecDepth 4096
 
+private theorem s_arg {body : CIL.Method} {pc i : Nat} {args : List Value} {frame : Frame}
+    {stack : List Value} {m : Memory} {r : Reference}
+    (h : args[i]? = some (.reference (.address r))) (formed : form m r = .ok r) :
+    step body (.arg i) pc args frame stack m = .ok (.next (pc + 1) (.reference (.address r) :: stack) frame m) := by
+  unfold step
+  simp only [h, checkedValue, formValue, formed, checkedAt, Except.mapError, Bind.bind, Except.bind,
+    Pure.pure, Except.pure]
+
+private theorem s_skipInit {body : CIL.Method} {pc : Nat} {args : List Value} {frame : Frame}
+    {rest : List Value} {m : Memory} {r : Reference} (formed : form m r = .ok r) :
+    step body .skipInit pc args frame (.reference (.address r) :: rest) m = .ok (.next (pc + 1) rest frame m) := by
+  unfold step instruction
+  simp only [show pureArity .skipInit = none from rfl, formValue, formed, checkedAt, Except.mapError,
+    Bind.bind, Except.bind, Pure.pure, Except.pure]
+
+private theorem s_fieldAddress {body : CIL.Method} {pc offset : Nat} {args : List Value} {frame : Frame}
+    {rest : List Value} {m : Memory} {r result : Reference}
+    (added : add m r 1 (BitVec.ofNat 64 offset) = .ok result) :
+    step body (.fieldAddress offset) pc args frame (.reference (.address r) :: rest) m =
+      .ok (.next (pc + 1) (.reference (.address result) :: rest) frame m) := by
+  unfold step instruction
+  simp only [show pureArity (.fieldAddress offset) = none from rfl, added, checkedAt, Except.mapError,
+    Bind.bind, Except.bind, Pure.pure, Except.pure]
+
+private theorem s_asRef {body : CIL.Method} {pc : Nat} {args : List Value} {frame : Frame}
+    {rest : List Value} {m : Memory} {r : Reference} (formed : form m r = .ok r) :
+    step body (.memory .asRef) pc args frame (.reference (.address r) :: rest) m =
+      .ok (.next (pc + 1) (.reference (.address r) :: rest) frame m) := by
+  unfold step staticInstruction memoryInstruction
+  simp only [formValue, formed, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
+
+private theorem s_store64 {body : CIL.Method} {pc : Nat} {args : List Value} {frame : Frame}
+    {rest : List Value} {m m' : Memory} {r : Reference} {bits : BitVec 64}
+    (written : write m r (numberBytes bits.toNat 8) 1 = .ok m') :
+    step body .store64 pc args frame (.scalar (.i64 bits) :: .reference (.address r) :: rest) m =
+      .ok (.next (pc + 1) rest frame m') := by
+  unfold step instruction storeValue
+  simp only [show pureArity .store64 = none from rfl, referenceAt, ordinaryAccessAlignment, written, checkedAt,
+    Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
+
 def body (profile : CIL.FeatureProfile) : CIL.Method :=
   { profile := profile, locals := [], returnsValue := false, code := [
     .arg 0, .skipInit, .arg 0, .fieldAddress 0, .memory .asRef, .arg 1, .store64,
@@ -48,27 +88,34 @@ theorem store_limbs_safe (profile : CIL.FeatureProfile) (program : CIL.Program) 
   have f1 := c1.output_formed (by simp : output ∈ [output])
   have f2 := c2.output_formed (by simp : output ∈ [output])
   have f3 := c3.output_formed (by simp : output ∈ [output])
-  have l1 := c1.output_limb_formed (by simp : output ∈ [output]) 1
-  have l2 := c2.output_limb_formed (by simp : output ∈ [output]) 2
-  have l3 := c3.output_limb_formed (by simp : output ∈ [output]) 3
-  have a0 := call.output_limb_address (by simp : output ∈ [output]) 0
-  have a1 := c1.output_limb_address (by simp : output ∈ [output]) 1
-  have a2 := c2.output_limb_address (by simp : output ∈ [output]) 2
-  have a3 := c3.output_limb_address (by simp : output ∈ [output]) 3
-  simp only [Fin.val_zero, Fin.val_one, Fin.val_two, CIL.fin_val_three, Nat.reduceMul, Nat.add_zero] at a0 a1 a2 a3 h0 l1 l2 l3
   apply invoke_of_run found
   · simp [arguments, checkedValue, numericValue, formValue, checkedAt, f0,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   · rfl
-  · iterate 22
-      apply Eq.trans
-      · apply run_next found
-        · simp only [body]; rfl
-        · limb_storage_step f0, f1, f2, f3, l1, l2, l3, a0, a1, a2, a3, h0, h1, h2, h3
-          try exact ⟨rfl, rfl, rfl, rfl⟩
-          done
-    simp [run, found, body, step, leaveFrame, Except.mapError,
-      Bind.bind, Except.bind, Pure.pure, Except.pure]
+  · refine (run_next found rfl (s_arg (by rfl) f0)).trans ?_
+    refine (run_next found rfl (s_skipInit f0)).trans ?_
+    refine (run_next found rfl (s_arg (by rfl) f0)).trans ?_
+    refine (run_next found rfl (s_fieldAddress (call.output_limb_address (by simp : output ∈ [output]) 0))).trans ?_
+    refine (run_next found rfl (s_asRef (call.output_limb_formed (by simp : output ∈ [output]) 0))).trans ?_
+    refine (run_next found rfl (rfl)).trans ?_
+    refine (run_next found rfl (s_store64 h0)).trans ?_
+    refine (run_next found rfl (s_arg (by rfl) f1)).trans ?_
+    refine (run_next found rfl (s_fieldAddress (c1.output_limb_address (by simp : output ∈ [output]) 1))).trans ?_
+    refine (run_next found rfl (s_asRef (c1.output_limb_formed (by simp : output ∈ [output]) 1))).trans ?_
+    refine (run_next found rfl (rfl)).trans ?_
+    refine (run_next found rfl (s_store64 h1)).trans ?_
+    refine (run_next found rfl (s_arg (by rfl) f2)).trans ?_
+    refine (run_next found rfl (s_fieldAddress (c2.output_limb_address (by simp : output ∈ [output]) 2))).trans ?_
+    refine (run_next found rfl (s_asRef (c2.output_limb_formed (by simp : output ∈ [output]) 2))).trans ?_
+    refine (run_next found rfl (rfl)).trans ?_
+    refine (run_next found rfl (s_store64 h2)).trans ?_
+    refine (run_next found rfl (s_arg (by rfl) f3)).trans ?_
+    refine (run_next found rfl (s_fieldAddress (c3.output_limb_address (by simp : output ∈ [output]) 3))).trans ?_
+    refine (run_next found rfl (s_asRef (c3.output_limb_formed (by simp : output ∈ [output]) 3))).trans ?_
+    refine (run_next found rfl (rfl)).trans ?_
+    refine (run_next found rfl (s_store64 h3)).trans ?_
+    refine (run_return found rfl rfl rfl).trans ?_
+    rfl
 
 #print axioms store_limbs_safe
 
