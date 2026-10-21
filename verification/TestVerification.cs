@@ -121,8 +121,10 @@ using (StringWriter forwarded = new())
     string? reason = null;
     try
     {
-        Console.SetOut(forwarded);
-        Console.SetError(forwarded);
+        // One wrapper, one lock: separate SetOut/SetError wrappers let stdout and stderr corrupt the shared builder.
+        TextWriter shared = TextWriter.Synchronized(forwarded);
+        Console.SetOut(shared);
+        Console.SetError(shared);
         await VerificationSupport.Run(root, "dotnet", ["uint256-missing-tool.dll"]);
     }
     catch (InvalidOperationException exception) { reason = exception.Message; }
