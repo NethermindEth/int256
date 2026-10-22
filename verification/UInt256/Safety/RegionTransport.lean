@@ -1,5 +1,4 @@
-import CIL.Safety.Embedding.Step
-import CIL.Safety.Linking
+import CIL.Safety.StepFlow
 
 namespace UInt256Proof.Transport
 open CIL.Safety
@@ -100,40 +99,6 @@ def FlowInput (lower : Nat) (calleeAllowed : Nat → Prop) : CIL.Op → Prop
   | .call callee _ => calleeAllowed callee
   | .newVector256 .. | .newAggregate .. => False
   | op => ∀ target ∈ op.targets, lower ≤ target
-
-theorem relabel_fixed (r : Nat → Nat) (op : CIL.Op) (fixed : ∀ target ∈ op.targets, r target = target) :
-    op.relabel r = op := by
-  induction op <;> simp_all [CIL.Op.relabel, CIL.Op.targets]
-  exact (List.map_congr_left fixed).trans (List.map_id _)
-
-/-- A successful next-pc step resumes at the fallthrough of a continuing instruction or at one of its targets. -/
-theorem step_next_target {body : CIL.Method} {op : CIL.Op} {pc : Nat} {args : List Value} {frame : Frame}
-    {stack : List Value} {memory : Memory} {target : Nat} {stack' : List Value} {frame' : Frame} {memory' : Memory}
-    (executed : step body op pc args frame stack memory = .ok (.next target stack' frame' memory')) :
-    (op.continues = true ∧ target = pc + 1) ∨ target ∈ op.targets := by
-  refine Decidable.byContradiction fun outside => ?_
-  let r : Nat → Nat := fun t => if t = target then target + 1 else t
-  have same : op.relabel r = op := relabel_fixed r op fun t member =>
-    ite_eq_right fun e => outside (.inr (by rw [← e]; exact member))
-  have moved := step_relabel op body body r pc pc args frame stack memory _
-    ⟨rfl, rfl, rfl, fun continues => ite_eq_right fun e => outside (.inl ⟨continues, e.symm⟩)⟩ executed
-  rw [same, executed] at moved
-  have shifted : target = r target := by
-    simp only [FrameAction.relabel, Except.ok.injEq, FrameAction.next.injEq] at moved
-    exact moved.1
-  have : r target = target + 1 := ite_eq_left rfl
-  omega
-
-theorem step_call_action {body : CIL.Method} {callee argc pc : Nat} {args : List Value} {frame : Frame}
-    {stack : List Value} {memory : Memory} {action : FrameAction}
-    (executed : step body (.call callee argc) pc args frame stack memory = .ok action) :
-    ∃ arguments rest updated, action = .call callee arguments rest updated := by
-  unfold step at executed
-  split at executed
-  · cases executed
-  · obtain ⟨_, _, executed⟩ := except_bind_ok executed
-    cases executed
-    exact ⟨_, _, _, rfl⟩
 
 theorem step_flow (body : CIL.Method) (op : CIL.Op) (pc : Nat) (args : List Value) (frame : Frame)
     (stack : List Value) (memory : Memory) (action : FrameAction) (lower : Nat) (calleeAllowed : Nat → Prop)
