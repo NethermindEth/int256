@@ -78,13 +78,16 @@ theorem helper_prefix_prepend (profile : CIL.FeatureProfile) (program : CIL.Prog
 
 theorem helper_suffix_lookup (profile : CIL.FeatureProfile) (storage helper pc : Nat) (inside : 3 ≤ pc) :
     (helperBody profile storage helper).code[pc - 1]? =
-      ((scalarBody profile .left storage).code[pc]?).map (relocateOp (· - 1)) := by
+      ((scalarBody profile .left storage).code[pc]?).map (CIL.Op.relabel (· - 1)) := by
   change ([CIL.Op.arg 1, .call helper 1] ++
     ((scalarBody profile .left storage).code.drop 3).map (relocateOp (· - 1)))[pc - 1]? = _
   rw [List.getElem?_append_right (by simp only [List.length_cons, List.length_nil]; omega)]
   simp only [List.length_cons, List.length_nil, Nat.zero_add, List.getElem?_map, List.getElem?_drop]
   have index : 3 + (pc - 1 - 2) = pc := by omega
   rw [index]
+  cases opcode : (scalarBody profile .left storage).code[pc]? with
+  | none => rfl
+  | some op => exact congrArg some (left_relabel profile storage _ op (List.mem_of_getElem? opcode))
 
 /-- The helper variant satisfies the public left-shift contract for any call-free storage callee
     whose own contract is supplied; scalar and vector storage instantiate it below. -/
@@ -111,9 +114,8 @@ theorem helper_contract (profile : CIL.FeatureProfile) (storageBody : CIL.Method
     (shiftArguments input count output) frame entered final count [] (by rfl) finished
   have relation := suffix_correspondence program index storage 3 (· - 1) (scalarBody profile .left storage)
     (helperBody profile storage helper) storageBody distinct found storageFound callFree (fun _ _ => rfl)
-    (fun _ _ _ _ _ _ => rfl) (fun pc lower => by omega)
-    (fun pc op _ opcode => ⟨left_supported profile storage op (List.mem_of_getElem? opcode),
-      left_flow_inputs profile storage op (List.mem_of_getElem? opcode)⟩)
+    rfl rfl (fun _ _ => rfl) (fun pc lower => by omega)
+    (fun pc op _ opcode => left_flow_inputs profile storage op (List.mem_of_getElem? opcode))
     (fun pc lower => helper_suffix_lookup profile storage helper pc lower)
   have moved := run_success_transport virtual program _ _ relation remaining index 3
     (shiftArguments input count output) frame [.scalar (.i32 (count.sshiftRight 6))] entered final []
