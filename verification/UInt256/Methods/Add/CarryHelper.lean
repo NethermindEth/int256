@@ -96,26 +96,6 @@ variable {profile : CIL.FeatureProfile} {program : CIL.Program} {index : Nat}
 
 open CIL.Safety
 
-/-- Total checked invocation from caller permissions, including setup and teardown. -/
-theorem carry_invoke_succeeds (found : program[index]? = some (carryBody profile)) (a b c : BitVec 64) (carry output : Reference) (memory : Memory)
-    (wellFormed : memory.WellFormed)
-    (carryReadable : read memory carry 8 1 = .ok (numberBytes c.toNat 8))
-    (carryWritable : access memory carry 8 1 true = .ok ())
-    (outputWritable : access memory output 8 1 true = .ok ()) :
-    ∃ fuel result,
-      invoke program fuel index
-        [.scalar (.i64 a), .scalar (.i64 b), .reference (.address carry), .reference (.address output)]
-        memory = .ok (result, []) ∧
-      loadValue result (.address output) 8 = .ok (.i64 (a + b + c)) ∧
-      (WordsDisjoint carry output → loadValue result (.address carry) 8 = .ok (.i64 (carryWord a b c))) ∧
-      Confined [(carry, 8), (output, 8)] memory result ∧
-      read result output 8 1 = .ok (numberBytes (a + b + c).toNat 8) ∧
-      (WordsDisjoint carry output → read result carry 8 1 = .ok (numberBytes (carryWord a b c).toNat 8)) :=
-  carry_invoke_succeeds_of_run carryWord found carryBody_shape (carry_run_of_memory_steps found) a b c carry output
-    memory wellFormed carryReadable carryWritable outputWritable
-
-#print axioms carry_invoke_succeeds
-
 end UInt256Proof.Add.CarrySafety
 
 
@@ -147,112 +127,12 @@ variable {profile : CIL.FeatureProfile} {program : CIL.Program} {index : Nat}
 
 open CIL.Safety
 
-/-- Independent arithmetic, actual byte readbacks, and retained caller storage. -/
-structure CarryPost (a b c : BitVec 64) (carryRef output : Reference) (before after : Memory) : Prop where
-  wellFormed : after.WellFormed
+/-- Independent arithmetic and actual byte readbacks; `Confined` carries the memory guarantee. -/
+structure CarryPost (a b c : BitVec 64) (carryRef output : Reference) (after : Memory) : Prop where
   outputBytes : read after output 8 1 = .ok (numberBytes (a + b + c).toNat 8)
   carryBytes : read after carryRef 8 1 = .ok (numberBytes (UInt256Proof.carry a b c).toNat 8)
   carryBound : (UInt256Proof.carry a b c).toNat ≤ 1
   arithmetic : (a + b + c).toNat + 2^64 * (UInt256Proof.carry a b c).toNat = a.toNat + b.toNat + c.toNat
-  staticWorld : StaticWorldValid (programStaticDescriptors program) before →
-    StaticWorldValid (programStaticDescriptors program) after
-
-theorem CarryPost.output_load {a b c : BitVec 64} {carryRef output : Reference} {before after : Memory}
-    (post : CarryPost (program := program) a b c carryRef output before after) :
-    loadValue after (.address output) 8 = .ok (.i64 (a + b + c)) := load_word64_of_read post.outputBytes
-
-theorem CarryPost.carry_load {a b c : BitVec 64} {carryRef output : Reference} {before after : Memory}
-    (post : CarryPost (program := program) a b c carryRef output before after) :
-    loadValue after (.address carryRef) 8 = .ok (.i64 (UInt256Proof.carry a b c)) := load_word64_of_read post.carryBytes
-
-/-- Simultaneous carry/result readback requires nonoverlapping output words. -/
-theorem carry_checked_contract (found : program[index]? = some (carryBody profile)) (a b c : BitVec 64) (carryRef output : Reference) (memory : Memory)
-    (wellFormed : memory.WellFormed) (incoming : c.toNat ≤ 1)
-    (carryReadable : read memory carryRef 8 1 = .ok (numberBytes c.toNat 8))
-    (carryWritable : access memory carryRef 8 1 true = .ok ())
-    (outputWritable : access memory output 8 1 true = .ok ())
-    (disjoint : WordsDisjoint carryRef output) :
-    ∃ fuel result,
-      invoke program fuel index
-        [.scalar (.i64 a), .scalar (.i64 b), .reference (.address carryRef), .reference (.address output)]
-        memory = .ok (result, []) ∧ Confined [(carryRef, 8), (output, 8)] memory result ∧
-        CarryPost (program := program) a b c carryRef output memory result := by
-  obtain ⟨fuel, result, invoked, _, _, framed, outputBytes, carryBytes⟩ :=
-    carry_invoke_succeeds found a b c carryRef output memory wellFormed carryReadable carryWritable outputWritable
-  have carryBytes := carryBytes disjoint
-  rw [carryWord_correct a b c incoming] at carryBytes
-  exact ⟨fuel, result, invoked, framed,
-    ⟨invoke_preserves_wellFormed _ _ _ _ _ _ _ wellFormed invoked,
-      outputBytes, carryBytes, UInt256Proof.carry_bound a b c incoming,
-      UInt256Proof.carry_word_nat a b c incoming,
-      fun world => invoke_preserves_static_world _ _ _ _ _ _ _ wellFormed world invoked⟩⟩
-
-#print axioms CarryPost.output_load
-#print axioms CarryPost.carry_load
-#print axioms carry_checked_contract
-
-end UInt256Proof.Add.CarrySafety
-
-
-namespace UInt256Proof.Add.CarrySafety
-variable {profile : CIL.FeatureProfile} {program : CIL.Program} {index : Nat}
-
-open CIL.Safety UInt256Model.Safety
-
-/-- A carry call writing private homes preserves caller input snapshots. -/
-theorem private_input_bytes {carryRef output : Reference}
-    {before after : CIL.Safety.Memory} (framed : Confined [(carryRef, 8), (output, 8)] before after)
-    {inputs outputs : List Reference}
-    (call : CallingConditions program before inputs outputs)
-    {reference : Reference} (member : reference ∈ inputs)
-    (notCarry : reference.allocation ≠ carryRef.allocation)
-    (notOutput : reference.allocation ≠ output.allocation) :
-    (fun offset => (after.cells reference.allocation offset).bits) =
-      (fun offset => (before.cells reference.allocation offset).bits) := by
-  obtain ⟨allocation, present, _, _⟩ := formed_reference_live _ _ _ (call.input_formed member)
-  have old := (call.1.1.1 _ _ present).1
-  funext offset
-  rw [framed.cells _ old _ (outside_words (Or.inl notCarry) (Or.inl notOutput))]
-
-/-- Caller authority, readable inputs and static data survive a private carry call. -/
-theorem CarryPost.private_calling_conditions {a b c : BitVec 64} {carryRef output : Reference}
-    {before after : CIL.Safety.Memory} (post : CarryPost (program := program) a b c carryRef output before after)
-    (framed : Confined [(carryRef, 8), (output, 8)] before after)
-    {inputs outputs : List Reference}
-    (call : CallingConditions program before inputs outputs)
-    (separate : ∀ reference ∈ inputs,
-      reference.allocation ≠ carryRef.allocation ∧ reference.allocation ≠ output.allocation) :
-    CallingConditions program after inputs outputs := by
-  refine ⟨⟨post.wellFormed, ?_, ?_⟩, post.staticWorld call.2⟩
-  · intro view member
-    obtain ⟨reference, inputMember, rfl⟩ := List.mem_map.mp member
-    obtain ⟨allocation, present, _, _⟩ := formed_reference_live _ _ _ (call.input_formed inputMember)
-    have old := (call.1.1.1 _ _ present).1
-    obtain ⟨notCarry, notOutput⟩ := separate reference inputMember
-    refine ⟨_, (framed.read_eq _ old _ _ fun _ _ => outside_words (Or.inl notCarry) (Or.inl notOutput)).trans
-      (call.input_snapshot inputMember)⟩
-  · intro view member
-    have writable := call.1.2.2 view member
-    obtain ⟨allocation, present, _, _⟩ := access_within_allocation _ _ _ _ _ writable
-    exact (framed.access_write _ (call.1.1.1 _ _ present).1 _ _).trans writable
-
-theorem CarryPost.private_input_field {a b c : BitVec 64} {carryRef output : Reference}
-    {before after : CIL.Safety.Memory} (post : CarryPost (program := program) a b c carryRef output before after)
-    (framed : Confined [(carryRef, 8), (output, 8)] before after)
-    {inputs outputs : List Reference}
-    (call : CallingConditions program before inputs outputs)
-    (separate : ∀ reference ∈ inputs,
-      reference.allocation ≠ carryRef.allocation ∧ reference.allocation ≠ output.allocation)
-    {reference : Reference} (member : reference ∈ inputs) (index : Fin 4) (rest : List Value) :
-    instruction (.fieldAt (8 * index.val) 8) (.reference (.address reference) :: rest) after =
-      .ok (after, .scalar (.i64 (inputLimb before reference index)) :: rest) := by
-  rw [(post.private_calling_conditions framed call separate).input_field_instruction member index rest]
-  simp only [inputLimb, private_input_bytes framed call member (separate reference member).1
-    (separate reference member).2]
-
-#print axioms private_input_bytes
-#print axioms CarryPost.private_calling_conditions
-#print axioms CarryPost.private_input_field
 
 end UInt256Proof.Add.CarrySafety
 
@@ -296,8 +176,11 @@ structure ScalarCarryState (original current : CIL.Safety.Memory) (frame : Frame
 theorem ScalarCarryState.advance {original before after : CIL.Safety.Memory} {frame : Frame}
     {left right output carryHome : Reference} {results : Fin 4 → Reference} {carryIndex resultBase : Nat} (index : Fin 4)
     (state : ScalarCarryState (program := program) original before frame left right output carryHome results index.val carryIndex resultBase)
-    (math : CarryPost (program := program) (inputLimb original left index) (inputLimb original right index)
-      (scalarCarryValue original left right index.val) carryHome (results index) before after)
+    (math : CarryPost (inputLimb original left index) (inputLimb original right index)
+      (scalarCarryValue original left right index.val) carryHome (results index) after)
+    (formed : after.WellFormed)
+    (world : StaticWorldValid (programStaticDescriptors program) before →
+      StaticWorldValid (programStaticDescriptors program) after)
     (framed : Confined [(carryHome, 8), (results index, 8)] before after) :
     ScalarCarryState (program := program) original after frame left right output carryHome results (index.val + 1) carryIndex resultBase := by
   have separate : ∀ reference ∈ [left, right],
@@ -311,7 +194,7 @@ theorem ScalarCarryState.advance {original before after : CIL.Safety.Memory} {fr
     intro i
     obtain ⟨allocation, present, _, _⟩ := access_within_allocation _ _ _ _ _ (state.resultWrites i)
     exact (state.call.1.1.1 _ _ present).1
-  refine ⟨math.private_calling_conditions framed state.call separate, ?_, state.carrySlot, state.resultSlots,
+  refine ⟨private_calling_conditions framed formed world state.call separate, ?_, state.carrySlot, state.resultSlots,
     (framed.access_write _ carryOld _ _).trans state.carryWrite,
     fun i => (framed.access_write _ (resultOld i) _ _).trans (state.resultWrites i), ?_, ?_,
     state.callerSeparate, state.carrySeparate, state.resultSeparate,

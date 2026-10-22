@@ -155,8 +155,11 @@ theorem vector128_sse_indexed_carry (program : CIL.Program) (body : CIL.Method) 
     (resultWrite : access memory resultHome 8 1 true = .ok ())
     (disjoint : WordsDisjoint carryHome resultHome)
     (post : Memory → List Value → Prop)
-    (continuation : ∀ after, Confined [(carryHome, 8), (resultHome, 8)] memory after →
-      CarryPost (program := program) a b c carryHome resultHome memory after →
+    (continuation : ∀ after, after.WellFormed →
+      (StaticWorldValid (programStaticDescriptors program) memory →
+        StaticWorldValid (programStaticDescriptors program) after) →
+      Confined [(carryHome, 8), (resultHome, 8)] memory after →
+      CarryPost a b c carryHome resultHome after →
       ∃ fuel result returned,
         run program fuel method (172 + 7 * index.val) args frame [] after =
           .ok (result, returned) ∧ post result returned) :
@@ -178,10 +181,11 @@ theorem vector128_sse_indexed_carry (program : CIL.Program) (body : CIL.Method) 
     simp [step, checkedValue, numericValue, formValue, carryFormed, resultFormed,
       checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     try exact ⟨rfl, rfl⟩
-  apply run_call_of_contract (carry_helper_contract carryFound) ⟨a, b, c, carryHome, resultHome⟩ found fetched stepped rfl
-    ⟨wellFormed, incoming, carryRead, carryWrite, resultWrite, disjoint⟩
-  rintro after _ - framed ⟨rfl, math⟩
-  simpa only [show 171 + 7 * index.val + 1 = 172 + 7 * index.val by omega, List.append_nil] using continuation after framed math
+  apply run_call_of_contract_formed (carry_helper_contract carryFound) ⟨a, b, c, carryHome, resultHome⟩ found fetched stepped rfl
+    ⟨wellFormed, incoming, carryRead, carryWrite, resultWrite, disjoint⟩ wellFormed
+  rintro after _ - formed world framed ⟨_, rfl, math⟩
+  simpa only [show 171 + 7 * index.val + 1 = 172 + 7 * index.val by omega, carryContract, List.append_nil] using
+    continuation after formed world framed math
 
 #print axioms vector128_sse_indexed_carry
 
@@ -203,9 +207,12 @@ theorem vector128_sse_carry_segment_checked (program : CIL.Program) (body : CIL.
     (resultWrite : access memory resultHome 8 1 true = .ok ())
     (disjoint : WordsDisjoint carryHome resultHome)
     (post : CIL.Safety.Memory → List Value → Prop)
-    (continuation : ∀ after, Confined [(carryHome, 8), (resultHome, 8)] memory after →
-      CarryPost (program := program) (inputLimb memory left segment)
-        (inputLimb memory right segment) c carryHome resultHome memory after →
+    (continuation : ∀ after, after.WellFormed →
+      (StaticWorldValid (programStaticDescriptors program) memory →
+        StaticWorldValid (programStaticDescriptors program) after) →
+      Confined [(carryHome, 8), (resultHome, 8)] memory after →
+      CarryPost (inputLimb memory left segment)
+        (inputLimb memory right segment) c carryHome resultHome after →
       ∃ fuel result returned,
         run program fuel method (172 + 7 * segment.val) args frame [] after = .ok (result, returned) ∧
           post result returned) :
@@ -253,9 +260,9 @@ theorem vector128_sse_carry_next (program : CIL.Program) (body : CIL.Method) (me
     (scalarCarryValue original left right index.val) carryHome (results index) state.call
     state.carrySlot (state.resultSlots index) state.carryBound state.carryRead state.carryWrite
     (state.resultWrites index) (Or.inl (Ne.symm (state.carrySeparate index))) post
-  intro after framed math
+  intro after formed world framed math
   apply continuation after
-  apply state.advance index _ framed
+  refine state.advance index ?_ formed world framed
   simpa only [inputLimb, state.inputBytes left (by simp), state.inputBytes right (by simp)] using math
 
 /-- All four carry calls keep the initial operands, private homes and completed limbs. -/

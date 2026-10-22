@@ -18,8 +18,11 @@ theorem scalar_indexed_borrow (contract : BorrowHelperContract Extracted.program
     (borrowWrite : access memory borrowHome 8 1 true = .ok ())
     (resultWrite : access memory resultHome 8 1 true = .ok ()) (disjoint : WordsDisjoint borrowHome resultHome)
     (post : Memory → List Value → Prop)
-    (continuation : ∀ after, Confined [(borrowHome, 8), (resultHome, 8)] memory after →
-      BorrowPost (program := Extracted.program) a b c borrowHome resultHome memory after →
+    (continuation : ∀ after, after.WellFormed →
+      (StaticWorldValid (programStaticDescriptors Extracted.program) memory →
+        StaticWorldValid (programStaticDescriptors Extracted.program) after) →
+      Confined [(borrowHome, 8), (resultHome, 8)] memory after →
+      BorrowPost a b c borrowHome resultHome after →
       ∃ fuel result returned,
         run Extracted.program fuel scalarIndex (scalarBorrowCall index.val + 1) args frame [] after =
           .ok (result, returned) ∧ post result returned) :
@@ -29,8 +32,8 @@ theorem scalar_indexed_borrow (contract : BorrowHelperContract Extracted.program
         memory = .ok (result, returned) ∧ post result returned := by
   have fb := access_reference_valid _ _ _ _ _ borrowWrite
   have fr := access_reference_valid _ _ _ _ _ resultWrite
-  apply run_call_of_contract contract ⟨a, b, c, borrowHome, resultHome⟩ (body := scalarBody)
-    (op := .call Extracted.subtractWithBorrowIndex 4) (encoded := rfl)
+  apply run_call_of_contract_formed contract ⟨a, b, c, borrowHome, resultHome⟩ (body := scalarBody)
+    (op := .call Extracted.subtractWithBorrowIndex 4) (encoded := rfl) (formed := wellFormed)
   · rfl
   · obtain ⟨index, bound⟩ := index
     have cases : index = 0 ∨ index = 1 ∨ index = 2 ∨ index = 3 := by omega
@@ -39,8 +42,8 @@ theorem scalar_indexed_borrow (contract : BorrowHelperContract Extracted.program
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     exact ⟨rfl, rfl, rfl⟩
   · exact ⟨wellFormed, incoming, borrowRead, borrowWrite, resultWrite, disjoint⟩
-  · rintro after _ - framed ⟨rfl, math⟩
-    exact continuation after framed math
+  · rintro after _ - formed world framed ⟨_, rfl, math⟩
+    exact continuation after formed world framed math
 
 theorem scalar_borrow_segment_checked (contract : BorrowHelperContract Extracted.program Extracted.subtractWithBorrowIndex) (segment : Fin 3) (left right output : Reference)
     (frame : Frame) (memory : Memory) (c : BitVec 64) (borrowHome resultHome : Reference)
@@ -51,9 +54,12 @@ theorem scalar_borrow_segment_checked (contract : BorrowHelperContract Extracted
     (borrowWrite : access memory borrowHome 8 1 true = .ok ())
     (resultWrite : access memory resultHome 8 1 true = .ok ()) (disjoint : WordsDisjoint borrowHome resultHome)
     (post : Memory → List Value → Prop)
-    (continuation : ∀ after, Confined [(borrowHome, 8), (resultHome, 8)] memory after →
-      BorrowPost (program := Extracted.program) (inputLimb memory left ⟨segment.val + 1, by omega⟩)
-        (inputLimb memory right ⟨segment.val + 1, by omega⟩) c borrowHome resultHome memory after →
+    (continuation : ∀ after, after.WellFormed →
+      (StaticWorldValid (programStaticDescriptors Extracted.program) memory →
+        StaticWorldValid (programStaticDescriptors Extracted.program) after) →
+      Confined [(borrowHome, 8), (resultHome, 8)] memory after →
+      BorrowPost (inputLimb memory left ⟨segment.val + 1, by omega⟩)
+        (inputLimb memory right ⟨segment.val + 1, by omega⟩) c borrowHome resultHome after →
       ∃ fuel result returned,
         run Extracted.program fuel scalarIndex (scalarBorrowCall (segment.val + 1) + 1)
           (binaryArguments left right output) frame [] after = .ok (result, returned) ∧ post result returned) :

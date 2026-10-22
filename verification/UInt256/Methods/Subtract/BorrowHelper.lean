@@ -148,52 +148,12 @@ variable {profile : CIL.FeatureProfile} {program : CIL.Program} {index : Nat}
 open CIL.Safety UInt256Model.Safety
 
 /-- Independent arithmetic and actual byte readbacks; `Confined` carries the memory guarantee. -/
-structure BorrowPost (a b c : BitVec 64) (borrowRef output : Reference) (before after : Memory) : Prop where
-  wellFormed : after.WellFormed
+structure BorrowPost (a b c : BitVec 64) (borrowRef output : Reference) (after : Memory) : Prop where
   outputBytes : read after output 8 1 = .ok (numberBytes (a - b - c).toNat 8)
   borrowBytes : read after borrowRef 8 1 = .ok (numberBytes (UInt256Proof.borrow a b c).toNat 8)
   borrowBound : (UInt256Proof.borrow a b c).toNat ≤ 1
   arithmetic : a.toNat + 2^64 * (UInt256Proof.borrow a b c).toNat = b.toNat + c.toNat + (a - b - c).toNat
-  staticWorld : StaticWorldValid (programStaticDescriptors program) before →
-    StaticWorldValid (programStaticDescriptors program) after
 
-/-- A borrow call writing private homes preserves caller input snapshots. -/
-theorem private_input_bytes {borrowRef output : Reference}
-    {before after : Memory} (framed : Confined [(borrowRef, 8), (output, 8)] before after)
-    {inputs outputs : List Reference} (call : CallingConditions program before inputs outputs)
-    {reference : Reference} (member : reference ∈ inputs)
-    (notBorrow : reference.allocation ≠ borrowRef.allocation)
-    (notOutput : reference.allocation ≠ output.allocation) :
-    (fun offset => (after.cells reference.allocation offset).bits) =
-      (fun offset => (before.cells reference.allocation offset).bits) := by
-  obtain ⟨allocation, present, _, _⟩ := formed_reference_live _ _ _ (call.input_formed member)
-  have old := (call.1.1.1 _ _ present).1
-  funext offset
-  rw [framed.cells _ old _ (outside_words (Or.inl notBorrow) (Or.inl notOutput))]
-
-/-- Caller authority, readable inputs and static data survive a private borrow call. -/
-theorem BorrowPost.private_calling_conditions {a b c : BitVec 64} {borrowRef output : Reference}
-    {before after : Memory} (post : BorrowPost (program := program) a b c borrowRef output before after)
-    (framed : Confined [(borrowRef, 8), (output, 8)] before after)
-    {inputs outputs : List Reference} (call : CallingConditions program before inputs outputs)
-    (separate : ∀ reference ∈ inputs,
-      reference.allocation ≠ borrowRef.allocation ∧ reference.allocation ≠ output.allocation) :
-    CallingConditions program after inputs outputs := by
-  refine ⟨⟨post.wellFormed, ?_, ?_⟩, post.staticWorld call.2⟩
-  · intro view member
-    obtain ⟨reference, inputMember, rfl⟩ := List.mem_map.mp member
-    obtain ⟨allocation, present, _, _⟩ := formed_reference_live _ _ _ (call.input_formed inputMember)
-    have old := (call.1.1.1 _ _ present).1
-    obtain ⟨notBorrow, notOutput⟩ := separate reference inputMember
-    refine ⟨_, (framed.read_eq _ old _ _ fun _ _ => outside_words (Or.inl notBorrow) (Or.inl notOutput)).trans
-      (call.input_snapshot inputMember)⟩
-  · intro view member
-    have writable := call.1.2.2 view member
-    obtain ⟨allocation, present, _, _⟩ := access_within_allocation _ _ _ _ _ writable
-    exact (framed.access_write _ (call.1.1.1 _ _ present).1 _ _).trans writable
-
-#print axioms private_input_bytes
-#print axioms BorrowPost.private_calling_conditions
 end UInt256Proof.Subtract.Profile
 
 namespace UInt256Proof.Subtract.Profile
@@ -236,8 +196,11 @@ structure ScalarBorrowState (original current : CIL.Safety.Memory) (frame : Fram
 theorem ScalarBorrowState.advance {original before after : CIL.Safety.Memory} {frame : Frame}
     {left right output borrowHome : Reference} {results : Fin 4 → Reference} {borrowIndex resultBase : Nat} (index : Fin 4)
     (state : ScalarBorrowState (program := program) original before frame left right output borrowHome results index.val borrowIndex resultBase)
-    (math : BorrowPost (program := program) (inputLimb original left index) (inputLimb original right index)
-      (scalarBorrowValue original left right index.val) borrowHome (results index) before after)
+    (math : BorrowPost (inputLimb original left index) (inputLimb original right index)
+      (scalarBorrowValue original left right index.val) borrowHome (results index) after)
+    (formed : after.WellFormed)
+    (world : StaticWorldValid (programStaticDescriptors program) before →
+      StaticWorldValid (programStaticDescriptors program) after)
     (framed : Confined [(borrowHome, 8), (results index, 8)] before after) :
     ScalarBorrowState (program := program) original after frame left right output borrowHome results (index.val + 1) borrowIndex resultBase := by
   have separate : ∀ reference ∈ [left, right],
@@ -251,7 +214,7 @@ theorem ScalarBorrowState.advance {original before after : CIL.Safety.Memory} {f
     intro i
     obtain ⟨allocation, present, _, _⟩ := access_within_allocation _ _ _ _ _ (state.resultWrites i)
     exact (state.call.1.1.1 _ _ present).1
-  refine ⟨math.private_calling_conditions framed state.call separate, ?_, state.borrowSlot, state.resultSlots,
+  refine ⟨private_calling_conditions framed formed world state.call separate, ?_, state.borrowSlot, state.resultSlots,
     (framed.access_write _ borrowOld _ _).trans state.borrowWrite,
     fun i => (framed.access_write _ (resultOld i) _ _).trans (state.resultWrites i), ?_, ?_,
     state.callerSeparate, state.borrowSeparate, state.resultSeparate,

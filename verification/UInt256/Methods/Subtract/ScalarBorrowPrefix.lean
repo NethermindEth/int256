@@ -25,15 +25,15 @@ theorem scalar_borrow_run_next (contract : BorrowHelperContract Extracted.progra
     (scalarBorrowValue original left right (segment.val + 1)) borrowHome (results index) state.call
     state.borrowSlot slot state.borrowBound state.borrowRead state.borrowWrite (state.resultWrites index)
     (Or.inl (Ne.symm (state.borrowSeparate index))) post
-  intro after framed math
+  intro after formed world framed math
   have leftSame : inputLimb before left index = inputLimb original left index := by
     simp only [inputLimb, state.inputBytes left (by simp)]
   have rightSame : inputLimb before right index = inputLimb original right index := by
     simp only [inputLimb, state.inputBytes right (by simp)]
-  change BorrowPost (program := Extracted.program) (inputLimb before left index) (inputLimb before right index)
-    (scalarBorrowValue original left right index.val) borrowHome (results index) before after at math
+  change BorrowPost (inputLimb before left index) (inputLimb before right index)
+    (scalarBorrowValue original left right index.val) borrowHome (results index) after at math
   rw [leftSame, rightSame] at math
-  exact continuation after (state.advance index math framed)
+  exact continuation after (state.advance index math formed world framed)
 
 /-- Compose all three remaining extracted calls; the final continuation receives
     all four exact result words and the mathematical final borrow. -/
@@ -256,8 +256,8 @@ theorem scalar_general_borrows (contract : BorrowHelperContract Extracted.progra
     (scalarBorrowValue original left right 0) borrowHome (results 0)
     state.call.1.1 state.borrowBound state.borrowRead state.borrowWrite (state.resultWrites 0)
     (Or.inl (Ne.symm (state.borrowSeparate 0))) post
-  intro after framed math
-  exact scalar_borrow_run_remaining contract (state.advance 0 math framed) post (fun final completed =>
+  intro after formed world framed math
+  exact scalar_borrow_run_remaining contract (state.advance 0 math formed world framed) post (fun final completed =>
     continuation borrowHome results final completed)
 
 #print axioms scalar_general_borrows

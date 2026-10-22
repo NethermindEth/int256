@@ -65,8 +65,11 @@ theorem scalar_first_carry (contract : CarryHelperContract Extracted.program Ext
     (resultWrite : access memory resultHome 8 1 true = .ok ())
     (disjoint : WordsDisjoint carryHome resultHome)
     (post : Memory → List Value → Prop)
-    (continuation : ∀ after, Confined [(carryHome, 8), (resultHome, 8)] memory after →
-      CarryPost (program := Extracted.program) a b 0 carryHome resultHome memory after →
+    (continuation : ∀ after, after.WellFormed →
+      (StaticWorldValid (programStaticDescriptors Extracted.program) memory →
+        StaticWorldValid (programStaticDescriptors Extracted.program) after) →
+      Confined [(carryHome, 8), (resultHome, 8)] memory after →
+      CarryPost a b 0 carryHome resultHome after →
       ∃ fuel result returned,
         run Extracted.program fuel Extracted.addScalarIndex (scalarFirstCarryCall + 1) args frame [] after =
           .ok (result, returned) ∧ post result returned) :
@@ -76,8 +79,8 @@ theorem scalar_first_carry (contract : CarryHelperContract Extracted.program Ext
         memory = .ok (result, returned) ∧ post result returned := by
   have carryFormed := access_reference_valid _ _ _ _ _ carryWrite
   have resultFormed := access_reference_valid _ _ _ _ _ resultWrite
-  apply run_call_of_contract contract ⟨a, b, 0, carryHome, resultHome⟩ (body := Extracted.addScalarBody)
-    (op := .call Extracted.addWithCarryIndex 4) (encoded := rfl)
+  apply run_call_of_contract_formed contract ⟨a, b, 0, carryHome, resultHome⟩ (body := Extracted.addScalarBody)
+    (op := .call Extracted.addWithCarryIndex 4) (encoded := rfl) (formed := wellFormed)
   · simp only [cil_code]
   · conv in scalarFirstCarryCall => cbv
     simp only [cil_code]
@@ -85,8 +88,8 @@ theorem scalar_first_carry (contract : CarryHelperContract Extracted.program Ext
       checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     exact ⟨rfl, rfl, rfl⟩
   · exact ⟨wellFormed, by simp, carryRead, carryWrite, resultWrite, disjoint⟩
-  · rintro after _ - framed ⟨rfl, math⟩
-    exact continuation after framed math
+  · rintro after _ - formed world framed ⟨_, rfl, math⟩
+    exact continuation after formed world framed math
 
 #print axioms scalar_carry_prefix
 #print axioms scalar_first_carry
@@ -159,8 +162,11 @@ theorem scalar_indexed_carry (contract : CarryHelperContract Extracted.program E
     (resultWrite : access memory resultHome 8 1 true = .ok ())
     (disjoint : WordsDisjoint carryHome resultHome)
     (post : Memory → List Value → Prop)
-    (continuation : ∀ after, Confined [(carryHome, 8), (resultHome, 8)] memory after →
-      CarryPost (program := Extracted.program) a b c carryHome resultHome memory after →
+    (continuation : ∀ after, after.WellFormed →
+      (StaticWorldValid (programStaticDescriptors Extracted.program) memory →
+        StaticWorldValid (programStaticDescriptors Extracted.program) after) →
+      Confined [(carryHome, 8), (resultHome, 8)] memory after →
+      CarryPost a b c carryHome resultHome after →
       ∃ fuel result returned,
         run Extracted.program fuel Extracted.addScalarIndex (scalarCarryCall index.val + 1) args frame [] after =
           .ok (result, returned) ∧ post result returned) :
@@ -170,8 +176,8 @@ theorem scalar_indexed_carry (contract : CarryHelperContract Extracted.program E
         memory = .ok (result, returned) ∧ post result returned := by
   have carryFormed := access_reference_valid _ _ _ _ _ carryWrite
   have resultFormed := access_reference_valid _ _ _ _ _ resultWrite
-  apply run_call_of_contract contract ⟨a, b, c, carryHome, resultHome⟩ (body := Extracted.addScalarBody)
-    (op := .call Extracted.addWithCarryIndex 4) (encoded := rfl)
+  apply run_call_of_contract_formed contract ⟨a, b, c, carryHome, resultHome⟩ (body := Extracted.addScalarBody)
+    (op := .call Extracted.addWithCarryIndex 4) (encoded := rfl) (formed := wellFormed)
   · simp only [cil_code]
   · obtain ⟨index, bound⟩ := index
     have cases : index = 0 ∨ index = 1 ∨ index = 2 ∨ index = 3 := by omega
@@ -183,8 +189,8 @@ theorem scalar_indexed_carry (contract : CarryHelperContract Extracted.program E
       checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     exact ⟨rfl, rfl, rfl⟩
   · exact ⟨wellFormed, incoming, carryRead, carryWrite, resultWrite, disjoint⟩
-  · rintro after _ - framed ⟨rfl, math⟩
-    exact continuation after framed math
+  · rintro after _ - formed world framed ⟨_, rfl, math⟩
+    exact continuation after formed world framed math
 
 #print axioms scalar_indexed_carry
 
@@ -203,9 +209,12 @@ theorem scalar_carry_segment_checked (contract : CarryHelperContract Extracted.p
     (resultWrite : access memory resultHome 8 1 true = .ok ())
     (disjoint : WordsDisjoint carryHome resultHome)
     (post : CIL.Safety.Memory → List Value → Prop)
-    (continuation : ∀ after, Confined [(carryHome, 8), (resultHome, 8)] memory after →
-      CarryPost (program := Extracted.program) (inputLimb memory left ⟨segment.val + 1, by omega⟩)
-        (inputLimb memory right ⟨segment.val + 1, by omega⟩) c carryHome resultHome memory after →
+    (continuation : ∀ after, after.WellFormed →
+      (StaticWorldValid (programStaticDescriptors Extracted.program) memory →
+        StaticWorldValid (programStaticDescriptors Extracted.program) after) →
+      Confined [(carryHome, 8), (resultHome, 8)] memory after →
+      CarryPost (inputLimb memory left ⟨segment.val + 1, by omega⟩)
+        (inputLimb memory right ⟨segment.val + 1, by omega⟩) c carryHome resultHome after →
       ∃ fuel result returned,
         run Extracted.program fuel Extracted.addScalarIndex (scalarCarryCall (segment.val + 1) + 1)
           (binaryArguments left right output ++ extra) frame [] after = .ok (result, returned) ∧ post result returned) :

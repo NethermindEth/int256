@@ -123,8 +123,11 @@ theorem subtract_repair_indexed_borrow (program : CIL.Program) (body : CIL.Metho
     (resultWrite : access memory resultHome 8 1 true = .ok ())
     (disjoint : WordsDisjoint borrowHome resultHome)
     (post : Memory → List Value → Prop)
-    (continuation : ∀ after, Confined [(borrowHome, 8), (resultHome, 8)] memory after →
-      BorrowPost (program := program) a b c borrowHome resultHome memory after →
+    (continuation : ∀ after, after.WellFormed →
+      (StaticWorldValid (programStaticDescriptors program) memory →
+        StaticWorldValid (programStaticDescriptors program) after) →
+      Confined [(borrowHome, 8), (resultHome, 8)] memory after →
+      BorrowPost a b c borrowHome resultHome after →
       ∃ fuel result returned,
         run program fuel method (87 + 7 * index.val) args frame [] after =
           .ok (result, returned) ∧ post result returned) :
@@ -146,10 +149,11 @@ theorem subtract_repair_indexed_borrow (program : CIL.Program) (body : CIL.Metho
     simp [step, checkedValue, numericValue, formValue, borrowFormed, resultFormed,
       checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     try exact ⟨rfl, rfl⟩
-  apply run_call_of_contract (borrow_helper_contract borrowFound) ⟨a, b, c, borrowHome, resultHome⟩ found fetched stepped rfl
-    ⟨wellFormed, incoming, borrowRead, borrowWrite, resultWrite, disjoint⟩
-  rintro after _ - framed ⟨rfl, math⟩
-  simpa only [show 86 + 7 * index.val + 1 = 87 + 7 * index.val by omega, List.append_nil] using continuation after framed math
+  apply run_call_of_contract_formed (borrow_helper_contract borrowFound) ⟨a, b, c, borrowHome, resultHome⟩ found fetched stepped rfl
+    ⟨wellFormed, incoming, borrowRead, borrowWrite, resultWrite, disjoint⟩ wellFormed
+  rintro after _ - formed world framed ⟨_, rfl, math⟩
+  simpa only [show 86 + 7 * index.val + 1 = 87 + 7 * index.val by omega, borrowContract, List.append_nil] using
+    continuation after formed world framed math
 
 #print axioms subtract_repair_indexed_borrow
 
@@ -171,9 +175,12 @@ theorem subtract_repair_segment_checked (program : CIL.Program) (body : CIL.Meth
     (resultWrite : access memory resultHome 8 1 true = .ok ())
     (disjoint : WordsDisjoint borrowHome resultHome)
     (post : CIL.Safety.Memory → List Value → Prop)
-    (continuation : ∀ after, Confined [(borrowHome, 8), (resultHome, 8)] memory after →
-      BorrowPost (program := program) (inputLimb memory left segment)
-        (inputLimb memory right segment) c borrowHome resultHome memory after →
+    (continuation : ∀ after, after.WellFormed →
+      (StaticWorldValid (programStaticDescriptors program) memory →
+        StaticWorldValid (programStaticDescriptors program) after) →
+      Confined [(borrowHome, 8), (resultHome, 8)] memory after →
+      BorrowPost (inputLimb memory left segment)
+        (inputLimb memory right segment) c borrowHome resultHome after →
       ∃ fuel result returned,
         run program fuel method (87 + 7 * segment.val) args frame [] after = .ok (result, returned) ∧
           post result returned) :
@@ -221,9 +228,9 @@ theorem subtract_repair_next (program : CIL.Program) (body : CIL.Method) (method
     (scalarBorrowValue original left right index.val) borrowHome (results index) state.call
     state.borrowSlot (state.resultSlots index) state.borrowBound state.borrowRead state.borrowWrite
     (state.resultWrites index) (Or.inl (Ne.symm (state.borrowSeparate index))) post
-  intro after framed math
+  intro after formed world framed math
   apply continuation after
-  apply state.advance index _ framed
+  refine state.advance index ?_ formed world framed
   simpa only [inputLimb, state.inputBytes left (by simp), state.inputBytes right (by simp)] using math
 
 /-- All four borrow calls keep the initial operands, private homes and completed limbs. -/
