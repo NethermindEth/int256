@@ -7,7 +7,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 
 internal sealed record VerificationOptions(string Action, string[] Methods, string Profile, string? Proof = null, string? Theorem = null,
-    int? Parallel = null, BatchGroup[]? Groups = null);
+    int? Parallel = null, BatchGroup[]? Groups = null, int? GroupParallel = null);
 
 internal static class VerificationRunner
 {
@@ -35,13 +35,20 @@ internal static class VerificationRunner
         // Docs beside the dll and PDB, from the same compile; the assembly is byte-identical without them.
         await command("dotnet", ["build", "../src/Nethermind.Int256/Nethermind.Int256.csproj", "-c", "Release",
             "-p:GenerateDocumentationFile=true", "-p:WarningsNotAsErrors=CS1591", "-nowarn:CS1591"]);
-        List<string> failures = [];
         const string tool = ".lake/packages/leancil/Extractor/bin/Nethermind.LeanCIL.dll";
         Stopwatch elapsed = Stopwatch.StartNew();
-        // Later profiles restore the support the first one built from the local cache.
-        for (int index = 0; index < groups.Length; index++)
-            await RunGroup(root, options with { Profile = groups[index].Profile, Methods = groups[index].Methods },
-                index == groups.Length - 1, inventory, gates, failures, command, tool);
+        List<string>[] failed = [.. groups.Select(_ => new List<string>())];
+        Task Group(int index) => RunGroup(root, options with { Profile = groups[index].Profile, Methods = groups[index].Methods },
+            index == groups.Length - 1, inventory, gates, failed[index], command, tool);
+        // Later profiles restore the first one's support from the local cache; a session peaks near 5 GB, so run
+        // one per 8 cores and 8 GB. Hiding the export is process-wide, so exporting jobs stay sequential.
+        int concurrency = string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(ExportVariable))
+            ? options.GroupParallel ?? Math.Max(1, (int)Math.Min(Environment.ProcessorCount / 8,
+                GC.GetGCMemoryInfo().TotalAvailableMemoryBytes / (8L << 30))) : 1;
+        await Group(0);
+        await Parallel.ForEachAsync(Enumerable.Range(1, groups.Length - 1),
+            new ParallelOptions { MaxDegreeOfParallelism = concurrency }, async (index, _) => await Group(index));
+        List<string> failures = [.. failed.SelectMany(group => group)];
         int total = groups.Sum(group => group.Methods.Length);
         Console.WriteLine($"{options.Action} finished in {elapsed.Elapsed.TotalSeconds:F1}s: {total - failures.Count} passed, {failures.Count} failed");
         if (failures.Count > 0) throw new InvalidOperationException(string.Join(Environment.NewLine, failures));

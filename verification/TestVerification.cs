@@ -246,6 +246,68 @@ try
         Require(calls.Where(call => call.Contains("extract")).Select(call => call[4]).SequenceEqual(
             ["artifacts/First/scalar", "artifacts/Second/scalar", "artifacts/Third/x64-avx2"]), "Methods were extracted under the wrong profile");
     }
+    // Later profiles overlap but start only after the first, which builds the support they restore;
+    // failures still read in group order.
+    File.WriteAllText(Path.Combine(temporary, "manifests/gates.json"), """
+        {"gates":[{"method":"First","profile":"scalar","proof":"First.lean","theorem":"first"},
+                  {"method":"Second","profile":"x64-sse42","proof":"Second.lean","theorem":"second"},
+                  {"method":"Third","profile":"x64-avx2","proof":"Third.lean","theorem":"third"}]}
+        """);
+    Environment.SetEnvironmentVariable(export, null);
+    foreach (int? groupParallel in new int?[] { 1, 2 })
+    {
+        object gate = new();
+        int running = 0, peak = 0;
+        bool early = false;
+        List<string> started = [], finished = [];
+        async Task Command(string command, string[] arguments)
+        {
+            if (!arguments.Contains("verify-batch")) return;
+            using JsonDocument manifest = JsonDocument.Parse(File.ReadAllText(arguments[2]));
+            string theorem = manifest.RootElement.GetProperty("requests")[0].GetProperty("theorem").GetString()!;
+            lock (gate) { early |= theorem != "first" && !finished.Contains("first"); started.Add(theorem); peak = Math.Max(peak, ++running); }
+            // Both later sessions overlap, and the third finishes before the second.
+            for (int wait = 0; groupParallel == 2 && theorem != "first" && wait < 500; wait++)
+            {
+                lock (gate) if (started.Count == 3 && (theorem == "third" || finished.Contains("third"))) break;
+                await Task.Delay(10);
+            }
+            File.WriteAllText(arguments[4], JsonSerializer.Serialize(new[] { new { status = "failed", stage = "proof checking", error = theorem } }));
+            lock (gate) { finished.Add(theorem); running--; }
+        }
+        string? message = null;
+        try
+        {
+            await VerificationRunner.Run(temporary, new("verify", [], "scalar", GroupParallel: groupParallel,
+                Groups: [new("scalar", ["First"]), new("x64-sse42", ["Second"]), new("x64-avx2", ["Third"])]), Command);
+        }
+        catch (InvalidOperationException exception) { message = exception.Message; }
+        Require(!early && started.Count == 3,
+            "Later profiles must start after the first builds the shared support");
+        Require(peak == groupParallel, "Group concurrency must follow GroupParallel");
+        Require(message is not null && message.IndexOf("First/scalar", StringComparison.Ordinal) < message.IndexOf("Second/x64-sse42", StringComparison.Ordinal)
+            && message.IndexOf("Second/x64-sse42", StringComparison.Ordinal) < message.IndexOf("Third/x64-avx2", StringComparison.Ordinal),
+            "Failures must be reported in group order regardless of completion order");
+    }
+    // An exporting job stays sequential: hiding the export is process-wide.
+    Environment.SetEnvironmentVariable(export, temporary);
+    {
+        int running = 0, peak = 0;
+        async Task Command(string command, string[] arguments)
+        {
+            if (!arguments.Contains("verify-batch")) return;
+            peak = Math.Max(peak, Interlocked.Increment(ref running));
+            await Task.Delay(20);
+            using JsonDocument manifest = JsonDocument.Parse(File.ReadAllText(arguments[2]));
+            File.WriteAllText(arguments[4], JsonSerializer.Serialize(manifest.RootElement.GetProperty("requests").EnumerateArray()
+                .Select(_ => new { status = "verified", stage = "", error = "" })));
+            Interlocked.Decrement(ref running);
+        }
+        await VerificationRunner.Run(temporary, new("verify", [], "scalar", GroupParallel: 3,
+            Groups: [new("scalar", ["First"]), new("x64-sse42", ["Second"]), new("x64-avx2", ["Third"])]), Command);
+        Require(peak == 1, "An exporting job must not overlap sessions");
+    }
+    Environment.SetEnvironmentVariable(export, null);
     bool rejected = false;
     try { await VerificationRunner.Run(temporary, new("verify", [], "scalar", Groups: [new("scalar", ["First"]), new("scalar", ["Second"])]), (_, _) => Task.CompletedTask); }
     catch (ArgumentException) { rejected = true; }

@@ -214,7 +214,10 @@ dotnet run --file verification/Verify.cs -- --action verify --method Subtract --
 The runner extracts every selected method, then checks them in one LeanCIL
 `verify-batch` session, which builds and replays the shared support once;
 `--parallel <n>` bounds its concurrent workspaces (LeanCIL default: processor
-count / 8). Each method still receives its own certificate. When
+count / 8). With `--groups-json`, the first profile runs alone to build the shared
+support, then the rest run concurrently: `--group-parallel <n>` bounds them
+(default: one per 8 cores and 8 GB of memory; sequential while exporting support).
+Each method still receives its own certificate. When
 `LEANCIL_EXPORT_CONSUMER_SUPPORT` is set, the last method runs as a single
 `verify` because support export requires one request. The regression runners
 likewise submit each refutation and its `expect: rejected` production proof
