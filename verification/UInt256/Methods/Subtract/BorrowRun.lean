@@ -33,19 +33,18 @@ set_option hygiene false in
 macro "borrow_run_steps " "[" normalize:term,* "]" : tactic => `(tactic| (
   intro a b c borrow output frame memory stored final borrowFormed outputFormed borrowStored beforeRead
     afterRead resultWrite borrowWrite
-  simp [$[$normalize:term],*] at borrowWrite
-  simp [BitVec.toNat_sub] at resultWrite
   simp only [cil_code]
   repeat' first
     | (apply Eq.trans
        · apply run_next
          · simp only [cil_code]; rfl
          · simp only [cil_code]; rfl
-         · simp (config := { implicitDefEqProofs := false })
-             [cil_code, step, checkedValue, numericValue, formValue, borrowFormed, outputFormed,
-               borrowStored, beforeRead, afterRead, pureArity, scalars, CIL.step.eq_def, CIL.binary, CIL.unary,
-               instruction, storeValue, referenceAt, resultWrite, borrowWrite, checkedAt,
+         · cil_fact_simp (config := { implicitDefEqProofs := false })
+             [cil_code, step, checkedValue, numericValue, formValue, pureArity, scalars, CIL.step.eq_def,
+               CIL.binary, CIL.unary, instruction, storeValue, referenceAt, checkedAt,
                Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
+             [borrowFormed, outputFormed, borrowStored, beforeRead, afterRead, resultWrite, borrowWrite,
+               $[$normalize:term],*]
            exact ⟨rfl, rfl, rfl, rfl⟩)
     | (apply run_call_of_invoke
        · simp only [cil_code]; rfl

@@ -72,18 +72,15 @@ theorem carry_run_of_memory_steps (found : program[index]? = some (carryBody pro
       index 0
       [.scalar (.i64 a), .scalar (.i64 b), .reference (.address carry), .reference (.address output)]
       frame [] m0 = .ok (leaveFrame frame m4, []) := by
-  simp [carryWord, BitVec.toNat_add] at wc
-  simp [BitVec.toNat_add] at wo
   change run program 25 index 0 _ frame [] m0 = _
   iterate 23
     apply Eq.trans
     · apply run_next found (by rfl)
-      first | rfl | simp
-        [step, locals, s0, s1, r0, rc, r1, r2, r3,
-          checkedValue, formValue, fc1, fc2, fo3,
-          pureArity.eq_def, instruction.eq_def, storeValue,
-          referenceAt, wc, wo, checkedAt, Except.mapError,
-          Bind.bind, Except.bind, Pure.pure, Except.pure] <;> first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
+      first | rfl | cil_fact_simp
+        [step, checkedValue, formValue, pureArity.eq_def, instruction.eq_def, storeValue,
+          referenceAt, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
+        [locals, s0, s1, r0, rc, r1, r2, r3, fc1, fc2, fo3, wc, wo, carryWord] <;>
+        first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
   rw [run]
   simp [found, carryBody, step, leaveFrame, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
 

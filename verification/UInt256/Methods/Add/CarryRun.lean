@@ -44,8 +44,6 @@ set_option hygiene false in
     calls to frameless pure helpers; `normalize` puts the carry write in evaluated form. -/
 macro "carry_run_steps " "[" normalize:term,* "]" : tactic => `(tactic| (
   intro a b c carry output first second frame m0 m1 m2 m3 m4 locals s0 s1 r0 rc r1 r2 r3 fc1 fc2 fo3 wc wo
-  simp [$[$normalize:term],*] at wc
-  simp [BitVec.toNat_add] at wo
   simp only [cil_code]
   repeat'
     first
@@ -53,12 +51,11 @@ macro "carry_run_steps " "[" normalize:term,* "]" : tactic => `(tactic| (
       · apply run_next
         · simp only [cil_code]; rfl
         · simp only [cil_code]; rfl
-        · simp (config := { implicitDefEqProofs := false })
-            [cil_code, step, locals, s0, s1, r0, rc, r1, r2, r3,
-              checkedValue, numericValue, formValue, fc1, fc2, fo3,
-              pureArity, scalars, CIL.step.eq_def, CIL.binary, CIL.unary, instruction, storeValue,
-              referenceAt, wc, wo, checkedAt, Except.mapError,
+        · cil_fact_simp (config := { implicitDefEqProofs := false })
+            [cil_code, step, checkedValue, numericValue, formValue, pureArity, scalars, CIL.step.eq_def,
+              CIL.binary, CIL.unary, instruction, storeValue, referenceAt, checkedAt, Except.mapError,
               Bind.bind, Except.bind, Pure.pure, Except.pure]
+            [locals, s0, s1, r0, rc, r1, r2, r3, fc1, fc2, fo3, wc, wo, $[$normalize:term],*]
           exact ⟨rfl, rfl, rfl, rfl⟩
     | apply run_call_of_invoke
       · simp only [cil_code]; rfl
