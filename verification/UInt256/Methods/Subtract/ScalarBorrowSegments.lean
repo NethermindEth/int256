@@ -1,8 +1,8 @@
-import UInt256.Methods.Subtract.BorrowPost
+import UInt256.Methods.Subtract.BorrowContract
 import UInt256.Methods.Subtract.ScalarSafetySetup
 
 namespace UInt256Proof.Subtract.Safety
-open CIL.Safety UInt256Model.Safety
+open CIL.Safety UInt256Model.Safety UInt256Proof.Subtract.Profile
 
 def scalarBorrowCalls : List Nat := scalarBody.code.zipIdx.filterMap fun (op, pc) =>
   match op with
@@ -11,14 +11,15 @@ def scalarBorrowCalls : List Nat := scalarBody.code.zipIdx.filterMap fun (op, pc
 
 def scalarBorrowCall (index : Nat) : Nat := scalarBorrowCalls[index]?.getD 0
 
-theorem scalar_indexed_borrow (contract : BorrowHelperContract) (index : Fin 4) (args : List Value) (frame : Frame) (memory : Memory)
+theorem scalar_indexed_borrow (contract : BorrowHelperContract Extracted.program Extracted.subtractWithBorrowIndex) (index : Fin 4) (args : List Value) (frame : Frame) (memory : Memory)
     (a b c : BitVec 64) (borrowHome resultHome : Reference)
     (wellFormed : memory.WellFormed) (incoming : c.toNat ≤ 1)
     (borrowRead : read memory borrowHome 8 1 = .ok (numberBytes c.toNat 8))
     (borrowWrite : access memory borrowHome 8 1 true = .ok ())
     (resultWrite : access memory resultHome 8 1 true = .ok ()) (disjoint : WordsDisjoint borrowHome resultHome)
     (post : Memory → List Value → Prop)
-    (continuation : ∀ after, BorrowPost a b c borrowHome resultHome memory after →
+    (continuation : ∀ after, Confined [(borrowHome, 8), (resultHome, 8)] memory after →
+      BorrowPost (program := Extracted.program) a b c borrowHome resultHome memory after →
       ∃ fuel result returned,
         run Extracted.program fuel scalarIndex (scalarBorrowCall index.val + 1) args frame [] after =
           .ok (result, returned) ∧ post result returned) :
@@ -28,24 +29,20 @@ theorem scalar_indexed_borrow (contract : BorrowHelperContract) (index : Fin 4) 
         memory = .ok (result, returned) ∧ post result returned := by
   have fb := access_reference_valid _ _ _ _ _ borrowWrite
   have fr := access_reference_valid _ _ _ _ _ resultWrite
-  apply run_borrow_call contract a b c borrowHome resultHome post (body := scalarBody)
-    (op := .call Extracted.subtractWithBorrowIndex 4)
+  apply run_call_of_contract contract ⟨a, b, c, borrowHome, resultHome⟩ (body := scalarBody)
+    (op := .call Extracted.subtractWithBorrowIndex 4) (encoded := rfl)
   · rfl
   · obtain ⟨index, bound⟩ := index
     have cases : index = 0 ∨ index = 1 ∨ index = 2 ∨ index = 3 := by omega
     rcases cases with rfl | rfl | rfl | rfl <;> rfl
   · simp [step, checkedValue, numericValue, formValue, fb, fr, checkedAt,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-    exact ⟨rfl, rfl⟩
-  · exact wellFormed
-  · exact incoming
-  · exact borrowRead
-  · exact borrowWrite
-  · exact resultWrite
-  · exact disjoint
-  · exact continuation
+    exact ⟨rfl, rfl, rfl⟩
+  · exact ⟨wellFormed, incoming, borrowRead, borrowWrite, resultWrite, disjoint⟩
+  · rintro after _ - framed ⟨rfl, math⟩
+    exact continuation after framed math
 
-theorem scalar_borrow_segment_checked (contract : BorrowHelperContract) (segment : Fin 3) (left right output : Reference)
+theorem scalar_borrow_segment_checked (contract : BorrowHelperContract Extracted.program Extracted.subtractWithBorrowIndex) (segment : Fin 3) (left right output : Reference)
     (frame : Frame) (memory : Memory) (c : BitVec 64) (borrowHome resultHome : Reference)
     (call : CallingConditions Extracted.program memory [left, right] [output])
     (borrowSlot : frame.locals[1]? = some (.bytes .word64 borrowHome))
@@ -54,8 +51,8 @@ theorem scalar_borrow_segment_checked (contract : BorrowHelperContract) (segment
     (borrowWrite : access memory borrowHome 8 1 true = .ok ())
     (resultWrite : access memory resultHome 8 1 true = .ok ()) (disjoint : WordsDisjoint borrowHome resultHome)
     (post : Memory → List Value → Prop)
-    (continuation : ∀ after,
-      BorrowPost (inputLimb memory left ⟨segment.val + 1, by omega⟩)
+    (continuation : ∀ after, Confined [(borrowHome, 8), (resultHome, 8)] memory after →
+      BorrowPost (program := Extracted.program) (inputLimb memory left ⟨segment.val + 1, by omega⟩)
         (inputLimb memory right ⟨segment.val + 1, by omega⟩) c borrowHome resultHome memory after →
       ∃ fuel result returned,
         run Extracted.program fuel scalarIndex (scalarBorrowCall (segment.val + 1) + 1)

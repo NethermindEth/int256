@@ -8,7 +8,7 @@ import UInt256.Methods.Subtract.ScalarSmallChecked
 
 namespace UInt256Proof.Subtract.Safety
 
-open CIL.Safety
+open CIL.Safety UInt256Proof.Subtract.Profile
 
 def scalarStoreCall : Nat :=
   scalarBody.code.findIdx fun op => match op with
@@ -98,7 +98,7 @@ end UInt256Proof.Subtract.Safety
 
 namespace UInt256Proof.Subtract.Safety
 
-open CIL.Safety UInt256Model.Safety
+open CIL.Safety UInt256Model.Safety UInt256Proof.Subtract.Profile
 
 /-- Finish the extracted general scalar path, preserving the private borrow
     across output writes and the original caller footprint across teardown. -/
@@ -106,7 +106,7 @@ theorem scalar_finish (original entered current : CIL.Safety.Memory) (frame : Fr
     (left right output borrowHome : Reference) (results : Fin 4 → Reference)
     (call : CallingConditions Extracted.program original [left, right] [output])
     (setup : enterFrame scalarBody (binaryArguments left right output) original = .ok (frame, entered))
-    (state : ScalarBorrowState original current frame left right output borrowHome results 4) :
+    (state : ScalarBorrowState (program := Extracted.program) original current frame left right output borrowHome results 4) :
     ∃ fuel final values,
       run Extracted.program fuel scalarIndex (scalarBorrowCall 3 + 1)
         (binaryArguments left right output) frame [] current = .ok (final, values) ∧
@@ -158,11 +158,11 @@ theorem scalar_finish (original entered current : CIL.Safety.Memory) (frame : Fr
 end UInt256Proof.Subtract.Safety
 
 namespace UInt256Proof.Subtract.Safety
-open CIL.Safety UInt256Model.Safety
+open CIL.Safety UInt256Model.Safety UInt256Proof.Subtract.Profile
 
 /-- Complete checked invocation of the large-right scalar branch, including
     initial-input arithmetic, the exact borrow and caller storage preservation. -/
-theorem scalar_general_checked (contract : BorrowHelperContract) (memory : Memory) (left right output : Reference)
+theorem scalar_general_checked (contract : BorrowHelperContract Extracted.program Extracted.subtractWithBorrowIndex) (memory : Memory) (left right output : Reference)
     (call : CallingConditions Extracted.program memory [left, right] [output])
     (large : inputLimb memory right 1 ||| inputLimb memory right 2 |||
       inputLimb memory right 3 ≠ BitVec.ofNat 64 0) :
@@ -191,7 +191,7 @@ theorem scalar_general_checked (contract : BorrowHelperContract) (memory : Memor
 end UInt256Proof.Subtract.Safety
 
 namespace UInt256Proof.Subtract.Safety
-open CIL.Safety UInt256Model.Safety
+open CIL.Safety UInt256Model.Safety UInt256Proof.Subtract.Profile
 
 theorem ScalarResult.as_subtract {original final : Memory} {values : List Value}
     {left right output : Reference} (result : ScalarResult original final values left right output) :
@@ -200,7 +200,7 @@ theorem ScalarResult.as_subtract {original final : Memory} {values : List Value}
     by simpa only [scalar_flag_underflow, subtractUnderflow] using result.flag,
     result.writable, result.footprint⟩
 
-theorem scalar_checked (contract : BorrowHelperContract) (memory : Memory) (left right output : Reference)
+theorem scalar_checked (contract : BorrowHelperContract Extracted.program Extracted.subtractWithBorrowIndex) (memory : Memory) (left right output : Reference)
     (call : CallingConditions Extracted.program memory [left, right] [output]) :
     ∃ fuel final values,
       invoke Extracted.program fuel scalarIndex (binaryArguments left right output) memory =

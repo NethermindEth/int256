@@ -1,6 +1,6 @@
 import CIL.StepEquations
 import CIL.Safety.Equations
-import UInt256.Methods.Subtract.BorrowHelper
+import UInt256.Methods.Subtract.BorrowContract
 import UInt256.Methods.Subtract.SafetyResult
 import UInt256.Methods.AddSubtract.Vector128Inputs
 import UInt256.Methods.Multiply.LimbStorage
@@ -123,7 +123,8 @@ theorem subtract_repair_indexed_borrow (program : CIL.Program) (body : CIL.Metho
     (resultWrite : access memory resultHome 8 1 true = .ok ())
     (disjoint : WordsDisjoint borrowHome resultHome)
     (post : Memory → List Value → Prop)
-    (continuation : ∀ after, BorrowPost (program := program) a b c borrowHome resultHome memory after →
+    (continuation : ∀ after, Confined [(borrowHome, 8), (resultHome, 8)] memory after →
+      BorrowPost (program := program) a b c borrowHome resultHome memory after →
       ∃ fuel result returned,
         run program fuel method (87 + 7 * index.val) args frame [] after =
           .ok (result, returned) ∧ post result returned) :
@@ -133,9 +134,6 @@ theorem subtract_repair_indexed_borrow (program : CIL.Program) (body : CIL.Metho
         memory = .ok (result, returned) ∧ post result returned := by
   have borrowFormed := access_reference_valid _ _ _ _ _ borrowWrite
   have resultFormed := access_reference_valid _ _ _ _ _ resultWrite
-  obtain ⟨childFuel, stored, invoked, guarantees⟩ := borrow_checked_contract borrowFound a b c borrowHome resultHome
-    memory wellFormed incoming borrowRead borrowWrite resultWrite disjoint
-  obtain ⟨parentFuel, result, values, resumed, satisfied⟩ := continuation stored guarantees
   have fetched : body.code[86 + 7 * index.val]? = some (.call borrow 4) := by
     obtain ⟨index, bound⟩ := index
     have cases : index = 0 ∨ index = 1 ∨ index = 2 ∨ index = 3 := by omega
@@ -148,11 +146,10 @@ theorem subtract_repair_indexed_borrow (program : CIL.Program) (body : CIL.Metho
     simp [step, checkedValue, numericValue, formValue, borrowFormed, resultFormed,
       checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     try exact ⟨rfl, rfl⟩
-  have resumed' : run program parentFuel method (86 + 7 * index.val + 1) args frame [] stored =
-      .ok (result, values) := by
-    simpa only [show 86 + 7 * index.val + 1 = 87 + 7 * index.val by omega] using resumed
-  obtain ⟨fuel, finished⟩ := run_call_exists found fetched stepped ⟨childFuel, invoked⟩ ⟨parentFuel, resumed'⟩
-  exact ⟨fuel, result, values, finished, satisfied⟩
+  apply run_call_of_contract (borrow_helper_contract borrowFound) ⟨a, b, c, borrowHome, resultHome⟩ found fetched stepped rfl
+    ⟨wellFormed, incoming, borrowRead, borrowWrite, resultWrite, disjoint⟩
+  rintro after _ - framed ⟨rfl, math⟩
+  simpa only [show 86 + 7 * index.val + 1 = 87 + 7 * index.val by omega, List.append_nil] using continuation after framed math
 
 #print axioms subtract_repair_indexed_borrow
 
@@ -174,7 +171,7 @@ theorem subtract_repair_segment_checked (program : CIL.Program) (body : CIL.Meth
     (resultWrite : access memory resultHome 8 1 true = .ok ())
     (disjoint : WordsDisjoint borrowHome resultHome)
     (post : CIL.Safety.Memory → List Value → Prop)
-    (continuation : ∀ after,
+    (continuation : ∀ after, Confined [(borrowHome, 8), (resultHome, 8)] memory after →
       BorrowPost (program := program) (inputLimb memory left segment)
         (inputLimb memory right segment) c borrowHome resultHome memory after →
       ∃ fuel result returned,
@@ -224,9 +221,9 @@ theorem subtract_repair_next (program : CIL.Program) (body : CIL.Method) (method
     (scalarBorrowValue original left right index.val) borrowHome (results index) state.call
     state.borrowSlot (state.resultSlots index) state.borrowBound state.borrowRead state.borrowWrite
     (state.resultWrites index) (Or.inl (Ne.symm (state.borrowSeparate index))) post
-  intro after math
+  intro after framed math
   apply continuation after
-  apply state.advance index
+  apply state.advance index _ framed
   simpa only [inputLimb, state.inputBytes left (by simp), state.inputBytes right (by simp)] using math
 
 /-- All four borrow calls keep the initial operands, private homes and completed limbs. -/

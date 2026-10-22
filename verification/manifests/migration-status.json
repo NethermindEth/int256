@@ -702,7 +702,8 @@
     "Profiles and AlignedLoad fixture groups are extractor infrastructure, mapped to LeanCIL tests rather than ported.",
     "Three upstream drafts from the original branch are not filed.",
     "UInt256.Safety.RegionTransport, RegionSteps and RegionSuffix are general memory-region lemmas and candidates for LeanCIL.",
-    "Duplicated helpers to consolidate: Subtract BorrowHelper and SmallHelper.",
+    "Duplicated helpers to consolidate: Subtract SmallHelper.",
+    "UInt256.Safety.OutsideWords (a byte outside two words is outside their Confined footprint) is a candidate for LeanCIL.",
     "Two deferred API entries remain unported.",
     "Safety fixture expectations changed under LeanCIL for ReusedLocal and related cases; review them against the original branch."
   ],

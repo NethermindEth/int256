@@ -1,17 +1,17 @@
-import UInt256.Methods.Subtract.BorrowState
+import UInt256.Methods.Subtract.BorrowHelper
 import UInt256.Methods.Subtract.ScalarBorrowSegments
 import UInt256.Safety.CallerSetup
 import UInt256.Methods.Subtract.ScalarSafetyPrefix
 
 namespace UInt256Proof.Subtract.Safety
-open CIL.Safety UInt256Model.Safety
+open CIL.Safety UInt256Model.Safety UInt256Proof.Subtract.Profile
 
-theorem ScalarBorrowState.run_next (contract : BorrowHelperContract) {original before : CIL.Safety.Memory} {frame : Frame}
+theorem scalar_borrow_run_next (contract : BorrowHelperContract Extracted.program Extracted.subtractWithBorrowIndex) {original before : CIL.Safety.Memory} {frame : Frame}
     {left right output borrowHome : Reference} {results : Fin 4 → Reference} (segment : Fin 3)
-    (state : ScalarBorrowState original before frame left right output borrowHome results (segment.val + 1))
+    (state : ScalarBorrowState (program := Extracted.program) original before frame left right output borrowHome results (segment.val + 1))
     (post : CIL.Safety.Memory → List Value → Prop)
     (continuation : ∀ after,
-      ScalarBorrowState original after frame left right output borrowHome results (segment.val + 2) →
+      ScalarBorrowState (program := Extracted.program) original after frame left right output borrowHome results (segment.val + 2) →
       ∃ fuel result returned,
         run Extracted.program fuel scalarIndex (scalarBorrowCall (segment.val + 1) + 1)
           (binaryArguments left right output) frame [] after = .ok (result, returned) ∧ post result returned) :
@@ -25,44 +25,44 @@ theorem ScalarBorrowState.run_next (contract : BorrowHelperContract) {original b
     (scalarBorrowValue original left right (segment.val + 1)) borrowHome (results index) state.call
     state.borrowSlot slot state.borrowBound state.borrowRead state.borrowWrite (state.resultWrites index)
     (Or.inl (Ne.symm (state.borrowSeparate index))) post
-  intro after math
+  intro after framed math
   have leftSame : inputLimb before left index = inputLimb original left index := by
     simp only [inputLimb, state.inputBytes left (by simp)]
   have rightSame : inputLimb before right index = inputLimb original right index := by
     simp only [inputLimb, state.inputBytes right (by simp)]
-  change BorrowPost (inputLimb before left index) (inputLimb before right index)
+  change BorrowPost (program := Extracted.program) (inputLimb before left index) (inputLimb before right index)
     (scalarBorrowValue original left right index.val) borrowHome (results index) before after at math
   rw [leftSame, rightSame] at math
-  exact continuation after (state.advance index math)
+  exact continuation after (state.advance index math framed)
 
 /-- Compose all three remaining extracted calls; the final continuation receives
     all four exact result words and the mathematical final borrow. -/
-theorem ScalarBorrowState.run_remaining (contract : BorrowHelperContract) {original before : CIL.Safety.Memory} {frame : Frame}
+theorem scalar_borrow_run_remaining (contract : BorrowHelperContract Extracted.program Extracted.subtractWithBorrowIndex) {original before : CIL.Safety.Memory} {frame : Frame}
     {left right output borrowHome : Reference} {results : Fin 4 → Reference}
-    (state : ScalarBorrowState original before frame left right output borrowHome results 1)
+    (state : ScalarBorrowState (program := Extracted.program) original before frame left right output borrowHome results 1)
     (post : CIL.Safety.Memory → List Value → Prop)
     (continuation : ∀ after,
-      ScalarBorrowState original after frame left right output borrowHome results 4 →
+      ScalarBorrowState (program := Extracted.program) original after frame left right output borrowHome results 4 →
       ∃ fuel result returned,
         run Extracted.program fuel scalarIndex (scalarBorrowCall 3 + 1)
           (binaryArguments left right output) frame [] after = .ok (result, returned) ∧ post result returned) :
     ∃ fuel result returned,
       run Extracted.program fuel scalarIndex (scalarBorrowCall 0 + 1)
         (binaryArguments left right output) frame [] before = .ok (result, returned) ∧ post result returned := by
-  apply state.run_next contract 0 post
+  apply scalar_borrow_run_next contract 0 state post
   intro _ second
-  apply second.run_next contract 1 post
+  apply scalar_borrow_run_next contract 1 second post
   intro _ third
-  exact third.run_next contract 2 post continuation
+  exact scalar_borrow_run_next contract 2 third post continuation
 
-#print axioms ScalarBorrowState.run_next
-#print axioms ScalarBorrowState.run_remaining
+#print axioms scalar_borrow_run_next
+#print axioms scalar_borrow_run_remaining
 
 end UInt256Proof.Subtract.Safety
 
 namespace UInt256Proof.Subtract.Safety
 
-open CIL.Safety UInt256Model.Safety
+open CIL.Safety UInt256Model.Safety UInt256Proof.Subtract.Profile
 
 /-- Derive all result homes, freshness and separation from actual frame setup;
     no new separation restrictions are imposed on caller views. -/
@@ -77,7 +77,7 @@ theorem scalar_borrow_initial_state {original entered current : CIL.Safety.Memor
     (borrowSlot : frame.locals[1]? = some (.bytes .word64 borrowHome))
     (borrowWrite : access current borrowHome 8 1 true = .ok ())
     (borrowRead : read current borrowHome 8 1 = .ok (numberBytes 0 8)) :
-    ∃ results : Fin 4 → Reference, ScalarBorrowState original current frame left right output borrowHome results 0 := by
+    ∃ results : Fin 4 → Reference, ScalarBorrowState (program := Extracted.program) original current frame left right output borrowHome results 0 := by
   have candidates : ∀ i : Fin 4, ∃ reference,
       frame.locals[i.val + 2]? = some (.bytes .word64 reference) ∧
       original.nextIdentity ≤ reference.allocation ∧ access entered reference 8 1 true = .ok () := by
@@ -124,7 +124,7 @@ theorem scalar_borrow_initial_state {original entered current : CIL.Safety.Memor
 end UInt256Proof.Subtract.Safety
 
 namespace UInt256Proof.Subtract.Safety
-open CIL.Safety UInt256Model.Safety
+open CIL.Safety UInt256Model.Safety UInt256Proof.Subtract.Profile
 
 /-- Initialize the private borrow word, retaining the saved right operand and
     deriving the complete chain invariant from actual allocated local homes. -/
@@ -139,7 +139,7 @@ theorem scalar_borrow_store (original entered before : CIL.Safety.Memory)
     (rightSlot : frame.locals[0]? = some (.bytes .word64 rightHome))
     (rightRead : read before rightHome 8 1 = .ok (numberBytes (inputLimb original right 0).toNat 8)) :
     ∃ borrowHome results after,
-      ScalarBorrowState original after frame left right output borrowHome results 0 ∧
+      ScalarBorrowState (program := Extracted.program) original after frame left right output borrowHome results 0 ∧
       read after rightHome 8 1 = .ok (numberBytes (inputLimb original right 0).toNat 8) ∧
       ∀ pc rest, step scalarBody (.setLocal 1) pc (binaryArguments left right output) frame
         (.scalar (.i64 0) :: rest) before = .ok (.next (pc + 1) rest frame after) := by
@@ -171,7 +171,7 @@ theorem scalar_borrow_store (original entered before : CIL.Safety.Memory)
 end UInt256Proof.Subtract.Safety
 
 namespace UInt256Proof.Subtract.Safety
-open CIL.Safety UInt256Model.Safety
+open CIL.Safety UInt256Model.Safety UInt256Proof.Subtract.Profile
 
 /-- Follow the extracted large-right branch and scalar feature guards through
     borrow initialization to the first discovered borrow call. -/
@@ -218,7 +218,7 @@ theorem scalar_borrow_prefix (left right output : Reference) (frame : Frame) (be
 #print axioms scalar_borrow_prefix
 /-- Execute the scalar body through its complete large-operand borrow chain.
     The continuation receives the four checked result words before output stores. -/
-theorem scalar_general_borrows (contract : BorrowHelperContract) (original entered : Memory) (left right output : Reference) (frame : Frame)
+theorem scalar_general_borrows (contract : BorrowHelperContract Extracted.program Extracted.subtractWithBorrowIndex) (original entered : Memory) (left right output : Reference) (frame : Frame)
     (call : CallingConditions Extracted.program original [left, right] [output])
     (setup : enterFrame scalarBody (binaryArguments left right output) original = .ok (frame, entered))
     (homes : WordHomes entered original.nextIdentity scalarLocalSpecs frame.locals)
@@ -226,7 +226,7 @@ theorem scalar_general_borrows (contract : BorrowHelperContract) (original enter
       inputLimb original right 3 ≠ BitVec.ofNat 64 0)
     (post : Memory → List Value → Prop)
     (continuation : ∀ borrowHome results after,
-      ScalarBorrowState original after frame left right output borrowHome results 4 →
+      ScalarBorrowState (program := Extracted.program) original after frame left right output borrowHome results 4 →
       ∃ fuel result returned,
         run Extracted.program fuel scalarIndex (scalarBorrowCall 3 + 1)
           (binaryArguments left right output) frame [] after = .ok (result, returned) ∧ post result returned) :
@@ -256,8 +256,8 @@ theorem scalar_general_borrows (contract : BorrowHelperContract) (original enter
     (scalarBorrowValue original left right 0) borrowHome (results 0)
     state.call.1.1 state.borrowBound state.borrowRead state.borrowWrite (state.resultWrites 0)
     (Or.inl (Ne.symm (state.borrowSeparate 0))) post
-  intro after math
-  exact (state.advance 0 math).run_remaining contract post (fun final completed =>
+  intro after framed math
+  exact scalar_borrow_run_remaining contract (state.advance 0 math framed) post (fun final completed =>
     continuation borrowHome results final completed)
 
 #print axioms scalar_general_borrows

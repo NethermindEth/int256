@@ -24,7 +24,8 @@ vector/AVX2/AVX512 ordering, all seven multiplication entries on each of
 the 14 multiplication feature profiles, and `Add`/`AddOverflow`/`Subtract`/`SubtractUnderflow`
 on `arm64-advsimd`, `x64-sse42`, `x64-avx2`, `x64-avx2-bmi1`, `x64-avx512` and `x64-avx512-bmi1`.
 The Vector128 Subtract gates share one profile-parametric proof
-(`UInt256/Methods/Subtract/{BorrowHelper,SmallHelper,Vector128*,ScalarDispatch,AcceleratedContract}.lean`);
+(`UInt256/Methods/Subtract/{BorrowRun,BorrowHelper,BorrowContract,SmallHelper,Vector128*,ScalarDispatch,AcceleratedContract}.lean`);
+the scalar gates compose the same `BorrowContract` borrow-helper `MethodContract`.
 the AVX2/AVX512 contracts (`UInt256/Methods/{Add,Subtract}/Vector256*.lean`) bind every reachable body by `rfl`.
 The `arm64-advsimd` gates cover the public entry, the `AddScalar` dispatcher, the
 AdvSimd `AddVector128` helper, `AddScalarUInt64` and `StoreLimbs`. Their contracts

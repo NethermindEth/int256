@@ -11,6 +11,7 @@ import UInt256.Methods.Add.SafetyResult
 import UInt256.Methods.Reporting.Arithmetic
 import UInt256.Methods.Add.CarryRun
 import CIL.Safety.MethodContract
+import UInt256.Safety.OutsideWords
 namespace UInt256Proof.Add.CarrySafety
 def carryBody (profile : CIL.FeatureProfile) : CIL.Method := { profile := profile, returnsValue := false, locals := [.i64 0, .i64 0], localKinds := [.word64, .word64], parameterHomes := [], staticSites := [], code := [
   .arg 0,
@@ -155,16 +156,6 @@ structure CarryPost (a b c : BitVec 64) (carryRef output : Reference) (before af
   arithmetic : (a + b + c).toNat + 2^64 * (UInt256Proof.carry a b c).toNat = a.toNat + b.toNat + c.toNat
   staticWorld : StaticWorldValid (programStaticDescriptors program) before →
     StaticWorldValid (programStaticDescriptors program) after
-
-/-- A byte outside both carry-helper words is outside its contract footprint. -/
-theorem outside_words {carryRef output : Reference} {id offset : Nat}
-    (carry : OutsideWord carryRef id offset) (out : OutsideWord output id offset) :
-    Outside [(carryRef, 8), (output, 8)] id offset := by
-  intro entry member
-  simp only [List.mem_cons, List.not_mem_nil, or_false] at member
-  rcases member with rfl | rfl
-  · exact carry
-  · exact out
 
 theorem CarryPost.output_load {a b c : BitVec 64} {carryRef output : Reference} {before after : Memory}
     (post : CarryPost (program := program) a b c carryRef output before after) :

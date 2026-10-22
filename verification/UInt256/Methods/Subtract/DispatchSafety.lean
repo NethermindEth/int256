@@ -2,9 +2,9 @@ import UInt256.Methods.Subtract.ScalarSafetyChecked
 import UInt256.Methods.Subtract.DispatchSafetyCommon
 
 namespace UInt256Proof.Subtract.Safety
-open UInt256Model.Safety
+open UInt256Model.Safety UInt256Proof.Subtract.Profile
 
-theorem checked_dispatch_contract (contract : BorrowHelperContract) : ReportingBinaryContract (· - ·)
+theorem checked_dispatch_contract (contract : BorrowHelperContract Extracted.program Extracted.subtractWithBorrowIndex) : ReportingBinaryContract (· - ·)
     (fun left right => decide (left.toNat < right.toNat))
     Extracted.program Extracted.subtractVector256Index :=
   dispatch_contract_of_scalar (scalar_checked contract)

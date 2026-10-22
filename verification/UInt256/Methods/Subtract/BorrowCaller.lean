@@ -1,15 +1,12 @@
-import UInt256.Methods.Subtract.BorrowFrameless
+import UInt256.Methods.Subtract.Bindings
+import UInt256.Methods.Subtract.BorrowContract
 
 namespace UInt256Proof.Subtract.Safety
-open CIL.Safety
+open UInt256Proof.Subtract.Profile
 
-theorem borrow_run : BorrowRun borrowWord := by
-  borrow_run_steps [borrowWord, BitVec.toNat_or, BitVec.toNat_and]
+/-- The extracted helper is the production borrow body, supplied to the shared parent proofs. -/
+theorem borrow_production_contract : BorrowHelperContract Extracted.program Extracted.subtractWithBorrowIndex :=
+  borrow_helper_contract (profile := Extracted.profile) rfl
 
-/-- The production helper's checked contract, supplied to the shared parent proofs. -/
-theorem borrow_checked_contract : BorrowHelperContract :=
-  borrow_contract_of_run borrowWord borrow_run borrowWord_correct
-
-#print axioms borrow_run
-#print axioms borrow_checked_contract
+#print axioms borrow_production_contract
 end UInt256Proof.Subtract.Safety
