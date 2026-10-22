@@ -259,7 +259,7 @@ extract. The pinned revision includes the fixes for multiplication (`Math.BigMul
 static lookup tables (#53) and linear per-site evidence checks (#54).
 
 All scalar ports have registered certificates, and `remainingPorts` is empty.
-All 256 gates were recertified on LeanCIL `81e7617` on the final tree, and every
+All 256 gates were recertified on LeanCIL `17f489a` in CI run 39696707787, and every
 regression runner passed; `migration-status.json` records the per-runner counts. `BitwiseRegression.cs`
 and `ShiftRegression.cs` take a profile argument (default `scalar`), so a
 complete run also passes `x64-vector256`.
