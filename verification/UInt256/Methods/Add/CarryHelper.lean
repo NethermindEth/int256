@@ -11,7 +11,7 @@ import UInt256.Methods.Add.SafetyResult
 import UInt256.Methods.Reporting.Arithmetic
 import UInt256.Methods.Add.CarryRun
 import CIL.Safety.MethodContract
-import UInt256.Safety.OutsideWords
+import UInt256.Safety.PrivateCalls
 namespace UInt256Proof.Add.CarrySafety
 def carryBody (profile : CIL.FeatureProfile) : CIL.Method := { profile := profile, returnsValue := false, locals := [.i64 0, .i64 0], localKinds := [.word64, .word64], parameterHomes := [], staticSites := [], code := [
   .arg 0,
@@ -207,8 +207,8 @@ theorem ScalarCarryState.advance {original before after : CIL.Safety.Memory} {fr
   · intro id old offset
     have belowCarry := Nat.lt_of_lt_of_le old state.carryFresh
     have belowResult := Nat.lt_of_lt_of_le old (state.resultsFresh index)
-    exact (framed.cells id (Nat.lt_trans belowCarry carryOld) offset
-      (outside_words (Or.inl (Nat.ne_of_lt belowCarry)) (Or.inl (Nat.ne_of_lt belowResult)))).trans
+    exact (framed.cells_apart (Nat.lt_trans belowCarry carryOld)
+      (by simp [Nat.ne_of_lt belowCarry, Nat.ne_of_lt belowResult]) offset).trans
       (state.callerCells id old offset)
   · intro i done
     by_cases same : i = index
@@ -217,8 +217,8 @@ theorem ScalarCarryState.advance {original before after : CIL.Safety.Memory} {fr
     · have earlier : i.val < index.val := by
         have different : i.val ≠ index.val := fun h => same (Fin.ext h)
         omega
-      exact (framed.read_eq _ (resultOld i) _ _ fun _ _ => outside_words (Or.inl (state.carrySeparate i))
-        (Or.inl (state.resultSeparate i index same))).trans (state.completed i earlier)
+      exact framed.read_apart state.call.1.1 (state.completed i earlier)
+        (by simp [Apart, state.carrySeparate i, state.resultSeparate i index same])
 
 #print axioms ScalarCarryState.advance
 

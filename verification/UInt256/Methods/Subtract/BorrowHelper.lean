@@ -8,7 +8,7 @@ import CIL.Safety.ExecutionStaticWorld
 import CIL.Safety.CallComposition
 import UInt256.Safety.CallerSetup
 import UInt256.Safety.LimbAccess
-import UInt256.Safety.OutsideWords
+import UInt256.Safety.PrivateCalls
 import UInt256.Methods.Reporting.Arithmetic
 import UInt256.Methods.Subtract.BorrowRun
 
@@ -227,8 +227,8 @@ theorem ScalarBorrowState.advance {original before after : CIL.Safety.Memory} {f
   · intro id old offset
     have belowBorrow := Nat.lt_of_lt_of_le old state.borrowFresh
     have belowResult := Nat.lt_of_lt_of_le old (state.resultsFresh index)
-    exact (framed.cells id (Nat.lt_trans belowBorrow borrowOld) offset
-      (outside_words (Or.inl (Nat.ne_of_lt belowBorrow)) (Or.inl (Nat.ne_of_lt belowResult)))).trans
+    exact (framed.cells_apart (Nat.lt_trans belowBorrow borrowOld)
+      (by simp [Nat.ne_of_lt belowBorrow, Nat.ne_of_lt belowResult]) offset).trans
       (state.callerCells id old offset)
   · intro i done
     by_cases same : i = index
@@ -237,8 +237,8 @@ theorem ScalarBorrowState.advance {original before after : CIL.Safety.Memory} {f
     · have earlier : i.val < index.val := by
         have different : i.val ≠ index.val := fun h => same (Fin.ext h)
         omega
-      exact (framed.read_eq _ (resultOld i) _ _ fun _ _ => outside_words (Or.inl (state.borrowSeparate i))
-        (Or.inl (state.resultSeparate i index same))).trans (state.completed i earlier)
+      exact framed.read_apart state.call.1.1 (state.completed i earlier)
+        (by simp [Apart, state.borrowSeparate i, state.resultSeparate i index same])
 
 def scalarUnderflowFlag (borrow : BitVec 64) : BitVec 32 :=
   if BitVec.ofNat 64 0 < borrow then BitVec.ofNat 32 1 else BitVec.ofNat 32 0
