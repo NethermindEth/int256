@@ -1,7 +1,8 @@
 import UInt256.Methods.Shift.ScalarContract
 import UInt256.Methods.Shift.LeftFlow
 import UInt256.Methods.StorageFlow
-import UInt256.Safety.RegionSuffix
+import CIL.Safety.RegionRun
+import CIL.Safety.Embedding.Suffix
 
 namespace UInt256Proof.Shift.Variant
 open CIL.Safety UInt256Model.Safety UInt256Proof.Transport UInt256Proof.Shift.Safety
@@ -13,7 +14,7 @@ def countBody (profile : CIL.FeatureProfile) : CIL.Method :=
 /-- The left body with its whole-limb count computed by a call to `countBody`. -/
 def helperBody (profile : CIL.FeatureProfile) (storage helper : Nat) : CIL.Method :=
   let canonical := scalarBody profile .left storage
-  { canonical with code := [.arg 1, .call helper 1] ++ (canonical.code.drop 3).map (relocateOp (· - 1)) }
+  { canonical with code := [.arg 1, .call helper 1] ++ (canonical.code.drop 3).map (CIL.Op.relabel (· - 3 + 2)) }
 
 theorem count_invoke (profile : CIL.FeatureProfile) (program : CIL.Program) (index : Nat)
     (found : program[index]? = some (countBody profile)) (memory : Memory) (count : BitVec 32) :
@@ -76,23 +77,46 @@ theorem helper_prefix_prepend (profile : CIL.FeatureProfile) (program : CIL.Prog
     ⟨4, count_invoke profile program helper helperFound memory count⟩ suffix
   exact ⟨fuel + 1, (run_next found (by rfl) firstStep).trans finished⟩
 
-theorem helper_suffix_lookup (profile : CIL.FeatureProfile) (storage helper pc : Nat) (inside : 3 ≤ pc) :
-    (helperBody profile storage helper).code[pc - 1]? =
-      ((scalarBody profile .left storage).code[pc]?).map (CIL.Op.relabel (· - 1)) := by
-  change ([CIL.Op.arg 1, .call helper 1] ++
-    ((scalarBody profile .left storage).code.drop 3).map (relocateOp (· - 1)))[pc - 1]? = _
-  rw [List.getElem?_append_right (by simp only [List.length_cons, List.length_nil]; omega)]
-  simp only [List.length_cons, List.length_nil, Nat.zero_add, List.getElem?_map, List.getElem?_drop]
-  have index : 3 + (pc - 1 - 2) = pc := by omega
-  rw [index]
-  cases opcode : (scalarBody profile .left storage).code[pc]? with
-  | none => rfl
-  | some op => exact congrArg some (left_relabel profile storage _ op (List.mem_of_getElem? opcode))
+/-- A replaced method with the same static sites keeps the caller's static-world condition. -/
+theorem set_calling {program : CIL.Program} {index : Nat} {source target : CIL.Method}
+    (found : program[index]? = some target) (same : source.staticSites = target.staticSites)
+    {memory : Memory} {inputs outputs : List Reference}
+    (call : CallingConditions program memory inputs outputs) :
+    CallingConditions (program.set index source) memory inputs outputs := by
+  refine ⟨call.1, ?_⟩
+  rw [programStaticDescriptors_set program index source fun old present => by
+    rw [found] at present; cases present; rw [same]]
+  exact call.2
+
+/-- The canonical body with its count prefix masked; only the suffix from PC 3 is ever run. -/
+def suffixBody (profile : CIL.FeatureProfile) (storage : Nat) : CIL.Method :=
+  let canonical := scalarBody profile .left storage
+  { canonical with code := List.replicate 3 (.unsupported "Outside the region") ++ canonical.code.drop 3 }
+
+/-- The masked suffix runs one PC earlier in the helper variant, after its two-instruction call prefix. -/
+theorem suffix_refines (profile : CIL.FeatureProfile) (storage helper : Nat) :
+    CIL.Embedding.BodyRefines (suffixBody profile storage) (helperBody profile storage helper)
+      (CIL.Embedding.suffixRename 3 2) := by
+  have targets : ∀ op ∈ (suffixBody profile storage).code.drop 3, ∀ target ∈ op.targets, 3 ≤ target := by
+    intro op member
+    simp only [suffixBody, List.drop_append, List.length_replicate, Nat.sub_self, List.drop_zero,
+      List.drop_replicate, List.replicate_zero, List.nil_append] at member
+    exact (left_flow profile storage op (List.mem_of_mem_drop member)).1
+  refine CIL.Embedding.BodyRefines.of_relocated_suffix (lower := 3) (start := 2) ?_ rfl (by omega) ?_ ?_ targets ?_
+  · rfl
+  · intro pc op before fetched
+    rw [suffixBody, List.getElem?_append_left (by simpa only [List.length_replicate] using before),
+      List.getElem?_replicate_of_lt before] at fetched
+    cases fetched
+    rfl
+  · simp [helperBody, suffixBody]
+  · intro pc after
+    rfl
 
 /-- The helper variant satisfies the public left-shift contract for any call-free storage callee
     whose own contract is supplied; scalar and vector storage instantiate it below. -/
 theorem helper_contract (profile : CIL.FeatureProfile) (storageBody : CIL.Method)
-    (callFree : CallFree storageBody)
+    (storageCalls : ∀ op ∈ storageBody.code, op.callees = [])
     (storeOf : ∀ program : CIL.Program, ∀ storage, program[storage]? = some storageBody → StoreLimbsContract program storage)
     (program : CIL.Program) (index storage helper : Nat) (distinct : index ≠ storage)
     (found : program[index]? = some (helperBody profile storage helper))
@@ -112,17 +136,30 @@ theorem helper_contract (profile : CIL.FeatureProfile) (storageBody : CIL.Method
   cases bodyFound
   obtain ⟨remaining, suffix⟩ := canonical_prefix_strip profile virtual index storage fuel virtualFound
     (shiftArguments input count output) frame entered final count [] (by rfl) finished
-  have relation := suffix_correspondence program index storage 3 (· - 1) (scalarBody profile .left storage)
-    (helperBody profile storage helper) storageBody distinct found storageFound callFree (fun _ _ => rfl)
-    rfl rfl (fun _ _ => rfl) (fun pc lower => by omega)
-    (fun pc op _ opcode => left_flow_inputs profile storage op (List.mem_of_getElem? opcode))
-    (fun pc lower => helper_suffix_lookup profile storage helper pc lower)
-  have moved := run_success_transport virtual program _ _ relation remaining index 3
-    (shiftArguments input count output) frame [.scalar (.i32 (count.sshiftRight 6))] entered final []
-    (Or.inr ⟨rfl, Nat.le_refl 3⟩) suffix
+  let region : Nat → Nat → Prop := fun method pc => method = storage ∨ method = index ∧ 3 ≤ pc
+  have closed : RegionClosed virtual region := by
+    intro method pc body op inside fetched opcode
+    rcases inside with rfl | ⟨rfl, lower⟩
+    · rw [virtualStorage] at fetched
+      cases fetched
+      have none := storageCalls op (List.mem_of_getElem? opcode)
+      exact ⟨fun _ => .inl rfl, fun _ _ => .inl rfl, by simp [none]⟩
+    · rw [virtualFound] at fetched
+      cases fetched
+      obtain ⟨targets, callees⟩ := left_flow profile storage op (List.mem_of_getElem? opcode)
+      exact ⟨fun _ => .inr ⟨rfl, by omega⟩, fun target member => .inr ⟨rfl, targets target member⟩,
+        fun callee member => .inl (callees callee member)⟩
+  have agrees := AgreesOn.set (region := region) virtualFound (suffixBody profile storage).code fun pc inside =>
+    code_agrees_of_drop (lower := 3) (by simp [suffixBody])
+      (by rcases inside with same | ⟨_, lower⟩; exact absurd same distinct; exact lower)
+  have masked := (run_congr_region closed agrees remaining index 3 _ frame _ entered (.inr ⟨rfl, Nat.le_refl 3⟩)).trans
+    suffix
+  rw [List.set_set] at masked
+  have moved := run_refines ((ProgramRefines.refl program).set_body found (suffix_refines profile storage helper))
+    remaining index 3 _ frame _ entered _ masked
   obtain ⟨targetFuel, executed⟩ := helper_prefix_prepend profile program index storage helper found helperFound
     (shiftArguments input count output) frame entered final count [] (by rfl)
-    ⟨remaining, by simpa [suffixMap] using moved⟩
+    ⟨remaining, by simpa [CIL.Embedding.suffixRename] using moved⟩
   have targetSetup : enterFrame (helperBody profile storage helper) (shiftArguments input count output) memory =
     .ok (frame, entered) := setup
   have live := checked_entry_live_state _ _ _ _ _ _ _ call.1.1 call.2 checked targetSetup
@@ -134,7 +171,7 @@ theorem scalar_helper_contract (profile : CIL.FeatureProfile) (scalar : profile.
     (found : program[index]? = some (helperBody profile storage helper))
     (storageFound : program[storage]? = some (UInt256Proof.StorageScalar.body profile))
     (helperFound : program[helper]? = some (countBody profile)) : ShiftContract .left program index :=
-  helper_contract profile _ (scalar_storage_call_free profile)
+  helper_contract profile _ (scalar_storage_calls_nothing profile)
     (fun program storage found => UInt256Proof.StorageScalar.store_limbs_readable_contract profile scalar program storage found)
     program index storage helper distinct found storageFound helperFound
 
@@ -143,7 +180,7 @@ theorem vector_helper_contract (profile : CIL.FeatureProfile) (vector : profile.
     (found : program[index]? = some (helperBody profile storage helper))
     (storageFound : program[storage]? = some (UInt256Proof.StorageVector.body profile))
     (helperFound : program[helper]? = some (countBody profile)) : ShiftContract .left program index :=
-  helper_contract profile _ (vector_storage_call_free profile)
+  helper_contract profile _ (vector_storage_calls_nothing profile)
     (fun program storage found => UInt256Proof.StorageVector.store_limbs_readable_contract profile vector program storage found)
     program index storage helper distinct found storageFound helperFound
 
