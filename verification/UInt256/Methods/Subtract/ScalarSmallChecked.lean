@@ -1,5 +1,5 @@
 import UInt256.Methods.Subtract.ScalarSafetyPrefix
-import UInt256.Methods.Subtract.SmallSafetyFinish
+import UInt256.Methods.Subtract.SmallHelper
 import UInt256.Methods.Subtract.SafetyResult
 
 namespace UInt256Proof.Subtract.Safety
@@ -93,8 +93,10 @@ theorem scalar_small_finish (original entered current : CIL.Safety.Memory)
     exact currentCall.1.2.1 _ (List.mem_map.mpr ⟨_, member, rfl⟩)
   have inputFormed := currentCall.input_formed member
   have outputFormed := currentCall.output_formed (by simp : output ∈ [output])
-  obtain ⟨childFuel, after, values, invoked, result⟩ :=
-    small_checked current (left) output word selected
+  obtain ⟨childFuel, after, values, certified, result⟩ :=
+    Profile.small_checked Extracted.program Extracted.subtractScalarUInt64Index Extracted.storeLimbsIndex
+      Extracted.profile (by rfl) (by rfl) current left output word selected
+  have invoked := certified.1
   rw [result.underflow] at invoked
   have methodFound : Extracted.program[scalarIndex]? = some scalarBody := by
     rfl
@@ -106,8 +108,8 @@ theorem scalar_small_finish (original entered current : CIL.Safety.Memory)
       [.reference (.address output), .scalar (.i64 word),
         .reference (.address (left))] current =
         .ok (.call Extracted.subtractScalarUInt64Index
-          (smallArguments (left) output word) [] current) := by
-    simp [step, smallArguments, checkedValue, numericValue, formValue, inputFormed, outputFormed,
+          (Profile.smallArguments left output word) [] current) := by
+    simp [step, Profile.smallArguments, checkedValue, numericValue, formValue, inputFormed, outputFormed,
       checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   have returned := scalar_small_return (binaryArguments left right output)
     (if (inputValue current left).toNat < word.toNat then 1 else 0) frame after
