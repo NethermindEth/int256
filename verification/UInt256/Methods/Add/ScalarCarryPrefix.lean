@@ -66,8 +66,7 @@ theorem scalar_first_carry (contract : CarryHelperContract Extracted.program Ext
     (disjoint : WordsDisjoint carryHome resultHome)
     (post : Memory → List Value → Prop)
     (continuation : ∀ after, after.WellFormed →
-      (StaticWorldValid (programStaticDescriptors Extracted.program) memory →
-        StaticWorldValid (programStaticDescriptors Extracted.program) after) →
+      (StaticWorldPreserved Extracted.program memory after) →
       Confined [(carryHome, 8), (resultHome, 8)] memory after →
       CarryPost a b 0 carryHome resultHome after →
       ∃ fuel result returned,
@@ -163,8 +162,7 @@ theorem scalar_indexed_carry (contract : CarryHelperContract Extracted.program E
     (disjoint : WordsDisjoint carryHome resultHome)
     (post : Memory → List Value → Prop)
     (continuation : ∀ after, after.WellFormed →
-      (StaticWorldValid (programStaticDescriptors Extracted.program) memory →
-        StaticWorldValid (programStaticDescriptors Extracted.program) after) →
+      (StaticWorldPreserved Extracted.program memory after) →
       Confined [(carryHome, 8), (resultHome, 8)] memory after →
       CarryPost a b c carryHome resultHome after →
       ∃ fuel result returned,
@@ -210,8 +208,7 @@ theorem scalar_carry_segment_checked (contract : CarryHelperContract Extracted.p
     (disjoint : WordsDisjoint carryHome resultHome)
     (post : CIL.Safety.Memory → List Value → Prop)
     (continuation : ∀ after, after.WellFormed →
-      (StaticWorldValid (programStaticDescriptors Extracted.program) memory →
-        StaticWorldValid (programStaticDescriptors Extracted.program) after) →
+      (StaticWorldPreserved Extracted.program memory after) →
       Confined [(carryHome, 8), (resultHome, 8)] memory after →
       CarryPost (inputLimb memory left ⟨segment.val + 1, by omega⟩)
         (inputLimb memory right ⟨segment.val + 1, by omega⟩) c carryHome resultHome after →

@@ -124,8 +124,7 @@ theorem subtract_repair_indexed_borrow (program : CIL.Program) (body : CIL.Metho
     (disjoint : WordsDisjoint borrowHome resultHome)
     (post : Memory → List Value → Prop)
     (continuation : ∀ after, after.WellFormed →
-      (StaticWorldValid (programStaticDescriptors program) memory →
-        StaticWorldValid (programStaticDescriptors program) after) →
+      (StaticWorldPreserved program memory after) →
       Confined [(borrowHome, 8), (resultHome, 8)] memory after →
       BorrowPost a b c borrowHome resultHome after →
       ∃ fuel result returned,
@@ -176,8 +175,7 @@ theorem subtract_repair_segment_checked (program : CIL.Program) (body : CIL.Meth
     (disjoint : WordsDisjoint borrowHome resultHome)
     (post : CIL.Safety.Memory → List Value → Prop)
     (continuation : ∀ after, after.WellFormed →
-      (StaticWorldValid (programStaticDescriptors program) memory →
-        StaticWorldValid (programStaticDescriptors program) after) →
+      (StaticWorldPreserved program memory after) →
       Confined [(borrowHome, 8), (resultHome, 8)] memory after →
       BorrowPost (inputLimb memory left segment)
         (inputLimb memory right segment) c borrowHome resultHome after →

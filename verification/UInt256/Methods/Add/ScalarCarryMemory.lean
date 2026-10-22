@@ -76,8 +76,7 @@ theorem scalar_first_carry_checked (contract : CarryHelperContract Extracted.pro
     (continuation : ∀ carryHome resultHome prepared after,
       ScalarCarryReady memory entered prepared frame left right output rightHome leftHome carryHome resultHome →
       after.WellFormed →
-      (StaticWorldValid (programStaticDescriptors Extracted.program) prepared →
-        StaticWorldValid (programStaticDescriptors Extracted.program) after) →
+      (StaticWorldPreserved Extracted.program prepared after) →
       Confined [(carryHome, 8), (resultHome, 8)] prepared after →
       CarryPost (inputLimb memory left 0) (inputLimb memory right 0) 0 carryHome resultHome after →
       ∃ fuel result returned,

@@ -156,8 +156,7 @@ theorem vector128_sse_indexed_carry (program : CIL.Program) (body : CIL.Method) 
     (disjoint : WordsDisjoint carryHome resultHome)
     (post : Memory → List Value → Prop)
     (continuation : ∀ after, after.WellFormed →
-      (StaticWorldValid (programStaticDescriptors program) memory →
-        StaticWorldValid (programStaticDescriptors program) after) →
+      (StaticWorldPreserved program memory after) →
       Confined [(carryHome, 8), (resultHome, 8)] memory after →
       CarryPost a b c carryHome resultHome after →
       ∃ fuel result returned,
@@ -208,8 +207,7 @@ theorem vector128_sse_carry_segment_checked (program : CIL.Program) (body : CIL.
     (disjoint : WordsDisjoint carryHome resultHome)
     (post : CIL.Safety.Memory → List Value → Prop)
     (continuation : ∀ after, after.WellFormed →
-      (StaticWorldValid (programStaticDescriptors program) memory →
-        StaticWorldValid (programStaticDescriptors program) after) →
+      (StaticWorldPreserved program memory after) →
       Confined [(carryHome, 8), (resultHome, 8)] memory after →
       CarryPost (inputLimb memory left segment)
         (inputLimb memory right segment) c carryHome resultHome after →

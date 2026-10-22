@@ -199,8 +199,7 @@ theorem ScalarBorrowState.advance {original before after : CIL.Safety.Memory} {f
     (math : BorrowPost (inputLimb original left index) (inputLimb original right index)
       (scalarBorrowValue original left right index.val) borrowHome (results index) after)
     (formed : after.WellFormed)
-    (world : StaticWorldValid (programStaticDescriptors program) before →
-      StaticWorldValid (programStaticDescriptors program) after)
+    (world : StaticWorldPreserved program before after)
     (framed : Confined [(borrowHome, 8), (results index, 8)] before after) :
     ScalarBorrowState (program := program) original after frame left right output borrowHome results (index.val + 1) borrowIndex resultBase := by
   have separate : ∀ reference ∈ [left, right],

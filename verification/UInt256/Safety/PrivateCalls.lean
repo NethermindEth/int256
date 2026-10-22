@@ -44,8 +44,7 @@ theorem private_input_bytes {program : CIL.Program} {first second : Reference}
 theorem private_calling_conditions {program : CIL.Program} {first second : Reference}
     {before after : Memory} (framed : Confined [(first, 8), (second, 8)] before after)
     (formed : after.WellFormed)
-    (world : StaticWorldValid (programStaticDescriptors program) before →
-      StaticWorldValid (programStaticDescriptors program) after)
+    (world : StaticWorldPreserved program before after)
     {inputs outputs : List Reference} (call : CallingConditions program before inputs outputs)
     (separate : ∀ reference ∈ inputs,
       reference.allocation ≠ first.allocation ∧ reference.allocation ≠ second.allocation) :

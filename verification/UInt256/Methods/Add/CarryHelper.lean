@@ -176,8 +176,7 @@ theorem ScalarCarryState.advance {original before after : CIL.Safety.Memory} {fr
     (math : CarryPost (inputLimb original left index) (inputLimb original right index)
       (scalarCarryValue original left right index.val) carryHome (results index) after)
     (formed : after.WellFormed)
-    (world : StaticWorldValid (programStaticDescriptors program) before →
-      StaticWorldValid (programStaticDescriptors program) after)
+    (world : StaticWorldPreserved program before after)
     (framed : Confined [(carryHome, 8), (results index, 8)] before after) :
     ScalarCarryState (program := program) original after frame left right output carryHome results (index.val + 1) carryIndex resultBase := by
   have separate : ∀ reference ∈ [left, right],

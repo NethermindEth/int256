@@ -19,8 +19,7 @@ theorem scalar_indexed_borrow (contract : BorrowHelperContract Extracted.program
     (resultWrite : access memory resultHome 8 1 true = .ok ()) (disjoint : WordsDisjoint borrowHome resultHome)
     (post : Memory → List Value → Prop)
     (continuation : ∀ after, after.WellFormed →
-      (StaticWorldValid (programStaticDescriptors Extracted.program) memory →
-        StaticWorldValid (programStaticDescriptors Extracted.program) after) →
+      (StaticWorldPreserved Extracted.program memory after) →
       Confined [(borrowHome, 8), (resultHome, 8)] memory after →
       BorrowPost a b c borrowHome resultHome after →
       ∃ fuel result returned,
@@ -55,8 +54,7 @@ theorem scalar_borrow_segment_checked (contract : BorrowHelperContract Extracted
     (resultWrite : access memory resultHome 8 1 true = .ok ()) (disjoint : WordsDisjoint borrowHome resultHome)
     (post : Memory → List Value → Prop)
     (continuation : ∀ after, after.WellFormed →
-      (StaticWorldValid (programStaticDescriptors Extracted.program) memory →
-        StaticWorldValid (programStaticDescriptors Extracted.program) after) →
+      (StaticWorldPreserved Extracted.program memory after) →
       Confined [(borrowHome, 8), (resultHome, 8)] memory after →
       BorrowPost (inputLimb memory left ⟨segment.val + 1, by omega⟩)
         (inputLimb memory right ⟨segment.val + 1, by omega⟩) c borrowHome resultHome after →
