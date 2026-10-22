@@ -1,5 +1,5 @@
 import CIL.Safety.Equations
-import UInt256.Methods.Add.CarryHelper
+import UInt256.Methods.Add.CarryContract
 import UInt256.Methods.Add.ARMBody
 import UInt256.Methods.Multiply.LimbStorage
 import CIL.Safety.CallComposition
@@ -155,7 +155,8 @@ theorem vector128_sse_indexed_carry (program : CIL.Program) (body : CIL.Method) 
     (resultWrite : access memory resultHome 8 1 true = .ok ())
     (disjoint : WordsDisjoint carryHome resultHome)
     (post : Memory → List Value → Prop)
-    (continuation : ∀ after, CarryPost (program := program) a b c carryHome resultHome memory after →
+    (continuation : ∀ after, Confined [(carryHome, 8), (resultHome, 8)] memory after →
+      CarryPost (program := program) a b c carryHome resultHome memory after →
       ∃ fuel result returned,
         run program fuel method (172 + 7 * index.val) args frame [] after =
           .ok (result, returned) ∧ post result returned) :
@@ -165,9 +166,6 @@ theorem vector128_sse_indexed_carry (program : CIL.Program) (body : CIL.Method) 
         memory = .ok (result, returned) ∧ post result returned := by
   have carryFormed := access_reference_valid _ _ _ _ _ carryWrite
   have resultFormed := access_reference_valid _ _ _ _ _ resultWrite
-  obtain ⟨childFuel, stored, invoked, guarantees⟩ := carry_checked_contract carryFound a b c carryHome resultHome
-    memory wellFormed incoming carryRead carryWrite resultWrite disjoint
-  obtain ⟨parentFuel, result, values, resumed, satisfied⟩ := continuation stored guarantees
   have fetched : body.code[171 + 7 * index.val]? = some (.call carry 4) := by
     obtain ⟨index, bound⟩ := index
     have cases : index = 0 ∨ index = 1 ∨ index = 2 ∨ index = 3 := by omega
@@ -180,11 +178,10 @@ theorem vector128_sse_indexed_carry (program : CIL.Program) (body : CIL.Method) 
     simp [step, checkedValue, numericValue, formValue, carryFormed, resultFormed,
       checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     try exact ⟨rfl, rfl⟩
-  have resumed' : run program parentFuel method (171 + 7 * index.val + 1) args frame [] stored =
-      .ok (result, values) := by
-    simpa only [show 171 + 7 * index.val + 1 = 172 + 7 * index.val by omega] using resumed
-  obtain ⟨fuel, finished⟩ := run_call_exists found fetched stepped ⟨childFuel, invoked⟩ ⟨parentFuel, resumed'⟩
-  exact ⟨fuel, result, values, finished, satisfied⟩
+  apply run_call_of_contract (carry_helper_contract carryFound) ⟨a, b, c, carryHome, resultHome⟩ found fetched stepped rfl
+    ⟨wellFormed, incoming, carryRead, carryWrite, resultWrite, disjoint⟩
+  rintro after _ - framed ⟨rfl, math⟩
+  simpa only [show 171 + 7 * index.val + 1 = 172 + 7 * index.val by omega, List.append_nil] using continuation after framed math
 
 #print axioms vector128_sse_indexed_carry
 
@@ -206,7 +203,7 @@ theorem vector128_sse_carry_segment_checked (program : CIL.Program) (body : CIL.
     (resultWrite : access memory resultHome 8 1 true = .ok ())
     (disjoint : WordsDisjoint carryHome resultHome)
     (post : CIL.Safety.Memory → List Value → Prop)
-    (continuation : ∀ after,
+    (continuation : ∀ after, Confined [(carryHome, 8), (resultHome, 8)] memory after →
       CarryPost (program := program) (inputLimb memory left segment)
         (inputLimb memory right segment) c carryHome resultHome memory after →
       ∃ fuel result returned,
@@ -256,9 +253,9 @@ theorem vector128_sse_carry_next (program : CIL.Program) (body : CIL.Method) (me
     (scalarCarryValue original left right index.val) carryHome (results index) state.call
     state.carrySlot (state.resultSlots index) state.carryBound state.carryRead state.carryWrite
     (state.resultWrites index) (Or.inl (Ne.symm (state.carrySeparate index))) post
-  intro after math
+  intro after framed math
   apply continuation after
-  apply state.advance index
+  apply state.advance index _ framed
   simpa only [inputLimb, state.inputBytes left (by simp), state.inputBytes right (by simp)] using math
 
 /-- All four carry calls keep the initial operands, private homes and completed limbs. -/

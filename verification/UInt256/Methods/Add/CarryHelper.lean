@@ -10,6 +10,7 @@ import UInt256.Safety.LimbAccess
 import UInt256.Methods.Add.SafetyResult
 import UInt256.Methods.Reporting.Arithmetic
 import UInt256.Methods.Add.CarryRun
+import CIL.Safety.MethodContract
 namespace UInt256Proof.Add.CarrySafety
 def carryBody (profile : CIL.FeatureProfile) : CIL.Method := { profile := profile, returnsValue := false, locals := [.i64 0, .i64 0], localKinds := [.word64, .word64], parameterHomes := [], staticSites := [], code := [
   .arg 0,
@@ -94,66 +95,6 @@ variable {profile : CIL.FeatureProfile} {program : CIL.Program} {index : Nat}
 
 open CIL.Safety
 
-/-- Ordinary access and private locals suffice; caller references may overlap since the carry is read first. -/
-theorem carry_body_succeeds (found : program[index]? = some (carryBody profile)) (a b c : BitVec 64) (carry output first second : Reference)
-    (frame : Frame) (memory : Memory)
-    (locals : frame.locals = [.bytes .word64 first, .bytes .word64 second])
-    (distinct : first.allocation ≠ second.allocation)
-    (privateFirst : carry.allocation ≠ first.allocation)
-    (privateSecond : carry.allocation ≠ second.allocation)
-    (firstWritable : access memory first 8 1 true = .ok ())
-    (secondWritable : access memory second 8 1 true = .ok ())
-    (carryReadable : read memory carry 8 1 = .ok (numberBytes c.toNat 8))
-    (carryWritable : access memory carry 8 1 true = .ok ())
-    (outputWritable : access memory output 8 1 true = .ok ()) :
-    ∃ stored,
-      run program ((carryBody profile).code.length + 1)
-        index 0
-        [.scalar (.i64 a), .scalar (.i64 b), .reference (.address carry), .reference (.address output)]
-        frame [] memory = .ok (leaveFrame frame stored, []) ∧
-      read stored output 8 1 = .ok (numberBytes (a + b + c).toNat 8) ∧
-      (WordsDisjoint carry output → read stored carry 8 1 = .ok (numberBytes (carryWord a b c).toNat 8)) ∧
-      (∀ id offset, id ≠ first.allocation → id ≠ second.allocation →
-        OutsideWord carry id offset → OutsideWord output id offset →
-        stored.cells id offset = memory.cells id offset) ∧
-      AccessBelow memory.nextIdentity memory stored :=
-  carry_body_succeeds_of_run carryWord (carry_run_of_memory_steps found) a b c carry output first second
-    frame memory locals distinct privateFirst privateSecond firstWritable secondWritable carryReadable carryWritable
-    outputWritable
-
-#print axioms carry_body_succeeds
-
-end UInt256Proof.Add.CarrySafety
-
-
-namespace UInt256Proof.Add.CarrySafety
-variable {profile : CIL.FeatureProfile} {program : CIL.Program} {index : Nat}
-
-open CIL.Safety
-
-/-- The carry helper's two word homes are fresh, writable and private; setup keeps caller memory. -/
-theorem carry_frame_setup (memory : Memory) (args : List Value) (wellFormed : memory.WellFormed) :
-    ∃ first second frame result,
-      enterFrame (carryBody profile) args memory = .ok (frame, result) ∧
-      frame.locals = [.bytes .word64 first, .bytes .word64 second] ∧
-      frame.owned = [first.allocation, second.allocation] ∧
-      first.allocation ≠ second.allocation ∧
-      read result first 8 1 = .ok (numberBytes 0 8) ∧
-      read result second 8 1 = .ok (numberBytes 0 8) ∧
-      access result first 8 1 true = .ok () ∧
-      access result second 8 1 true = .ok () ∧
-      MemoryBelow memory.nextIdentity memory result :=
-  carry_frame_setup_of_shape carryBody_shape memory args wellFormed
-
-#print axioms carry_frame_setup
-
-end UInt256Proof.Add.CarrySafety
-
-namespace UInt256Proof.Add.CarrySafety
-variable {profile : CIL.FeatureProfile} {program : CIL.Program} {index : Nat}
-
-open CIL.Safety
-
 /-- Total checked invocation from caller permissions, including setup and teardown. -/
 theorem carry_invoke_succeeds (found : program[index]? = some (carryBody profile)) (a b c : BitVec 64) (carry output : Reference) (memory : Memory)
     (wellFormed : memory.WellFormed)
@@ -166,9 +107,7 @@ theorem carry_invoke_succeeds (found : program[index]? = some (carryBody profile
         memory = .ok (result, []) ∧
       loadValue result (.address output) 8 = .ok (.i64 (a + b + c)) ∧
       (WordsDisjoint carry output → loadValue result (.address carry) 8 = .ok (.i64 (carryWord a b c))) ∧
-      (∀ id offset, id < memory.nextIdentity → OutsideWord carry id offset → OutsideWord output id offset →
-        result.cells id offset = memory.cells id offset) ∧
-      AccessBelow memory.nextIdentity memory result ∧
+      Confined [(carry, 8), (output, 8)] memory result ∧
       read result output 8 1 = .ok (numberBytes (a + b + c).toNat 8) ∧
       (WordsDisjoint carry output → read result carry 8 1 = .ok (numberBytes (carryWord a b c).toNat 8)) :=
   carry_invoke_succeeds_of_run carryWord found carryBody_shape (carry_run_of_memory_steps found) a b c carry output
@@ -214,11 +153,18 @@ structure CarryPost (a b c : BitVec 64) (carryRef output : Reference) (before af
   carryBytes : read after carryRef 8 1 = .ok (numberBytes (UInt256Proof.carry a b c).toNat 8)
   carryBound : (UInt256Proof.carry a b c).toNat ≤ 1
   arithmetic : (a + b + c).toNat + 2^64 * (UInt256Proof.carry a b c).toNat = a.toNat + b.toNat + c.toNat
-  footprint : ∀ id offset, id < before.nextIdentity → OutsideWord carryRef id offset → OutsideWord output id offset →
-    after.cells id offset = before.cells id offset
-  access : AccessBelow before.nextIdentity before after
   staticWorld : StaticWorldValid (programStaticDescriptors program) before →
     StaticWorldValid (programStaticDescriptors program) after
+
+/-- A byte outside both carry-helper words is outside its contract footprint. -/
+theorem outside_words {carryRef output : Reference} {id offset : Nat}
+    (carry : OutsideWord carryRef id offset) (out : OutsideWord output id offset) :
+    Outside [(carryRef, 8), (output, 8)] id offset := by
+  intro entry member
+  simp only [List.mem_cons, List.not_mem_nil, or_false] at member
+  rcases member with rfl | rfl
+  · exact carry
+  · exact out
 
 theorem CarryPost.output_load {a b c : BitVec 64} {carryRef output : Reference} {before after : Memory}
     (post : CarryPost (program := program) a b c carryRef output before after) :
@@ -238,15 +184,16 @@ theorem carry_checked_contract (found : program[index]? = some (carryBody profil
     ∃ fuel result,
       invoke program fuel index
         [.scalar (.i64 a), .scalar (.i64 b), .reference (.address carryRef), .reference (.address output)]
-        memory = .ok (result, []) ∧ CarryPost (program := program) a b c carryRef output memory result := by
-  obtain ⟨fuel, result, invoked, _, _, footprint, retainedAccess, outputBytes, carryBytes⟩ :=
+        memory = .ok (result, []) ∧ Confined [(carryRef, 8), (output, 8)] memory result ∧
+        CarryPost (program := program) a b c carryRef output memory result := by
+  obtain ⟨fuel, result, invoked, _, _, framed, outputBytes, carryBytes⟩ :=
     carry_invoke_succeeds found a b c carryRef output memory wellFormed carryReadable carryWritable outputWritable
   have carryBytes := carryBytes disjoint
   rw [carryWord_correct a b c incoming] at carryBytes
-  exact ⟨fuel, result, invoked,
+  exact ⟨fuel, result, invoked, framed,
     ⟨invoke_preserves_wellFormed _ _ _ _ _ _ _ wellFormed invoked,
       outputBytes, carryBytes, UInt256Proof.carry_bound a b c incoming,
-      UInt256Proof.carry_word_nat a b c incoming, footprint, retainedAccess,
+      UInt256Proof.carry_word_nat a b c incoming,
       fun world => invoke_preserves_static_world _ _ _ _ _ _ _ wellFormed world invoked⟩⟩
 
 #print axioms CarryPost.output_load
@@ -262,8 +209,8 @@ variable {profile : CIL.FeatureProfile} {program : CIL.Program} {index : Nat}
 open CIL.Safety UInt256Model.Safety
 
 /-- A carry call writing private homes preserves caller input snapshots. -/
-theorem CarryPost.private_input_bytes {a b c : BitVec 64} {carryRef output : Reference}
-    {before after : CIL.Safety.Memory} (post : CarryPost (program := program) a b c carryRef output before after)
+theorem private_input_bytes {carryRef output : Reference}
+    {before after : CIL.Safety.Memory} (framed : Confined [(carryRef, 8), (output, 8)] before after)
     {inputs outputs : List Reference}
     (call : CallingConditions program before inputs outputs)
     {reference : Reference} (member : reference ∈ inputs)
@@ -274,11 +221,12 @@ theorem CarryPost.private_input_bytes {a b c : BitVec 64} {carryRef output : Ref
   obtain ⟨allocation, present, _, _⟩ := formed_reference_live _ _ _ (call.input_formed member)
   have old := (call.1.1.1 _ _ present).1
   funext offset
-  rw [post.footprint _ _ old (Or.inl notCarry) (Or.inl notOutput)]
+  rw [framed.cells _ old _ (outside_words (Or.inl notCarry) (Or.inl notOutput))]
 
 /-- Caller authority, readable inputs and static data survive a private carry call. -/
 theorem CarryPost.private_calling_conditions {a b c : BitVec 64} {carryRef output : Reference}
     {before after : CIL.Safety.Memory} (post : CarryPost (program := program) a b c carryRef output before after)
+    (framed : Confined [(carryRef, 8), (output, 8)] before after)
     {inputs outputs : List Reference}
     (call : CallingConditions program before inputs outputs)
     (separate : ∀ reference ∈ inputs,
@@ -290,16 +238,16 @@ theorem CarryPost.private_calling_conditions {a b c : BitVec 64} {carryRef outpu
     obtain ⟨allocation, present, _, _⟩ := formed_reference_live _ _ _ (call.input_formed inputMember)
     have old := (call.1.1.1 _ _ present).1
     obtain ⟨notCarry, notOutput⟩ := separate reference inputMember
-    refine ⟨_, post.access.read_eq (call.input_snapshot inputMember) old ?_⟩
-    intro i _
-    exact post.footprint _ _ old (Or.inl notCarry) (Or.inl notOutput)
+    refine ⟨_, (framed.read_eq _ old _ _ fun _ _ => outside_words (Or.inl notCarry) (Or.inl notOutput)).trans
+      (call.input_snapshot inputMember)⟩
   · intro view member
     have writable := call.1.2.2 view member
     obtain ⟨allocation, present, _, _⟩ := access_within_allocation _ _ _ _ _ writable
-    exact post.access.access writable (call.1.1.1 _ _ present).1
+    exact (framed.access_write _ (call.1.1.1 _ _ present).1 _ _).trans writable
 
 theorem CarryPost.private_input_field {a b c : BitVec 64} {carryRef output : Reference}
     {before after : CIL.Safety.Memory} (post : CarryPost (program := program) a b c carryRef output before after)
+    (framed : Confined [(carryRef, 8), (output, 8)] before after)
     {inputs outputs : List Reference}
     (call : CallingConditions program before inputs outputs)
     (separate : ∀ reference ∈ inputs,
@@ -307,11 +255,11 @@ theorem CarryPost.private_input_field {a b c : BitVec 64} {carryRef output : Ref
     {reference : Reference} (member : reference ∈ inputs) (index : Fin 4) (rest : List Value) :
     instruction (.fieldAt (8 * index.val) 8) (.reference (.address reference) :: rest) after =
       .ok (after, .scalar (.i64 (inputLimb before reference index)) :: rest) := by
-  rw [(post.private_calling_conditions call separate).input_field_instruction member index rest]
-  simp only [inputLimb, post.private_input_bytes call member (separate reference member).1
+  rw [(post.private_calling_conditions framed call separate).input_field_instruction member index rest]
+  simp only [inputLimb, private_input_bytes framed call member (separate reference member).1
     (separate reference member).2]
 
-#print axioms CarryPost.private_input_bytes
+#print axioms private_input_bytes
 #print axioms CarryPost.private_calling_conditions
 #print axioms CarryPost.private_input_field
 
@@ -358,7 +306,8 @@ theorem ScalarCarryState.advance {original before after : CIL.Safety.Memory} {fr
     {left right output carryHome : Reference} {results : Fin 4 → Reference} {carryIndex resultBase : Nat} (index : Fin 4)
     (state : ScalarCarryState (program := program) original before frame left right output carryHome results index.val carryIndex resultBase)
     (math : CarryPost (program := program) (inputLimb original left index) (inputLimb original right index)
-      (scalarCarryValue original left right index.val) carryHome (results index) before after) :
+      (scalarCarryValue original left right index.val) carryHome (results index) before after)
+    (framed : Confined [(carryHome, 8), (results index, 8)] before after) :
     ScalarCarryState (program := program) original after frame left right output carryHome results (index.val + 1) carryIndex resultBase := by
   have separate : ∀ reference ∈ [left, right],
       reference.allocation ≠ carryHome.allocation ∧ reference.allocation ≠ (results index).allocation :=
@@ -371,21 +320,21 @@ theorem ScalarCarryState.advance {original before after : CIL.Safety.Memory} {fr
     intro i
     obtain ⟨allocation, present, _, _⟩ := access_within_allocation _ _ _ _ _ (state.resultWrites i)
     exact (state.call.1.1.1 _ _ present).1
-  refine ⟨math.private_calling_conditions state.call separate, ?_, state.carrySlot, state.resultSlots,
-    math.access.access state.carryWrite carryOld,
-    fun i => math.access.access (state.resultWrites i) (resultOld i), ?_, ?_,
+  refine ⟨math.private_calling_conditions framed state.call separate, ?_, state.carrySlot, state.resultSlots,
+    (framed.access_write _ carryOld _ _).trans state.carryWrite,
+    fun i => (framed.access_write _ (resultOld i) _ _).trans (state.resultWrites i), ?_, ?_,
     state.callerSeparate, state.carrySeparate, state.resultSeparate,
     state.carryFresh, state.resultsFresh, ?_, ?_⟩
   · intro reference member
-    exact (math.private_input_bytes state.call member (separate reference member).1
+    exact (private_input_bytes framed state.call member (separate reference member).1
       (separate reference member).2).trans (state.inputBytes reference member)
   · simpa only [scalarCarryValue, dite_eq_left index.isLt] using math.carryBytes
   · simpa only [scalarCarryValue, dite_eq_left index.isLt] using math.carryBound
   · intro id old offset
     have belowCarry := Nat.lt_of_lt_of_le old state.carryFresh
     have belowResult := Nat.lt_of_lt_of_le old (state.resultsFresh index)
-    exact (math.footprint id offset (Nat.lt_trans belowCarry carryOld)
-      (Or.inl (Nat.ne_of_lt belowCarry)) (Or.inl (Nat.ne_of_lt belowResult))).trans
+    exact (framed.cells id (Nat.lt_trans belowCarry carryOld) offset
+      (outside_words (Or.inl (Nat.ne_of_lt belowCarry)) (Or.inl (Nat.ne_of_lt belowResult)))).trans
       (state.callerCells id old offset)
   · intro i done
     by_cases same : i = index
@@ -394,10 +343,8 @@ theorem ScalarCarryState.advance {original before after : CIL.Safety.Memory} {fr
     · have earlier : i.val < index.val := by
         have different : i.val ≠ index.val := fun h => same (Fin.ext h)
         omega
-      apply math.access.read_eq (state.completed i earlier) (resultOld i)
-      intro offset _
-      exact math.footprint _ _ (resultOld i) (Or.inl (state.carrySeparate i))
-        (Or.inl (state.resultSeparate i index same))
+      exact (framed.read_eq _ (resultOld i) _ _ fun _ _ => outside_words (Or.inl (state.carrySeparate i))
+        (Or.inl (state.resultSeparate i index same))).trans (state.completed i earlier)
 
 #print axioms ScalarCarryState.advance
 

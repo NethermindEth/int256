@@ -1,6 +1,6 @@
 import UInt256.Methods.Add.ScalarCarryPrefix
 import UInt256.Safety.StorageSelection
-import UInt256.Methods.Add.CarryCall
+import UInt256.Methods.Add.CarryContract
 import UInt256.Methods.Add.ScalarCarryMemory
 import UInt256.Methods.Add.ScalarSmallFacts
 

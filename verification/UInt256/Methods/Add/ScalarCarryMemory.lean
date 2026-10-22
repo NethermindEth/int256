@@ -1,6 +1,5 @@
 import UInt256.Methods.Add.ScalarMemory
 import UInt256.Methods.Add.ScalarCarryPrefix
-import UInt256.Methods.Add.CarryCall
 
 namespace UInt256Proof.Safety
 
@@ -76,6 +75,7 @@ theorem scalar_first_carry_checked (contract : CarryHelperContract Extracted.pro
     (post : CIL.Safety.Memory → List Value → Prop)
     (continuation : ∀ carryHome resultHome prepared after,
       ScalarCarryReady memory entered prepared frame left right output rightHome leftHome carryHome resultHome →
+      Confined [(carryHome, 8), (resultHome, 8)] prepared after →
       CarryPost (program := Extracted.program) (inputLimb memory left 0) (inputLimb memory right 0) 0 carryHome resultHome prepared after →
       ∃ fuel result returned,
         run Extracted.program fuel Extracted.addScalarIndex (scalarFirstCarryCall + 1) args frame [] after =
@@ -94,7 +94,7 @@ theorem scalar_first_carry_checked (contract : CarryHelperContract Extracted.pro
     (access_reference_valid _ _ _ _ _ ready.resultWrite) stored post
   exact scalar_first_carry contract args frame prepared (inputLimb memory left 0) (inputLimb memory right 0)
     carryHome resultHome ready.lowWords.call.1.1 ready.carryRead ready.carryWrite ready.resultWrite
-    ready.disjoint post (fun after math => continuation carryHome resultHome prepared after ready math)
+    ready.disjoint post (fun after framed math => continuation carryHome resultHome prepared after ready framed math)
 
 #print axioms scalar_first_carry_checked
 
@@ -123,9 +123,9 @@ theorem scalar_carry_run_next (contract : CarryHelperContract Extracted.program 
     (scalarCarryValue original left right (segment.val + 1)) carryHome (results index) state.call
     state.carrySlot slot state.carryBound state.carryRead state.carryWrite (state.resultWrites index)
     (Or.inl (Ne.symm (state.carrySeparate index))) post
-  intro after math
+  intro after framed math
   apply continuation after
-  apply state.advance index
+  apply state.advance index _ framed
   simpa only [inputLimb, state.inputBytes left (by simp), state.inputBytes right (by simp)] using math
 
 /-- Compose all three remaining extracted calls; the final continuation receives
@@ -237,12 +237,13 @@ theorem scalar_general_carries (contract : CarryHelperContract Extracted.program
   have enteredWF := enterFrame_preserves_wellFormed _ _ _ _ _ call.1.1 setup
   apply scalar_first_carry_checked contract memory entered before left right output rightHome leftHome
     (scalarArguments left right output) frame call enteredWF homes lowWords largeLeft post
-  intro carryHome resultHome prepared after ready math
+  intro carryHome resultHome prepared after ready framed math
   obtain ⟨results, first, initial⟩ := ready.initial_state call enteredWF homes
+  subst first
   have math' : CarryPost (program := Extracted.program) (inputLimb memory left 0) (inputLimb memory right 0)
       (scalarCarryValue memory left right 0) carryHome (results 0) prepared after := by
-    simpa only [scalarCarryValue, first] using math
-  have firstDone := initial.advance 0 math'
+    simpa only [scalarCarryValue] using math
+  have firstDone := initial.advance 0 math' framed
   exact scalar_carry_run_remaining contract firstDone [.scalar (.i32 0)] post
     (fun final completed => continuation frame entered carryHome results final setup completed)
 

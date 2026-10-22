@@ -5,6 +5,7 @@ import CIL.Safety.CallComposition
 import CIL.Safety.AccessBelow
 import CIL.Safety.ReturnMemory
 import CIL.Safety.SymbolicExecution
+import CIL.Safety.MethodContract
 
 namespace UInt256Proof.Add.CarrySafety
 variable {program : CIL.Program} {index : Nat} {body : CIL.Method}
@@ -93,10 +94,7 @@ theorem carry_body_succeeds_of_run (cw : BitVec 64 → BitVec 64 → BitVec 64 �
         frame [] memory = .ok (leaveFrame frame stored, []) ∧
       read stored output 8 1 = .ok (numberBytes (a + b + c).toNat 8) ∧
       (WordsDisjoint carry output → read stored carry 8 1 = .ok (numberBytes (cw a b c).toNat 8)) ∧
-      (∀ id offset, id ≠ first.allocation → id ≠ second.allocation →
-        OutsideWord carry id offset → OutsideWord output id offset →
-        stored.cells id offset = memory.cells id offset) ∧
-      AccessBelow memory.nextIdentity memory stored := by
+      Confined ([(first, 8), (second, 8)] ++ [(carry, 8), (output, 8)]) memory stored := by
   have length (word : BitVec 64) : (numberBytes word.toNat 8).length = 8 := by simp [numberBytes]
   obtain ⟨secondAllocation, secondAccess⟩ := access_requirements secondWritable
   obtain ⟨carryAllocation, carryAccess⟩ := access_requirements carryWritable
@@ -119,21 +117,14 @@ theorem carry_body_succeeds_of_run (cw : BitVec 64 → BitVec 64 → BitVec 64 �
     (load_local_word64_of_read retainedFirst) secondLoad
     (load_local_word64_of_read retainedSecond)
     (access_reference_valid _ _ _ _ _ carry1) (access_reference_valid _ _ _ _ _ carry2)
-    (access_reference_valid _ _ _ _ _ output3) wc wo, ?_, ?_, ?_, ?_⟩
+    (access_reference_valid _ _ _ _ _ output3) wc wo, ?_, ?_, ?_⟩
   · simpa only [length] using write_readback _ _ _ _ _ wo
   · intro disjoint
     have carryRead : read m3 carry 8 1 = .ok (numberBytes (cw a b c).toNat 8) := by
       simpa only [length] using write_readback _ _ _ _ _ wc
     exact write_preserves_disjoint_read wo carryRead (by simpa only [WordsDisjoint, length] using disjoint)
-  · intro id offset notFirst notSecond outsideCarry outsideOutput
-    rw [write_word_outside wo id offset outsideOutput,
-      write_word_outside wc id offset outsideCarry,
-      write_word_outside w1 id offset (Or.inl notSecond),
-      write_word_outside w0 id offset (Or.inl notFirst)]
-  · exact (write_preserves_access_below w0 memory.nextIdentity).trans
-      ((write_preserves_access_below w1 memory.nextIdentity).trans
-        ((write_preserves_access_below wc memory.nextIdentity).trans
-          (write_preserves_access_below wo memory.nextIdentity)))
+  · exact (Confined.write w0 (by simp [numberBytes])).trans ((Confined.write w1 (by simp [numberBytes])).trans
+      ((Confined.write wc (by simp [numberBytes])).trans (Confined.write wo (by simp [numberBytes]))))
 
 /-- The helper's two word homes are fresh, writable and private; setup keeps caller memory. -/
 theorem carry_frame_setup_of_shape (shape : CarryShape body) (memory : Memory) (args : List Value)
@@ -183,9 +174,7 @@ theorem carry_invoke_succeeds_of_run (cw : BitVec 64 → BitVec 64 → BitVec 64
         memory = .ok (result, []) ∧
       loadValue result (.address output) 8 = .ok (.i64 (a + b + c)) ∧
       (WordsDisjoint carry output → loadValue result (.address carry) 8 = .ok (.i64 (cw a b c))) ∧
-      (∀ id offset, id < memory.nextIdentity → OutsideWord carry id offset → OutsideWord output id offset →
-        result.cells id offset = memory.cells id offset) ∧
-      AccessBelow memory.nextIdentity memory result ∧
+      Confined [(carry, 8), (output, 8)] memory result ∧
       read result output 8 1 = .ok (numberBytes (a + b + c).toNat 8) ∧
       (WordsDisjoint carry output → read result carry 8 1 = .ok (numberBytes (cw a b c).toNat 8)) := by
   let args := [Value.scalar (.i64 a), .scalar (.i64 b), .reference (.address carry), .reference (.address output)]
@@ -206,7 +195,7 @@ theorem carry_invoke_succeeds_of_run (cw : BitVec 64 → BitVec 64 → BitVec 64
     rw [preserved.access carry carryOld 8 1 true]; exact carryWritable
   have writeOutput : access enteredMemory output 8 1 true = .ok () := by
     rw [preserved.access output outputOld 8 1 true]; exact outputWritable
-  obtain ⟨stored, executed, outputRead, carryRead, footprint, retainedAccess⟩ :=
+  obtain ⟨stored, executed, outputRead, carryRead, written⟩ :=
     carry_body_succeeds_of_run cw runs a b c carry output first second
       frame enteredMemory locals distinct (Nat.ne_of_lt (Nat.lt_of_lt_of_le carryOld firstNew))
       (Nat.ne_of_lt (Nat.lt_of_lt_of_le carryOld secondNew))
@@ -216,7 +205,7 @@ theorem carry_invoke_succeeds_of_run (cw : BitVec 64 → BitVec 64 → BitVec 64
   have outputRead' : read (leaveFrame frame stored) output 8 1 = .ok (numberBytes (a + b + c).toNat 8) := by
     rw [returned.read output outputOld 8 1]; exact outputRead
   refine ⟨body.code.length + 1, leaveFrame frame stored, ?_,
-    load_word64_of_read outputRead', ?_, ?_, ?_, outputRead', ?_⟩
+    load_word64_of_read outputRead', ?_, ?_, outputRead', ?_⟩
   · have checked : args.mapM (checkedValue memory) = .ok args := by
       simp [args, checkedValue, numericValue, formValue, fc, fo, checkedAt,
         Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
@@ -226,13 +215,10 @@ theorem carry_invoke_succeeds_of_run (cw : BitVec 64 → BitVec 64 → BitVec 64
     apply load_word64_of_read
     rw [returned.read carry carryOld 8 1]
     exact carryRead disjoint
-  · intro id offset old outsideCarry outsideOutput
-    rw [returned.cells id old offset,
-      footprint id offset (Nat.ne_of_lt (Nat.lt_of_lt_of_le old firstNew))
-        (Nat.ne_of_lt (Nat.lt_of_lt_of_le old secondNew)) outsideCarry outsideOutput,
-      preserved.cells id old offset]
-  · exact preserved.accessBelow.trans
-      ((retainedAccess.weaken fresh.1.next).trans returned.accessBelow)
+  · have young : ∀ entry ∈ [(first, 8), (second, 8)], memory.nextIdentity ≤ entry.1.allocation := by
+      simp [firstNew, secondNew]
+    exact ((((Confined.refl _ memory).then_below preserved fresh.1.next).trans written).forget_fresh young).then_below
+      returned (Nat.le_of_eq (leaveFrame_nextIdentity frame stored).symm)
   · intro disjoint
     rw [returned.read carry carryOld 8 1]
     exact carryRead disjoint
