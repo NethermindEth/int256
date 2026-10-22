@@ -1,14 +1,10 @@
 import UInt256.Methods.Add.ScalarMemory
-import UInt256.Methods.Add.PortableSmall
+import UInt256.Methods.Add.SmallChecked
 import UInt256.Methods.Add.SafetyResult
 
 namespace UInt256Proof.Safety
 
 open CIL.Safety
-
-/-- Overflow flag of adding `word` to the input word. -/
-def smallOverflow (memory : CIL.Safety.Memory) (input : CIL.Safety.Reference) (word : BitVec 64) : BitVec 32 :=
-  if 2^256 ≤ (UInt256Model.Safety.inputValue memory input).toNat + word.toNat then 1 else 0
 
 def scalarSmallDecision (swapped : Bool) : Nat :=
   if swapped then scalarSecondDecision else scalarFirstDecision
@@ -85,16 +81,6 @@ namespace UInt256Proof.Safety
 
 open CIL.Safety UInt256Model.Safety
 
-/-- The extracted scalar small helper and its store are the profile-generic portable bodies. -/
-theorem scalar_small_portable :
-    Extracted.program[Extracted.addScalarUInt64Index]? =
-      some (Add.Safety.portableSmallBody Extracted.profile Extracted.storeLimbsIndex) := by
-  simp only [cil_code]; rfl
-
-theorem scalar_small_storage :
-    Extracted.program[Extracted.storeLimbsIndex]? = some (UInt256Proof.Multiply.LimbStorage.body Extracted.profile) := by
-  simp only [cil_code]; rfl
-
 theorem scalar_small_finish (swapped : Bool) (original entered current : CIL.Safety.Memory)
     (frame : Frame) (left right output : Reference) (word : BitVec 64) {flag : BitVec 32}
     (call : CallingConditions Extracted.program original [left, right] [output])
@@ -123,12 +109,9 @@ theorem scalar_small_finish (swapped : Bool) (original entered current : CIL.Saf
     exact currentCall.1.2.1 _ (List.mem_map.mpr ⟨_, member, rfl⟩)
   have inputFormed := currentCall.input_formed member
   have outputFormed := currentCall.output_formed (by simp : output ∈ [output])
-  obtain ⟨childFuel, after, values, certified, result⟩ :=
-    Add.Safety.checked_portable_small_contract Extracted.program Extracted.addScalarUInt64Index
-      Extracted.storeLimbsIndex Extracted.profile scalar_small_portable scalar_small_storage rfl current
-      (scalarSmallSource swapped left right) output word selected
-  have invoked := certified.1
-  rw [result.flag] at invoked
+  obtain ⟨childFuel, after, values, invoked, result⟩ :=
+    small_checked current (scalarSmallSource swapped left right) output word selected
+  rw [result.flagValue] at invoked
   have methodFound : Extracted.program[Extracted.addScalarIndex]? = some Extracted.addScalarBody := by
     simp only [cil_code]
   have instructionFound : Extracted.addScalarBody.code[scalarSmallCall swapped]? =
@@ -141,8 +124,8 @@ theorem scalar_small_finish (swapped : Bool) (original entered current : CIL.Saf
       [.reference (.address output), .scalar (.i64 word),
         .reference (.address (scalarSmallSource swapped left right))] current =
         .ok (.call Extracted.addScalarUInt64Index
-          (Add.Safety.armSmallArguments (scalarSmallSource swapped left right) output word) [] current) := by
-    simp [step, Add.Safety.armSmallArguments, checkedValue, numericValue, formValue, inputFormed, outputFormed,
+          (smallArguments (scalarSmallSource swapped left right) output word) [] current) := by
+    simp [step, smallArguments, checkedValue, numericValue, formValue, inputFormed, outputFormed,
       checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   have returned := scalar_small_return swapped (UInt256Model.Safety.binaryArguments left right output ++ [.scalar (.i32 flag)])
     (smallOverflow current (scalarSmallSource swapped left right) word) frame after
