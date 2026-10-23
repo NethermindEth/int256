@@ -1,7 +1,7 @@
 {
-  "leancilRevision": "17f489a95f19773ddd9c9b07e3352797401c7240",
+  "leancilRevision": "d085262e7867c227c94fd7c9d798101cfa78c01a",
   "assemblySha256": "7d44ec9be3b6cfa4b853ad25cec8d246c1ada781866e04b7f9d6dfd4c2266e4e",
-  "note": "All scalar targets extract; every registered gate and regression runner passed on LeanCIL 17f489a in CI run 39696707787. Extraction is not a compiled-method certificate; upstream issues 36-40, 42, 53 and 54 are resolved.",
+  "note": "All scalar targets extract; every registered gate and regression runner passed on LeanCIL d085262 in CI run 39875547772. Extraction is not a compiled-method certificate; upstream issues 36-40, 42, 53 and 54 are resolved.",
   "scalar": [
     {
       "method": "EqualsInt32",
@@ -707,9 +707,9 @@
   ],
   "supportingAuditTheorems": 2477,
   "validation": {
-    "leancilRevision": "17f489a95f19773ddd9c9b07e3352797401c7240",
-    "gates": "All 256 registered gates passed on aaebb4f in CI run 39696707787 (https://github.com/NethermindEth/int256/actions/runs/39696707787).",
-    "runnersTree": "aaebb4f; its Lean sources, fixtures and runners match this tree.",
+    "leancilRevision": "d085262e7867c227c94fd7c9d798101cfa78c01a",
+    "gates": "All 256 registered gates passed on 589426d in CI run 39875547772 (https://github.com/NethermindEth/int256/actions/runs/39875547772).",
+    "runnersTree": "589426d; its Lean sources, fixtures and runners match this tree.",
     "runners": {
       "EqualityRegression": "210/210",
       "CompareRegression": "16/16",
