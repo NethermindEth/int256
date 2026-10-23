@@ -701,7 +701,6 @@
   "pendingValidation": [
     "Profiles and AlignedLoad fixture groups are extractor infrastructure, mapped to LeanCIL tests rather than ported.",
     "Three upstream drafts from the original branch are not filed.",
-    "UInt256.Safety.RegionTransport and RegionSuffix keep only the region-restricted run transport and suffix correspondence over LeanCIL step_relabel; a region-restricted refinement upstream would remove them.",
     "Duplicated helpers to consolidate: Subtract SmallHelper.",
     "Two deferred API entries remain unported.",
     "Safety fixture expectations changed under LeanCIL for ReusedLocal and related cases; review them against the original branch."
