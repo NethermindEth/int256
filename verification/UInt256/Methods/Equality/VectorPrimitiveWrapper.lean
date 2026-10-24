@@ -159,4 +159,3 @@ theorem checked64 (profile : CIL.FeatureProfile) (program : CIL.Program) (index 
 
 #print axioms checked64
 end UInt256Proof.Equality.VectorPrimitiveWrapper
-

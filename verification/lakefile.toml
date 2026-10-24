@@ -12,4 +12,3 @@ name = "UInt256"
 
 [[lean_lib]]
 name = "Tests.Fixtures.Equality.Shared"
-
