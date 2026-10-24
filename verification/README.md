@@ -16,13 +16,16 @@ this directory contains only UInt256 specifications and proofs.
 
 ## Verification scope
 
-The 256 registered method/profile gates in `manifests/gates.json` include all
+The 244 registered method/profile gates in `manifests/gates.json` include all
 87 scalar migration targets: addition/subtraction and their reporting variants,
 multiplication, bitwise operations, shifts, equality, and ordering. Accelerated
 gates currently cover vector bitwise operations and shifts, vector/SSE equality,
-vector/AVX2/AVX512 ordering, all seven multiplication entries on each of
+AVX2/AVX512 ordering, all seven multiplication entries on each of
 the 14 multiplication feature profiles, and `Add`/`AddOverflow`/`Subtract`/`SubtractUnderflow`
-on `arm64-advsimd`, `x64-sse42`, `x64-avx2`, `x64-avx2-bmi1`, `x64-avx512` and `x64-avx512-bmi1`.
+on `arm64-advsimd`, `x64-sse42`, `x64-v3` and `x64-v4`.
+Profiles follow the .NET 10 CoreCLR runtime groups (LeanCIL `docs/RUNTIME-PROFILES.md`); each method is gated
+on one profile per distinct reachable body. The ordering operators' Vector256-only path needs Vector256
+acceleration without AVX2, which no .NET 10 runtime reports, so it has no gate.
 The Vector128 Subtract gates share one profile-parametric proof
 (`UInt256/Methods/Subtract/{BorrowRun,BorrowHelper,BorrowContract,SmallHelper,Vector128*,ScalarDispatch,AcceleratedContract}.lean`);
 the scalar gates compose the same `BorrowContract` borrow-helper `MethodContract`.
@@ -266,7 +269,7 @@ All scalar ports have registered certificates, and `remainingPorts` is empty.
 All 256 gates were recertified on LeanCIL `17f489a` in CI run 39696707787, and every
 regression runner passed; `migration-status.json` records the per-runner counts. `BitwiseRegression.cs`
 and `ShiftRegression.cs` take a profile argument (default `scalar`), so a
-complete run also passes `x64-vector256`.
+complete run also passes `x64-v3`.
 
 ## Regression fixtures
 
@@ -285,7 +288,7 @@ Equality `EquivalentReduction` and Compare `ComparisonAlternative`.
 exits nonzero until each has one. Extractor rejection fixtures (unsupported instructions, static
 initializers, metadata mutations) are covered by LeanCIL's own tests.
 
-`ShiftPositiveRegression.cs [dir] [all|scalar|x64-vector256]` (default `all`) certifies
+`ShiftPositiveRegression.cs [dir] [all|scalar|x64-v3]` (default `all`) certifies
 `LshHelper` (count computed by a compiled helper) for `Lsh`, `LeftShift` and `op<<`.
 Each case must extract differently from Baseline and is proved against the production
 gate contract by `Tests/Fixtures/Shift/LshHelper/<Method>_<profile>.lean`.
@@ -306,7 +309,7 @@ group's `Tests/Fixtures/<group>/README.md` maps every original case to a runner
 case, the LeanCIL test that covers it, an unfiled upstream issue draft, or names
 it as a dropped positive refactor.
 
-`EqualityRegression.cs [dir] [all|scalar|x64-vector256|x64-sse41] [all|<case>]`
+`EqualityRegression.cs [dir] [all|scalar|x64-v3|x64-sse42] [all|<case>]`
 covers the equality gates. Baseline and Renamed are checked against the
 production proof or a renamed copy of it; EquivalentReduction (xor-to-zero vector
 leaf, scalar-direct vector primitive, high-half-first SSE reduction) is checked on
@@ -317,15 +320,16 @@ WrongLane, WrongReduction, WrongReceiver, WrongSnapshot, WrongSignedEmbedding
 and WrongPolarity each get a checked refutation from `witnesses.json`.
 
 `CompareRegression.cs [dir] [all|<profile>]` covers `op<` on scalar,
-x64-vector256, x64-avx2 and x64-avx512, and `CompareTo(in UInt256)` on scalar.
+x64-v3 and x64-v4, and `CompareTo(in UInt256)` on scalar.
 ComparisonAlternative is proved per profile under
 `Tests/Fixtures/Compare/ComparisonAlternative/`; ComparisonLowFirst,
-ComparisonSigned, ComparisonWrongLane and ThreeWayAlternative are refuted.
+ComparisonSigned and ThreeWayAlternative are refuted. ComparisonWrongLane mutates the
+Vector256-only path, which no .NET 10 profile reaches; the runner only checks that it leaves every gated extraction unchanged.
 Differences from the original group: ThreeWayAlternative (returns -7/9) is a
 refutation because the CompareTo contract is the exact -1/0/1 result; the
 vector mutations use `Vector256.LessThan` on sign-flipped lanes and
 `GetElement` because the extractor rejects `Vector256.LessThan<long>` and
-`Vector256.GreaterThan`; x64-avx512 runs Baseline only because its native
+`Vector256.GreaterThan`; x64-v4 runs Baseline only because its native
 `op<` path is not touched by any mutation, which the runner checks by
 requiring an unchanged extraction for every inapplicable case.
 

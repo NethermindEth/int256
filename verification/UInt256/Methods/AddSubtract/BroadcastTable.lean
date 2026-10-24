@@ -37,9 +37,10 @@ def broadcastTable : List (BitVec 8) := [
   (BitVec.ofNat 8 1), (BitVec.ofNat 8 0), (BitVec.ofNat 8 0), (BitVec.ofNat 8 0), (BitVec.ofNat 8 0), (BitVec.ofNat 8 0), (BitVec.ofNat 8 0), (BitVec.ofNat 8 0), (BitVec.ofNat 8 1), (BitVec.ofNat 8 0), (BitVec.ofNat 8 0), (BitVec.ofNat 8 0), (BitVec.ofNat 8 0), (BitVec.ofNat 8 0), (BitVec.ofNat 8 0), (BitVec.ofNat 8 0),
   (BitVec.ofNat 8 1), (BitVec.ofNat 8 0), (BitVec.ofNat 8 0), (BitVec.ofNat 8 0), (BitVec.ofNat 8 0), (BitVec.ofNat 8 0), (BitVec.ofNat 8 0), (BitVec.ofNat 8 0), (BitVec.ofNat 8 1), (BitVec.ofNat 8 0), (BitVec.ofNat 8 0), (BitVec.ofNat 8 0), (BitVec.ofNat 8 0), (BitVec.ofNat 8 0), (BitVec.ofNat 8 0), (BitVec.ofNat 8 0)]
 
-/-- The readonly RVA field that backs the table. -/
+/-- The readonly RVA field that backs the table; the identity is the extractor's, keyed by assembly identity and field name. -/
 def broadcastDescriptor : CIL.StaticDescriptor :=
-  { identity := 0, fieldName := "<PrivateImplementationDetails>/__StaticArrayInitTypeSize=512 <PrivateImplementationDetails>::0D55F250B28FB32E65353A01AF2D3C6D99F84FCFAE4806CE99F0476D255D1613",
+  { identity := 11353081662827807761529699819355225027863954688139755053144786196758801720132,
+    assemblyIdentity := "Nethermind.Int256, Version=1.12.0.0, Culture=neutral, PublicKeyToken=null", fieldName := "<PrivateImplementationDetails>/__StaticArrayInitTypeSize=512 <PrivateImplementationDetails>::0D55F250B28FB32E65353A01AF2D3C6D99F84FCFAE4806CE99F0476D255D1613",
     bytes := broadcastTable }
 
 /-- `get_BroadcastLookup`. -/

@@ -215,7 +215,7 @@ try
     File.WriteAllText(Path.Combine(temporary, "manifests/gates.json"), """
         {"gates":[{"method":"First","profile":"scalar","proof":"First.lean","theorem":"first"},
                   {"method":"Second","profile":"scalar","proof":"Second.lean","theorem":"second"},
-                  {"method":"Third","profile":"x64-avx2","proof":"Third.lean","theorem":"third"}]}
+                  {"method":"Third","profile":"x64-v3","proof":"Third.lean","theorem":"third"}]}
         """);
     File.WriteAllText(Path.Combine(temporary, "Third.lean"), "");
     foreach (bool exporting in new[] { false, true })
@@ -227,7 +227,7 @@ try
             if (command == "dotnet") calls.Add(arguments);
             if (arguments.Contains("verify-batch"))
             {
-                bool last = arguments[2].EndsWith("verify-batch-x64-avx2.json", StringComparison.Ordinal);
+                bool last = arguments[2].EndsWith("verify-batch-x64-v3.json", StringComparison.Ordinal);
                 Require(Environment.GetEnvironmentVariable(export) == (exporting && last ? temporary : null),
                     "Only the last group's session may export, since one artifact name carries one digest");
                 using JsonDocument manifest = JsonDocument.Parse(File.ReadAllText(arguments[2]));
@@ -239,19 +239,19 @@ try
         }
         Environment.SetEnvironmentVariable(export, exporting ? temporary : null);
         await VerificationRunner.Run(temporary, new("verify", [], "scalar",
-            Groups: [new("scalar", ["First", "Second"]), new("x64-avx2", ["Third"])]), Command);
+            Groups: [new("scalar", ["First", "Second"]), new("x64-v3", ["Third"])]), Command);
         Require(calls.Count(call => call[0] == "build") == 2, "A multi-profile job must build the tools once");
         Require(sessions.SequenceEqual(["first,second", "third"]), "Each profile needs its own batch session");
         Require(!calls.Any(call => call.Contains("verify")), "Batch sessions export support themselves; no request is split out");
         Require(calls.Where(call => call.Contains("extract")).Select(call => call[4]).SequenceEqual(
-            ["artifacts/First/scalar", "artifacts/Second/scalar", "artifacts/Third/x64-avx2"]), "Methods were extracted under the wrong profile");
+            ["artifacts/First/scalar", "artifacts/Second/scalar", "artifacts/Third/x64-v3"]), "Methods were extracted under the wrong profile");
     }
     // Later profiles overlap but start only after the first, which builds the support they restore;
     // failures still read in group order.
     File.WriteAllText(Path.Combine(temporary, "manifests/gates.json"), """
         {"gates":[{"method":"First","profile":"scalar","proof":"First.lean","theorem":"first"},
                   {"method":"Second","profile":"x64-sse42","proof":"Second.lean","theorem":"second"},
-                  {"method":"Third","profile":"x64-avx2","proof":"Third.lean","theorem":"third"}]}
+                  {"method":"Third","profile":"x64-v3","proof":"Third.lean","theorem":"third"}]}
         """);
     Environment.SetEnvironmentVariable(export, null);
     foreach (int? groupParallel in new int?[] { 1, 2 })
@@ -279,14 +279,14 @@ try
         try
         {
             await VerificationRunner.Run(temporary, new("verify", [], "scalar", GroupParallel: groupParallel,
-                Groups: [new("scalar", ["First"]), new("x64-sse42", ["Second"]), new("x64-avx2", ["Third"])]), Command);
+                Groups: [new("scalar", ["First"]), new("x64-sse42", ["Second"]), new("x64-v3", ["Third"])]), Command);
         }
         catch (InvalidOperationException exception) { message = exception.Message; }
         Require(!early && started.Count == 3,
             "Later profiles must start after the first builds the shared support");
         Require(peak == groupParallel, "Group concurrency must follow GroupParallel");
         Require(message is not null && message.IndexOf("First/scalar", StringComparison.Ordinal) < message.IndexOf("Second/x64-sse42", StringComparison.Ordinal)
-            && message.IndexOf("Second/x64-sse42", StringComparison.Ordinal) < message.IndexOf("Third/x64-avx2", StringComparison.Ordinal),
+            && message.IndexOf("Second/x64-sse42", StringComparison.Ordinal) < message.IndexOf("Third/x64-v3", StringComparison.Ordinal),
             "Failures must be reported in group order regardless of completion order");
     }
     // An exporting job stays sequential: hiding the export is process-wide.
@@ -304,7 +304,7 @@ try
             Interlocked.Decrement(ref running);
         }
         await VerificationRunner.Run(temporary, new("verify", [], "scalar", GroupParallel: 3,
-            Groups: [new("scalar", ["First"]), new("x64-sse42", ["Second"]), new("x64-avx2", ["Third"])]), Command);
+            Groups: [new("scalar", ["First"]), new("x64-sse42", ["Second"]), new("x64-v3", ["Third"])]), Command);
         Require(peak == 1, "An exporting job must not overlap sessions");
     }
     Environment.SetEnvironmentVariable(export, null);

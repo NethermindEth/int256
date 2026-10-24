@@ -10,7 +10,7 @@ using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 
-string[] profiles = ["scalar", "x64-vector256", "x64-avx2", "x64-avx512"];
+string[] profiles = ["scalar", "x64-v3", "x64-v4"];
 string usage = "Usage: CompareRegression.cs [verification-directory] [all|" + string.Join('|', profiles) + "]";
 if (args.Length > 2) throw new ArgumentException(usage);
 string root = Path.GetFullPath(args.Length > 0 ? args[0] : "verification");
