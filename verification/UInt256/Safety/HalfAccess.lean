@@ -16,13 +16,7 @@ theorem CallingConditions.input_half_address {program : CIL.Program}
     (member : reference ∈ inputs) (index : Fin 2) :
     add memory reference 16 (BitVec.ofNat 64 index.val) =
       .ok { reference with offset := reference.offset + 16 * index.val } := by
-  have loaded := call.input_snapshot member
-  have readable : access memory reference 32 1 false = .ok () := by
-    unfold CIL.Safety.read at loaded
-    cases h : access memory reference 32 1 false with
-    | error fault => simp [h, Bind.bind, Except.bind] at loaded
-    | ok value => cases value; rfl
-  obtain ⟨allocation, ready⟩ := access_requirements readable
+  obtain ⟨allocation, ready⟩ := access_requirements (read_access (call.input_snapshot member))
   exact ready.add_slice call.1.1 16 index.val 16 (by decide) (by omega)
 
 theorem CallingConditions.input_half_load {program : CIL.Program}
