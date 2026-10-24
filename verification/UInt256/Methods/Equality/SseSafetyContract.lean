@@ -60,7 +60,6 @@ theorem sse_run (profile : CIL.FeatureProfile) (program : CIL.Program) (index : 
   cil_checked_steps [readOnlyArguments, fl, fr, hl, hr, al, ar, staticInstruction, memoryInstruction, formValue,
     storeLocal, loadLocal, CIL.offsetValue, referenceAt]
   simp [CIL.NarrowKind.extend, ← difference]
-  split <;> rfl
 #print axioms sse_run
 end UInt256Proof.Equality.Safety
 

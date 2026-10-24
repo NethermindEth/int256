@@ -62,7 +62,6 @@ theorem scalar_run (memory : Memory) (left right : Reference) (frame : Frame)
   refine ⟨28, ?_⟩
   cil_checked_steps [readOnlyArguments, fl, fr, hl, hr]
   simp [scalarDifference, CIL.NarrowKind.extend]
-  split <;> rfl
 #print axioms scalar_run
 
 end UInt256Proof.Equality.ScalarLeaf
