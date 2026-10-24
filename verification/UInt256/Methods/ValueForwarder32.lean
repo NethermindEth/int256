@@ -6,6 +6,7 @@ import CIL.Safety.ReturnMemory
 import UInt256.Safety.ParameterSetup32
 import UInt256.Safety.ReadOnlyScalarContract
 import CIL.Safety.GuardNormalization
+import CIL.Safety.SymbolicExecution
 
 namespace UInt256Proof.ValueForwarder32
 open CIL.Safety UInt256Model.Safety
@@ -60,14 +61,7 @@ theorem checked (profile : CIL.FeatureProfile) (program : CIL.Program) (index ca
   obtain ⟨tailFuel, tail⟩ := run_call_exists found (by rfl) stepped ⟨childFuel, certificate.1⟩ ⟨1, returnTrace⟩
   have executed : run program (tailFuel + 2) index 0 (scalarArguments left (encode right)) frame [] entered =
       .ok (leaveFrame frame final, [.scalar (.i32 (operation (inputValue entered left) (inputValue entered copy)))]) := by
-    iterate 2
-      apply Eq.trans
-      · apply run_next found
-        · simp only [body]; rfl
-        · simp (config := { implicitDefEqProofs := false }) [step, cil_guard, observerCount, scalarArguments, checkedValue, formValue, fl, fc,
-            localAddress, frame, parameterFrame32, checkedAt,
-            Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-          exact ⟨rfl, rfl, rfl, rfl⟩
+    cil_checked_steps 2 [body, scalarArguments, fl, fc, localAddress, frame, parameterFrame32]
     exact tail
   rw [leftValue, copyValue] at executed
   refine ⟨tailFuel + 2, leaveFrame frame final,

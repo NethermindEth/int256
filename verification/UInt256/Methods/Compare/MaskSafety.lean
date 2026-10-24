@@ -22,8 +22,7 @@ theorem mask_invoke (profile : CIL.FeatureProfile) (program : CIL.Program) (inde
   refine invoke_of_run found rfl rfl ?_
   repeat refine (run_next found rfl rfl).trans ?_
   refine (run_return found rfl rfl rfl).trans ?_
-  simp [leaveFrame, maskResult, CIL.NarrowKind.extend, BitVec.lt_def]
-  split <;> rfl
+  simp [leaveFrame, maskResult, CIL.NarrowKind.extend_ite_ofNat_one_zero, BitVec.lt_def]
 
 theorem mask_result_math (left right : UInt256Model.Limbs) :
     maskResult (BitVec.ofNat 32 (equalityMask left right)) (BitVec.ofNat 32 (lessMask left right)) =

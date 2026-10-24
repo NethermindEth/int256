@@ -49,10 +49,8 @@ theorem portable_run (profile : CIL.FeatureProfile) (program : CIL.Program) (ind
   have tail : run program 1 index 19 (readOnlyArguments [left, right]) frame
       [.scalar (.i32 (maskResult eqWord ltWord))] m2 =
       .ok (leaveFrame frame m2, [.scalar (.i32 (maskResult eqWord ltWord))]) := by
-    simp [run, found, returned, returns, step, cil_guard, observerCount, checkedValue, numericValue,
-      Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-    unfold maskResult
-    split <;> simp [CIL.NarrowKind.extend]
+    simp [run, found, returned, returns, step, cil_guard, observerCount, checkedValue, numericValue, maskResult,
+      CIL.NarrowKind.extend_ite_ofNat_one_zero, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   obtain ⟨tailFuel, tail⟩ := run_call_exists found fetched stepped ⟨8, mask_invoke profile program callee maskFound m2 eqWord ltWord⟩ ⟨1, tail⟩
   have fl := call.input_formed (reference := left) (by simp)
   have fr := call.input_formed (reference := right) (by simp)
@@ -66,18 +64,9 @@ theorem portable_run (profile : CIL.FeatureProfile) (program : CIL.Program) (ind
   generalize rightValue : inputValue memory right = rightBits at *
   refine ⟨tailFuel + 18, m2, ?_, preserved⟩
 
-  iterate 18
-    apply Eq.trans
-    · apply run_next found
-      · simp only [portableBody]; rfl
-      · simp (config := { implicitDefEqProofs := false })
-          [step, cil_guard, observerCount, checkedIntrinsic, readOnlyArguments, checkedValue, numericValue, formValue, fl, fr, hl, hr, cl, cr,
-            slot0, slot1, slot2, duplicate, s0, s1, s2, r0, r0after, r1, r2, keep0, keep1, keep2,
-            pureArity, scalars, staticInstruction,
-            CIL.step.eq_def, CIL.Intrinsic.available, intrinsic_portable_eq, intrinsic_portable_lt,
-            intrinsic_portable_mask, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-        try (exact ⟨rfl, rfl, rfl, rfl⟩)
-        done
+  cil_checked_steps 18 [readOnlyArguments, fl, fr, hl, hr, cl, cr, slot0, slot1, slot2, duplicate, s0, s1, s2, r0, r0after,
+    r1, r2, keep0, keep1, keep2, staticInstruction, CIL.Intrinsic.available, intrinsic_portable_eq, intrinsic_portable_lt,
+    intrinsic_portable_mask]
   exact tail
 
 #print axioms portable_run

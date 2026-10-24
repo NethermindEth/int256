@@ -92,16 +92,10 @@ theorem executed {α : Type} (encode : α → CIL.Value) (equal : BitVec 256 →
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   obtain ⟨fuel, tail⟩ := run_call_exists found fetched stepped ⟨childFuel, child⟩ ⟨1, returnTrace⟩
   refine ⟨fuel + 4, ?_⟩
+  have vectorOn : profile.evaluate .vector256Accelerated = true := vector
   cases narrow
   all_goals
-    iterate 4
-      apply Eq.trans
-      · apply run_next found
-        · simp only [body, body32, body64]; rfl
-        · simp (config := { implicitDefEqProofs := false }) [body, body32, body64, step, cil_guard, observerCount, scalarArguments,
-            checkedValue, numericValue, numeric, numericWord, formValue, formed, pureArity, scalars, CIL.step.eq_def, CIL.truth,
-            CIL.FeatureProfile.evaluate, vector, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-          try exact ⟨rfl, rfl, rfl, rfl⟩
+    cil_checked_steps 4 [body, body32, body64, scalarArguments, numeric, numericWord, formed, vectorOn]
     exact tail
 
 theorem checked {α : Type} (encode : α → CIL.Value) (equal : BitVec 256 → α → Bool)

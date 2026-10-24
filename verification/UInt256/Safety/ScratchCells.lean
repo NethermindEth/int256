@@ -75,9 +75,7 @@ theorem ScratchCells.write_cell {memory : Memory} {cells : List Reference}
 theorem scratch_load {memory : Memory} {cell : Reference} {value : BitVec 256}
     (loaded : CIL.Safety.read memory cell 32 1 = .ok (numberBytes value.toNat 32)) :
     loadValue memory (.address cell) 32 = .ok (.v256 value) := by
-  simp only [loadValue, dereference, loaded, checkedAt, ordinaryAccessAlignment, Except.mapError,
-    Bind.bind, Except.bind, Pure.pure, Except.pure]
-  simp [element_value (width := 32) value]
+  simpa [numericOfWidth] using load_scalar_of_read (by decide) loaded
 
 /-- Remembered cells that are typed vector homes of a frame give its remembered locals. -/
 theorem ScratchCells.known_locals {memory : Memory} {cells : List Reference}

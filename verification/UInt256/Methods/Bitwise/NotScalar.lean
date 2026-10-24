@@ -1,5 +1,6 @@
 import UInt256.Methods.Bitwise.ScalarSafetyContract
 import UInt256.Safety.UnaryContract
+import CIL.Safety.SymbolicExecution
 
 namespace UInt256Proof.Bitwise
 open CIL.Safety UInt256Model.Safety UInt256Proof.ConstructorSafety
@@ -18,11 +19,6 @@ def notBody (profile : CIL.FeatureProfile) (constructor : Nat) : CIL.Method :=
     .arg 0, .fieldAt 24 8, .bnot,
     .newAggregate constructor 4 32, .storeAggregate 32, .ret] }
 
-private theorem not_step (body : CIL.Method) (pc : Nat)
-    (args rest : List Value) (frame : Frame) (memory : Memory) (a : BitVec 64) :
-    step body .bnot pc args frame (.scalar (.i64 a) :: rest) memory =
-      .ok (.next (pc + 1) (.scalar (.i64 (~~~a)) :: rest) frame memory) := rfl
-
 theorem not_prefix (profile : CIL.FeatureProfile)
     (scalar : profile.vector256Accelerated = false) (constructor : Nat)
     (program : CIL.Program) (index fuel : Nat)
@@ -39,23 +35,8 @@ theorem not_prefix (profile : CIL.FeatureProfile)
   have inputFormed := call.input_formed (reference := input) (by simp)
   have outputFormed := call.output_formed (reference := output) (by simp)
   have fields := fun i rest => call.input_field_instruction (reference := input) (by simp) i rest
-  have l0 := fields (0 : Fin 4)
-  have l1 := fields (1 : Fin 4)
-  have l2 := fields (2 : Fin 4)
-  have l3 := fields (3 : Fin 4)
-  simp only [Fin.val_zero, Fin.val_one, Fin.val_two, CIL.fin_val_three, Nat.reduceMul] at l0 l1 l2 l3
-  iterate 15
-    apply Eq.trans
-    · apply run_next found
-      · simp only [notBody]; rfl
-      · first
-        | exact not_step _ _ _ _ _ _ _
-        | exact feature_disabled _ scalar _ _ _ _ _
-        | exact scalar_branch _ _ _ _ _ _ _
-        | (bitwise_step_simp unaryArguments, inputFormed, outputFormed, l0, l1, l2, l3
-           try exact ⟨rfl, rfl, rfl, rfl⟩
-           done)
-  rfl
+  have evaluated : profile.evaluate .vector256Accelerated = false := scalar
+  cil_checked_steps 15 [notBody, unaryArguments, inputFormed, outputFormed, fields, evaluated]
 
 theorem not_result (profile : CIL.FeatureProfile)
     (scalar : profile.vector256Accelerated = false) (program : CIL.Program) (index constructor : Nat)

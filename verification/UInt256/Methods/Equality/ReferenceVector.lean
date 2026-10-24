@@ -42,9 +42,8 @@ theorem executed (profile : CIL.FeatureProfile) (program : CIL.Program) (index :
             checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
         try exact ⟨rfl, rfl, rfl, rfl⟩
         done
-  simp [run, found, body, step, cil_guard, observerCount, checkedValue, numericValue, CIL.NarrowKind.extend,
-    Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-  split <;> rfl
+  simp [run, found, body, step, cil_guard, observerCount, checkedValue, numericValue,
+    CIL.NarrowKind.extend_ite_ofNat_one_zero, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 theorem checked (profile : CIL.FeatureProfile) (program : CIL.Program) (index : Nat)
     (found : program[index]? = some (body profile))

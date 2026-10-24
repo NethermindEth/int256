@@ -44,13 +44,7 @@ theorem checked (equal : BitVec 256 → BitVec 256 → Bool)
   have executed : run program (tailFuel + 2) entry 0 (readOnlyArguments [left, right]) frame [] memory =
       .ok (leaveFrame frame final,
         [.scalar (.i32 (if equal (inputValue memory left) (inputValue memory right) != negate then 1 else 0))]) := by
-    iterate 2
-      apply Eq.trans
-      · apply run_next found
-        · simp only [body, PrimitiveOperator.body]; rfl
-        · simp (config := { implicitDefEqProofs := false }) [step, cil_guard, observerCount, readOnlyArguments, checkedValue, formValue, fl, fr,
-            checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-          exact ⟨rfl, rfl, rfl, rfl⟩
+    cil_checked_steps 2 [body, PrimitiveOperator.body, readOnlyArguments, fl, fr]
     exact tail
   refine ⟨tailFuel + 2, _, certify_invocation _ _ _ _ _ _ _ _ _ _ found checked setup live executed, ?_⟩
   simpa only [leaveFrame, frame, List.foldl_nil] using cells

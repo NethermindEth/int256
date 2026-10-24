@@ -39,12 +39,7 @@ theorem certify_readOnly_binary_frame (program : CIL.Program) (method : Nat) (bo
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   refine ⟨fuel, leaveFrame frame entered,
     certify_invocation _ _ _ _ _ _ _ _ _ _ lookup checked setup live finished, ?_⟩
-  have before := enterFrame_preserves_caller_memory _ _ _ _ _ setup
-  have fresh := enterFrame_fresh _ _ _ _ _ setup
-  have after := leaveFrame_preserves_memory_below frame entered memory.nextIdentity
-    (fun id member => (fresh.2 id member).1)
-  intro id bound offset
-  exact (after.cells id bound offset).trans (before.cells id bound offset)
+  exact (MemoryBelow.frame_round_trip setup (.refl _ _)).cells
 
 theorem certify_readOnly_binary (program : CIL.Program) (method : Nat) (body : CIL.Method)
     (operation : BitVec 256 → BitVec 256 → CIL.Value)

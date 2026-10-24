@@ -33,13 +33,7 @@ theorem wrapper_correctness (profile : CIL.FeatureProfile) (direction : Directio
   obtain ⟨fuel, finished⟩ := run_call_exists found (by rfl) stepped ⟨childFuel, certificate.1⟩ ⟨1, tail⟩
   have leading : run program (fuel + 3) index 0 args frame [] memory =
       run program fuel index 3 args frame args.reverse memory := by
-    iterate 3
-      apply Eq.trans
-      · apply run_next found (by rfl)
-        simp (config := { implicitDefEqProofs := false }) [step, cil_guard, observerCount, args, shiftArguments,
-          checkedValue, numericValue, formValue, fi, fo, checkedAt, Except.mapError,
-          Bind.bind, Except.bind, Pure.pure, Except.pure]
-        first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
+    cil_checked_steps 3 [args, shiftArguments, fi, fo]
     rfl
   exact ⟨fuel + 3, final, certify_invocation _ _ _ _ _ _ _ _ _ _ found checked setup
     (checked_entry_live_state _ _ _ _ _ _ _ call.1.1 call.2 checked setup) (leading.trans finished),

@@ -22,14 +22,7 @@ theorem operator_prefix (profile : CIL.FeatureProfile) (callee : Nat)
         (shiftArguments input count output).reverse entered := by
   have hl := call.input_formed (reference := input) (by simp)
   have ho := call.output_formed (reference := output) (by simp)
-  iterate 3
-    apply Eq.trans
-    · apply run_next found (by rfl)
-      simp (config := { implicitDefEqProofs := false }) only [step, scalarArguments,
-        UInt256Model.Safety.AggregateReturn.frame, List.getElem?_cons_zero, List.getElem?_cons_succ,
-        checkedValue, numericValue, formValue, localAddress, hl, ho, checkedAt, Except.mapError,
-        Bind.bind, Except.bind, Pure.pure, Except.pure]
-      rfl
+  cil_checked_steps 3 [scalarArguments, UInt256Model.Safety.AggregateReturn.frame, localAddress, hl, ho]
   rfl
 
 /-- The operator returns aggregate bytes for the mathematical result and retires its private output. -/

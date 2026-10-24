@@ -302,9 +302,7 @@ theorem overflow_tail (program : CIL.Program) (profile : CIL.FeatureProfile) (av
       finishContract after output state.call.without_inputs sum (generatedCarry a b) (propagationMask sum)
     obtain ⟨value, access, kept⟩ := state.finish_child call owned result writable footprint
     have normalized : CIL.NarrowKind.unsigned8.extend (finishFlag (generatedCarry a b) (propagationMask sum)) =
-        finishFlag (generatedCarry a b) (propagationMask sum) := by
-      unfold finishFlag
-      split <;> rfl
+        finishFlag (generatedCarry a b) (propagationMask sum) := CIL.NarrowKind.extend_ite_ofNat_one_zero _ _
     obtain ⟨total, ran⟩ := run_call_exists found rfl stepped ⟨childFuel, invoked⟩
       ⟨1, by simpa using retEq 19 _ rfl normalized finished⟩
     refine ⟨total, _, _, ran, ?_, by rw [ha, hb]; exact value.trans (cascade_sum_value a b), access, kept⟩

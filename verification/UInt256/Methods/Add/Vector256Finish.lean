@@ -164,9 +164,7 @@ theorem finish_tail (program : CIL.Program) (method lookup : Nat) (profile : CIL
   have returns : (finishAddBody profile lookup).returnsValue = true := rfl
   have fetched : (finishAddBody profile lookup).code[43]? = some (.ret (some .unsigned8)) := rfl
   have normalized : CIL.NarrowKind.unsigned8.extend (finishFlag carry propagation) =
-      finishFlag carry propagation := by
-    unfold finishFlag
-    split <;> rfl
+      finishFlag carry propagation := CIL.NarrowKind.extend_ite_ofNat_one_zero _ _
   refine ⟨1, _, _, ?_, continuation stored _ state⟩
   simp [run, found, fetched, returns, step, cil_guard, observerCount, checkedValue, numericValue,
     Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]

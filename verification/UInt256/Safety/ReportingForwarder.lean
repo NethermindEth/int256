@@ -78,9 +78,7 @@ theorem forward_reporting_byte (program : CIL.Program) (wrapperIndex childIndex 
   obtain ⟨childFuel, final, certificate, value, writable, footprint⟩ := child memory left right output call
   let bit : BitVec 32 := if flag (inputValue memory left) (inputValue memory right) then 1 else 0
   have fetch : wrapperBody.code[4]? = some (.ret (some .unsigned8)) := by simp [code]
-  have normalized : CIL.NarrowKind.unsigned8.extend bit = bit := by
-    simp only [bit]
-    split <;> rfl
+  have normalized : CIL.NarrowKind.unsigned8.extend bit = bit := CIL.NarrowKind.extend_ite_one_zero _ _
   have tail : run program 2 wrapperIndex 4 (binaryArguments left right output)
       ⟨memory.nextIdentity, [], [], []⟩ [.scalar (.i32 bit)] final = .ok (final, [.scalar (.i32 bit)]) := by
     simp [run, found, fetch, returns, step, cil_guard, observerCount, normalized, leaveFrame, checkedValue, numericValue,

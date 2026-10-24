@@ -74,11 +74,6 @@ theorem constructor_safe (profile : CIL.FeatureProfile) (program : CIL.Program) 
 def packed (w0 w1 w2 w3 : BitVec 64) : BitVec 256 := BitVec.ofNat 256
   (w0.toNat + w1.toNat * 2^64 + w2.toNat * 2^128 + w3.toNat * 2^192)
 
-private theorem load_aggregate_of_read (memory : Memory) (output : Reference) (bytes : List (BitVec 8))
-    (loaded : read memory output 32 1 = .ok bytes) :
-    loadLocal memory (.bytes (.aggregate 32) output) = .ok (.scalar (.aggregate bytes)) := by
-  exact loadLocal_of_read loaded
-
 theorem constructor_contract (profile : CIL.FeatureProfile) (program : CIL.Program) (index : Nat)
     (found : program[index]? = some (body profile))
     (memory : Memory) (inputs : List Reference) (output : Reference)
@@ -113,7 +108,7 @@ theorem constructor_contract (profile : CIL.FeatureProfile) (program : CIL.Progr
     exact vector256_bytes_roundtrip bytes length
   have readback : read result output 32 1 = .ok (numberBytes (packed w0 w1 w2 w3).toNat 32) := by
     rw [encoded]; exact loaded
-  exact ⟨result, executed, valid, outside, authority, readback, load_aggregate_of_read result output _ readback⟩
+  exact ⟨result, executed, valid, outside, authority, readback, loadLocal_of_read readback⟩
 
 #print axioms constructor_contract
 end UInt256Proof.ConstructorSafety

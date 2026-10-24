@@ -116,7 +116,7 @@ theorem add_overflow_contract_of_scalar (program : CIL.Program) (method scalarIn
       checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   obtain ⟨tailFuel, tail⟩ := run_call_exists found fetched stepped ⟨childFuel, certified.1⟩
     ⟨1, reporting_entry_return program method scalarIndex profile found (binaryArguments left right output)
-      bit frame after (by simp only [bit]; split <;> rfl)⟩
+      bit frame after (CIL.NarrowKind.extend_ite_one_zero _ _)⟩
   let post : CIL.Safety.Memory → List Value → Prop := fun final values =>
     final = leaveFrame frame after ∧ values = [.scalar (.i32 bit)]
   obtain ⟨fuel, final, values, finished, sameFinal, sameValues⟩ :=

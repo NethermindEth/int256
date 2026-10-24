@@ -48,9 +48,8 @@ theorem executed (profile : CIL.FeatureProfile) (program : CIL.Program) (index :
             checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
         try exact ⟨rfl, rfl, rfl, rfl⟩
         done
-  simp [run, found, body, step, cil_guard, observerCount, checkedValue, numericValue, CIL.NarrowKind.extend,
-    Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-  split <;> rfl
+  simp [run, found, body, step, cil_guard, observerCount, checkedValue, numericValue,
+    CIL.NarrowKind.extend_ite_ofNat_one_zero, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 theorem checked (profile : CIL.FeatureProfile) (program : CIL.Program) (index : Nat)
     (found : program[index]? = some (body profile))
@@ -123,14 +122,8 @@ theorem executed (profile : CIL.FeatureProfile) (program : CIL.Program) (index c
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   obtain ⟨fuel, tail⟩ := run_call_exists found (by rfl) stepped ⟨childFuel, child⟩ ⟨1, returnTrace⟩
   refine ⟨fuel + 4, ?_⟩
-  iterate 4
-    apply Eq.trans
-    · apply run_next found
-      · simp only [body]; rfl
-      · simp (config := { implicitDefEqProofs := false }) [body, step, cil_guard, observerCount, readOnlyArguments, checkedValue, numericValue, formValue, fl, fr,
-          pureArity, scalars, CIL.step.eq_def, CIL.truth, CIL.FeatureProfile.evaluate, vector,
-          checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-        try exact ⟨rfl, rfl, rfl, rfl⟩
+  have vectorOn : profile.evaluate .vector256Accelerated = true := vector
+  cil_checked_steps 4 [body, readOnlyArguments, fl, fr, vectorOn]
   exact tail
 
 theorem checked (profile : CIL.FeatureProfile) (program : CIL.Program) (index callee : Nat)

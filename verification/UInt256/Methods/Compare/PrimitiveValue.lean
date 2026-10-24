@@ -4,6 +4,7 @@ import UInt256.Safety.ParameterSetup32
 import UInt256.Methods.Compare.PrimitiveLeafContract
 import CIL.Safety.CallComposition
 import CIL.Safety.GuardNormalization
+import CIL.Safety.SymbolicExecution
 
 namespace UInt256Proof.Compare.PrimitiveValue
 open CIL.Safety UInt256Model.Safety
@@ -31,14 +32,7 @@ theorem value_prefix (program : CIL.Program) (index callee fuel : Nat)
       run program fuel index 2 (arguments word value) (parameterFrame32 memory copy)
         [.scalar (.i64 word), .reference (.address copy)] entered := by
   have formed := call.input_formed (reference := copy) (by simp)
-  iterate 2
-    apply Eq.trans
-    · apply run_next found
-      · simp only [body]; rfl
-      · simp (config := { implicitDefEqProofs := false }) only [step, arguments, parameterFrame32,
-          List.getElem?_cons_zero, checkedValue, numericValue, ↓reduceIte, formValue, localAddress,
-          formed, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-        rfl
+  cil_checked_steps 2 [arguments, parameterFrame32, localAddress, formed]
   rfl
 
 theorem returned (program : CIL.Program) (index callee : Nat)
