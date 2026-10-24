@@ -135,14 +135,7 @@ macro "negative_steps" found:term "," negative:term : tactic => `(tactic|
 macro "positive_steps" found:term "," nonnegative:term : tactic => `(tactic|
   (intro memory left frame call post continuation
    have formed := call.input_formed (reference := left) (by simp)
-   repeat' first
-     | exact continuation
-     | (apply run_next_exists post $found
-        · simp only [body32, body64]; rfl
-        · simp [body32, body64, step, cil_guard, observerCount, scalarArguments, checkedValue, numericValue, formValue, formed,
-            pureArity, scalars, instruction, CIL.step.eq_def, CIL.unary, $nonnegative:term,
-            checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-          try (exact ⟨rfl, rfl, rfl, rfl⟩))))
+   cil_contract_steps [$found, formed, $nonnegative:term, scalarArguments] until continuation))
 
 theorem negative32 (profile : CIL.FeatureProfile) (program : CIL.Program) (entry callee : Nat)
     (found : program[entry]? = some (body32 profile callee)) (right : BitVec 32) (negative : right.toInt < 0) :

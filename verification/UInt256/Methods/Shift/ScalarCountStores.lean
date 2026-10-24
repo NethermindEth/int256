@@ -34,11 +34,8 @@ theorem shift_mask_count (boundary : Nat) (entered current : Memory)
       (.i32 (count &&& (63 : BitVec 32))) (count &&& (63 : BitVec 32)).toNat rfl
   have done := continuation reference after slot loaded preserved afterCall afterAuthority written
   have found := bodyFound
-  iterate 3
-    apply run_next_exists post found (by rfl)
-    shift_pure_step [argument]
-  apply run_next_exists post found (by rfl) (stored _ _ _)
-  exact done
+  cil_contract_steps 3 [argument]
+  exact run_next_exists post found rfl (stored _ _ _) done
 
 theorem shift_complement_count (boundary : Nat) (entered current : Memory)
     (inputs outputs : List Reference) (frame : Frame) (args : List Value) (count : BitVec 32)
@@ -69,16 +66,9 @@ theorem shift_complement_count (boundary : Nat) (entered current : Memory)
       (.i32 ((63 : BitVec 32) - count)) ((63 : BitVec 32) - count).toNat rfl
   have done := continuation reference after slot loaded preserved afterCall afterAuthority written
   have found := bodyFound
-  have load := fun (pc : Nat) (stack : List Value) => step_load_numeric_local
-    (body := (scalarBody profile direction storage)) (args := args) (pc := pc) (stack := stack)
-    .word32 (.i32 count) count.toNat rfl countSlot countRead
-  iterate 3
-    apply run_next_exists post found (by rfl)
-    first
-    | exact load _ _
-    | shift_pure_step []
-  apply run_next_exists post found (by rfl) (stored _ _ _)
-  exact done
+  have load := load_numeric_local .word32 (.i32 count) count.toNat rfl countRead
+  cil_contract_steps 3 [countSlot, load]
+  exact run_next_exists post found rfl (stored _ _ _) done
 
 #print axioms shift_mask_count
 #print axioms shift_complement_count

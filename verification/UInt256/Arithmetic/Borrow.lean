@@ -1,4 +1,5 @@
 import UInt256.RepresentationLemmas
+import UInt256.Arithmetic.Carry
 
 open CIL UInt256Model
 set_option maxRecDepth 8192
@@ -128,9 +129,6 @@ def differenceWords (a b : Limbs) : Limbs :=
     if i.val = 1 then a 1 - b 1 - c1 else
     if i.val = 2 then a 2 - b 2 - c2 else a 3 - b 3 - c3
 
-private theorem borrow_congr2 (f : Nat → Nat → Nat) {a b c d : Nat}
-    (h : a = b) (k : c = d) : f a c = f b d := by cases h; cases k; rfl
-
 theorem borrow_telescope (a0 a1 a2 a3 b0 b1 b2 b3 r0 r1 r2 r3 c1 c2 c3 c4 : Nat)
     (h0 : a0 + 2^64 * c1 = b0 + r0)
     (h1 : a1 + 2^64 * c2 = b1 + c1 + r1)
@@ -139,9 +137,9 @@ theorem borrow_telescope (a0 a1 a2 a3 b0 b1 b2 b3 r0 r1 r2 r3 c1 c2 c3 c4 : Nat)
     a0 + a1 * 2^64 + a2 * 2^128 + a3 * 2^192 + c4 * 2^256 =
       (b0 + b1 * 2^64 + b2 * 2^128 + b3 * 2^192) +
       (r0 + r1 * 2^64 + r2 * 2^128 + r3 * 2^192) := by
-  have sum01 := borrow_congr2 (fun x y : Nat => x + 2^64 * y) h0 h1
-  have sum23 := borrow_congr2 (fun x y : Nat => 2^128 * x + 2^192 * y) h2 h3
-  have summed := borrow_congr2 (fun x y : Nat => x + y) sum01 sum23
+  have sum01 := congr2 (fun x y : Nat => x + 2^64 * y) h0 h1
+  have sum23 := congr2 (fun x y : Nat => 2^128 * x + 2^192 * y) h2 h3
+  have summed := congr2 (fun x y : Nat => x + y) sum01 sum23
   clear h0 h1 h2 h3 sum01 sum23
   omega
 

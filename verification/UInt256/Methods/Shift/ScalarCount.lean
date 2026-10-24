@@ -2,6 +2,7 @@ import UInt256.Methods.Shift.ScalarBody
 import CIL.Safety.StepComposition
 import UInt256.Safety.NumericStore
 import CIL.Safety.GuardNormalization
+import CIL.Safety.MethodContract
 
 namespace UInt256Proof.Shift.Safety
 open CIL.Safety UInt256Model.Safety
@@ -58,11 +59,8 @@ theorem shift_count_start (boundary : Nat) (entered current : Memory)
       (.i32 (count.sshiftRight 6)) (count.sshiftRight 6).toNat rfl
   have done := continuation reference after slot loaded preserved afterCall afterAuthority written
   have found := bodyFound
-  iterate 3
-    apply run_next_exists post found (by rfl)
-    shift_pure_step [argument]
-  apply run_next_exists post found (by rfl) (stored _ _ _)
-  exact done
+  cil_contract_steps 3 [argument]
+  exact run_next_exists post found rfl (stored _ _ _) done
 /-- Both count comparisons read the initialized local and preserve memory.
     The unsigned comparison precedes the signed negative-count test. -/
 theorem shift_count_guard (signed : Bool) (memory : Memory) (frame : Frame) (args : List Value)
@@ -103,9 +101,7 @@ theorem shift_negative_count_guard (memory : Memory) (frame : Frame) (args : Lis
       run program fuel index (10) args frame [] memory =
         .ok (final, returned) ∧ post final returned := by
   have found := bodyFound
-  iterate 4
-    apply run_next_exists post found (by rfl)
-    shift_pure_step [argument]
+  cil_contract_steps 4 [argument]
   exact continuation
 
 /-- Reset the whole-limb count only on the selected negative-count route. -/
@@ -135,11 +131,8 @@ theorem shift_negative_count_reset (boundary : Nat) (entered current : Memory)
       (.i32 0) 0 rfl
   have done := continuation reference after slot loaded preserved afterCall afterAuthority written
   have found := bodyFound
-  iterate 1
-    apply run_next_exists post found (by rfl)
-    shift_pure_step []
-  apply run_next_exists post found (by rfl) (stored _ _ _)
-  exact done
+  cil_contract_steps 1 []
+  exact run_next_exists post found rfl (stored _ _ _) done
 
 #print axioms shift_negative_count_reset
 #print axioms shift_negative_count_guard

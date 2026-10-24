@@ -64,37 +64,17 @@ theorem shift_output_arguments (whole : Fin 4) (memory : Memory) (frame : Frame)
     ∃ fuel final returned,
       run program fuel index (outputStart whole) args frame [] memory =
         .ok (final, returned) ∧ post final returned := by
-  have loadMask := fun (pc : Nat) (stack : List Value) => step_load_numeric_local
-    (body := (scalarBody profile direction storage)) (args := args) (pc := pc) (stack := stack)
-    .word32 (.i32 mask) mask.toNat rfl maskSlot maskRead
-  have loadComplement := fun (pc : Nat) (stack : List Value) => step_load_numeric_local
-    (body := (scalarBody profile direction storage)) (args := args) (pc := pc) (stack := stack)
-    .word32 (.i32 complement) complement.toNat rfl complementSlot complementRead
-  have loadWord := fun (i : Fin 4) (pc : Nat) (stack : List Value) => step_load_numeric_local
-    (body := (scalarBody profile direction storage)) (args := args) (pc := pc) (stack := stack)
-    .word64 (.i64 (words i)) (words i).toNat rfl (slots i) (reads i)
+  have loadMask := load_numeric_local .word32 (.i32 mask) mask.toNat rfl maskRead
+  have loadComplement := load_numeric_local .word32 (.i32 complement) complement.toNat rfl complementRead
+  have loadWord := fun i => load_numeric_local .word64 (.i64 (words i)) (words i).toNat rfl (reads i)
   have found := bodyFound
   have cases : whole = 0 ∨ whole = 1 ∨ whole = 2 ∨ whole = 3 := by omega
   cases direction <;> rcases cases with rfl | rfl | rfl | rfl
   all_goals
     simp only [outputStart, outputCall, outputWords, List.reverse_cons, List.reverse_nil,
       List.nil_append, List.append_assoc, List.cons_append, List.map_cons, List.map_nil] at continuation ⊢
-    repeat'
-      first
-      | exact continuation
-      | apply run_next_exists post found (by rfl)
-        first
-        | exact loadMask _ _
-        | exact loadComplement _ _
-        | exact loadWord 0 _ _
-        | exact loadWord 1 _ _
-        | exact loadWord 2 _ _
-        | exact loadWord 3 _ _
-        | rfl
-        | (simp (config := { implicitDefEqProofs := false })
-            [step, cil_guard, observerCount, argument, checkedValue, formValue, formed, numericValue, pureArity, scalars,
-              CIL.step, CIL.binary, Bind.bind, Except.bind, Pure.pure, Except.pure]
-           first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)
+    cil_contract_steps [argument, formed, maskSlot, complementSlot, slots, loadMask, loadComplement, loadWord]
+      until continuation
 
 #print axioms shift_output_arguments
 

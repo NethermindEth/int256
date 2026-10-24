@@ -11,6 +11,7 @@ import CIL.Safety.ByteRoundTrip
 import CIL.Safety.CallComposition
 import CIL.Safety.ExecutionLifetime
 import UInt256.Safety.VectorFrame
+import CIL.Safety.BufferContents
 
 namespace UInt256Proof.AddSubtract.Vector256
 open CIL.Safety UInt256Proof.SIMD
@@ -43,11 +44,7 @@ theorem lookup_invoke (program : CIL.Program) (index : Nat) (profile : CIL.Featu
   rw [length] at size loaded
   refine ⟨after, reference, ?_, below, afterWF, afterWorld, loaded⟩
   have formed : form after reference = .ok reference := by
-    have ready : access after reference 512 1 false = .ok () := by
-      unfold CIL.Safety.read at loaded
-      cases h : access after reference 512 1 false with
-      | error fault => simp [h, Bind.bind, Except.bind] at loaded
-      | ok result => cases result; rfl
+    have ready := read_access loaded
     exact access_reference_valid _ _ _ _ _ ready
   simp [invoke, found, lookupBody, enterFrame, makeSelectedLocals, makeLocals, makeArgumentHomes, makeParameterHomes,
     Bind.bind, Except.bind, Pure.pure, Except.pure, Except.mapError]
@@ -63,13 +60,6 @@ theorem lookup_invoke (program : CIL.Program) (index : Nat) (profile : CIL.Featu
     | simp [run, found, lookupBody, step, cil_guard, observerCount, leaveFrame, checkedValue, formValue, formed, checkedAt,
         Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
-theorem decode_vector256 (vector : BitVec 256) :
-    BitVec.ofNat 256 (byteNumber (numberBytes vector.toNat 32)) = vector := by
-  rw [byteNumber_numberBytes]
-  have bound : vector.toNat < 256^32 := vector.isLt
-  rw [Nat.mod_eq_of_lt bound]
-  simp
-
 /-- A masked index selects one in-bounds 32-byte row, which decodes to its cascade vector. -/
 theorem table_row (memory : Memory) (reference : Reference) (wf : memory.WellFormed)
     (loaded : read memory reference 512 1 = .ok broadcastTable) (index : BitVec 32) (small : index.toNat < 16) :
@@ -77,11 +67,7 @@ theorem table_row (memory : Memory) (reference : Reference) (wf : memory.WellFor
         .ok { reference with offset := reference.offset + 32 * index.toNat } ∧
       loadValue memory (.address { reference with offset := reference.offset + 32 * index.toNat }) 32 =
         .ok (.v256 (cascadeVector index)) := by
-  have ready : access memory reference 512 1 false = .ok () := by
-    unfold CIL.Safety.read at loaded
-    cases h : access memory reference 512 1 false with
-    | error fault => simp [h, Bind.bind, Except.bind] at loaded
-    | ok result => cases result; rfl
+  have ready := read_access loaded
   obtain ⟨allocation, requirements⟩ := access_requirements ready
   have offset : BitVec.ofInt 64 ((index.zeroExtend 64).toNat : Int) = BitVec.ofNat 64 index.toNat := by
     rw [BitVec.ofInt_natCast]
@@ -95,7 +81,7 @@ theorem table_row (memory : Memory) (reference : Reference) (wf : memory.WellFor
     rw [same] at row
     simp only [loadValue, dereference, row, checkedAt, ordinaryAccessAlignment, Except.mapError,
       Bind.bind, Except.bind, Pure.pure, Except.pure]
-    simp [decode_vector256]
+    simp [element_value (width := 32) (cascadeVector index)]
 
 #print axioms table_row
 #print axioms table_rows

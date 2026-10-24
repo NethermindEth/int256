@@ -1,4 +1,5 @@
 import UInt256.Arithmetic.Carry
+import UInt256.Arithmetic.RippleMasks
 import CIL.SIMD.VectorLemmas
 
 open CIL CIL.Vector UInt256Model
@@ -109,12 +110,6 @@ theorem masked_carry_no_propagation (x y previousLeft previousRight : W64)
       BitVec.and_self] using h
   exact (by decide : (BitVec.allOnes 64) ≠ (0 : W64)) impossible
 
-theorem increment_full (x : W64) : x + 1 = 0 ↔ x = BitVec.allOnes 64 := by
-  have hx := x.isLt
-  simp only [← BitVec.toNat_inj, BitVec.toNat_add, BitVec.toNat_allOnes]
-  change (x.toNat + 1) % 2^64 = 0 ↔ x.toNat = 2^64 - 1
-  omega
-
 def fullPropagationBit (sum incoming : W64) : W64 :=
   if sum = BitVec.allOnes 64 ∧ incoming = 1 then 1 else 0
 
@@ -135,7 +130,7 @@ theorem propagation_two_hops (x y g p : W64)
       simp [propagationBit, fullPropagationBit]
     · subst p
       have hi : x + y + BitVec.ofNat 64 1 = BitVec.ofNat 64 0 ↔
-          x + y = BitVec.ofNat 64 (2^64 - 1) := increment_full (x + y)
+          x + y = BitVec.ofNat 64 (2^64 - 1) := increment_wrap_iff (x + y)
       simp [propagationBit, fullPropagationBit]
       simp only [hi]
   · subst g
