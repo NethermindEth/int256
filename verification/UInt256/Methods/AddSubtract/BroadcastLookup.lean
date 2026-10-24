@@ -80,9 +80,7 @@ theorem table_row (memory : Memory) (reference : Reference) (wf : memory.WellFor
     rw [table_rows ⟨index.toNat, small⟩] at row
     have same : BitVec.ofNat 32 index.toNat = index := by simp
     rw [same] at row
-    simp only [loadValue, dereference, row, checkedAt, ordinaryAccessAlignment, Except.mapError,
-      Bind.bind, Except.bind, Pure.pure, Except.pure]
-    simp [element_value (width := 32) (cascadeVector index)]
+    simpa [numericOfWidth] using load_scalar_of_read (by decide) row
 
 #print axioms table_row
 #print axioms table_rows
