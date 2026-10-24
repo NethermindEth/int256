@@ -40,7 +40,7 @@ macro "borrow_run_steps " "[" normalize:term,* "]" : tactic => `(tactic| (
          · simp only [cil_code]; rfl
          · simp only [cil_code]; rfl
          · cil_fact_simp (config := { implicitDefEqProofs := false })
-             [cil_code, step, checkedValue, numericValue, formValue, pureArity, scalars, CIL.step.eq_def,
+             [cil_code, step, observerCount, checkedValue, numericValue, formValue, pureArity, scalars, CIL.step.eq_def,
                CIL.binary, CIL.unary, instruction, storeValue, referenceAt, checkedAt,
                Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
              [borrowFormed, outputFormed, borrowStored, beforeRead, afterRead, resultWrite, borrowWrite,
