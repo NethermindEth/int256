@@ -715,7 +715,7 @@
     "Two deferred API entries remain unported.",
     "Safety fixture expectations changed under LeanCIL for ReusedLocal and related cases; review them against the original branch."
   ],
-  "supportingAuditTheorems": 2477,
+  "supportingAuditTheorems": 2571,
   "validation": {
     "leancilRevision": "d085262e7867c227c94fd7c9d798101cfa78c01a",
     "gates": "All 256 registered gates passed on 589426d in CI run 39875547772 (https://github.com/NethermindEth/int256/actions/runs/39875547772).",

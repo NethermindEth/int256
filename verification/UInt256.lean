@@ -107,3 +107,6 @@ import UInt256.Methods.Add.Vector256Entry
 import UInt256.Methods.Subtract.Vector256Blended
 import UInt256.Methods.Add.Vector256Masked
 import UInt256.Methods.Add.SSEShapes.ReversedStorage
+import UInt256.Methods.Add.StorageCall
+import UInt256.Methods.Subtract.BorrowArithmetic
+import UInt256.Safety.ScalarOperatorResult

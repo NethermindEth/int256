@@ -13,15 +13,18 @@ internal static class VerificationRunner
 {
     internal static async Task Run(string root, VerificationOptions options, Func<string, string[], Task> command)
     {
+        if (options.Action is not ("contracts" or "verify" or "extract")) throw new ArgumentException("Expected contracts, extract or verify");
         await command("lake", ["update"]);
+        const string tool = ".lake/packages/leancil/Extractor/bin/Nethermind.LeanCIL.dll";
         if (options.Action == "contracts")
         {
+            // The streamed build surfaces sorry warnings; the audit then kernel-replays the oleans without running UInt256 code.
             await command("lake", ["build"]);
-            await command("lake", ["env", "lean", "Audit.lean"]);
+            await command("dotnet", ["build", ".lake/packages/leancil/Extractor", "-c", "Release"]);
+            await command("dotnet", [tool, "audit-library", "--project", ".", .. AuditArguments]);
             Console.WriteLine("UInt256 contracts and supporting lemmas checked. No compiled-method certificate was produced.");
             return;
         }
-        if (options.Action is not ("verify" or "extract")) throw new ArgumentException("Expected contracts, extract or verify");
         BatchGroup[] groups = options.Groups ?? [new(options.Profile, options.Methods)];
         if (groups.Length == 0 || groups.Any(group => group.Methods.Length == 0)) throw new ArgumentException("Select at least one method");
         if ((groups.Length > 1 || groups[0].Methods.Length > 1) && (options.Proof is not null || options.Theorem is not null))
@@ -35,7 +38,6 @@ internal static class VerificationRunner
         // Docs beside the dll and PDB, from the same compile; the assembly is byte-identical without them.
         await command("dotnet", ["build", "../src/Nethermind.Int256/Nethermind.Int256.csproj", "-c", "Release",
             "-p:GenerateDocumentationFile=true", "-p:WarningsNotAsErrors=CS1591", "-nowarn:CS1591"]);
-        const string tool = ".lake/packages/leancil/Extractor/bin/Nethermind.LeanCIL.dll";
         Stopwatch elapsed = Stopwatch.StartNew();
         List<string>[] failed = [.. groups.Select(_ => new List<string>())];
         Task Group(int index) => RunGroup(root, options with { Profile = groups[index].Profile, Methods = groups[index].Methods },
@@ -53,6 +55,10 @@ internal static class VerificationRunner
         Console.WriteLine($"{options.Action} finished in {elapsed.Elapsed.TotalSeconds:F1}s: {total - failures.Count} passed, {failures.Count} failed");
         if (failures.Count > 0) throw new InvalidOperationException(string.Join(Environment.NewLine, failures));
     }
+
+    // UInt256 roots every library module; both namespaces must match a theorem, and only the core axioms are allowed.
+    internal static readonly string[] AuditArguments =
+        ["--module", "UInt256", "--prefix", "UInt256Model", "--prefix", "UInt256Proof", "--axioms", "propext,Quot.sound,Classical.choice"];
 
     static async Task RunGroup(string root, VerificationOptions options, bool lastGroup, JsonDocument inventory, Gate[] gates,
         List<string> failures, Func<string, string[], Task> command, string tool)

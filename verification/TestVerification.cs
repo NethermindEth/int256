@@ -313,6 +313,21 @@ try
     catch (ArgumentException) { rejected = true; }
     Require(rejected, "A repeated profile would overwrite its batch manifest");
     Environment.SetEnvironmentVariable(export, previousExport);
+    {
+        // A dropped module, prefix or axiom restriction would silently narrow the audit, and the elaborated audit is forgeable.
+        List<string> contracts = [];
+        await VerificationRunner.Run(temporary, new("contracts", [], "scalar"), (command, arguments) =>
+        {
+            contracts.Add(string.Join(' ', [command, .. arguments]));
+            return Task.CompletedTask;
+        });
+        Require(contracts.SequenceEqual([
+            "lake update",
+            "lake build",
+            "dotnet build .lake/packages/leancil/Extractor -c Release",
+            "dotnet .lake/packages/leancil/Extractor/bin/Nethermind.LeanCIL.dll audit-library --project . --module UInt256 " +
+                "--prefix UInt256Model --prefix UInt256Proof --axioms propext,Quot.sound,Classical.choice"]),
+            "The contract audit must kernel-replay the whole UInt256 library under both namespaces with only the core axioms");    }
     Console.WriteLine("Verification batch checks passed.");
 }
 finally
