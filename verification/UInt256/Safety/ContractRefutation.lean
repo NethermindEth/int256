@@ -1,5 +1,6 @@
 import UInt256.Safety.AggregateReturn
 import CIL.Safety.FuelLemmas
+import CIL.Safety.MethodContract
 namespace UInt256Model.Safety.ContractRefutation
 open CIL.Safety UInt256Model.Safety
 
@@ -13,11 +14,7 @@ theorem checked_observation_unique {α : Type} (program : CIL.Program)
   cases firstExecution : invoke program observedFuel entry args memory with
   | error fault => simp [firstExecution, Except.map] at observed
   | ok outcome =>
-    have first := invoke_mono program observedFuel fuel entry args memory (.ok outcome) trivial firstExecution
-    have second := invoke_mono program fuel observedFuel entry args memory (.ok (final, values)) trivial execution
-    rw [Nat.add_comm] at second
-    have same := Except.ok.inj (first.symm.trans second)
-    subst outcome
+    cases invoke_ok_unique firstExecution execution
     simpa [firstExecution, Except.map] using observed
 
 /-- An overlapping-input counterexample refutes the full checked contract. -/

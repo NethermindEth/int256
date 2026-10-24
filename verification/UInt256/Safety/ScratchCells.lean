@@ -1,5 +1,6 @@
 import UInt256.Safety.VectorFrame
 import CIL.Safety.ByteEncoding
+import CIL.Safety.BufferContents
 
 namespace UInt256Model.Safety
 open CIL.Safety
@@ -71,19 +72,12 @@ theorem ScratchCells.write_cell {memory : Memory} {cells : List Reference}
     exact write_preserves_disjoint_read written (targetValues stored previous)
       (Or.inl (layout.distinct other index target cell same targetFound found))
 
-theorem vector_bytes_decode (vector : BitVec 256) :
-    BitVec.ofNat 256 (CIL.Safety.byteNumber (numberBytes vector.toNat 32)) = vector := by
-  rw [byteNumber_numberBytes]
-  have bound : vector.toNat < 256^32 := vector.isLt
-  rw [Nat.mod_eq_of_lt bound]
-  simp
-
 theorem scratch_load {memory : Memory} {cell : Reference} {value : BitVec 256}
     (loaded : CIL.Safety.read memory cell 32 1 = .ok (numberBytes value.toNat 32)) :
     loadValue memory (.address cell) 32 = .ok (.v256 value) := by
   simp only [loadValue, dereference, loaded, checkedAt, ordinaryAccessAlignment, Except.mapError,
     Bind.bind, Except.bind, Pure.pure, Except.pure]
-  simp [vector_bytes_decode]
+  simp [element_value (width := 32) value]
 
 /-- Remembered cells that are typed vector homes of a frame give its remembered locals. -/
 theorem ScratchCells.known_locals {memory : Memory} {cells : List Reference}

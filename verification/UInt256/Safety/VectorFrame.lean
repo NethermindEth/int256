@@ -9,6 +9,7 @@ import CIL.Safety.ExecutionLifetime
 import CIL.Safety.ExecutionStaticWorld
 import CIL.Safety.ReturnMemory
 import CIL.Safety.GuardNormalization
+import CIL.Safety.MethodContract
 
 namespace UInt256Model.Safety
 open CIL.Safety
@@ -40,11 +41,7 @@ theorem KnownLocals.preserve {before after : Memory} {slots : List LocalSlot}
     KnownLocals after slots known := by
   intro index value specified
   obtain ⟨kind, reference, number, slot, fits, result, loaded⟩ := locals index value specified
-  have ready : access before reference (localWidth kind) 1 false = .ok () := by
-    unfold CIL.Safety.read at loaded
-    cases h : access before reference (localWidth kind) 1 false with
-    | error fault => simp [h, Bind.bind, Except.bind] at loaded
-    | ok value => cases value; rfl
+  have ready := read_access loaded
   obtain ⟨allocation, requirements⟩ := access_requirements ready
   have old := (wf.1 _ _ requirements.present).1
   exact ⟨kind, reference, number, slot, fits, result,
@@ -157,11 +154,7 @@ theorem VectorFrame.store {program : CIL.Program} {original entered current : Me
     exact (outside id different offset).trans (state.caller id old offset away)
   · intro x specifiedX
     have loaded := state.result x specifiedX
-    have ready : access current output 32 1 false = .ok () := by
-      unfold CIL.Safety.read at loaded
-      cases h : access current output 32 1 false with
-      | error fault => simp [h, Bind.bind, Except.bind] at loaded
-      | ok value => cases value; rfl
+    have ready := read_access loaded
     have different : output.allocation ≠ reference.allocation := fun same =>
       Nat.lt_irrefl _ (Nat.lt_of_lt_of_le (same ▸ outputOld) bound)
     exact (write_preserves_access_below written current.nextIdentity).read_eq loaded
@@ -267,11 +260,7 @@ theorem VectorFrame.after_call {program : CIL.Program} {original entered current
     Nat.le_trans state.next grown, state.authority.trans (preserved.accessBelow.weaken state.next), ?_, ?_, ?_⟩
   · intro index value specified
     obtain ⟨kind, reference, number, slot, fits, result, loaded⟩ := state.locals index value specified
-    have ready : access current reference (localWidth kind) 1 false = .ok () := by
-      unfold CIL.Safety.read at loaded
-      cases h : access current reference (localWidth kind) 1 false with
-      | error fault => simp [h, Bind.bind, Except.bind] at loaded
-      | ok value => cases value; rfl
+    have ready := read_access loaded
     obtain ⟨allocation, requirements⟩ := access_requirements ready
     exact ⟨kind, reference, number, slot, fits, result,
       (preserved.read reference (state.call.1.1.1 _ _ requirements.present).1 _ _).trans loaded⟩
@@ -279,11 +268,7 @@ theorem VectorFrame.after_call {program : CIL.Program} {original entered current
     exact (preserved.cells id (older id old) offset).trans (state.caller id old offset away)
   · intro value specified
     have loaded := state.result value specified
-    have ready : access current output 32 1 false = .ok () := by
-      unfold CIL.Safety.read at loaded
-      cases h : access current output 32 1 false with
-      | error fault => simp [h, Bind.bind, Except.bind] at loaded
-      | ok value => cases value; rfl
+    have ready := read_access loaded
     obtain ⟨allocation, requirements⟩ := access_requirements ready
     exact (preserved.read output (state.call.1.1.1 _ _ requirements.present).1 _ _).trans loaded
 
