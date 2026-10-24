@@ -1,4 +1,5 @@
 import CIL.Safety.Equations
+import CIL.Safety.SymbolicExecution
 import UInt256.Methods.Bitwise.VectorValues
 
 namespace UInt256Proof.Bitwise.VectorSafety
@@ -86,19 +87,6 @@ def entryBody (profile : CIL.FeatureProfile) (callee : Nat) : CIL.Method :=
     [.feature .vector256Accelerated, .brzero 7, .arg 0, .arg 1, .arg 2, .call callee 3, .ret] ++
       List.replicate 24 (.unsupported "Unreachable under selected profile") }
 
-theorem enabled_step (method : CIL.Method) (enabled : method.profile.vector256Accelerated = true)
-    (pc : Nat) (args rest : List Value) (frame : Frame) (memory : Memory) :
-    step method (.feature .vector256Accelerated) pc args frame rest memory =
-      .ok (.next (pc + 1) (.scalar (.i32 1) :: rest) frame memory) := by
-  change (Except.ok (.next (pc + 1) (.scalar (.i32 (if method.profile.vector256Accelerated then 1 else 0)) :: rest) frame memory) : ExecutionResult FrameAction) = _
-  rw [enabled]
-  rfl
-
-theorem enabled_branch (method : CIL.Method) (pc target : Nat) (args rest : List Value)
-    (frame : Frame) (memory : Memory) :
-    step method (.brzero target) pc args frame (.scalar (.i32 1) :: rest) memory =
-      .ok (.next (pc + 1) rest frame memory) := rfl
-
 theorem entry_prefix (profile : CIL.FeatureProfile) (enabled : profile.vector256Accelerated = true)
     (program : CIL.Program) (index callee fuel : Nat) (found : program[index]? = some (entryBody profile callee))
     (memory : Memory) (left right output : Reference) (frame : Frame)
@@ -109,18 +97,8 @@ theorem entry_prefix (profile : CIL.FeatureProfile) (enabled : profile.vector256
   have fl := call.input_formed (reference := left) (by simp)
   have fr := call.input_formed (reference := right) (by simp)
   have fo := call.output_formed (reference := output) (by simp)
-  iterate 5
-    apply Eq.trans
-    · apply run_next found
-      · simp only [entryBody]; rfl
-      · first
-        | exact enabled_step _ enabled _ _ _ _ _
-        | exact enabled_branch _ _ _ _ _ _ _
-        | (simp (config := { implicitDefEqProofs := false })
-             [step, cil_guard, observerCount, binaryArguments, checkedValue, formValue, fl, fr, fo, checkedAt,
-               Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-           try exact ⟨rfl,rfl,rfl,rfl⟩
-           done)
+  have evaluated : profile.evaluate .vector256Accelerated = true := enabled
+  cil_checked_steps 5 [entryBody, binaryArguments, fl, fr, fo, evaluated]
   rfl
 
 theorem entry_result (profile : CIL.FeatureProfile) (enabled : profile.vector256Accelerated = true)

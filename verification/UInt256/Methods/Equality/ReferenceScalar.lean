@@ -55,14 +55,9 @@ theorem executed (profile : CIL.FeatureProfile) (program : CIL.Program) (index c
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   obtain ⟨fuel, tail⟩ := run_call_exists found (by rfl) stepped ⟨childFuel, child⟩ ⟨1, returnTrace⟩
   refine ⟨fuel + 6, ?_⟩
-  iterate 6
-    apply Eq.trans
-    · apply run_next found
-      · simp only [body]; rfl
-      · simp (config := { implicitDefEqProofs := false }) [body, step, cil_guard, observerCount, readOnlyArguments, checkedValue, numericValue, formValue, fl, fr,
-          pureArity, scalars, CIL.step.eq_def, CIL.truth, CIL.FeatureProfile.evaluate, vector, sse,
-          checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-        try exact ⟨rfl, rfl, rfl, rfl⟩
+  have vectorOff : profile.evaluate .vector256Accelerated = false := vector
+  have sseOff : profile.evaluate .sse41 = false := sse
+  cil_checked_steps 6 [body, readOnlyArguments, fl, fr, vectorOff, sseOff]
   exact tail
 
 theorem checked (profile : CIL.FeatureProfile) (program : CIL.Program) (index callee : Nat)

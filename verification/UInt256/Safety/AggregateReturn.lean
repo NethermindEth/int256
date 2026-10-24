@@ -6,6 +6,7 @@ import CIL.Safety.StepComposition
 import CIL.Safety.ReturnMemory
 import CIL.Safety.CallComposition
 import CIL.Safety.GuardNormalization
+import CIL.Safety.SymbolicExecution
 
 namespace UInt256Model.Safety.AggregateReturn
 open CIL.Safety UInt256Model.Safety
@@ -38,14 +39,7 @@ theorem binary_prefix (profile : CIL.FeatureProfile) (callee : Nat)
   have hl := call.input_formed (reference := left) (by simp)
   have hr := call.input_formed (reference := right) (by simp)
   have ho := call.output_formed (reference := output) (by simp)
-  iterate 3
-    apply Eq.trans
-    · apply run_next found
-      · simp only [binaryBody]; rfl
-      · simp (config := { implicitDefEqProofs := false }) only [step, binaryArgs, frame, List.getElem?_cons_zero, List.getElem?_cons_succ,
-          checkedValue, formValue, localAddress, hl, hr, ho, checkedAt, Except.mapError,
-          Bind.bind, Except.bind, Pure.pure, Except.pure]
-        rfl
+  cil_checked_steps 3 [binaryArgs, frame, localAddress, hl, hr, ho]
   rfl
 
 def InitializedBinaryResult (operation : BitVec 256 → BitVec 256 → BitVec 256)
@@ -165,14 +159,7 @@ theorem unary_prefix (profile : CIL.FeatureProfile) (callee : Nat)
         (unaryArguments input output).reverse entered := by
   have hl := call.input_formed (reference := input) (by simp)
   have ho := call.output_formed (reference := output) (by simp)
-  iterate 2
-    apply Eq.trans
-    · apply run_next found
-      · simp only [unaryBody]; rfl
-      · simp (config := { implicitDefEqProofs := false }) only [step, unaryArgs, frame, List.getElem?_cons_zero,
-          checkedValue, formValue, localAddress, hl, ho, checkedAt, Except.mapError,
-          Bind.bind, Except.bind, Pure.pure, Except.pure]
-        rfl
+  cil_checked_steps 2 [unaryArgs, frame, localAddress, hl, ho]
   rfl
 
 def InitializedUnaryResult (operation : BitVec 256 → BitVec 256)
