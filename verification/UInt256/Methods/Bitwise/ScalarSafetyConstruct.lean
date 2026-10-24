@@ -39,7 +39,7 @@ theorem construct_prefix (program : CIL.Program) (index pc constructor : Nat)
     simp [words, checkedValue, numericValue, Bind.bind, Except.bind, Pure.pure, Except.pure]
   obtain ⟨temporary, updated, stepped, updatedCall, _, before, fresh⟩ :=
     readonly.new_aggregate256 (pc := pc) (callee := constructor)
-      args (words w0 w1 w2 w3) [.reference (.address output)] frame memory found checked
+      args (words w0 w1 w2 w3) [.reference (.address output)] frame memory found checked (by rfl)
   let nextFrame := { frame with owned := temporary.allocation :: frame.owned }
   have writable := call.1.2.2 (wordView output) (by simp)
   obtain ⟨allocation, present, _, _⟩ := access_within_allocation _ _ _ _ _ writable

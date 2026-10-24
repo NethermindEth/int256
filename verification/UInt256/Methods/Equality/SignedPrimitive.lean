@@ -49,7 +49,7 @@ include lookup retFetched returns in
 
 include lookup fetched retFetched returns locals kinds vectors homes in
 theorem signed_checked (memory : Memory) (left : Reference) (argument : CIL.Value) (bits : BitVec 256)
-    (negative : Bool) (numeric : numericValue argument = true)
+    (negative : Bool) (numeric : numericValue argument = true) (known : argument.hasUnspecified = false)
     (child : SignedChild program signedCallee argument bits)
     (negativeExecution : negative = true → SignedNegative program signedIndex argument)
     (positiveExecution : negative = false → SignedPositive program signedIndex signedCall argument)
@@ -76,7 +76,7 @@ theorem signed_checked (memory : Memory) (left : Reference) (argument : CIL.Valu
     have stepped : step signedBody (.call signedCallee 2) signedCall
         (scalarArguments left argument) frame [.scalar argument, .reference (.address left)] memory =
         .ok (.call signedCallee (scalarArguments left argument) [] memory) := by
-      simp [step, cil_guard, observerCount, scalarArguments, checkedValue, formValue, numeric, formed, checkedAt,
+      simp [step, cil_guard, observerCount, scalarArguments, checkedValue, formValue, numeric, known, formed, checkedAt,
         Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     obtain ⟨tailFuel, tail⟩ := run_call_exists lookup fetched stepped
       ⟨childFuel, certificate.1⟩ ⟨1, signed_return program signedIndex signedCall signedBody lookup retFetched returns _ _ frame childFinal (by split <;> simp)⟩
@@ -183,7 +183,7 @@ theorem checked32 (profile : CIL.FeatureProfile) (program : CIL.Program) (entry 
       using child memory left word call
   have result := signed_checked program entry 5 callee (body32 profile callee)
     found rfl rfl rfl rfl rfl rfl rfl memory left (.i32 word) (BitVec.ofNat 256 word.toNat)
-    (decide (word.toInt < 0)) rfl child'
+    (decide (word.toInt < 0)) rfl rfl child'
     (fun negative => negative32 profile program entry callee found word (by simpa using negative))
     (fun positive => positive32 profile program entry callee found word (by simpa using positive)) call
   by_cases sign : word.toInt < 0 <;>
@@ -203,7 +203,7 @@ theorem checked64 (profile : CIL.FeatureProfile) (program : CIL.Program) (entry 
       using child memory left word call
   have result := signed_checked program entry 6 callee (body64 profile callee)
     found rfl rfl rfl rfl rfl rfl rfl memory left (.i64 word) (BitVec.ofNat 256 word.toNat)
-    (decide (word.toInt < 0)) rfl child'
+    (decide (word.toInt < 0)) rfl rfl child'
     (fun negative => negative64 profile program entry callee found word (by simpa using negative))
     (fun positive => positive64 profile program entry callee found word (by simpa using positive)) call
   by_cases sign : word.toInt < 0 <;>

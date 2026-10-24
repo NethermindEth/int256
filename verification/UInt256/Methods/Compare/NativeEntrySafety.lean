@@ -23,6 +23,7 @@ theorem native_entry_checked (profile : CIL.FeatureProfile) (usesLess inclusive 
     simp [FrameSetupFits, InitializersFit, AggregateArgumentsFit, ParameterArgumentsFit, SelectedKindsFit, nativeEntryBody]
   · intros; rfl
   · intros; rfl
+  · intros; rfl
   · intro left right
     split <;> exact ⟨_, rfl, rfl⟩
   · intro memory left right call

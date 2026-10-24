@@ -25,7 +25,8 @@ theorem CallingConditions.new_aggregate256 {program : CIL.Program} {body : CIL.M
     (args arguments rest : List Value) (frame : Frame) (memory : Memory)
     (found : program[method]? = some body)
     (call : CallingConditions program memory inputs [])
-    (checked : arguments.mapM (checkedValue memory) = .ok arguments) :
+    (checked : arguments.mapM (checkedValue memory) = .ok arguments)
+    (known : arguments.any Value.hasUnspecified = false) :
     ∃ temporary updated,
       step body (.newAggregate callee arguments.length 32) pc args frame (arguments.reverse ++ rest) memory =
         .ok (.construct callee (.reference (.address temporary) :: arguments) rest
@@ -35,7 +36,7 @@ theorem CallingConditions.new_aggregate256 {program : CIL.Program} {body : CIL.M
       MemoryBelow memory.nextIdentity memory updated ∧
       temporary.allocation = memory.nextIdentity := by
   obtain ⟨temporary, updated, stepped, loaded, writable, preserved, fresh⟩ :=
-    step_newAggregate (32 : Fin (2^64)) (by decide) args arguments rest frame memory call.1.1 checked
+    step_newAggregate (32 : Fin (2^64)) (by decide) args arguments rest frame memory call.1.1 checked known
   have wf := step_preserves_wellFormed _ _ _ _ _ _ _ _ call.1.1 stepped
   have world := step_preserves_static_world _ _ _ _ _ _ _ _ _ call.1.1
     (program_static_sites_valid _ _ _ found) call.2 stepped

@@ -28,6 +28,9 @@ theorem wrapper_compose (wrapper : Wrapper)
   · intro left right
     cases wrapper <;> simp only [childArguments]
     all_goals first | rfl | (split <;> rfl)
+  · intro left right
+    cases wrapper <;> simp only [childArguments]
+    all_goals first | rfl | (split <;> rfl)
   · exact child
   · exact suffix
   · intro memory left right frame call post continuation

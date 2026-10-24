@@ -32,6 +32,9 @@ theorem wrapper_checked (wrapper : Wrapper)
   · intro left right
     cases wrapper <;> simp only [childArguments]
     all_goals first | rfl | (split <;> rfl)
+  · intro left right
+    cases wrapper <;> simp only [childArguments]
+    all_goals first | rfl | (split <;> rfl)
   · exact numeric
   · exact normalized
   · exact child

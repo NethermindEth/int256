@@ -45,7 +45,8 @@ theorem checked {α : Type} (encode : α → CIL.Value) (equal : BitVec 256 → 
     (profile : CIL.FeatureProfile) (reversed negate : Bool) (program : CIL.Program) (entry callee : Nat)
     (found : program[entry]? = some (body profile reversed negate callee))
     (numeric : ∀ word, numericValue (encode word) = true)
-    (child : ScalarOperatorContract false false encode equal program callee) :
+    (child : ScalarOperatorContract false false encode equal program callee)
+    (known : ∀ word, (encode word).hasUnspecified = false := by intros; rfl) :
     ScalarOperatorContract reversed negate encode equal program entry := by
   intro memory input word call
   let frame : Frame := ⟨memory.nextIdentity, [], [], []⟩
@@ -68,7 +69,7 @@ theorem checked {α : Type} (encode : α → CIL.Value) (equal : BitVec 256 → 
       (scalarOperatorArguments reversed input (encode word)) frame
       [.scalar (encode word), .reference (.address input)] memory =
       .ok (.call callee (scalarOperatorArguments false input (encode word)) [] memory) := by
-    simp [step, cil_guard, observerCount, scalarOperatorArguments, scalarArguments, checkedValue, numeric, formValue, formed,
+    simp [step, cil_guard, observerCount, scalarOperatorArguments, scalarArguments, checkedValue, numeric, known, formValue, formed,
       checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   obtain ⟨tailFuel, tail⟩ := run_call_exists found fetched stepped ⟨childFuel, certificate.1⟩
     ⟨3, returned profile reversed negate program entry callee found _ _ frame final⟩

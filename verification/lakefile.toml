@@ -5,10 +5,11 @@ defaultTargets = ["UInt256"]
 [[require]]
 name = "leancil"
 git = "https://github.com/NethermindEth/LeanCIL.git"
-rev = "f8ac3c1421c7881a86d167bbb9ca226facdcd0f8"
+rev = "99234831740420e5aa038953829f4ba840dc6b67"
 
 [[lean_lib]]
 name = "UInt256"
 
 [[lean_lib]]
 name = "Tests.Fixtures.Equality.Shared"
+

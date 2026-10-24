@@ -56,6 +56,7 @@ theorem compose_readOnly_binary (program : CIL.Program) (method pc callee : Nat)
     (fetched : body.code[pc]? = some (.call callee 2))
     (fits : ∀ left right, FrameSetupFits body (readOnlyArguments [left, right]))
     (length : ∀ left right, (childArguments left right).length = 2)
+    (known : ∀ left right, (childArguments left right).any Value.hasUnspecified = false)
     (child : ∀ memory left right, CallingConditions program memory [left, right] [] →
       ∃ fuel final,
         InvocationCertificate program callee (childArguments left right) memory fuel final
@@ -95,7 +96,7 @@ theorem compose_readOnly_binary (program : CIL.Program) (method pc callee : Nat)
     have drop : List.drop 2 (childArguments left right).reverse = [] := by
       apply List.drop_eq_nil_of_le
       simp [count]
-    simp [take, drop, checkedChild, Bind.bind, Except.bind, Pure.pure, Except.pure]
+    simp [unspecifiedOperands, take, drop, known, checkedChild, Bind.bind, Except.bind, Pure.pure, Except.pure]
   let value := operation (inputValue entered left) (inputValue entered right)
   obtain ⟨suffixFuel, tail⟩ := suffixProof childFinal left right frame
     (inputValue entered left) (inputValue entered right)
@@ -138,6 +139,7 @@ theorem forward_readOnly_binary (program : CIL.Program) (method pc callee : Nat)
     (forwarding : body.code[pc + 1]? = some (.ret (some .unsigned8))) (returns : body.returnsValue = true)
     (fits : ∀ left right, FrameSetupFits body (readOnlyArguments [left, right]))
     (length : ∀ left right, (childArguments left right).length = 2)
+    (known : ∀ left right, (childArguments left right).any Value.hasUnspecified = false)
     (numeric : ∀ left right, numericValue (operation left right) = true)
     (normalized : ∀ left right, ∃ flag, operation left right = .i32 flag ∧
       CIL.NarrowKind.unsigned8.extend flag = flag)
@@ -157,7 +159,7 @@ theorem forward_readOnly_binary (program : CIL.Program) (method pc callee : Nat)
           .ok (final, values) ∧ post final values) :
     BinaryReadOnlyInvocation operation program method := by
   apply compose_readOnly_binary program method pc callee body operation operation childArguments
-    lookup fetched fits length child
+    lookup fetched fits length known child
   · intro memory left right frame x y
     refine ⟨1, ?_⟩
     obtain ⟨flag, result, normalizedFlag⟩ := normalized x y

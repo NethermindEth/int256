@@ -93,7 +93,8 @@ open CIL.Safety UInt256Model.Safety
 theorem primitive_body (ctx : PrimitiveContext) (wordContract : Calls.WordContract ctx.program ctx.indices.word) (top : Full.FullTopContract ctx.profile ctx.program ctx.indices.full ctx.indices.word ctx.indices.count ctx.indices.storage)
     (firstScalar : Bool) (memory : Memory) (input operand output : Reference)
     (argument : CIL.Value) (word : BitVec 64) (frame : Frame) (watermark : Nat)
-    (numeric : numericValue argument = true) (prefixProof : ConversionPrefix ctx argument word)
+    (numeric : numericValue argument = true) (known : argument.hasUnspecified = false)
+    (prefixProof : ConversionPrefix ctx argument word)
     (slots : frame.locals = [.bytes (.aggregate 32) operand, .bytes (.aggregate 32) output])
     (call : CallingConditions ctx.program memory [input] [output])
     (writable : access memory operand 32 1 true = .ok ())
@@ -147,7 +148,7 @@ theorem primitive_body (ctx : PrimitiveContext) (wordContract : Calls.WordContra
   have callStep : step (primitiveBody ctx.profile ctx.firstScalar ctx.indices.entry ctx.conversionIndex) (.call ctx.conversionIndex 1) 1
       (scalarOperatorArguments firstScalar input argument) frame [.scalar argument] memory =
       .ok (.call ctx.conversionIndex [.scalar argument] [] memory) := by
-    simp [step, cil_guard, observerCount, checkedValue, numeric, Bind.bind, Except.bind, Pure.pure, Except.pure]
+    simp [step, cil_guard, observerCount, checkedValue, numeric, known, Bind.bind, Except.bind, Pure.pure, Except.pure]
   obtain ⟨callFuel, called⟩ := run_call_exists found (by rfl) callStep ⟨conversionFuel, invoked⟩ ⟨afterFuel, afterRun⟩
   have started : ∃ fuel result returned,
       run ctx.program fuel ctx.wrapperIndex 0 (scalarOperatorArguments firstScalar input argument)
@@ -218,7 +219,8 @@ open CIL.Safety UInt256Model.Safety
 theorem primitive_checked (ctx : PrimitiveContext) (wordContract : Calls.WordContract ctx.program ctx.indices.word) (top : Full.FullTopContract ctx.profile ctx.program ctx.indices.full ctx.indices.word ctx.indices.count ctx.indices.storage)
     (firstScalar : Bool) (memory : Memory) (input : Reference)
     (argument : CIL.Value) (word : BitVec 64)
-    (numeric : numericValue argument = true) (prefixProof : ConversionPrefix ctx argument word)
+    (numeric : numericValue argument = true) (known : argument.hasUnspecified = false)
+    (prefixProof : ConversionPrefix ctx argument word)
     (code0 : (primitiveBody ctx.profile ctx.firstScalar ctx.indices.entry ctx.conversionIndex).code[0]? = some (.arg (if firstScalar then 0 else 1)))
     (code3 : (primitiveBody ctx.profile ctx.firstScalar ctx.indices.entry ctx.conversionIndex).code[3]? = some (if firstScalar then .localAddr 0 else .arg 0))
     (code4 : (primitiveBody ctx.profile ctx.firstScalar ctx.indices.entry ctx.conversionIndex).code[4]? = some (if firstScalar then .arg 1 else .localAddr 0))
@@ -243,7 +245,7 @@ theorem primitive_checked (ctx : PrimitiveContext) (wordContract : Calls.WordCon
   have bound := (call.1.1.1 _ _ present).1
   have older := Nat.lt_of_lt_of_le bound privateOperand
   obtain ⟨fuel, final, finished, cells⟩ := primitive_body ctx wordContract top firstScalar
-    entered input operand output argument word frame memory.nextIdentity numeric prefixProof slots
+    entered input operand output argument word frame memory.nextIdentity numeric known prefixProof slots
     enteredCall writable older privateOperand ordered (fun id member => (fresh.2 id member).1) code0 code3 code4
   have sameInput : inputValue entered input = inputValue memory input := by
     simp only [inputValue, before.cells _ bound]
@@ -290,7 +292,7 @@ theorem primitive64_with_contracts (ctx : PrimitiveContext) (narrow : ctx.narrow
       (fun input word => encoded (input * BitVec.ofNat 256 word.toNat)) ctx.program ctx.wrapperIndex := by
   intro memory input word call
   exact primitive_checked ctx wordContract top
-    ctx.firstScalar memory input (.i64 word) word rfl (conversion_prefix64 ctx narrow word)
+    ctx.firstScalar memory input (.i64 word) word rfl rfl (conversion_prefix64 ctx narrow word)
     (by rfl) (by rfl) (by rfl) call
 
 theorem primitive32_with_contracts (ctx : PrimitiveContext) (narrow : ctx.narrow = true)
@@ -300,7 +302,7 @@ theorem primitive32_with_contracts (ctx : PrimitiveContext) (narrow : ctx.narrow
       (fun input word => encoded (input * BitVec.ofNat 256 word.toNat)) ctx.program ctx.wrapperIndex := by
   intro memory input word call
   have result := primitive_checked ctx wordContract top
-    ctx.firstScalar memory input (.i32 word) (word.setWidth 64) rfl (conversion_prefix32 ctx narrow word)
+    ctx.firstScalar memory input (.i32 word) (word.setWidth 64) rfl rfl (conversion_prefix32 ctx narrow word)
     (by rfl) (by rfl) (by rfl) call
   simpa only [BitVec.toNat_setWidth, Nat.mod_eq_of_lt (Nat.lt_trans word.isLt (by decide : 2^32 < 2^64))] using result
 theorem primitive64_correctness (ctx : PrimitiveContext) (narrow : ctx.narrow = false)

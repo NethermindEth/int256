@@ -55,7 +55,7 @@ theorem conversion_invoke (ctx : PrimitiveContext) (memory : Memory) (argument :
   have checked : (conversionWords word).mapM (checkedValue memory) = .ok (conversionWords word) := by
     simp [conversionWords, checkedValue, numericValue, Bind.bind, Except.bind, Pure.pure, Except.pure]
   obtain ⟨temporary, updated, stepped, updatedCall, _, preserved, fresh⟩ :=
-    call.new_aggregate256 (pc := (if ctx.narrow then 8 else 7)) (callee := ctx.constructorIndex) args (conversionWords word) [] frame memory found checked
+    call.new_aggregate256 (pc := (if ctx.narrow then 8 else 7)) (callee := ctx.constructorIndex) args (conversionWords word) [] frame memory found checked (by rfl)
   let nextFrame := { frame with owned := temporary.allocation :: frame.owned }
   obtain ⟨constructed, invoked, valid, outside, authority, _, loaded⟩ :=
     constructor_contract ctx.profile ctx.program ctx.constructorIndex ctx.constructor updated [] temporary word 0 0 0 updatedCall

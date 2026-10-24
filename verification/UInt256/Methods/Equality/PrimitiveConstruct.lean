@@ -39,7 +39,7 @@ theorem primitive_construct (memory : Memory) (left home : Reference) (argument 
     simp [constructorWords, checkedValue, numericValue, Bind.bind, Except.bind, Pure.pure, Except.pure]
   obtain ⟨temporary, updated, stepped, updatedCall, _, preserved, fresh⟩ :=
     call.new_aggregate256 (pc := primitiveConstructorCall) (callee := constructorIndex)
-      (primitiveArguments left argument) (constructorWords right) [.reference (.address left)] frame memory lookup checked
+      (primitiveArguments left argument) (constructorWords right) [.reference (.address left)] frame memory lookup checked (by rfl)
   let nextFrame := { frame with owned := temporary.allocation :: frame.owned }
   obtain ⟨allocation, present, _, _⟩ := access_within_allocation _ _ _ _ _ writable
   have homeBound : home.allocation < memory.nextIdentity := (call.1.1.1 _ _ present).1
