@@ -1,4 +1,5 @@
 import UInt256.Methods.Compare.PrimitiveWrapper
+import CIL.Safety.SymbolicExecution
 
 namespace UInt256Proof.Compare.PrimitiveWrapper
 open CIL.Safety UInt256Model.Safety UInt256Proof.Compare.PrimitiveSafety
@@ -14,15 +15,9 @@ theorem prefix32 (signed scalarFirst reversed negate : Bool) (program : CIL.Prog
     intro memory input word frame call post continuation
     have formed := call.input_formed (reference := input) (by simp)
     iterate 3
-      apply run_next_exists post
-      · exact found
-      · rfl
-      · simp (config := { implicitDefEqProofs := false })
-          [step, cil_guard, observerCount, pureArity, scalars, CIL.step, CIL.unary, scalarOperatorArguments, scalarArguments,
-            checkedValue, numericValue, formValue, formed, checkedAt,
-            Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-        try (exact ⟨rfl, rfl, rfl, rfl⟩)
-        done
+      cil_strict refine run_next_exists (post := _) (by cil_lookup [found]) (by cil_lookup [found])
+        (by cil_checked_step [formed, scalarOperatorArguments, scalarArguments]) ?_
+      cil_stack_cleanup
     simpa only [callPC, scalarOperatorArguments, scalarArguments, List.reverse_cons, List.reverse_nil,
       List.nil_append, List.cons_append, ite_true, ite_false, Bool.false_eq_true, widen32] using continuation
 
