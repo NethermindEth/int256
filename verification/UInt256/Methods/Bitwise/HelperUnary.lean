@@ -51,7 +51,7 @@ theorem not_limb_checked (profile : CIL.FeatureProfile)
   apply Eq.trans
   · apply run_next (target := pc + 1) (nextFrame := frame) (updated := memory)
       (values := .reference (.address input) :: rest) found h0
-    simp [step, unaryArguments, checkedValue, formValue, inputFormed, checkedAt,
+    simp [step, cil_guard, observerCount, unaryArguments, checkedValue, formValue, inputFormed, checkedAt,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   apply Eq.trans
   · apply run_next (target := pc + 2) (nextFrame := frame) (updated := memory)
@@ -104,7 +104,7 @@ theorem unary_result (profile : CIL.FeatureProfile)
     apply Eq.trans
     · apply run_next (target := 1) (values := [.reference (.address output)])
         (nextFrame := frame) (updated := memory) found (by rfl)
-      simp [step, unaryArguments, checkedValue, formValue, call.output_formed (by simp : output ∈ [output]),
+      simp [step, cil_guard, observerCount, unaryArguments, checkedValue, formValue, call.output_formed (by simp : output ∈ [output]),
         checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     exact prefixRun
   have setup : enterFrame (unaryBody profile constructor helper) (unaryArguments input output) memory =

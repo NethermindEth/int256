@@ -124,7 +124,7 @@ theorem vector128_arm_repair_mask (program : CIL.Program) (body : CIL.Method) (m
            | exact loadHigh _ _
            | exact stored _ _ _
            | (simp (config := { implicitDefEqProofs := false })
-               [localResult, checkedIntrinsic, step, enabled, flagFit, argument, pureArity, scalars, CIL.step.eq_def, CIL.FeatureProfile.evaluate,
+               [localResult, checkedIntrinsic, step, cil_guard, observerCount, enabled, flagFit, argument, pureArity, scalars, CIL.step.eq_def, CIL.FeatureProfile.evaluate,
                  CIL.Intrinsic.available, CIL.Vector.intrinsic_or128, CIL.Vector.intrinsic_adv_extract,
                  incoming128_arm_high, show (0 : BitVec 32) = BitVec.ofNat 32 0 from rfl, zero,
                  checkedValue, numericValue, Bind.bind, Except.bind, Pure.pure, Except.pure]
@@ -183,7 +183,7 @@ theorem vector128_arm_full_mask (program : CIL.Program) (body : CIL.Method) (met
          | exact load_result _ _
          | exact stored _ _ _
          | (simp (config := { implicitDefEqProofs := false })
-             [localResult, checkedIntrinsic, step, enabled, pureArity, scalars, CIL.step.eq_def,
+             [localResult, checkedIntrinsic, step, cil_guard, observerCount, enabled, pureArity, scalars, CIL.step.eq_def,
                CIL.Intrinsic.available, ones, CIL.Vector.intrinsic_eq128, full128,
                checkedValue, numericValue, Bind.bind, Except.bind, Pure.pure, Except.pure]
             first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
@@ -241,7 +241,7 @@ theorem vector128_arm_extra_mask (program : CIL.Program) (body : CIL.Method) (me
          | exact load_propagation _ _
          | exact stored _ _ _
          | (simp (config := { implicitDefEqProofs := false })
-             [localResult, checkedIntrinsic, step, enabled, pureArity, scalars, CIL.step.eq_def,
+             [localResult, checkedIntrinsic, step, cil_guard, observerCount, enabled, pureArity, scalars, CIL.step.eq_def,
                CIL.Intrinsic.available, ones, CIL.Vector.intrinsic_zero128, CIL.Vector.intrinsic_and128, CIL.Vector.intrinsic_adv_extract, incoming128_arm_low,
                checkedValue, numericValue, Bind.bind, Except.bind, Pure.pure, Except.pure]
             first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
@@ -378,7 +378,7 @@ theorem vector128_arm_repair_value (program : CIL.Program) (body : CIL.Method) (
            | exact loadRight _ _
            | exact stored _ _ _
            | (simp (config := { implicitDefEqProofs := false })
-               [localResult, checkedIntrinsic, step, enabled, pureArity, scalars, CIL.step.eq_def, CIL.Intrinsic.available,
+               [localResult, checkedIntrinsic, step, cil_guard, observerCount, enabled, pureArity, scalars, CIL.step.eq_def, CIL.Intrinsic.available,
                  CIL.Vector.intrinsic_sub128, CIL.Vector.intrinsic_or128, corrected128,
                  checkedValue, numericValue, Bind.bind, Except.bind, Pure.pure, Except.pure]
               first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))

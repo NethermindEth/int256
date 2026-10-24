@@ -64,7 +64,7 @@ theorem store_template_contract (profile : CIL.FeatureProfile) (featureFirst : B
       change run program 2 index 11 args frame [.scalar (.v256 packed), .reference (.address output)] memory = _
       apply Eq.trans
       · apply run_next (target := 12) (values := []) (nextFrame := frame) (updated := after) found (by rfl)
-        simp only [step, staticInstruction, memoryInstruction, storeValue, referenceAt, ordinaryAccessAlignment,
+        simp only [step, cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, staticInstruction, memoryInstruction, storeValue, referenceAt, ordinaryAccessAlignment,
           written, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
       exact run_return found (by rfl) (by rfl) (by rfl)
 

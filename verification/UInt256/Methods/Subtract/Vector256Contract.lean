@@ -47,9 +47,9 @@ theorem impl_contract (program : CIL.Program) (method lookup : Nat) (profile : C
   obtain ⟨frame, entered, setup, live⟩ := call.binary_setup_succeeds
     (body := subtractImplBody profile avx512 bmi1 lookup)
     (by simp [subtractImplBody, FrameSetupFits, InitializersFit, InitializerFits, AggregateArgumentsFit,
-      ParameterArgumentsFit])
+      ParameterArgumentsFit, SelectedKindsFit])
   obtain ⟨frame', entered', setup', homes, _, wf⟩ := numeric_frame_setup
-    (subtractImplBody profile avx512 bmi1 lookup) implSpecs rfl rfl rfl rfl memory
+    (subtractImplBody profile avx512 bmi1 lookup) implSpecs rfl rfl rfl rfl rfl memory
     (binaryArguments left right output) call.1.1
   rw [setup] at setup'
   cases setup'

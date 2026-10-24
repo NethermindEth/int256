@@ -28,11 +28,11 @@ theorem run_input_to_local {program : CIL.Program} {method pc argument target : 
   obtain ⟨after, stored, next⟩ := state.store enteredWF homes target kind (inputLimb original input limb)
     (pc + 2) args rest (body := body)
   apply run_next_exists post found code0
-  · simp [step, arg, checkedValue, formValue, formed, checkedAt,
+  · simp [step, cil_guard, observerCount, arg, checkedValue, formValue, formed, checkedAt,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     exact ⟨rfl,rfl,rfl,rfl⟩
   apply run_next_exists post found code1
-  · simp [step, pureArity, reading, Bind.bind, Except.bind, Pure.pure, Except.pure]
+  · simp [step, cil_guard, observerCount, pureArity, reading, Bind.bind, Except.bind, Pure.pure, Except.pure]
     exact ⟨rfl,rfl,rfl,rfl⟩
   exact run_next_exists post found code2 stored (by simpa only [Nat.add_assoc] using continuation after next)
 

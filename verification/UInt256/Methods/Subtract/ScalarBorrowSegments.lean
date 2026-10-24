@@ -37,7 +37,7 @@ theorem scalar_indexed_borrow (contract : BorrowHelperContract Extracted.program
   · obtain ⟨index, bound⟩ := index
     have cases : index = 0 ∨ index = 1 ∨ index = 2 ∨ index = 3 := by omega
     rcases cases with rfl | rfl | rfl | rfl <;> rfl
-  · simp [step, checkedValue, numericValue, formValue, fb, fr, checkedAt,
+  · simp [step, cil_guard, observerCount, checkedValue, numericValue, formValue, fb, fr, checkedAt,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     exact ⟨rfl, rfl, rfl⟩
   · exact ⟨wellFormed, incoming, borrowRead, borrowWrite, resultWrite, disjoint⟩
@@ -86,7 +86,7 @@ theorem scalar_borrow_segment_checked (contract : BorrowHelperContract Extracted
       | (simp (config := { failIfUnchanged := false })
          apply run_next_exists post found (by rfl)
          simp (config := { implicitDefEqProofs := false })
-           [step, binaryArguments, checkedValue, formValue, fl, fr, fb, fo, borrowSlot, resultSlot,
+           [step, cil_guard, observerCount, binaryArguments, checkedValue, formValue, fl, fr, fb, fo, borrowSlot, resultSlot,
              localAddress, leftRead, rightRead, checkedAt, Except.mapError, Bind.bind, Except.bind,
              Pure.pure, Except.pure]
          first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)

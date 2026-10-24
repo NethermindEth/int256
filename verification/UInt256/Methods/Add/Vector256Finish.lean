@@ -45,7 +45,7 @@ macro "finish_pure" : tactic => `(tactic|
   (have formedOutput := state.call.output_formed (reference := output) (by simp)
    apply run_next_exists post found (by rfl)
    · simp (config := { implicitDefEqProofs := false })
-       [step, pureArity.eq_def, finishArguments, checkedValue, numericValue, formValue, formedOutput,
+       [step, cil_guard, observerCount, pureArity.eq_def, finishArguments, checkedValue, numericValue, formValue, formedOutput,
          staticInstruction, memoryInstruction, checkedAt, profileEq, features.avx, features.avx2,
          CIL.FeatureProfile.evaluate, scalars, checkedIntrinsic, CIL.Intrinsic.available, CIL.step.eq_def,
          CIL.binary.eq_def, CIL.unary.eq_def, CIL.truth, instruction.eq_def, Except.mapError, Bind.bind, Except.bind, Pure.pure,
@@ -128,21 +128,21 @@ theorem finish_tail (program : CIL.Program) (method lookup : Nat) (profile : CIL
     (UInt256Proof.SIMD.cascadeIndex (CIL.Vector.moveMask64 carry) (CIL.Vector.moveMask64 propagation))
     (UInt256Proof.SIMD.cascade_index_bound _ _)
   apply run_next_exists post found (by rfl)
-  · simp [step, staticInstruction, memoryInstruction, formValue, formed, checkedAt, Except.mapError,
+  · simp [step, cil_guard, observerCount, staticInstruction, memoryInstruction, formValue, formed, checkedAt, Except.mapError,
       Bind.bind, Except.bind, Pure.pure, Except.pure]
     exact ⟨rfl, rfl, rfl, rfl⟩
   apply run_next_exists post found (by rfl)
-  · simp [step, staticInstruction, memoryInstruction, formValue, formed, checkedAt, Except.mapError,
+  · simp [step, cil_guard, observerCount, staticInstruction, memoryInstruction, formValue, formed, checkedAt, Except.mapError,
       Bind.bind, Except.bind, Pure.pure, Except.pure]
     exact ⟨rfl, rfl, rfl, rfl⟩
   finish_load
   finish_pure
   apply run_next_exists post found (by rfl)
-  · simp only [step, staticInstruction, memoryInstruction, referenceAt, CIL.offsetValue, checkedAt,
+  · simp only [step, cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, staticInstruction, memoryInstruction, referenceAt, CIL.offsetValue, checkedAt,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     rw [added]
   apply run_next_exists post found (by rfl)
-  · simp [step, staticInstruction, memoryInstruction, row,
+  · simp [step, cil_guard, observerCount, staticInstruction, memoryInstruction, row,
       Bind.bind, Except.bind, Pure.pure, Except.pure]
     try exact ⟨rfl, rfl, rfl, rfl⟩
   finish_store
@@ -167,7 +167,7 @@ theorem finish_tail (program : CIL.Program) (method lookup : Nat) (profile : CIL
     unfold finishFlag
     split <;> rfl
   refine ⟨1, _, _, ?_, continuation stored _ state⟩
-  simp [run, found, fetched, returns, step, checkedValue, numericValue,
+  simp [run, found, fetched, returns, step, cil_guard, observerCount, checkedValue, numericValue,
     Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   exact normalized
 
@@ -186,7 +186,7 @@ theorem finish_invoke (program : CIL.Program) (method lookup : Nat) (profile : C
       ∀ id, id < memory.nextIdentity → ∀ offset, OutsideOutput output id offset →
         after.cells id offset = memory.cells id offset := by
   obtain ⟨frame, entered, setup, numeric, _, _⟩ := numeric_frame_setup
-    (finishAddBody profile lookup) finishSpecs rfl rfl rfl rfl memory
+    (finishAddBody profile lookup) finishSpecs rfl rfl rfl rfl rfl memory
     (finishArguments sum carry propagation output) originalCall.1.1
   have homes : WritableHomes entered memory.nextIdentity
       (finishAddBody profile lookup).localKinds frame.locals :=

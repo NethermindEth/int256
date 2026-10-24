@@ -10,6 +10,7 @@ import CIL.Safety.NumericHomes
 import UInt256.Safety.NumericStore
 import UInt256.Safety.HalfAccess
 import CIL.SIMD.Incoming128
+import CIL.Safety.GuardNormalization
 
 namespace UInt256Proof.AddSubtract.Safety
 open CIL.Safety UInt256Model.Safety
@@ -163,7 +164,7 @@ theorem vector128_operand_checked (program : CIL.Program) (body : CIL.Method) (m
          first
          | exact stored _ _ _
          | (simp (config := { implicitDefEqProofs := false })
-             [step, staticInstruction, memoryInstruction, reading, checkedAt, Except.mapError,
+             [step, cil_guard, observerCount, staticInstruction, memoryInstruction, reading, checkedAt, Except.mapError,
                Bind.bind, Except.bind, Pure.pure, Except.pure]
             first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
 
@@ -199,7 +200,7 @@ theorem vector128_reference_prefix (program : CIL.Program) (body : CIL.Method) (
     | exact continuation
     | (apply run_next_exists post found (by simp [code, vector128PrefixCode]; rfl)
        simp (config := { implicitDefEqProofs := false })
-         [step, leftArg, rightArg, checkedValue, formValue, leftFormed, rightFormed,
+         [step, cil_guard, observerCount, leftArg, rightArg, checkedValue, formValue, leftFormed, rightFormed,
            staticInstruction, memoryInstruction, storeLocal, layout, vector128SavedFrame,
            checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
        first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)
@@ -225,7 +226,7 @@ theorem vector128_left_upper (program : CIL.Program) (body : CIL.Method) (method
     | exact continuation
     | (apply run_next_exists post found (by simp [code, vector128PrefixCode]; rfl)
        simp (config := { implicitDefEqProofs := false })
-         [step, staticInstruction, memoryInstruction, CIL.offsetValue, referenceAt, advanced,
+         [step, cil_guard, observerCount, staticInstruction, memoryInstruction, CIL.offsetValue, referenceAt, advanced,
            checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
        first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)
 
@@ -255,7 +256,7 @@ theorem vector128_right_reference (program : CIL.Program) (body : CIL.Method) (m
       | exact continuation
       | (apply run_next_exists post found (by simp [code, vector128PrefixCode]; rfl)
          simp (config := { implicitDefEqProofs := false })
-           [step, slot, loadLocal, formValue, formed, staticInstruction, memoryInstruction,
+           [step, cil_guard, observerCount, slot, loadLocal, formValue, formed, staticInstruction, memoryInstruction,
              CIL.offsetValue, referenceAt, advanced, checkedAt, Except.mapError,
              Bind.bind, Except.bind, Pure.pure, Except.pure]
          first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)
@@ -381,6 +382,7 @@ open CIL.Safety
 theorem vector128_frame_setup (body : CIL.Method) (specs : List NumericLocalSpec)
     (metadata : body.localKinds = .reference :: specs.map NumericLocalSpec.kind ∧ body.locals = .nullRef :: specs.map NumericLocalSpec.value)
     (vectors : body.vectorArgs = []) (parameters : body.parameterHomes = [])
+    (opaqueLocals : body.opaqueVectorLocals = [])
     (memory : Memory) (args : List Value) (wf : memory.WellFormed) :
     ∃ frame entered slots,
       enterFrame body args memory = .ok (frame, entered) ∧
@@ -394,7 +396,7 @@ theorem vector128_frame_setup (body : CIL.Method) (specs : List NumericLocalSpec
 
   have setup : enterFrame body args memory = .ok (frame, entered) := by
     simp only [enterFrame, metadata.1, metadata.2,
-      makeLocals, makeLocal, made, vectors, makeArgumentHomes, parameters, makeParameterHomes,
+      opaqueLocals, makeSelectedLocals, List.isEmpty_nil, ite_true, makeLocals, makeLocal, made, vectors, makeArgumentHomes, parameters, makeParameterHomes,
       Bind.bind, Except.bind, Pure.pure, Except.pure, List.nil_append, List.append_nil, List.map_nil]
     rfl
   exact ⟨frame, entered, slots, setup, rfl, homes,

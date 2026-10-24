@@ -2,6 +2,7 @@ import UInt256.Methods.Subtract.ScalarSafetySetup
 import UInt256.Safety.CallerSetup
 import CIL.Safety.AccessBelow
 import CIL.Safety.StepComposition
+import CIL.Safety.GuardNormalization
 
 namespace UInt256Proof.Subtract.Safety
 open CIL.Safety UInt256Model.Safety
@@ -79,9 +80,9 @@ theorem scalar_right_prefix_checked (memory entered : Memory) (left right output
     | (simp (config := { failIfUnchanged := false }) [BitVec.ofNat_eq_ofNat]
        apply run_next_exists post found (by rfl)
        first
-       | exact stored _ _
+       | ((with_reducible show step _ (.setLocal 0) _ _ _ _ _ = _); exact stored _ _)
        | (simp (config := { implicitDefEqProofs := false })
-           [step, binaryArguments, checkedValue, numericValue, formValue, beforeFormed, afterFormed,
+           [step, cil_guard, observerCount, binaryArguments, checkedValue, numericValue, formValue, beforeFormed, afterFormed,
              firstRead, upper1, upper2, upper3, pureArity, scalars, CIL.step, CIL.binary, CIL.unary, checkedAt,
              Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
           first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))

@@ -1,6 +1,7 @@
 import UInt256.Methods.Add.Bindings
 import CIL.Safety.StepComposition
 import CIL.Safety.WordLocals
+import CIL.Safety.GuardNormalization
 
 namespace UInt256Proof.Safety
 
@@ -51,9 +52,9 @@ theorem scalar_right_prefix (left right output : Reference) (extra : List Value)
       · simp only [cil_code]; rfl
       · simp only [cil_code]; rfl
       · first
-        | exact stored _ _
+        | ((with_reducible show step _ (.setLocal 0) _ _ _ _ _ = _); exact stored _ _)
         | simp (config := { implicitDefEqProofs := false })
-            [cil_code, step, checkedValue, numericValue, formValue, rightBefore, rightAfter,
+            [cil_code, step, cil_guard, observerCount, checkedValue, numericValue, formValue, rightBefore, rightAfter,
               pureArity, scalars, CIL.step.eq_def, CIL.binary, CIL.unary, CIL.FeatureProfile.evaluate, firstRead, upper1, upper2, upper3,
               checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
           first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
@@ -112,9 +113,9 @@ theorem scalar_left_prefix (left right output : Reference) (extra : List Value)
       · simp only [cil_code]; rfl
       · simp only [cil_code]; rfl
       · first
-        | exact stored _ _
+        | ((with_reducible show step _ (.setLocal 1) _ _ _ _ _ = _); exact stored _ _)
         | simp (config := { implicitDefEqProofs := false })
-            [cil_code, step, checkedValue, numericValue, formValue, leftBefore, leftAfter,
+            [cil_code, step, cil_guard, observerCount, checkedValue, numericValue, formValue, leftBefore, leftAfter,
               pureArity, scalars, CIL.step.eq_def, CIL.binary, CIL.unary, firstRead, upper1, upper2, upper3,
               checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
           first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩

@@ -29,7 +29,8 @@ theorem scalar_frame_setup (memory : Memory) (args : List Value) (wellFormed : m
   have entered : enterFrame Extracted.addScalarBody args memory = .ok (frame, result) := by
     unfold enterFrame
     dsimp only
-    rw [scalar_local_metadata.1, scalar_local_metadata.2, made]
+    rw [scalar_local_metadata.1, scalar_local_metadata.2, show Extracted.addScalarBody.opaqueVectorLocals = [] from rfl,
+      makeSelectedLocals, List.isEmpty_nil, if_pos rfl, made]
     simp only [Bind.bind, Except.bind, cil_code, makeArgumentHomes, makeParameterHomes, Pure.pure, Except.pure, List.map_nil, List.append_nil]
     rfl
   exact ⟨frame, result, entered, homes, enterFrame_preserves_caller_memory _ _ _ _ _ entered,

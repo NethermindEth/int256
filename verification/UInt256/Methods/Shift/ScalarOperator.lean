@@ -41,7 +41,7 @@ theorem operator_correctness (profile : CIL.FeatureProfile) (direction : Directi
       (fun input count => .aggregate (numberBytes (result direction input count).toNat 32)) program index := by
   intro memory input count call
   obtain ⟨output, entered, entry, childCall, before, fresh⟩ := UInt256Model.Safety.AggregateReturn.setup
-    (operatorBody profile callee) (scalarArguments input (.i32 count)) rfl rfl rfl rfl program memory [input] call
+    (operatorBody profile callee) (scalarArguments input (.i32 count)) rfl rfl rfl rfl rfl program memory [input] call
   obtain ⟨childFuel, childResult, childCert, value, _, ⟨snapshot, loaded⟩, outside⟩ :=
     child entered input count output childCall
   let frame := UInt256Model.Safety.AggregateReturn.frame memory output
@@ -61,7 +61,7 @@ theorem operator_correctness (profile : CIL.FeatureProfile) (direction : Directi
   have stepped : step (operatorBody profile callee) (.call callee 3) 3 args frame
       (shiftArguments input count output).reverse entered =
       .ok (.call callee (shiftArguments input count output) [] entered) := by
-    simp [step, shiftArguments, checkedValue, numericValue, formValue, hl, ho, checkedAt,
+    simp [step, cil_guard, observerCount, shiftArguments, checkedValue, numericValue, formValue, hl, ho, checkedAt,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   have tail : run program 2 index 4 args frame [] childResult =
       .ok (leaveFrame frame childResult, [.scalar (.aggregate bytes)]) := by

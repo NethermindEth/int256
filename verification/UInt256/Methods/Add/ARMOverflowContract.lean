@@ -63,7 +63,7 @@ theorem reporting_entry_prefix (program : CIL.Program) (method scalarIndex : Nat
       · simp only [found, publicReportingBody, disabled]; rfl
       · simp only [found, publicReportingBody, disabled]; rfl
       · simp (config := { implicitDefEqProofs := false })
-          [found, publicReportingBody, disabled, binaryArguments, step, checkedValue, numericValue, formValue, fl, fr, fo,
+          [found, publicReportingBody, disabled, binaryArguments, step, cil_guard, observerCount, checkedValue, numericValue, formValue, fl, fr, fo,
             pureArity, scalars, CIL.step.eq_def, CIL.truth, CIL.FeatureProfile.evaluate, checkedAt, Except.mapError,
             Bind.bind, Except.bind, Pure.pure, Except.pure]
         try (first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)
@@ -75,7 +75,7 @@ theorem reporting_entry_return (program : CIL.Program) (method scalarIndex : Nat
       .ok (leaveFrame frame memory, [.scalar (.i32 flag)]) := by
   have returned : (publicReportingBody profile scalarIndex).code[32 + 1]? = some (.ret (some .unsigned8)) := by rfl
   have returns : (publicReportingBody profile scalarIndex).returnsValue = true := by rfl
-  simp [run, found, returned, returns, step, normalized, checkedValue, numericValue,
+  simp [run, found, returned, returns, step, cil_guard, observerCount, normalized, checkedValue, numericValue,
     Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 /-- Public AddOverflow through its scalar dispatcher: exact initial-input carry, modular sum, writable output, caller bytes kept. -/
@@ -90,7 +90,7 @@ theorem add_overflow_contract_of_scalar (program : CIL.Program) (method scalarIn
   intro memory left right output call
   obtain ⟨frame, entered, setup, live⟩ := call.binary_setup_succeeds
     (body := publicReportingBody profile scalarIndex)
-    (by simp [publicReportingBody, FrameSetupFits, InitializersFit, InitializerFits, AggregateArgumentsFit, ParameterArgumentsFit])
+    (by simp [publicReportingBody, FrameSetupFits, InitializersFit, InitializerFits, AggregateArgumentsFit, ParameterArgumentsFit, SelectedKindsFit])
   have enteredCall := call.after_frame_setup setup
   have preserved := enterFrame_preserves_caller_memory _ _ _ _ _ setup
   have fresh := enterFrame_fresh _ _ _ _ _ setup
@@ -112,7 +112,7 @@ theorem add_overflow_contract_of_scalar (program : CIL.Program) (method scalarIn
       (binaryArguments left right output) frame
       [.scalar (.i32 1), .reference (.address output), .reference (.address right), .reference (.address left)] entered =
         .ok (.call scalarIndex (binaryArguments left right output ++ [.scalar (.i32 1)]) [] entered) := by
-    simp [step, binaryArguments, checkedValue, numericValue, formValue, fl, fr, fo,
+    simp [step, cil_guard, observerCount, binaryArguments, checkedValue, numericValue, formValue, fl, fr, fo,
       checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   obtain ⟨tailFuel, tail⟩ := run_call_exists found fetched stepped ⟨childFuel, certified.1⟩
     ⟨1, reporting_entry_return program method scalarIndex profile found (binaryArguments left right output)

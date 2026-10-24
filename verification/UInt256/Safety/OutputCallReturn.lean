@@ -28,7 +28,7 @@ theorem run_output_call {program : CIL.Program} {method pc callee : Nat} {body :
   have finished : run program 1 method (pc + 1) args frame [] final =
       .ok (leaveFrame frame final, []) := by
     rw [run]
-    simp only [found, returnCode, step, void]
+    simp only [found, returnCode, step, cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, void]
     rfl
   obtain ⟨fuel, ran⟩ := run_call_exists found fetched stepped ⟨childFuel, invoked⟩ ⟨1, finished⟩
   exact ⟨fuel, leaveFrame frame final, [], ran, state.finish_output originalCall owned expected result⟩

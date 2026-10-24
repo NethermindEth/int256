@@ -19,6 +19,7 @@ theorem primitive_setup (primitiveBody : CIL.Method)
     (kinds : primitiveBody.localKinds = [.aggregate 32])
     (initializers : primitiveBody.locals = [.aggregate (List.replicate 32 0)])
     (vectorArgs : primitiveBody.vectorArgs = []) (parameters : primitiveBody.parameterHomes = [])
+    (opaqueLocals : primitiveBody.opaqueVectorLocals = [])
     (program : CIL.Program) (memory : Memory) (left : Reference) (right : CIL.Value)
     (call : CallingConditions program memory [left] []) :
     ∃ frame entered home,
@@ -30,7 +31,7 @@ theorem primitive_setup (primitiveBody : CIL.Method)
       inputValue entered left = inputValue memory left := by
   obtain ⟨home, entered, setup, writableCall, before, fresh⟩ :=
     Bitwise.ReturnSafety.setup primitiveBody (primitiveArguments left right)
-      kinds initializers vectorArgs parameters program memory [left] call
+      kinds initializers vectorArgs parameters opaqueLocals program memory [left] call
   exact ⟨_, entered, home, setup, rfl, writableCall.1.2.2 (wordView home) (by simp), fresh,
     call.after_frame_setup setup, call.input_value_after_setup setup (by simp)⟩
 
@@ -48,8 +49,9 @@ variable (program : CIL.Program) (primitiveIndex primitiveConstructorCall scalar
   (kinds : primitiveBody.localKinds = [.aggregate 32])
   (initializers : primitiveBody.locals = [.aggregate (List.replicate 32 0)])
   (vectorArgs : primitiveBody.vectorArgs = []) (parameters : primitiveBody.parameterHomes = [])
+  (opaqueLocals : primitiveBody.opaqueVectorLocals = [])
 
-include lookup constructFetched storeFetched addrFetched callFetched retFetched returns scalarFound constructorFound kinds initializers vectorArgs parameters in
+include lookup constructFetched storeFetched addrFetched callFetched retFetched returns scalarFound constructorFound kinds initializers vectorArgs parameters opaqueLocals in
 theorem primitive_checked (memory : Memory) (left : Reference) (argument : CIL.Value) (right : BitVec 64)
     (numeric : numericValue argument = true) (prefixExecution : PrimitivePrefix program primitiveIndex primitiveConstructorCall argument right)
     (call : CallingConditions program memory [left] []) :
@@ -58,7 +60,7 @@ theorem primitive_checked (memory : Memory) (left : Reference) (argument : CIL.V
         [.scalar (.i32 (if inputValue memory left = BitVec.ofNat 256 right.toNat then 1 else 0))] ∧
       ∀ id, id < memory.nextIdentity → ∀ offset, final.cells id offset = memory.cells id offset := by
   obtain ⟨frame, entered, home, setup, slots, writable, homeFresh, enteredCall, leftValue⟩ :=
-    primitive_setup primitiveBody kinds initializers vectorArgs parameters program memory left argument call
+    primitive_setup primitiveBody kinds initializers vectorArgs parameters opaqueLocals program memory left argument call
   have checked : (primitiveArguments left argument).mapM (checkedValue memory) =
       .ok (primitiveArguments left argument) := by
     have formed := call.input_formed (reference := left) (by simp)

@@ -81,14 +81,14 @@ theorem executed {α : Type} (encode : α → CIL.Value) (equal : BitVec 256 →
       [.scalar (.i32 (if equal (inputValue memory left) right then 1 else 0))] memory =
       .ok (leaveFrame frame memory, [.scalar (.i32 (if equal (inputValue memory left) right then 1 else 0))]) := by
     cases narrow <;> cases equal (inputValue memory left) right <;>
-      simp [run, found, body, body32, body64, callPC, step, checkedValue, numericValue, CIL.NarrowKind.extend,
+      simp [run, found, body, body32, body64, callPC, step, cil_guard, observerCount, checkedValue, numericValue, CIL.NarrowKind.extend,
         Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   have fetched : (body narrow profile callee).code[callPC narrow]? = some (.call callee 2) := by
     cases narrow <;> rfl
   have stepped : step (body narrow profile callee) (.call callee 2) (callPC narrow)
       (scalarArguments left (encode right)) frame [.scalar (encode right), .reference (.address left)] memory =
       .ok (.call callee (scalarArguments left (encode right)) [] memory) := by
-    simp [step, scalarArguments, checkedValue, numeric, formValue, formed, checkedAt,
+    simp [step, cil_guard, observerCount, scalarArguments, checkedValue, numeric, formValue, formed, checkedAt,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   obtain ⟨fuel, tail⟩ := run_call_exists found fetched stepped ⟨childFuel, child⟩ ⟨1, returnTrace⟩
   refine ⟨fuel + 4, ?_⟩
@@ -98,7 +98,7 @@ theorem executed {α : Type} (encode : α → CIL.Value) (equal : BitVec 256 →
       apply Eq.trans
       · apply run_next found
         · simp only [body, body32, body64]; rfl
-        · simp (config := { implicitDefEqProofs := false }) [body, body32, body64, step, scalarArguments,
+        · simp (config := { implicitDefEqProofs := false }) [body, body32, body64, step, cil_guard, observerCount, scalarArguments,
             checkedValue, numericValue, numeric, numericWord, formValue, formed, pureArity, scalars, CIL.step.eq_def, CIL.truth,
             CIL.FeatureProfile.evaluate, vector, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
           try exact ⟨rfl, rfl, rfl, rfl⟩
@@ -117,7 +117,7 @@ theorem checked {α : Type} (encode : α → CIL.Value) (equal : BitVec 256 → 
   have result := certify_readOnly_scalar program index (body narrow profile callee) encode
     (fun input word => .i32 (if equal input word then 1 else 0)) found numeric
     (by intro left right; cases narrow <;>
-        (simp [body, body32, body64, FrameSetupFits, InitializersFit, InitializerFits, AggregateArgumentsFit, ParameterArgumentsFit]; rfl))
+        (simp [body, body32, body64, FrameSetupFits, InitializersFit, InitializerFits, AggregateArgumentsFit, ParameterArgumentsFit, SelectedKindsFit]; rfl))
     (executed encode equal narrow profile program index callee vector found leafFound numeric childRun)
   simpa only [ScalarOperatorContract, ReadOnlyScalarContract, scalarOperatorArguments,
     Bool.false_eq_true, ite_false, Bool.bne_false] using result

@@ -109,7 +109,7 @@ theorem small_frame_setup (profile : CIL.FeatureProfile) (storage : Nat) (memory
       WordHomes result memory.nextIdentity smallWordSpecs frame.locals ∧
       MemoryBelow memory.nextIdentity memory result ∧ result.WellFormed :=
   word_frame_setup (subtractSmallBody profile storage) smallWordSpecs (by rfl) (by rfl)
-    (by rfl) (by rfl) memory args wf
+    (by rfl) (by rfl) (by rfl) memory args wf
 
 /-- A private word store retains the caller snapshot and all frame access authority. -/
 theorem small_private_store (program : CIL.Program) (profile : CIL.FeatureProfile) (storage : Nat)
@@ -214,7 +214,7 @@ private theorem step_reference_arg {body : CIL.Method} {pc index : Nat} {args st
     (formed : form memory reference = .ok reference) :
     step body (.arg index) pc args frame stack memory =
       .ok (.next (pc + 1) (.reference (.address reference) :: stack) frame memory) := by
-  simp only [step, found, checkedValue, formValue, formed, checkedAt, Except.mapError,
+  simp only [step, cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, found, checkedValue, formValue, formed, checkedAt, Except.mapError,
     Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 private theorem step_field {body : CIL.Method} {pc offset width : Nat} {args stack values : List Value}
@@ -222,10 +222,7 @@ private theorem step_field {body : CIL.Method} {pc offset width : Nat} {args sta
     (loaded : instruction (.fieldAt offset width) stack memory = .ok (after, values)) :
     step body (.fieldAt offset width) pc args frame stack memory =
       .ok (.next (pc + 1) values frame after) := by
-  show (instruction (.fieldAt offset width) stack memory >>= fun result =>
-    pure (FrameAction.next (pc + 1) result.2 frame result.1) : ExecutionResult FrameAction) = _
-  rw [loaded]
-  rfl
+  simp only [cil_step, instructionStep, loaded, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 /-- Save the upper limbs and the low difference, keeping the low limb for the first borrow test. -/
 theorem small_input_prefix_checked (program : CIL.Program) (method storage : Nat) (profile : CIL.FeatureProfile)
@@ -328,7 +325,7 @@ private theorem step_local_loaded {body : CIL.Method} {pc index : Nat} {args sta
     (found : frame.locals[index]? = some slot) (loaded : loadLocal memory slot = .ok value) :
     step body (.local index) pc args frame stack memory =
       .ok (.next (pc + 1) (value :: stack) frame memory) := by
-  simp only [step, found, loaded, Bind.bind, Except.bind, Pure.pure, Except.pure]
+  simp only [step, cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, found, loaded, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 private theorem step_bltu_word {body : CIL.Method} {pc target : Nat} {args rest : List Value}
     {frame : Frame} {memory : Memory} {x y : BitVec 64} {next : Nat}
@@ -394,8 +391,8 @@ theorem small_branch_prefix (program : CIL.Program) (method storage : Nat) (prof
         by_cases h3 : words 3 = 0
         · refine run_next_exists post found rfl (step_brzero_word (ite_eq_left_of_eq_true _ _ (eq_true h3))) ?_
           repeat' first
-            | refine run_next_exists post found rfl (step_reference_arg a2 formed) ?_
-            | refine run_next_exists post found rfl (step_local_loaded s3 r3) ?_
+            | refine run_next_exists (op := .arg 2) post found rfl (step_reference_arg a2 formed) ?_
+            | refine run_next_exists (op := .local 3) post found rfl (step_local_loaded s3 r3) ?_
             | refine run_next_exists post found rfl rfl ?_
           simp only [smallSelectedBranch, smallDifference, smallStoreCall, Fin.val_zero, Fin.val_one, Fin.val_two,
               CIL.fin_val_three, Nat.reduceEqDiff, ne_eq, h0, h1, h2, h3, not_true_eq_false, and_true,
@@ -403,9 +400,9 @@ theorem small_branch_prefix (program : CIL.Program) (method storage : Nat) (prof
           exact continuation
         · refine run_next_exists post found rfl (step_brzero_word (ite_eq_right_of_eq_false _ _ (eq_false h3))) ?_
           repeat' first
-            | refine run_next_exists post found rfl (step_reference_arg a2 formed) ?_
-            | refine run_next_exists post found rfl (step_local_loaded s2 r2) ?_
-            | refine run_next_exists post found rfl (step_local_loaded s3 r3) ?_
+            | refine run_next_exists (op := .arg 2) post found rfl (step_reference_arg a2 formed) ?_
+            | refine run_next_exists (op := .local 2) post found rfl (step_local_loaded s2 r2) ?_
+            | refine run_next_exists (op := .local 3) post found rfl (step_local_loaded s3 r3) ?_
             | refine run_next_exists post found rfl rfl ?_
           simp only [smallSelectedBranch, smallDifference, smallStoreCall, Fin.val_zero, Fin.val_one, Fin.val_two,
               CIL.fin_val_three, Nat.reduceEqDiff, ne_eq, h0, h1, h2, h3, not_false_eq_true, not_true_eq_false, and_true,
@@ -413,10 +410,10 @@ theorem small_branch_prefix (program : CIL.Program) (method storage : Nat) (prof
           exact continuation
       · refine run_next_exists post found rfl (step_brzero_word (ite_eq_right_of_eq_false _ _ (eq_false h2))) ?_
         repeat' first
-          | refine run_next_exists post found rfl (step_reference_arg a2 formed) ?_
-          | refine run_next_exists post found rfl (step_local_loaded s1 r1) ?_
-          | refine run_next_exists post found rfl (step_local_loaded s2 r2) ?_
-          | refine run_next_exists post found rfl (step_local_loaded s3 r3) ?_
+          | refine run_next_exists (op := .arg 2) post found rfl (step_reference_arg a2 formed) ?_
+          | refine run_next_exists (op := .local 1) post found rfl (step_local_loaded s1 r1) ?_
+          | refine run_next_exists (op := .local 2) post found rfl (step_local_loaded s2 r2) ?_
+          | refine run_next_exists (op := .local 3) post found rfl (step_local_loaded s3 r3) ?_
           | refine run_next_exists post found rfl rfl ?_
         simp only [smallSelectedBranch, smallDifference, smallStoreCall, Fin.val_zero, Fin.val_one, Fin.val_two,
             CIL.fin_val_three, Nat.reduceEqDiff, ne_eq, h0, h1, h2, not_false_eq_true, not_true_eq_false, and_true,
@@ -424,11 +421,11 @@ theorem small_branch_prefix (program : CIL.Program) (method storage : Nat) (prof
         exact continuation
     · refine run_next_exists post found rfl (step_brzero_word (ite_eq_right_of_eq_false _ _ (eq_false h1))) ?_
       repeat' first
-        | refine run_next_exists post found rfl (step_reference_arg a2 formed) ?_
-        | refine run_next_exists post found rfl (step_local_loaded s0 r0) ?_
-        | refine run_next_exists post found rfl (step_local_loaded s1 r1) ?_
-        | refine run_next_exists post found rfl (step_local_loaded s2 r2) ?_
-        | refine run_next_exists post found rfl (step_local_loaded s3 r3) ?_
+        | refine run_next_exists (op := .arg 2) post found rfl (step_reference_arg a2 formed) ?_
+        | refine run_next_exists (op := .local 0) post found rfl (step_local_loaded s0 r0) ?_
+        | refine run_next_exists (op := .local 1) post found rfl (step_local_loaded s1 r1) ?_
+        | refine run_next_exists (op := .local 2) post found rfl (step_local_loaded s2 r2) ?_
+        | refine run_next_exists (op := .local 3) post found rfl (step_local_loaded s3 r3) ?_
         | refine run_next_exists post found rfl rfl ?_
       simp only [smallSelectedBranch, smallDifference, smallStoreCall, Fin.val_zero, Fin.val_one, Fin.val_two,
           CIL.fin_val_three, Nat.reduceEqDiff, ne_eq, h0, h1, not_false_eq_true, not_true_eq_false,
@@ -436,11 +433,11 @@ theorem small_branch_prefix (program : CIL.Program) (method storage : Nat) (prof
       exact continuation
   · refine run_next_exists post found rfl (step_bltu_word (ite_eq_right_of_eq_false _ _ (eq_false h0))) ?_
     repeat' first
-      | refine run_next_exists post found rfl (step_reference_arg a2 formed) ?_
-      | refine run_next_exists post found rfl (step_local_loaded s0 r0) ?_
-      | refine run_next_exists post found rfl (step_local_loaded s1 r1) ?_
-      | refine run_next_exists post found rfl (step_local_loaded s2 r2) ?_
-      | refine run_next_exists post found rfl (step_local_loaded s3 r3) ?_
+      | refine run_next_exists (op := .arg 2) post found rfl (step_reference_arg a2 formed) ?_
+      | refine run_next_exists (op := .local 0) post found rfl (step_local_loaded s0 r0) ?_
+      | refine run_next_exists (op := .local 1) post found rfl (step_local_loaded s1 r1) ?_
+      | refine run_next_exists (op := .local 2) post found rfl (step_local_loaded s2 r2) ?_
+      | refine run_next_exists (op := .local 3) post found rfl (step_local_loaded s3 r3) ?_
     simp only [smallSelectedBranch, smallDifference, smallStoreCall, Fin.val_zero, Fin.val_one, Fin.val_two,
         CIL.fin_val_three, Nat.reduceEqDiff, h0, not_false_eq_true,
         ↓reduceIte] at continuation
@@ -506,7 +503,7 @@ theorem small_finish (program : CIL.Program) (method storage : Nat) (profile : C
       [.scalar (.i64 (words 3)), .scalar (.i64 (words 2)), .scalar (.i64 (words 1)),
         .scalar (.i64 (words 0)), .reference (.address output)] current =
       .ok (.call storage (UInt256Proof.Multiply.LimbStorage.arguments output (words 0) (words 1) (words 2) (words 3)) [] current) := by
-    simp [step, UInt256Proof.Multiply.LimbStorage.arguments, checkedValue, numericValue,
+    simp [step, cil_guard, observerCount, UInt256Proof.Multiply.LimbStorage.arguments, checkedValue, numericValue,
       formValue, formed, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     try exact ⟨rfl, rfl⟩
   have returned := small_return program method storage profile found branch (smallArguments input output word) frame stored

@@ -323,6 +323,6 @@ theorem scalar_frame_setup (profile : CIL.FeatureProfile) (direction : Direction
       enterFrame (scalarBody profile direction storage) args memory = .ok (frame, result) ∧
       NumericHomes result memory.nextIdentity shiftSpecs frame.locals ∧
       MemoryBelow memory.nextIdentity memory result ∧ result.WellFormed :=
-  numeric_frame_setup _ shiftSpecs rfl rfl rfl rfl memory args wellFormed
+  numeric_frame_setup _ shiftSpecs rfl rfl rfl rfl rfl memory args wellFormed
 
 end UInt256Proof.Shift.Safety

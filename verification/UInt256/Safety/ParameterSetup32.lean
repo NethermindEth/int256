@@ -29,7 +29,7 @@ theorem parameter_setup32 (body : CIL.Method) (args : List Value) (value : BitVe
       (numberBytes value.toNat 32) (by simp only [numberBytes, List.length_map, List.length_range]; rfl)
       call.1.1 argument
   have setup : enterFrame body args memory = .ok (parameterFrame32 memory copy, entered) := by
-    simp only [enterFrame, kinds, initializers, makeLocals, vectors, makeArgumentHomes,
+    simp only [enterFrame, kinds, initializers, makeSelectedLocals, makeLocals, makeSelectedLocalsFrom, ite_self, vectors, makeArgumentHomes,
       parameters, made, Bind.bind, Except.bind, Pure.pure, Except.pure,
       List.map_cons, List.map_nil, List.nil_append, parameterFrame32]
   exact ⟨copy, entered, setup, (call.after_frame_setup setup).with_readable_input loaded,

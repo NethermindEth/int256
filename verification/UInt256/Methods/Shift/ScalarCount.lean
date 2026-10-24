@@ -1,6 +1,7 @@
 import UInt256.Methods.Shift.ScalarBody
 import CIL.Safety.StepComposition
 import UInt256.Safety.NumericStore
+import CIL.Safety.GuardNormalization
 
 namespace UInt256Proof.Shift.Safety
 open CIL.Safety UInt256Model.Safety
@@ -18,14 +19,14 @@ private theorem step_arg_scalar {body : CIL.Method} {pc index : Nat} {args stack
   delta step
   dsimp only
   rw [found]
-  simp only [checkedValue, numeric, ite_true, Bind.bind, Except.bind, Pure.pure, Except.pure]
+  simp only [cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, checkedValue, numeric, ite_true, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 macro "shift_pure_step" "[" facts:term,* "]" : tactic =>
   `(tactic| first
     | rfl
     $[| exact step_arg_scalar $facts:term rfl]*
     | (simp (config := { implicitDefEqProofs := false })
-        [step, checkedValue, numericValue, pureArity, scalars, CIL.step, CIL.binary,
+        [step, cil_guard, observerCount, checkedValue, numericValue, pureArity, scalars, CIL.step, CIL.binary,
           Bind.bind, Except.bind, Pure.pure, Except.pure, $[$facts:term],*]
        first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
 /-- Compute the signed whole-limb count from the actual Int32 argument and

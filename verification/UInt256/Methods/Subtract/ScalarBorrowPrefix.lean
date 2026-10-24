@@ -207,9 +207,9 @@ theorem scalar_borrow_prefix (left right output : Reference) (frame : Frame) (be
     | (simp (config := { failIfUnchanged := false }) [BitVec.ofNat_eq_ofNat, large]
        apply run_next_exists post found (by rfl)
        first
-       | exact stored _ _
+       | ((with_reducible show step _ (.setLocal 1) _ _ _ _ _ = _); exact stored _ _)
        | (simp (config := { implicitDefEqProofs := false })
-           [step, binaryArguments, checkedValue, numericValue, formValue, leftFormed,
+           [step, cil_guard, observerCount, binaryArguments, checkedValue, numericValue, formValue, leftFormed,
              borrowFormed, resultFormed, rightSlot, borrowSlot, resultSlot, rightLoaded,
              leftRead, localAddress, pureArity, scalars, CIL.step, CIL.FeatureProfile.evaluate, adv, sse,
               checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]

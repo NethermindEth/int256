@@ -32,14 +32,14 @@ theorem subtract_fast_return (program : CIL.Program) (body : CIL.Method) (method
       first
       | exact load _ _ _
       | (simp (config := { implicitDefEqProofs := false })
-          [checkedIntrinsic, step, pureArity, scalars, CIL.step.eq_def, CIL.binary,
+          [checkedIntrinsic, step, cil_guard, observerCount, pureArity, scalars, CIL.step.eq_def, CIL.binary,
             CIL.Intrinsic.available, CIL.Vector.intrinsic_extract128,
             checkedValue, numericValue, Bind.bind, Except.bind, Pure.pure, Except.pure]
          first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)
   have fetched : body.code[140]? = some (.ret (some .unsigned8)) := by
     simp [code, List.getElem?_append, leadingLength, subtractFastCode]
   by_cases borrow : lane64 (subtractSnapshot values 7) 1 > BitVec.ofNat 64 0
-  all_goals simp [run, found, fetched, returns, step, checkedValue, numericValue, CIL.NarrowKind.extend, borrow,
+  all_goals simp [run, found, fetched, returns, step, cil_guard, observerCount, checkedValue, numericValue, CIL.NarrowKind.extend, borrow,
     Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 /-- Store the speculative halves through the checked output view and return the top borrow. -/
@@ -102,7 +102,7 @@ theorem subtract_fast_checked (program : CIL.Program) (body : CIL.Method) (metho
          | exact b5 _ _ _
          | exact b9 _ _ _
          | (simp (config := { implicitDefEqProofs := false })
-             [localResult, step, argument, checkedValue, formValue, formed, instruction, staticInstruction,
+             [localResult, step, cil_guard, observerCount, argument, checkedValue, formValue, formed, instruction, staticInstruction,
                memoryInstruction, storeValue, referenceAt, firstWrite, secondWrite, address, CIL.offsetValue,
                checkedIntrinsic, pureArity, scalars, CIL.step.eq_def, CIL.Intrinsic.available,
                CIL.Vector.intrinsic_add128, numericValue,

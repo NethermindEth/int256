@@ -51,7 +51,7 @@ theorem run_leaf (profile : CIL.FeatureProfile) (operation : Binary)
       · first
         | exact intrinsic_step operation _ _ _ _ _ _ _ _
         | (simp (config := { implicitDefEqProofs := false })
-            [step, binaryArguments, checkedValue, formValue, fl, fr, fo, hl, hr,
+            [step, cil_guard, observerCount, binaryArguments, checkedValue, formValue, fl, fr, fo, hl, hr,
              pureArity, instruction, staticInstruction, memoryInstruction, dereference, referenceAt,
              aggregate_to_vector, vector_to_aggregate, length, written, bits, checkedAt,
              Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
@@ -117,7 +117,7 @@ theorem entry_prefix (profile : CIL.FeatureProfile) (enabled : profile.vector256
         | exact enabled_step _ enabled _ _ _ _ _
         | exact enabled_branch _ _ _ _ _ _ _
         | (simp (config := { implicitDefEqProofs := false })
-             [step, binaryArguments, checkedValue, formValue, fl, fr, fo, checkedAt,
+             [step, cil_guard, observerCount, binaryArguments, checkedValue, formValue, fl, fr, fo, checkedAt,
                Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
            try exact ⟨rfl,rfl,rfl,rfl⟩
            done)
@@ -142,7 +142,7 @@ theorem entry_result (profile : CIL.FeatureProfile) (enabled : profile.vector256
       checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   have stepped : step (entryBody profile callee) (.call callee 3) 5 (binaryArguments left right output) frame
       (binaryArguments left right output).reverse memory = .ok (.call callee (binaryArguments left right output) [] memory) := by
-    simp only [step, binaryArguments, List.length_cons, List.length_nil,
+    simp only [step, cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, binaryArguments, List.length_cons, List.length_nil,
       Nat.reduceAdd, Nat.lt_irrefl, ↓reduceIte, List.reverse_cons, List.reverse_nil,
       List.nil_append, List.cons_append, List.take, List.drop, Bind.bind, Except.bind]
     exact congrArg (fun xs => xs.map fun checked => FrameAction.call callee checked [] memory) checked

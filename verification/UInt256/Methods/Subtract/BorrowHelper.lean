@@ -67,7 +67,7 @@ private theorem step_reference_arg {body : CIL.Method} {pc index : Nat} {args st
     (formed : form memory reference = .ok reference) :
     step body (.arg index) pc args frame stack memory =
       .ok (.next (pc + 1) (.reference (.address reference) :: stack) frame memory) := by
-  simp only [step, found, checkedValue, formValue, formed, checkedAt, Except.mapError,
+  simp only [step, cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, found, checkedValue, formValue, formed, checkedAt, Except.mapError,
     Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 private theorem step_load_word {body : CIL.Method} {pc : Nat} {args rest : List Value}

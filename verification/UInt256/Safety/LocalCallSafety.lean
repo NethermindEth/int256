@@ -48,7 +48,7 @@ theorem run_local_word_call {program : CIL.Program} {method pc callee : Nat} {bo
   have addressRest : step body (.localAddr target) (pc + 2) args frame
       (.scalar (.i64 b) :: .scalar (.i64 a) :: rest) current =
       .ok (.next (pc + 3) (.reference (.address reference) :: .scalar (.i64 b) :: .scalar (.i64 a) :: rest) frame current) := by
-    simp [step, localAddress, slot, formValue, formed, checkedAt,
+    simp [step, cil_guard, observerCount, localAddress, slot, formValue, formed, checkedAt,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   apply run_next_exists post found code2 addressRest
   obtain ⟨childFuel, after, invoked, wf, loaded, authority, outside⟩ := effect reference slot ready
@@ -62,7 +62,7 @@ theorem run_local_word_call {program : CIL.Program} {method pc callee : Nat} {bo
   have stepped : step body (.call callee 3) (pc + 3) args frame
       (.reference (.address reference) :: .scalar (.i64 b) :: .scalar (.i64 a) :: rest) current =
       .ok (.call callee [.scalar (.i64 a), .scalar (.i64 b), .reference (.address reference)] rest current) := by
-    simp [step, checkedValue, numericValue, formValue, formed, checkedAt,
+    simp [step, cil_guard, observerCount, checkedValue, numericValue, formValue, formed, checkedAt,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   obtain ⟨fuel, ran⟩ := run_call_exists found code3 stepped ⟨childFuel, invoked⟩
     ⟨tailFuel, by simpa only [Nat.add_assoc, Nat.reduceAdd, List.cons_append, List.nil_append] using resumed⟩

@@ -42,7 +42,7 @@ theorem hardware_word_tail (program : CIL.Program) (index start : Nat) (body : C
           | simpa [hardwareWordTail, Nat.add_assoc] using code ⟨3, by decide⟩
         · first
           | rfl
-          | (simp [step, args, checkedValue, formValue, formed, checkedAt,
+          | (simp [step, cil_guard, observerCount, args, checkedValue, formValue, formed, checkedAt,
                 Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
              try exact ⟨rfl, rfl, rfl, rfl⟩
              done)
@@ -51,7 +51,7 @@ theorem hardware_word_tail (program : CIL.Program) (index start : Nat) (body : C
         (by simpa [hardwareWordTail, Nat.add_assoc] using code ⟨4, by decide⟩)
       have written' : write memory output (numberBytes (a.toNat * b.toNat % 2^64) 8) 1 = .ok final := by
         simpa only [lowProduct, BitVec.toNat_mul] using written
-      simp [step, pureArity, instruction, storeValue, referenceAt, ordinaryAccessAlignment, written', checkedAt,
+      simp [step, cil_guard, observerCount, pureArity, instruction, storeValue, referenceAt, ordinaryAccessAlignment, written', checkedAt,
         Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure, Nat.add_assoc]
     · iterate 2
         apply Eq.trans
@@ -64,10 +64,10 @@ theorem hardware_word_tail (program : CIL.Program) (index start : Nat) (body : C
       · apply run_next (target := start + 8) (values := [.scalar (.i64 (highProduct a b))])
           (nextFrame := frame) (updated := final) found
           (by simpa [hardwareWordTail, Nat.add_assoc] using code ⟨7, by decide⟩)
-        simp [step, available, scalars, evaluation, checkedValue, numericValue,
+        simp [step, cil_guard, observerCount, available, scalars, evaluation, checkedValue, numericValue,
           Bind.bind, Except.bind, Pure.pure, Except.pure, Nat.add_assoc]
       · have last : body.code[start + 8]? = some .ret := by simpa [hardwareWordTail] using code ⟨8, by decide⟩
-        simp [run, found, last, step, returns, leaveFrame, frame, checkedValue, numericValue,
+        simp [run, found, last, step, cil_guard, observerCount, returns, leaveFrame, frame, checkedValue, numericValue,
           Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   · intro id offset outside
     apply write_outside _ _ _ _ _ _ _ written

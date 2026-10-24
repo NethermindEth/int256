@@ -10,16 +10,14 @@ private theorem s_arg {body : CIL.Method} {pc i : Nat} {args : List Value} {fram
     (h : args[i]? = some (.reference (.address r))) (formed : form m r = .ok r) :
     step body (.arg i) pc args frame stack m = .ok (.next (pc + 1) (.reference (.address r) :: stack) frame m) := by
   unfold step
-  simp only [h, checkedValue, formValue, formed, checkedAt, Except.mapError, Bind.bind, Except.bind,
+  simp only [cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, h, checkedValue, formValue, formed, checkedAt, Except.mapError, Bind.bind, Except.bind,
     Pure.pure, Except.pure]
 
 private theorem s_fieldAt_of {body : CIL.Method} {pc offset width : Nat} {args : List Value} {frame : Frame}
     {stack values : List Value} {m m' : Memory}
     (h : instruction (.fieldAt offset width) stack m = .ok (m', values)) :
     step body (.fieldAt offset width) pc args frame stack m = .ok (.next (pc + 1) values frame m') := by
-  unfold step
-  simp only [show pureArity (.fieldAt offset width) = none from rfl, h, Bind.bind, Except.bind, Pure.pure,
-    Except.pure]
+  simp only [cil_step, instructionStep, h, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 private theorem s_call5 {body : CIL.Method} {pc callee : Nat} {args : List Value} {frame : Frame} {m : Memory}
     {r : Reference} {w0 w1 w2 w3 : BitVec 64} (formed : form m r = .ok r) :
@@ -239,7 +237,7 @@ theorem full_frame_setup (profile : CIL.FeatureProfile) (program : CIL.Program) 
       PrivateWords program memory entered entered [left, right] [output] frame (fun _ => none) := by
   have kinds : (fullBody profile wordIndex countIndex storageIndex alternative).localKinds = (List.replicate 22 CIL.LocalKind.word64 ++ List.replicate 4 CIL.LocalKind.vector256) := by rfl
   obtain ⟨frame, entered, setup, homes, _, wf⟩ := unknown_frame_setup (fullBody profile wordIndex countIndex storageIndex alternative)
-    (by rfl) (by simp [kinds]) (by rfl) (by rfl) memory (productArgs left right output) call.1.1
+    (by rfl) (by simp [kinds]) (by rfl) (by rfl) (by rfl) memory (productArgs left right output) call.1.1
   exact ⟨frame, entered, setup, homes, wf, PrivateWords.initial call setup⟩
 
 def fullInputs (original : Memory) (left right : Reference) :=

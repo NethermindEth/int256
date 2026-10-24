@@ -15,7 +15,7 @@ theorem prefix64 (scalarFirst reversed negate : Bool) (program : CIL.Program) (e
       · exact found
       · rfl
       · simp (config := { implicitDefEqProofs := false })
-          [step, scalarOperatorArguments, scalarArguments, checkedValue, numericValue, formValue, formed,
+          [step, cil_guard, observerCount, scalarOperatorArguments, scalarArguments, checkedValue, numericValue, formValue, formed,
             checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
         try (exact ⟨rfl, rfl, rfl, rfl⟩)
         done

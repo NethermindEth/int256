@@ -166,9 +166,9 @@ theorem small_increment_prefix (segment : Fin 3) (input output home : Reference)
         · simp only [cil_code]; rfl
         · simp only [cil_code]; rfl
         · first
-          | exact stored _ _
+          | ((with_reducible show step _ (.setLocal _) _ _ _ _ _ = _); exact stored _ _)
           | simp (config := { implicitDefEqProofs := false })
-              [cil_code, step, slot, reading, checkedValue, numericValue, pureArity, scalars,
+              [cil_code, step, cil_guard, observerCount, slot, reading, checkedValue, numericValue, pureArity, scalars,
                 CIL.step, CIL.binary, CIL.unary, Bind.bind, Except.bind, Pure.pure, Except.pure]
             first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
 

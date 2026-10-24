@@ -5,6 +5,7 @@ import UInt256.Safety.OutputReadability
 import CIL.Safety.StepComposition
 import CIL.Safety.ReturnMemory
 import CIL.Safety.CallComposition
+import CIL.Safety.GuardNormalization
 
 namespace UInt256Model.Safety.AggregateReturn
 open CIL.Safety UInt256Model.Safety
@@ -80,7 +81,7 @@ theorem binary_disjoint_checked (operation : BitVec 256 → BitVec 256 → BitVe
     BinaryContract operation program index := by
   intro memory left right call
   obtain ⟨output, entered, entry, childCall, before, fresh⟩ := setup
-    (binaryBody profile callee) (binaryArgs left right) rfl rfl rfl rfl program memory [left, right] call
+    (binaryBody profile callee) (binaryArgs left right) rfl rfl rfl rfl rfl program memory [left, right] call
   obtain ⟨childFuel, childResult, childCert, readback, _, outside⟩ :=
     child entered left right output childCall
       (fresh_disjoint call fresh left (by simp)) (fresh_disjoint call fresh right (by simp))
@@ -92,7 +93,7 @@ theorem binary_disjoint_checked (operation : BitVec 256 → BitVec 256 → BitVe
   have stepped : step (binaryBody profile callee) (.call callee 3) 3 (binaryArgs left right)
       (frame memory output) (binaryArguments left right output).reverse entered =
       .ok (.call callee (binaryArguments left right output) [] entered) := by
-    simp [step, binaryArguments, checkedValue, formValue, hl, hr, ho, checkedAt,
+    simp [step, cil_guard, observerCount, binaryArguments, checkedValue, formValue, hl, hr, ho, checkedAt,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   have tail : run program 2 index 4 (binaryArgs left right) (frame memory output) [] childResult =
       .ok (leaveFrame (frame memory output) childResult, [.scalar (.aggregate bytes)]) := by
@@ -200,7 +201,7 @@ theorem unary_disjoint_checked (operation : BitVec 256 → BitVec 256) (profile 
     UnaryContract operation program index := by
   intro memory input call
   obtain ⟨output, entered, entry, childCall, before, fresh⟩ := setup
-    (unaryBody profile callee) (unaryArgs input) rfl rfl rfl rfl program memory [input] call
+    (unaryBody profile callee) (unaryArgs input) rfl rfl rfl rfl rfl program memory [input] call
   obtain ⟨childFuel, childResult, childCert, readback, _, outside⟩ :=
     child entered input output childCall (fresh_disjoint call fresh input (by simp))
   let bits := operation (inputValue entered input)
@@ -210,7 +211,7 @@ theorem unary_disjoint_checked (operation : BitVec 256 → BitVec 256) (profile 
   have stepped : step (unaryBody profile callee) (.call callee 2) 2 (unaryArgs input)
       (frame memory output) (unaryArguments input output).reverse entered =
       .ok (.call callee (unaryArguments input output) [] entered) := by
-    simp [step, unaryArguments, checkedValue, formValue, hl, ho, checkedAt,
+    simp [step, cil_guard, observerCount, unaryArguments, checkedValue, formValue, hl, ho, checkedAt,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   have tail : run program 2 index 3 (unaryArgs input) (frame memory output) [] childResult =
       .ok (leaveFrame (frame memory output) childResult, [.scalar (.aggregate bytes)]) := by

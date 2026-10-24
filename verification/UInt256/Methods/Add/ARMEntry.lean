@@ -113,7 +113,8 @@ theorem checked_vector128_arm_contract (program : CIL.Program) (body : CIL.Metho
     (repairLeading repairTail : List CIL.Op) (repairLength : repairLeading.length = 113)
     (repairCode : body.code = repairLeading ++ armRepairCode ++ repairTail)
     (repairSpecs : ∀ i : Fin 4, specs[19 + i.val]? = some vector128ZeroSpec)     (metadata : body.localKinds = .reference :: specs.map NumericLocalSpec.kind ∧ body.locals = .nullRef :: specs.map NumericLocalSpec.value)
-    (vectors : body.vectorArgs = []) (parameters : body.parameterHomes = []) (enabled : body.profile.advSimd = true)
+    (vectors : body.vectorArgs = []) (parameters : body.parameterHomes = [])
+    (opaqueLocals : body.opaqueVectorLocals = []) (enabled : body.profile.advSimd = true)
     (memory : Memory) (left right output : Reference) (flag : BitVec 32) (flagFit : CIL.NarrowKind.unsigned8.extend flag = flag)
     (call : CallingConditions program memory [left, right] [output]) :
     ∃ fuel final returned,
@@ -127,7 +128,7 @@ theorem checked_vector128_arm_contract (program : CIL.Program) (body : CIL.Metho
         final.cells id offset = memory.cells id offset) := by
   let args := vector128Arguments left right output flag
   obtain ⟨frame, entered, slots, setup, layout, homes, preserved, enteredWF⟩ :=
-    vector128_frame_setup body specs metadata vectors parameters memory args call.1.1
+    vector128_frame_setup body specs metadata vectors parameters opaqueLocals memory args call.1.1
   obtain ⟨fuel, final, returned, executed, scalar, result, writable, footprint⟩ :=
     vector128_arm_entry program body method specs found startTail incomingTail leading correctionTail startCode incomingCode leadingLength correctionCodeFound firstFourteen sse ssse earlyLeading earlyTail earlyLength earlyCode propLeading propTail propLength propCode decisionLeading decisionTail decisionLength decisionCodeFound fastLeading fastTail fastLength fastCode returns repairDispatchLeading repairDispatchTail repairDispatchLength repairDispatchCode repairLeading repairTail repairLength repairCode repairSpecs enabled memory entered [left, right] [output] left right output frame slots args
       call setup layout homes (by simp) (by simp) (by simp) rfl rfl rfl flag flagFit rfl

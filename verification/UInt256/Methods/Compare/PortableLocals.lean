@@ -43,8 +43,9 @@ theorem portable_setup (profile : CIL.FeatureProfile) (callee : Nat) (program : 
   have values : (portableBody profile callee).locals = numericInitializers portableSpecs := by rfl
   have aggregates : (portableBody profile callee).vectorArgs = [] := by rfl
   have parameters : (portableBody profile callee).parameterHomes = [] := rfl
+  have opaqueLocals : (portableBody profile callee).opaqueVectorLocals = [] := rfl
   have setup : enterFrame (portableBody profile callee) (readOnlyArguments [left, right]) memory = .ok (frame, entered) := by
-    simp [enterFrame, kinds, values, aggregates, made, makeArgumentHomes, parameters, makeParameterHomes, frame,
+    simp [enterFrame, opaqueLocals, makeSelectedLocals, kinds, values, aggregates, made, makeArgumentHomes, parameters, makeParameterHomes, frame,
       Bind.bind, Except.bind, Pure.pure, Except.pure]
   exact ⟨frame, entered, setup, homes, call.after_frame_setup setup,
     enterFrame_preserves_caller_memory _ _ _ _ _ setup⟩

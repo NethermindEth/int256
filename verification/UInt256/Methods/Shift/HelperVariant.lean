@@ -40,7 +40,7 @@ theorem canonical_prefix_strip (profile : CIL.FeatureProfile) (program : CIL.Pro
       .ok (final, returned) := by
   have firstStep : step (scalarBody profile .left storage) (.arg 1) 0 args frame [] memory =
       .ok (.next 1 [.scalar (.i32 count)] frame memory) := by
-    simp [step, argument, checkedValue, numericValue, Bind.bind, Except.bind, Pure.pure, Except.pure]
+    simp [step, cil_guard, observerCount, argument, checkedValue, numericValue, Bind.bind, Except.bind, Pure.pure, Except.pure]
   have secondStep : step (scalarBody profile .left storage) (.const32 6) 1 args frame [.scalar (.i32 count)] memory =
       .ok (.next 2 [.scalar (.i32 6), .scalar (.i32 count)] frame memory) := by shift_pure_step []
   have thirdStep : step (scalarBody profile .left storage) .shr 2 args frame
@@ -70,7 +70,7 @@ theorem helper_prefix_prepend (profile : CIL.FeatureProfile) (program : CIL.Prog
     ∃ fuel, run program fuel index 0 args frame [] memory = .ok (final, returned) := by
   have firstStep : step (helperBody profile storage helper) (.arg 1) 0 args frame [] memory =
       .ok (.next 1 [.scalar (.i32 count)] frame memory) := by
-    simp [step, argument, checkedValue, numericValue, Bind.bind, Except.bind, Pure.pure, Except.pure]
+    simp [step, cil_guard, observerCount, argument, checkedValue, numericValue, Bind.bind, Except.bind, Pure.pure, Except.pure]
   have callStep : step (helperBody profile storage helper) (.call helper 1) 1 args frame
       [.scalar (.i32 count)] memory = .ok (.call helper [.scalar (.i32 count)] [] memory) := rfl
   obtain ⟨fuel, finished⟩ := run_call_exists found (by rfl) callStep

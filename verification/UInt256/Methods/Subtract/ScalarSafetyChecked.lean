@@ -50,7 +50,7 @@ theorem scalar_store_prefix (left right output : Reference)
       · exact found
       · rfl
       · simp (config := { implicitDefEqProofs := false })
-          [UInt256Model.Safety.binaryArguments, step, checkedValue, formValue, outputFormed, s0, s1, s2, s3, r0, r1, r2, r3,
+          [UInt256Model.Safety.binaryArguments, step, cil_guard, observerCount, checkedValue, formValue, outputFormed, s0, s1, s2, s3, r0, r1, r2, r3,
             checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
         first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
 
@@ -78,17 +78,17 @@ theorem scalar_return (args : List Value) (frame : Frame) (memory : Memory)
         · exact found
         · rfl
         · simp (config := { implicitDefEqProofs := false })
-            [found, step, slot, reading, checkedValue, numericValue,
+            [found, step, cil_guard, observerCount, slot, reading, checkedValue, numericValue,
               pureArity, scalars, CIL.step, CIL.binary, CIL.unary, instruction,
               Bind.bind, Except.bind, Pure.pure, Except.pure]
           first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
     | solve
       | rw [run]
         simp (config := { implicitDefEqProofs := false })
-          [found, tailMetadata.1, tailMetadata.2, step, checkedValue, numericValue, scalarUnderflowFlag, CIL.NarrowKind.extend,
+          [found, tailMetadata.1, tailMetadata.2, step, cil_guard, observerCount, checkedValue, numericValue, scalarUnderflowFlag, CIL.NarrowKind.extend,
             Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
-  simp [run, found, tailMetadata.1, tailMetadata.2, step, checkedValue, numericValue,
+  simp [run, found, tailMetadata.1, tailMetadata.2, step, cil_guard, observerCount, checkedValue, numericValue,
     scalarUnderflowFlag, CIL.NarrowKind.extend, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   split <;> rfl
 
@@ -122,7 +122,7 @@ theorem scalar_finish (original entered current : CIL.Safety.Memory) (frame : Fr
   · rfl
   · unfold UInt256Proof.Safety.storageArguments
     repeat' (conv in UInt256Proof.Safety.storageWordOrder => cbv)
-    simp [List.range_succ, List.findIdx, List.findIdx.go, step, checkedValue, numericValue, formValue, formed,
+    simp [List.range_succ, List.findIdx, List.findIdx.go, step, cil_guard, observerCount, checkedValue, numericValue, formValue, formed,
       checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     exact ⟨rfl, rfl, rfl⟩
   · exact state.call

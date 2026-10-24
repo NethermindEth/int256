@@ -20,7 +20,7 @@ theorem native_entry_checked (profile : CIL.FeatureProfile) (usesLess inclusive 
   · rfl
   · rfl
   · intro left right
-    simp [FrameSetupFits, InitializersFit, AggregateArgumentsFit, ParameterArgumentsFit, nativeEntryBody]
+    simp [FrameSetupFits, InitializersFit, AggregateArgumentsFit, ParameterArgumentsFit, SelectedKindsFit, nativeEntryBody]
   · intros; rfl
   · intros; rfl
   · intro left right
@@ -37,7 +37,7 @@ theorem native_entry_checked (profile : CIL.FeatureProfile) (usesLess inclusive 
       | (apply run_next_exists post found
          · simp only [nativeEntryBody]; rfl
          · simp (config := { implicitDefEqProofs := false })
-             [readOnlyArguments, step, checkedValue, formValue,
+             [readOnlyArguments, step, cil_guard, observerCount, checkedValue, formValue,
                fl, fr, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
            try (exact ⟨rfl, rfl, rfl, rfl⟩))
 #print axioms native_entry_checked

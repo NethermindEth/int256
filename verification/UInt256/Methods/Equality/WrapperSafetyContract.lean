@@ -2,6 +2,7 @@ import UInt256.Methods.Bindings
 import UInt256.Safety.ReadOnlyExecution
 import CIL.Safety.CallComposition
 import CIL.Safety.StepComposition
+import CIL.Safety.GuardNormalization
 
 namespace UInt256Proof.Equality.Safety
 
@@ -53,7 +54,7 @@ theorem wrapper_prefix (outer : Bool) (left right : Reference) (frame : Frame) (
          · simp only [cil_code]; rfl
          · simp only [cil_code]; rfl
          · simp (config := { implicitDefEqProofs := false })
-             [cil_code, readOnlyArguments, step, checkedValue, numericValue, formValue,
+             [cil_code, readOnlyArguments, step, cil_guard, observerCount, checkedValue, numericValue, formValue,
                fl, fr, pureArity, scalars, CIL.step, CIL.truth, CIL.FeatureProfile.evaluate,
                checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
            try (exact ⟨rfl, rfl, rfl, rfl⟩))
@@ -68,7 +69,7 @@ theorem wrapper_return (outer : Bool) (args : List Value) (flag : BitVec 32)
     cases outer <;> rfl
   have returns : (wrapperBody outer).returnsValue = true := by cases outer <;> rfl
   rw [run]
-  simp [lookup, forwarding, step, returns, checkedValue, numericValue, normalized,
+  simp [lookup, forwarding, step, cil_guard, observerCount, returns, checkedValue, numericValue, normalized,
     Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 #print axioms wrapper_prefix
@@ -104,7 +105,7 @@ theorem wrapper_checked (outer : Bool)
     cases outer
     all_goals
       conv in (wrapperBody _) => cbv
-      simp [FrameSetupFits, InitializersFit, AggregateArgumentsFit, ParameterArgumentsFit]
+      simp [FrameSetupFits, InitializersFit, AggregateArgumentsFit, ParameterArgumentsFit, SelectedKindsFit]
   obtain ⟨frame, entered, setup, live⟩ := call.readOnly_setup_succeeds fits
   have enteredCall := call.after_frame_setup setup
   obtain ⟨childFuel, childFinal, childCertificate, childCells⟩ := child entered left right enteredCall
@@ -115,7 +116,7 @@ theorem wrapper_checked (outer : Bool)
   have stepped : step (wrapperBody outer) (.call (wrapperCallee outer) 2) (wrapperCall outer)
       (readOnlyArguments [left, right]) frame [.reference (.address right), .reference (.address left)] entered =
       .ok (.call (wrapperCallee outer) (readOnlyArguments [left, right]) [] entered) := by
-    simp [step, readOnlyArguments, checkedValue, formValue, fl, fr, checkedAt,
+    simp [step, cil_guard, observerCount, readOnlyArguments, checkedValue, formValue, fl, fr, checkedAt,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   obtain ⟨tailFuel, tail⟩ := run_call_exists lookup fetched stepped
     ⟨childFuel, childCertificate.1⟩ ⟨1, wrapper_return outer _ _ frame childFinal (by split <;> decide) forwarding⟩

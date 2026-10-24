@@ -51,7 +51,7 @@ theorem scalar_store_prefix (left right output : Reference) (extra : List Value)
       · simp only [cil_code]; rfl
       · simp only [cil_code]; rfl
       · simp (config := { implicitDefEqProofs := false })
-          [cil_code, step, checkedValue, formValue, outputFormed, s0, s1, s2, s3, r0, r1, r2, r3,
+          [cil_code, step, cil_guard, observerCount, checkedValue, formValue, outputFormed, s0, s1, s2, s3, r0, r1, r2, r3,
             checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
         first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
 
@@ -74,17 +74,17 @@ theorem scalar_return (args : List Value) (frame : Frame) (memory : Memory)
         · simp only [cil_code]; rfl
         · simp only [cil_code]; rfl
         · simp (config := { implicitDefEqProofs := false })
-            [cil_code, step, slot, reading, checkedValue, numericValue,
+            [cil_code, step, cil_guard, observerCount, slot, reading, checkedValue, numericValue,
               pureArity, scalars, CIL.step, CIL.binary, CIL.unary, instruction,
               Bind.bind, Except.bind, Pure.pure, Except.pure]
           first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
     | solve
       | rw [run]
         simp (config := { implicitDefEqProofs := false })
-          [cil_code, step, checkedValue, numericValue, scalarOverflowFlag, CIL.NarrowKind.extend,
+          [cil_code, step, cil_guard, observerCount, checkedValue, numericValue, scalarOverflowFlag, CIL.NarrowKind.extend,
             Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
-  simp [run, cil_code, step, checkedValue, numericValue, scalarOverflowFlag,
+  simp [run, cil_code, step, cil_guard, observerCount, checkedValue, numericValue, scalarOverflowFlag,
     CIL.NarrowKind.extend, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   split <;> rfl
 
@@ -129,7 +129,7 @@ theorem scalar_finish (original entered current : CIL.Safety.Memory) (frame : Fr
     simp only [cil_code]
   · unfold storageArguments
     repeat' (conv in storageWordOrder => cbv)
-    simp [List.range_succ, List.findIdx, step, checkedValue, numericValue, formValue, formed,
+    simp [List.range_succ, List.findIdx, step, cil_guard, observerCount, checkedValue, numericValue, formValue, formed,
       checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     exact ⟨rfl, rfl, rfl⟩
   · exact state.call

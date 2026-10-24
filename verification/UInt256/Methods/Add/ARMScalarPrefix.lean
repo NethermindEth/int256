@@ -164,12 +164,12 @@ theorem vector128_arm_parent_call (program : CIL.Program) (method vectorIndex sm
         (vector128Arguments left right output flag) frame
         [.scalar (.i32 flag), .reference (.address output), .reference (.address right), .reference (.address left)] memory =
         .ok (.call vectorIndex (vector128Arguments left right output flag) [] memory) := by
-      simp [step, flagFit, vector128Arguments, checkedValue, numericValue, formValue, fl, fr, fo,
+      simp [step, cil_guard, observerCount, flagFit, vector128Arguments, checkedValue, numericValue, formValue, fl, fr, fo,
         checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     have returned : run program 1 method 30
         (vector128Arguments left right output flag) frame [.scalar (.i32 returnedFlag)] final =
         .ok (leaveFrame frame final, [.scalar (.i32 returnedFlag)]) := by
-      simp [run, found, armScalarBody, step, returnedFit, List.mapM, Option.bind, checkedValue, numericValue, Except.mapError,
+      simp [run, found, armScalarBody, step, cil_guard, observerCount, returnedFit, List.mapM, Option.bind, checkedValue, numericValue, Except.mapError,
         Bind.bind, Except.bind, Pure.pure, Except.pure]
       rfl
     obtain ⟨fuel, executed⟩ := run_call_exists found fetched stepped ⟨_, certified.1⟩ ⟨1, returned⟩
@@ -182,7 +182,7 @@ theorem vector128_arm_parent_call (program : CIL.Program) (method vectorIndex sm
       | exact finish
       | (apply run_next_exists post found (by rfl)
          simp (config := { implicitDefEqProofs := false })
-           [step, flagFit, vector128Arguments, checkedValue, numericValue, formValue, fl, fr, fo,
+           [step, cil_guard, observerCount, flagFit, vector128Arguments, checkedValue, numericValue, formValue, fl, fr, fo,
              checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
          try (first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
 
@@ -212,7 +212,8 @@ theorem arm_scalar_frame_setup (profile : CIL.FeatureProfile) (vectorIndex small
   have entered : enterFrame (armScalarBody profile vectorIndex smallIndex) args memory = .ok (frame, result) := by
     unfold enterFrame
     dsimp only
-    rw [(arm_scalar_local_metadata profile vectorIndex smallIndex).1, (arm_scalar_local_metadata profile vectorIndex smallIndex).2, made]
+    rw [(arm_scalar_local_metadata profile vectorIndex smallIndex).1, (arm_scalar_local_metadata profile vectorIndex smallIndex).2,
+      show (armScalarBody profile vectorIndex smallIndex).opaqueVectorLocals = [] from rfl, makeSelectedLocals, List.isEmpty_nil, if_pos rfl, made]
     simp only [Bind.bind, Except.bind, armScalarBody, makeArgumentHomes, makeParameterHomes, Pure.pure, Except.pure, List.map_nil, List.append_nil]
     rfl
   exact ⟨frame, result, entered, homes, enterFrame_preserves_caller_memory _ _ _ _ _ entered,
@@ -240,7 +241,7 @@ theorem arm_scalar_dispatch (program : CIL.Program) (method vectorIndex smallInd
       | exact continuation
       | (apply run_next_exists post found (by rfl)
          simp (config := { implicitDefEqProofs := false })
-           [step, armScalarBody, enabled, pureArity, scalars, CIL.step.eq_def, CIL.truth, CIL.FeatureProfile.evaluate,
+           [step, cil_guard, observerCount, armScalarBody, enabled, pureArity, scalars, CIL.step.eq_def, CIL.truth, CIL.FeatureProfile.evaluate,
              checkedValue, numericValue, Bind.bind, Except.bind, Pure.pure, Except.pure]
          try (first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
 
@@ -262,7 +263,7 @@ theorem arm_scalar_save_source (program : CIL.Program) (method vectorIndex small
         | exact continuation
         | (apply run_next_exists post found (by rfl)
            simp (config := { implicitDefEqProofs := false })
-             [step, argument, slot, storeLocal, armScalarSavedFrame, checkedValue, formValue, formed,
+             [step, cil_guard, observerCount, argument, slot, storeLocal, armScalarSavedFrame, checkedValue, formValue, formed,
                checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
            try (first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
 
@@ -287,7 +288,7 @@ theorem arm_scalar_low_load (program : CIL.Program) (method vectorIndex smallInd
         | exact continuation
         | (apply run_next_exists post found (by rfl)
            simp (config := { implicitDefEqProofs := false })
-             [step, argument, checkedValue, formValue, formed, loaded, pureArity,
+             [step, cil_guard, observerCount, argument, checkedValue, formValue, formed, loaded, pureArity,
                checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
            try (first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
 
@@ -332,7 +333,7 @@ theorem arm_scalar_upper_loads (program : CIL.Program) (method vectorIndex small
         | exact continuation
         | (apply run_next_exists post found (by rfl)
            simp (config := { implicitDefEqProofs := false })
-             [step, argument, checkedValue, numericValue, formValue, formed, l1, l2, l3, pureArity,
+             [step, cil_guard, observerCount, argument, checkedValue, numericValue, formValue, formed, l1, l2, l3, pureArity,
                pureArity, scalars, CIL.step.eq_def, CIL.truth, CIL.binary,
                checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
            try (first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
@@ -353,7 +354,7 @@ theorem arm_scalar_upper_branch (program : CIL.Program) (method vectorIndex smal
     all_goals
       simp only [Bool.false_eq_true, ite_false, ite_true, zero] at continuation ⊢
       apply run_next_exists post found (by rfl) _ continuation
-      simp [step, checkedValue, numericValue, pureArity, scalars, CIL.step.eq_def, CIL.truth, CIL.truth,
+      simp [step, cil_guard, observerCount, checkedValue, numericValue, pureArity, scalars, CIL.step.eq_def, CIL.truth, CIL.truth,
         show (0 : BitVec 64) = BitVec.ofNat 64 0 from rfl, zero,
         Bind.bind, Except.bind, Pure.pure, Except.pure]
 
@@ -592,7 +593,7 @@ theorem arm_scalar_small_arguments (program : CIL.Program) (method vectorIndex s
          first
          | exact wordLoad _ _
          | (simp (config := { implicitDefEqProofs := false })
-             [step, root, loadLocal, outputArg, checkedValue, formValue, sourceFormed, outputFormed,
+             [step, cil_guard, observerCount, root, loadLocal, outputArg, checkedValue, formValue, sourceFormed, outputFormed,
                checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
             try (first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)))
 

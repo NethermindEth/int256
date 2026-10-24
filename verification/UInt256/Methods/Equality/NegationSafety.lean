@@ -25,7 +25,7 @@ theorem negation_prefix (left right : Reference) (frame : Frame) (memory : Memor
     | (apply run_next_exists post
        · simp only [cil_code]; rfl
        · simp only [cil_code]; rfl
-       · simp [readOnlyArguments, step, checkedValue, formValue, fl, fr,
+       · simp [readOnlyArguments, step, cil_guard, observerCount, checkedValue, formValue, fl, fr,
            checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
          try (exact ⟨rfl, rfl, rfl, rfl⟩))
 
@@ -35,7 +35,7 @@ theorem negation_return (args : List Value) (flag : BitVec 32) (frame : Frame) (
       .ok (leaveFrame frame memory, [.scalar (.i32 (if flag = 0 then 1 else 0))]) := by
   conv in negationCall => cbv
   simp only [Nat.reduceAdd]
-  simp [run, cil_code, step, pureArity, scalars, CIL.step, CIL.binary, CIL.unary, CIL.NarrowKind.extend, instruction,
+  simp [run, cil_code, step, cil_guard, observerCount, pureArity, scalars, CIL.step, CIL.binary, CIL.unary, CIL.NarrowKind.extend, instruction,
     checkedValue, numericValue, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
   split <;> rfl

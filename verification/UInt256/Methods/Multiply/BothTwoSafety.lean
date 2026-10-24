@@ -93,7 +93,7 @@ theorem both_two_frame_setup (profile : CIL.FeatureProfile) (program : CIL.Progr
       PrivateWords program memory entered entered [left, right] [output] frame (fun _ => none) := by
   have kinds : (bothTwoBody profile wordIndex countIndex storageIndex).localKinds = List.replicate 14 CIL.LocalKind.word64 := by rfl
   obtain ⟨frame, entered, setup, homes, _, wf⟩ := unknown_frame_setup (bothTwoBody profile wordIndex countIndex storageIndex)
-    (by rfl) (by simp [kinds]) (by rfl) (by rfl) memory (productArgs left right output) call.1.1
+    (by rfl) (by simp [kinds]) (by rfl) (by rfl) (by rfl) memory (productArgs left right output) call.1.1
   exact ⟨frame, entered, setup, homes, wf, PrivateWords.initial call setup⟩
 
 def bothTwoInputs (original : Memory) (left right : Reference) :=
@@ -123,7 +123,7 @@ theorem both_two_inputs (profile : CIL.FeatureProfile) (program : CIL.Program) (
   simp only [Fin.val_zero, Nat.mul_zero] at loadLeft loadRight
   iterate 4
     apply run_next_exists post found (by rfl)
-    · simp [step, pureArity, productArgs, checkedValue, formValue, formedLeft, formedRight,
+    · simp [step, cil_guard, observerCount, pureArity, productArgs, checkedValue, formValue, formedLeft, formedRight,
       loadLeft, loadRight, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
       try exact ⟨rfl, rfl, rfl, rfl⟩
       done
@@ -135,7 +135,7 @@ theorem both_two_inputs (profile : CIL.FeatureProfile) (program : CIL.Program) (
   simp only [Fin.val_one, Nat.mul_one] at *
   iterate 2
     apply run_next_exists post found (by rfl)
-    · simp [step, pureArity, productArgs, checkedValue, formValue, formedLeft, loadLeft,
+    · simp [step, cil_guard, observerCount, pureArity, productArgs, checkedValue, formValue, formedLeft, loadLeft,
       checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
       try exact ⟨rfl, rfl, rfl, rfl⟩
       done
@@ -147,7 +147,7 @@ theorem both_two_inputs (profile : CIL.FeatureProfile) (program : CIL.Program) (
   simp only [Fin.val_one, Nat.mul_one] at *
   iterate 2
     apply run_next_exists post found (by rfl)
-    · simp [step, pureArity, productArgs, checkedValue, formValue, formedRight, loadRight,
+    · simp [step, cil_guard, observerCount, pureArity, productArgs, checkedValue, formValue, formedRight, loadRight,
       checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
       try exact ⟨rfl, rfl, rfl, rfl⟩
       done
@@ -194,12 +194,12 @@ theorem both_two_first_products (profile : CIL.FeatureProfile) (program : CIL.Pr
     apply run_next_exists post found (by rfl)
     first
     | exact load0 _ _
-    | simp [step, pureArity, instruction, localAddress, slot0, formValue, formed0, checkedAt,
+    | simp [step, cil_guard, observerCount, pureArity, instruction, localAddress, slot0, formValue, formed0, checkedAt,
         Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
       first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
   apply run_word_call contract state originalCall homes 4 low0
     (inputLimb original left 0) (inputLimb original right 0) slot0 ready0 post found (by rfl)
-  · simp [step, checkedValue, numericValue, formValue, formed0, checkedAt,
+  · simp [step, cil_guard, observerCount, checkedValue, numericValue, formValue, formed0, checkedAt,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     first | rfl | exact ⟨rfl, rfl⟩
   intro m0 state0
@@ -215,12 +215,12 @@ theorem both_two_first_products (profile : CIL.FeatureProfile) (program : CIL.Pr
     apply run_next_exists post found (by rfl)
     first
     | exact load1 _ _
-    | simp [step, localAddress, slot1, formValue, formed1, checkedAt,
+    | simp [step, cil_guard, observerCount, localAddress, slot1, formValue, formed1, checkedAt,
         Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
       first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
   apply run_word_call contract state1 originalCall homes 6 low1
     (inputLimb original left 0) (inputLimb original right 1) slot1 ready1 post found (by rfl)
-  · simp [step, checkedValue, numericValue, formValue, formed1, checkedAt,
+  · simp [step, cil_guard, observerCount, checkedValue, numericValue, formValue, formed1, checkedAt,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     first | rfl | exact ⟨rfl, rfl⟩
   intro m2 state2
@@ -412,7 +412,7 @@ theorem both_two_output_with_storage (profile : CIL.FeatureProfile) (program : C
       (pc := pc) (stack := stack) (index := index) value present
   change ∃ fuel final returned, _ ∧ post final returned
   apply run_next_exists post found (by rfl)
-  · simp [step, productArgs, checkedValue, formValue, formed, checkedAt,
+  · simp [step, cil_guard, observerCount, productArgs, checkedValue, formValue, formed, checkedAt,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
   apply run_next_exists post found (by rfl) (load 4 (words 0) (by rfl) _ _)
@@ -429,7 +429,7 @@ theorem both_two_output_with_storage (profile : CIL.FeatureProfile) (program : C
         .reference (.address output)] current =
       .ok (.call storageIndex [.reference (.address output), .scalar (.i64 (words 0)),
         .scalar (.i64 (words 1)), .scalar (.i64 (words 2)), .scalar (.i64 (words 3))] [] current) := by
-    simp [step, checkedValue, numericValue, formValue, formed, checkedAt,
+    simp [step, cil_guard, observerCount, checkedValue, numericValue, formValue, formed, checkedAt,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   have finished : run program 1 index 71 (productArgs left right output) frame [] result =
       .ok (leaveFrame frame result, []) := by

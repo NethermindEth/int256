@@ -44,7 +44,7 @@ theorem multiply_small_branch (ctx : Context alternative) (word : WordContract c
     first
     | exact loadLow _ _
     | exact loadHigh _ _
-    | simp [step, productArgs, checkedValue, numericValue, pureArity, scalars, CIL.step.eq_def,
+    | simp [step, cil_guard, observerCount, productArgs, checkedValue, numericValue, pureArity, scalars, CIL.step.eq_def,
         formValue, formed, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
       first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
   obtain ⟨childFuel, childFinal, invoked, valid, outside, _, value, readable⟩ :=
@@ -57,7 +57,7 @@ theorem multiply_small_branch (ctx : Context alternative) (word : WordContract c
   apply run_output_call (callee := ctx.indices.storage)
     next originalCall owned (inputValue original left * inputValue original right)
     found (by rfl) _ (by rfl) (by rfl) ⟨childFuel, childFinal, invoked, expected⟩
-  simp [step, checkedValue, numericValue, formValue, formed, checkedAt,
+  simp [step, cil_guard, observerCount, checkedValue, numericValue, formValue, formed, checkedAt,
     Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   try rfl
 
@@ -113,13 +113,13 @@ theorem multiply_left_two_branch (ctx : Context alternative) (word : WordContrac
   all_goals
     iterate 3
       apply run_next_exists post found (by rfl)
-      simp [step, productArgs, checkedValue, formValue, leftFormed, rightFormed, outputFormed, checkedAt,
+      simp [step, cil_guard, observerCount, productArgs, checkedValue, formValue, leftFormed, rightFormed, outputFormed, checkedAt,
         Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
       first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
     apply run_output_call (callee := ctx.indices.leftTwo)
       state originalCall owned (inputValue original left * inputValue original right)
       found (by rfl) _ (by rfl) (by rfl) ⟨childFuel, childFinal, invoked, expected⟩
-    simp [step, checkedValue, formValue, leftFormed, rightFormed, outputFormed, checkedAt,
+    simp [step, cil_guard, observerCount, checkedValue, formValue, leftFormed, rightFormed, outputFormed, checkedAt,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     rfl
 
@@ -148,7 +148,7 @@ theorem multiply_both_two_branch (ctx : Context alternative) (word : WordContrac
   change ∃ fuel final returned, _ ∧ post final returned
   iterate 3
     apply run_next_exists post found (by rfl)
-    simp [step, productArgs, checkedValue, formValue, leftFormed, rightFormed, outputFormed, checkedAt,
+    simp [step, cil_guard, observerCount, productArgs, checkedValue, formValue, leftFormed, rightFormed, outputFormed, checkedAt,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
   have leftZero : inputLimb current left 2 = 0 ∧ inputLimb current left 3 = 0 := by
@@ -165,7 +165,7 @@ theorem multiply_both_two_branch (ctx : Context alternative) (word : WordContrac
   apply run_output_call (callee := ctx.indices.bothTwo) (callArgs := productArgs left right output)
     state originalCall owned (inputValue original left * inputValue original right)
     found (by rfl) _ (by rfl) (by rfl) ⟨childFuel, childFinal, invoked, expected⟩
-  simp [step, productArgs, checkedValue, formValue, leftFormed, rightFormed, outputFormed, checkedAt,
+  simp [step, cil_guard, observerCount, productArgs, checkedValue, formValue, leftFormed, rightFormed, outputFormed, checkedAt,
     Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   try rfl
 
@@ -193,7 +193,7 @@ theorem multiply_full_branch (ctx : Context alternative) (word : WordContract ct
   change ∃ fuel final returned, _ ∧ post final returned
   iterate 3
     apply run_next_exists post found (by rfl)
-    simp [step, productArgs, checkedValue, formValue, leftFormed, rightFormed, outputFormed, checkedAt,
+    simp [step, cil_guard, observerCount, productArgs, checkedValue, formValue, leftFormed, rightFormed, outputFormed, checkedAt,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
   obtain ⟨childFuel, childFinal, invoked, result⟩ := Full.full_invoke_with_storage ctx.profile ctx.program ctx.indices.full ctx.indices.word ctx.indices.count ctx.indices.storage ctx.storage ctx.full ctx.count word top current left right output state.call
@@ -206,7 +206,7 @@ theorem multiply_full_branch (ctx : Context alternative) (word : WordContract ct
   apply run_output_call (callee := ctx.indices.full) (callArgs := productArgs left right output)
     state originalCall owned (inputValue original left * inputValue original right)
     found (by rfl) _ (by rfl) (by rfl) ⟨childFuel, childFinal, invoked, expected⟩
-  simp [step, productArgs, checkedValue, formValue, leftFormed, rightFormed, outputFormed, checkedAt,
+  simp [step, cil_guard, observerCount, productArgs, checkedValue, formValue, leftFormed, rightFormed, outputFormed, checkedAt,
     Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   try rfl
 
@@ -237,7 +237,7 @@ theorem multiply_large_dispatch (ctx : Context alternative) (word : WordContract
   apply run_next_exists post found (by rfl) (loadLeft _ _)
   apply run_next_exists post found (by rfl) (loadRight _ _)
   apply run_next_exists post found (by rfl)
-  · simp [step, pureArity, numericValue, scalars, CIL.step.eq_def, CIL.binary,
+  · simp [step, cil_guard, observerCount, pureArity, numericValue, scalars, CIL.step.eq_def, CIL.binary,
       Bind.bind, Except.bind, Pure.pure, Except.pure]
     first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
   apply run_next_exists post found (by rfl) (step_word_nonzero _ _ _ _ _ _ _)
@@ -314,13 +314,13 @@ theorem multiply_scalar_branch (ctx : Context alternative) (word : WordContract 
       apply run_next_exists post found (by rfl)
       first
       | exact loadWord _ _
-      | simp [step, productArgs, checkedValue, formValue, leftFormed, rightFormed, outputFormed, checkedAt,
+      | simp [step, cil_guard, observerCount, productArgs, checkedValue, formValue, leftFormed, rightFormed, outputFormed, checkedAt,
           Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
         first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
     apply run_output_call (callee := ctx.indices.single)
       state originalCall owned (inputValue original left * inputValue original right)
       found (by rfl) _ (by rfl) (by rfl) ⟨childFuel, childFinal, invoked, expected⟩
-    simp [step, ScalarSafety.scalarArgs, checkedValue, formValue, leftFormed, rightFormed, outputFormed, checkedAt,
+    simp [step, cil_guard, observerCount, ScalarSafety.scalarArgs, checkedValue, formValue, leftFormed, rightFormed, outputFormed, checkedAt,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     rfl
 
@@ -353,7 +353,7 @@ theorem multiply_dispatch (ctx : Context alternative) (word : WordContract ctx.p
   apply run_next_exists post found (by rfl) (loadLeft _ _)
   apply run_next_exists post found (by rfl) (loadRight _ _)
   apply run_next_exists post found (by rfl)
-  · simp [step, pureArity, numericValue, scalars, CIL.step.eq_def, CIL.binary,
+  · simp [step, cil_guard, observerCount, pureArity, numericValue, scalars, CIL.step.eq_def, CIL.binary,
       Bind.bind, Except.bind, Pure.pure, Except.pure]
     first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
   apply run_next_exists post found (by rfl) (step_word_nonzero _ _ _ _ _ _ _)

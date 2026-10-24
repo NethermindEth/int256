@@ -2,6 +2,7 @@ import UInt256.Methods.Bindings
 import UInt256.Safety.ReadOnlyContract
 import UInt256.Safety.LimbAccess
 import CIL.Safety.StepComposition
+import CIL.Safety.GuardNormalization
 
 namespace UInt256Proof.Compare.Safety
 open CIL.Safety UInt256Model.Safety
@@ -26,7 +27,7 @@ macro "comparison_steps" count:num "with" facts:term,* : tactic =>
       · simp only [cil_code]; rfl
       · simp only [cil_code]; rfl
       · simp (config := { implicitDefEqProofs := false })
-          [step, readOnlyArguments, checkedValue, numericValue, formValue,
+          [step, cil_guard, observerCount, readOnlyArguments, checkedValue, numericValue, formValue,
             pureArity, scalars, CIL.step, CIL.unary, CIL.binary, checkedAt,
             Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure, $[$facts:term],*]
         try (exact ⟨rfl, rfl, rfl, rfl⟩)
@@ -56,16 +57,16 @@ theorem scalar_run (memory : Memory) (left right : Reference) (frame : Frame)
   · by_cases h2 : inputLimb memory left 2 = inputLimb memory right 2
     · by_cases h1 : inputLimb memory left 1 = inputLimb memory right 1
       · comparison_steps 20 with fl, fr, hl0, hl1, hl2, hl3, hr0, hr1, hr2, hr3, h3, h2, h1
-        simp [run, cil_code, step, checkedValue, numericValue, scalarResult, CIL.NarrowKind.extend, h3, h2, h1,
+        simp [run, cil_code, step, cil_guard, observerCount, checkedValue, numericValue, scalarResult, CIL.NarrowKind.extend, h3, h2, h1,
           BitVec.lt_def, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure] <;> try (split <;> rfl)
       · comparison_steps 20 with fl, fr, hl0, hl1, hl2, hl3, hr0, hr1, hr2, hr3, h3, h2, h1
-        simp [run, cil_code, step, checkedValue, numericValue, scalarResult, CIL.NarrowKind.extend, h3, h2, h1,
+        simp [run, cil_code, step, cil_guard, observerCount, checkedValue, numericValue, scalarResult, CIL.NarrowKind.extend, h3, h2, h1,
           BitVec.lt_def, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure] <;> try (split <;> rfl)
     · comparison_steps 15 with fl, fr, hl0, hl1, hl2, hl3, hr0, hr1, hr2, hr3, h3, h2
-      simp [run, cil_code, step, checkedValue, numericValue, scalarResult, CIL.NarrowKind.extend, h3, h2,
+      simp [run, cil_code, step, cil_guard, observerCount, checkedValue, numericValue, scalarResult, CIL.NarrowKind.extend, h3, h2,
         BitVec.lt_def, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure] <;> try (split <;> rfl)
   · comparison_steps 10 with fl, fr, hl0, hl1, hl2, hl3, hr0, hr1, hr2, hr3, h3
-    simp [run, cil_code, step, checkedValue, numericValue, scalarResult, CIL.NarrowKind.extend, h3,
+    simp [run, cil_code, step, cil_guard, observerCount, checkedValue, numericValue, scalarResult, CIL.NarrowKind.extend, h3,
       BitVec.lt_def, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure] <;> try (split <;> rfl)
 
 #print axioms scalar_run

@@ -12,6 +12,7 @@ theorem setup (body : CIL.Method) (args : List Value)
     (kinds : body.localKinds = [.aggregate 32])
     (initializers : body.locals = [.aggregate (List.replicate 32 0)])
     (vectorArgs : body.vectorArgs = []) (parameters : body.parameterHomes = [])
+    (opaqueLocals : body.opaqueVectorLocals = [])
     (program : CIL.Program) (memory : Memory) (inputs : List Reference)
     (call : CallingConditions program memory inputs []) :
     ∃ output entered,
@@ -27,7 +28,7 @@ theorem setup (body : CIL.Method) (args : List Value)
     simp only [makeLocal, localWidth, localAlignment, allocatedHome, stored, reduceCtorEq, ↓reduceIte,
       Bind.bind, Except.bind, Pure.pure, Except.pure]
   have enteredFrame : enterFrame body args memory = .ok (frame memory output, entered) := by
-    simp only [enterFrame, kinds, initializers, makeLocals, made, vectorArgs, parameters,
+    simp only [enterFrame, opaqueLocals, makeSelectedLocals, List.isEmpty_nil, ite_true, kinds, initializers, makeLocals, made, vectorArgs, parameters,
       makeArgumentHomes, makeParameterHomes, frame, Bind.bind, Except.bind, Pure.pure, Except.pure, List.map_nil, List.append_nil]
   exact ⟨output, entered, enteredFrame,
     (call.after_frame_setup enteredFrame).with_writable_output writable, before, fresh⟩

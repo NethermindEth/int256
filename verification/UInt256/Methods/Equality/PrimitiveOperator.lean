@@ -15,7 +15,7 @@ theorem returned (profile : CIL.FeatureProfile) (reversed negate : Bool) (progra
     run program 3 entry 3 args frame [.scalar (.i32 (if flag then 1 else 0))] memory =
       .ok (leaveFrame frame memory, [.scalar (.i32 (if flag != negate then 1 else 0))]) := by
   cases reversed <;> cases negate <;> cases flag <;>
-    simp [run, found, body, step, pureArity, scalars, CIL.step.eq_def, CIL.binary,
+    simp [run, found, body, step, cil_guard, observerCount, pureArity, scalars, CIL.step.eq_def, CIL.binary,
       CIL.NarrowKind.extend, instruction, checkedValue, numericValue,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
@@ -37,7 +37,7 @@ theorem prefix_trace {α : Type} (encode : α → CIL.Value)
       | exact continuation
       | (apply run_next_exists post found
          · simp only [body]; rfl
-         · simp [body, step, scalarOperatorArguments, scalarArguments, numeric, checkedValue, formValue, formed,
+         · simp [body, step, cil_guard, observerCount, scalarOperatorArguments, scalarArguments, numeric, checkedValue, formValue, formed,
              checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
            exact ⟨rfl, rfl, rfl, rfl⟩)
 
@@ -51,7 +51,7 @@ theorem checked {α : Type} (encode : α → CIL.Value) (equal : BitVec 256 → 
   let frame : Frame := ⟨memory.nextIdentity, [], [], []⟩
   have setup : enterFrame (body profile reversed negate callee)
       (scalarOperatorArguments reversed input (encode word)) memory = .ok (frame, memory) := by
-    simp [enterFrame, body, makeLocals, makeArgumentHomes, makeParameterHomes, frame,
+    simp [enterFrame, body, makeSelectedLocals, makeLocals, makeArgumentHomes, makeParameterHomes, frame,
       Bind.bind, Except.bind, Pure.pure, Except.pure]
   have formed := call.input_formed (reference := input) (by simp)
   have checked : (scalarOperatorArguments reversed input (encode word)).mapM (checkedValue memory) =
@@ -68,7 +68,7 @@ theorem checked {α : Type} (encode : α → CIL.Value) (equal : BitVec 256 → 
       (scalarOperatorArguments reversed input (encode word)) frame
       [.scalar (encode word), .reference (.address input)] memory =
       .ok (.call callee (scalarOperatorArguments false input (encode word)) [] memory) := by
-    simp [step, scalarOperatorArguments, scalarArguments, checkedValue, numeric, formValue, formed,
+    simp [step, cil_guard, observerCount, scalarOperatorArguments, scalarArguments, checkedValue, numeric, formValue, formed,
       checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   obtain ⟨tailFuel, tail⟩ := run_call_exists found fetched stepped ⟨childFuel, certificate.1⟩
     ⟨3, returned profile reversed negate program entry callee found _ _ frame final⟩

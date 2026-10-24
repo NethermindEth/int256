@@ -41,7 +41,7 @@ theorem shift_store_return (whole : Fin 4) (memory : Memory) (inputs : List Refe
       args frame [.scalar (.i64 w3), .scalar (.i64 w2), .scalar (.i64 w1), .scalar (.i64 w0),
         .reference (.address output)] memory =
       .ok (.call storage (UInt256Proof.StorageScalar.arguments output w0 w1 w2 w3) [] memory) := by
-    simp [step, UInt256Proof.StorageScalar.arguments, checkedValue, numericValue, formValue, formed,
+    simp [step, cil_guard, observerCount, UInt256Proof.StorageScalar.arguments, checkedValue, numericValue, formValue, formed,
       checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   obtain ⟨childFuel, stored, invoked, valid, outside, authority, value, readable⟩ :=
     store

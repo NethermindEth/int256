@@ -24,7 +24,7 @@ theorem full_avx512_top (profile : CIL.FeatureProfile) (program : CIL.Program)
   iterate 16
     apply run_next_exists post found (by rfl)
     simp (config := { implicitDefEqProofs := false })
-      [step, pureArity, productArgs, checkedValue, numericValue, formValue, formedLeft, formedRight,
+      [step, cil_guard, observerCount, pureArity, productArgs, checkedValue, numericValue, formValue, formedLeft, formedRight,
         staticInstruction, memoryInstruction, loadedLeft, loadedRight, checkedAt, profileEq, enabled,
         CIL.FeatureProfile.evaluate, scalars, CIL.step.eq_def, Except.mapError,
         Bind.bind, Except.bind, Pure.pure, Except.pure]
@@ -47,7 +47,7 @@ theorem full_avx512_top (profile : CIL.FeatureProfile) (program : CIL.Program)
     (fullTop original left right) 40 (productArgs left right output) [] (body := (fullBody profile wordIndex countIndex storageIndex))
   apply run_next_exists post found (by change some _ = _; simp only [enabled, ↓reduceIte] <;> rfl) storedTop
   apply run_next_exists post found (by rfl)
-  · simp [enabled, step, pureArity, scalars, CIL.step.eq_def, Bind.bind, Except.bind, Pure.pure, Except.pure]
+  · simp [enabled, step, cil_guard, observerCount, pureArity, scalars, CIL.step.eq_def, Bind.bind, Except.bind, Pure.pure, Except.pure]
     exact ⟨rfl, rfl, rfl, rfl⟩
   exact continuation after finalState
 

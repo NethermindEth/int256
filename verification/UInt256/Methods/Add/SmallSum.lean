@@ -196,9 +196,9 @@ theorem small_sum_prefix (input output lowHome sumHome : Reference) (word low : 
       · simp only [cil_code]; rfl
       · simp only [cil_code]; rfl
       · first
-        | exact stored _ _
+        | ((with_reducible show step _ (.setLocal 4) _ _ _ _ _ = _); exact stored _ _)
         | simp (config := { implicitDefEqProofs := false })
-            [cil_code, smallArguments, step, lowSlot, sumSlot, r0, r1, r4, checkedValue,
+            [cil_code, smallArguments, step, cil_guard, observerCount, lowSlot, sumSlot, r0, r1, r4, checkedValue,
               numericValue, pureArity, scalars, CIL.step, CIL.binary, CIL.unary,
               Bind.bind, Except.bind, Pure.pure, Except.pure]
           first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩

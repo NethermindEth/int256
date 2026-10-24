@@ -36,13 +36,13 @@ theorem executed (profile : CIL.FeatureProfile) (program : CIL.Program) (index :
     · apply run_next found
       · simp only [body]; rfl
       · simp (config := { implicitDefEqProofs := false })
-          [body, step, readOnlyArguments, checkedValue, numericValue, formValue, fl, fr,
+          [body, step, cil_guard, observerCount, readOnlyArguments, checkedValue, numericValue, formValue, fl, fr,
             hl, hr, cl, cr, staticInstruction, checkedIntrinsic, pureArity, scalars,
             CIL.step.eq_def, CIL.Intrinsic.available, eval_equal,
             checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
         try exact ⟨rfl, rfl, rfl, rfl⟩
         done
-  simp [run, found, body, step, checkedValue, numericValue, CIL.NarrowKind.extend,
+  simp [run, found, body, step, cil_guard, observerCount, checkedValue, numericValue, CIL.NarrowKind.extend,
     Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   split <;> rfl
 
@@ -56,7 +56,7 @@ theorem checked (profile : CIL.FeatureProfile) (program : CIL.Program) (index : 
       ∀ id, id < memory.nextIdentity → ∀ offset, final.cells id offset = memory.cells id offset :=
   certify_readOnly_binary program index (body profile)
     (fun left right => .i32 (if left = right then 1 else 0)) found
-    (by intro left right; simp [body, FrameSetupFits, InitializersFit, AggregateArgumentsFit, ParameterArgumentsFit])
+    (by intro left right; simp [body, FrameSetupFits, InitializersFit, AggregateArgumentsFit, ParameterArgumentsFit, SelectedKindsFit])
     (executed profile program index found) memory left right call
 
 #print axioms executed

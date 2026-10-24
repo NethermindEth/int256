@@ -71,7 +71,7 @@ theorem vector128_propagation_checked (program : CIL.Program) (body : CIL.Method
          | exact loadIncoming _ _
          | exact stored _ _ _
          | (simp (config := { implicitDefEqProofs := false })
-             [step, pureArity, scalars, CIL.step.eq_def, CIL.Intrinsic.available,
+             [step, cil_guard, observerCount, pureArity, scalars, CIL.step.eq_def, CIL.Intrinsic.available,
                CIL.Vector.intrinsic_zero128, CIL.Vector.intrinsic_eq128, CIL.Vector.intrinsic_and128,
                propagating128, checkedValue, numericValue,
                Bind.bind, Except.bind, Pure.pure, Except.pure]

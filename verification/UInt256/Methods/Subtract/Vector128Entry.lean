@@ -230,7 +230,7 @@ theorem checked_subtract_vector_contract (program : CIL.Program) (method borrow 
       SubtractResult memory final values left right output := by
   let args := binaryArguments left right output
   obtain ⟨frame, entered, slots, setup, layout, homes, _, _⟩ :=
-    vector128_frame_setup (subtractVectorBody profile borrow storage) subtractVectorSpecs ⟨rfl, rfl⟩ rfl rfl
+    vector128_frame_setup (subtractVectorBody profile borrow storage) subtractVectorSpecs ⟨rfl, rfl⟩ rfl rfl rfl
       memory args call.1.1
   obtain ⟨fuel, final, returned, executed, result⟩ :=
     subtract_vector_entry program method borrow storage profile found borrowFound storageFound sse ssse

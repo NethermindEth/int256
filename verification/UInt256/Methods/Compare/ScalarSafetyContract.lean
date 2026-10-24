@@ -36,7 +36,7 @@ theorem scalar_body_found : Extracted.program[scalarIndex]? = some scalarBody :=
 theorem scalar_frame_fits (left right : Reference) :
     FrameSetupFits scalarBody (readOnlyArguments [left, right]) := by
   conv in scalarBody => cbv
-  simp [FrameSetupFits, InitializersFit, AggregateArgumentsFit, ParameterArgumentsFit]
+  simp [FrameSetupFits, InitializersFit, AggregateArgumentsFit, ParameterArgumentsFit, SelectedKindsFit]
 
 theorem scalar_checked (memory : Memory) (left right : Reference)
     (call : CallingConditions Extracted.program memory [left, right] []) :

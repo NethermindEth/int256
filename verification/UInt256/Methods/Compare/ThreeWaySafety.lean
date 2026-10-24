@@ -2,6 +2,7 @@ import UInt256.Methods.Bindings
 import UInt256.Safety.ReadOnlyContract
 import UInt256.Safety.LimbAccess
 import CIL.Safety.StepComposition
+import CIL.Safety.GuardNormalization
 
 namespace UInt256Proof.Compare.Safety
 open CIL.Safety UInt256Model.Safety
@@ -28,7 +29,7 @@ macro "threeway_steps" count:num "with" facts:term,* : tactic =>
       · simp only [cil_code]; rfl
       · simp only [cil_code]; rfl
       · simp (config := { implicitDefEqProofs := false })
-          [step, readOnlyArguments, checkedValue, numericValue, formValue,
+          [step, cil_guard, observerCount, readOnlyArguments, checkedValue, numericValue, formValue,
             pureArity, scalars, CIL.step, CIL.binary, CIL.unary, CIL.truth, BitVec.lt_def, checkedAt,
             Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure, $[$facts:term],*]
         try (exact ⟨rfl, rfl, rfl, rfl⟩)
@@ -62,27 +63,27 @@ theorem threeWay_run (memory : Memory) (left right : Reference) (frame : Frame)
     · by_cases h1 : inputLimb memory left 1 = inputLimb memory right 1
       · by_cases h0 : inputLimb memory left 0 = inputLimb memory right 0
         · threeway_steps 21 with fl, fr, hl0, hl1, hl2, hl3, hr0, hr1, hr2, hr3, hc, h3, h2, h1, h0
-          simp [run, cil_code, step, checkedValue, numericValue, threeWayResult, h3, h2, h1, h0,
+          simp [run, cil_code, step, cil_guard, observerCount, checkedValue, numericValue, threeWayResult, h3, h2, h1, h0,
             Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
         · by_cases lt : (inputLimb memory left 0).toNat < (inputLimb memory right 0).toNat
           all_goals
             threeway_steps 26 with fl, fr, hl0, hl1, hl2, hl3, hr0, hr1, hr2, hr3, hc, h3, h2, h1, h0, lt
-            simp [run, cil_code, step, checkedValue, numericValue, threeWayResult, h3, h2, h1, h0, lt,
+            simp [run, cil_code, step, cil_guard, observerCount, checkedValue, numericValue, threeWayResult, h3, h2, h1, h0, lt,
               Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
       · by_cases lt : (inputLimb memory left 1).toNat < (inputLimb memory right 1).toNat
         all_goals
           threeway_steps 21 with fl, fr, hl0, hl1, hl2, hl3, hr0, hr1, hr2, hr3, hc, h3, h2, h1, lt
-          simp [run, cil_code, step, checkedValue, numericValue, threeWayResult, h3, h2, h1, lt,
+          simp [run, cil_code, step, cil_guard, observerCount, checkedValue, numericValue, threeWayResult, h3, h2, h1, lt,
             Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     · by_cases lt : (inputLimb memory left 2).toNat < (inputLimb memory right 2).toNat
       all_goals
         threeway_steps 16 with fl, fr, hl0, hl1, hl2, hl3, hr0, hr1, hr2, hr3, hc, h3, h2, lt
-        simp [run, cil_code, step, checkedValue, numericValue, threeWayResult, h3, h2, lt,
+        simp [run, cil_code, step, cil_guard, observerCount, checkedValue, numericValue, threeWayResult, h3, h2, lt,
           Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   · by_cases lt : (inputLimb memory left 3).toNat < (inputLimb memory right 3).toNat
     all_goals
       threeway_steps 11 with fl, fr, hl0, hl1, hl2, hl3, hr0, hr1, hr2, hr3, hc, h3, lt
-      simp [run, cil_code, step, checkedValue, numericValue, threeWayResult, h3, lt,
+      simp [run, cil_code, step, cil_guard, observerCount, checkedValue, numericValue, threeWayResult, h3, lt,
         Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 #print axioms threeWay_run

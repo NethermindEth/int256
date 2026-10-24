@@ -44,13 +44,13 @@ theorem subtract_forward_prefix (program : CIL.Program) (method : Nat) (body : C
   have fr := call.input_formed (reference := right) (by simp)
   have fo := call.output_formed (reference := output) (by simp)
   apply run_next_exists post found arg0 (by
-    simp [step, binaryArguments, checkedValue, formValue, fl, checkedAt, Except.mapError,
+    simp [step, cil_guard, observerCount, binaryArguments, checkedValue, formValue, fl, checkedAt, Except.mapError,
       Bind.bind, Except.bind, Pure.pure, Except.pure]; exact ⟨rfl, rfl, rfl, rfl⟩)
   apply run_next_exists post found arg1 (by
-    simp [step, binaryArguments, checkedValue, formValue, fr, checkedAt, Except.mapError,
+    simp [step, cil_guard, observerCount, binaryArguments, checkedValue, formValue, fr, checkedAt, Except.mapError,
       Bind.bind, Except.bind, Pure.pure, Except.pure]; exact ⟨rfl, rfl, rfl, rfl⟩)
   apply run_next_exists post found arg2 (by
-    simp [step, binaryArguments, checkedValue, formValue, fo, checkedAt, Except.mapError,
+    simp [step, cil_guard, observerCount, binaryArguments, checkedValue, formValue, fo, checkedAt, Except.mapError,
       Bind.bind, Except.bind, Pure.pure, Except.pure]; exact ⟨rfl, rfl, rfl, rfl⟩)
   exact continuation
 
@@ -62,7 +62,7 @@ theorem subtract_flag_return (program : CIL.Program) (method : Nat) (body : CIL.
     run program 1 method pc args frame [.scalar (.i32 (subtractUnderflow left l r))] memory =
       .ok (leaveFrame frame memory, [.scalar (.i32 (subtractUnderflow left l r))]) := by
   unfold subtractUnderflow
-  split <;> simp [run, found, fetched, returns, step, checkedValue, numericValue,
+  split <;> simp [run, found, fetched, returns, step, cil_guard, observerCount, checkedValue, numericValue,
     Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure] <;> rfl
 
 #print axioms subtract_forward_prefix
@@ -126,7 +126,7 @@ theorem subtract_impl_contract (program : CIL.Program) (method scalarIndex : Nat
     ReportingBinaryContract (· - ·) (fun left right => decide (left.toNat < right.toNat)) program method := by
   intro memory left right output call
   have fits : FrameSetupFits (subtractImplBody profile scalarIndex) (binaryArguments left right output) := by
-    simp [subtractImplBody, FrameSetupFits, InitializersFit, InitializerFits, AggregateArgumentsFit, ParameterArgumentsFit]
+    simp [subtractImplBody, FrameSetupFits, InitializersFit, InitializerFits, AggregateArgumentsFit, ParameterArgumentsFit, SelectedKindsFit]
   obtain ⟨frame, entered, setup, live⟩ := call.binary_setup_succeeds fits
   have enteredCall := call.after_frame_setup setup
   obtain ⟨childFuel, after, values, invoked, result⟩ := scalarChecked entered left right output enteredCall
@@ -139,7 +139,7 @@ theorem subtract_impl_contract (program : CIL.Program) (method scalarIndex : Nat
       (binaryArguments left right output) frame
       [.reference (.address output), .reference (.address right), .reference (.address left)]
       entered = .ok (.call scalarIndex (binaryArguments left right output) [] entered) := by
-    simp [step, binaryArguments, checkedValue, numericValue, formValue, fl, fr, fo,
+    simp [step, cil_guard, observerCount, binaryArguments, checkedValue, numericValue, formValue, fl, fr, fo,
       checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   obtain ⟨tailFuel, tail⟩ := run_call_exists found (by rfl) stepped ⟨childFuel, invoked⟩
     ⟨1, subtract_flag_return program method _ 129 found rfl (by rfl) _ frame after entered entered left right⟩
@@ -150,10 +150,10 @@ theorem subtract_impl_contract (program : CIL.Program) (method scalarIndex : Nat
         .ok (final, values) ∧ post final values := by
     have bodyProfile : (subtractImplBody profile scalarIndex).profile = profile := rfl
     apply run_next_exists post found (by rfl) (by
-      simp [step, bodyProfile, noAvx2, pureArity, scalars, CIL.step.eq_def, CIL.FeatureProfile.evaluate,
+      simp [step, cil_guard, observerCount, bodyProfile, noAvx2, pureArity, scalars, CIL.step.eq_def, CIL.FeatureProfile.evaluate,
         Bind.bind, Except.bind, Pure.pure, Except.pure]; try (first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
     apply run_next_exists post found (by rfl) (by
-      simp [step, checkedValue, numericValue, pureArity, scalars, CIL.step.eq_def, CIL.truth,
+      simp [step, cil_guard, observerCount, checkedValue, numericValue, pureArity, scalars, CIL.step.eq_def, CIL.truth,
         Bind.bind, Except.bind, Pure.pure, Except.pure]; try (first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
     exact subtract_forward_prefix program method _ 125 found (by rfl) (by rfl) (by rfl) left right output frame entered
       enteredCall post ⟨tailFuel, _, _, tail, rfl, rfl⟩
@@ -194,7 +194,7 @@ theorem subtract_wrapping_contract (program : CIL.Program) (method impl : Nat) (
     WrappingBinaryContract (· - ·) program method := by
   intro memory left right output call
   have fits : FrameSetupFits (publicSubtractBody profile impl) (binaryArguments left right output) := by
-    simp [publicSubtractBody, FrameSetupFits, InitializersFit, InitializerFits, AggregateArgumentsFit, ParameterArgumentsFit]
+    simp [publicSubtractBody, FrameSetupFits, InitializersFit, InitializerFits, AggregateArgumentsFit, ParameterArgumentsFit, SelectedKindsFit]
   obtain ⟨frame, entered, setup, live⟩ := call.binary_setup_succeeds fits
   have enteredCall := call.after_frame_setup setup
   obtain ⟨childFuel, after, invoked, result⟩ := subtract_reporting_invoke reporting entered left right output enteredCall
@@ -205,17 +205,17 @@ theorem subtract_wrapping_contract (program : CIL.Program) (method impl : Nat) (
       (binaryArguments left right output) frame
       [.reference (.address output), .reference (.address right), .reference (.address left)]
       entered = .ok (.call impl (binaryArguments left right output) [] entered) := by
-    simp [step, binaryArguments, checkedValue, numericValue, formValue, fl, fr, fo,
+    simp [step, cil_guard, observerCount, binaryArguments, checkedValue, numericValue, formValue, fl, fr, fo,
       checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   have returned : run program 2 method 4 (binaryArguments left right output) frame
       [.scalar (.i32 (subtractUnderflow entered left right))] after = .ok (leaveFrame frame after, []) := by
     have returns : (publicSubtractBody profile impl).returnsValue = false := rfl
     apply Eq.trans
     · apply run_next found (by rfl)
-      simp [step, pureArity, scalars, CIL.step, checkedValue, instruction, Bind.bind, Except.bind, Pure.pure, Except.pure]
+      simp [step, cil_guard, observerCount, pureArity, scalars, CIL.step, checkedValue, instruction, Bind.bind, Except.bind, Pure.pure, Except.pure]
       exact ⟨rfl, rfl, rfl, rfl⟩
     · rw [run]
-      simp [found, publicSubtractBody, step, checkedValue, numericValue,
+      simp [found, publicSubtractBody, step, cil_guard, observerCount, checkedValue, numericValue,
         Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   obtain ⟨tailFuel, tail⟩ := run_call_exists found (by rfl) stepped ⟨childFuel, invoked⟩ ⟨2, returned⟩
   let post : Memory → List Value → Prop := fun final values => final = leaveFrame frame after ∧ values = []
@@ -238,7 +238,7 @@ theorem subtract_underflow_contract (program : CIL.Program) (method impl : Nat) 
   intro memory left right output call
   have fits : FrameSetupFits (publicSubtractUnderflowBody profile impl) (binaryArguments left right output) := by
     simp [publicSubtractUnderflowBody, FrameSetupFits, InitializersFit, InitializerFits, AggregateArgumentsFit,
-      ParameterArgumentsFit]
+      ParameterArgumentsFit, SelectedKindsFit]
   obtain ⟨frame, entered, setup, live⟩ := call.binary_setup_succeeds fits
   have enteredCall := call.after_frame_setup setup
   obtain ⟨childFuel, after, invoked, result⟩ := subtract_reporting_invoke reporting entered left right output enteredCall
@@ -249,7 +249,7 @@ theorem subtract_underflow_contract (program : CIL.Program) (method impl : Nat) 
       (binaryArguments left right output) frame
       [.reference (.address output), .reference (.address right), .reference (.address left)]
       entered = .ok (.call impl (binaryArguments left right output) [] entered) := by
-    simp [step, binaryArguments, checkedValue, numericValue, formValue, fl, fr, fo,
+    simp [step, cil_guard, observerCount, binaryArguments, checkedValue, numericValue, formValue, fl, fr, fo,
       checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   obtain ⟨tailFuel, tail⟩ := run_call_exists found (by rfl) stepped ⟨childFuel, invoked⟩
     ⟨1, subtract_flag_return program method _ 4 found rfl (by rfl) _ frame after entered entered left right⟩

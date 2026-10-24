@@ -34,7 +34,7 @@ theorem subtract_scalar_frame_setup (profile : CIL.FeatureProfile) (vectorIndex 
       WordHomes result memory.nextIdentity subtractScalarSpecs frame.locals ∧
       MemoryBelow memory.nextIdentity memory result ∧ result.WellFormed :=
   word_frame_setup (subtractScalarBody profile vectorIndex smallIndex) subtractScalarSpecs (by rfl) (by rfl)
-    (by rfl) (by rfl) memory args wellFormed
+    (by rfl) (by rfl) (by rfl) memory args wellFormed
 
 #print axioms subtract_scalar_frame_setup
 end UInt256Proof.Subtract.Profile
@@ -117,9 +117,9 @@ theorem subtract_scalar_prefix (program : CIL.Program) (method vectorIndex small
     | (simp (config := { failIfUnchanged := false }) [BitVec.ofNat_eq_ofNat]
        apply run_next_exists post found (by rfl)
        first
-       | exact stored _ _
+       | ((with_reducible show step _ (.setLocal 0) _ _ _ _ _ = _); exact stored _ _)
        | (simp (config := { implicitDefEqProofs := false })
-           [step, binaryArguments, checkedValue, numericValue, formValue, beforeFormed, afterFormed,
+           [step, cil_guard, observerCount, binaryArguments, checkedValue, numericValue, formValue, beforeFormed, afterFormed,
              firstRead, upper1, upper2, upper3, pureArity, scalars, CIL.step, CIL.binary, CIL.unary, checkedAt,
              Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
           first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
@@ -139,7 +139,7 @@ theorem subtract_scalar_upper_branch (program : CIL.Program) (method vectorIndex
   all_goals
     simp only [zero, ite_true, ite_false] at continuation
     apply run_next_exists post found (by rfl) _ continuation
-    simp [step, checkedValue, numericValue, pureArity, scalars, CIL.step.eq_def, CIL.truth,
+    simp [step, cil_guard, observerCount, checkedValue, numericValue, pureArity, scalars, CIL.step.eq_def, CIL.truth,
       show (0 : BitVec 64) = BitVec.ofNat 64 0 from rfl, zero,
       Bind.bind, Except.bind, Pure.pure, Except.pure]
 
@@ -240,14 +240,14 @@ theorem subtract_scalar_small_route (program : CIL.Program) (method vectorIndex 
   have stepped : step (subtractScalarBody profile vectorIndex smallIndex) (.call smallIndex 3) 15 args frame
       [.reference (.address output), .scalar (.i64 word), .reference (.address left)] current =
         .ok (.call smallIndex (smallArguments left output word) [] current) := by
-    simp [step, smallArguments, checkedValue, numericValue, formValue, fl, fo,
+    simp [step, cil_guard, observerCount, smallArguments, checkedValue, numericValue, formValue, fl, fo,
       checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   have returned : run program 1 method 16 args frame
       [.scalar (.i32 (if (inputValue current left).toNat < word.toNat then 1 else 0))] after =
         .ok (leaveFrame frame after, [.scalar (.i32 (if (inputValue current left).toNat < word.toNat then 1 else 0))]) := by
     have fetched : (subtractScalarBody profile vectorIndex smallIndex).code[16]? = some (.ret (some .unsigned8)) := by rfl
     have returns : (subtractScalarBody profile vectorIndex smallIndex).returnsValue = true := rfl
-    split <;> simp [run, found, fetched, returns, step, checkedValue, numericValue, Except.mapError,
+    split <;> simp [run, found, fetched, returns, step, cil_guard, observerCount, checkedValue, numericValue, Except.mapError,
       Bind.bind, Except.bind, Pure.pure, Except.pure] <;> rfl
   obtain ⟨fuel, finished⟩ := run_call_exists found (by rfl) stepped ⟨childFuel, invoked⟩ ⟨1, returned⟩
   have keptLeft : inputValue current left = inputValue original left := by
@@ -275,7 +275,7 @@ theorem subtract_scalar_small_route (program : CIL.Program) (method vectorIndex 
        first
        | exact wordLoad _ _
        | (simp (config := { implicitDefEqProofs := false })
-           [step, args, binaryArguments, checkedValue, formValue, fl, fo,
+           [step, cil_guard, observerCount, args, binaryArguments, checkedValue, formValue, fl, fo,
              checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
           try (first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)))
 
@@ -316,7 +316,7 @@ theorem subtract_scalar_vector_route (program : CIL.Program) (method vectorIndex
   have stepped : step (subtractScalarBody profile vectorIndex smallIndex) (.call vectorIndex 3) 24 args frame
       [.reference (.address output), .reference (.address right), .reference (.address left)] current =
         .ok (.call vectorIndex (binaryArguments left right output) [] current) := by
-    simp [step, args, binaryArguments, checkedValue, numericValue, formValue, fl, fr, fo,
+    simp [step, cil_guard, observerCount, args, binaryArguments, checkedValue, numericValue, formValue, fl, fr, fo,
       checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   have returnedRun : run program 1 method 25 args frame (returned ++ []) final =
       .ok (leaveFrame frame final, returned) := by
@@ -324,7 +324,7 @@ theorem subtract_scalar_vector_route (program : CIL.Program) (method vectorIndex
     have returns : (subtractScalarBody profile vectorIndex smallIndex).returnsValue = true := rfl
     rw [result.flag]
     unfold subtractUnderflow
-    split <;> simp [run, found, fetched, returns, step, checkedValue, numericValue, Except.mapError,
+    split <;> simp [run, found, fetched, returns, step, cil_guard, observerCount, checkedValue, numericValue, Except.mapError,
       Bind.bind, Except.bind, Pure.pure, Except.pure] <;> rfl
   obtain ⟨fuel, executed⟩ := run_call_exists found (by rfl) stepped ⟨childFuel, certified.1⟩ ⟨1, returnedRun⟩
   have done := subtract_result_retire original current final frame left right output returned call preserved next owned result
@@ -339,7 +339,7 @@ theorem subtract_scalar_vector_route (program : CIL.Program) (method vectorIndex
       | exact finish
       | (apply run_next_exists post found (by rfl)
          simp (config := { implicitDefEqProofs := false })
-           [step, adv, enabled, bodyProfile, args, binaryArguments, checkedValue, numericValue, formValue, fl, fr, fo,
+           [step, cil_guard, observerCount, adv, enabled, bodyProfile, args, binaryArguments, checkedValue, numericValue, formValue, fl, fr, fo,
              pureArity, scalars, CIL.step.eq_def, CIL.truth, CIL.FeatureProfile.evaluate,
              checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
          try (first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
@@ -347,7 +347,7 @@ theorem subtract_scalar_vector_route (program : CIL.Program) (method vectorIndex
       | exact finish
       | (apply run_next_exists post found (by rfl)
          simp (config := { implicitDefEqProofs := false })
-           [step, adv, bodyProfile, args, binaryArguments, checkedValue, numericValue, formValue, fl, fr, fo,
+           [step, cil_guard, observerCount, adv, bodyProfile, args, binaryArguments, checkedValue, numericValue, formValue, fl, fr, fo,
              pureArity, scalars, CIL.step.eq_def, CIL.truth, CIL.FeatureProfile.evaluate,
              checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
          try (first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))

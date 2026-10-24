@@ -68,7 +68,7 @@ theorem conversion_invoke (ctx : PrimitiveContext) (memory : Memory) (argument :
       .ok (leaveFrame nextFrame constructed, [.scalar (encoded (BitVec.ofNat 256 word.toNat))]) := by
     have fetched : (conversionBody ctx.profile ctx.narrow ctx.constructorIndex).code[(if ctx.narrow then 8 else 7) + 1]? = some .ret := by cases h : ctx.narrow <;> simp [conversionBody]
     have returns : (conversionBody ctx.profile ctx.narrow ctx.constructorIndex).returnsValue = true := by cases h : ctx.narrow <;> simp [conversionBody]
-    simp [run, found, fetched, returns, step, checkedValue, numericValue, encoded, Except.mapError,
+    simp [run, found, fetched, returns, step, cil_guard, observerCount, checkedValue, numericValue, encoded, Except.mapError,
       Bind.bind, Except.bind, Pure.pure, Except.pure]
   obtain ⟨tailFuel, tail⟩ := run_construct_exists found (by cases h : ctx.narrow <;> simp [conversionBody, conversionWords]) stepped ⟨13, childInvoke⟩ childLoad ⟨1, returned⟩
   have body : ∃ fuel final returned,
@@ -85,7 +85,7 @@ theorem conversion_invoke (ctx : PrimitiveContext) (memory : Memory) (argument :
     have kinds : (conversionBody ctx.profile ctx.narrow ctx.constructorIndex).localKinds = [] := by cases h : ctx.narrow <;> simp [conversionBody]
     have locals : (conversionBody ctx.profile ctx.narrow ctx.constructorIndex).locals = [] := by cases h : ctx.narrow <;> simp [conversionBody]
     have aggregates : (conversionBody ctx.profile ctx.narrow ctx.constructorIndex).parameterHomes = [] := by cases h : ctx.narrow <;> simp [conversionBody]
-    simp [enterFrame, conversionBody, makeLocals, makeParameterHomes, makeArgumentHomes, frame,
+    simp [enterFrame, conversionBody, makeSelectedLocals, makeLocals, makeParameterHomes, makeArgumentHomes, frame,
       Bind.bind, Except.bind, Pure.pure, Except.pure]
   have finished : invoke ctx.program fuel ctx.conversionIndex args memory =
       .ok (leaveFrame nextFrame constructed, [.scalar (encoded (BitVec.ofNat 256 word.toNat))]) := by

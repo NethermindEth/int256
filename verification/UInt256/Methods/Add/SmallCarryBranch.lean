@@ -23,7 +23,7 @@ theorem small_carry_dispatch (input output : Reference) (word low : BitVec 64)
   apply run_next_exists post
   · simp only [cil_code]; rfl
   · simp only [cil_code]; rfl
-  · simp [step, numericValue, pureArity, scalars, CIL.step, carry,
+  · simp [step, cil_guard, observerCount, numericValue, pureArity, scalars, CIL.step, carry,
       Bind.bind, Except.bind, Pure.pure, Except.pure]
     exact ⟨rfl, rfl, rfl, rfl⟩
   · exact continuation
@@ -47,7 +47,7 @@ theorem small_zero_dispatch (segment : Fin 3) (input output : Reference) (word :
     apply run_next_exists post
     · simp only [cil_code]; rfl
     · simp only [cil_code]; rfl
-    · simp [step, numericValue, pureArity, scalars, CIL.step, CIL.truth,
+    · simp [step, cil_guard, observerCount, numericValue, pureArity, scalars, CIL.step, CIL.truth,
         Bind.bind, Except.bind, Pure.pure, Except.pure]
       exact ⟨rfl, rfl, rfl, rfl⟩
     · exact continuation
@@ -99,7 +99,7 @@ theorem SmallCarryState.nonzero_prefix {original current : CIL.Safety.Memory} {f
         · simp only [cil_code]; rfl
         · simp only [cil_code]; rfl
         · simp (config := { implicitDefEqProofs := false })
-            [cil_code, smallArguments, step, checkedValue, numericValue, formValue, formed,
+            [cil_code, smallArguments, step, cil_guard, observerCount, checkedValue, numericValue, formValue, formed,
               s1, s2, s3, s4, r1, r2, r3, r4, pureArity, scalars, CIL.step, CIL.truth, nonzero,
               checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
           first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
@@ -137,7 +137,7 @@ theorem SmallCarryState.overflow_prefix {original current : CIL.Safety.Memory} {
       · simp only [cil_code]; rfl
       · simp only [cil_code]; rfl
       · simp (config := { implicitDefEqProofs := false })
-          [cil_code, smallArguments, step, checkedValue, numericValue, formValue, formed,
+          [cil_code, smallArguments, step, cil_guard, observerCount, checkedValue, numericValue, formValue, formed,
             slot, reading, pureArity, scalars, CIL.step,
             checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
         first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩

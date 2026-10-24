@@ -3,6 +3,7 @@ import CIL.Safety.AggregateLocals
 
 import UInt256.Safety.PrivateAggregateStore
 import CIL.Safety.CallComposition
+import CIL.Safety.GuardNormalization
 
 namespace UInt256Proof.Equality.PrimitiveFinish
 
@@ -40,10 +41,10 @@ theorem primitive_store_prefix (memory updated : Memory) (left home : Reference)
   change localSlots = _ at slots
   subst localSlots
   apply run_next_exists post lookup storeFetched
-  · simp [step, stored, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
+  · simp [step, cil_guard, observerCount, stored, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     exact ⟨rfl, rfl, rfl, rfl⟩
   apply run_next_exists post lookup addrFetched
-  · simp [step, localAddress, formValue, formed, checkedAt,
+  · simp [step, cil_guard, observerCount, localAddress, formValue, formed, checkedAt,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     exact ⟨rfl, rfl, rfl, rfl⟩
   exact continuation
@@ -53,7 +54,7 @@ include lookup retFetched returns in
     run program 1 primitiveIndex (primitiveConstructorCall + 4) args frame [.scalar (.i32 flag)] memory =
       .ok (leaveFrame frame memory, [.scalar (.i32 flag)]) := by
   rcases boolean with rfl | rfl <;>
-    simp [run, lookup, retFetched, step, returns, checkedValue, numericValue, CIL.NarrowKind.extend,
+    simp [run, lookup, retFetched, step, cil_guard, observerCount, returns, checkedValue, numericValue, CIL.NarrowKind.extend,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
 #print axioms primitive_store_prefix
 #print axioms primitive_return
@@ -99,7 +100,7 @@ theorem primitive_finish (memory : Memory) (left home : Reference) (right : CIL.
   have stepped : step primitiveBody (.call scalarIndex 2) (primitiveConstructorCall + 3)
       (primitiveArguments left right) frame [.reference (.address home), .reference (.address left)] storedMemory =
       .ok (.call scalarIndex (readOnlyArguments [left, home]) [] storedMemory) := by
-    simp [step, readOnlyArguments, checkedValue, formValue, fl, fh, checkedAt,
+    simp [step, cil_guard, observerCount, readOnlyArguments, checkedValue, formValue, fl, fh, checkedAt,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   obtain ⟨tailFuel, tail⟩ := run_call_exists lookup callFetched stepped
     ⟨childFuel, childCertificate.1⟩ ⟨1, primitive_return program primitiveIndex primitiveConstructorCall primitiveBody lookup retFetched returns _ _ frame childFinal (by split <;> simp)⟩

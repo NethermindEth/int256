@@ -58,7 +58,7 @@ theorem scalar_entry_prefix (program : CIL.Program) (method scalarIndex : Nat) (
       · simp only [found, publicScalarBody, disabled]; rfl
       · simp only [found, publicScalarBody, disabled]; rfl
       · simp (config := { implicitDefEqProofs := false })
-          [found, publicScalarBody, disabled, binaryArguments, step, checkedValue, numericValue, formValue, fl, fr, fo,
+          [found, publicScalarBody, disabled, binaryArguments, step, cil_guard, observerCount, checkedValue, numericValue, formValue, fl, fr, fo,
             pureArity, scalars, CIL.step.eq_def, CIL.truth, CIL.FeatureProfile.evaluate, checkedAt, Except.mapError,
             Bind.bind, Except.bind, Pure.pure, Except.pure]
         try (first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)
@@ -71,10 +71,10 @@ theorem scalar_entry_return (program : CIL.Program) (method scalarIndex : Nat) (
   · apply run_next
     · simp only [found, publicScalarBody, disabled]; rfl
     · simp only [found, publicScalarBody, disabled]; rfl
-    · simp [step, pureArity, instruction, Bind.bind, Except.bind, Pure.pure, Except.pure]
+    · simp [step, cil_guard, observerCount, pureArity, instruction, Bind.bind, Except.bind, Pure.pure, Except.pure]
       try exact ⟨rfl, rfl, rfl, rfl⟩
   · rw [run]
-    simp [found, publicScalarBody, disabled, step, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
+    simp [found, publicScalarBody, disabled, step, cil_guard, observerCount, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 /-- Complete the public feature guard, certified dispatcher invocation and discarded scalar return, leaving only the public postcondition to discharge. -/
 theorem scalar_entry_dispatch (program : CIL.Program) (method scalarIndex : Nat) (profile : CIL.FeatureProfile) (found : program[method]? = some (publicScalarBody profile scalarIndex)) (disabled : profile.avx2 = false)
@@ -108,7 +108,7 @@ theorem scalar_entry_dispatch (program : CIL.Program) (method scalarIndex : Nat)
       (binaryArguments left right output) frame
       [.scalar (.i32 0), .reference (.address output), .reference (.address right), .reference (.address left)] memory =
         .ok (.call scalarIndex ((binaryArguments left right output ++ [.scalar (.i32 0)])) [] memory) := by
-    simp [step, binaryArguments, checkedValue, numericValue, formValue, fl, fr, fo,
+    simp [step, cil_guard, observerCount, binaryArguments, checkedValue, numericValue, formValue, fl, fr, fo,
       checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   obtain ⟨fuel, executed⟩ := run_call_exists found fetched stepped ⟨childFuel, certified.1⟩
     ⟨2, scalar_entry_return program method scalarIndex profile found disabled (binaryArguments left right output) returnedFlag frame final⟩
@@ -135,7 +135,7 @@ theorem add_contract_of_scalar (program : CIL.Program) (method scalarIndex : Nat
   intro memory left right output call
   obtain ⟨frame, entered, setup, live⟩ := call.binary_setup_succeeds
     (body := publicScalarBody profile scalarIndex)
-    (by simp [publicScalarBody, FrameSetupFits, InitializersFit, InitializerFits, AggregateArgumentsFit, ParameterArgumentsFit])
+    (by simp [publicScalarBody, FrameSetupFits, InitializersFit, InitializerFits, AggregateArgumentsFit, ParameterArgumentsFit, SelectedKindsFit])
   have enteredCall := call.after_frame_setup setup
   have preserved := enterFrame_preserves_caller_memory _ _ _ _ _ setup
   have fresh := enterFrame_fresh _ _ _ _ _ setup

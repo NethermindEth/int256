@@ -40,10 +40,10 @@ theorem small_return (branch : Fin 5) (args : List Value) (frame : Frame) (memor
       · simp only [cil_code]; rfl
       · simp only [cil_code]; rfl
       · simp (config := { implicitDefEqProofs := false })
-          [step, pureArity,
+          [step, cil_guard, observerCount, pureArity,
             Bind.bind, Except.bind, Pure.pure, Except.pure]
         first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
-    · simp [run, cil_code, step, CIL.NarrowKind.extend, smallBranchFlag, checkedValue, numericValue,
+    · simp [run, cil_code, step, cil_guard, observerCount, CIL.NarrowKind.extend, smallBranchFlag, checkedValue, numericValue,
         Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 theorem small_no_carry_prefix (input output sumHome : Reference) (word : BitVec 64)
@@ -88,7 +88,7 @@ theorem small_no_carry_prefix (input output sumHome : Reference) (word : BitVec 
       · simp only [cil_code]; rfl
       · simp only [cil_code]; rfl
       · simp (config := { implicitDefEqProofs := false })
-          [cil_code, smallArguments, step, checkedValue, numericValue, formValue, formed,
+          [cil_code, smallArguments, step, cil_guard, observerCount, checkedValue, numericValue, formValue, formed,
             s1, s2, s3, sumSlot, r1, r2, r3, r4, pureArity, scalars, CIL.step,
             checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
         first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
@@ -138,7 +138,7 @@ theorem small_store_finish (branch : Fin 5) (original entered current : CIL.Safe
   · unfold storageArguments
     rw [small_storage_word_order]
     repeat' (conv in (List.filterMap _ Extracted.storeLimbsBody.code) => cbv)
-    simp [List.range_succ, List.findIdx, step, checkedValue, numericValue, formValue, formed,
+    simp [List.range_succ, List.findIdx, step, cil_guard, observerCount, checkedValue, numericValue, formValue, formed,
       checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     exact ⟨rfl, rfl, rfl⟩
   · exact currentCall

@@ -26,7 +26,7 @@ macro "entry_pure" : tactic => `(tactic|
    have formedOutput := state.call.output_formed (reference := output) (by simp)
    apply run_next_exists post found (by first | assumption | rfl)
    · simp (config := { implicitDefEqProofs := false })
-       [step, pureArity.eq_def, binaryArguments, checkedValue, numericValue, formValue, formedLeft, formedRight,
+       [step, cil_guard, observerCount, pureArity.eq_def, binaryArguments, checkedValue, numericValue, formValue, formedLeft, formedRight,
          formedOutput, staticInstruction, memoryInstruction, checkedAt, profileEq, features.avx, features.avx2,
          CIL.FeatureProfile.evaluate, scalars, checkedIntrinsic, CIL.Intrinsic.available, CIL.step.eq_def,
          CIL.binary.eq_def, CIL.unary.eq_def, CIL.truth, instruction.eq_def, Except.mapError, Bind.bind, Except.bind, Pure.pure,
@@ -36,7 +36,7 @@ macro "entry_pure" : tactic => `(tactic|
 set_option hygiene false in
 macro "entry_address" : tactic => `(tactic|
   (apply run_next_exists post found (by first | assumption | rfl)
-   · simp [step, slot0, slot1, slot2, slot3, localAddress, formValue, formed0, formed1, formed2, formed3,
+   · simp [step, cil_guard, observerCount, slot0, slot1, slot2, slot3, localAddress, formValue, formed0, formed1, formed2, formed3,
        checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
      try (first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)))
 
@@ -127,7 +127,7 @@ theorem entry_prepare (program : CIL.Program) (method prepare : Nat) (body : CIL
       [.reference (.address h3), .reference (.address h2), .reference (.address h1), .reference (.address h0),
        .reference (.address output), .reference (.address right), .reference (.address left)] entered =
       .ok (.call prepare (prepareArguments left right output h0 h1 h2 h3) [] entered) := by
-    simp [step, prepareArguments, checkedValue, formValue, formedLeft, formedRight, formedOutput,
+    simp [step, cil_guard, observerCount, prepareArguments, checkedValue, formValue, formedLeft, formedRight, formedOutput,
       formed0, formed1, formed2, formed3, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure,
       Except.pure]
   obtain ⟨total, composed⟩ := run_call_exists found f9 stepped ⟨childFuel, invoked⟩ ⟨fuel, by simpa using ran⟩
@@ -143,14 +143,15 @@ theorem entry_setup (program : CIL.Program) (body : CIL.Method) (memory : Memory
     (left right output : Reference) (call : CallingConditions program memory [left, right] [output])
     (kinds : body.localKinds = entrySpecs.map NumericLocalSpec.kind)
     (initializers : body.locals = entrySpecs.map NumericLocalSpec.value)
-    (arguments : body.vectorArgs = []) (parameters : body.parameterHomes = []) :
+    (arguments : body.vectorArgs = []) (parameters : body.parameterHomes = [])
+    (opaqueLocals : body.opaqueVectorLocals = []) :
     ∃ frame entered,
       enterFrame body (binaryArguments left right output) memory = .ok (frame, entered) ∧
       LiveState program (binaryArguments left right output) frame [] entered ∧
       WritableHomes entered memory.nextIdentity (entrySpecs.map NumericLocalSpec.kind) frame.locals ∧
       ∀ id ∈ frame.owned, memory.nextIdentity ≤ id := by
   obtain ⟨frame, entered, setup, numeric, _, _⟩ := numeric_frame_setup body entrySpecs kinds initializers
-    arguments parameters memory (binaryArguments left right output) call.1.1
+    arguments parameters opaqueLocals memory (binaryArguments left right output) call.1.1
   exact ⟨frame, entered, setup, call.binary_entry_live setup, UInt256Model.Safety.NumericHomes.writable numeric,
     fun id member => ((enterFrame_fresh _ _ _ _ _ setup).2 id member).1⟩
 
@@ -216,7 +217,7 @@ theorem add_tail (program : CIL.Program) (profile : CIL.FeatureProfile) (avx512 
         [.reference (.address output), .scalar (.v256 (propagationMask sum)),
          .scalar (.v256 (generatedCarry a b)), .scalar (.v256 sum)] after =
         .ok (.call finish (finishArguments sum (generatedCarry a b) (propagationMask sum) output) [] after) := by
-      simp [step, finishArguments, checkedValue, numericValue, formValue, formedOutput, checkedAt,
+      simp [step, cil_guard, observerCount, finishArguments, checkedValue, numericValue, formValue, formedOutput, checkedAt,
         Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     obtain ⟨childFuel, finished, invoked, result, writable, footprint⟩ :=
       finishContract after output state.call.without_inputs sum (generatedCarry a b) (propagationMask sum)
@@ -260,7 +261,7 @@ theorem overflow_tail (program : CIL.Program) (profile : CIL.FeatureProfile) (av
       run program 1 0 pc (binaryArguments left right output) frame [.scalar (.i32 flag)] m =
         .ok (leaveFrame frame m, [.scalar (.i32 flag)]) := by
     intro pc flag fetched normalized m
-    simp [run, found, fetched, returns, step, normalized, checkedValue, numericValue,
+    simp [run, found, fetched, returns, step, cil_guard, observerCount, normalized, checkedValue, numericValue,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   entry_load
   entry_load
@@ -294,7 +295,7 @@ theorem overflow_tail (program : CIL.Program) (profile : CIL.FeatureProfile) (av
         [.reference (.address output), .scalar (.v256 (propagationMask sum)),
          .scalar (.v256 (generatedCarry a b)), .scalar (.v256 sum)] after =
         .ok (.call finish (finishArguments sum (generatedCarry a b) (propagationMask sum) output) [] after) := by
-      simp [step, finishArguments, checkedValue, numericValue, formValue, formedOutput, checkedAt,
+      simp [step, cil_guard, observerCount, finishArguments, checkedValue, numericValue, formValue, formedOutput, checkedAt,
         Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     obtain ⟨childFuel, finished, invoked, result, writable, footprint⟩ :=
       finishContract after output state.call.without_inputs sum (generatedCarry a b) (propagationMask sum)
@@ -330,7 +331,7 @@ theorem add_contract_of_callees (program : CIL.Program) (profile : CIL.FeaturePr
     WrappingBinaryContract (· + ·) program 0 := by
   intro memory left right output call
   obtain ⟨frame, entered, setup, live, homes, owned⟩ := entry_setup program (addEntryBody profile finish prepare)
-    memory left right output call rfl rfl rfl rfl
+    memory left right output call rfl rfl rfl rfl rfl
   have finished : ∃ fuel final values,
       run program fuel 0 0 (binaryArguments left right output) frame [] entered = .ok (final, values) ∧
         values = [] ∧ AddPost memory left right output final := by
@@ -354,7 +355,7 @@ theorem add_overflow_contract_of_callees (program : CIL.Program) (profile : CIL.
     ReportingBinaryContract (· + ·) (fun left right => decide (2^256 ≤ left.toNat + right.toNat)) program 0 := by
   intro memory left right output call
   obtain ⟨frame, entered, setup, live, homes, owned⟩ := entry_setup program
-    (addOverflowEntryBody profile finish prepare) memory left right output call rfl rfl rfl rfl
+    (addOverflowEntryBody profile finish prepare) memory left right output call rfl rfl rfl rfl rfl
   have finished : ∃ fuel final values,
       run program fuel 0 0 (binaryArguments left right output) frame [] entered = .ok (final, values) ∧
         values = [.scalar (.i32 (overflowFlag memory left right))] ∧ AddPost memory left right output final := by

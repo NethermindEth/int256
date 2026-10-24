@@ -4,6 +4,7 @@ import CIL.Safety.WordMemory
 import CIL.Safety.AccessBelow
 import CIL.Safety.StepComposition
 import CIL.SymbolicExecution
+import CIL.Safety.GuardNormalization
 
 namespace UInt256Proof.Multiply
 open CIL.Safety
@@ -90,17 +91,17 @@ theorem scalar_word_invoke (profile : CIL.FeatureProfile)
             | exact feature_disabled (scalarWordBody profile) .bmi2 bmi _ _ _ _ _
             | exact feature_disabled (scalarWordBody profile) .armBase64 arm _ _ _ _ _
             | exact branch_zero _ _ _ _ _ _ _
-            | (simp [step, args, checkedValue, numericValue, formValue, formed, checkedAt,
+            | (simp [step, cil_guard, observerCount, args, checkedValue, numericValue, formValue, formed, checkedAt,
                  Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
                try exact ⟨rfl, rfl, rfl, rfl⟩
                done)
       apply Eq.trans
       · apply run_next (target := 26) (values := [.scalar (.i64 (highProduct a b))])
           (nextFrame := frame) (updated := final) found (by rfl)
-        simp [step, staticInstruction, memoryInstruction, storeValue, referenceAt, normalized,
+        simp [step, cil_guard, observerCount, staticInstruction, memoryInstruction, storeValue, referenceAt, normalized,
           BitVec.toNat_mul, CIL.WideMultiply.high64, highProduct, checkedAt,
           Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-      · simp [run, found, scalarWordBody, step, highProduct, leaveFrame, frame, checkedValue, numericValue,
+      · simp [run, found, scalarWordBody, step, cil_guard, observerCount, highProduct, leaveFrame, frame, checkedValue, numericValue,
           Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   · intro id offset outside
     apply write_outside _ _ _ _ _ _ _ written

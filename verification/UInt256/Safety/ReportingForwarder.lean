@@ -3,6 +3,7 @@ import UInt256.Safety.Contract
 import UInt256.Safety.ReportingContract
 import CIL.Safety.CallComposition
 import CIL.Safety.StepComposition
+import CIL.Safety.GuardNormalization
 
 namespace UInt256Model.Safety
 open CIL.Safety
@@ -32,7 +33,7 @@ theorem forward_binary_call (program : CIL.Program) (wrapperIndex childIndex : N
   have stepped : step wrapperBody (.call childIndex 3) 3 args frame
       [.reference (.address output), .reference (.address right), .reference (.address left)] memory =
       .ok (.call childIndex args [] memory) := by
-    simp [args, binaryArguments, step, checkedValue, formValue, fl, fr, fo, checkedAt,
+    simp [args, binaryArguments, step, cil_guard, observerCount, checkedValue, formValue, fl, fr, fo, checkedAt,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   obtain ⟨tailFuel, ran⟩ := run_call_exists found fetched stepped ⟨childFuel, child⟩
     ⟨2, by simpa only [List.append_nil] using tail⟩
@@ -40,15 +41,15 @@ theorem forward_binary_call (program : CIL.Program) (wrapperIndex childIndex : N
       run program fuel wrapperIndex 0 args frame [] memory = .ok (after, returned) ∧
       after = childFinal ∧ returned = wrapperReturned := by
     apply run_next_exists (fun after returned => after = childFinal ∧ returned = wrapperReturned) found f0
-    · simp [step, args, binaryArguments, checkedValue, formValue, fl, checkedAt,
+    · simp [step, cil_guard, observerCount, args, binaryArguments, checkedValue, formValue, fl, checkedAt,
         Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
       exact ⟨rfl, rfl, rfl, rfl⟩
     apply run_next_exists (fun after returned => after = childFinal ∧ returned = wrapperReturned) found f1
-    · simp [step, args, binaryArguments, checkedValue, formValue, fr, checkedAt,
+    · simp [step, cil_guard, observerCount, args, binaryArguments, checkedValue, formValue, fr, checkedAt,
         Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
       exact ⟨rfl, rfl, rfl, rfl⟩
     apply run_next_exists (fun after returned => after = childFinal ∧ returned = wrapperReturned) found f2
-    · simp [step, args, binaryArguments, checkedValue, formValue, fo, checkedAt,
+    · simp [step, cil_guard, observerCount, args, binaryArguments, checkedValue, formValue, fo, checkedAt,
         Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
       exact ⟨rfl, rfl, rfl, rfl⟩
     exact ⟨tailFuel, childFinal, wrapperReturned, ran, rfl, rfl⟩
@@ -57,7 +58,7 @@ theorem forward_binary_call (program : CIL.Program) (wrapperIndex childIndex : N
     simp [args, binaryArguments, checkedValue, formValue, fl, fr, fo, checkedAt,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   have setup : enterFrame wrapperBody args memory = .ok (frame, memory) := by
-    simp [enterFrame, kinds, locals, parameters, vectors, makeLocals, makeParameterHomes, makeArgumentHomes, frame,
+    simp [enterFrame, kinds, locals, parameters, vectors, makeSelectedLocals, makeLocals, makeSelectedLocalsFrom, ite_self, makeParameterHomes, makeArgumentHomes, frame,
       Bind.bind, Except.bind, Pure.pure, Except.pure]
   have live := checked_entry_live_state _ _ _ _ _ _ _ call.1.1 call.2 checked setup
   exact ⟨fuel, certify_invocation _ _ _ _ _ _ _ _ _ _ found checked setup live executed⟩
@@ -82,7 +83,7 @@ theorem forward_reporting_byte (program : CIL.Program) (wrapperIndex childIndex 
     split <;> rfl
   have tail : run program 2 wrapperIndex 4 (binaryArguments left right output)
       ⟨memory.nextIdentity, [], [], []⟩ [.scalar (.i32 bit)] final = .ok (final, [.scalar (.i32 bit)]) := by
-    simp [run, found, fetch, returns, step, normalized, leaveFrame, checkedValue, numericValue,
+    simp [run, found, fetch, returns, step, cil_guard, observerCount, normalized, leaveFrame, checkedValue, numericValue,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   obtain ⟨fuel, certified⟩ := forward_binary_call program wrapperIndex childIndex wrapperBody found
     (by simp [code]) (by simp [code]) (by simp [code]) (by simp [code]) kinds locals parameters vectors memory left right output call
@@ -108,7 +109,7 @@ theorem forward_reporting_pop (program : CIL.Program) (wrapperIndex childIndex :
       ⟨memory.nextIdentity, [], [], []⟩
       [.scalar (.i32 (if flag (inputValue memory left) (inputValue memory right) then 1 else 0))] final =
       .ok (final, []) := by
-    simp [run, found, popFetch, retFetch, returns, step, pureArity, leaveFrame,
+    simp [run, found, popFetch, retFetch, returns, step, cil_guard, observerCount, pureArity, leaveFrame,
       instruction, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   obtain ⟨fuel, certified⟩ := forward_binary_call program wrapperIndex childIndex wrapperBody found
     (by simp [code]) (by simp [code]) (by simp [code]) (by simp [code]) kinds locals parameters vectors memory left right output call

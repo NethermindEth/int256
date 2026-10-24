@@ -18,6 +18,7 @@ structure CarryShape (body : CIL.Method) : Prop where
   locals : body.locals = [.i64 0, .i64 0]
   vectorArgs : body.vectorArgs = []
   parameterHomes : body.parameterHomes = []
+  opaqueVectorLocals : body.opaqueVectorLocals = []
 
 /-- Execution of a two-local carry body whose only memory effects are, in order,
     both local stores, the carry write `cw`, and the sum write. -/
@@ -60,7 +61,7 @@ macro "carry_run_steps " "[" normalize:term,* "]" : tactic => `(tactic| (
     | apply run_call_of_invoke
       · simp only [cil_code]; rfl
       · simp only [cil_code]; rfl
-      · simp [cil_code, step, checkedValue, numericValue, Except.mapError, Bind.bind, Except.bind,
+      · simp [cil_code, step, cil_guard, observerCount, checkedValue, numericValue, Except.mapError, Bind.bind, Except.bind,
           Pure.pure, Except.pure]
         exact ⟨rfl, rfl, rfl, rfl⟩
       · cil_checked_steps
@@ -68,8 +69,8 @@ macro "carry_run_steps " "[" normalize:term,* "]" : tactic => `(tactic| (
     | solve
       | rw [run]
         simp (config := { implicitDefEqProofs := false })
-          [cil_code, step, leaveFrame, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-  simp [run, cil_code, step, leaveFrame, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]))
+          [cil_code, step, cil_guard, observerCount, leaveFrame, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
+  simp [run, cil_code, step, cil_guard, observerCount, leaveFrame, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]))
 
 /-- Ordinary access and private locals suffice; caller references may overlap since the carry is read first. -/
 theorem carry_body_succeeds_of_run (cw : BitVec 64 → BitVec 64 → BitVec 64 → BitVec 64)
@@ -146,7 +147,7 @@ theorem carry_frame_setup_of_shape (shape : CarryShape body) (memory : Memory) (
   let frame : Frame := ⟨memory.nextIdentity, [.bytes .word64 first, .bytes .word64 second],
     [first.allocation, second.allocation], []⟩
   have entered : enterFrame body args memory = .ok (frame, result) := by
-    simp [enterFrame, shape.localKinds, shape.locals, shape.vectorArgs, shape.parameterHomes, makeLocals,
+    simp [enterFrame, shape.localKinds, shape.locals, shape.vectorArgs, shape.parameterHomes, shape.opaqueVectorLocals, makeSelectedLocals, makeLocals,
       madeFirst, madeSecond, makeArgumentHomes, makeParameterHomes, frame, Bind.bind, Except.bind,
       Pure.pure, Except.pure]
   refine ⟨first, second, frame, result, entered, rfl, rfl, ?_, ?_, readSecond, ?_, writeSecond,

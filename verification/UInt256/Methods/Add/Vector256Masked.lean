@@ -117,9 +117,9 @@ theorem prepare_inputs (program : CIL.Program) (method : Nat) (profile : CIL.Fea
   rw [sameLeft] at castLeft
   prep_pure
   apply run_next_exists post found (by rfl)
-  · simp only [step, pureArity, loadLeft]; rfl
+  · simp only [step, cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, pureArity, loadLeft]; rfl
   apply run_next_exists post found (by rfl)
-  · simp only [step, staticInstruction, castLeft]; rfl
+  · simp only [step, cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, staticInstruction, castLeft]; rfl
   prep_store
   have loadRight := UInt256Proof.Equality.VectorPrimitive.load_input state.call (by simp : right ∈ [left, right])
   have castRight := UInt256Proof.Equality.VectorPrimitive.cast_input current right
@@ -127,9 +127,9 @@ theorem prepare_inputs (program : CIL.Program) (method : Nat) (profile : CIL.Fea
   rw [sameRight] at castRight
   prep_pure
   apply run_next_exists post found (by rfl)
-  · simp only [step, pureArity, loadRight]; rfl
+  · simp only [step, cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, pureArity, loadRight]; rfl
   apply run_next_exists post found (by rfl)
-  · simp only [step, staticInstruction, castRight]; rfl
+  · simp only [step, cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, staticInstruction, castRight]; rfl
   prep_store
   prep_pure
   prep_load
@@ -233,7 +233,7 @@ theorem prepare_tail (program : CIL.Program) (method : Nat) (profile : CIL.Featu
   have returns : (prepareMaskedBody profile).returnsValue = false := rfl
   have fetched : (prepareMaskedBody profile).code[73]? = some .ret := rfl
   refine ⟨1, _, _, ?_, continuation current state scratch⟩
-  simp [run, found, fetched, returns, step, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
+  simp [run, found, fetched, returns, step, cil_guard, observerCount, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 #print axioms prepare_tail
 
@@ -260,7 +260,7 @@ theorem prepare_invoke (program : CIL.Program) (method : Nat) (profile : CIL.Fea
   let a := inputValue original left
   let b := inputValue original right
   obtain ⟨frame, entered, setup, numeric, below, _⟩ := numeric_frame_setup
-    (prepareMaskedBody profile) prepareSpecs rfl rfl rfl rfl memory args call.1.1
+    (prepareMaskedBody profile) prepareSpecs rfl rfl rfl rfl rfl memory args call.1.1
   have homes : WritableHomes entered memory.nextIdentity
       (prepareMaskedBody profile).localKinds frame.locals :=
     UInt256Model.Safety.NumericHomes.writable numeric

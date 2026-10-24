@@ -57,7 +57,7 @@ theorem vector128_output_dispatch (program : CIL.Program) (body : CIL.Method) (m
     | exact continuation
     | (apply run_next_exists post found (by simp [code, List.getElem?_append, leadingLength, earlyOutputCode, selected]; rfl)
        simp (config := { implicitDefEqProofs := false })
-         [step, selected, argument, checkedValue, formValue, formed, instruction,
+         [step, cil_guard, observerCount, selected, argument, checkedValue, formValue, formed, instruction,
            pureArity, scalars, CIL.step.eq_def, CIL.FeatureProfile.evaluate,
            numericValue, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
        first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)
@@ -132,7 +132,7 @@ theorem vector128_early_output (program : CIL.Program) (body : CIL.Method) (meth
          | exact loadLow _ _
          | exact loadHigh _ _
          | (simp (config := { implicitDefEqProofs := false })
-             [localResult, step, argument, checkedValue, formValue, formed, staticInstruction, memoryInstruction,
+             [localResult, step, cil_guard, observerCount, argument, checkedValue, formValue, formed, staticInstruction, memoryInstruction,
                storeValue, referenceAt, firstWrite, secondWrite, address, CIL.offsetValue,
                checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
             first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))

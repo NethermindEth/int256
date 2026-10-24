@@ -39,7 +39,7 @@ private theorem limb_address {program : CIL.Program} {memory : Memory}
   exact ready.add_slice call.1.1 8 index.val 8 (by omega) (by dsimp [wordView] at ready ⊢; omega)
 
 macro "storage_step" facts:term,* : tactic =>
-  `(tactic| simp [step, arguments, checkedValue, numericValue, formValue,
+  `(tactic| simp [step, cil_guard, observerCount, arguments, checkedValue, numericValue, formValue,
     pureArity, instruction, staticInstruction, memoryInstruction, CIL.offsetValue, storeValue, referenceAt, ordinaryAccessAlignment,
     checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure,
     cil_code, $[$facts:term],*])
@@ -86,7 +86,7 @@ theorem store_limbs_safe (profile : CIL.FeatureProfile) (scalar : profile.vector
           | storage_step f0, f1, f2, f3, a0, a1, a2, a3, h0, h1, h2, h3
             try exact ⟨rfl, rfl, rfl, rfl⟩
             done
-    simp [run, found, body, step, leaveFrame, Except.mapError,
+    simp [run, found, body, step, cil_guard, observerCount, leaveFrame, Except.mapError,
       Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 #print axioms store_limbs_safe

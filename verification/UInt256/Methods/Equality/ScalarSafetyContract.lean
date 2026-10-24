@@ -4,6 +4,7 @@ import UInt256.Safety.LimbAccess
 import CIL.Safety.StepComposition
 import UInt256.Methods.Equality.Lemmas
 import UInt256.Safety.ReadOnlyExecution
+import CIL.Safety.GuardNormalization
 
 namespace UInt256Proof.Equality.Safety
 
@@ -52,12 +53,12 @@ theorem scalar_run (memory : Memory) (left right : Reference) (frame : Frame)
       · simp only [cil_code]; rfl
       · simp only [cil_code]; rfl
       · simp (config := { implicitDefEqProofs := false })
-          [step, readOnlyArguments, checkedValue, numericValue, formValue, fl, fr,
+          [step, cil_guard, observerCount, readOnlyArguments, checkedValue, numericValue, formValue, fl, fr,
             hl0, hl1, hl2, hl3, hr0, hr1, hr2, hr3, hc, pureArity, scalars, CIL.step.eq_def, CIL.binary, CIL.unary, checkedAt,
             Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
         try (exact ⟨rfl, rfl, rfl, rfl⟩)
         done
-  simp [run, cil_code, step, checkedValue, numericValue, scalarDifference, CIL.NarrowKind.extend,
+  simp [run, cil_code, step, cil_guard, observerCount, checkedValue, numericValue, scalarDifference, CIL.NarrowKind.extend,
     Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   split <;> rfl
 #print axioms scalar_run
@@ -105,7 +106,7 @@ theorem scalar_body_found : Extracted.program[scalarIndex]? = some scalarBody :=
 theorem scalar_frame_fits (left right : Reference) :
     FrameSetupFits scalarBody (readOnlyArguments [left, right]) := by
   conv in scalarBody => cbv
-  simp [FrameSetupFits, InitializersFit, AggregateArgumentsFit, ParameterArgumentsFit]
+  simp [FrameSetupFits, InitializersFit, AggregateArgumentsFit, ParameterArgumentsFit, SelectedKindsFit]
 
 theorem scalar_checked (memory : Memory) (left right : Reference)
     (call : CallingConditions Extracted.program memory [left, right] []) :

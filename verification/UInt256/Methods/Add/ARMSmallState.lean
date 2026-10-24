@@ -16,7 +16,7 @@ theorem arm_small_frame_setup (profile : CIL.FeatureProfile) (storage : Nat) (me
       NumericHomes entered memory.nextIdentity armSmallSpecs frame.locals ∧
       MemoryBelow memory.nextIdentity memory entered ∧ entered.WellFormed :=
   numeric_frame_setup (armSmallBody profile storage) armSmallSpecs (arm_small_local_metadata profile storage).1
-    (arm_small_local_metadata profile storage).2 (by rfl) (by rfl) memory args wf
+    (arm_small_local_metadata profile storage).2 (by rfl) (by rfl) (by rfl) memory args wf
 
 /-- Original initialized-home evidence justifies later private writes after any prior checked writes, with byte width and representability checked explicitly. -/
 theorem arm_small_private_store (program : CIL.Program) (profile : CIL.FeatureProfile) (storage : Nat) (boundary : Nat) (entered current : Memory)
@@ -210,7 +210,7 @@ theorem arm_small_prepare (program : CIL.Program) (method storage : Nat) (profil
     apply arm_small_sum program method storage profile found enabled input output lowHome word (inputLimb original input 0) frame
       current middle lowSlot lowRead (sumStep 17 _ []) post
     apply run_next_exists post found (by rfl)
-    · simp [step, instruction, Bind.bind, Except.bind, Pure.pure, Except.pure]
+    · simp [step, cil_guard, observerCount, instruction, Bind.bind, Except.bind, Pure.pure, Except.pure]
       first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
     · exact run_next_exists (op := .setLocal 6 (some .unsigned8)) post found (by rfl) (flagStep 19 (armSmallArguments input output word) []) (continuation after ready)
 
@@ -269,7 +269,7 @@ theorem arm_small_store_return (program : CIL.Program) (method storage : Nat) (p
       [.scalar (.i64 (words 3)), .scalar (.i64 (words 2)), .scalar (.i64 (words 1)),
         .scalar (.i64 (words 0)), .reference (.address output)] memory =
       .ok (.call storage (UInt256Proof.Multiply.LimbStorage.arguments output (words 0) (words 1) (words 2) (words 3)) [] memory) := by
-    simp [step, UInt256Proof.Multiply.LimbStorage.arguments, checkedValue, numericValue,
+    simp [step, cil_guard, observerCount, UInt256Proof.Multiply.LimbStorage.arguments, checkedValue, numericValue,
       formValue, formed, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     try exact ⟨rfl, rfl⟩
   have retained : read stored flagHome 1 1 = .ok (numberBytes flag.toNat 1) := by

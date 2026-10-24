@@ -13,16 +13,14 @@ private theorem step_arg_address {body : CIL.Method} {pc i : Nat} {args : List V
     {stack : List Value} {m : Memory} {r : Reference}
     (h : args[i]? = some (.reference (.address r))) (formed : form m r = .ok r) :
     step body (.arg i) pc args frame stack m = .ok (.next (pc + 1) (.reference (.address r) :: stack) frame m) := by
-  unfold step
-  simp only [h, checkedValue, formValue, formed, checkedAt, Except.mapError, Bind.bind, Except.bind,
+  simp only [cil_step, h, checkedValue, formValue, formed, checkedAt, Except.mapError, Bind.bind, Except.bind,
     Pure.pure, Except.pure]
 
 private theorem step_fieldAt_of {body : CIL.Method} {pc offset width : Nat} {args : List Value} {frame : Frame}
     {stack values : List Value} {m m' : Memory}
     (h : instruction (.fieldAt offset width) stack m = .ok (m', values)) :
     step body (.fieldAt offset width) pc args frame stack m = .ok (.next (pc + 1) values frame m') := by
-  unfold step
-  simp only [show pureArity (.fieldAt offset width) = none from rfl, h, Bind.bind, Except.bind, Pure.pure, Except.pure]
+  simp only [cil_step, instructionStep, h, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 def body (profile : CIL.FeatureProfile) : CIL.Method := { profile := profile, returnsValue := true, locals := [], localKinds := [], parameterHomes := [], staticSites := [], code := [
   .arg 0,
@@ -149,7 +147,7 @@ variable (profile : CIL.FeatureProfile) (program : CIL.Program) (index : Nat)
 
 theorem scalar_frame_fits (left right : Reference) :
     FrameSetupFits (body profile) (readOnlyArguments [left, right]) := by
-  simp [body, FrameSetupFits, InitializersFit, AggregateArgumentsFit, ParameterArgumentsFit]
+  simp [body, FrameSetupFits, InitializersFit, AggregateArgumentsFit, ParameterArgumentsFit, SelectedKindsFit]
 
 include found in
 theorem scalar_checked (memory : Memory) (left right : Reference)

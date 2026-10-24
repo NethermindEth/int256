@@ -1,6 +1,7 @@
 import UInt256.Safety.FourLimbWrites
 import UInt256.Safety.OutputReadability
 import CIL.Safety.StepComposition
+import CIL.Safety.GuardNormalization
 import CIL.Safety.ValueBitCasts
 import CIL.SymbolicExecution
 
@@ -13,14 +14,14 @@ private theorem s_arg {body : CIL.Method} {pc i : Nat} {args : List Value} {fram
     (h : args[i]? = some (.reference (.address r))) (formed : form m r = .ok r) :
     step body (.arg i) pc args frame stack m = .ok (.next (pc + 1) (.reference (.address r) :: stack) frame m) := by
   unfold step
-  simp only [h, checkedValue, formValue, formed, checkedAt, Except.mapError, Bind.bind, Except.bind,
+  simp only [cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, h, checkedValue, formValue, formed, checkedAt, Except.mapError, Bind.bind, Except.bind,
     Pure.pure, Except.pure]
 
 private theorem s_skipInit {body : CIL.Method} {pc : Nat} {args : List Value} {frame : Frame}
     {rest : List Value} {m : Memory} {r : Reference} (formed : form m r = .ok r) :
     step body .skipInit pc args frame (.reference (.address r) :: rest) m = .ok (.next (pc + 1) rest frame m) := by
   unfold step instruction
-  simp only [show pureArity .skipInit = none from rfl, formValue, formed, checkedAt, Except.mapError,
+  simp only [cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, show pureArity .skipInit = none from rfl, formValue, formed, checkedAt, Except.mapError,
     Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 private theorem s_fieldAddress {body : CIL.Method} {pc offset : Nat} {args : List Value} {frame : Frame}
@@ -29,7 +30,7 @@ private theorem s_fieldAddress {body : CIL.Method} {pc offset : Nat} {args : Lis
     step body (.fieldAddress offset) pc args frame (.reference (.address r) :: rest) m =
       .ok (.next (pc + 1) (.reference (.address result) :: rest) frame m) := by
   unfold step instruction
-  simp only [show pureArity (.fieldAddress offset) = none from rfl, added, checkedAt, Except.mapError,
+  simp only [cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, show pureArity (.fieldAddress offset) = none from rfl, added, checkedAt, Except.mapError,
     Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 private theorem s_asRef {body : CIL.Method} {pc : Nat} {args : List Value} {frame : Frame}
@@ -37,7 +38,7 @@ private theorem s_asRef {body : CIL.Method} {pc : Nat} {args : List Value} {fram
     step body (.memory .asRef) pc args frame (.reference (.address r) :: rest) m =
       .ok (.next (pc + 1) (.reference (.address r) :: rest) frame m) := by
   unfold step staticInstruction memoryInstruction
-  simp only [formValue, formed, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
+  simp only [cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, formValue, formed, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 private theorem s_store64 {body : CIL.Method} {pc : Nat} {args : List Value} {frame : Frame}
     {rest : List Value} {m m' : Memory} {r : Reference} {bits : BitVec 64}
@@ -45,7 +46,7 @@ private theorem s_store64 {body : CIL.Method} {pc : Nat} {args : List Value} {fr
     step body .store64 pc args frame (.scalar (.i64 bits) :: .reference (.address r) :: rest) m =
       .ok (.next (pc + 1) rest frame m') := by
   unfold step instruction storeValue
-  simp only [show pureArity .store64 = none from rfl, referenceAt, ordinaryAccessAlignment, written, checkedAt,
+  simp only [cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, show pureArity .store64 = none from rfl, referenceAt, ordinaryAccessAlignment, written, checkedAt,
     Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 def body (profile : CIL.FeatureProfile) : CIL.Method :=
@@ -60,7 +61,7 @@ def arguments (output : Reference) (w0 w1 w2 w3 : BitVec 64) : List Value :=
     .scalar (.i64 w2), .scalar (.i64 w3)]
 
 macro "limb_storage_step" facts:term,* : tactic =>
-  `(tactic| simp [step, arguments, checkedValue, numericValue, formValue,
+  `(tactic| simp [step, cil_guard, observerCount, arguments, checkedValue, numericValue, formValue,
     pureArity, instruction, staticInstruction, memoryInstruction, storeValue, referenceAt, ordinaryAccessAlignment,
     checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure,
     cil_code, $[$facts:term],*])

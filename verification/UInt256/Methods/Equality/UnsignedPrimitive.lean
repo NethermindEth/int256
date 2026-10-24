@@ -57,7 +57,7 @@ macro "primitive_prefix" found:term "," inactive:term : tactic => `(tactic|
      | exact continuation
      | (apply run_next_exists post $found
         · simp only [body32, body64]; rfl
-        · simp [body32, body64, step, primitiveArguments, checkedValue, numericValue, formValue, formed,
+        · simp [body32, body64, step, cil_guard, observerCount, primitiveArguments, checkedValue, numericValue, formValue, formed,
             pureArity, scalars, instruction, CIL.unary, CIL.step.eq_def, CIL.truth, CIL.FeatureProfile.evaluate, $inactive:term,
             checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
           try (exact ⟨rfl, rfl, rfl, rfl⟩))))
@@ -89,7 +89,7 @@ theorem checked64 (profile : CIL.FeatureProfile) (program : CIL.Program) (index 
   simpa only [scalarOperatorArguments, Bool.false_eq_true, ite_false, scalarArguments, primitiveArguments,
     Bool.bne_false, decide_eq_true_eq] using
     primitive_checked program index 10 scalarIndex constructorIndex (body64 profile scalarIndex constructorIndex) profile
-      found rfl rfl rfl rfl rfl rfl scalarFound constructorFound rfl rfl rfl rfl memory left (.i64 right) right
+      found rfl rfl rfl rfl rfl rfl scalarFound constructorFound rfl rfl rfl rfl rfl memory left (.i64 right) right
       rfl (prefix64 profile program index scalarIndex constructorIndex inactive found right) call
 
 #print axioms checked64
@@ -108,7 +108,7 @@ theorem checked32 (profile : CIL.FeatureProfile) (program : CIL.Program) (index 
   simpa only [scalarOperatorArguments, Bool.false_eq_true, ite_false, scalarArguments, primitiveArguments,
     Bool.bne_false, decide_eq_true_eq, widen] using
     primitive_checked program index 11 scalarIndex constructorIndex (body32 profile scalarIndex constructorIndex) profile
-      found rfl rfl rfl rfl rfl rfl scalarFound constructorFound rfl rfl rfl rfl memory left (.i32 right) (BitVec.zeroExtend 64 right)
+      found rfl rfl rfl rfl rfl rfl scalarFound constructorFound rfl rfl rfl rfl rfl memory left (.i32 right) (BitVec.zeroExtend 64 right)
       rfl (prefix32 profile program index scalarIndex constructorIndex inactive found right) call
 
 #print axioms checked32

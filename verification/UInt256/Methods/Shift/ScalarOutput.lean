@@ -92,7 +92,7 @@ theorem shift_output_arguments (whole : Fin 4) (memory : Memory) (frame : Frame)
         | exact loadWord 3 _ _
         | rfl
         | (simp (config := { implicitDefEqProofs := false })
-            [step, argument, checkedValue, formValue, formed, numericValue, pureArity, scalars,
+            [step, cil_guard, observerCount, argument, checkedValue, formValue, formed, numericValue, pureArity, scalars,
               CIL.step, CIL.binary, Bind.bind, Except.bind, Pure.pure, Except.pure]
            first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)
 
@@ -111,7 +111,7 @@ theorem shift_output_dispatch (whole : Fin 4) (memory : Memory) (frame : Frame)
       run program fuel index (39) args frame [] memory =
         .ok (final, returned) ∧ post final returned := by
   have fits : localNumber .word32 (.i32 (BitVec.ofNat 32 whole.val)) = .ok whole.val := by
-    simp [localNumber, Nat.mod_eq_of_lt (show whole.val < 2^32 by omega)]
+    simp [localNumber, CIL.Value.hasUnspecified, Nat.mod_eq_of_lt (show whole.val < 2^32 by omega)]
   have load := fun (pc : Nat) (stack : List Value) => step_load_numeric_local
     (body := (scalarBody profile direction storage)) (args := args) (pc := pc) (stack := stack)
     .word32 (.i32 (BitVec.ofNat 32 whole.val)) whole.val fits slot loaded
@@ -128,7 +128,7 @@ theorem shift_output_dispatch (whole : Fin 4) (memory : Memory) (frame : Frame)
         | exact load _ _
         | rfl
         | (simp (config := { implicitDefEqProofs := false })
-            [step, checkedValue, numericValue, pureArity, scalars, CIL.step, CIL.binary,
+            [step, cil_guard, observerCount, checkedValue, numericValue, pureArity, scalars, CIL.step, CIL.binary,
               Bind.bind, Except.bind, Pure.pure, Except.pure]
            first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)
 

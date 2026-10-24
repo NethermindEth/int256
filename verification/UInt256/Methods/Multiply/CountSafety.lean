@@ -4,6 +4,7 @@ import CIL.Safety.WordMemory
 import CIL.Safety.ReturnMemory
 import CIL.Safety.AccessBelow
 import CIL.Safety.StepComposition
+import CIL.Safety.GuardNormalization
 
 namespace UInt256Proof.Multiply.CountSafety
 open CIL.Safety
@@ -13,7 +14,7 @@ private theorem s_arg {body : CIL.Method} {pc i : Nat} {args : List Value} {fram
     (h : args[i]? = some (.reference (.address r))) (formed : form m r = .ok r) :
     step body (.arg i) pc args frame stack m = .ok (.next (pc + 1) (.reference (.address r) :: stack) frame m) := by
   unfold step
-  simp only [h, checkedValue, formValue, formed, checkedAt, Except.mapError, Bind.bind, Except.bind,
+  simp only [cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, h, checkedValue, formValue, formed, checkedAt, Except.mapError, Bind.bind, Except.bind,
     Pure.pure, Except.pure]
 
 private theorem s_load64 {body : CIL.Method} {pc : Nat} {args : List Value} {frame : Frame}
@@ -21,7 +22,7 @@ private theorem s_load64 {body : CIL.Method} {pc : Nat} {args : List Value} {fra
     (loaded : loadValue m r 8 = .ok v) :
     step body .load64 pc args frame (.reference r :: rest) m = .ok (.next (pc + 1) (.scalar v :: rest) frame m) := by
   unfold step instruction
-  simp only [show pureArity .load64 = none from rfl, loaded, Bind.bind, Except.bind, Pure.pure, Except.pure]
+  simp only [cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, show pureArity .load64 = none from rfl, loaded, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 private theorem s_store64 {body : CIL.Method} {pc : Nat} {args : List Value} {frame : Frame}
     {rest : List Value} {m m' : Memory} {r : Reference} {bits : BitVec 64}
@@ -29,7 +30,7 @@ private theorem s_store64 {body : CIL.Method} {pc : Nat} {args : List Value} {fr
     step body .store64 pc args frame (.scalar (.i64 bits) :: .reference (.address r) :: rest) m =
       .ok (.next (pc + 1) rest frame m') := by
   unfold step instruction storeValue
-  simp only [show pureArity .store64 = none from rfl, referenceAt, ordinaryAccessAlignment, written, checkedAt,
+  simp only [cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, show pureArity .store64 = none from rfl, referenceAt, ordinaryAccessAlignment, written, checkedAt,
     Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 def body (profile : CIL.FeatureProfile) : CIL.Method :=
@@ -59,7 +60,7 @@ theorem count_carry_invoke (profile : CIL.FeatureProfile) (program : CIL.Program
   obtain ⟨allocation, present, _, _⟩ := formed_reference_live _ _ _ formed
   have old := (wf.1 _ _ present).1
   obtain ⟨frame, entered, setup, homes, before, enteredWF⟩ :=
-    numeric_frame_setup (body profile) specs (by rfl) (by rfl) (by rfl) (by rfl) memory args wf
+    numeric_frame_setup (body profile) specs (by rfl) (by rfl) (by rfl) (by rfl) (by rfl) memory args wf
   obtain ⟨home, slot, bound, _, ready⟩ := homes.home_at 0 ⟨.word64, .i64 0, 0, rfl⟩ (by rfl)
   obtain ⟨middle, stored, written, sumRead⟩ := step_store_numeric_local
     (body := (body profile)) (pc := 3) (args := args) (rest := [])

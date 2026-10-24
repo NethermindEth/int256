@@ -212,7 +212,7 @@ theorem VectorFrame.output_store_scratch {program : CIL.Program} {original enter
   have mine : step body (.memory .store256) pc args frame
       (.scalar (.v256 value) :: .reference (.address output) :: rest) current =
       .ok (.next (pc + 1) rest frame written) := by
-    simp [step, staticInstruction, memoryInstruction, storeValue, referenceAt, ordinaryAccessAlignment,
+    simp [step, cil_guard, observerCount, staticInstruction, memoryInstruction, storeValue, referenceAt, ordinaryAccessAlignment,
       write, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   rw [stepped] at mine
   have same : after = written := by
@@ -248,7 +248,7 @@ theorem VectorFrame.cell_store {program : CIL.Program} {original entered current
   refine ⟨after, ?_, ⟨state.call.after_write write, state.enteredWF, state.enteredBound,
     Nat.le_trans state.next (write_extends_allocations _ _ _ _ _ write).next,
     state.authority.trans (write_preserves_access_below write _), ?_, ?_, ?_⟩, next⟩
-  · simp [step, staticInstruction, memoryInstruction, storeValue, referenceAt, ordinaryAccessAlignment,
+  · simp [step, cil_guard, observerCount, staticInstruction, memoryInstruction, storeValue, referenceAt, ordinaryAccessAlignment,
       write, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   · intro other entry specified
     obtain ⟨kind, reference, number, slot, fits, result, loaded⟩ := state.locals other entry specified
@@ -328,7 +328,7 @@ theorem run_cell_load {program : CIL.Program} {body : CIL.Method} {method pc : N
       run program fuel method pc args frame (.reference (.address cell) :: stack) current =
         .ok (result, returned) ∧ post result returned := by
   apply run_next_exists post found fetched _ continuation
-  simp [step, staticInstruction, memoryInstruction, scratch_load loaded,
+  simp [step, cil_guard, observerCount, staticInstruction, memoryInstruction, scratch_load loaded,
     Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 /-- A 256-bit store to a scratch cell; the continuation receives the updated frame and cells. -/

@@ -70,7 +70,7 @@ theorem construct_prefix (program : CIL.Program) (index pc constructor : Nat)
       apply Eq.trans
       · apply run_next (target := pc + 2) (values := []) (nextFrame := nextFrame)
           (updated := stored) found storeFetched
-        simp [step, pureArity, instruction, referenceAt, length, written, checkedAt,
+        simp [step, cil_guard, observerCount, pureArity, instruction, referenceAt, length, written, checkedAt,
           Nat.add_assoc, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
       exact continuation
     have child : invoke program 13 constructor
@@ -102,7 +102,7 @@ theorem construct_result (program : CIL.Program) (scalarIndex constructPC constr
   let nextFrame : Frame := ⟨memory.nextIdentity, [], [temporary.allocation], []⟩
   have tail : run program 1 scalarIndex (constructPC + 2) args nextFrame [] stored =
       .ok (leaveFrame nextFrame stored, []) := by
-    simp [run, found, returnFetched, returns, step, Except.mapError,
+    simp [run, found, returnFetched, returns, step, cil_guard, observerCount, Except.mapError,
       Bind.bind, Except.bind, Pure.pure, Except.pure]
   obtain ⟨fuel, finished⟩ := continuation _ [] ⟨1, tail⟩
   have after := leaveFrame_preserves_memory_below nextFrame stored memory.nextIdentity

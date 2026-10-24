@@ -27,7 +27,7 @@ theorem entry_scalar_prefix (left right output : Reference) (frame : Frame) (mem
       · simp only [cil_code]; rfl
       · simp only [cil_code]; rfl
       · simp (config := { implicitDefEqProofs := false })
-          [cil_code, binaryArguments, step, checkedValue, numericValue, formValue, fl, fr, fo,
+          [cil_code, binaryArguments, step, cil_guard, observerCount, checkedValue, numericValue, formValue, fl, fr, fo,
             pureArity, scalars, CIL.step, CIL.FeatureProfile.evaluate, checkedAt, Except.mapError,
             Bind.bind, Except.bind, Pure.pure, Except.pure]
         first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
@@ -40,10 +40,10 @@ theorem entry_scalar_return (args : List Value) (flag : BitVec 32) (frame : Fram
   · apply run_next
     · simp only [cil_code]; rfl
     · simp only [cil_code]; rfl
-    · simp [step, pureArity, instruction, Bind.bind, Except.bind, Pure.pure, Except.pure]
+    · simp [step, cil_guard, observerCount, pureArity, instruction, Bind.bind, Except.bind, Pure.pure, Except.pure]
       exact ⟨rfl, rfl, rfl, rfl⟩
   · rw [run]
-    simp [cil_code, step, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
+    simp [cil_code, step, cil_guard, observerCount, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 structure PublicAddResult (original final : CIL.Safety.Memory) (left right output : Reference) : Prop where
   wellFormed : final.WellFormed
@@ -78,7 +78,7 @@ theorem entry_run_checked (contract : CarryHelperContract Extracted.program Extr
       have fl := enteredCall.input_formed (reference := left) (by simp)
       have fr := enteredCall.input_formed (reference := right) (by simp)
       have fo := enteredCall.output_formed (reference := output) (by simp)
-      simp [step, scalarArguments, binaryArguments, checkedValue, numericValue, formValue, fl, fr, fo,
+      simp [step, cil_guard, observerCount, scalarArguments, binaryArguments, checkedValue, numericValue, formValue, fl, fr, fo,
         checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     obtain ⟨fuel, finished⟩ := run_call_exists mf fetched stepped ⟨childFuel, invoked⟩
       ⟨2, entry_scalar_return _ (addOverflow entered left right) frame after⟩

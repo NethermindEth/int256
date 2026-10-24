@@ -2,6 +2,7 @@ import CIL.Safety.StepComposition
 import UInt256.Safety.ReadOnlyScalarExecution
 import CIL.SymbolicExecution
 import CIL.Safety.Equations
+import CIL.Safety.GuardNormalization
 
 namespace UInt256Proof.Equality.VectorPrimitive
 open CIL.Safety UInt256Model.Safety
@@ -16,7 +17,7 @@ theorem load_input {program : CIL.Program} {memory : Memory} {inputs outputs : L
       .ok (memory, .scalar (.aggregate (inputBytes memory input)) :: rest) := by
   have loaded := call.input_snapshot member
   unfold instruction
-  simp only [dereference, ordinaryAccessAlignment, loaded, inputBytes, checkedAt, Except.mapError,
+  simp only [cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, dereference, ordinaryAccessAlignment, loaded, inputBytes, checkedAt, Except.mapError,
     Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 theorem cast_input (memory : Memory) (input : Reference) (rest : List Value) :
@@ -34,24 +35,28 @@ private theorem s_arg {body : CIL.Method} {pc i : Nat} {args : List Value} {fram
     (h : args[i]? = some (.reference (.address r))) (formed : form m r = .ok r) :
     step body (.arg i) pc args frame stack m = .ok (.next (pc + 1) (.reference (.address r) :: stack) frame m) := by
   unfold step
-  simp only [h, checkedValue, formValue, formed, checkedAt, Except.mapError, Bind.bind, Except.bind,
+  simp only [cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, h, checkedValue, formValue, formed, checkedAt, Except.mapError, Bind.bind, Except.bind,
     Pure.pure, Except.pure]
 
 private theorem s_loadAggregate {body : CIL.Method} {pc size : Nat} {args : List Value} {frame : Frame}
     {stack values : List Value} {m m' : Memory}
     (h : instruction (.loadAggregate size) stack m = .ok (m', values)) :
     step body (.loadAggregate size) pc args frame stack m = .ok (.next (pc + 1) values frame m') := by
-  unfold step
-  simp only [show pureArity (.loadAggregate size) = none from rfl, h, Bind.bind, Except.bind, Pure.pure,
-    Except.pure]
+  simp only [cil_step, instructionStep, h, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 private theorem s_bitcast {body : CIL.Method} {pc : Nat} {args : List Value} {frame : Frame}
     {stack values : List Value} {m m' : Memory} {source target : CIL.SnapshotShape}
     (h : memoryInstruction (.bitcastValue source target) stack m = .ok (m', values)) :
     step body (.memory (.bitcastValue source target)) pc args frame stack m =
       .ok (.next (pc + 1) values frame m') := by
-  unfold step staticInstruction
-  simp only [h, Bind.bind, Except.bind, Pure.pure, Except.pure]
+  have known : unspecifiedOperands (CIL.MemoryOp.bitcastValue source target).argumentCount stack = false := by
+    cases observed : unspecifiedOperands (CIL.MemoryOp.bitcastValue source target).argumentCount stack
+    · rfl
+    · unfold memoryInstruction at h
+      simp only [observed, ite_true] at h
+      cases h
+  simp only [cil_step, known, staticInstruction, h, Bool.false_eq_true, ite_false, Bind.bind, Except.bind,
+    Pure.pure, Except.pure]
 
 def body (narrow : Bool) (profile : CIL.FeatureProfile) : CIL.Method :=
   { profile := profile, returnsValue := true, locals := [], code := [
@@ -144,7 +149,7 @@ theorem checked32 (profile : CIL.FeatureProfile) (program : CIL.Program) (index 
     ReadOnlyScalarContract CIL.Value.i32
       (fun input word => .i32 (if input = word.zeroExtend 256 then 1 else 0)) program index :=
   certify_readOnly_scalar program index (body true profile) CIL.Value.i32 _ found (fun _ => rfl)
-    (by intro left right; simp [body, FrameSetupFits, InitializersFit, InitializerFits, AggregateArgumentsFit, ParameterArgumentsFit])
+    (by intro left right; simp [body, FrameSetupFits, InitializersFit, InitializerFits, AggregateArgumentsFit, ParameterArgumentsFit, SelectedKindsFit])
     (run32 profile program index found)
 
 #print axioms checked32
@@ -153,7 +158,7 @@ theorem checked64 (profile : CIL.FeatureProfile) (program : CIL.Program) (index 
     ReadOnlyScalarContract CIL.Value.i64
       (fun input word => .i32 (if input = word.zeroExtend 256 then 1 else 0)) program index :=
   certify_readOnly_scalar program index (body false profile) CIL.Value.i64 _ found (fun _ => rfl)
-    (by intro left right; simp [body, FrameSetupFits, InitializersFit, InitializerFits, AggregateArgumentsFit, ParameterArgumentsFit])
+    (by intro left right; simp [body, FrameSetupFits, InitializersFit, InitializerFits, AggregateArgumentsFit, ParameterArgumentsFit, SelectedKindsFit])
     (run64 profile program index found)
 
 #print axioms checked64

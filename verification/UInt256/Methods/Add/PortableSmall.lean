@@ -147,7 +147,7 @@ theorem portable_small_frame_setup (profile : CIL.FeatureProfile) (storage : Nat
       enterFrame (portableSmallBody profile storage) args memory = .ok (frame, entered) ∧
       NumericHomes entered memory.nextIdentity armSmallSpecs frame.locals ∧
       MemoryBelow memory.nextIdentity memory entered ∧ entered.WellFormed :=
-  numeric_frame_setup (portableSmallBody profile storage) armSmallSpecs (by rfl) (by rfl) (by rfl) (by rfl) memory args wf
+  numeric_frame_setup (portableSmallBody profile storage) armSmallSpecs (by rfl) (by rfl) (by rfl) (by rfl) (by rfl) memory args wf
 
 theorem portable_small_private_store (program : CIL.Program) (profile : CIL.FeatureProfile) (storage : Nat) (boundary : Nat) (entered current : Memory)
     (inputs outputs : List Reference) (frame : Frame)
@@ -216,7 +216,7 @@ theorem portable_small_input_prefix (program : CIL.Program) (method storage : Na
           | exact s2 _ _
           | exact s3 _ _
           | simp (config := { implicitDefEqProofs := false })
-              [armSmallArguments, found, step, checkedValue, numericValue, formValue,
+              [armSmallArguments, found, step, cil_guard, observerCount, checkedValue, numericValue, formValue,
                 f0, f1, f2, f3, l0, l1, l2, l3, pureArity, scalars, CIL.step.eq_def, disabled, localResult,
                 CIL.FeatureProfile.evaluate, CIL.truth, checkedAt, Except.mapError,
                 Bind.bind, Except.bind, Pure.pure, Except.pure]
@@ -349,16 +349,15 @@ theorem portable_small_prepare (program : CIL.Program) (method storage : Nat) (p
     (args := armSmallArguments input output word) (stack := []) lowSlot lowRead
   have stored := sumStep 58 (armSmallArguments input output word) []
   have done := continuation after state
-  repeat' first
-    | exact done
-    | (apply run_next_exists post found (by rfl)
-       first
-       | exact load
-       | exact stored
-       | (simp (config := { implicitDefEqProofs := false })
-           [step, armSmallArguments, checkedValue, numericValue, pureArity, scalars, CIL.step.eq_def, localResult, CIL.binary,
-             Bind.bind, Except.bind, Pure.pure, Except.pure]
-          try (first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)))
+  refine run_next_exists post found rfl load ?_
+  iterate 2
+    apply run_next_exists post found (by rfl)
+    simp (config := { implicitDefEqProofs := false })
+      [step, cil_guard, observerCount, armSmallArguments, checkedValue, numericValue, pureArity, scalars, CIL.step.eq_def, localResult, CIL.binary,
+        Bind.bind, Except.bind, Pure.pure, Except.pure]
+    try (first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)
+  refine run_next_exists post found rfl stored ?_
+  exact done
 
 /-- Compare the stored low sum with the saved low limb: carry at70, no-carry output at62. -/
 theorem portable_small_low_decision (program : CIL.Program) (method storage : Nat) (profile : CIL.FeatureProfile) (found : program[method]? = some (portableSmallBody profile storage))
@@ -385,7 +384,7 @@ theorem portable_small_low_decision (program : CIL.Program) (method storage : Na
   all_goals
     simp only [carry, ite_true, ite_false] at continuation
     apply run_next_exists post found (by rfl) _ continuation
-    simp [step, instruction, checkedValue, numericValue, pureArity, scalars, CIL.step.eq_def, localResult, carry,
+    simp [step, cil_guard, observerCount, instruction, checkedValue, numericValue, pureArity, scalars, CIL.step.eq_def, localResult, carry,
       Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 def portableIncrementStart : Fin 3 → Nat
@@ -429,11 +428,11 @@ theorem portable_small_increment (program : CIL.Program) (method storage : Nat) 
         | exact load _
         | exact stored _ _
         | (simp (config := { implicitDefEqProofs := false })
-            [step, instruction, checkedValue, numericValue, pureArity, scalars, CIL.step.eq_def, localResult, CIL.binary,
+            [step, cil_guard, observerCount, instruction, checkedValue, numericValue, pureArity, scalars, CIL.step.eq_def, localResult, CIL.binary,
               CIL.unary, Bind.bind, Except.bind, Pure.pure, Except.pure]
            try (first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
       apply run_next_exists post found (by rfl) _ continuation
-      simp [step, checkedValue, numericValue, pureArity, scalars, CIL.step.eq_def, CIL.truth,
+      simp [step, cil_guard, observerCount, checkedValue, numericValue, pureArity, scalars, CIL.step.eq_def, CIL.truth,
         BitVec.ofNat_eq_ofNat, zero', Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 #print axioms portable_small_prepare
@@ -524,18 +523,18 @@ theorem portable_small_store_return (program : CIL.Program) (method storage : Na
       [.scalar (.i64 (words 3)), .scalar (.i64 (words 2)), .scalar (.i64 (words 1)),
         .scalar (.i64 (words 0)), .reference (.address output)] memory =
       .ok (.call storage (UInt256Proof.Multiply.LimbStorage.arguments output (words 0) (words 1) (words 2) (words 3)) [] memory) := by
-    simp [step, UInt256Proof.Multiply.LimbStorage.arguments, checkedValue, numericValue,
+    simp [step, cil_guard, observerCount, UInt256Proof.Multiply.LimbStorage.arguments, checkedValue, numericValue,
       formValue, formed, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     try exact ⟨rfl, rfl⟩
   have returned : run program 2 method (callPc + 1) args frame [] stored =
       .ok (leaveFrame frame stored, [.scalar (.i32 flag)]) := by
     have constStep : step (portableSmallBody profile storage) (.const32 flag) (callPc + 1) args frame [] stored =
         .ok (.next (callPc + 1 + 1) [.scalar (.i32 flag)] frame stored) := by
-      simp [step, instruction, checkedValue, numericValue, pureArity, scalars, CIL.step.eq_def,
+      simp [step, cil_guard, observerCount, instruction, checkedValue, numericValue, pureArity, scalars, CIL.step.eq_def,
         Bind.bind, Except.bind, Pure.pure, Except.pure]
     rw [run_next found constAt constStep]
     have returns : (portableSmallBody profile storage).returnsValue = true := by rfl
-    simp [run, found, retAt, returns, step, checkedValue, numericValue, flagFit, List.mapM, List.mapM.loop, Option.bind,
+    simp [run, found, retAt, returns, step, cil_guard, observerCount, checkedValue, numericValue, flagFit, List.mapM, List.mapM.loop, Option.bind,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   obtain ⟨fuel, executed⟩ := run_call_exists found callAt stepped ⟨childFuel, invoked⟩ ⟨2, returned⟩
   refine ⟨fuel, leaveFrame frame stored, [.scalar (.i32 flag)], executed, ?_⟩
@@ -610,7 +609,7 @@ theorem PortableSmallState.finish (program : CIL.Program) (method storage : Nat)
          | exact l3 _ _
          | exact l4 _ _
          | (simp (config := { implicitDefEqProofs := false })
-             [step, instruction, argument, checkedValue, formValue, formed, numericValue, pureArity, scalars,
+             [step, cil_guard, observerCount, instruction, argument, checkedValue, formValue, formed, numericValue, pureArity, scalars,
                CIL.step.eq_def, CIL.unary, Bind.bind, Except.bind, Pure.pure, Except.pure]
             try (first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)))
 

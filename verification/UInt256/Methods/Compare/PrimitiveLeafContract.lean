@@ -25,9 +25,10 @@ theorem checked_template (leafSigned leafScalarFirst : Bool) (program : CIL.Prog
   have values : leafBody.locals = [] := by cases leafSigned <;> cases leafScalarFirst <;> rfl
   have vectors : leafBody.vectorArgs = [] := by cases leafSigned <;> cases leafScalarFirst <;> rfl
   have arguments : leafBody.parameterHomes = [] := by cases leafSigned <;> cases leafScalarFirst <;> rfl
+  have opaqueLocals : leafBody.opaqueVectorLocals = [] := by cases leafSigned <;> cases leafScalarFirst <;> rfl
   have setup : enterFrame leafBody (scalarOperatorArguments leafScalarFirst input (.i64 word)) memory =
       .ok (frame, memory) := by
-    simp [enterFrame, kinds, values, vectors, arguments, makeLocals, makeArgumentHomes, makeParameterHomes, frame, cil_code,
+    simp [enterFrame, kinds, values, vectors, arguments, opaqueLocals, makeSelectedLocals, makeLocals, makeArgumentHomes, makeParameterHomes, frame, cil_code,
       Bind.bind, Except.bind, Pure.pure, Except.pure]
   have formed := call.input_formed (reference := input) (by simp)
   have checked : (scalarOperatorArguments leafScalarFirst input (.i64 word)).mapM (checkedValue memory) =

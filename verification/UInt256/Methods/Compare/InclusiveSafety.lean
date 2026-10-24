@@ -24,7 +24,7 @@ theorem wrapper_compose (wrapper : Wrapper)
     cases wrapper
     all_goals
       conv in (wrapperBody _) => cbv
-      simp [FrameSetupFits, InitializersFit, InitializerFits, AggregateArgumentsFit, ParameterArgumentsFit]
+      simp [FrameSetupFits, InitializersFit, InitializerFits, AggregateArgumentsFit, ParameterArgumentsFit, SelectedKindsFit]
   · intro left right
     cases wrapper <;> simp only [childArguments]
     all_goals first | rfl | (split <;> rfl)
@@ -45,7 +45,7 @@ theorem inclusive_inner_checked (leaf : BinaryReadOnlyInvocation (fun x y => .i3
     have lookup : Extracted.program[wrapperIndex .less]? = some (wrapperBody .less) := by rfl
     have returned : (wrapperBody .less).code[wrapperCall .less + 1]? = some (.ret (some .unsigned8)) := by rfl
     have returns : (wrapperBody .less).returnsValue = true := by rfl
-    simp [run, lookup, returned, returns, step, checkedValue, numericValue, strictFlag, CIL.NarrowKind.extend,
+    simp [run, lookup, returned, returns, step, cil_guard, observerCount, checkedValue, numericValue, strictFlag, CIL.NarrowKind.extend,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure] <;> split <;> rfl
 
 def middleFlag (left right : BitVec 256) : BitVec 32 :=
@@ -67,7 +67,7 @@ theorem inclusive_middle_checked (leaf : BinaryReadOnlyInvocation (fun x y => .i
     refine ⟨3, ?_⟩
     conv in (wrapperIndex .greater) => cbv
     conv in (wrapperCall .greater) => cbv
-    simp [run, cil_code, step, pureArity, scalars, CIL.step, CIL.binary, CIL.unary,
+    simp [run, cil_code, step, cil_guard, observerCount, pureArity, scalars, CIL.step, CIL.binary, CIL.unary,
       CIL.NarrowKind.extend, instruction, inclusiveValue, checkedValue, numericValue,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     split <;> rfl
@@ -82,7 +82,7 @@ theorem inclusive_entry_checked (leaf : BinaryReadOnlyInvocation (fun x y => .i3
     have lookup : Extracted.program[wrapperIndex .entry]? = some (wrapperBody .entry) := by rfl
     have returned : (wrapperBody .entry).code[wrapperCall .entry + 1]? = some (.ret (some .unsigned8)) := by rfl
     have returns : (wrapperBody .entry).returnsValue = true := by rfl
-    simp [run, lookup, returned, returns, step, inclusiveValue, checkedValue, numericValue,
+    simp [run, lookup, returned, returns, step, cil_guard, observerCount, inclusiveValue, checkedValue, numericValue,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure] <;> split <;> rfl
 
 #print axioms inclusive_entry_checked

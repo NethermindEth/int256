@@ -26,12 +26,12 @@ theorem arm_small_parent_call (program : CIL.Program) (method vectorIndex smallI
     have stepped : step (armScalarBody profile vectorIndex smallIndex) (.call smallIndex 3) 39 args frame
         [.reference (.address output), .scalar (.i64 word), .reference (.address input)] memory =
           .ok (.call smallIndex (armSmallArguments input output word) [] memory) := by
-      simp [step, armSmallArguments, checkedValue, numericValue, formValue, fi, fo,
+      simp [step, cil_guard, observerCount, armSmallArguments, checkedValue, numericValue, formValue, fi, fo,
         checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     have returnedRun : run program 1 method 40 args frame (returned ++ []) final =
         .ok (leaveFrame frame final, returned) := by
       rw [result.flag]
-      split <;> simp [run, found, armScalarBody, step, checkedValue, numericValue, List.mapM, Except.mapError,
+      split <;> simp [run, found, armScalarBody, step, cil_guard, observerCount, checkedValue, numericValue, List.mapM, Except.mapError,
         Bind.bind, Except.bind, Pure.pure, Except.pure]
       all_goals rfl
     obtain ⟨fuel, executed⟩ := run_call_exists found fetched stepped

@@ -65,7 +65,7 @@ theorem wrapper_prefix (wrapper : Wrapper) (left right : Reference) (frame : Fra
          · simp only [cil_code]; rfl
          · simp only [cil_code]; rfl
          · simp (config := { implicitDefEqProofs := false })
-             [cil_code, readOnlyArguments, step, checkedValue, numericValue, formValue,
+             [cil_code, readOnlyArguments, step, cil_guard, observerCount, checkedValue, numericValue, formValue,
                fl, fr, pureArity, scalars, CIL.step, CIL.unary, CIL.truth, CIL.FeatureProfile.evaluate,
                checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
            try (exact ⟨rfl, rfl, rfl, rfl⟩))

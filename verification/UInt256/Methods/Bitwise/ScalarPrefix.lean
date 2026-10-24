@@ -3,6 +3,7 @@ import UInt256.Methods.Bitwise.Contract
 import UInt256.Safety.LimbAccess
 import CIL.Safety.StepComposition
 import CIL.SymbolicExecution
+import CIL.Safety.GuardNormalization
 
 namespace UInt256Proof.Bitwise
 open CIL.Safety UInt256Model.Safety UInt256Model.Bitwise
@@ -63,7 +64,7 @@ def scalarBody (profile : CIL.FeatureProfile) (operation : Binary) (constructor 
     .newAggregate constructor 4 32, .storeAggregate 32, .ret] }
 
 macro "bitwise_step_simp" facts:term,* : tactic =>
-  `(tactic| simp [step, binaryArguments, checkedValue, numericValue, formValue,
+  `(tactic| simp [step, cil_guard, observerCount, binaryArguments, checkedValue, numericValue, formValue,
       pureArity, checkedAt, Except.mapError, Bind.bind, Except.bind,
       Pure.pure, Except.pure, cil_code, $[$facts:term],*])
 

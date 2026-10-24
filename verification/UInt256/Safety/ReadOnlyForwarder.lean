@@ -1,6 +1,7 @@
 import CIL.Safety.Equations
 import UInt256.Safety.ReadOnlyExecution
 import CIL.Safety.CallComposition
+import CIL.Safety.GuardNormalization
 
 namespace UInt256Model.Safety
 open CIL.Safety
@@ -86,7 +87,7 @@ theorem compose_readOnly_binary (program : CIL.Program) (method pc callee : Nat)
       (childArguments left right).reverse entered =
       .ok (.call callee (childArguments left right) [] entered) := by
     have count := length left right
-    simp only [step, List.length_reverse, count]
+    simp only [step, cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, List.length_reverse, count]
     simp only [Nat.lt_irrefl, ite_false]
     have take : List.take 2 (childArguments left right).reverse = (childArguments left right).reverse := by
       apply List.take_of_length_le
@@ -161,7 +162,7 @@ theorem forward_readOnly_binary (program : CIL.Program) (method pc callee : Nat)
     refine ⟨1, ?_⟩
     obtain ⟨flag, result, normalizedFlag⟩ := normalized x y
     rw [result]
-    simp [run, lookup, forwarding, step, returns, checkedValue, numericValue, normalizedFlag,
+    simp [run, lookup, forwarding, step, cil_guard, observerCount, returns, checkedValue, numericValue, normalizedFlag,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   · exact prefixProof
 

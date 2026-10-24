@@ -87,7 +87,7 @@ theorem vector128_sse_repair_start (program : CIL.Program) (body : CIL.Method) (
        first
        | exact stored _ _ _
        | (simp (config := { implicitDefEqProofs := false })
-           [step, pureArity, scalars, CIL.step.eq_def, CIL.unary, checkedValue, numericValue,
+           [step, cil_guard, observerCount, pureArity, scalars, CIL.step.eq_def, CIL.unary, checkedValue, numericValue,
              Bind.bind, Except.bind, Pure.pure, Except.pure]
           first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
 
@@ -131,7 +131,7 @@ theorem vector128_sse_carry_segment (program : CIL.Program) (body : CIL.Method) 
       | exact continuation
       | (apply run_next_exists post found (by simp [code, List.getElem?_append, leadingLength, sseRepairCode]; rfl)
          simp (config := { implicitDefEqProofs := false })
-           [step, checkedValue, numericValue, formValue, leftArg, rightArg, leftFormed, rightFormed,
+           [step, cil_guard, observerCount, checkedValue, numericValue, formValue, leftArg, rightArg, leftFormed, rightFormed,
              carryFormed, resultFormed, carrySlot, resultSlot, localAddress, leftRead, rightRead,
              pureArity, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
          first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)
@@ -177,7 +177,7 @@ theorem vector128_sse_indexed_carry (program : CIL.Program) (body : CIL.Method) 
       [.reference (.address resultHome), .reference (.address carryHome), .scalar (.i64 b), .scalar (.i64 a)] memory =
       .ok (.call carry [.scalar (.i64 a), .scalar (.i64 b), .reference (.address carryHome),
         .reference (.address resultHome)] [] memory) := by
-    simp [step, checkedValue, numericValue, formValue, carryFormed, resultFormed,
+    simp [step, cil_guard, observerCount, checkedValue, numericValue, formValue, carryFormed, resultFormed,
       checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     try exact ⟨rfl, rfl⟩
   apply run_call_of_contract_formed (carry_helper_contract carryFound) ⟨a, b, c, carryHome, resultHome⟩ found fetched stepped rfl
@@ -453,7 +453,7 @@ theorem vector128_sse_store_prefix (program : CIL.Program) (body : CIL.Method) (
     | exact continuation
     | (apply run_next_exists post found (by simp [code, List.getElem?_append, leadingLength, sseRepairCode]; rfl)
        simp (config := { implicitDefEqProofs := false })
-         [step, checkedValue, formValue, outputArg, outputFormed, s0, s1, s2, s3, r0, r1, r2, r3,
+         [step, cil_guard, observerCount, checkedValue, formValue, outputArg, outputFormed, s0, s1, s2, s3, r0, r1, r2, r3,
            checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
        first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)
 
@@ -473,13 +473,13 @@ theorem vector128_sse_return (program : CIL.Program) (body : CIL.Method) (method
     apply Eq.trans
     · apply run_next found (by simp [code, List.getElem?_append, leadingLength, sseRepairCode]; rfl)
       simp (config := { implicitDefEqProofs := false })
-        [step, slot, reading, checkedValue, numericValue, pureArity, scalars,
+        [step, cil_guard, observerCount, slot, reading, checkedValue, numericValue, pureArity, scalars,
           CIL.step.eq_def, CIL.binary, CIL.unary, instruction, Bind.bind, Except.bind, Pure.pure, Except.pure]
       first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
   have fetched : body.code[203]? = some (.ret (some .unsigned8)) := by
     simp [code, List.getElem?_append, leadingLength, sseRepairCode]
   by_cases positive : BitVec.ofNat 64 0 < carryWord
-  all_goals simp [run, found, fetched, returns, step, checkedValue, numericValue, CIL.NarrowKind.extend,
+  all_goals simp [run, found, fetched, returns, step, cil_guard, observerCount, checkedValue, numericValue, CIL.NarrowKind.extend,
     scalarOverflowFlag, positive, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 #print axioms vector128_sse_store_prefix
@@ -516,7 +516,7 @@ theorem vector128_sse_finish (program : CIL.Program) (body : CIL.Method) (method
       [.scalar (.i64 (words 3)), .scalar (.i64 (words 2)), .scalar (.i64 (words 1)),
         .scalar (.i64 (words 0)), .reference (.address output)] current =
       .ok (.call storage (UInt256Proof.Multiply.LimbStorage.arguments output (words 0) (words 1) (words 2) (words 3)) [] current) := by
-    simp [step, UInt256Proof.Multiply.LimbStorage.arguments, checkedValue, numericValue,
+    simp [step, cil_guard, observerCount, UInt256Proof.Multiply.LimbStorage.arguments, checkedValue, numericValue,
       formValue, formed, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     try exact ⟨rfl, rfl⟩
   obtain ⟨outputAllocation, outputPresent, _, _⟩ := formed_reference_live _ _ _

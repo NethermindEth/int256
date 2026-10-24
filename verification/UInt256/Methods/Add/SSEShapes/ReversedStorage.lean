@@ -54,7 +54,7 @@ theorem store_limbs_safe (profile : CIL.FeatureProfile) (program : CIL.Program) 
         · limb_storage_step f0, f1, f2, f3, l1, l2, l3, a0, a1, a2, a3, h0, h1, h2, h3
           try exact ⟨rfl, rfl, rfl, rfl⟩
           done
-    simp [run, found, body, step, leaveFrame, Except.mapError,
+    simp [run, found, body, step, cil_guard, observerCount, leaveFrame, Except.mapError,
       Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 /-- Reversed limb storage: same caller-visible contract with the word arguments reversed. -/

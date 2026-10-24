@@ -5,6 +5,7 @@ import CIL.Safety.StepComposition
 import CIL.Safety.ReturnMemory
 import UInt256.Safety.ParameterSetup32
 import UInt256.Safety.ReadOnlyScalarContract
+import CIL.Safety.GuardNormalization
 
 namespace UInt256Proof.ValueForwarder32
 open CIL.Safety UInt256Model.Safety
@@ -45,16 +46,16 @@ theorem checked (profile : CIL.FeatureProfile) (program : CIL.Program) (index ca
       [.scalar (.i32 (operation (inputValue entered left) (inputValue entered copy)))] final =
       .ok (leaveFrame frame final, [.scalar (.i32 (operation (inputValue entered left) (inputValue entered copy)))]) := by
     cases mode : booleanReturn
-    · simp [run, found, body, mode, step, checkedValue, numericValue,
+    · simp [run, found, body, mode, step, cil_guard, observerCount, checkedValue, numericValue,
         Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     · rcases range (inputValue entered left) (inputValue entered copy) mode with flag | flag <;>
-        simp [run, found, body, mode, step, checkedValue, numericValue, CIL.NarrowKind.extend, flag,
+        simp [run, found, body, mode, step, cil_guard, observerCount, checkedValue, numericValue, CIL.NarrowKind.extend, flag,
           Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   have stepped : step (body profile booleanReturn callee) (.call callee 2) 2
       (scalarArguments left (encode right)) frame
       [.reference (.address copy), .reference (.address left)] entered =
       .ok (.call callee (readOnlyArguments [left, copy]) [] entered) := by
-    simp [step, readOnlyArguments, checkedValue, formValue, fl, fc, checkedAt,
+    simp [step, cil_guard, observerCount, readOnlyArguments, checkedValue, formValue, fl, fc, checkedAt,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   obtain ⟨tailFuel, tail⟩ := run_call_exists found (by rfl) stepped ⟨childFuel, certificate.1⟩ ⟨1, returnTrace⟩
   have executed : run program (tailFuel + 2) index 0 (scalarArguments left (encode right)) frame [] entered =
@@ -63,7 +64,7 @@ theorem checked (profile : CIL.FeatureProfile) (program : CIL.Program) (index ca
       apply Eq.trans
       · apply run_next found
         · simp only [body]; rfl
-        · simp (config := { implicitDefEqProofs := false }) [step, scalarArguments, checkedValue, formValue, fl, fc,
+        · simp (config := { implicitDefEqProofs := false }) [step, cil_guard, observerCount, scalarArguments, checkedValue, formValue, fl, fc,
             localAddress, frame, parameterFrame32, checkedAt,
             Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
           exact ⟨rfl, rfl, rfl, rfl⟩

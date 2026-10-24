@@ -23,7 +23,7 @@ theorem checked (equal : BitVec 256 → BitVec 256 → Bool)
   let frame : Frame := ⟨memory.nextIdentity, [], [], []⟩
   have setup : enterFrame (body profile negate callee) (readOnlyArguments [left, right]) memory =
       .ok (frame, memory) := by
-    simp [enterFrame, body, PrimitiveOperator.body, makeLocals, makeArgumentHomes, makeParameterHomes, frame,
+    simp [enterFrame, body, PrimitiveOperator.body, makeSelectedLocals, makeLocals, makeArgumentHomes, makeParameterHomes, frame,
       Bind.bind, Except.bind, Pure.pure, Except.pure]
   have fl := call.input_formed (reference := left) (by simp)
   have fr := call.input_formed (reference := right) (by simp)
@@ -37,7 +37,7 @@ theorem checked (equal : BitVec 256 → BitVec 256 → Bool)
   have stepped : step (body profile negate callee) (.call callee 2) 2
       (readOnlyArguments [left, right]) frame [.reference (.address right), .reference (.address left)] memory =
       .ok (.call callee (readOnlyArguments [left, right]) [] memory) := by
-    simp [step, readOnlyArguments, checkedValue, formValue, fl, fr, checkedAt,
+    simp [step, cil_guard, observerCount, readOnlyArguments, checkedValue, formValue, fl, fr, checkedAt,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   obtain ⟨tailFuel, tail⟩ := run_call_exists found fetched stepped ⟨childFuel, certificate.1⟩
     ⟨3, PrimitiveOperator.returned profile false negate program entry callee found _ _ frame final⟩
@@ -48,7 +48,7 @@ theorem checked (equal : BitVec 256 → BitVec 256 → Bool)
       apply Eq.trans
       · apply run_next found
         · simp only [body, PrimitiveOperator.body]; rfl
-        · simp (config := { implicitDefEqProofs := false }) [step, readOnlyArguments, checkedValue, formValue, fl, fr,
+        · simp (config := { implicitDefEqProofs := false }) [step, cil_guard, observerCount, readOnlyArguments, checkedValue, formValue, fl, fr,
             checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
           exact ⟨rfl, rfl, rfl, rfl⟩
     exact tail

@@ -44,7 +44,7 @@ include lookup retFetched returns in
     run program 1 signedIndex (signedCall + 1) args frame [.scalar (.i32 flag)] memory =
       .ok (leaveFrame frame memory, [.scalar (.i32 flag)]) := by
   rcases boolean with rfl | rfl <;>
-    simp [run, lookup, retFetched, step, returns, checkedValue, numericValue, CIL.NarrowKind.extend,
+    simp [run, lookup, retFetched, step, cil_guard, observerCount, returns, checkedValue, numericValue, CIL.NarrowKind.extend,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 include lookup fetched retFetched returns locals kinds vectors homes in
@@ -61,7 +61,7 @@ theorem signed_checked (memory : Memory) (left : Reference) (argument : CIL.Valu
       ∀ id, id < memory.nextIdentity → ∀ offset, final.cells id offset = memory.cells id offset := by
   let frame : Frame := ⟨memory.nextIdentity, [], [], []⟩
   have setup : enterFrame signedBody (scalarArguments left argument) memory = .ok (frame, memory) := by
-    simp [enterFrame, locals, kinds, vectors, homes, makeLocals, makeArgumentHomes, makeParameterHomes, frame,
+    simp [enterFrame, locals, kinds, vectors, homes, makeSelectedLocals, makeLocals, makeSelectedLocalsFrom, ite_self, makeArgumentHomes, makeParameterHomes, frame,
       Bind.bind, Except.bind, Pure.pure, Except.pure]
   have formed := call.input_formed (reference := left) (by simp)
   have checked : (scalarArguments left argument).mapM (checkedValue memory) =
@@ -76,7 +76,7 @@ theorem signed_checked (memory : Memory) (left : Reference) (argument : CIL.Valu
     have stepped : step signedBody (.call signedCallee 2) signedCall
         (scalarArguments left argument) frame [.scalar argument, .reference (.address left)] memory =
         .ok (.call signedCallee (scalarArguments left argument) [] memory) := by
-      simp [step, scalarArguments, checkedValue, formValue, numeric, formed, checkedAt,
+      simp [step, cil_guard, observerCount, scalarArguments, checkedValue, formValue, numeric, formed, checkedAt,
         Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     obtain ⟨tailFuel, tail⟩ := run_call_exists lookup fetched stepped
       ⟨childFuel, certificate.1⟩ ⟨1, signed_return program signedIndex signedCall signedBody lookup retFetched returns _ _ frame childFinal (by split <;> simp)⟩
@@ -128,7 +128,7 @@ def body64 (profile : CIL.FeatureProfile) (callee : Nat) : CIL.Method := { profi
 macro "negative_steps" found:term "," negative:term : tactic => `(tactic|
   (intro memory left frame call
    refine ⟨16, ?_⟩
-   simp [run, $found:term, body32, body64, step, scalarArguments, checkedValue, numericValue,
+   simp [run, $found:term, body32, body64, step, cil_guard, observerCount, scalarArguments, checkedValue, numericValue,
      pureArity, scalars, instruction, CIL.step.eq_def, CIL.unary, CIL.NarrowKind.extend, $negative:term,
      Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]))
 
@@ -139,7 +139,7 @@ macro "positive_steps" found:term "," nonnegative:term : tactic => `(tactic|
      | exact continuation
      | (apply run_next_exists post $found
         · simp only [body32, body64]; rfl
-        · simp [body32, body64, step, scalarArguments, checkedValue, numericValue, formValue, formed,
+        · simp [body32, body64, step, cil_guard, observerCount, scalarArguments, checkedValue, numericValue, formValue, formed,
             pureArity, scalars, instruction, CIL.step.eq_def, CIL.unary, $nonnegative:term,
             checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
           try (exact ⟨rfl, rfl, rfl, rfl⟩))))

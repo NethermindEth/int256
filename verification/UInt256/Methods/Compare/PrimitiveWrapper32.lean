@@ -18,7 +18,7 @@ theorem prefix32 (signed scalarFirst reversed negate : Bool) (program : CIL.Prog
       · exact found
       · rfl
       · simp (config := { implicitDefEqProofs := false })
-          [step, pureArity, scalars, CIL.step, CIL.unary, scalarOperatorArguments, scalarArguments,
+          [step, cil_guard, observerCount, pureArity, scalars, CIL.step, CIL.unary, scalarOperatorArguments, scalarArguments,
             checkedValue, numericValue, formValue, formed, checkedAt,
             Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
         try (exact ⟨rfl, rfl, rfl, rfl⟩)

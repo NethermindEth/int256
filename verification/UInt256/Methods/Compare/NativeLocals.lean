@@ -90,8 +90,9 @@ theorem native_setup (profile : CIL.FeatureProfile) (usesLess inclusive : Bool) 
   have values : (nativeBody profile usesLess inclusive).locals = numericInitializers nativeSpecs := by cases inclusive <;> rfl
   have aggregates : (nativeBody profile usesLess inclusive).vectorArgs = [] := by cases inclusive <;> rfl
   have parameters : (nativeBody profile usesLess inclusive).parameterHomes = [] := by cases inclusive <;> rfl
+  have opaqueLocals : (nativeBody profile usesLess inclusive).opaqueVectorLocals = [] := by cases inclusive <;> rfl
   have setup : enterFrame (nativeBody profile usesLess inclusive) (readOnlyArguments [left, right]) memory = .ok (frame, entered) := by
-    simp [enterFrame, kinds, values, aggregates, made, makeArgumentHomes, parameters, makeParameterHomes, frame,
+    simp [enterFrame, opaqueLocals, makeSelectedLocals, kinds, values, aggregates, made, makeArgumentHomes, parameters, makeParameterHomes, frame,
       Bind.bind, Except.bind, Pure.pure, Except.pure]
   exact ⟨frame, entered, setup, homes, call.after_frame_setup setup,
     enterFrame_preserves_caller_memory _ _ _ _ _ setup⟩

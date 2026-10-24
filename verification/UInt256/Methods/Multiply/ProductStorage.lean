@@ -58,7 +58,7 @@ theorem store_product_contract (profile : CIL.FeatureProfile) (scalar : profile.
     rfl
   have stepped : step (body profile callee) (.call callee 5) 18 args frame args.reverse memory =
       .ok (.call callee args [] memory) := by
-    simp [step, args, checkedValue, numericValue, formValue, formed, checkedAt,
+    simp [step, cil_guard, observerCount, args, checkedValue, numericValue, formValue, formed, checkedAt,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   obtain ⟨tailFuel, tail⟩ := run_call_exists found (by rfl) stepped ⟨childFuel, invoked⟩ ⟨1, resume⟩
   have disabled (pc : Nat) (stack : List Value) :
@@ -76,7 +76,7 @@ theorem store_product_contract (profile : CIL.FeatureProfile) (scalar : profile.
       first
       | exact disabled _ _
       | rfl
-      | simp only [step, args, List.getElem?_cons_zero,
+      | simp only [step, cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, args, List.getElem?_cons_zero,
           checkedValue, formValue, formed, checkedAt, Except.mapError,
           Bind.bind, Except.bind, Pure.pure, Except.pure]
         rfl

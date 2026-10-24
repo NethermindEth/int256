@@ -103,7 +103,7 @@ theorem scalar_frame_setup (profile : CIL.FeatureProfile) (program : CIL.Program
       PrivateWords program memory entered entered [input] [output] frame (fun _ => none) := by
   have kinds : (scalarBody profile wordIndex storageIndex).localKinds = List.replicate 9 CIL.LocalKind.word64 := by rfl
   obtain ⟨frame, entered, setup, homes, _, wf⟩ := unknown_frame_setup (scalarBody profile wordIndex storageIndex)
-    (by rfl) (by simp [kinds]) (by rfl) (by rfl) memory (scalarArgs input word output) call.1.1
+    (by rfl) (by simp [kinds]) (by rfl) (by rfl) (by rfl) memory (scalarArgs input word output) call.1.1
   exact ⟨frame, entered, setup, homes, wf, PrivateWords.initial call setup⟩
 
 /-- Each input limb is loaded from the original caller bytes before being
@@ -153,7 +153,7 @@ theorem scalar_input_save (profile : CIL.FeatureProfile) (program : CIL.Program)
     iterate 2
       apply run_next_exists post found (by rfl)
       simp (config := { implicitDefEqProofs := false })
-        [step, pureArity, scalarArgs, checkedValue, formValue, formed, reading,
+        [step, cil_guard, observerCount, pureArity, scalarArgs, checkedValue, formValue, formed, reading,
           checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
       first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
     exact run_next_exists post found (by rfl) stored done
@@ -237,13 +237,13 @@ theorem scalar_first_product (profile : CIL.FeatureProfile) (program : CIL.Progr
     first
     | exact load0 _ _
     | simp (config := { implicitDefEqProofs := false })
-        [step, pureArity, scalarArgs, checkedValue, numericValue, formValue, inputFormed,
+        [step, cil_guard, observerCount, pureArity, scalarArgs, checkedValue, numericValue, formValue, inputFormed,
           localAddress, slot, referenceFormed, reading, checkedAt, Except.mapError,
           Bind.bind, Except.bind, Pure.pure, Except.pure]
       first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
   apply run_word_call contract state originalCall homes 4 reference word (inputLimb original input 0)
     slot writable post found (by rfl)
-  · simp [step, checkedValue, numericValue, formValue, referenceFormed,
+  · simp [step, cil_guard, observerCount, checkedValue, numericValue, formValue, referenceFormed,
       checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     first | rfl | exact ⟨rfl, rfl⟩
   intro middle middleState
@@ -296,11 +296,11 @@ theorem scalar_next_product (profile : CIL.FeatureProfile) (program : CIL.Progra
       first
       | exact load _ _
       | simp (config := { implicitDefEqProofs := false })
-          [step, scalarArgs, checkedValue, numericValue, formValue, localAddress, slot, formed,
+          [step, cil_guard, observerCount, scalarArgs, checkedValue, numericValue, formValue, localAddress, slot, formed,
             checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
         first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
     apply run_word_call contract state originalCall homes 5 reference word limb slot writable post found (by rfl)
-    · simp [step, checkedValue, numericValue, formValue, formed,
+    · simp [step, cil_guard, observerCount, checkedValue, numericValue, formValue, formed,
         checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
       first | rfl | exact ⟨rfl, rfl⟩
     exact continuation
@@ -357,7 +357,7 @@ theorem scalar_accumulate (profile : CIL.FeatureProfile) (program : CIL.Program)
       | exact loadLow _ _
       | exact loadCarry _ _
       | simp (config := { implicitDefEqProofs := false })
-          [step, checkedValue, numericValue, pureArity, scalars, CIL.step.eq_def, CIL.binary,
+          [step, cil_guard, observerCount, checkedValue, numericValue, pureArity, scalars, CIL.step.eq_def, CIL.binary,
             Bind.bind, Except.bind, Pure.pure, Except.pure]
         first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
     apply run_next_exists post found (by rfl) storeResult
@@ -367,7 +367,7 @@ theorem scalar_accumulate (profile : CIL.FeatureProfile) (program : CIL.Program)
       | exact loadResult _ _
       | exact loadLowAgain _ _
       | simp (config := { implicitDefEqProofs := false })
-          [step, checkedValue, numericValue, pureArity, scalars, CIL.step.eq_def, CIL.binary,
+          [step, cil_guard, observerCount, checkedValue, numericValue, pureArity, scalars, CIL.step.eq_def, CIL.binary,
             Bind.bind, Except.bind, Pure.pure, Except.pure]
         first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
     apply run_next_exists post found (by rfl)
@@ -475,7 +475,7 @@ theorem scalar_output_with_storage (profile : CIL.FeatureProfile) (program : CIL
     first
     | exact loadCarry _ _
     | simp (config := { implicitDefEqProofs := false })
-        [step, scalarArgs, checkedValue, numericValue, pureArity, scalars, CIL.step.eq_def, CIL.binary,
+        [step, cil_guard, observerCount, scalarArgs, checkedValue, numericValue, pureArity, scalars, CIL.step.eq_def, CIL.binary,
           Bind.bind, Except.bind, Pure.pure, Except.pure]
       first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
   apply run_next_exists post found (by rfl)
@@ -498,7 +498,7 @@ theorem scalar_output_with_storage (profile : CIL.FeatureProfile) (program : CIL
     | exact load 1 _ _
     | exact load 2 _ _
     | exact load 3 _ _
-    | simp [step, scalarArgs, checkedValue, formValue, formed, checkedAt,
+    | simp [step, cil_guard, observerCount, scalarArgs, checkedValue, formValue, formed, checkedAt,
         Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
       first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
   obtain ⟨childFuel, result, invoked, valid, outside, _, value, readable⟩ :=
@@ -509,7 +509,7 @@ theorem scalar_output_with_storage (profile : CIL.FeatureProfile) (program : CIL
       .ok (.call storageIndex
         [.reference (.address output), .scalar (.i64 (words 0)), .scalar (.i64 (words 1)), .scalar (.i64 (words 2)),
           .scalar (.i64 (words 3))] [] prepared) := by
-    simp [step, checkedValue, numericValue, formValue, formed, checkedAt,
+    simp [step, cil_guard, observerCount, checkedValue, numericValue, formValue, formed, checkedAt,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   have finished : run program 1 methodIndex 77 (scalarArgs input word output) frame [] result =
       .ok (leaveFrame frame result, []) := by
@@ -561,7 +561,7 @@ theorem scalar_zero_with_storage (profile : CIL.FeatureProfile) (program : CIL.P
   change ∃ fuel final returned, _ ∧ post final returned
   iterate 9
     apply run_next_exists post found (by rfl)
-    simp [step, scalarArgs, checkedValue, numericValue, formValue, formed, checkedAt,
+    simp [step, cil_guard, observerCount, scalarArgs, checkedValue, numericValue, formValue, formed, checkedAt,
       pureArity, scalars, CIL.step.eq_def, Except.mapError,
       Bind.bind, Except.bind, Pure.pure, Except.pure]
     first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
@@ -572,7 +572,7 @@ theorem scalar_zero_with_storage (profile : CIL.FeatureProfile) (program : CIL.P
         .reference (.address output)] current =
       .ok (.call storageIndex [.reference (.address output), .scalar (.i64 0),
         .scalar (.i64 0), .scalar (.i64 0), .scalar (.i64 0)] [] current) := by
-    simp [step, checkedValue, numericValue, formValue, formed, checkedAt,
+    simp [step, cil_guard, observerCount, checkedValue, numericValue, formValue, formed, checkedAt,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   have finished : run program 1 methodIndex 16 (scalarArgs input 0 output) frame [] result =
       .ok (leaveFrame frame result, []) := by
@@ -624,7 +624,7 @@ theorem scalar_one_with_storage (profile : CIL.FeatureProfile) (program : CIL.Pr
   change ∃ fuel final returned, _ ∧ post final returned
   iterate 4
     apply run_next_exists post found (by rfl)
-    · simp [step, scalarArgs, checkedValue, formValue, inputFormed, outputFormed, checkedAt,
+    · simp [step, cil_guard, observerCount, scalarArgs, checkedValue, formValue, inputFormed, outputFormed, checkedAt,
       pureArity, instruction, dereference, ordinaryAccessAlignment, loaded, referenceAt, written, length,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
       try (first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)
@@ -685,13 +685,13 @@ theorem scalar_invoke_with_storage (profile : CIL.FeatureProfile) (program : CIL
         .ok (final, returned) ∧ post final returned := by
     iterate 3
       apply run_next_exists post found (by rfl)
-      simp [step, scalarArgs, checkedValue, numericValue, pureArity, scalars, CIL.step.eq_def,
+      simp [step, cil_guard, observerCount, scalarArgs, checkedValue, numericValue, pureArity, scalars, CIL.step.eq_def,
         Bind.bind, Except.bind, Pure.pure, Except.pure]
       first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
     by_cases large : 1 < word.toNat
     · have greater : BitVec.ofNat 64 1 < word := large
       apply run_next_exists post found (by rfl)
-      · simp [step, pureArity, scalars, numericValue, CIL.step.eq_def,
+      · simp [step, cil_guard, observerCount, pureArity, scalars, numericValue, CIL.step.eq_def,
           Bind.bind, Except.bind, Pure.pure, Except.pure]
         first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
       simp only [greater, ite_true]
@@ -707,7 +707,7 @@ theorem scalar_invoke_with_storage (profile : CIL.FeatureProfile) (program : CIL
       all_goals
         iterate 3
           apply run_next_exists post found (by rfl)
-          simp [step, scalarArgs, checkedValue, numericValue, pureArity, scalars, CIL.step.eq_def,
+          simp [step, cil_guard, observerCount, scalarArgs, checkedValue, numericValue, pureArity, scalars, CIL.step.eq_def,
             Bind.bind, Except.bind, Pure.pure, Except.pure]
           first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
       · exact scalar_zero_with_storage profile program methodIndex wordIndex storageIndex storage found memory entered entered input output frame _ call owned state

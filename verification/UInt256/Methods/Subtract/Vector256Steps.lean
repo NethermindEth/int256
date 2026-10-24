@@ -29,7 +29,7 @@ macro "impl_pure" : tactic => `(tactic|
    have formedOutput := state.call.output_formed (reference := output) (by simp)
    apply run_next_exists post found (by rfl)
    · simp (config := { implicitDefEqProofs := false })
-       [step, pureArity, binaryArguments, checkedValue, numericValue, formValue, formedLeft, formedRight,
+       [step, cil_guard, observerCount, pureArity, binaryArguments, checkedValue, numericValue, formValue, formedLeft, formedRight,
          formedOutput, staticInstruction, memoryInstruction, checkedAt, profileEq, features.avx, features.avx2,
          features.wideF, features.wide, features.bits, CIL.FeatureProfile.evaluate, scalars, checkedIntrinsic,
          CIL.Intrinsic.available, CIL.step.eq_def, CIL.binary, CIL.unary, CIL.truth, instruction,
@@ -52,7 +52,7 @@ private theorem step_reference_arg {body : CIL.Method} {pc index : Nat} {args st
     (formed : form memory reference = .ok reference) :
     step body (.arg index) pc args frame stack memory =
       .ok (.next (pc + 1) (.reference (.address reference) :: stack) frame memory) := by
-  simp only [step, found, checkedValue, formValue, formed, checkedAt, Except.mapError,
+  simp only [step, cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, found, checkedValue, formValue, formed, checkedAt, Except.mapError,
     Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 private theorem formed_value {memory : Memory} {reference : Reference}
@@ -78,10 +78,14 @@ private theorem step_memory {body : CIL.Method} {operation : CIL.MemoryOp} {pc :
     (executed : memoryInstruction operation stack memory = .ok (after, values))
     (direct : staticInstruction body pc operation stack memory = memoryInstruction operation stack memory) :
     step body (.memory operation) pc args frame stack memory = .ok (.next (pc + 1) values frame after) := by
-  show (staticInstruction body pc operation stack memory >>= fun result =>
-    pure (FrameAction.next (pc + 1) result.2 frame result.1) : ExecutionResult FrameAction) = _
-  rw [direct, executed]
-  rfl
+  have known : unspecifiedOperands operation.argumentCount stack = false := by
+    cases observed : unspecifiedOperands operation.argumentCount stack
+    · rfl
+    · unfold memoryInstruction at executed
+      simp only [observed, ite_true] at executed
+      cases executed
+  simp only [cil_step, known, direct, executed, Bool.false_eq_true, ite_false, Bind.bind, Except.bind,
+    Pure.pure, Except.pure]
 
 private theorem step_skip_init {body : CIL.Method} {pc : Nat} {args rest : List Value}
     {frame : Frame} {memory : Memory} {reference : Reference}

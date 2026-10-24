@@ -146,7 +146,7 @@ theorem multiply_frame_setup (ctx : Context alternative) (memory : Memory) (left
       PrivateWords ctx.program memory entered entered [left, right] [output] frame (fun _ => none) := by
   have kinds : (multiplyBody ctx.profile ctx.indices).localKinds = List.replicate 8 CIL.LocalKind.word64 := by rfl
   obtain ⟨frame, entered, setup, homes, _, wf⟩ := unknown_frame_setup (multiplyBody ctx.profile ctx.indices)
-    (by rfl) (by simp [kinds]) (by rfl) (by rfl) memory (productArgs left right output) call.1.1
+    (by rfl) (by simp [kinds]) (by rfl) (by rfl) (by rfl) memory (productArgs left right output) call.1.1
   exact ⟨frame, entered, setup, homes, wf, PrivateWords.initial call setup⟩
 
 def multiplyLowInputs (original : Memory) (left right : Reference) :=
@@ -219,7 +219,7 @@ theorem multiply_upper_mask (ctx : Context alternative) (rightSide : Bool)
     iterate 5
       apply run_next_exists post found (by rfl)
       simp (config := { implicitDefEqProofs := false })
-        [step, pureArity, productArgs, checkedValue, numericValue, formValue, formed, reading2, reading3,
+        [step, cil_guard, observerCount, pureArity, productArgs, checkedValue, numericValue, formValue, formed, reading2, reading3,
           checkedAt, scalars, CIL.step.eq_def, CIL.binary, Except.mapError,
           Bind.bind, Except.bind, Pure.pure, Except.pure]
       first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
@@ -265,7 +265,7 @@ theorem multiply_tail_mask (ctx : Context alternative) (rightSide : Bool)
       first
       | exact loadUpper _ _
       | simp (config := { implicitDefEqProofs := false })
-          [step, pureArity, productArgs, checkedValue, numericValue, formValue, formed, reading,
+          [step, cil_guard, observerCount, pureArity, productArgs, checkedValue, numericValue, formValue, formed, reading,
             checkedAt, scalars, CIL.step.eq_def, CIL.binary, Except.mapError,
             Bind.bind, Except.bind, Pure.pure, Except.pure]
         first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩

@@ -13,7 +13,7 @@ theorem inequality_entry_checked
       ∀ id, id < memory.nextIdentity → ∀ offset, final.cells id offset = memory.cells id offset := by
   have lookup : Extracted.program[Extracted.entryIndex]? = some Extracted.entryBody := by simp only [cil_code]
   have fits : FrameSetupFits Extracted.entryBody (readOnlyArguments [left, right]) := by
-    simp [cil_code, FrameSetupFits, InitializersFit, AggregateArgumentsFit, ParameterArgumentsFit]
+    simp [cil_code, FrameSetupFits, InitializersFit, AggregateArgumentsFit, ParameterArgumentsFit, SelectedKindsFit]
   obtain ⟨frame, entered, setup, live⟩ := call.readOnly_setup_succeeds fits
   have enteredCall := call.after_frame_setup setup
   obtain ⟨childFuel, childFinal, childCertificate, childCells⟩ := child entered left right enteredCall
@@ -23,7 +23,7 @@ theorem inequality_entry_checked
   have stepped : step Extracted.entryBody (.call (wrapperIndex true) 2) negationCall
       (readOnlyArguments [left, right]) frame [.reference (.address right), .reference (.address left)] entered =
       .ok (.call (wrapperIndex true) (readOnlyArguments [left, right]) [] entered) := by
-    simp [step, readOnlyArguments, checkedValue, formValue, fl, fr, checkedAt,
+    simp [step, cil_guard, observerCount, readOnlyArguments, checkedValue, formValue, fl, fr, checkedAt,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   obtain ⟨tailFuel, tail⟩ := run_call_exists lookup fetched stepped
     ⟨childFuel, childCertificate.1⟩ ⟨3, negation_return _ _ frame childFinal⟩

@@ -228,7 +228,7 @@ theorem vector128_incoming_checked (program : CIL.Program) (body : CIL.Method) (
          | exact loadHigh _ _
          
          | (simp (config := { implicitDefEqProofs := false })
-             [show (BitVec.setWidth 8 (8 : BitVec 32)).toNat = 8 from rfl, step, selected, sse, ssse, pureArity, scalars, CIL.step.eq_def, CIL.Intrinsic.available,
+             [show (BitVec.setWidth 8 (8 : BitVec 32)).toNat = 8 from rfl, step, cil_guard, observerCount, selected, sse, ssse, pureArity, scalars, CIL.step.eq_def, CIL.Intrinsic.available,
                CIL.Vector.intrinsic_zero128, CIL.Vector.intrinsic_adv_extract,
                CIL.Vector.intrinsic_sse_shift, CIL.Vector.intrinsic_sse_align,
                CIL.Vector.intrinsic_reinterpret128, incoming128_arm_low, incoming128_arm_high,
@@ -252,7 +252,7 @@ theorem vector128_incoming_dispatch (program : CIL.Program) (body : CIL.Method) 
     | exact continuation
     | (apply run_next_exists post found (by simp [code, incomingPrefix, selected]; rfl)
        simp (config := { implicitDefEqProofs := false })
-         [step, selected, pureArity, scalars, CIL.step.eq_def, CIL.FeatureProfile.evaluate,
+         [step, cil_guard, observerCount, selected, pureArity, scalars, CIL.step.eq_def, CIL.FeatureProfile.evaluate,
            checkedValue, numericValue, Bind.bind, Except.bind, Pure.pure, Except.pure]
        first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)
 
@@ -271,7 +271,7 @@ theorem vector128_incoming_join (program : CIL.Program) (body : CIL.Method) (met
     | exact continuation
     | (apply run_next_exists post found (by simp [code, incomingPrefix, selected]; rfl)
        simp (config := { implicitDefEqProofs := false })
-         [step, pureArity, scalars, CIL.step.eq_def, checkedValue, numericValue,
+         [step, cil_guard, observerCount, pureArity, scalars, CIL.step.eq_def, checkedValue, numericValue,
            Bind.bind, Except.bind, Pure.pure, Except.pure]
        first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)
 

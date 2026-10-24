@@ -169,9 +169,9 @@ theorem impl_inputs (program : CIL.Program) (method lookup : Nat) (profile : CIL
   impl_pure
   impl_pure
   apply run_next_exists post found (by rfl)
-  · simp only [step, pureArity, loadLeft]; rfl
+  · simp only [step, cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, pureArity, loadLeft]; rfl
   apply run_next_exists post found (by rfl)
-  · simp only [step, staticInstruction, castLeft]; rfl
+  · simp only [step, cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, staticInstruction, castLeft]; rfl
   impl_store
   have loadRight := UInt256Proof.Equality.VectorPrimitive.load_input state.call (by simp : right ∈ [left, right])
   have castRight := UInt256Proof.Equality.VectorPrimitive.cast_input current right
@@ -179,9 +179,9 @@ theorem impl_inputs (program : CIL.Program) (method lookup : Nat) (profile : CIL
   rw [sameRight] at castRight
   impl_pure
   apply run_next_exists post found (by rfl)
-  · simp only [step, pureArity, loadRight]; rfl
+  · simp only [step, cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, pureArity, loadRight]; rfl
   apply run_next_exists post found (by rfl)
-  · simp only [step, staticInstruction, castRight]; rfl
+  · simp only [step, cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, staticInstruction, castRight]; rfl
   impl_store
   impl_load
   impl_load
@@ -298,7 +298,7 @@ theorem impl_return (program : CIL.Program) (method lookup : Nat) (profile : CIL
     run program 1 method pc args frame [.scalar (.i32 flag)] memory =
       .ok (leaveFrame frame memory, [.scalar (.i32 flag)]) := by
   have returns : (subtractBlendImplBody profile bmi1 lookup).returnsValue = true := rfl
-  simp [run, found, fetched, returns, step, normalized, checkedValue, numericValue,
+  simp [run, found, fetched, returns, step, cil_guard, observerCount, normalized, checkedValue, numericValue,
     Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 theorem impl_fast_return (program : CIL.Program) (method lookup : Nat) (profile : CIL.FeatureProfile)
@@ -400,21 +400,21 @@ theorem impl_slow_tail (program : CIL.Program) (method lookup : Nat) (profile : 
     (UInt256Proof.SIMD.cascadeIndex (CIL.Vector.moveMask64 (borrowLanes a b)) (CIL.Vector.moveMask64 (equalLanes a b)))
     (UInt256Proof.SIMD.cascade_index_bound _ _)
   apply run_next_exists post found (by rfl)
-  · simp [step, staticInstruction, memoryInstruction, formValue, formed, checkedAt, Except.mapError,
+  · simp [step, cil_guard, observerCount, staticInstruction, memoryInstruction, formValue, formed, checkedAt, Except.mapError,
       Bind.bind, Except.bind, Pure.pure, Except.pure]
     exact ⟨rfl, rfl, rfl, rfl⟩
   apply run_next_exists post found (by rfl)
-  · simp [step, staticInstruction, memoryInstruction, formValue, formed, checkedAt, Except.mapError,
+  · simp [step, cil_guard, observerCount, staticInstruction, memoryInstruction, formValue, formed, checkedAt, Except.mapError,
       Bind.bind, Except.bind, Pure.pure, Except.pure]
     exact ⟨rfl, rfl, rfl, rfl⟩
   impl_load
   impl_pure
   apply run_next_exists post found (by rfl)
-  · simp only [step, staticInstruction, memoryInstruction, referenceAt, CIL.offsetValue, checkedAt,
+  · simp only [step, cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, staticInstruction, memoryInstruction, referenceAt, CIL.offsetValue, checkedAt,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     rw [added]
   apply run_next_exists post found (by rfl)
-  · simp [step, staticInstruction, memoryInstruction, row,
+  · simp [step, cil_guard, observerCount, staticInstruction, memoryInstruction, row,
       Bind.bind, Except.bind, Pure.pure, Except.pure]
     try exact ⟨rfl, rfl, rfl, rfl⟩
   impl_store
@@ -447,7 +447,7 @@ theorem impl_slow_tail (program : CIL.Program) (method lookup : Nat) (profile : 
     have bit := bextr_bit (CIL.Vector.moveMask64 (equalLanes a b) + 2#32 * CIL.Vector.moveMask64 (borrowLanes a b))
     simp only [BitVec.toNat_setWidth] at bit
     apply run_next_exists post found (by rfl)
-    · simp [step, staticInstruction, memoryInstruction, bit,
+    · simp [step, cil_guard, observerCount, staticInstruction, memoryInstruction, bit,
         Bind.bind, Except.bind, Pure.pure, Except.pure]
       try exact ⟨rfl, rfl, rfl, rfl⟩
     exact ⟨1, _, _, impl_return program method lookup profile true found 111 rfl _ frame stored _
@@ -464,9 +464,9 @@ theorem impl_contract (program : CIL.Program) (method lookup : Nat) (profile : C
   obtain ⟨frame, entered, setup, live⟩ := call.binary_setup_succeeds
     (body := subtractBlendImplBody profile bmi1 lookup)
     (by simp [subtractBlendImplBody, FrameSetupFits, InitializersFit, InitializerFits, AggregateArgumentsFit,
-      ParameterArgumentsFit])
+      ParameterArgumentsFit, SelectedKindsFit])
   obtain ⟨frame', entered', setup', homes, _, wf⟩ := numeric_frame_setup
-    (subtractBlendImplBody profile bmi1 lookup) implSpecs rfl rfl rfl rfl memory
+    (subtractBlendImplBody profile bmi1 lookup) implSpecs rfl rfl rfl rfl rfl memory
     (binaryArguments left right output) call.1.1
   rw [setup] at setup'
   cases setup'

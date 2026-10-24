@@ -2,6 +2,7 @@ import CIL.Safety.Equations
 import UInt256.Safety.Contract
 import CIL.Safety.CallComposition
 import CIL.Safety.StepComposition
+import CIL.Safety.GuardNormalization
 
 namespace UInt256Model.Safety
 open CIL.Safety
@@ -27,12 +28,12 @@ theorem forward_wrapping_binary (program : CIL.Program) (wrapperIndex childIndex
   have stepped : step wrapperBody (.call childIndex 3) 3 args frame
       [.reference (.address output), .reference (.address right), .reference (.address left)] memory =
       .ok (.call childIndex args [] memory) := by
-    simp [args, binaryArguments, step, checkedValue, formValue, fl, fr, fo, checkedAt,
+    simp [args, binaryArguments, step, cil_guard, observerCount, checkedValue, formValue, fl, fr, fo, checkedAt,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   have returned : run program 1 wrapperIndex 4 args frame [] final =
       .ok (final, []) := by
     have fetch : wrapperBody.code[4]? = some .ret := by simp [code]
-    simp [run, found, fetch, returns, step, frame, leaveFrame,
+    simp [run, found, fetch, returns, step, cil_guard, observerCount, frame, leaveFrame,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   obtain ⟨tailFuel, tail⟩ := run_call_exists found fetched stepped ⟨childFuel, certificate.1⟩ ⟨1, returned⟩
   have prefixRun : ∃ fuel after returned,
@@ -40,7 +41,7 @@ theorem forward_wrapping_binary (program : CIL.Program) (wrapperIndex childIndex
       after = final ∧ returned = [] := by
     iterate 3
       apply run_next_exists (fun after returned => after = final ∧ returned = []) found (by rw [code]; rfl)
-      simp [step, args, binaryArguments, checkedValue, formValue, fl, fr, fo, checkedAt,
+      simp [step, cil_guard, observerCount, args, binaryArguments, checkedValue, formValue, fl, fr, fo, checkedAt,
         Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
       first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
     exact ⟨tailFuel, final, [], tail, rfl, rfl⟩
@@ -49,7 +50,7 @@ theorem forward_wrapping_binary (program : CIL.Program) (wrapperIndex childIndex
     simp [args, binaryArguments, checkedValue, formValue, fl, fr, fo, checkedAt,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   have setup : enterFrame wrapperBody args memory = .ok (frame, memory) := by
-    simp [enterFrame, kinds, locals, parameters, vectors, makeLocals, makeParameterHomes, makeArgumentHomes, frame,
+    simp [enterFrame, kinds, locals, parameters, vectors, makeSelectedLocals, makeLocals, makeSelectedLocalsFrom, ite_self, makeParameterHomes, makeArgumentHomes, frame,
       Bind.bind, Except.bind, Pure.pure, Except.pure]
   have live := checked_entry_live_state _ _ _ _ _ _ _ call.1.1 call.2 checked setup
   exact ⟨fuel, after, certify_invocation _ _ _ _ _ _ _ _ _ _ found checked setup live executed,

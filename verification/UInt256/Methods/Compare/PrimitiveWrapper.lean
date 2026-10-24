@@ -2,6 +2,7 @@ import CIL.StepEquations
 import CIL.Safety.Equations
 import UInt256.Methods.Compare.PrimitiveLeafContract
 import CIL.Safety.CallComposition
+import CIL.Safety.GuardNormalization
 
 namespace UInt256Proof.Compare.PrimitiveWrapper
 open CIL.Safety UInt256Model.Safety UInt256Proof.Compare.PrimitiveSafety
@@ -55,7 +56,7 @@ theorem returned (narrow signed scalarFirst reversed negate : Bool) (program : C
   cases polarity : negate <;> cases less
   all_goals
     simp only [polarity] at found at0 at1 at2 returns
-    simp [run, found, at0, at1, at2, step, returns,
+    simp [run, found, at0, at1, at2, step, cil_guard, observerCount, returns,
       pureArity, scalars, CIL.step, CIL.binary, CIL.NarrowKind.extend,
       instruction, checkedValue, numericValue, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
@@ -72,7 +73,7 @@ theorem checked {α : Type} (encode : α → CIL.Value) (widen : α → BitVec 6
   let frame : Frame := ⟨memory.nextIdentity, [], [], []⟩
   have setup : enterFrame body (scalarOperatorArguments (scalarFirst != reversed) input (encode word)) memory =
       .ok (frame, memory) := by
-    simp [enterFrame, body, method, makeLocals, makeArgumentHomes, makeParameterHomes, frame,
+    simp [enterFrame, body, method, makeSelectedLocals, makeLocals, makeArgumentHomes, makeParameterHomes, frame,
       Bind.bind, Except.bind, Pure.pure, Except.pure]
   have formed := call.input_formed (reference := input) (by simp)
   have checked : (scalarOperatorArguments (scalarFirst != reversed) input (encode word)).mapM (checkedValue memory) =
@@ -92,7 +93,7 @@ theorem checked {α : Type} (encode : α → CIL.Value) (widen : α → BitVec 6
       (scalarOperatorArguments scalarFirst input (.i64 (widen word))).reverse memory =
       .ok (.call callee (scalarOperatorArguments scalarFirst input (.i64 (widen word))) [] memory) := by
     cases scalarFirst <;>
-      simp [step, scalarOperatorArguments, scalarArguments, checkedValue, numericValue, formValue, formed,
+      simp [step, cil_guard, observerCount, scalarOperatorArguments, scalarArguments, checkedValue, numericValue, formValue, formed,
         checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   obtain ⟨tailFuel, tail⟩ := run_call_exists found fetched stepped ⟨childFuel, certificate.1⟩
     ⟨3, returned narrow signed scalarFirst reversed negate program entry callee found _ _ frame final⟩

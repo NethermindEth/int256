@@ -49,7 +49,7 @@ macro "borrow_run_steps " "[" normalize:term,* "]" : tactic => `(tactic| (
     | (apply run_call_of_invoke
        · simp only [cil_code]; rfl
        · simp only [cil_code]; rfl
-       · simp [cil_code, step, checkedValue, numericValue, Except.mapError, Bind.bind, Except.bind,
+       · simp [cil_code, step, cil_guard, observerCount, checkedValue, numericValue, Except.mapError, Bind.bind, Except.bind,
            Pure.pure, Except.pure]
          exact ⟨rfl, rfl, rfl, rfl⟩
        · cil_checked_steps
@@ -57,8 +57,8 @@ macro "borrow_run_steps " "[" normalize:term,* "]" : tactic => `(tactic| (
     | (solve
        | rw [run]
          simp (config := { implicitDefEqProofs := false })
-           [cil_code, step, leaveFrame, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure])
-  simp [run, cil_code, step, leaveFrame, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]))
+           [cil_code, step, cil_guard, observerCount, leaveFrame, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure])
+  simp [run, cil_code, step, cil_guard, observerCount, leaveFrame, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]))
 
 /-- The incoming borrow is reread after the difference write, so the words must be disjoint. -/
 theorem borrow_invoke_succeeds_of_run (bw : BitVec 64 → BitVec 64 → BitVec 64 → BitVec 64)
@@ -94,7 +94,7 @@ theorem borrow_invoke_succeeds_of_run (bw : BitVec 64 → BitVec 64 → BitVec 6
   have setup : enterFrame body
       [.scalar (.i64 a), .scalar (.i64 b), .reference (.address borrowRef), .reference (.address output)]
       memory = .ok (frame, memory) := by
-    simp [enterFrame, shape.localKinds, shape.locals, shape.vectorArgs, shape.parameterHomes, makeLocals,
+    simp [enterFrame, shape.localKinds, shape.locals, shape.vectorArgs, shape.parameterHomes, makeSelectedLocals, makeLocals, makeSelectedLocalsFrom, ite_self,
       makeArgumentHomes, makeParameterHomes, frame, Bind.bind, Except.bind, Pure.pure, Except.pure]
   have invoked : invoke program (body.code.length + 1) index
       [.scalar (.i64 a), .scalar (.i64 b), .reference (.address borrowRef), .reference (.address output)]

@@ -65,13 +65,13 @@ theorem vector128_fast_return (program : CIL.Program) (body : CIL.Method) (metho
       first
       | exact load _ _
       | (simp (config := { implicitDefEqProofs := false })
-          [localResult, checkedIntrinsic, step, selected, pureArity, scalars, CIL.step.eq_def, CIL.binary,
+          [localResult, checkedIntrinsic, step, cil_guard, observerCount, selected, pureArity, scalars, CIL.step.eq_def, CIL.binary,
             CIL.Intrinsic.available, CIL.Vector.intrinsic_extract128,
             checkedValue, numericValue, Bind.bind, Except.bind, Pure.pure, Except.pure]
          first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)
   all_goals have fetched : body.code[221]? = some (.ret (some .unsigned8)) := by simp [code, List.getElem?_append, leadingLength, fastOutputCode, selected]
   all_goals by_cases carry : CIL.Vector.lane64 mask 1 > BitVec.ofNat 64 0
-  all_goals simp [run, found, fetched, returns, step, checkedValue, numericValue, CIL.NarrowKind.extend, carry,
+  all_goals simp [run, found, fetched, returns, step, cil_guard, observerCount, checkedValue, numericValue, CIL.NarrowKind.extend, carry,
     Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 #print axioms vector128_fast_return
@@ -147,7 +147,7 @@ theorem vector128_fast_output (program : CIL.Program) (body : CIL.Method) (metho
          | exact loadLow _ _
          | exact loadHigh _ _
          | (simp (config := { implicitDefEqProofs := false })
-             [localResult, step, argument, checkedValue, formValue, formed, staticInstruction, memoryInstruction,
+             [localResult, step, cil_guard, observerCount, argument, checkedValue, formValue, formed, staticInstruction, memoryInstruction,
                storeValue, referenceAt, firstWrite, secondWrite, address, CIL.offsetValue,
                checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
             first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
@@ -168,7 +168,7 @@ theorem vector128_fast_output_dispatch (program : CIL.Program) (body : CIL.Metho
     | exact continuation
     | (apply run_next_exists post found (by simp [code, List.getElem?_append, leadingLength, fastOutputCode, selected]; rfl)
        simp (config := { implicitDefEqProofs := false })
-         [localResult, checkedIntrinsic, step, selected, pureArity, scalars, CIL.step.eq_def, CIL.FeatureProfile.evaluate,
+         [localResult, checkedIntrinsic, step, cil_guard, observerCount, selected, pureArity, scalars, CIL.step.eq_def, CIL.FeatureProfile.evaluate,
            numericValue, checkedValue, Bind.bind, Except.bind, Pure.pure, Except.pure]
        first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)
 

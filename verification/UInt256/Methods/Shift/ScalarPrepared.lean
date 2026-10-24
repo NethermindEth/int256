@@ -63,10 +63,10 @@ theorem shift_operand_save (original entered current : Memory)
     have cases : i = 0 ∨ i = 1 ∨ i = 2 ∨ i = 3 := by omega
     rcases cases with rfl | rfl | rfl | rfl <;> rfl
   apply run_next_exists post found fetchedArg
-  · simp [step, argument, checkedValue, formValue, formed, Bind.bind, Except.bind, Pure.pure, Except.pure]
+  · simp [step, cil_guard, observerCount, argument, checkedValue, formValue, formed, Bind.bind, Except.bind, Pure.pure, Except.pure]
     first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
   apply run_next_exists post found fetchedField
-  · simp only [step, pureArity, reading, Bind.bind, Except.bind, Pure.pure, Except.pure]
+  · simp only [step, cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, pureArity, reading, Bind.bind, Except.bind, Pure.pure, Except.pure]
     first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
   apply run_next_exists post found fetchedStore (stored _ _ _)
   simpa only [show ((27 + 3 * index.val) + 1) + 1 + 1 = 30 + 3 * index.val by omega] using done

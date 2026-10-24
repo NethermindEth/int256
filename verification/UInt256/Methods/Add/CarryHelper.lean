@@ -39,7 +39,7 @@ def carryBody (profile : CIL.FeatureProfile) : CIL.Method := { profile := profil
   .store64,
   .ret] }
 
-theorem carryBody_shape {profile : CIL.FeatureProfile} : CarryShape (carryBody profile) := ⟨rfl, rfl, rfl, rfl⟩
+theorem carryBody_shape {profile : CIL.FeatureProfile} : CarryShape (carryBody profile) := ⟨rfl, rfl, rfl, rfl, rfl⟩
 end UInt256Proof.Add.CarrySafety
 
 namespace UInt256Proof.Add.CarrySafety
@@ -82,7 +82,7 @@ theorem carry_run_of_memory_steps (found : program[index]? = some (carryBody pro
         [locals, s0, s1, r0, rc, r1, r2, r3, fc1, fc2, fo3, wc, wo, carryWord] <;>
         first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
   rw [run]
-  simp [found, carryBody, step, leaveFrame, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
+  simp [found, carryBody, step, cil_guard, observerCount, leaveFrame, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 #print axioms carry_run_of_memory_steps
 

@@ -43,7 +43,7 @@ theorem run_leaf (profile : CIL.FeatureProfile)
     · apply run_next found
       · simp only [body]; rfl
       · simp (config := { implicitDefEqProofs := false })
-            [step, unaryArguments, checkedValue, formValue, fl, fo, hl,
+            [step, cil_guard, observerCount, unaryArguments, checkedValue, formValue, fl, fo, hl,
              pureArity, instruction, staticInstruction, memoryInstruction, dereference,
              aggregate_to_vector, checkedAt,
              Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
@@ -57,7 +57,7 @@ theorem run_leaf (profile : CIL.FeatureProfile)
     · apply run_next found
       · simp only [body]; rfl
       · simp (config := { implicitDefEqProofs := false })
-            [step,
+            [step, cil_guard, observerCount,
              pureArity, instruction, staticInstruction, memoryInstruction, referenceAt,
              vector_to_aggregate, length, written, checkedAt,
              Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
@@ -123,7 +123,7 @@ theorem entry_prefix (profile : CIL.FeatureProfile) (enabled : profile.vector256
         | exact enabled_step _ enabled _ _ _ _ _
         | exact enabled_branch _ _ _ _ _ _ _
         | (simp (config := { implicitDefEqProofs := false })
-             [step, unaryArguments, checkedValue, formValue, fl, fo, checkedAt,
+             [step, cil_guard, observerCount, unaryArguments, checkedValue, formValue, fl, fo, checkedAt,
                Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
            try exact ⟨rfl,rfl,rfl,rfl⟩
            done)
@@ -148,7 +148,7 @@ theorem entry_result (profile : CIL.FeatureProfile) (enabled : profile.vector256
       checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   have stepped : step (entryBody profile callee) (.call callee 2) 4 (unaryArguments input output) frame
       (unaryArguments input output).reverse memory = .ok (.call callee (unaryArguments input output) [] memory) := by
-    simp only [step, unaryArguments, List.length_cons, List.length_nil,
+    simp only [step, cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, unaryArguments, List.length_cons, List.length_nil,
       Nat.reduceAdd, Nat.lt_irrefl, ↓reduceIte, List.reverse_cons, List.reverse_nil,
       List.nil_append, List.cons_append, List.take, List.drop, Bind.bind, Except.bind]
     exact congrArg (fun xs => xs.map fun checked => FrameAction.call callee checked [] memory) checked

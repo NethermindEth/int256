@@ -62,7 +62,7 @@ theorem vector128_correction_checked (program : CIL.Program) (body : CIL.Method)
          | exact loadSum _ _
          | exact stored _ _ _
          | (simp (config := { implicitDefEqProofs := false })
-             [step, pureArity, scalars, CIL.step.eq_def, CIL.Intrinsic.available,
+             [step, cil_guard, observerCount, pureArity, scalars, CIL.step.eq_def, CIL.Intrinsic.available,
                CIL.Vector.intrinsic_sub128, corrected128, checkedValue, numericValue,
                Bind.bind, Except.bind, Pure.pure, Except.pure]
             first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))

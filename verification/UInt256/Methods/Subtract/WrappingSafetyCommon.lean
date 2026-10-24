@@ -4,6 +4,7 @@ import CIL.Safety.StepComposition
 import CIL.Safety.CallComposition
 import CIL.Safety.ReturnMemory
 import UInt256.Safety.ReportingContract
+import CIL.Safety.GuardNormalization
 
 namespace UInt256Proof.Subtract.Safety
 open CIL.Safety UInt256Model.Safety
@@ -32,7 +33,7 @@ theorem wrapping_prefix (left right output : Reference) (frame : Frame) (memory 
        · simp only [cil_code]; rfl
        · simp only [cil_code]; rfl
        · simp (config := { implicitDefEqProofs := false })
-           [cil_code, binaryArguments, step, checkedValue, numericValue, formValue, fl, fr, fo,
+           [cil_code, binaryArguments, step, cil_guard, observerCount, checkedValue, numericValue, formValue, fl, fr, fo,
              pureArity, scalars, CIL.step, CIL.FeatureProfile.evaluate, checkedAt, Except.mapError,
              Bind.bind, Except.bind, Pure.pure, Except.pure]
          first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)
@@ -46,10 +47,10 @@ theorem wrapping_return (args : List Value) (flag : BitVec 32) (frame : Frame) (
   have returns : Extracted.entryBody.returnsValue = false := by rfl
   apply Eq.trans
   · apply run_next found popFound
-    simp [step, pureArity, scalars, CIL.step, checkedValue, instruction, Bind.bind, Except.bind, Pure.pure, Except.pure]
+    simp [step, cil_guard, observerCount, pureArity, scalars, CIL.step, checkedValue, instruction, Bind.bind, Except.bind, Pure.pure, Except.pure]
     exact ⟨rfl, rfl, rfl, rfl⟩
   · rw [run]
-    simp [found, returnFound, returns, step, checkedValue, numericValue,
+    simp [found, returnFound, returns, step, cil_guard, observerCount, checkedValue, numericValue,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 theorem wrapping_contract_of_reporting
@@ -58,7 +59,7 @@ theorem wrapping_contract_of_reporting
     Extracted.program Extracted.entryIndex := by
   intro memory left right output call
   have fits : FrameSetupFits Extracted.entryBody (binaryArguments left right output) := by
-    simp [cil_code, FrameSetupFits, InitializersFit, InitializerFits, AggregateArgumentsFit, ParameterArgumentsFit]
+    simp [cil_code, FrameSetupFits, InitializersFit, InitializerFits, AggregateArgumentsFit, ParameterArgumentsFit, SelectedKindsFit]
   obtain ⟨frame, entered, setup, live⟩ := call.binary_setup_succeeds fits
   have enteredCall := call.after_frame_setup setup
   obtain ⟨childFuel, after, certificate, resultValue, resultWritable, resultFootprint⟩ :=
@@ -78,7 +79,7 @@ theorem wrapping_contract_of_reporting
       (binaryArguments left right output) frame
       [.reference (.address output), .reference (.address right), .reference (.address left)]
       entered = .ok (.call Extracted.subtractVector256Index (binaryArguments left right output) [] entered) := by
-    simp [step, binaryArguments, binaryArguments, checkedValue, numericValue, formValue, fl, fr, fo,
+    simp [step, cil_guard, observerCount, binaryArguments, binaryArguments, checkedValue, numericValue, formValue, fl, fr, fo,
       checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   obtain ⟨tailFuel, tail⟩ := run_call_exists found fetched stepped ⟨childFuel, invoked⟩
     ⟨2, wrapping_return _ (if (inputValue entered left).toNat < (inputValue entered right).toNat then 1 else 0) frame after⟩

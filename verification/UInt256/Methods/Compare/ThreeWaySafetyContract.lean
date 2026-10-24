@@ -38,7 +38,7 @@ theorem threeWay_checked (memory : Memory) (left right : Reference)
     (by rfl) ?_ ?_ memory left right call
   · intro left right
     conv in threeWayBody => cbv
-    simp [FrameSetupFits, InitializersFit, AggregateArgumentsFit, ParameterArgumentsFit]
+    simp [FrameSetupFits, InitializersFit, AggregateArgumentsFit, ParameterArgumentsFit, SelectedKindsFit]
   · intro memory left right frame call
     simpa only [threeWay_result_math] using threeWay_run memory left right frame call
 

@@ -52,7 +52,7 @@ theorem scalar_small_prefix (swapped : Bool) (left right output home : Reference
         · simp only [cil_code]; rfl
         · simp only [cil_code]; rfl
         · simp (config := { implicitDefEqProofs := false })
-            [cil_code, scalarArguments, UInt256Model.Safety.binaryArguments, step,
+            [cil_code, scalarArguments, UInt256Model.Safety.binaryArguments, step, cil_guard, observerCount,
               checkedValue, numericValue, formValue, formed, outputFormed, slot, reading,
               pureArity, scalars, CIL.step, CIL.truth, checkedAt, Except.mapError,
               Bind.bind, Except.bind, Pure.pure, Except.pure]
@@ -69,7 +69,7 @@ theorem scalar_small_return (swapped : Bool) (args : List Value) (flag : BitVec 
     conv in (scalarSmallCall _) => cbv
     simp only [Nat.reduceAdd]
     rw [run]
-    simp [cil_code, step, checkedValue, numericValue, normalized,
+    simp [cil_code, step, cil_guard, observerCount, checkedValue, numericValue, normalized,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 #print axioms scalar_small_prefix
@@ -125,7 +125,7 @@ theorem scalar_small_finish (swapped : Bool) (original entered current : CIL.Saf
         .reference (.address (scalarSmallSource swapped left right))] current =
         .ok (.call Extracted.addScalarUInt64Index
           (smallArguments (scalarSmallSource swapped left right) output word) [] current) := by
-    simp [step, smallArguments, checkedValue, numericValue, formValue, inputFormed, outputFormed,
+    simp [step, cil_guard, observerCount, smallArguments, checkedValue, numericValue, formValue, inputFormed, outputFormed,
       checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   have returned := scalar_small_return swapped (UInt256Model.Safety.binaryArguments left right output ++ [.scalar (.i32 flag)])
     (smallOverflow current (scalarSmallSource swapped left right) word) frame after

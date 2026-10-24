@@ -28,7 +28,7 @@ theorem wrapper_checked (wrapper : Wrapper)
     cases wrapper
     all_goals
       conv in (wrapperBody _) => cbv
-      simp [FrameSetupFits, InitializersFit, InitializerFits, AggregateArgumentsFit, ParameterArgumentsFit]
+      simp [FrameSetupFits, InitializersFit, InitializerFits, AggregateArgumentsFit, ParameterArgumentsFit, SelectedKindsFit]
   · intro left right
     cases wrapper <;> simp only [childArguments]
     all_goals first | rfl | (split <;> rfl)

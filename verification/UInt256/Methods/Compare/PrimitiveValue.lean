@@ -3,6 +3,7 @@ import CIL.Safety.Equations
 import UInt256.Safety.ParameterSetup32
 import UInt256.Methods.Compare.PrimitiveLeafContract
 import CIL.Safety.CallComposition
+import CIL.Safety.GuardNormalization
 
 namespace UInt256Proof.Compare.PrimitiveValue
 open CIL.Safety UInt256Model.Safety
@@ -45,7 +46,7 @@ theorem returned (program : CIL.Program) (index callee : Nat)
     (frame : Frame) (memory : Memory) (less : Bool) :
     run program 3 index 3 args frame [.scalar (.i32 (if less then 1 else 0))] memory =
       .ok (leaveFrame frame memory, [.scalar (.i32 (if less then 0 else 1))]) := by
-  cases less <;> simp [run, found, body, step, pureArity, scalars, CIL.step, CIL.binary,
+  cases less <;> simp [run, found, body, step, cil_guard, observerCount, pureArity, scalars, CIL.step, CIL.binary,
     CIL.NarrowKind.extend, instruction, checkedValue, numericValue, Except.mapError,
     Bind.bind, Except.bind, Pure.pure, Except.pure]
 
@@ -64,7 +65,7 @@ theorem correctness (program : CIL.Program) (index callee : Nat)
   have stepped : step (body callee) (.call callee 2) 2 (arguments word value)
       (parameterFrame32 memory copy) [.scalar (.i64 word), .reference (.address copy)] entered =
       .ok (.call callee (scalarOperatorArguments false copy (.i64 word)) [] entered) := by
-    simp [step, scalarOperatorArguments, scalarArguments, checkedValue, numericValue, formValue, formed,
+    simp [step, cil_guard, observerCount, scalarOperatorArguments, scalarArguments, checkedValue, numericValue, formValue, formed,
       checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   have suffix := returned program index callee found (arguments word value) (parameterFrame32 memory copy)
     childFinal (decide ((value.toNat : Int) < (word.toNat : Int)))

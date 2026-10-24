@@ -72,7 +72,7 @@ theorem vector128_arm_repair_carry (program : CIL.Program) (body : CIL.Method) (
          | exact load_repair _ _
          | exact stored _ _ _
          | (simp (config := { implicitDefEqProofs := false })
-             [localResult, checkedIntrinsic, step, enabled, pureArity, scalars, CIL.step.eq_def, CIL.Intrinsic.available,
+             [localResult, checkedIntrinsic, step, cil_guard, observerCount, enabled, pureArity, scalars, CIL.step.eq_def, CIL.Intrinsic.available,
                CIL.Vector.intrinsic_and128, CIL.Vector.intrinsic_or128, repaired128Carry,
                checkedValue, numericValue, Bind.bind, Except.bind, Pure.pure, Except.pure]
             first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))

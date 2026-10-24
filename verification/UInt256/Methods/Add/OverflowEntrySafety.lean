@@ -5,6 +5,7 @@ import UInt256.Safety.CallerSetup
 import CIL.Safety.ReturnMemory
 import UInt256.Methods.Add.EntrySafetySetup
 import UInt256.Safety.ReportingContract
+import CIL.Safety.GuardNormalization
 
 namespace UInt256Proof.Safety
 open CIL.Safety UInt256Model.Safety
@@ -36,7 +37,7 @@ theorem overflow_prefix (left right output : Reference) (frame : Frame) (memory 
        · simp only [cil_code]; rfl
        · simp only [cil_code]; rfl
        · simp (config := { implicitDefEqProofs := false })
-           [cil_code, binaryArguments, step, checkedValue, numericValue, formValue, fl, fr, fo,
+           [cil_code, binaryArguments, step, cil_guard, observerCount, checkedValue, numericValue, formValue, fl, fr, fo,
              pureArity, scalars, CIL.step, CIL.FeatureProfile.evaluate, checkedAt, Except.mapError,
              Bind.bind, Except.bind, Pure.pure, Except.pure]
          first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)
@@ -48,7 +49,7 @@ theorem overflow_return (args : List Value) (flag : BitVec 32) (frame : Frame) (
   have lookup : Extracted.program[Extracted.entryIndex]? = some Extracted.entryBody := by simp only [cil_code]
   have returned : Extracted.entryBody.code[overflowCall + 1]? = some (.ret (some .unsigned8)) := by rfl
   have returns : Extracted.entryBody.returnsValue = true := by rfl
-  simp [run, lookup, returned, returns, step, normalized, checkedValue, numericValue,
+  simp [run, lookup, returned, returns, step, cil_guard, observerCount, normalized, checkedValue, numericValue,
     Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 /-- The public proof consumes a proved invocation of the actual extracted child. -/
@@ -75,7 +76,7 @@ theorem overflow_contract_of_child
       (binaryArguments left right output) frame
       [.scalar (.i32 1), .reference (.address output), .reference (.address right), .reference (.address left)]
       entered = .ok (.call Extracted.addScalarIndex (overflowScalarArguments left right output) [] entered) := by
-    simp [step, overflowScalarArguments, binaryArguments, checkedValue, numericValue, formValue, fl, fr, fo,
+    simp [step, cil_guard, observerCount, overflowScalarArguments, binaryArguments, checkedValue, numericValue, formValue, fl, fr, fo,
       checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   obtain ⟨tailFuel, tail⟩ := run_call_exists found fetched stepped ⟨childFuel, invoked⟩
     ⟨1, overflow_return _ (addOverflow entered left right) frame after (by unfold addOverflow; split <;> rfl)⟩

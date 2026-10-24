@@ -48,9 +48,9 @@ theorem scalar_carry_prefix (args : List Value) (frame : Frame) (before after : 
       · simp only [cil_code]; rfl
       · simp only [cil_code]; rfl
       · first
-        | exact stored _ _
+        | ((with_reducible show step _ (.setLocal 2) _ _ _ _ _ = _); exact stored _ _)
         | simp (config := { implicitDefEqProofs := false })
-            [cil_code, step, checkedValue, numericValue, formValue, carryFormed, resultFormed,
+            [cil_code, step, cil_guard, observerCount, checkedValue, numericValue, formValue, carryFormed, resultFormed,
               leftSlot, rightSlot, carrySlot, resultSlot, leftLoaded, rightLoaded, localAddress,
               pureArity, scalars, CIL.step, CIL.FeatureProfile.evaluate, instruction,
               checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
@@ -83,7 +83,7 @@ theorem scalar_first_carry (contract : CarryHelperContract Extracted.program Ext
   · simp only [cil_code]
   · conv in scalarFirstCarryCall => cbv
     simp only [cil_code]
-  · simp [step, checkedValue, numericValue, formValue, carryFormed, resultFormed,
+  · simp [step, cil_guard, observerCount, checkedValue, numericValue, formValue, carryFormed, resultFormed,
       checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     exact ⟨rfl, rfl, rfl⟩
   · exact ⟨wellFormed, by simp, carryRead, carryWrite, resultWrite, disjoint⟩
@@ -145,7 +145,7 @@ theorem scalar_carry_segment (segment : Fin 3) (left right output : Reference) (
         · simp only [cil_code]; rfl
         · simp only [cil_code]; rfl
         · simp (config := { implicitDefEqProofs := false })
-            [cil_code, step, checkedValue, formValue, leftFormed, rightFormed,
+            [cil_code, step, cil_guard, observerCount, checkedValue, formValue, leftFormed, rightFormed,
               carryFormed, resultFormed, carrySlot, resultSlot, localAddress, leftRead, rightRead,
               pureArity, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
           first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
@@ -183,7 +183,7 @@ theorem scalar_indexed_carry (contract : CarryHelperContract Extracted.program E
     all_goals
       conv in (scalarCarryCall _) => cbv
       simp only [cil_code]
-  · simp [step, checkedValue, numericValue, formValue, carryFormed, resultFormed,
+  · simp [step, cil_guard, observerCount, checkedValue, numericValue, formValue, carryFormed, resultFormed,
       checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     exact ⟨rfl, rfl, rfl⟩
   · exact ⟨wellFormed, incoming, carryRead, carryWrite, resultWrite, disjoint⟩

@@ -4,6 +4,7 @@ import CIL.Safety.WordLocals
 import CIL.Safety.WordPrefix
 import UInt256.Safety.CallerSetup
 import CIL.Safety.AccessBelow
+import CIL.Safety.GuardNormalization
 
 namespace UInt256Proof.Safety
 
@@ -61,12 +62,12 @@ theorem small_input_prefix (input output : Reference) (word : BitVec 64)
       · simp only [cil_code]; rfl
       · simp only [cil_code]; rfl
       · first
-        | exact s0 _ _
-        | exact s1 _ _
-        | exact s2 _ _
-        | exact s3 _ _
+        | ((with_reducible show step _ (.setLocal 0) _ _ _ _ _ = _); exact s0 _ _)
+        | ((with_reducible show step _ (.setLocal 1) _ _ _ _ _ = _); exact s1 _ _)
+        | ((with_reducible show step _ (.setLocal 2) _ _ _ _ _ = _); exact s2 _ _)
+        | ((with_reducible show step _ (.setLocal 3) _ _ _ _ _ = _); exact s3 _ _)
         | simp (config := { implicitDefEqProofs := false })
-            [smallArguments, cil_code, step, checkedValue, numericValue, formValue,
+            [smallArguments, cil_code, step, cil_guard, observerCount, checkedValue, numericValue, formValue,
               f0, f1, f2, f3, l0, l1, l2, l3, pureArity, scalars, CIL.step.eq_def,
               CIL.FeatureProfile.evaluate, checkedAt, Except.mapError,
               Bind.bind, Except.bind, Pure.pure, Except.pure]
@@ -112,7 +113,8 @@ theorem small_frame_setup (memory : Memory) (args : List Value) (wellFormed : me
   have entered : enterFrame Extracted.addScalarUInt64Body args memory = .ok (frame, result) := by
     unfold enterFrame
     dsimp only
-    rw [small_local_metadata.1, small_local_metadata.2.1, made]
+    rw [small_local_metadata.1, small_local_metadata.2.1, show Extracted.addScalarUInt64Body.opaqueVectorLocals = [] from rfl,
+      makeSelectedLocals, List.isEmpty_nil, if_pos rfl, made]
     simp only [Bind.bind, Except.bind, cil_code, makeArgumentHomes, makeParameterHomes, Pure.pure, Except.pure, List.map_nil, List.append_nil]
     rfl
   exact ⟨frame, result, slots, tailSlots, entered, rfl, homes,

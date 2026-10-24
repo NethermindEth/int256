@@ -267,7 +267,7 @@ theorem arm_helper_checked (profile : CIL.FeatureProfile) (enabled : profile.adv
     (b.code.take 94) (b.code.drop 111) rfl (by simp only [b, armBody, decisionCode, enabled, ite_true]; rfl)
     (b.code.take 204) (b.code.drop 222) rfl (by simp only [b, armBody, fastOutputCode, enabled, ite_true]; rfl) rfl
     (b.code.take 111) (b.code.drop 113) rfl rfl
-    (b.code.take 113) (b.code.drop 162) rfl rfl armSpecs_repair ⟨rfl,rfl⟩ rfl rfl enabled
+    (b.code.take 113) (b.code.drop 162) rfl rfl armSpecs_repair ⟨rfl,rfl⟩ rfl rfl rfl enabled
     memory left right output flag flagFit call
 #print axioms arm_helper_checked
 end UInt256Proof.Add.Safety

@@ -34,7 +34,7 @@ theorem portable_run (profile : CIL.FeatureProfile) (program : CIL.Program) (ind
   have duplicate (m : Memory) (bits : BitVec 256) (rest : List Value) :
       instruction .dup (.scalar (.v256 bits) :: rest) m =
         .ok (m, .scalar (.v256 bits) :: .scalar (.v256 bits) :: rest) := by
-    simp [instruction, checkedValue, numericValue, Pure.pure, Except.pure]
+    simp [instruction, cil_guard, observerCount, checkedValue, numericValue, Pure.pure, Except.pure]
   have keep0 : frame.locals.set 0 (.bytes .vector256 vr) = frame.locals := by simp [slots]
   have keep1 : frame.locals.set 1 (.bytes .word32 er) = frame.locals := by simp [slots]
   have keep2 : frame.locals.set 2 (.bytes .word32 lr) = frame.locals := by simp [slots]
@@ -45,11 +45,11 @@ theorem portable_run (profile : CIL.FeatureProfile) (program : CIL.Program) (ind
   have stepped : step (portableBody profile callee) (.call callee 2) 18 (readOnlyArguments [left, right]) frame
       [.scalar (.i32 ltWord), .scalar (.i32 eqWord)] m2 =
       .ok (.call callee [.scalar (.i32 eqWord), .scalar (.i32 ltWord)] [] m2) := by
-    simp [step, checkedValue, numericValue, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
+    simp [step, cil_guard, observerCount, checkedValue, numericValue, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   have tail : run program 1 index 19 (readOnlyArguments [left, right]) frame
       [.scalar (.i32 (maskResult eqWord ltWord))] m2 =
       .ok (leaveFrame frame m2, [.scalar (.i32 (maskResult eqWord ltWord))]) := by
-    simp [run, found, returned, returns, step, checkedValue, numericValue,
+    simp [run, found, returned, returns, step, cil_guard, observerCount, checkedValue, numericValue,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     unfold maskResult
     split <;> simp [CIL.NarrowKind.extend]
@@ -71,7 +71,7 @@ theorem portable_run (profile : CIL.FeatureProfile) (program : CIL.Program) (ind
     · apply run_next found
       · simp only [portableBody]; rfl
       · simp (config := { implicitDefEqProofs := false })
-          [step, checkedIntrinsic, readOnlyArguments, checkedValue, numericValue, formValue, fl, fr, hl, hr, cl, cr,
+          [step, cil_guard, observerCount, checkedIntrinsic, readOnlyArguments, checkedValue, numericValue, formValue, fl, fr, hl, hr, cl, cr,
             slot0, slot1, slot2, duplicate, s0, s1, s2, r0, r0after, r1, r2, keep0, keep1, keep2,
             pureArity, scalars, staticInstruction,
             CIL.step.eq_def, CIL.Intrinsic.available, intrinsic_portable_eq, intrinsic_portable_lt,

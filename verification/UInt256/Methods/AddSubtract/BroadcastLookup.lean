@@ -49,18 +49,18 @@ theorem lookup_invoke (program : CIL.Program) (index : Nat) (profile : CIL.Featu
       | error fault => simp [h, Bind.bind, Except.bind] at loaded
       | ok result => cases result; rfl
     exact access_reference_valid _ _ _ _ _ ready
-  simp [invoke, found, lookupBody, enterFrame, makeLocals, makeArgumentHomes, makeParameterHomes,
+  simp [invoke, found, lookupBody, enterFrame, makeSelectedLocals, makeLocals, makeArgumentHomes, makeParameterHomes,
     Bind.bind, Except.bind, Pure.pure, Except.pure, Except.mapError]
   repeat'
     first
     | apply Eq.trans
       · apply run_next found (by rfl)
         simp (config := { implicitDefEqProofs := false })
-          [step, lookupBody, staticInstruction, bytes, resolved, checkedValue, formValue,
+          [step, cil_guard, observerCount, lookupBody, staticInstruction, bytes, resolved, checkedValue, formValue,
             formed, checkedAt, liveAllocation, present, live, kind, size, offset, pureArity,
             Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
         first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
-    | simp [run, found, lookupBody, step, leaveFrame, checkedValue, formValue, formed, checkedAt,
+    | simp [run, found, lookupBody, step, cil_guard, observerCount, leaveFrame, checkedValue, formValue, formed, checkedAt,
         Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 theorem decode_vector256 (vector : BitVec 256) :
@@ -125,7 +125,7 @@ theorem run_lookup {program : CIL.Program} {original entered current : Memory}
   have next := state.after_call below wf world grown
   have stepped : step body (.call lookup 0) pc args frame stack current =
       .ok (.call lookup [] stack current) := by
-    simp [step, Bind.bind, Except.bind, Pure.pure, Except.pure]
+    simp [step, cil_guard, observerCount, Bind.bind, Except.bind, Pure.pure, Except.pure]
   obtain ⟨fuel, result, returned, finished, satisfied⟩ :=
     continuation after reference next loaded (read_reference_valid _ _ _ _ _ loaded)
   obtain ⟨total, ran⟩ := run_call_exists found fetched stepped ⟨4, invoked⟩ ⟨fuel, finished⟩

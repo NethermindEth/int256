@@ -345,7 +345,8 @@ theorem checked_vector128_sse_contract (program : CIL.Program) (body : CIL.Metho
     (storageFound : program[storage]? = some (UInt256Proof.Multiply.LimbStorage.body body.profile))
     (wordSpecs : ∀ i : Fin 5, specs[14 + i.val]? = some armWordSpec)
     (metadata : body.localKinds = .reference :: specs.map NumericLocalSpec.kind ∧ body.locals = .nullRef :: specs.map NumericLocalSpec.value)
-    (vectors : body.vectorArgs = []) (parameters : body.parameterHomes = []) (disabled : body.profile.advSimd = false)
+    (vectors : body.vectorArgs = []) (parameters : body.parameterHomes = [])
+    (opaqueLocals : body.opaqueVectorLocals = []) (disabled : body.profile.advSimd = false)
     (memory : Memory) (left right output : Reference) (flag : BitVec 32) (flagFit : CIL.NarrowKind.unsigned8.extend flag = flag)
     (call : CallingConditions program memory [left, right] [output]) :
     ∃ fuel final returned,
@@ -360,7 +361,7 @@ theorem checked_vector128_sse_contract (program : CIL.Program) (body : CIL.Metho
         final.cells id offset = memory.cells id offset) := by
   let args := vector128Arguments left right output flag
   obtain ⟨frame, entered, slots, setup, layout, homes, preserved, enteredWF⟩ :=
-    vector128_frame_setup body specs metadata vectors parameters memory args call.1.1
+    vector128_frame_setup body specs metadata vectors parameters opaqueLocals memory args call.1.1
   obtain ⟨fuel, final, returned, executed, scalar, result, writable, footprint⟩ :=
     vector128_sse_entry program body method specs found startTail incomingTail leading correctionTail startCode incomingCode leadingLength correctionCodeFound firstFourteen sse ssse earlyLeading earlyTail earlyLength earlyCode propLeading propTail propLength propCode decisionLeading decisionTail decisionLength decisionCodeFound fastLeading fastTail fastLength fastCode returns repairDispatchLeading repairDispatchTail repairDispatchLength repairDispatchCode repairLeading repairTail repairLength carry storage repairCode carryFound storageFound wordSpecs disabled memory entered left right output frame slots args
       call setup layout homes rfl rfl rfl flag flagFit rfl
@@ -418,7 +419,7 @@ theorem sse_helper_checked (profile : CIL.FeatureProfile) (disabled : profile.ad
     (b.code.take 204) (b.code.drop 222) rfl (by simp only [b, sseBody, fastOutputCode, disabled, Bool.false_eq_true, ite_false]; rfl) rfl
     (b.code.take 111) (b.code.drop 113) rfl rfl
     (b.code.take 162) (b.code.drop 204) rfl carry storage rfl carryFound storageFound armSpecs_words
-    ⟨rfl, rfl⟩ rfl rfl disabled
+    ⟨rfl, rfl⟩ rfl rfl rfl disabled
     memory left right output flag flagFit call
 
 #print axioms armSpecs_words

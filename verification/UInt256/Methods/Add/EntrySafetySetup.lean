@@ -9,13 +9,13 @@ open CIL.Safety UInt256Model.Safety
     locals and no by-value aggregate argument homes. Names/counts are not fixed. -/
 theorem program_frames_fit (args : List Value) :
     ∀ body ∈ Extracted.program, FrameSetupFits body args := by
-  simp [Extracted.program, cil_code, FrameSetupFits, InitializersFit, InitializerFits, AggregateArgumentsFit, ParameterArgumentsFit]
+  simp [Extracted.program, cil_code, FrameSetupFits, InitializersFit, InitializerFits, AggregateArgumentsFit, ParameterArgumentsFit, SelectedKindsFit]
 
 /-- Kernel-check compatibility of the current extracted local metadata.
     This is an entry-setup checkpoint, not the combined Add certificate. -/
 theorem entry_frame_fits (left right output : Reference) :
     FrameSetupFits Extracted.entryBody (binaryArguments left right output) := by
-  simp [cil_code, FrameSetupFits, InitializersFit, InitializerFits, AggregateArgumentsFit, ParameterArgumentsFit]
+  simp [cil_code, FrameSetupFits, InitializersFit, InitializerFits, AggregateArgumentsFit, ParameterArgumentsFit, SelectedKindsFit]
 
 theorem checked_entry_setup : ∀ (memory : Memory) (left right output : Reference),
     CallingConditions Extracted.program memory [left, right] [output] →

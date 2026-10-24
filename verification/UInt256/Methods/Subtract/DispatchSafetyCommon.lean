@@ -29,7 +29,7 @@ theorem dispatch_prefix (left right output : Reference) (frame : Frame) (memory 
        · simp only [cil_code]; rfl
        · simp only [cil_code]; rfl
        · simp (config := { implicitDefEqProofs := false })
-           [cil_code, binaryArguments, step, checkedValue, numericValue, formValue, fl, fr, fo,
+           [cil_code, binaryArguments, step, cil_guard, observerCount, checkedValue, numericValue, formValue, fl, fr, fo,
              pureArity, scalars, CIL.step, CIL.FeatureProfile.evaluate, checkedAt, Except.mapError,
              Bind.bind, Except.bind, Pure.pure, Except.pure]
          first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)
@@ -43,7 +43,7 @@ theorem dispatch_return (args : List Value) (flag : BitVec 32) (frame : Frame) (
     conv in dispatchCall => cbv
     simp only [Nat.reduceAdd, cil_code]
   have returns : Extracted.subtractVector256Body.returnsValue = true := by rfl
-  simp [run, lookup, returned, returns, step, checkedValue, numericValue, normalized,
+  simp [run, lookup, returned, returns, step, cil_guard, observerCount, checkedValue, numericValue, normalized,
     Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 theorem dispatch_contract_of_scalar
@@ -56,7 +56,7 @@ theorem dispatch_contract_of_scalar
     Extracted.program Extracted.subtractVector256Index := by
   intro memory left right output call
   have fits : FrameSetupFits Extracted.subtractVector256Body (binaryArguments left right output) := by
-    simp [cil_code, FrameSetupFits, InitializersFit, InitializerFits, AggregateArgumentsFit, ParameterArgumentsFit]
+    simp [cil_code, FrameSetupFits, InitializersFit, InitializerFits, AggregateArgumentsFit, ParameterArgumentsFit, SelectedKindsFit]
   obtain ⟨frame, entered, setup, live⟩ := call.binary_setup_succeeds fits
   have enteredCall := call.after_frame_setup setup
   obtain ⟨childFuel, after, values, invoked, result⟩ := scalarChecked entered left right output enteredCall
@@ -73,7 +73,7 @@ theorem dispatch_contract_of_scalar
       (binaryArguments left right output) frame
       [.reference (.address output), .reference (.address right), .reference (.address left)]
       entered = .ok (.call scalarIndex (binaryArguments left right output) [] entered) := by
-    simp [step, binaryArguments, binaryArguments, checkedValue, numericValue, formValue, fl, fr, fo,
+    simp [step, cil_guard, observerCount, binaryArguments, binaryArguments, checkedValue, numericValue, formValue, fl, fr, fo,
       checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   obtain ⟨tailFuel, tail⟩ := run_call_exists found fetched stepped ⟨childFuel, invoked⟩
     ⟨1, dispatch_return _ (subtractUnderflow entered left right) frame after

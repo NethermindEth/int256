@@ -206,20 +206,20 @@ theorem subtract_start_checked (program : CIL.Program) (body : CIL.Method) (meth
     | exact done
     | (apply run_next_exists post found (by simp [code, List.getElem?_append, leadingLength, subtractStartCode]; rfl)
        first
-       | exact a0 _ _ _
-       | exact a2 _ _ _
-       | exact b1 _ _ _
-       | exact b3 _ _ _
-       | exact c0 _ _ _
-       | exact c2 _ _ _
-       | exact d1 _ _ _
-       | exact d3 _ _ _
-       | exact st4 _ _ _
-       | exact st5 _ _ _
-       | exact st6 _ _ _
-       | exact st7 _ _ _
+       | ((with_reducible show step _ (.local 1) _ _ _ _ _ = _); exact a0 _ _ _)
+       | ((with_reducible show step _ (.local 3) _ _ _ _ _ = _); exact a2 _ _ _)
+       | ((with_reducible show step _ (.local 2) _ _ _ _ _ = _); exact b1 _ _ _)
+       | ((with_reducible show step _ (.local 4) _ _ _ _ _ = _); exact b3 _ _ _)
+       | ((with_reducible show step _ (.local 1) _ _ _ _ _ = _); exact c0 _ _ _)
+       | ((with_reducible show step _ (.local 3) _ _ _ _ _ = _); exact c2 _ _ _)
+       | ((with_reducible show step _ (.local 2) _ _ _ _ _ = _); exact d1 _ _ _)
+       | ((with_reducible show step _ (.local 4) _ _ _ _ _ = _); exact d3 _ _ _)
+       | ((with_reducible show step _ (.setLocal 5) _ _ _ _ _ = _); exact st4 _ _ _)
+       | ((with_reducible show step _ (.setLocal 6) _ _ _ _ _ = _); exact st5 _ _ _)
+       | ((with_reducible show step _ (.setLocal 7) _ _ _ _ _ = _); exact st6 _ _ _)
+       | ((with_reducible show step _ (.setLocal 8) _ _ _ _ _ = _); exact st7 _ _ _)
        | (simp (config := { implicitDefEqProofs := false })
-           [step, checkedIntrinsic, pureArity, scalars, CIL.step.eq_def, CIL.Intrinsic.available,
+           [step, cil_guard, observerCount, checkedIntrinsic, pureArity, scalars, CIL.step.eq_def, CIL.Intrinsic.available,
              CIL.Vector.intrinsic_sub128, CIL.Vector.intrinsic_lt128, checkedValue, numericValue,
              Bind.bind, Except.bind, Pure.pure, Except.pure]
           first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
@@ -270,13 +270,13 @@ theorem subtract_incoming_checked (program : CIL.Program) (body : CIL.Method) (m
       | exact done
       | (apply run_next_exists post found (by simp [code, List.getElem?_append, leadingLength, subtractIncomingCode, selected]; rfl)
          first
-         | exact a6 _ _ _
-         | exact b6 _ _ _
-         | exact b7 _ _ _
-         | exact st8 _ _ _
-         | exact st9 _ _ _
+         | ((with_reducible show step _ (.local 7) _ _ _ _ _ = _); exact a6 _ _ _)
+         | ((with_reducible show step _ (.local 7) _ _ _ _ _ = _); exact b6 _ _ _)
+         | ((with_reducible show step _ (.local 8) _ _ _ _ _ = _); exact b7 _ _ _)
+         | ((with_reducible show step _ (.setLocal 9) _ _ _ _ _ = _); exact st8 _ _ _)
+         | ((with_reducible show step _ (.setLocal 10) _ _ _ _ _ = _); exact st9 _ _ _)
          | (simp (config := { implicitDefEqProofs := false })
-             [show (BitVec.setWidth 8 (8 : BitVec 32)).toNat = 8 from rfl, step, selected, sse, ssse, pureArity,
+             [show (BitVec.setWidth 8 (8 : BitVec 32)).toNat = 8 from rfl, step, cil_guard, observerCount, selected, sse, ssse, pureArity,
                scalars, CIL.step.eq_def, CIL.Intrinsic.available, CIL.FeatureProfile.evaluate,
                CIL.Vector.intrinsic_sse_shift, CIL.Vector.intrinsic_sse_align,
                CIL.Vector.intrinsic_reinterpret128, checkedValue, numericValue,
@@ -288,13 +288,13 @@ theorem subtract_incoming_checked (program : CIL.Program) (body : CIL.Method) (m
       | exact done
       | (apply run_next_exists post found (by simp [code, List.getElem?_append, leadingLength, subtractIncomingCode, selected]; rfl)
          first
-         | exact a6 _ _ _
-         | exact b6 _ _ _
-         | exact b7 _ _ _
-         | exact st8 _ _ _
-         | exact st9 _ _ _
+         | ((with_reducible show step _ (.local 7) _ _ _ _ _ = _); exact a6 _ _ _)
+         | ((with_reducible show step _ (.local 7) _ _ _ _ _ = _); exact b6 _ _ _)
+         | ((with_reducible show step _ (.local 8) _ _ _ _ _ = _); exact b7 _ _ _)
+         | ((with_reducible show step _ (.setLocal 9) _ _ _ _ _ = _); exact st8 _ _ _)
+         | ((with_reducible show step _ (.setLocal 10) _ _ _ _ _ = _); exact st9 _ _ _)
          | (simp (config := { implicitDefEqProofs := false })
-             [step, selected, pureArity, scalars, CIL.step.eq_def, CIL.Intrinsic.available, CIL.FeatureProfile.evaluate,
+             [step, cil_guard, observerCount, selected, pureArity, scalars, CIL.step.eq_def, CIL.Intrinsic.available, CIL.FeatureProfile.evaluate,
                CIL.Vector.intrinsic_zero128, CIL.Vector.intrinsic_adv_extract, checkedValue, numericValue,
                Bind.bind, Except.bind, Pure.pure, Except.pure]
             first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
@@ -329,7 +329,7 @@ theorem subtract_decision_checked (program : CIL.Program) (body : CIL.Method) (m
       | exact a8 _ _ _
       | exact a9 _ _ _
       | (simp (config := { implicitDefEqProofs := false })
-           [CIL.truth, Option.bind, List.mapM, checkedIntrinsic, step, pureArity, scalars, CIL.step.eq_def,
+           [CIL.truth, Option.bind, List.mapM, checkedIntrinsic, step, cil_guard, observerCount, pureArity, scalars, CIL.step.eq_def,
              CIL.Intrinsic.available, CIL.Vector.intrinsic_zero128, CIL.Vector.intrinsic_eq128,
              CIL.Vector.intrinsic_and128, CIL.Vector.intrinsic_or128, CIL.Vector.intrinsic_equal_all128,
              show (0 : BitVec 128) = BitVec.ofNat 128 0 from rfl, zero,

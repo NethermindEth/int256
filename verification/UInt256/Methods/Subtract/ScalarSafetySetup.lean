@@ -25,7 +25,7 @@ theorem scalar_frame_setup (memory : Memory) (args : List Value) (wellFormed : m
       WordHomes result memory.nextIdentity scalarLocalSpecs frame.locals ∧
       MemoryBelow memory.nextIdentity memory result ∧ result.WellFormed :=
   word_frame_setup scalarBody scalarLocalSpecs scalar_local_metadata.1
-    scalar_local_metadata.2 (by rfl) (by rfl) memory args wellFormed
+    scalar_local_metadata.2 (by rfl) (by rfl) (by rfl) memory args wellFormed
 
 #print axioms scalar_local_metadata
 #print axioms scalar_frame_setup

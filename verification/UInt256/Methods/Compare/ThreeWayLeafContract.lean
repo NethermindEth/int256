@@ -35,7 +35,7 @@ theorem threeWay_checked (profile : CIL.FeatureProfile) (program : CIL.Program) 
     (fun left right => .i32 (UInt256Model.Compare.compareWord left.toNat right.toNat))
     found ?_ ?_ memory left right call
   · intro left right
-    simp [body, FrameSetupFits, InitializersFit, AggregateArgumentsFit, ParameterArgumentsFit]
+    simp [body, FrameSetupFits, InitializersFit, AggregateArgumentsFit, ParameterArgumentsFit, SelectedKindsFit]
   · intro memory left right frame call
     simpa only [threeWay_result_math] using threeWay_run profile program index found memory left right frame call
 

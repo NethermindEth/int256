@@ -99,7 +99,7 @@ theorem vector128_decision_checked (program : CIL.Program) (body : CIL.Method) (
          | exact loadHigh _ _
          | exact stored _ _ _
          | (simp (config := { implicitDefEqProofs := false })
-             [localResult, checkedIntrinsic, step, selected, flagFit, argument, pureArity, scalars, CIL.step.eq_def, CIL.FeatureProfile.evaluate,
+             [localResult, checkedIntrinsic, step, cil_guard, observerCount, selected, flagFit, argument, pureArity, scalars, CIL.step.eq_def, CIL.FeatureProfile.evaluate,
                CIL.Intrinsic.available, CIL.Vector.intrinsic_or128, CIL.Vector.intrinsic_adv_extract,
                incoming128_arm_high, show (0 : BitVec 32) = BitVec.ofNat 32 0 from rfl, zero,
                checkedValue, numericValue, Bind.bind, Except.bind, Pure.pure, Except.pure]
@@ -129,7 +129,7 @@ theorem vector128_decision_branch (program : CIL.Program) (body : CIL.Method) (m
       first
       | exact load _ _
       | (simp (config := { implicitDefEqProofs := false })
-           [CIL.truth, Option.bind, List.mapM, localResult, checkedIntrinsic, step, selected, pureArity, scalars, CIL.step.eq_def, CIL.Intrinsic.available,
+           [CIL.truth, Option.bind, List.mapM, localResult, checkedIntrinsic, step, cil_guard, observerCount, selected, pureArity, scalars, CIL.step.eq_def, CIL.Intrinsic.available,
              CIL.Vector.intrinsic_zero128, CIL.Vector.intrinsic_equal_all128,
              show (0 : BitVec 128) = BitVec.ofNat 128 0 from rfl, zero,
              checkedValue, numericValue, Bind.bind, Except.bind, Pure.pure, Except.pure]

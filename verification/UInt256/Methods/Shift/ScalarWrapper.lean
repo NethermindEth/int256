@@ -26,7 +26,7 @@ theorem wrapper_correctness (profile : CIL.FeatureProfile) (direction : Directio
   have setup : enterFrame (wrapperBody profile callee) args memory = .ok (frame, memory) := rfl
   have stepped : step (wrapperBody profile callee) (.call callee 3) 3 args frame args.reverse memory =
       .ok (.call callee args [] memory) := by
-    simp [args, shiftArguments, step, checkedValue, numericValue, formValue, fi, fo, checkedAt,
+    simp [args, shiftArguments, step, cil_guard, observerCount, checkedValue, numericValue, formValue, fi, fo, checkedAt,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   have tail : run program 1 index 4 args frame [] final = .ok (final, []) :=
     run_return found (by rfl) (by rfl) (by rfl)
@@ -36,7 +36,7 @@ theorem wrapper_correctness (profile : CIL.FeatureProfile) (direction : Directio
     iterate 3
       apply Eq.trans
       · apply run_next found (by rfl)
-        simp (config := { implicitDefEqProofs := false }) [step, args, shiftArguments,
+        simp (config := { implicitDefEqProofs := false }) [step, cil_guard, observerCount, args, shiftArguments,
           checkedValue, numericValue, formValue, fi, fo, checkedAt, Except.mapError,
           Bind.bind, Except.bind, Pure.pure, Except.pure]
         first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩

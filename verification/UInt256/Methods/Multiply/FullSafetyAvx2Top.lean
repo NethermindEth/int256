@@ -46,7 +46,7 @@ theorem full_avx2_inputs (profile : CIL.FeatureProfile) (program : CIL.Program)
   iterate 14
     apply run_next_exists post found (by change some _ = _; first | (simp only [noAvx512, avx2, Bool.false_eq_true, ↓reduceIte] <;> rfl) | rfl)
     simp (config := { implicitDefEqProofs := false })
-      [step, pureArity, productArgs, checkedValue, numericValue, formValue, formedLeft,
+      [step, cil_guard, observerCount, pureArity, productArgs, checkedValue, numericValue, formValue, formedLeft,
         staticInstruction, memoryInstruction, loadedLeft, checkedAt, profileEq, noAvx512, avx2,
         CIL.FeatureProfile.evaluate, scalars, Except.mapError,
         Bind.bind, Except.bind, Pure.pure, Except.pure]
@@ -60,7 +60,7 @@ theorem full_avx2_inputs (profile : CIL.FeatureProfile) (program : CIL.Program)
   iterate 6
     apply run_next_exists post found (by change some _ = _; first | (simp only [noAvx512, avx2, Bool.false_eq_true, ↓reduceIte] <;> rfl) | rfl)
     simp (config := { implicitDefEqProofs := false })
-      [step, pureArity, productArgs, checkedValue, numericValue, formValue, formedRight,
+      [step, cil_guard, observerCount, pureArity, productArgs, checkedValue, numericValue, formValue, formedRight,
         staticInstruction, memoryInstruction, loadedRight, checkedAt, profileEq, avx2,
         CIL.Intrinsic.available, scalars, checkedIntrinsic, eval_reverse256, Except.mapError,
         Bind.bind, Except.bind, Pure.pure, Except.pure]
@@ -230,7 +230,7 @@ theorem full_avx2_finish (profile : CIL.FeatureProfile) (program : CIL.Program)
     (fullTop original left right) 82 (productArgs left right output) [] (body := (fullBody profile wordIndex countIndex storageIndex))
   apply run_next_exists post found (by change some _ = _; first | (simp only [noAvx512, avx2, Bool.false_eq_true, ↓reduceIte] <;> rfl) | rfl) stored
   apply run_next_exists post found (by change some _ = _; first | (simp only [noAvx512, avx2, Bool.false_eq_true, ↓reduceIte] <;> rfl) | rfl)
-  · simp [step, pureArity, scalars, CIL.step.eq_def, Bind.bind, Except.bind, Pure.pure, Except.pure]
+  · simp [step, cil_guard, observerCount, pureArity, scalars, CIL.step.eq_def, Bind.bind, Except.bind, Pure.pure, Except.pure]
     exact ⟨rfl, rfl, rfl, rfl⟩
   exact continuation after finalState
 

@@ -8,6 +8,7 @@ import CIL.Safety.StepComposition
 import CIL.Safety.ExecutionLifetime
 import CIL.Safety.ExecutionStaticWorld
 import CIL.Safety.ReturnMemory
+import CIL.Safety.GuardNormalization
 
 namespace UInt256Model.Safety
 open CIL.Safety
@@ -238,7 +239,7 @@ theorem VectorFrame.output_store {program : CIL.Program} {original entered curre
   refine ⟨after, ?_, afterCall, state.enteredWF, state.enteredBound,
     Nat.le_trans state.next (write_extends_allocations _ _ _ _ _ written).next,
     state.authority.trans (write_preserves_access_below written _), ?_, ?_, ?_⟩
-  · simp [step, staticInstruction, memoryInstruction, storeValue, referenceAt, ordinaryAccessAlignment,
+  · simp [step, cil_guard, observerCount, staticInstruction, memoryInstruction, storeValue, referenceAt, ordinaryAccessAlignment,
       written, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   · intro index entry specified
     obtain ⟨kind, reference, number, slot, fits, result, loaded⟩ := state.locals index entry specified

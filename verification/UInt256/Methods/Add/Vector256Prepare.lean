@@ -45,7 +45,7 @@ macro "prep_pure" : tactic => `(tactic|
    have formed3 := access_reference_valid _ _ _ _ _ (scratch 3 s3 rfl).1
    apply run_next_exists post found (by rfl)
    · simp (config := { implicitDefEqProofs := false })
-       [step, pureArity, prepareArguments, checkedValue, numericValue, formValue, formedLeft, formedRight,
+       [step, cil_guard, observerCount, pureArity, prepareArguments, checkedValue, numericValue, formValue, formedLeft, formedRight,
          formedOutput, formed0, formed1, formed2, formed3, staticInstruction, memoryInstruction, checkedAt,
          profileEq, features.avx, features.avx2, features.wideF, features.wide, CIL.FeatureProfile.evaluate,
          scalars, checkedIntrinsic, CIL.Intrinsic.available, CIL.step.eq_def, CIL.binary, CIL.unary, CIL.truth,
@@ -89,9 +89,9 @@ theorem prepare_inputs (program : CIL.Program) (method : Nat) (profile : CIL.Fea
   rw [sameLeft] at castLeft
   prep_pure
   apply run_next_exists post found (by rfl)
-  · simp only [step, pureArity, loadLeft]; rfl
+  · simp only [step, cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, pureArity, loadLeft]; rfl
   apply run_next_exists post found (by rfl)
-  · simp only [step, staticInstruction, castLeft]; rfl
+  · simp only [step, cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, staticInstruction, castLeft]; rfl
   prep_store
   have loadRight := UInt256Proof.Equality.VectorPrimitive.load_input state.call (by simp : right ∈ [left, right])
   have castRight := UInt256Proof.Equality.VectorPrimitive.cast_input current right
@@ -99,9 +99,9 @@ theorem prepare_inputs (program : CIL.Program) (method : Nat) (profile : CIL.Fea
   rw [sameRight] at castRight
   prep_pure
   apply run_next_exists post found (by rfl)
-  · simp only [step, pureArity, loadRight]; rfl
+  · simp only [step, cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, pureArity, loadRight]; rfl
   apply run_next_exists post found (by rfl)
-  · simp only [step, staticInstruction, castRight]; rfl
+  · simp only [step, cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, staticInstruction, castRight]; rfl
   prep_store
   prep_pure
   prep_load
@@ -227,7 +227,7 @@ theorem prepare_tail (program : CIL.Program) (method : Nat) (profile : CIL.Featu
   have returns : (prepareAddBody profile avx512).returnsValue = false := rfl
   have fetched : (prepareAddBody profile avx512).code[68]? = some .ret := rfl
   refine ⟨1, _, _, ?_, continuation current state scratch⟩
-  simp [run, found, fetched, returns, step, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
+  simp [run, found, fetched, returns, step, cil_guard, observerCount, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 #print axioms prepare_tail
 
@@ -254,7 +254,7 @@ theorem prepare_invoke (program : CIL.Program) (method : Nat) (profile : CIL.Fea
   let a := inputValue original left
   let b := inputValue original right
   obtain ⟨frame, entered, setup, numeric, below, _⟩ := numeric_frame_setup
-    (prepareAddBody profile avx512) prepareSpecs rfl rfl rfl rfl memory args call.1.1
+    (prepareAddBody profile avx512) prepareSpecs rfl rfl rfl rfl rfl memory args call.1.1
   have homes : WritableHomes entered memory.nextIdentity
       (prepareAddBody profile avx512).localKinds frame.locals :=
     UInt256Model.Safety.NumericHomes.writable numeric
