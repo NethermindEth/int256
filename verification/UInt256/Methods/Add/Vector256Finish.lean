@@ -8,6 +8,7 @@ import UInt256.Methods.AddSubtract.BroadcastLookup
 
 namespace UInt256Proof.Add.Vector256
 open CIL.Safety UInt256Model.Safety
+variable {identity : Nat} {assembly : String}
 
 /-- The extracted profile facts the AVX2 Add bodies depend on. -/
 structure AddProfile (profile : CIL.FeatureProfile) (avx512 : Bool) : Prop where
@@ -107,7 +108,7 @@ theorem finish_index (program : CIL.Program) (method lookup : Nat) (profile : CI
 
 theorem finish_tail (program : CIL.Program) (method lookup : Nat) (profile : CIL.FeatureProfile)
     (avx512 : Bool) (found : program[method]? = some (finishAddBody profile lookup))
-    (lookupFound : program[lookup]? = some (UInt256Proof.AddSubtract.Vector256.lookupBody profile))
+    (lookupFound : program[lookup]? = some (UInt256Proof.AddSubtract.Vector256.lookupBody profile identity assembly))
     (features : AddProfile profile avx512)
     (memory entered current : Memory) (output : Reference) (frame : Frame)
     (originalCall : CallingConditions program memory [] [output])
@@ -174,7 +175,7 @@ theorem finish_tail (program : CIL.Program) (method lookup : Nat) (profile : CIL
 /-- `FinishAdd`: the table-corrected lane sum, the top carry bit, and no other caller byte changed. -/
 theorem finish_invoke (program : CIL.Program) (method lookup : Nat) (profile : CIL.FeatureProfile)
     (avx512 : Bool) (found : program[method]? = some (finishAddBody profile lookup))
-    (lookupFound : program[lookup]? = some (UInt256Proof.AddSubtract.Vector256.lookupBody profile))
+    (lookupFound : program[lookup]? = some (UInt256Proof.AddSubtract.Vector256.lookupBody profile identity assembly))
     (features : AddProfile profile avx512)
     (memory : Memory) (output : Reference) (originalCall : CallingConditions program memory [] [output])
     (sum carry propagation : BitVec 256) :
@@ -233,7 +234,7 @@ def FinishContract (program : CIL.Program) (method : Nat) : Prop :=
 
 theorem finish_contract (program : CIL.Program) (method lookup : Nat) (profile : CIL.FeatureProfile)
     (avx512 : Bool) (found : program[method]? = some (finishAddBody profile lookup))
-    (lookupFound : program[lookup]? = some (UInt256Proof.AddSubtract.Vector256.lookupBody profile))
+    (lookupFound : program[lookup]? = some (UInt256Proof.AddSubtract.Vector256.lookupBody profile identity assembly))
     (features : AddProfile profile avx512) : FinishContract program method :=
   fun memory output call sum carry propagation =>
     finish_invoke program method lookup profile avx512 found lookupFound features memory output call sum carry propagation

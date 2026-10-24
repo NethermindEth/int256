@@ -3,6 +3,7 @@ import UInt256.Safety.ReportingContract
 
 namespace UInt256Proof.Add.Vector256
 open CIL.Safety UInt256Model.Safety UInt256Proof.Add.Safety
+variable {identity : Nat} {assembly : String}
 
 def entrySpecs : List NumericLocalSpec :=
   [⟨.vector256, .v256 0, 0, rfl⟩, ⟨.vector256, .v256 0, 0, rfl⟩, ⟨.vector256, .v256 0, 0, rfl⟩,
@@ -375,7 +376,7 @@ theorem add_overflow_contract_of_callees (program : CIL.Program) (profile : CIL.
 theorem add_contract (program : CIL.Program) (profile : CIL.FeatureProfile) (avx512 : Bool)
     (entryFound : program[0]? = some (addEntryBody profile 1 3))
     (finishFound : program[1]? = some (finishAddBody profile 2))
-    (lookupFound : program[2]? = some (UInt256Proof.AddSubtract.Vector256.lookupBody profile))
+    (lookupFound : program[2]? = some (UInt256Proof.AddSubtract.Vector256.lookupBody profile identity assembly))
     (prepareFound : program[3]? = some (prepareAddBody profile avx512))
     (features : AddProfile profile avx512) :
     WrappingBinaryContract (· + ·) program 0 :=
@@ -387,7 +388,7 @@ theorem add_contract (program : CIL.Program) (profile : CIL.FeatureProfile) (avx
 theorem add_overflow_contract (program : CIL.Program) (profile : CIL.FeatureProfile) (avx512 : Bool)
     (entryFound : program[0]? = some (addOverflowEntryBody profile 1 3))
     (finishFound : program[1]? = some (finishAddBody profile 2))
-    (lookupFound : program[2]? = some (UInt256Proof.AddSubtract.Vector256.lookupBody profile))
+    (lookupFound : program[2]? = some (UInt256Proof.AddSubtract.Vector256.lookupBody profile identity assembly))
     (prepareFound : program[3]? = some (prepareAddBody profile avx512))
     (features : AddProfile profile avx512) :
     ReportingBinaryContract (· + ·) (fun left right => decide (2^256 ≤ left.toNat + right.toNat)) program 0 :=

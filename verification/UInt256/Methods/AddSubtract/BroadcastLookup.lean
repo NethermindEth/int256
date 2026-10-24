@@ -14,6 +14,7 @@ import UInt256.Safety.VectorFrame
 
 namespace UInt256Proof.AddSubtract.Vector256
 open CIL.Safety UInt256Proof.SIMD
+variable {identity : Nat} {assembly : String}
 
 /-- Every 32-byte row of the table is the cascade vector of its index. -/
 theorem table_rows : ∀ index : Fin 16,
@@ -23,18 +24,18 @@ theorem table_rows : ∀ index : Fin 16,
 
 /-- Resolving the readonly table allocates nothing below the caller boundary and binds the extracted bytes. -/
 theorem lookup_invoke (program : CIL.Program) (index : Nat) (profile : CIL.FeatureProfile)
-    (found : program[index]? = some (lookupBody profile)) (memory : Memory) (wf : memory.WellFormed)
+    (found : program[index]? = some (lookupBody profile identity assembly)) (memory : Memory) (wf : memory.WellFormed)
     (world : StaticWorldValid (programStaticDescriptors program) memory) :
     ∃ after reference,
       invoke program 4 index [] memory = .ok (after, [.span (.address reference) 512]) ∧
       MemoryBelow memory.nextIdentity memory after ∧ after.WellFormed ∧
       StaticWorldValid (programStaticDescriptors program) after ∧
       read after reference 512 1 = .ok broadcastTable := by
-  have bytes : broadcastDescriptor.bytes = broadcastTable := rfl
-  have selected : broadcastDescriptor ∈ programStaticDescriptors program :=
-    program_static_sites_valid program index _ found (0, broadcastDescriptor) (by simp [lookupBody])
+  have bytes : (broadcastDescriptor identity assembly).bytes = broadcastTable := rfl
+  have selected : (broadcastDescriptor identity assembly) ∈ programStaticDescriptors program :=
+    program_static_sites_valid program index _ found (0, (broadcastDescriptor identity assembly)) (by simp [lookupBody])
   obtain ⟨after, reference, resolved, afterWorld, binding⟩ :=
-    staticReference_valid_result broadcastDescriptor _ memory wf world selected
+    staticReference_valid_result (broadcastDescriptor identity assembly) _ memory wf world selected
   have below := staticReference_preserves_memory_below _ _ _ _ resolved
   have afterWF := staticReference_preserves_wellFormed _ _ _ _ wf resolved
   obtain ⟨offset, allocation, present, live, kind, size, loaded⟩ := binding
@@ -110,7 +111,7 @@ theorem run_lookup {program : CIL.Program} {original entered current : Memory}
     (post : Memory → List Value → Prop)
     (state : VectorFrame program original entered current inputs output frame known stored)
     (found : program[method]? = some body) (fetched : body.code[pc]? = some (.call lookup 0))
-    (lookupFound : program[lookup]? = some (lookupBody profile))
+    (lookupFound : program[lookup]? = some (lookupBody profile identity assembly))
     (continuation : ∀ after reference,
       VectorFrame program original entered after inputs output frame known stored →
       read after reference 512 1 = .ok broadcastTable → form after reference = .ok reference →

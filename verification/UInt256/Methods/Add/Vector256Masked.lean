@@ -2,6 +2,7 @@ import UInt256.Methods.Add.Vector256Entry
 
 namespace UInt256Proof.Add.Vector256.Masked
 open CIL.Safety UInt256Model.Safety UInt256Proof.Add.Safety UInt256Proof.Add.Vector256
+variable {identity : Nat} {assembly : String}
 
 /-- AVX2 `PrepareAdd` that forms the incoming carries with a permute and a constant lane mask. -/
 def prepareMaskedBody (profile : CIL.FeatureProfile) : CIL.Method := { profile := profile, returnsValue := false, locals := [.v256 0, .v256 0], localKinds := [.vector256, .vector256], parameterHomes := [], staticSites := [], code := [
@@ -336,7 +337,7 @@ theorem prepare_contract (program : CIL.Program) (method : Nat) (profile : CIL.F
 theorem add_contract (program : CIL.Program) (profile : CIL.FeatureProfile)
     (entryFound : program[0]? = some (addEntryBody profile 1 3))
     (finishFound : program[1]? = some (finishAddBody profile 2))
-    (lookupFound : program[2]? = some (UInt256Proof.AddSubtract.Vector256.lookupBody profile))
+    (lookupFound : program[2]? = some (UInt256Proof.AddSubtract.Vector256.lookupBody profile identity assembly))
     (prepareFound : program[3]? = some (prepareMaskedBody profile))
     (features : AddProfile profile false) :
     WrappingBinaryContract (· + ·) program 0 :=
@@ -348,7 +349,7 @@ theorem add_contract (program : CIL.Program) (profile : CIL.FeatureProfile)
 theorem add_overflow_contract (program : CIL.Program) (profile : CIL.FeatureProfile)
     (entryFound : program[0]? = some (addOverflowEntryBody profile 1 3))
     (finishFound : program[1]? = some (finishAddBody profile 2))
-    (lookupFound : program[2]? = some (UInt256Proof.AddSubtract.Vector256.lookupBody profile))
+    (lookupFound : program[2]? = some (UInt256Proof.AddSubtract.Vector256.lookupBody profile identity assembly))
     (prepareFound : program[3]? = some (prepareMaskedBody profile))
     (features : AddProfile profile false) :
     ReportingBinaryContract (· + ·) (fun left right => decide (2^256 ≤ left.toNat + right.toNat)) program 0 :=
