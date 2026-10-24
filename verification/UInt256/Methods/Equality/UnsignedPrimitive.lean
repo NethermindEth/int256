@@ -1,6 +1,7 @@
 import CIL.Safety.Equations
 import UInt256.Methods.Equality.PrimitiveChecked
 import UInt256.Safety.ScalarOperatorContract
+import CIL.Safety.MethodContract
 
 namespace UInt256Proof.Equality.UnsignedPrimitive
 open CIL.Safety UInt256Model.Safety PrimitiveFinish
@@ -53,14 +54,8 @@ macro "primitive_prefix" found:term "," inactive:term : tactic => `(tactic|
    have formed := call.input_formed (reference := left) (by simp)
    simp only [constructorWords, List.reverse_cons, List.reverse_nil,
      List.nil_append, List.cons_append] at continuation
-   repeat' first
-     | exact continuation
-     | (apply run_next_exists post $found
-        · simp only [body32, body64]; rfl
-        · simp [body32, body64, step, cil_guard, observerCount, primitiveArguments, checkedValue, numericValue, formValue, formed,
-            pureArity, scalars, instruction, CIL.unary, CIL.step.eq_def, CIL.truth, CIL.FeatureProfile.evaluate, $inactive:term,
-            checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-          try (exact ⟨rfl, rfl, rfl, rfl⟩))))
+   cil_contract_steps [$found, formed, $inactive:term, body32, body64, primitiveArguments,
+     CIL.FeatureProfile.evaluate] until continuation))
 
 theorem prefix64 (profile : CIL.FeatureProfile) (program : CIL.Program) (index scalarIndex constructorIndex : Nat)
     (inactive : profile.vector256Accelerated = false)
