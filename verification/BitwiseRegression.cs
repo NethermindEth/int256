@@ -11,12 +11,12 @@ using System.Text.Json.Nodes;
 string root = Path.GetFullPath(args.Length > 0 ? args[0] : "verification");
 string fixtures = Path.Combine(root, "Tests/Fixtures/Bitwise");
 string profile = args.Length > 1 ? args[1] : "scalar";
-string[] profiles = RegressionManifest.RequireProfiles(root, "BitwiseRegression.cs", ["scalar", "x64-vector256"]);
+string[] profiles = RegressionManifest.RequireProfiles(root, "BitwiseRegression.cs", ["scalar", "x64-v3"]);
 if (args.Length > 2 || !profiles.Contains(profile))
-    throw new ArgumentException("Usage: BitwiseRegression.cs [verification-directory] [scalar|x64-vector256]");
+    throw new ArgumentException("Usage: BitwiseRegression.cs [verification-directory] [scalar|x64-v3]");
 string work = Path.Combine(root, "artifacts/bitwise-regressions", profile);
 string tool = Path.Combine(root, ".lake/packages/leancil/Extractor/bin/Nethermind.LeanCIL.dll");
-string profileArgument = profile == "scalar" ? profile : "@" + Path.Combine(root, "manifests/profiles", profile + ".json");
+string profileArgument = File.Exists(Path.Combine(root, "manifests/profiles", profile + ".json")) ? "@" + Path.Combine(root, "manifests/profiles", profile + ".json") : profile;
 string consumer = Path.Combine(work, "consumer");
 List<(string Extraction, string Proof, string Id, string Mutation)> jobs = [];
 JsonArray targets = JsonNode.Parse(File.ReadAllText(Path.Combine(root, "manifests/targets.json")))!["methods"]!.AsArray();

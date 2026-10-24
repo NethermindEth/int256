@@ -1,0 +1,13 @@
+import Extracted
+import UInt256.Methods.Bindings
+import Tests.Fixtures.Equality.Shared.ReductionVectorPrimitive
+
+
+/-- EquivalentReduction fixture for EqUInt256Int32 on x64-v3, stated with the production contract. -/
+theorem EqualityFixture.correct :
+    UInt256Model.Safety.ScalarOperatorContract false false CIL.Value.i32 (fun input word => !decide (word.toInt < 0) && decide (input = BitVec.ofNat 256 word.toNat)) Extracted.program 0 :=
+  UInt256Proof.Equality.PrimitiveOperator.checked CIL.Value.i32 _ Extracted.profile false false Extracted.program 0 1 rfl (fun _ => rfl)
+    (UInt256Proof.Equality.SignedPrimitive.checked32 Extracted.profile Extracted.program 1 2 rfl
+    (EqualityFixture.LeafPrimitiveWrapper.checked32 Extracted.profile Extracted.program 2 3 rfl rfl rfl))
+
+#print axioms EqualityFixture.correct

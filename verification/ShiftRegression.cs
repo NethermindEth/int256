@@ -10,13 +10,13 @@ using System.Text.Json.Nodes;
 
 string root = Path.GetFullPath(args.Length > 0 ? args[0] : "verification");
 string profile = args.Length > 1 ? args[1] : "scalar";
-string[] profiles = RegressionManifest.RequireProfiles(root, "ShiftRegression.cs", ["scalar", "x64-vector256"]);
+string[] profiles = RegressionManifest.RequireProfiles(root, "ShiftRegression.cs", ["scalar", "x64-v3"]);
 if (args.Length > 2 || !profiles.Contains(profile))
-    throw new ArgumentException("Usage: ShiftRegression.cs [verification-directory] [scalar|x64-vector256]");
+    throw new ArgumentException("Usage: ShiftRegression.cs [verification-directory] [scalar|x64-v3]");
 string fixtures = Path.Combine(root, "Tests/Fixtures/Shift");
 string work = Path.Combine(root, "artifacts/shift-regressions", profile);
 string tool = Path.Combine(root, ".lake/packages/leancil/Extractor/bin/Nethermind.LeanCIL.dll");
-string profileArgument = profile == "scalar" ? profile : "@" + Path.Combine(root, "manifests/profiles", profile + ".json");
+string profileArgument = File.Exists(Path.Combine(root, "manifests/profiles", profile + ".json")) ? "@" + Path.Combine(root, "manifests/profiles", profile + ".json") : profile;
 JsonObject witnesses = JsonNode.Parse(File.ReadAllText(Path.Combine(fixtures, "Witnesses.json")))!["negativeCases"]!.AsObject();
 JsonArray targets = JsonNode.Parse(File.ReadAllText(Path.Combine(root, "manifests/targets.json")))!["methods"]!.AsArray();
 string[] methods = ["Lsh", "Rsh", "LeftShift", "RightShift", "OperatorLsh", "OperatorRsh"];

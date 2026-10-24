@@ -26,7 +26,7 @@ string tool = Path.Combine(root, ".lake/packages/leancil/Extractor/bin/Nethermin
 JsonArray targets = JsonNode.Parse(File.ReadAllText(Path.Combine(root, "manifests/targets.json")))!["methods"]!.AsArray();
 JsonArray gates = JsonNode.Parse(File.ReadAllText(Path.Combine(root, "manifests/gates.json")))!["gates"]!.AsArray();
 JsonArray witnesses = JsonNode.Parse(File.ReadAllText(Path.Combine(root, "Tests/Fixtures/SIMD/witnesses.json")))!.AsArray();
-string[] simdProfiles = ["arm64-advsimd", "x64-sse42", "x64-avx2", "x64-avx2-bmi1", "x64-avx512", "x64-avx512-bmi1"];
+string[] simdProfiles = ["arm64-advsimd", "x64-sse42", "x64-v3", "x64-v4"];
 // Only these positives keep every production method body; other refactors need their own fixture proof.
 HashSet<string> productionShaped = ["Baseline", "Renamed"];
 (string Group, string Item, (string Method, string Legacy, string Operation, string Flag)[] Methods, string[] Profiles)[] groups =
@@ -47,16 +47,16 @@ List<string> incomplete = [], failed = [];
 static bool Positive(string name, string profile) => name switch
 {
     "Baseline" or "Renamed" => true,
-    "EquivalentMask" => profile is "x64-avx2" or "x64-avx2-bmi1",
+    "EquivalentMask" => profile == "x64-v3",
     _ => false
 };
 static bool Negative(string name, string method, string profile) => name switch
 {
     "WrongAlignment" => profile is "arm64-advsimd" or "x64-sse42",
     "WrongTop" => profile == "arm64-advsimd" || method == "Subtract" && profile == "x64-sse42",
-    "WrongBlend" => profile is "x64-avx2" or "x64-avx2-bmi1",
-    "WrongAvxAlignment" or "WrongTernary" => profile is "x64-avx512" or "x64-avx512-bmi1",
-    _ => profile is "x64-avx2" or "x64-avx2-bmi1" or "x64-avx512" or "x64-avx512-bmi1"
+    "WrongBlend" => profile == "x64-v3",
+    "WrongAvxAlignment" or "WrongTernary" => profile == "x64-v4",
+    _ => profile is "x64-v3" or "x64-v4"
 };
 bool Selected(string key, string value) => !filters.TryGetValue(key, out string? wanted) || wanted == value;
 

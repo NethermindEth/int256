@@ -530,253 +530,253 @@
     },
     {
       "method": "And",
-      "profile": "x64-vector256",
+      "profile": "x64-v3",
       "proof": "proofs/AndVector.lean",
       "theorem": "UInt256Proof.And.vector_correctness"
     },
     {
       "method": "Or",
-      "profile": "x64-vector256",
+      "profile": "x64-v3",
       "proof": "proofs/OrVector.lean",
       "theorem": "UInt256Proof.Or.vector_correctness"
     },
     {
       "method": "Xor",
-      "profile": "x64-vector256",
+      "profile": "x64-v3",
       "proof": "proofs/XorVector.lean",
       "theorem": "UInt256Proof.Xor.vector_correctness"
     },
     {
       "method": "Not",
-      "profile": "x64-vector256",
+      "profile": "x64-v3",
       "proof": "proofs/NotVector.lean",
       "theorem": "UInt256Proof.Not.vector_correctness"
     },
     {
       "method": "OperatorAnd",
-      "profile": "x64-vector256",
+      "profile": "x64-v3",
       "proof": "proofs/OperatorAndVector.lean",
       "theorem": "UInt256Proof.OperatorAnd.vector_correctness"
     },
     {
       "method": "OperatorOr",
-      "profile": "x64-vector256",
+      "profile": "x64-v3",
       "proof": "proofs/OperatorOrVector.lean",
       "theorem": "UInt256Proof.OperatorOr.vector_correctness"
     },
     {
       "method": "OperatorXor",
-      "profile": "x64-vector256",
+      "profile": "x64-v3",
       "proof": "proofs/OperatorXorVector.lean",
       "theorem": "UInt256Proof.OperatorXor.vector_correctness"
     },
     {
       "method": "OperatorNot",
-      "profile": "x64-vector256",
+      "profile": "x64-v3",
       "proof": "proofs/OperatorNotVector.lean",
       "theorem": "UInt256Proof.OperatorNot.vector_correctness"
     },
     {
       "method": "EqInt32UInt256",
-      "profile": "x64-vector256",
+      "profile": "x64-v3",
       "proof": "proofs/EqInt32UInt256Vector.lean",
       "theorem": "UInt256Proof.Equality.EqInt32UInt256.vector_correctness"
     },
     {
       "method": "EqInt64UInt256",
-      "profile": "x64-vector256",
+      "profile": "x64-v3",
       "proof": "proofs/EqInt64UInt256Vector.lean",
       "theorem": "UInt256Proof.Equality.EqInt64UInt256.vector_correctness"
     },
     {
       "method": "EqualsInt32",
-      "profile": "x64-vector256",
+      "profile": "x64-v3",
       "proof": "proofs/EqualsInt32Vector.lean",
       "theorem": "UInt256Proof.Equality.EqualsInt32.vector_correctness"
     },
     {
       "method": "EqualsInt64",
-      "profile": "x64-vector256",
+      "profile": "x64-v3",
       "proof": "proofs/EqualsInt64Vector.lean",
       "theorem": "UInt256Proof.Equality.EqualsInt64.vector_correctness"
     },
     {
       "method": "EqualsUInt256Ref",
-      "profile": "x64-vector256",
+      "profile": "x64-v3",
       "proof": "proofs/EqualsUInt256RefVector.lean",
       "theorem": "UInt256Proof.Equality.EqualsUInt256Ref.vector_correctness"
     },
     {
       "method": "EqualsUInt256Value",
-      "profile": "x64-vector256",
+      "profile": "x64-v3",
       "proof": "proofs/EqualsUInt256ValueVector.lean",
       "theorem": "UInt256Proof.Equality.EqualsUInt256Value.vector_correctness"
     },
     {
       "method": "EqualsUInt32",
-      "profile": "x64-vector256",
+      "profile": "x64-v3",
       "proof": "proofs/EqualsUInt32Vector.lean",
       "theorem": "UInt256Proof.Equality.EqualsUInt32.vector_correctness"
     },
     {
       "method": "EqualsUInt64",
-      "profile": "x64-vector256",
+      "profile": "x64-v3",
       "proof": "proofs/EqualsUInt64Vector.lean",
       "theorem": "UInt256Proof.Equality.EqualsUInt64.vector_correctness"
     },
     {
       "method": "EqUInt256Int32",
-      "profile": "x64-vector256",
+      "profile": "x64-v3",
       "proof": "proofs/EqUInt256Int32Vector.lean",
       "theorem": "UInt256Proof.Equality.EqUInt256Int32.vector_correctness"
     },
     {
       "method": "EqUInt256Int64",
-      "profile": "x64-vector256",
+      "profile": "x64-v3",
       "proof": "proofs/EqUInt256Int64Vector.lean",
       "theorem": "UInt256Proof.Equality.EqUInt256Int64.vector_correctness"
     },
     {
       "method": "EqUInt256UInt256",
-      "profile": "x64-vector256",
+      "profile": "x64-v3",
       "proof": "proofs/EqUInt256UInt256Vector.lean",
       "theorem": "UInt256Proof.Equality.EqUInt256UInt256.vector_correctness"
     },
     {
       "method": "EqUInt256UInt32",
-      "profile": "x64-vector256",
+      "profile": "x64-v3",
       "proof": "proofs/EqUInt256UInt32Vector.lean",
       "theorem": "UInt256Proof.Equality.EqUInt256UInt32.vector_correctness"
     },
     {
       "method": "EqUInt256UInt64",
-      "profile": "x64-vector256",
+      "profile": "x64-v3",
       "proof": "proofs/EqUInt256UInt64Vector.lean",
       "theorem": "UInt256Proof.Equality.EqUInt256UInt64.vector_correctness"
     },
     {
       "method": "EqUInt32UInt256",
-      "profile": "x64-vector256",
+      "profile": "x64-v3",
       "proof": "proofs/EqUInt32UInt256Vector.lean",
       "theorem": "UInt256Proof.Equality.EqUInt32UInt256.vector_correctness"
     },
     {
       "method": "EqUInt64UInt256",
-      "profile": "x64-vector256",
+      "profile": "x64-v3",
       "proof": "proofs/EqUInt64UInt256Vector.lean",
       "theorem": "UInt256Proof.Equality.EqUInt64UInt256.vector_correctness"
     },
     {
       "method": "LeftShift",
-      "profile": "x64-vector256",
+      "profile": "x64-v3",
       "proof": "proofs/LeftShiftVector.lean",
       "theorem": "UInt256Proof.LeftShift.vector_correctness"
     },
     {
       "method": "Lsh",
-      "profile": "x64-vector256",
+      "profile": "x64-v3",
       "proof": "proofs/LshVector.lean",
       "theorem": "UInt256Proof.Lsh.vector_correctness"
     },
     {
       "method": "NeInt32UInt256",
-      "profile": "x64-vector256",
+      "profile": "x64-v3",
       "proof": "proofs/NeInt32UInt256Vector.lean",
       "theorem": "UInt256Proof.Equality.NeInt32UInt256.vector_correctness"
     },
     {
       "method": "NeInt64UInt256",
-      "profile": "x64-vector256",
+      "profile": "x64-v3",
       "proof": "proofs/NeInt64UInt256Vector.lean",
       "theorem": "UInt256Proof.Equality.NeInt64UInt256.vector_correctness"
     },
     {
       "method": "NeUInt256Int32",
-      "profile": "x64-vector256",
+      "profile": "x64-v3",
       "proof": "proofs/NeUInt256Int32Vector.lean",
       "theorem": "UInt256Proof.Equality.NeUInt256Int32.vector_correctness"
     },
     {
       "method": "NeUInt256Int64",
-      "profile": "x64-vector256",
+      "profile": "x64-v3",
       "proof": "proofs/NeUInt256Int64Vector.lean",
       "theorem": "UInt256Proof.Equality.NeUInt256Int64.vector_correctness"
     },
     {
       "method": "NeUInt256UInt256",
-      "profile": "x64-vector256",
+      "profile": "x64-v3",
       "proof": "proofs/NeUInt256UInt256Vector.lean",
       "theorem": "UInt256Proof.Equality.NeUInt256UInt256.vector_correctness"
     },
     {
       "method": "NeUInt256UInt32",
-      "profile": "x64-vector256",
+      "profile": "x64-v3",
       "proof": "proofs/NeUInt256UInt32Vector.lean",
       "theorem": "UInt256Proof.Equality.NeUInt256UInt32.vector_correctness"
     },
     {
       "method": "NeUInt256UInt64",
-      "profile": "x64-vector256",
+      "profile": "x64-v3",
       "proof": "proofs/NeUInt256UInt64Vector.lean",
       "theorem": "UInt256Proof.Equality.NeUInt256UInt64.vector_correctness"
     },
     {
       "method": "NeUInt32UInt256",
-      "profile": "x64-vector256",
+      "profile": "x64-v3",
       "proof": "proofs/NeUInt32UInt256Vector.lean",
       "theorem": "UInt256Proof.Equality.NeUInt32UInt256.vector_correctness"
     },
     {
       "method": "NeUInt64UInt256",
-      "profile": "x64-vector256",
+      "profile": "x64-v3",
       "proof": "proofs/NeUInt64UInt256Vector.lean",
       "theorem": "UInt256Proof.Equality.NeUInt64UInt256.vector_correctness"
     },
     {
       "method": "OperatorLsh",
-      "profile": "x64-vector256",
+      "profile": "x64-v3",
       "proof": "proofs/OperatorLshVector.lean",
       "theorem": "UInt256Proof.OperatorLsh.vector_correctness"
     },
     {
       "method": "OperatorRsh",
-      "profile": "x64-vector256",
+      "profile": "x64-v3",
       "proof": "proofs/OperatorRshVector.lean",
       "theorem": "UInt256Proof.OperatorRsh.vector_correctness"
     },
     {
       "method": "RightShift",
-      "profile": "x64-vector256",
+      "profile": "x64-v3",
       "proof": "proofs/RightShiftVector.lean",
       "theorem": "UInt256Proof.RightShift.vector_correctness"
     },
     {
       "method": "Rsh",
-      "profile": "x64-vector256",
+      "profile": "x64-v3",
       "proof": "proofs/RshVector.lean",
       "theorem": "UInt256Proof.Rsh.vector_correctness"
     },
     {
       "method": "EqualsUInt256Ref",
-      "profile": "x64-sse41",
+      "profile": "x64-sse42",
       "proof": "proofs/EqualsUInt256RefSse.lean",
       "theorem": "UInt256Proof.Equality.EqualsUInt256Ref.sse_correctness"
     },
     {
       "method": "EqualsUInt256Value",
-      "profile": "x64-sse41",
+      "profile": "x64-sse42",
       "proof": "proofs/EqualsUInt256ValueSse.lean",
       "theorem": "UInt256Proof.Equality.EqualsUInt256Value.sse_correctness"
     },
     {
       "method": "EqUInt256UInt256",
-      "profile": "x64-sse41",
+      "profile": "x64-sse42",
       "proof": "proofs/EqUInt256UInt256Sse.lean",
       "theorem": "UInt256Proof.Equality.EqUInt256UInt256.sse_correctness"
     },
     {
       "method": "NeUInt256UInt256",
-      "profile": "x64-sse41",
+      "profile": "x64-sse42",
       "proof": "proofs/NeUInt256UInt256Sse.lean",
       "theorem": "UInt256Proof.Equality.NeUInt256UInt256.sse_correctness"
     },
@@ -824,73 +824,49 @@
     },
     {
       "method": "LtUInt256UInt256",
-      "profile": "x64-vector256",
-      "proof": "proofs/LtUInt256UInt256Vector.lean",
-      "theorem": "UInt256Proof.Compare.LtUInt256UInt256.vector_correctness"
-    },
-    {
-      "method": "LtUInt256UInt256",
-      "profile": "x64-avx2",
+      "profile": "x64-v3",
       "proof": "proofs/LtUInt256UInt256Avx2.lean",
       "theorem": "UInt256Proof.Compare.LtUInt256UInt256.avx2_correctness"
     },
     {
       "method": "LtUInt256UInt256",
-      "profile": "x64-avx512",
+      "profile": "x64-v4",
       "proof": "proofs/LtUInt256UInt256Avx512.lean",
       "theorem": "UInt256Proof.Compare.LtUInt256UInt256.avx512_correctness"
     },
     {
       "method": "LeUInt256UInt256",
-      "profile": "x64-vector256",
-      "proof": "proofs/LeUInt256UInt256Vector.lean",
-      "theorem": "UInt256Proof.Compare.LeUInt256UInt256.vector_correctness"
-    },
-    {
-      "method": "LeUInt256UInt256",
-      "profile": "x64-avx2",
+      "profile": "x64-v3",
       "proof": "proofs/LeUInt256UInt256Avx2.lean",
       "theorem": "UInt256Proof.Compare.LeUInt256UInt256.avx2_correctness"
     },
     {
       "method": "LeUInt256UInt256",
-      "profile": "x64-avx512",
+      "profile": "x64-v4",
       "proof": "proofs/LeUInt256UInt256Avx512.lean",
       "theorem": "UInt256Proof.Compare.LeUInt256UInt256.avx512_correctness"
     },
     {
       "method": "GtUInt256UInt256",
-      "profile": "x64-vector256",
-      "proof": "proofs/GtUInt256UInt256Vector.lean",
-      "theorem": "UInt256Proof.Compare.GtUInt256UInt256.vector_correctness"
-    },
-    {
-      "method": "GtUInt256UInt256",
-      "profile": "x64-avx2",
+      "profile": "x64-v3",
       "proof": "proofs/GtUInt256UInt256Avx2.lean",
       "theorem": "UInt256Proof.Compare.GtUInt256UInt256.avx2_correctness"
     },
     {
       "method": "GtUInt256UInt256",
-      "profile": "x64-avx512",
+      "profile": "x64-v4",
       "proof": "proofs/GtUInt256UInt256Avx512.lean",
       "theorem": "UInt256Proof.Compare.GtUInt256UInt256.avx512_correctness"
     },
     {
       "method": "GeUInt256UInt256",
-      "profile": "x64-vector256",
-      "proof": "proofs/GeUInt256UInt256Vector.lean",
-      "theorem": "UInt256Proof.Compare.GeUInt256UInt256.vector_correctness"
-    },
-    {
-      "method": "GeUInt256UInt256",
-      "profile": "x64-avx2",
+      "profile": "x64-v3",
       "proof": "proofs/GeUInt256UInt256Avx2.lean",
       "theorem": "UInt256Proof.Compare.GeUInt256UInt256.avx2_correctness"
     },
     {
       "method": "GeUInt256UInt256",
-      "profile": "x64-avx512",
+      "profile": "x64-v4",
       "proof": "proofs/GeUInt256UInt256Avx512.lean",
       "theorem": "UInt256Proof.Compare.GeUInt256UInt256.avx512_correctness"
     },
@@ -1106,98 +1082,50 @@
     },
     {
       "method": "Subtract",
-      "profile": "x64-avx2",
-      "proof": "proofs/SubtractProfile_x64_avx2.lean",
+      "profile": "x64-v3",
+      "proof": "proofs/SubtractProfile_x64_v3.lean",
       "theorem": "UInt256Proof.Subtract.profile_correctness"
     },
     {
       "method": "Subtract",
-      "profile": "x64-avx2-bmi1",
-      "proof": "proofs/SubtractProfile_x64_avx2_bmi1.lean",
-      "theorem": "UInt256Proof.Subtract.profile_correctness"
-    },
-    {
-      "method": "Subtract",
-      "profile": "x64-avx512",
-      "proof": "proofs/SubtractProfile_x64_avx512.lean",
-      "theorem": "UInt256Proof.Subtract.profile_correctness"
-    },
-    {
-      "method": "Subtract",
-      "profile": "x64-avx512-bmi1",
-      "proof": "proofs/SubtractProfile_x64_avx512_bmi1.lean",
+      "profile": "x64-v4",
+      "proof": "proofs/SubtractProfile_x64_v4.lean",
       "theorem": "UInt256Proof.Subtract.profile_correctness"
     },
     {
       "method": "SubtractUnderflow",
-      "profile": "x64-avx2",
-      "proof": "proofs/SubtractUnderflowProfile_x64_avx2.lean",
+      "profile": "x64-v3",
+      "proof": "proofs/SubtractUnderflowProfile_x64_v3.lean",
       "theorem": "UInt256Proof.Subtract.underflow_profile_correctness"
     },
     {
       "method": "SubtractUnderflow",
-      "profile": "x64-avx2-bmi1",
-      "proof": "proofs/SubtractUnderflowProfile_x64_avx2_bmi1.lean",
-      "theorem": "UInt256Proof.Subtract.underflow_profile_correctness"
-    },
-    {
-      "method": "SubtractUnderflow",
-      "profile": "x64-avx512",
-      "proof": "proofs/SubtractUnderflowProfile_x64_avx512.lean",
-      "theorem": "UInt256Proof.Subtract.underflow_profile_correctness"
-    },
-    {
-      "method": "SubtractUnderflow",
-      "profile": "x64-avx512-bmi1",
-      "proof": "proofs/SubtractUnderflowProfile_x64_avx512_bmi1.lean",
+      "profile": "x64-v4",
+      "proof": "proofs/SubtractUnderflowProfile_x64_v4.lean",
       "theorem": "UInt256Proof.Subtract.underflow_profile_correctness"
     },
     {
       "method": "Add",
-      "profile": "x64-avx2",
-      "proof": "proofs/AddProfile_x64_avx2.lean",
+      "profile": "x64-v3",
+      "proof": "proofs/AddProfile_x64_v3.lean",
       "theorem": "UInt256Proof.Add.profile_correctness"
     },
     {
       "method": "Add",
-      "profile": "x64-avx2-bmi1",
-      "proof": "proofs/AddProfile_x64_avx2_bmi1.lean",
-      "theorem": "UInt256Proof.Add.profile_correctness"
-    },
-    {
-      "method": "Add",
-      "profile": "x64-avx512",
-      "proof": "proofs/AddProfile_x64_avx512.lean",
-      "theorem": "UInt256Proof.Add.profile_correctness"
-    },
-    {
-      "method": "Add",
-      "profile": "x64-avx512-bmi1",
-      "proof": "proofs/AddProfile_x64_avx512_bmi1.lean",
+      "profile": "x64-v4",
+      "proof": "proofs/AddProfile_x64_v4.lean",
       "theorem": "UInt256Proof.Add.profile_correctness"
     },
     {
       "method": "AddOverflow",
-      "profile": "x64-avx2",
-      "proof": "proofs/AddOverflowProfile_x64_avx2.lean",
+      "profile": "x64-v3",
+      "proof": "proofs/AddOverflowProfile_x64_v3.lean",
       "theorem": "UInt256Proof.Add.overflow_profile_correctness"
     },
     {
       "method": "AddOverflow",
-      "profile": "x64-avx2-bmi1",
-      "proof": "proofs/AddOverflowProfile_x64_avx2_bmi1.lean",
-      "theorem": "UInt256Proof.Add.overflow_profile_correctness"
-    },
-    {
-      "method": "AddOverflow",
-      "profile": "x64-avx512",
-      "proof": "proofs/AddOverflowProfile_x64_avx512.lean",
-      "theorem": "UInt256Proof.Add.overflow_profile_correctness"
-    },
-    {
-      "method": "AddOverflow",
-      "profile": "x64-avx512-bmi1",
-      "proof": "proofs/AddOverflowProfile_x64_avx512_bmi1.lean",
+      "profile": "x64-v4",
+      "proof": "proofs/AddOverflowProfile_x64_v4.lean",
       "theorem": "UInt256Proof.Add.overflow_profile_correctness"
     }
   ],

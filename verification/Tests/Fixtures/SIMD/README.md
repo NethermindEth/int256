@@ -30,14 +30,14 @@ Every case is a consumer contract or proof property, so every case is ported as
 
 | Case | Kind | Applicable profiles |
 | --- | --- | --- |
-| Baseline | positive, production control | all six |
-| Renamed | positive, helper identities only | all six |
-| EquivalentMask | positive, body change | x64-avx2, x64-avx2-bmi1 |
+| Baseline | positive, production control | all four |
+| Renamed | positive, helper identities only | all four |
+| EquivalentMask | positive, body change | x64-v3 |
 | WrongAlignment | negative, 128-bit lane alignment | arm64-advsimd, x64-sse42 |
 | WrongTop | negative, top-limb propagation | arm64-advsimd; Subtract x64-sse42 |
-| WrongAvxAlignment | negative, 256-bit alignment | x64-avx512, x64-avx512-bmi1 |
-| WrongBlend | negative, AVX2 blend mask | x64-avx2, x64-avx2-bmi1 |
-| WrongTernary | negative, AVX-512 ternary immediate | x64-avx512, x64-avx512-bmi1 |
+| WrongAvxAlignment | negative, 256-bit alignment | x64-v4 |
+| WrongBlend | negative, AVX2 blend mask | x64-v3 |
+| WrongTernary | negative, AVX-512 ternary immediate | x64-v4 |
 | WrongPredicate | negative, propagation predicate | AVX2 and AVX-512 |
 | WrongTable | negative, lookup table entry | AVX2 and AVX-512 |
 | WrongScale | negative, table index scaling | AVX2 and AVX-512 |

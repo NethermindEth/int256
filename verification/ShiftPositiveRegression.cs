@@ -7,13 +7,13 @@
 using System.Diagnostics;
 using System.Text.Json.Nodes;
 
-if (args.Length > 2) throw new ArgumentException("Usage: ShiftPositiveRegression.cs [verification-directory] [all|scalar|x64-vector256]");
+if (args.Length > 2) throw new ArgumentException("Usage: ShiftPositiveRegression.cs [verification-directory] [all|scalar|x64-v3]");
 string root = Path.GetFullPath(args.Length > 0 ? args[0] : "verification");
 string selection = args.Length > 1 ? args[1] : "all";
 string[] profiles = selection switch
 {
-    "all" => ["scalar", "x64-vector256"],
-    "scalar" or "x64-vector256" => [selection],
+    "all" => ["scalar", "x64-v3"],
+    "scalar" or "x64-v3" => [selection],
     _ => throw new ArgumentException("Unknown profile: " + selection),
 };
 string fixtures = Path.Combine(root, "Tests/Fixtures/Shift");
@@ -84,7 +84,7 @@ async Task<string> Extract(string variant, string method, string profile)
     string extraction = Path.Combine(work, profile, variant, method);
     if (Directory.Exists(extraction)) Directory.Delete(extraction, true);
     string signature = targets.Single(target => target!["id"]!.GetValue<string>() == method)!["signature"]!.GetValue<string>();
-    string profileArgument = profile == "scalar" ? profile : "@" + Path.Combine(root, "manifests/profiles", profile + ".json");
+    string profileArgument = File.Exists(Path.Combine(root, "manifests/profiles", profile + ".json")) ? "@" + Path.Combine(root, "manifests/profiles", profile + ".json") : profile;
     await Run("dotnet", [tool, "extract", assemblies[variant], signature, extraction, profileArgument]);
     return extraction;
 }

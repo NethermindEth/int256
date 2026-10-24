@@ -5,6 +5,7 @@ import UInt256.Safety.ReportingForwarder
 
 namespace UInt256Proof.Subtract.Vector256.Blended
 open CIL.Safety UInt256Model.Safety UInt256Proof.Subtract.Vector256
+variable {identity : Nat} {assembly : String}
 
 /-- AVX2 `SubtractImpl` that forms the incoming borrows with a permute and a zero blend. -/
 def subtractBlendImplBody (profile : CIL.FeatureProfile) (bmi1 : Bool) (lookup : Nat) : CIL.Method := { profile := profile, returnsValue := true, locals := [.v256 0, .v256 0, .v256 0, .v256 0, .v256 0, .v256 0, .i32 0, .i32 0, .v256 0], localKinds := [.vector256, .vector256, .vector256, .vector256, .vector256, .vector256, .word32, .word32, .vector256], parameterHomes := [], staticSites := [], code := [
@@ -374,7 +375,7 @@ theorem impl_index (program : CIL.Program) (method lookup : Nat) (profile : CIL.
 
 theorem impl_slow_tail (program : CIL.Program) (method lookup : Nat) (profile : CIL.FeatureProfile)
     (bmi1 : Bool) (found : program[method]? = some (subtractBlendImplBody profile bmi1 lookup))
-    (lookupFound : program[lookup]? = some (UInt256Proof.AddSubtract.Vector256.lookupBody profile))
+    (lookupFound : program[lookup]? = some (UInt256Proof.AddSubtract.Vector256.lookupBody profile identity assembly))
     (features : ImplProfile profile false bmi1)
     (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (originalCall : CallingConditions program original [left, right] [output])
@@ -457,7 +458,7 @@ theorem impl_slow_tail (program : CIL.Program) (method lookup : Nat) (profile : 
     unchanged caller bytes outside it, for either borrow-mask form and either flag extraction. -/
 theorem impl_contract (program : CIL.Program) (method lookup : Nat) (profile : CIL.FeatureProfile)
     (bmi1 : Bool) (found : program[method]? = some (subtractBlendImplBody profile bmi1 lookup))
-    (lookupFound : program[lookup]? = some (UInt256Proof.AddSubtract.Vector256.lookupBody profile))
+    (lookupFound : program[lookup]? = some (UInt256Proof.AddSubtract.Vector256.lookupBody profile identity assembly))
     (features : ImplProfile profile false bmi1) :
     ReportingBinaryContract (· - ·) (fun left right => decide (left.toNat < right.toNat)) program method := by
   intro memory left right output call
@@ -527,7 +528,7 @@ theorem impl_contract (program : CIL.Program) (method lookup : Nat) (profile : C
 theorem subtract_contract (program : CIL.Program) (profile : CIL.FeatureProfile) (bmi1 : Bool)
     (entryFound : program[0]? = some (subtractEntryBody profile 1))
     (implFound : program[1]? = some (subtractBlendImplBody profile bmi1 2))
-    (lookupFound : program[2]? = some (UInt256Proof.AddSubtract.Vector256.lookupBody profile))
+    (lookupFound : program[2]? = some (UInt256Proof.AddSubtract.Vector256.lookupBody profile identity assembly))
     (features : ImplProfile profile false bmi1) :
     WrappingBinaryContract (· - ·) program 0 :=
   forward_reporting_pop program 0 1 _ _ _ entryFound rfl rfl rfl rfl rfl rfl
@@ -537,7 +538,7 @@ theorem subtract_contract (program : CIL.Program) (profile : CIL.FeatureProfile)
 theorem subtract_underflow_contract (program : CIL.Program) (profile : CIL.FeatureProfile) (bmi1 : Bool)
     (entryFound : program[0]? = some (subtractUnderflowEntryBody profile 1))
     (implFound : program[1]? = some (subtractBlendImplBody profile bmi1 2))
-    (lookupFound : program[2]? = some (UInt256Proof.AddSubtract.Vector256.lookupBody profile))
+    (lookupFound : program[2]? = some (UInt256Proof.AddSubtract.Vector256.lookupBody profile identity assembly))
     (features : ImplProfile profile false bmi1) :
     ReportingBinaryContract (· - ·) (fun left right => decide (left.toNat < right.toNat)) program 0 :=
   forward_reporting_byte program 0 1 _ _ _ entryFound rfl rfl rfl rfl rfl rfl

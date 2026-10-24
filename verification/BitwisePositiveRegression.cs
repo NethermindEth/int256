@@ -58,7 +58,7 @@ await Run("dotnet", ["build", Path.Combine(fixtures, "Nethermind.Int256.csproj")
     "-p:EnforceCodeStyleInBuild=true", "-p:GenerateDocumentationFile=true", "-v:q"]);
 JsonArray targets = JsonNode.Parse(File.ReadAllText(Path.Combine(root, "manifests/targets.json")))!["methods"]!.AsArray();
 List<(string Directory, string Proof, string Id, string Profile)> jobs = [];
-foreach (string profile in new[] { "scalar", "x64-vector256" })
+foreach (string profile in new[] { "scalar", "x64-v3" })
 foreach (string operation in new[] { "And", "Or", "Xor", "Not" })
 foreach (bool returned in new[] { false, true })
 {
@@ -67,7 +67,7 @@ foreach (bool returned in new[] { false, true })
     string extraction = Path.Combine(work, id, profile);
     string signature = targets.Single(target => target!["id"]!.GetValue<string>() == id)!["signature"]!.GetValue<string>();
     await Run("dotnet", [tool, "extract", Path.Combine(build, "bin/Release/net10.0/Nethermind.Int256.dll"), signature,
-        extraction, profile == "scalar" ? profile : "@" + Path.Combine(root, "manifests/profiles", profile + ".json")]);
+        extraction, File.Exists(Path.Combine(root, "manifests/profiles", profile + ".json")) ? "@" + Path.Combine(root, "manifests/profiles", profile + ".json") : profile]);
     string operationTerm = unary ? "(~~~·)" : "(applyBinary ." + operation.ToLowerInvariant() + ")";
     string arguments = unary ? "" : "." + operation.ToLowerInvariant() + " ";
     string kind = unary ? "unary" : "binary";

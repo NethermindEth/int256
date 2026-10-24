@@ -6,6 +6,7 @@ import UInt256.RepresentationLemmas
 
 namespace UInt256Proof.Subtract.Vector256
 open CIL.Safety UInt256Model.Safety
+variable {identity : Nat} {assembly : String}
 
 def implSpecs : List NumericLocalSpec :=
   [⟨.vector256, .v256 0, 0, rfl⟩, ⟨.vector256, .v256 0, 0, rfl⟩, ⟨.vector256, .v256 0, 0, rfl⟩,
@@ -40,7 +41,7 @@ theorem slow_flag_bits (bmi1 : Bool) (a b : BitVec 256) :
     unchanged caller bytes outside it, for either borrow-mask form and either flag extraction. -/
 theorem impl_contract (program : CIL.Program) (method lookup : Nat) (profile : CIL.FeatureProfile)
     (avx512 bmi1 : Bool) (found : program[method]? = some (subtractImplBody profile avx512 bmi1 lookup))
-    (lookupFound : program[lookup]? = some (UInt256Proof.AddSubtract.Vector256.lookupBody profile))
+    (lookupFound : program[lookup]? = some (UInt256Proof.AddSubtract.Vector256.lookupBody profile identity assembly))
     (features : ImplProfile profile avx512 bmi1) :
     ReportingBinaryContract (· - ·) (fun left right => decide (left.toNat < right.toNat)) program method := by
   intro memory left right output call

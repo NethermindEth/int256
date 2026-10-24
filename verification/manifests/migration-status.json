@@ -695,6 +695,16 @@
         "Profiles"
       ],
       "note": "Safety: 6 positives (valid call, initial-input sum, probe value) and 11 negatives (located fault refutation plus production AddScalar rejection) certified on scalar; AlignedLoad is an extractor rejection mapped upstream. SIMD: Add arm64-advsimd Baseline, Renamed, WrongAlignment and WrongTop certified. Reporting: AddOverflow and SubtractUnderflow scalar Baseline, Renamed and WrongFlag, and AddOverflow arm64-advsimd Baseline, Renamed, WrongFlag, WrongAlignment and WrongTop certified. Each fixture family keeps one positive refactor fixture: SIMD and Reporting keep EquivalentMask; the other original body-changing positives (LaneLocals, InlineCarry, ExtractedHelper, ReversedStore, FeatureExpressions) were dropped."
+    },
+    {
+      "profiles": [
+        "x64-v3",
+        "x64-v4",
+        "x64-sse42"
+      ],
+      "completedCertificates": 58,
+      "leancilRevision": "99234831740420e5aa038953829f4ba840dc6b67",
+      "note": "Non-Multiply gates retargeted to .NET 10 runtime profiles: x64-vector256 vector bitwise, shift and equality gates to x64-v3; x64-sse41 SSE equality to x64-sse42; x64-avx2/x64-avx512 ordering to x64-v3/x64-v4; Add/Subtract x64-avx2-bmi1/x64-avx512-bmi1 to x64-v3/x64-v4 (x64-avx2 and x64-avx512 without BMI1 are not deployable). The four Vector256-only ordering gates are dropped: that path needs Vector256 without AVX2. Extraction shows x64-v4 matches x64-v3 for the vector gates, and x64-sse2, arm64-advsimd and the v128 profiles match a gated body. All 58 certified locally in one session (2973.8 s); the eight Add/Subtract gates were recertified after the broadcast descriptor generalisation (732.0 s)."
     }
   ],
   "remainingPorts": [],

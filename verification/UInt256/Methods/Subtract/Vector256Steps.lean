@@ -7,6 +7,7 @@ import UInt256.Methods.AddSubtract.BroadcastLookup
 
 namespace UInt256Proof.Subtract.Vector256
 open CIL.Safety UInt256Model.Safety
+variable {identity : Nat} {assembly : String}
 
 /-- The extracted profile facts the AVX2 body depends on. -/
 structure ImplProfile (profile : CIL.FeatureProfile) (avx512 bmi1 : Bool) : Prop where
@@ -476,7 +477,7 @@ def corrected (left right : BitVec 256) : BitVec 256 :=
 
 theorem impl_slow_tail (program : CIL.Program) (method lookup : Nat) (profile : CIL.FeatureProfile)
     (avx512 bmi1 : Bool) (found : program[method]? = some (subtractImplBody profile avx512 bmi1 lookup))
-    (lookupFound : program[lookup]? = some (UInt256Proof.AddSubtract.Vector256.lookupBody profile))
+    (lookupFound : program[lookup]? = some (UInt256Proof.AddSubtract.Vector256.lookupBody profile identity assembly))
     (features : ImplProfile profile avx512 bmi1)
     (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (originalCall : CallingConditions program original [left, right] [output])
