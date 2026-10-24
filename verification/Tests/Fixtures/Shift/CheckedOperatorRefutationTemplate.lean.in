@@ -30,7 +30,7 @@ theorem call : CallingConditions Extracted.program memory [⟨0,0⟩] [] := by
     exact ⟨_, rfl⟩
   · intro output member; simp at member
   · change StaticWorldValid [] memory
-    simp [StaticWorldValid, memory]
+    exact empty_static_world_valid [] memory (by decide) (by decide) rfl
 
 
 theorem refuted : ¬ UInt256Model.Safety.ReadOnlyScalarContract CIL.Value.i32
