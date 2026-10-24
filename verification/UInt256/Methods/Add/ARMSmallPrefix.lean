@@ -6,6 +6,7 @@ import UInt256.Methods.Multiply.LimbStorage
 import CIL.Safety.CallComposition
 import UInt256.Safety.NumericStore
 import CIL.Safety.StepComposition
+import CIL.Safety.MethodContract
 import CIL.Safety.WordLocals
 import CIL.Safety.NumericHomes
 
@@ -278,18 +279,12 @@ theorem arm_small_low_decision (program : CIL.Program) (method storage : Nat) (p
     ∃ fuel final returned,
       run program fuel method 20 args frame [] memory =
         .ok (final, returned) ∧ post final returned := by
-    have loadSum := step_load_word64 (body := (armSmallBody profile storage)) (pc := 20)
-      (args := args) (stack := []) sumSlot sumRead
-    have loadLow := step_load_word64 (body := (armSmallBody profile storage)) (pc := 21)
-      (args := args) (stack := [.scalar (.i64 sum)]) lowSlot lowRead
-    apply run_next_exists post found (by rfl) loadSum
-    apply run_next_exists post found (by rfl) loadLow
+    have loadSum := load_numeric_local .word64 (.i64 sum) sum.toNat rfl sumRead
+    have loadLow := load_numeric_local .word64 (.i64 low) low.toNat rfl lowRead
     by_cases carry : sum < low
     all_goals
       simp only [carry, ite_true, ite_false] at continuation
-      apply run_next_exists post found (by rfl) _ continuation
-      simp [step, cil_guard, observerCount, instruction, checkedValue, numericValue, pureArity, scalars, CIL.step.eq_def, armSmallBody, enabled, localResult, carry,
-        Bind.bind, Except.bind, Pure.pure, Except.pure]
+      cil_contract_steps [enabled, sumSlot, lowSlot, loadSum, loadLow, carry] until continuation
 
 /-- All three carry increments follow the same checked load/add/duplicate/store sequence. -/
 theorem arm_small_increment (program : CIL.Program) (method storage : Nat) (profile : CIL.FeatureProfile) (found : program[method]? = some (armSmallBody profile storage)) (enabled : profile.advSimd = true)
