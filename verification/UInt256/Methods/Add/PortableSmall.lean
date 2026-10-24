@@ -1,5 +1,6 @@
 import CIL.Safety.Equations
 import UInt256.Methods.Add.ARMSmallContract
+import CIL.Safety.MethodContract
 
 namespace UInt256Proof.Add.Safety
 
@@ -374,18 +375,12 @@ theorem portable_small_low_decision (program : CIL.Program) (method storage : Na
     ∃ fuel final returned,
       run program fuel method 59 args frame [] memory =
         .ok (final, returned) ∧ post final returned := by
-  have loadSum := step_load_word64 (body := portableSmallBody profile storage) (pc := 59)
-    (args := args) (stack := []) sumSlot sumRead
-  have loadLow := step_load_word64 (body := portableSmallBody profile storage) (pc := 60)
-    (args := args) (stack := [.scalar (.i64 sum)]) lowSlot lowRead
-  apply run_next_exists post found (by rfl) loadSum
-  apply run_next_exists post found (by rfl) loadLow
+  have loadSum := load_numeric_local .word64 (.i64 sum) sum.toNat rfl sumRead
+  have loadLow := load_numeric_local .word64 (.i64 low) low.toNat rfl lowRead
   by_cases carry : sum < low
   all_goals
     simp only [carry, ite_true, ite_false] at continuation
-    apply run_next_exists post found (by rfl) _ continuation
-    simp [step, cil_guard, observerCount, instruction, checkedValue, numericValue, pureArity, scalars, CIL.step.eq_def, localResult, carry,
-      Bind.bind, Except.bind, Pure.pure, Except.pure]
+    cil_contract_steps [sumSlot, lowSlot, loadSum, loadLow, carry] until continuation
 
 def portableIncrementStart : Fin 3 → Nat
   | 0 => 70 | 1 => 85 | 2 => 101
