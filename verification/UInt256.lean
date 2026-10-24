@@ -94,6 +94,7 @@ import UInt256.Methods.Bitwise.HelperWords
 import UInt256.Methods.Bitwise.HelperUnary
 import UInt256.Methods.Multiply.FullSafetyAvx2Top
 import UInt256.Methods.Multiply.FullSafetyAvx512Top
+import UInt256.Methods.Multiply.ProfileLayout
 import UInt256.Safety.ContractRefutation
 import UInt256.Safety.FixtureRefutation
 import UInt256.Safety.ReadOnlyRefutation
