@@ -7,6 +7,7 @@ import UInt256.Methods.Multiply.ScalarValue
 import UInt256.Methods.Multiply.ProductStorage
 import UInt256.Safety.ArgumentValues
 import UInt256.Safety.OutputReturn
+import CIL.Safety.MethodContract
 
 namespace UInt256Proof.Multiply.ScalarSafety
 open CIL.Safety UInt256Model.Safety UInt256Proof.Multiply.Calls
@@ -683,18 +684,10 @@ theorem scalar_invoke_with_storage (profile : CIL.FeatureProfile) (program : CIL
   have started : ∃ fuel final returned,
       run program fuel methodIndex 0 (scalarArgs input word output) frame [] entered =
         .ok (final, returned) ∧ post final returned := by
-    iterate 3
-      apply run_next_exists post found (by rfl)
-      simp [step, cil_guard, observerCount, scalarArgs, checkedValue, numericValue, pureArity, scalars, CIL.step.eq_def,
-        Bind.bind, Except.bind, Pure.pure, Except.pure]
-      first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
+    cil_contract_steps 3 [scalarArgs]
     by_cases large : 1 < word.toNat
     · have greater : BitVec.ofNat 64 1 < word := large
-      apply run_next_exists post found (by rfl)
-      · simp [step, cil_guard, observerCount, pureArity, scalars, numericValue, CIL.step.eq_def,
-          Bind.bind, Except.bind, Pure.pure, Except.pure]
-        first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
-      simp only [greater, ite_true]
+      cil_contract_steps 1 [greater]
       apply scalar_products profile program methodIndex wordIndex storageIndex found contract memory entered entered input output word frame call enteredWF homes state post
       intro current currentState
       exact scalar_output_with_storage profile program methodIndex wordIndex storageIndex storage found memory entered current input output word frame call enteredWF homes owned currentState
@@ -705,11 +698,7 @@ theorem scalar_invoke_with_storage (profile : CIL.FeatureProfile) (program : CIL
         · right; exact BitVec.eq_of_toNat_eq one
       rcases unit with rfl | rfl
       all_goals
-        iterate 3
-          apply run_next_exists post found (by rfl)
-          simp [step, cil_guard, observerCount, scalarArgs, checkedValue, numericValue, pureArity, scalars, CIL.step.eq_def,
-            Bind.bind, Except.bind, Pure.pure, Except.pure]
-          first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
+        cil_contract_steps 3 [scalarArgs]
       · exact scalar_zero_with_storage profile program methodIndex wordIndex storageIndex storage found memory entered entered input output frame _ call owned state
       · exact scalar_one_with_storage profile program methodIndex wordIndex storageIndex storage found memory entered entered input output frame _ call owned state
   obtain ⟨fuel, final, returned, ran, result⟩ := started
