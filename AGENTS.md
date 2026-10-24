@@ -42,6 +42,7 @@ High-performance 256-bit integer types for .NET. See [global.json](./global.json
 ## Verification
 
 - Consume pinned LeanCIL from `verification/lakefile.toml`; keep CIL infrastructure upstream.
+- Audit the supporting library with `dotnet run --file verification/Verify.cs -- --action contracts`, which runs LeanCIL `audit-library` on kernel-replayed oleans; import new `UInt256` modules from `verification/UInt256.lean` so the audit covers them, and do not audit with elaborated Lean (`run_cmd`, `#print axioms`).
 - Register completed method/profile proofs in `verification/manifests/gates.json`.
 - Validate gates with `dotnet run --file verification/Verify.cs -- --action verify --method <id> --profile <profile>`; a supporting-library build or successful extraction is not a compiled-method certificate.
 - Repeat `--method` in one invocation to reuse builds and LeanCIL's authenticated local consumer cache; every method still requires its own certificate.

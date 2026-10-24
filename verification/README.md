@@ -78,9 +78,13 @@ dotnet run --file verification/Verify.cs -- --action verify --method Add --profi
 dotnet run --file verification/Verify.cs -- --action extract --method Add --profile scalar
 ```
 
-`Contracts` audits theorems in the `UInt256Model` and `UInt256Proof` namespaces,
-allowing only `propext`, `Classical.choice`, and `Quot.sound`. It produces no
-assembly certificate. `Verify` checks consumer proofs and imports in a clean
+`Contracts` builds the library, then runs LeanCIL `audit-library` on the `UInt256`
+module closure: it kernel-replays every module outside the certified LeanCIL library
+and audits, from those replayed oleans, every theorem in the `UInt256Model` and
+`UInt256Proof` namespaces (private theorems included), allowing only `propext`,
+`Classical.choice`, and `Quot.sound`. No UInt256 code runs during replay or audit,
+and either namespace matching no theorem fails. Modules outside the `UInt256`
+import closure are neither built nor audited. It produces no assembly certificate. `Verify` checks consumer proofs and imports in a clean
 package, reuses source-bound certified artifacts where available, kernel-checks
 new consumer modules, audits axioms, and records the assembly,
 extraction and proof identities in `artifacts/Add/scalar/verified.json`.
