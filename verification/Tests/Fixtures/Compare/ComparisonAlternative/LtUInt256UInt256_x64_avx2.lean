@@ -25,7 +25,7 @@ macro "ladder_steps" count:num "with" facts:term,* : tactic =>
       · simp only [cil_code]; rfl
       · simp only [cil_code]; rfl
       · simp (config := { implicitDefEqProofs := false })
-          [step, readOnlyArguments, checkedValue, numericValue, formValue,
+          [step, cil_guard, observerCount, readOnlyArguments, checkedValue, numericValue, formValue,
             pureArity, scalars, CIL.step, CIL.unary, CIL.binary, checkedAt,
             Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure, $[$facts:term],*]
         try (exact ⟨rfl, rfl, rfl, rfl⟩)
@@ -56,36 +56,36 @@ theorem ladder_run (memory : Memory) (left right : Reference) (frame : Frame)
   by_cases a3 : inputLimb memory left 3 < inputLimb memory right 3
   · rw [show ladderResult memory left right = 1 by simp [ladderResult, a3]]
     ladder_steps 6 with k0, k1, fl, fr, hl0, hl1, hl2, hl3, hr0, hr1, hr2, hr3, a3
-    simp [run, cil_code, step, checkedValue, numericValue, CIL.NarrowKind.extend,
+    simp [run, cil_code, step, cil_guard, observerCount, checkedValue, numericValue, CIL.NarrowKind.extend,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   · by_cases b3 : inputLimb memory right 3 < inputLimb memory left 3
     · rw [show ladderResult memory left right = 0 by simp [ladderResult, a3, b3]]
       ladder_steps 11 with k0, k1, fl, fr, hl0, hl1, hl2, hl3, hr0, hr1, hr2, hr3, a3, b3
-      simp [run, cil_code, step, checkedValue, numericValue, CIL.NarrowKind.extend,
+      simp [run, cil_code, step, cil_guard, observerCount, checkedValue, numericValue, CIL.NarrowKind.extend,
         Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     · by_cases a2 : inputLimb memory left 2 < inputLimb memory right 2
       · rw [show ladderResult memory left right = 1 by simp [ladderResult, a3, b3, a2]]
         ladder_steps 16 with k0, k1, fl, fr, hl0, hl1, hl2, hl3, hr0, hr1, hr2, hr3, a3, b3, a2
-        simp [run, cil_code, step, checkedValue, numericValue, CIL.NarrowKind.extend,
+        simp [run, cil_code, step, cil_guard, observerCount, checkedValue, numericValue, CIL.NarrowKind.extend,
           Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
       · by_cases b2 : inputLimb memory right 2 < inputLimb memory left 2
         · rw [show ladderResult memory left right = 0 by simp [ladderResult, a3, b3, a2, b2]]
           ladder_steps 21 with k0, k1, fl, fr, hl0, hl1, hl2, hl3, hr0, hr1, hr2, hr3, a3, b3, a2, b2
-          simp [run, cil_code, step, checkedValue, numericValue, CIL.NarrowKind.extend,
+          simp [run, cil_code, step, cil_guard, observerCount, checkedValue, numericValue, CIL.NarrowKind.extend,
             Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
         · by_cases a1 : inputLimb memory left 1 < inputLimb memory right 1
           · rw [show ladderResult memory left right = 1 by simp [ladderResult, a3, b3, a2, b2, a1]]
             ladder_steps 26 with k0, k1, fl, fr, hl0, hl1, hl2, hl3, hr0, hr1, hr2, hr3, a3, b3, a2, b2, a1
-            simp [run, cil_code, step, checkedValue, numericValue, CIL.NarrowKind.extend,
+            simp [run, cil_code, step, cil_guard, observerCount, checkedValue, numericValue, CIL.NarrowKind.extend,
               Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
           · by_cases b1 : inputLimb memory right 1 < inputLimb memory left 1
             · rw [show ladderResult memory left right = 0 by simp [ladderResult, a3, b3, a2, b2, a1, b1]]
               ladder_steps 31 with k0, k1, fl, fr, hl0, hl1, hl2, hl3, hr0, hr1, hr2, hr3, a3, b3, a2, b2, a1, b1
-              simp [run, cil_code, step, checkedValue, numericValue, CIL.NarrowKind.extend,
+              simp [run, cil_code, step, cil_guard, observerCount, checkedValue, numericValue, CIL.NarrowKind.extend,
                 Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
             · rw [show ladderResult memory left right = (if inputLimb memory left 0 < inputLimb memory right 0 then 1 else 0) by simp [ladderResult, a3, b3, a2, b2, a1, b1]]
               ladder_steps 35 with k0, k1, fl, fr, hl0, hl1, hl2, hl3, hr0, hr1, hr2, hr3, a3, b3, a2, b2, a1, b1
-              simp [run, cil_code, step, checkedValue, numericValue, CIL.NarrowKind.extend,
+              simp [run, cil_code, step, cil_guard, observerCount, checkedValue, numericValue, CIL.NarrowKind.extend,
                 Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure] <;> try (split <;> rfl)
 
 #print axioms ladder_run
