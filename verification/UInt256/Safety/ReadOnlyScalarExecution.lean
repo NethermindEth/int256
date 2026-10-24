@@ -27,12 +27,7 @@ theorem certify_readOnly_scalar {α : Type} (program : CIL.Program) (method : Na
   rw [call.input_value_after_setup setup (by simp : left ∈ [left])] at finished
   refine ⟨fuel, leaveFrame frame entered,
     certify_invocation _ _ _ _ _ _ _ _ _ _ lookup checked setup live finished, ?_⟩
-  have before := enterFrame_preserves_caller_memory _ _ _ _ _ setup
-  have fresh := enterFrame_fresh _ _ _ _ _ setup
-  have after := leaveFrame_preserves_memory_below frame entered memory.nextIdentity
-    (fun id member => (fresh.2 id member).1)
-  intro id bound offset
-  exact (after.cells id bound offset).trans (before.cells id bound offset)
+  exact (MemoryBelow.frame_round_trip setup (.refl _ _)).cells
 
 #print axioms certify_readOnly_scalar
 
