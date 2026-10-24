@@ -19,7 +19,7 @@ theorem load_input {program : CIL.Program} {memory : Memory} {inputs outputs : L
     instruction (.loadAggregate 32) (.reference (.address input) :: rest) memory =
       .ok (memory, .scalar (.aggregate (inputBytes memory input)) :: rest) := by
   have loaded := call.input_snapshot member
-  simp [instruction, dereference, ordinaryAccessAlignment, loaded, inputBytes, checkedAt,
+  simp [instruction, cil_guard, observerCount, dereference, ordinaryAccessAlignment, loaded, inputBytes, checkedAt,
     Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 theorem cast_input (memory : Memory) (input : Reference) (rest : List Value) :
@@ -69,13 +69,13 @@ theorem run64 (profile : CIL.FeatureProfile) (program : CIL.Program) (index : Na
     · apply run_next found
       · simp only [body]; rfl
       · simp (config := { implicitDefEqProofs := false })
-          [body, step, scalarArguments, checkedValue, numericValue, formValue, formed,
+          [body, step, cil_guard, observerCount, scalarArguments, checkedValue, numericValue, formValue, formed,
             loaded, casted, staticInstruction, checkedIntrinsic, pureArity, scalars, CIL.step.eq_def, CIL.Intrinsic.available,
             eval_scalar32, eval_scalar64, eval_xor, eval_zero, eval_equal,
             checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
         try exact ⟨rfl, rfl, rfl, rfl⟩
         done
-  simp [run, found, body, step, checkedValue, numericValue, CIL.NarrowKind.extend,
+  simp [run, found, body, step, cil_guard, observerCount, checkedValue, numericValue, CIL.NarrowKind.extend,
     Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   split <;> rename_i h <;> simp [h, eq_comm]
   exact Ne.symm h
@@ -98,13 +98,13 @@ theorem run32 (profile : CIL.FeatureProfile) (program : CIL.Program) (index : Na
     · apply run_next found
       · simp only [body]; rfl
       · simp (config := { implicitDefEqProofs := false })
-          [body, step, scalarArguments, checkedValue, numericValue, formValue, formed,
+          [body, step, cil_guard, observerCount, scalarArguments, checkedValue, numericValue, formValue, formed,
             loaded, casted, staticInstruction, checkedIntrinsic, pureArity, scalars, CIL.step.eq_def, CIL.Intrinsic.available,
             eval_scalar32, eval_scalar64, eval_xor, eval_zero, eval_equal,
             checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
         try exact ⟨rfl, rfl, rfl, rfl⟩
         done
-  simp [run, found, body, step, checkedValue, numericValue, CIL.NarrowKind.extend,
+  simp [run, found, body, step, cil_guard, observerCount, checkedValue, numericValue, CIL.NarrowKind.extend,
     Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   split <;> rename_i h <;> simp [h, eq_comm]
   exact Ne.symm h
@@ -202,7 +202,7 @@ theorem executed {α : Type} (encode : α → CIL.Value) (equal : BitVec 256 →
     (vector : profile.vector256Accelerated = true)
     (found : program[index]? = some (body narrow profile callee))
     (leafFound : program[callee]? = some (EqualityFixture.LeafVectorPrimitive.body narrow profile))
-    (numeric : ∀ word, numericValue (encode word) = true)
+    (numeric : ∀ word, numericValue (encode word) = true) (known : ∀ word, (encode word).hasUnspecified = false)
     (childRun : ∀ memory left right frame, CallingConditions program memory [left] [] →
       ∃ fuel, run program fuel callee 0 (scalarArguments left (encode right)) frame [] memory =
         .ok (leaveFrame frame memory, [.scalar (.i32 (if equal (inputValue memory left) right then 1 else 0))]))
@@ -218,7 +218,7 @@ theorem executed {α : Type} (encode : α → CIL.Value) (equal : BitVec 256 →
   have child : invoke program childFuel callee (scalarArguments left (encode right)) memory =
       .ok (memory, [.scalar (.i32 (if equal (inputValue memory left) right then 1 else 0))]) := by
     apply invoke_of_run leafFound
-    · simp [scalarArguments, checkedValue, numeric, formValue, formed, checkedAt,
+    · simp [scalarArguments, checkedValue, numeric, known, formValue, formed, checkedAt,
         Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     · rfl
     · simpa [leaveFrame, childFrame] using childExecution
@@ -226,14 +226,14 @@ theorem executed {α : Type} (encode : α → CIL.Value) (equal : BitVec 256 →
       [.scalar (.i32 (if equal (inputValue memory left) right then 1 else 0))] memory =
       .ok (leaveFrame frame memory, [.scalar (.i32 (if equal (inputValue memory left) right then 1 else 0))]) := by
     cases narrow <;> cases equal (inputValue memory left) right <;>
-      simp [run, found, body, body32, body64, callPC, step, checkedValue, numericValue, CIL.NarrowKind.extend,
+      simp [run, found, body, body32, body64, callPC, step, cil_guard, observerCount, checkedValue, numericValue, CIL.NarrowKind.extend,
         Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   have fetched : (body narrow profile callee).code[callPC narrow]? = some (.call callee 2) := by
     cases narrow <;> rfl
   have stepped : step (body narrow profile callee) (.call callee 2) (callPC narrow)
       (scalarArguments left (encode right)) frame [.scalar (encode right), .reference (.address left)] memory =
       .ok (.call callee (scalarArguments left (encode right)) [] memory) := by
-    simp [step, scalarArguments, checkedValue, numeric, formValue, formed, checkedAt,
+    simp [step, cil_guard, observerCount, scalarArguments, checkedValue, numeric, known, formValue, formed, checkedAt,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   obtain ⟨fuel, tail⟩ := run_call_exists found fetched stepped ⟨childFuel, child⟩ ⟨1, returnTrace⟩
   refine ⟨fuel + 4, ?_⟩
@@ -243,7 +243,7 @@ theorem executed {α : Type} (encode : α → CIL.Value) (equal : BitVec 256 →
       apply Eq.trans
       · apply run_next found
         · simp only [body, body32, body64]; rfl
-        · simp (config := { implicitDefEqProofs := false }) [body, body32, body64, step, scalarArguments,
+        · simp (config := { implicitDefEqProofs := false }) [body, body32, body64, step, cil_guard, observerCount, scalarArguments,
             checkedValue, numericValue, numeric, numericWord, formValue, formed, pureArity, scalars, CIL.step.eq_def, CIL.truth,
             CIL.FeatureProfile.evaluate, vector, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
           try exact ⟨rfl, rfl, rfl, rfl⟩
@@ -254,7 +254,7 @@ theorem checked {α : Type} (encode : α → CIL.Value) (equal : BitVec 256 → 
     (vector : profile.vector256Accelerated = true)
     (found : program[index]? = some (body narrow profile callee))
     (leafFound : program[callee]? = some (EqualityFixture.LeafVectorPrimitive.body narrow profile))
-    (numeric : ∀ word, numericValue (encode word) = true)
+    (numeric : ∀ word, numericValue (encode word) = true) (known : ∀ word, (encode word).hasUnspecified = false)
     (childRun : ∀ memory left right frame, CallingConditions program memory [left] [] →
       ∃ fuel, run program fuel callee 0 (scalarArguments left (encode right)) frame [] memory =
         .ok (leaveFrame frame memory, [.scalar (.i32 (if equal (inputValue memory left) right then 1 else 0))])) :
@@ -263,7 +263,7 @@ theorem checked {α : Type} (encode : α → CIL.Value) (equal : BitVec 256 → 
     (fun input word => .i32 (if equal input word then 1 else 0)) found numeric
     (by intro left right; cases narrow <;>
         (simp [body, body32, body64, FrameSetupFits, InitializersFit, InitializerFits, AggregateArgumentsFit, ParameterArgumentsFit]; rfl))
-    (executed encode equal narrow profile program index callee vector found leafFound numeric childRun)
+    (executed encode equal narrow profile program index callee vector found leafFound numeric known childRun)
   simpa only [ScalarOperatorContract, ReadOnlyScalarContract, scalarOperatorArguments,
     Bool.false_eq_true, ite_false, Bool.bne_false] using result
 
@@ -284,7 +284,7 @@ theorem checked32 (profile : CIL.FeatureProfile) (program : CIL.Program) (index 
   have widen (word : BitVec 32) : word.zeroExtend 256 = BitVec.ofNat 256 word.toNat := by
     apply BitVec.eq_of_toNat_eq
     simp only [BitVec.zeroExtend_eq_setWidth, BitVec.toNat_setWidth, BitVec.toNat_ofNat]
-  apply checked CIL.Value.i32 _ true profile program index callee vector found leafFound (fun _ => rfl)
+  apply checked CIL.Value.i32 _ true profile program index callee vector found leafFound (fun _ => rfl) (fun _ => rfl)
   intro memory left right frame call
   simpa only [decide_eq_true_eq, widen] using EqualityFixture.LeafVectorPrimitive.run32 profile program callee leafFound memory left right frame call
 
@@ -298,7 +298,7 @@ theorem checked64 (profile : CIL.FeatureProfile) (program : CIL.Program) (index 
   have widen (word : BitVec 64) : word.zeroExtend 256 = BitVec.ofNat 256 word.toNat := by
     apply BitVec.eq_of_toNat_eq
     simp only [BitVec.zeroExtend_eq_setWidth, BitVec.toNat_setWidth, BitVec.toNat_ofNat]
-  apply checked CIL.Value.i64 _ false profile program index callee vector found leafFound (fun _ => rfl)
+  apply checked CIL.Value.i64 _ false profile program index callee vector found leafFound (fun _ => rfl) (fun _ => rfl)
   intro memory left right frame call
   simpa only [decide_eq_true_eq, widen] using EqualityFixture.LeafVectorPrimitive.run64 profile program callee leafFound memory left right frame call
 

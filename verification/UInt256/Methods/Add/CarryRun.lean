@@ -53,7 +53,7 @@ macro "carry_run_steps " "[" normalize:term,* "]" : tactic => `(tactic| (
         · simp only [cil_code]; rfl
         · simp only [cil_code]; rfl
         · cil_fact_simp (config := { implicitDefEqProofs := false })
-            [cil_code, step, checkedValue, numericValue, formValue, pureArity, scalars, CIL.step.eq_def,
+            [cil_code, step, observerCount, checkedValue, numericValue, formValue, pureArity, scalars, CIL.step.eq_def,
               CIL.binary, CIL.unary, instruction, storeValue, referenceAt, checkedAt, Except.mapError,
               Bind.bind, Except.bind, Pure.pure, Except.pure]
             [locals, s0, s1, r0, rc, r1, r2, r3, fc1, fc2, fo3, wc, wo, $[$normalize:term],*]

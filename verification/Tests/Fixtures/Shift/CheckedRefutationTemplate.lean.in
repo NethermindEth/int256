@@ -33,7 +33,7 @@ theorem call : CallingConditions Extracted.program memory [⟨0,0⟩] [⟨0,@OUT
     subst output
     rfl
   · change StaticWorldValid [] memory
-    simp [StaticWorldValid, memory]
+    exact empty_static_world_valid [] memory (by decide) (by decide) rfl
 
 
 theorem refuted : ¬ UInt256Model.Safety.ShiftContract .@DIRECTION@ Extracted.program 0 := by
