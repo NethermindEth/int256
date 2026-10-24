@@ -60,8 +60,9 @@ foreach (JsonNode? package in packages)
 List<(string Fixture, string Profile, string Extraction, string Proof, string Theorem, bool Negative)> jobs = [];
 foreach (string fixture in new[] { "Baseline", "AlternativeOrder", "WrongCarry", "WrongCrossProduct", "WrongHighLow", "WrongAliasing", "WrongBmiHigh" })
 {
-    string profile = fixture == "WrongBmiHigh" ? "x64-bmi2" : "scalar";
-    string profileArgument = profile == "scalar" ? profile : "@" + Path.Combine(root, "manifests/profiles", profile + ".json");
+    string profile = fixture == "WrongBmiHigh" ? "x64-v3" : "scalar";
+    string profileArgument = File.Exists(Path.Combine(root, "manifests/profiles", profile + ".json"))
+        ? "@" + Path.Combine(root, "manifests/profiles", profile + ".json") : profile;
     string build = Path.Combine(work, "build", fixture);
     string intermediate = Path.Combine(build, "obj") + Path.DirectorySeparatorChar;
     await Run("dotnet", ["build", Path.Combine(fixtures, "Nethermind.Int256.csproj"), "-c", "Release", "-p:FixtureCase=" + fixture,
@@ -73,7 +74,7 @@ foreach (string fixture in new[] { "Baseline", "AlternativeOrder", "WrongCarry",
     JsonNode? witness = witnesses.SingleOrDefault(value => value!["case"]!.GetValue<string>() == fixture);
     if (witness is null)
     {
-        string proof = fixture == "Baseline" ? Path.Combine(consumer, "proofs/MultiplyProfile_scalar.lean") : Path.Combine(consumer, "Tests/Fixtures/Multiply", fixture + ".lean");
+        string proof = fixture == "Baseline" ? Path.Combine(consumer, "proofs/MultiplyProfile.lean") : Path.Combine(consumer, "Tests/Fixtures/Multiply", fixture + ".lean");
         string theorem = fixture == "Baseline" ? "UInt256Proof.Multiply.profile_correctness" : "UInt256Proof.Multiply.FixtureAlternative.correctness";
         jobs.Add((fixture, profile, extraction, proof, theorem, false));
         continue;
@@ -94,7 +95,7 @@ foreach (string fixture in new[] { "Baseline", "AlternativeOrder", "WrongCarry",
 // Freeze the complete consumer source snapshot before issuing any certificates.
 List<string> failed = await RegressionBatch.Verify(root, tool, work, consumer, [.. jobs.Select(job => new RegressionCheck(job.Fixture + "/" + job.Profile, job.Extraction, job.Proof, job.Theorem,
     job.Negative ? "checked contract refutation and production proof rejection" : "checked multiplication contract",
-    job.Negative ? Path.Combine(consumer, "proofs", "MultiplyProfile_" + job.Profile.Replace('-', '_') + ".lean") : null,
+    job.Negative ? Path.Combine(consumer, "proofs/MultiplyProfile.lean") : null,
     job.Negative ? "UInt256Proof.Multiply.profile_correctness" : null))]);
 if (failed.Count != 0) throw new InvalidOperationException("FAILED: " + string.Join(", ", failed));
 

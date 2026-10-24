@@ -81,7 +81,7 @@
   },
   {
     "case": "WrongBmiHigh",
-    "profile": "x64-bmi2",
+    "profile": "x64-v3",
     "leftBase": 0,
     "rightBase": 64,
     "outputBase": 128,
