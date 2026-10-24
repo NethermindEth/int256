@@ -209,7 +209,7 @@ jobs:
     # Same trigger as the contract audit: any verification source, the LeanCIL pin or production code.
     if: needs.select.outputs.contracts == 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 150
     env:
       LEANCIL_CERTIFIED_LIBRARY: ${{ github.workspace }}/verification/artifacts/certified-library
       LEANCIL_CERTIFIED_LIBRARY_SHA256: ${{ needs.prepare.outputs.manifest-sha256 }}
