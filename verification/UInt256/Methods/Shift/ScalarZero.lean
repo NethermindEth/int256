@@ -32,14 +32,8 @@ theorem shift_zero_output (memory : Memory) (inputs outputs : List Reference)
   have done := continuation after loaded afterCall outside
   have formed := call.output_formed member
   have found := bodyFound
-  iterate 2
-    apply run_next_exists post found (by rfl)
-    simp (config := { implicitDefEqProofs := false }) only
-      [step, pureArity, instruction, ordinaryAccessAlignment, argument, checkedValue, formValue, formed, staticInstruction, memoryInstruction,
-        storeValue, referenceAt, writtenZero, checkedAt, Except.mapError,
-        Bind.bind, Except.bind, Pure.pure, Except.pure]
-    first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
-  exact done
+  cil_contract_steps [argument, formed, writtenZero, formValue, instruction, ordinaryAccessAlignment,
+    staticInstruction, memoryInstruction, storeValue, referenceAt] until done
 
 #print axioms shift_zero_output
 

@@ -2,6 +2,7 @@ import UInt256.Methods.Equality.HalfSafetyFacts
 import CIL.Safety.StepComposition
 import UInt256.Safety.ReadOnlyExecution
 import CIL.Safety.GuardNormalization
+import CIL.Safety.SymbolicExecution
 namespace UInt256Proof.Equality.Safety
 open CIL.Safety UInt256Model.Safety
  theorem intrinsic_equal128 (a b : BitVec 128) : CIL.evalIntrinsic (.vector (.equalsAll 128)) [.v128 a,.v128 b] = some (.i32 (if a = b then 1 else 0)) := by
@@ -10,53 +11,6 @@ open CIL.Safety UInt256Model.Safety
  theorem intrinsic_xor128 (a b : BitVec 128) : CIL.evalIntrinsic (.vector (.bxor 128)) [.v128 a,.v128 b] = some (.v128 (a ^^^ b)) := rfl
  theorem intrinsic_or128 (a b : BitVec 128) : CIL.evalIntrinsic (.vector (.bor 128)) [.v128 a,.v128 b] = some (.v128 (a ||| b)) := rfl
  theorem intrinsic_zero128 : CIL.evalIntrinsic (.vector (.zero 128)) [] = some (.v128 0) := rfl
-private theorem s_arg {body : CIL.Method} {pc i : Nat} {args : List Value} {frame : Frame}
-    {stack : List Value} {m : Memory} {r : Reference}
-    (h : args[i]? = some (.reference (.address r))) (formed : form m r = .ok r) :
-    step body (.arg i) pc args frame stack m = .ok (.next (pc + 1) (.reference (.address r) :: stack) frame m) := by
-  unfold step
-  simp only [cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, h, checkedValue, formValue, formed, checkedAt, Except.mapError, Bind.bind, Except.bind,
-    Pure.pure, Except.pure]
-
-private theorem s_asRef {body : CIL.Method} {pc : Nat} {args : List Value} {frame : Frame}
-    {rest : List Value} {m : Memory} {r : Reference} (formed : form m r = .ok r) :
-    step body (.memory .asRef) pc args frame (.reference (.address r) :: rest) m =
-      .ok (.next (pc + 1) (.reference (.address r) :: rest) frame m) := by
-  unfold step staticInstruction memoryInstruction
-  simp only [cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, formValue, formed, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-
-private theorem s_setLocal {body : CIL.Method} {pc i : Nat} {args : List Value} {frame : Frame}
-    {rest : List Value} {m : Memory} {r : Reference} {old : Option ManagedReference}
-    (slot : frame.locals[i]? = some (.root old)) (formed : form m r = .ok r) :
-    step body (.setLocal i) pc args frame (.reference (.address r) :: rest) m =
-      .ok (.next (pc + 1) rest { frame with locals := frame.locals.set i (.root (some (.address r))) } m) := by
-  unfold step storeLocal
-  simp only [cil_guard, observerCount, Bool.or_false, Bool.false_and, Bool.false_eq_true, ite_false, slot, formValue, formed, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-
-private theorem s_local {body : CIL.Method} {pc i : Nat} {args : List Value} {frame : Frame}
-    {stack : List Value} {m : Memory} {r : Reference}
-    (slot : frame.locals[i]? = some (.root (some (.address r)))) (formed : form m r = .ok r) :
-    step body (.local i) pc args frame stack m =
-      .ok (.next (pc + 1) (.reference (.address r) :: stack) frame m) := by
-  unfold step loadLocal
-  simp only [cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, slot, formValue, formed, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-
-private theorem s_load128 {body : CIL.Method} {pc : Nat} {args : List Value} {frame : Frame}
-    {rest : List Value} {m : Memory} {r : ManagedReference} {v : CIL.Value}
-    (loaded : loadValue m r 16 = .ok v) :
-    step body (.memory .load128) pc args frame (.reference r :: rest) m =
-      .ok (.next (pc + 1) (.scalar v :: rest) frame m) := by
-  unfold step staticInstruction memoryInstruction
-  simp only [cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, loaded, Bind.bind, Except.bind, Pure.pure, Except.pure]
-
-private theorem s_add {body : CIL.Method} {pc size : Nat} {args : List Value} {frame : Frame}
-    {rest : List Value} {m : Memory} {r result : Reference} {offset : BitVec 32} {delta : BitVec 64}
-    (converted : BitVec.ofInt 64 offset.toInt = delta) (added : add m r size delta = .ok result) :
-    step body (.memory (.add size true)) pc args frame (.scalar (.i32 offset) :: .reference (.address r) :: rest) m =
-      .ok (.next (pc + 1) (.reference (.address result) :: rest) frame m) := by
-  unfold step staticInstruction memoryInstruction
-  simp only [cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, CIL.offsetValue, referenceAt, converted, added, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-
 def body (profile : CIL.FeatureProfile) : CIL.Method := { profile := profile, returnsValue := true, locals := [.nullRef, .nullRef], localKinds := [.reference, .reference], parameterHomes := [], staticSites := [], code := [
   .arg 0,
   .memory .asRef,
@@ -103,33 +57,9 @@ theorem sse_run (profile : CIL.FeatureProfile) (program : CIL.Program) (index : 
   change frameLocals = _ at locals
   subst locals
   refine ⟨26, ?_⟩
-  refine (run_next found rfl (s_arg (by rfl) fl)).trans ?_
-  refine (run_next found rfl (s_asRef fl)).trans ?_
-  refine (run_next found rfl (s_asRef fl)).trans ?_
-  refine (run_next found rfl (s_setLocal rfl fl)).trans ?_
-  refine (run_next found rfl (s_arg (by rfl) fr)).trans ?_
-  refine (run_next found rfl (s_asRef fr)).trans ?_
-  refine (run_next found rfl (s_asRef fr)).trans ?_
-  refine (run_next found rfl (s_setLocal rfl fr)).trans ?_
-  refine (run_next found rfl (s_local rfl fl)).trans ?_
-  refine (run_next found rfl (s_load128 (hl 0))).trans ?_
-  refine (run_next found rfl (s_local rfl fr)).trans ?_
-  refine (run_next found rfl (s_load128 (hr 0))).trans ?_
-  refine (run_next found rfl (rfl)).trans ?_
-  refine (run_next found rfl (s_local rfl fl)).trans ?_
-  refine (run_next found rfl (rfl)).trans ?_
-  refine (run_next found rfl (s_add (by decide) (al 1))).trans ?_
-  refine (run_next found rfl (s_load128 (hl 1))).trans ?_
-  refine (run_next found rfl (s_local rfl fr)).trans ?_
-  refine (run_next found rfl (rfl)).trans ?_
-  refine (run_next found rfl (s_add (by decide) (ar 1))).trans ?_
-  refine (run_next found rfl (s_load128 (hr 1))).trans ?_
-  refine (run_next found rfl (rfl)).trans ?_
-  refine (run_next found rfl (rfl)).trans ?_
-  refine (run_next found rfl (rfl)).trans ?_
-  refine (run_next found rfl (rfl)).trans ?_
-  refine (run_return found rfl rfl rfl).trans ?_
-  simp [leaveFrame, CIL.NarrowKind.extend, ← difference]
+  cil_checked_steps [readOnlyArguments, fl, fr, hl, hr, al, ar, staticInstruction, memoryInstruction, formValue,
+    storeLocal, loadLocal, CIL.offsetValue, referenceAt]
+  simp [CIL.NarrowKind.extend, ← difference]
   split <;> rfl
 #print axioms sse_run
 end UInt256Proof.Equality.Safety

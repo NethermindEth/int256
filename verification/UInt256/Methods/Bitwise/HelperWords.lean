@@ -1,5 +1,6 @@
 import UInt256.Methods.Bitwise.ScalarSafetyContract
 import CIL.Safety.CallComposition
+import CIL.Safety.SymbolicExecution
 
 namespace UInt256Proof.Bitwise.Helper
 open CIL.Safety UInt256Model.Safety UInt256Model.Bitwise
@@ -28,45 +29,9 @@ theorem word_checked (operation : Binary) (profile : CIL.FeatureProfile)
     invoke program 10 index [.scalar (.i64 a), .scalar (.i64 b)] memory =
       .ok (memory, [.scalar (.i64 (wordOperation operation a b))]) := by
   cases operation
-  · simp only [wordOperation]
-    rw [← and_identity]
-    simp only [invoke, found]
-    change run program 10 index 0 [.scalar (.i64 a), .scalar (.i64 b)]
-      ⟨memory.nextIdentity, [], [], []⟩ [] memory = _
-    iterate 6
-      apply Eq.trans
-      · apply run_next found
-        · rfl
-        · rfl
-    rw [run]
-    simp only [found]
-    rfl
-  · simp only [wordOperation]
-    rw [← or_identity]
-    simp only [invoke, found]
-    change run program 10 index 0 [.scalar (.i64 a), .scalar (.i64 b)]
-      ⟨memory.nextIdentity, [], [], []⟩ [] memory = _
-    iterate 6
-      apply Eq.trans
-      · apply run_next found
-        · rfl
-        · rfl
-    rw [run]
-    simp only [found]
-    rfl
-  · simp only [wordOperation]
-    rw [← xor_identity]
-    simp only [invoke, found]
-    change run program 10 index 0 [.scalar (.i64 a), .scalar (.i64 b)]
-      ⟨memory.nextIdentity, [], [], []⟩ [] memory = _
-    iterate 8
-      apply Eq.trans
-      · apply run_next found
-        · rfl
-        · rfl
-    rw [run]
-    simp only [found]
-    rfl
+  · rw [wordOperation, ← and_identity]; cil_checked_steps
+  · rw [wordOperation, ← or_identity]; cil_checked_steps
+  · rw [wordOperation, ← xor_identity]; cil_checked_steps
 
 #print axioms word_checked
 

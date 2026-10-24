@@ -4,23 +4,11 @@ import UInt256.Safety.LimbAccess
 import CIL.Safety.StepComposition
 import UInt256.Methods.Equality.Lemmas
 import UInt256.Safety.ReadOnlyExecution
+import CIL.Safety.SymbolicExecution
 
 namespace UInt256Proof.Equality.ScalarLeaf
 
 open CIL.Safety UInt256Model.Safety
-
-private theorem step_arg_address {body : CIL.Method} {pc i : Nat} {args : List Value} {frame : Frame}
-    {stack : List Value} {m : Memory} {r : Reference}
-    (h : args[i]? = some (.reference (.address r))) (formed : form m r = .ok r) :
-    step body (.arg i) pc args frame stack m = .ok (.next (pc + 1) (.reference (.address r) :: stack) frame m) := by
-  simp only [cil_step, h, checkedValue, formValue, formed, checkedAt, Except.mapError, Bind.bind, Except.bind,
-    Pure.pure, Except.pure]
-
-private theorem step_fieldAt_of {body : CIL.Method} {pc offset width : Nat} {args : List Value} {frame : Frame}
-    {stack values : List Value} {m m' : Memory}
-    (h : instruction (.fieldAt offset width) stack m = .ok (m', values)) :
-    step body (.fieldAt offset width) pc args frame stack m = .ok (.next (pc + 1) values frame m') := by
-  simp only [cil_step, instructionStep, h, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 def body (profile : CIL.FeatureProfile) : CIL.Method := { profile := profile, returnsValue := true, locals := [], localKinds := [], parameterHomes := [], staticSites := [], code := [
   .arg 0,
@@ -69,36 +57,10 @@ theorem scalar_run (memory : Memory) (left right : Reference) (frame : Frame)
         [.scalar (.i32 (if scalarDifference memory left right = 0 then 1 else 0))]) := by
   have fl := call.input_formed (reference := left) (by simp)
   have fr := call.input_formed (reference := right) (by simp)
-  have hl := fun index rest => call.input_field_instruction (reference := left) (by simp) index rest
-  have hr := fun index rest => call.input_field_instruction (reference := right) (by simp) index rest
+  have hl := call.input_field_instruction (reference := left) (by simp)
+  have hr := call.input_field_instruction (reference := right) (by simp)
   refine ⟨28, ?_⟩
-  refine (run_next found rfl (step_arg_address (by rfl) fl)).trans ?_
-  refine (run_next found rfl (step_fieldAt_of (hl 0 _))).trans ?_
-  refine (run_next found rfl (step_arg_address (by rfl) fr)).trans ?_
-  refine (run_next found rfl (step_fieldAt_of (hr 0 _))).trans ?_
-  refine (run_next found rfl rfl).trans ?_
-  refine (run_next found rfl (step_arg_address (by rfl) fl)).trans ?_
-  refine (run_next found rfl (step_fieldAt_of (hl 1 _))).trans ?_
-  refine (run_next found rfl (step_arg_address (by rfl) fr)).trans ?_
-  refine (run_next found rfl (step_fieldAt_of (hr 1 _))).trans ?_
-  refine (run_next found rfl rfl).trans ?_
-  refine (run_next found rfl rfl).trans ?_
-  refine (run_next found rfl (step_arg_address (by rfl) fl)).trans ?_
-  refine (run_next found rfl (step_fieldAt_of (hl 2 _))).trans ?_
-  refine (run_next found rfl (step_arg_address (by rfl) fr)).trans ?_
-  refine (run_next found rfl (step_fieldAt_of (hr 2 _))).trans ?_
-  refine (run_next found rfl rfl).trans ?_
-  refine (run_next found rfl rfl).trans ?_
-  refine (run_next found rfl (step_arg_address (by rfl) fl)).trans ?_
-  refine (run_next found rfl (step_fieldAt_of (hl 3 _))).trans ?_
-  refine (run_next found rfl (step_arg_address (by rfl) fr)).trans ?_
-  refine (run_next found rfl (step_fieldAt_of (hr 3 _))).trans ?_
-  refine (run_next found rfl rfl).trans ?_
-  refine (run_next found rfl rfl).trans ?_
-  refine (run_next found rfl rfl).trans ?_
-  refine (run_next found rfl rfl).trans ?_
-  refine (run_next found rfl rfl).trans ?_
-  refine (run_return found rfl rfl rfl).trans ?_
+  cil_checked_steps [readOnlyArguments, fl, fr, hl, hr]
   simp [scalarDifference, CIL.NarrowKind.extend]
   split <;> rfl
 #print axioms scalar_run
