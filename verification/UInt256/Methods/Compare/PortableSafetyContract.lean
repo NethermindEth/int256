@@ -55,9 +55,9 @@ theorem portable_run (profile : CIL.FeatureProfile) (program : CIL.Program) (ind
   have fl := call.input_formed (reference := left) (by simp)
   have fr := call.input_formed (reference := right) (by simp)
   have hl := UInt256Proof.Equality.VectorPrimitive.load_input call (by simp : left ∈ [left, right])
-  have cl := UInt256Proof.Equality.VectorPrimitive.cast_input memory left
+  have cl := UInt256Proof.Equality.VectorPrimitive.bitcast_input memory left
   have hr := UInt256Proof.Equality.VectorPrimitive.load_input call (by simp : right ∈ [left, right])
-  have cr := UInt256Proof.Equality.VectorPrimitive.cast_input memory right
+  have cr := UInt256Proof.Equality.VectorPrimitive.bitcast_input memory right
   simp only [eqWord, ltWord, portableEqual, portableLess, x, y] at *
   clear eqWord ltWord x y
   generalize leftValue : inputValue memory left = leftBits at *

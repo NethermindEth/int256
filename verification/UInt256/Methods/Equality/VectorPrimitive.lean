@@ -21,14 +21,21 @@ theorem load_input {program : CIL.Program} {memory : Memory} {inputs outputs : L
   simp only [cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, dereference, ordinaryAccessAlignment, loaded, inputBytes, checkedAt, Except.mapError,
     Bind.bind, Except.bind, Pure.pure, Except.pure]
 
+theorem input_value (memory : Memory) (input : Reference) :
+    inputValue memory input = BitVec.ofNat 256 (byteNumber (inputBytes memory input)) := by
+  rw [inputBytes, byteNumber_snapshot (fun offset => (memory.cells input.allocation offset).bits) input.offset 32]
+  rfl
+
+theorem bitcast_input (memory : Memory) (input : Reference) :
+    bitcastValue (.aggregate 32) .vector256 (.aggregate (inputBytes memory input)) = .ok (.v256 (inputValue memory input)) := by
+  rw [input_value]
+  rfl
+
 theorem cast_input (memory : Memory) (input : Reference) (rest : List Value) :
     memoryInstruction (.bitcastValue (.aggregate 32) .vector256)
       (.scalar (.aggregate (inputBytes memory input)) :: rest) memory =
       .ok (memory, .scalar (.v256 (inputValue memory input)) :: rest) := by
-  have value : inputValue memory input = BitVec.ofNat 256 (byteNumber (inputBytes memory input)) := by
-    rw [inputBytes, byteNumber_snapshot (fun offset => (memory.cells input.allocation offset).bits) input.offset 32]
-    rfl
-  rw [value]
+  rw [input_value]
   rfl
 
 def body (narrow : Bool) (profile : CIL.FeatureProfile) : CIL.Method :=
@@ -60,13 +67,10 @@ theorem run64 (profile : CIL.FeatureProfile) (program : CIL.Program) (index : Na
         [.scalar (.i32 (if inputValue memory left = right.zeroExtend 256 then 1 else 0))]) := by
   have formed := call.input_formed (reference := left) (by simp)
   have loaded := load_input call (input := left) (by simp)
-  have casted := cast_input memory left
-  generalize valueEq : inputValue memory left = value at *
   refine ⟨10, ?_⟩
-  cil_checked_steps [scalarArguments, formed, loaded, casted, staticInstruction]
-  simp
-  split <;> rename_i h <;> simp [h, eq_comm]
-  exact Ne.symm h
+  cil_checked_steps [scalarArguments, formed, loaded, staticInstruction]
+  simp only [Function.comp_def, List.map_id', ← input_value]
+  split <;> split <;> simp_all
 
 #print axioms run64
 theorem run32 (profile : CIL.FeatureProfile) (program : CIL.Program) (index : Nat)
@@ -78,13 +82,10 @@ theorem run32 (profile : CIL.FeatureProfile) (program : CIL.Program) (index : Na
         [.scalar (.i32 (if inputValue memory left = right.zeroExtend 256 then 1 else 0))]) := by
   have formed := call.input_formed (reference := left) (by simp)
   have loaded := load_input call (input := left) (by simp)
-  have casted := cast_input memory left
-  generalize valueEq : inputValue memory left = value at *
   refine ⟨10, ?_⟩
-  cil_checked_steps [scalarArguments, formed, loaded, casted, staticInstruction]
-  simp
-  split <;> rename_i h <;> simp [h, eq_comm]
-  exact Ne.symm h
+  cil_checked_steps [scalarArguments, formed, loaded, staticInstruction]
+  simp only [Function.comp_def, List.map_id', ← input_value]
+  split <;> split <;> simp_all
 
 
 #print axioms run32

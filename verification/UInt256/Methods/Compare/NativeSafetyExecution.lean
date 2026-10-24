@@ -52,8 +52,9 @@ private theorem native_bitcast {body : CIL.Method} {pc : Nat} {args rest values 
     · unfold memoryInstruction at cast
       simp only [observed, ite_true] at cast
       cases cast
-  simp only [cil_step, known, staticInstruction, cast, Bool.false_eq_true, ite_false, Bind.bind, Except.bind,
-    Pure.pure, Except.pure]
+  rw [step_memory_eq]
+  simp only [known, staticInstruction, cast, Bool.false_eq_true, ite_false, Bind.bind, Except.bind, Pure.pure,
+    Except.pure]
 
 private theorem native_store0 {body : CIL.Method} {pc activation : Nat} {owned : List AllocationId}
     {arguments : List (Nat × LocalSlot)} {args rest : List Value} {value : Value} {memory updated : Memory}
