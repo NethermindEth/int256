@@ -42,13 +42,13 @@ theorem executed (profile : CIL.FeatureProfile) (program : CIL.Program) (index :
     · apply run_next found
       · simp only [body]; rfl
       · simp (config := { implicitDefEqProofs := false })
-          [body, step, readOnlyArguments, checkedValue, numericValue, formValue, fl, fr,
+          [body, step, cil_guard, observerCount, readOnlyArguments, checkedValue, numericValue, formValue, fl, fr,
             hl, hr, cl, cr, staticInstruction, checkedIntrinsic, pureArity, scalars,
             CIL.step.eq_def, CIL.Intrinsic.available, eval_xor, eval_zero, eval_equal,
             checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
         try exact ⟨rfl, rfl, rfl, rfl⟩
         done
-  simp [run, found, body, step, checkedValue, numericValue, CIL.NarrowKind.extend,
+  simp [run, found, body, step, cil_guard, observerCount, checkedValue, numericValue, CIL.NarrowKind.extend,
     Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   split <;> rfl
 
@@ -114,12 +114,12 @@ theorem executed (profile : CIL.FeatureProfile) (program : CIL.Program) (index c
   have returnTrace : run program 1 index 15 (readOnlyArguments [left, right]) frame
       [.scalar (.i32 (if inputValue memory left = inputValue memory right then 1 else 0))] memory =
       .ok (leaveFrame frame memory, [.scalar (.i32 (if inputValue memory left = inputValue memory right then 1 else 0))]) := by
-    split <;> simp [run, found, body, step, checkedValue, numericValue, CIL.NarrowKind.extend,
+    split <;> simp [run, found, body, step, cil_guard, observerCount, checkedValue, numericValue, CIL.NarrowKind.extend,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   have stepped : step (body profile callee) (.call callee 2) 14 (readOnlyArguments [left, right]) frame
       [.reference (.address right), .reference (.address left)] memory =
       .ok (.call callee (readOnlyArguments [left, right]) [] memory) := by
-    simp [step, readOnlyArguments, checkedValue, formValue, fl, fr, checkedAt,
+    simp [step, cil_guard, observerCount, readOnlyArguments, checkedValue, formValue, fl, fr, checkedAt,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   obtain ⟨fuel, tail⟩ := run_call_exists found (by rfl) stepped ⟨childFuel, child⟩ ⟨1, returnTrace⟩
   refine ⟨fuel + 4, ?_⟩
@@ -127,7 +127,7 @@ theorem executed (profile : CIL.FeatureProfile) (program : CIL.Program) (index c
     apply Eq.trans
     · apply run_next found
       · simp only [body]; rfl
-      · simp (config := { implicitDefEqProofs := false }) [body, step, readOnlyArguments, checkedValue, numericValue, formValue, fl, fr,
+      · simp (config := { implicitDefEqProofs := false }) [body, step, cil_guard, observerCount, readOnlyArguments, checkedValue, numericValue, formValue, fl, fr,
           pureArity, scalars, CIL.step.eq_def, CIL.truth, CIL.FeatureProfile.evaluate, vector,
           checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
         try exact ⟨rfl, rfl, rfl, rfl⟩
