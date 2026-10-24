@@ -64,7 +64,7 @@ theorem run64 (profile : CIL.FeatureProfile) (program : CIL.Program) (index : Na
   generalize valueEq : inputValue memory left = value at *
   refine ⟨10, ?_⟩
   cil_checked_steps [scalarArguments, formed, loaded, casted, staticInstruction]
-  simp [CIL.NarrowKind.extend]
+  simp
   split <;> rename_i h <;> simp [h, eq_comm]
   exact Ne.symm h
 
@@ -82,7 +82,7 @@ theorem run32 (profile : CIL.FeatureProfile) (program : CIL.Program) (index : Na
   generalize valueEq : inputValue memory left = value at *
   refine ⟨10, ?_⟩
   cil_checked_steps [scalarArguments, formed, loaded, casted, staticInstruction]
-  simp [CIL.NarrowKind.extend]
+  simp
   split <;> rename_i h <;> simp [h, eq_comm]
   exact Ne.symm h
 

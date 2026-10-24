@@ -61,7 +61,7 @@ theorem scalar_run (memory : Memory) (left right : Reference) (frame : Frame)
   have hr := call.input_field_instruction (reference := right) (by simp)
   refine ⟨28, ?_⟩
   cil_checked_steps [readOnlyArguments, fl, fr, hl, hr]
-  simp [scalarDifference, CIL.NarrowKind.extend]
+  simp [scalarDifference]
 #print axioms scalar_run
 
 end UInt256Proof.Equality.ScalarLeaf

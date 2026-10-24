@@ -49,10 +49,8 @@ theorem portable_run (profile : CIL.FeatureProfile) (program : CIL.Program) (ind
   have tail : run program 1 index 19 (readOnlyArguments [left, right]) frame
       [.scalar (.i32 (maskResult eqWord ltWord))] m2 =
       .ok (leaveFrame frame m2, [.scalar (.i32 (maskResult eqWord ltWord))]) := by
-    simp [run, found, returned, returns, step, cil_guard, observerCount, checkedValue, numericValue,
-      Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-    unfold maskResult
-    split <;> simp [CIL.NarrowKind.extend]
+    simp [run, found, returned, returns, step, cil_guard, observerCount, checkedValue, numericValue, maskResult,
+      CIL.NarrowKind.extend_ite_ofNat_one_zero, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   obtain ⟨tailFuel, tail⟩ := run_call_exists found fetched stepped ⟨8, mask_invoke profile program callee maskFound m2 eqWord ltWord⟩ ⟨1, tail⟩
   have fl := call.input_formed (reference := left) (by simp)
   have fr := call.input_formed (reference := right) (by simp)
