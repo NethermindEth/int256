@@ -16,12 +16,12 @@ this directory contains only UInt256 specifications and proofs.
 
 ## Verification scope
 
-The 244 registered method/profile gates in `manifests/gates.json` include all
+The 188 registered method/profile gates in `manifests/gates.json` include all
 87 scalar migration targets: addition/subtraction and their reporting variants,
 multiplication, bitwise operations, shifts, equality, and ordering. Accelerated
 gates currently cover vector bitwise operations and shifts, vector/SSE equality,
-AVX2/AVX512 ordering, all seven multiplication entries on each of
-the 14 multiplication feature profiles, and `Add`/`AddOverflow`/`Subtract`/`SubtractUnderflow`
+AVX2/AVX512 ordering, all seven multiplication entries on `arm64-advsimd`, `x64-v3`,
+`x64-v4`, `x64-v3-v128` and `x64-v4-v128`, and `Add`/`AddOverflow`/`Subtract`/`SubtractUnderflow`
 on `arm64-advsimd`, `x64-sse42`, `x64-v3` and `x64-v4`.
 Profiles follow the .NET 10 CoreCLR runtime groups (LeanCIL `docs/RUNTIME-PROFILES.md`); each method is gated
 on one profile per distinct reachable body. The ordering operators' Vector256-only path needs Vector256
