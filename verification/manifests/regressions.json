@@ -1,0 +1,19 @@
+{
+  "source": "Runners with profiles run once per profile; CI shards them by job, or by runner and profile when no job is named. Each sharded runner fails if this list differs from the profiles it supports.",
+  "runners": [
+    { "file": "EqualityRegression.cs", "profiles": ["scalar", "x64-v3", "x64-sse42"] },
+    {
+      "file": "SimdRegression.cs",
+      "profileOption": "--profile",
+      "profiles": ["scalar", "arm64-advsimd", "x64-sse42", "x64-v3", "x64-v4"]
+    },
+    { "file": "BitwiseRegression.cs", "profiles": ["scalar", "x64-v3"], "job": "bitwise-shift" },
+    { "file": "BitwisePositiveRegression.cs", "job": "bitwise-shift" },
+    { "file": "ShiftRegression.cs", "profiles": ["scalar", "x64-v3"], "job": "bitwise-shift" },
+    { "file": "ShiftPositiveRegression.cs", "job": "bitwise-shift" },
+    { "file": "CompareRegression.cs", "job": "compare-multiply" },
+    { "file": "MultiplyRegression.cs", "job": "compare-multiply" },
+    { "file": "AddSubtractRegression.cs", "job": "add-subtract-safety" },
+    { "file": "SafetyRegression.cs", "job": "add-subtract-safety" }
+  ]
+}

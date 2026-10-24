@@ -1,0 +1,40 @@
+import Extracted
+import UInt256.Safety.ContractRefutation
+namespace FixtureWitness
+open CIL.Safety UInt256Model.Safety
+set_option maxRecDepth 8192
+set_option maxHeartbeats 200000
+
+def memory : Memory := {
+  allocations := fun id => if id = 0 then some {kind := .callerStack, layout := {size := 160, alignment := 1}} else none
+  cells := fun id offset => ⟨if id = 0 ∧ @INITIAL@, true⟩
+  views := [⟨0, 0, 160, true, true⟩]
+  nextIdentity := 1
+}
+theorem wellFormed : memory.WellFormed := by
+  constructor
+  · intro id allocation present
+    by_cases h : id = 0
+    · subst id
+      simp [memory] at present
+      subst allocation
+      exact ⟨by decide, by simp [Allocation.WellFormed, nativeLimit]⟩
+    · simp [memory, h] at present
+  · simp [memory]
+theorem call : CallingConditions Extracted.program memory @INPUTS@ @OUTPUTS@ := by
+  refine ⟨⟨wellFormed, ?_, ?_⟩, ?_⟩
+  · intro input member
+    simp only [List.map_cons, List.map_nil, List.mem_cons, List.not_mem_nil, or_false] at member
+    @INPUT_CASES@
+  · intro output member
+    simp only [List.map_cons, List.map_nil, List.mem_cons, List.not_mem_nil, or_false] at member
+    @OUTPUT_CASE@
+  · change StaticWorldValid [] memory
+    exact empty_static_world_valid [] memory (by decide) (by decide) rfl
+theorem refuted : ¬ @CONTRACT@ @OPERATION@ Extracted.program 0 := by
+  apply UInt256Model.Safety.ContractRefutation.checked_binary_byte_refuted Extracted.program 0 1024 @OPERATION@
+    memory @REFERENCES@ @BYTE_INDEX@ @ACTUAL@ call
+  · rfl
+  · decide
+#print axioms refuted
+end FixtureWitness

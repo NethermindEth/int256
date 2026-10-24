@@ -1,0 +1,13 @@
+<Project>
+  <ItemGroup>
+    <EqualityCase Include="Baseline" Symbol="" />
+    <EqualityCase Include="Renamed" Symbol="RENAMED" />
+    <EqualityCase Include="EquivalentReduction" Symbol="EQUIVALENT_REDUCTION" />
+    <EqualityCase Include="WrongLane" Symbol="WRONG_LANE" />
+    <EqualityCase Include="WrongReduction" Symbol="WRONG_REDUCTION" />
+    <EqualityCase Include="WrongSignedEmbedding" Symbol="WRONG_SIGNED" />
+    <EqualityCase Include="WrongPolarity" Symbol="WRONG_POLARITY" />
+    <EqualityCase Include="WrongReceiver" Symbol="WRONG_RECEIVER" />
+    <EqualityCase Include="WrongSnapshot" Symbol="WRONG_SNAPSHOT" />
+  </ItemGroup>
+</Project>

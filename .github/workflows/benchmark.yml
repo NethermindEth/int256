@@ -16,7 +16,7 @@ on:
           - ubuntu-26.04-arm
           - both
       filter:
-        description: BenchmarkDotNet --filter glob. Keep the suite small — ARM runners have 4 vCPUs. (ToBigEndianAB is x86-only.)
+        description: BenchmarkDotNet --filter glob. Keep the suite small - ARM runners have 4 vCPUs. (ToBigEndianAB is x86-only.)
         default: '*ByteSwapBench*'
         type: string
       intrinsics:

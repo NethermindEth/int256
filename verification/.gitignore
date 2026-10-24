@@ -1,0 +1,6 @@
+.lake/
+artifacts/
+generated/
+**/bin/
+**/obj/
+__pycache__/
