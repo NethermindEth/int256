@@ -92,25 +92,13 @@ theorem shift_output_dispatch (whole : Fin 4) (memory : Memory) (frame : Frame)
         .ok (final, returned) ∧ post final returned := by
   have fits : localNumber .word32 (.i32 (BitVec.ofNat 32 whole.val)) = .ok whole.val := by
     simp [localNumber, CIL.Value.hasUnspecified, Nat.mod_eq_of_lt (show whole.val < 2^32 by omega)]
-  have load := fun (pc : Nat) (stack : List Value) => step_load_numeric_local
-    (body := (scalarBody profile direction storage)) (args := args) (pc := pc) (stack := stack)
-    .word32 (.i32 (BitVec.ofNat 32 whole.val)) whole.val fits slot loaded
+  have load := load_numeric_local .word32 (.i32 (BitVec.ofNat 32 whole.val)) whole.val fits loaded
   have cases : whole = 0 ∨ whole = 1 ∨ whole = 2 ∨ whole = 3 := by omega
   cases direction <;> rcases cases with rfl | rfl | rfl | rfl
   all_goals
     have found := bodyFound
     simp only [outputStart] at continuation
-    repeat'
-      first
-      | exact continuation
-      | apply run_next_exists post found (by rfl)
-        first
-        | exact load _ _
-        | rfl
-        | (simp (config := { implicitDefEqProofs := false })
-            [step, cil_guard, observerCount, checkedValue, numericValue, pureArity, scalars, CIL.step, CIL.binary,
-              Bind.bind, Except.bind, Pure.pure, Except.pure]
-           first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)
+    cil_contract_steps [slot, load] until continuation
 
 #print axioms shift_output_dispatch
 end UInt256Proof.Shift.Safety
