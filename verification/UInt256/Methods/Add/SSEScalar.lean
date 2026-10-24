@@ -137,20 +137,10 @@ theorem sse_scalar_frame_setup (profile : CIL.FeatureProfile) (vectorIndex small
       enterFrame (sseScalarBody profile vectorIndex smallIndex) args memory = .ok (frame, result) ∧
       WordHomes result memory.nextIdentity armScalarLocalSpecs frame.locals ∧
       MemoryBelow memory.nextIdentity memory result ∧ result.WellFormed := by
-  obtain ⟨slots, owned, result, made, homes⟩ := make_word_locals memory memory.nextIdentity armScalarLocalSpecs wellFormed
-  let frame : Frame := ⟨memory.nextIdentity, slots, owned, []⟩
   have metadata : (sseScalarBody profile vectorIndex smallIndex).localKinds = wordKinds armScalarLocalSpecs ∧
       (sseScalarBody profile vectorIndex smallIndex).locals = wordInitializers armScalarLocalSpecs := by
     simp [armScalarLocalSpecs, wordKinds, wordInitializers, sseScalarBody]
-  have entered : enterFrame (sseScalarBody profile vectorIndex smallIndex) args memory = .ok (frame, result) := by
-    unfold enterFrame
-    dsimp only
-    rw [metadata.1, metadata.2, show (sseScalarBody profile vectorIndex smallIndex).opaqueVectorLocals = [] from rfl,
-      makeSelectedLocals, List.isEmpty_nil, if_pos rfl, made]
-    simp only [Bind.bind, Except.bind, sseScalarBody, makeArgumentHomes, makeParameterHomes, Pure.pure, Except.pure, List.map_nil, List.append_nil]
-    rfl
-  exact ⟨frame, result, entered, homes, enterFrame_preserves_caller_memory _ _ _ _ _ entered,
-    enterFrame_preserves_wellFormed _ _ _ _ _ wellFormed entered⟩
+  exact word_frame_setup _ armScalarLocalSpecs metadata.1 metadata.2 (by rfl) (by rfl) (by rfl) memory args wellFormed
 
 /-- The disabled AdvSimd guard jumps straight to the portable small-operand tests. -/
 theorem sse_scalar_dispatch (program : CIL.Program) (method vectorIndex smallIndex : Nat) (profile : CIL.FeatureProfile) (found : program[method]? = some (sseScalarBody profile vectorIndex smallIndex)) (disabled : profile.advSimd = false)
@@ -159,13 +149,8 @@ theorem sse_scalar_dispatch (program : CIL.Program) (method vectorIndex smallInd
       run program fuel method 41 args frame [] memory = .ok (final, returned) ∧ post final returned) :
     ∃ fuel final returned,
       run program fuel method 0 args frame [] memory = .ok (final, returned) ∧ post final returned := by
-    repeat' first
-      | exact continuation
-      | (apply run_next_exists post found (by rfl)
-         simp (config := { implicitDefEqProofs := false })
-           [step, cil_guard, observerCount, sseScalarBody, disabled, pureArity, scalars, CIL.step.eq_def, CIL.truth, CIL.FeatureProfile.evaluate,
-             checkedValue, numericValue, Bind.bind, Except.bind, Pure.pure, Except.pure]
-         try (first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
+  have bodyProfile : (sseScalarBody profile vectorIndex smallIndex).profile = profile := rfl
+  cil_contract_steps [found, disabled, bodyProfile, CIL.FeatureProfile.evaluate] until continuation
 
 def sseSaveStart (swapped : Bool) : Nat := if swapped then 58 else 41
 

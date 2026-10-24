@@ -3,7 +3,7 @@ import UInt256.Methods.Add.ARMFlag
 import UInt256.Safety.Contract
 import UInt256.Safety.CallerSetup
 import UInt256.Methods.Add.ScalarReportingResult
-import CIL.Safety.WordHomes
+import CIL.Safety.WordFrameSetup
 import CIL.Safety.WordRoots
 import UInt256.Safety.LimbAccess
 set_option maxRecDepth 4096
@@ -206,18 +206,9 @@ theorem arm_scalar_frame_setup (profile : CIL.FeatureProfile) (vectorIndex small
     ∃ frame result,
       enterFrame (armScalarBody profile vectorIndex smallIndex) args memory = .ok (frame, result) ∧
       WordHomes result memory.nextIdentity armScalarLocalSpecs frame.locals ∧
-      MemoryBelow memory.nextIdentity memory result ∧ result.WellFormed := by
-  obtain ⟨slots, owned, result, made, homes⟩ := make_word_locals memory memory.nextIdentity armScalarLocalSpecs wellFormed
-  let frame : Frame := ⟨memory.nextIdentity, slots, owned, []⟩
-  have entered : enterFrame (armScalarBody profile vectorIndex smallIndex) args memory = .ok (frame, result) := by
-    unfold enterFrame
-    dsimp only
-    rw [(arm_scalar_local_metadata profile vectorIndex smallIndex).1, (arm_scalar_local_metadata profile vectorIndex smallIndex).2,
-      show (armScalarBody profile vectorIndex smallIndex).opaqueVectorLocals = [] from rfl, makeSelectedLocals, List.isEmpty_nil, if_pos rfl, made]
-    simp only [Bind.bind, Except.bind, armScalarBody, makeArgumentHomes, makeParameterHomes, Pure.pure, Except.pure, List.map_nil, List.append_nil]
-    rfl
-  exact ⟨frame, result, entered, homes, enterFrame_preserves_caller_memory _ _ _ _ _ entered,
-    enterFrame_preserves_wellFormed _ _ _ _ _ wellFormed entered⟩
+      MemoryBelow memory.nextIdentity memory result ∧ result.WellFormed :=
+  word_frame_setup _ armScalarLocalSpecs (arm_scalar_local_metadata profile vectorIndex smallIndex).1
+    (arm_scalar_local_metadata profile vectorIndex smallIndex).2 (by rfl) (by rfl) (by rfl) memory args wellFormed
 
 #print axioms arm_scalar_local_metadata
 #print axioms arm_scalar_frame_setup
@@ -237,13 +228,8 @@ theorem arm_scalar_dispatch (program : CIL.Program) (method vectorIndex smallInd
       run program fuel method 2 args frame [] memory = .ok (final, returned) ∧ post final returned) :
     ∃ fuel final returned,
       run program fuel method 0 args frame [] memory = .ok (final, returned) ∧ post final returned := by
-    repeat' first
-      | exact continuation
-      | (apply run_next_exists post found (by rfl)
-         simp (config := { implicitDefEqProofs := false })
-           [step, cil_guard, observerCount, armScalarBody, enabled, pureArity, scalars, CIL.step.eq_def, CIL.truth, CIL.FeatureProfile.evaluate,
-             checkedValue, numericValue, Bind.bind, Except.bind, Pure.pure, Except.pure]
-         try (first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
+  have bodyProfile : (armScalarBody profile vectorIndex smallIndex).profile = profile := rfl
+  cil_contract_steps [found, enabled, bodyProfile, CIL.FeatureProfile.evaluate] until continuation
 
 /-- Both selected source-reference assignments update a tracked root, without changing caller memory or any numeric local home. -/
 theorem arm_scalar_save_source (program : CIL.Program) (method vectorIndex smallIndex : Nat) (profile : CIL.FeatureProfile) (found : program[method]? = some (armScalarBody profile vectorIndex smallIndex)) (enabled : profile.advSimd = true) (swapped : Bool) (memory : Memory) (frame : Frame)

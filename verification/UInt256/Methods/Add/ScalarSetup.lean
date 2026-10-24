@@ -1,5 +1,5 @@
 import UInt256.Methods.Add.Bindings
-import CIL.Safety.WordHomes
+import CIL.Safety.WordFrameSetup
 
 namespace UInt256Proof.Safety
 
@@ -23,18 +23,9 @@ theorem scalar_frame_setup (memory : Memory) (args : List Value) (wellFormed : m
     ∃ frame result,
       enterFrame Extracted.addScalarBody args memory = .ok (frame, result) ∧
       WordHomes result memory.nextIdentity scalarLocalSpecs frame.locals ∧
-      MemoryBelow memory.nextIdentity memory result ∧ result.WellFormed := by
-  obtain ⟨slots, owned, result, made, homes⟩ := make_word_locals memory memory.nextIdentity scalarLocalSpecs wellFormed
-  let frame : Frame := ⟨memory.nextIdentity, slots, owned, []⟩
-  have entered : enterFrame Extracted.addScalarBody args memory = .ok (frame, result) := by
-    unfold enterFrame
-    dsimp only
-    rw [scalar_local_metadata.1, scalar_local_metadata.2, show Extracted.addScalarBody.opaqueVectorLocals = [] from rfl,
-      makeSelectedLocals, List.isEmpty_nil, if_pos rfl, made]
-    simp only [Bind.bind, Except.bind, cil_code, makeArgumentHomes, makeParameterHomes, Pure.pure, Except.pure, List.map_nil, List.append_nil]
-    rfl
-  exact ⟨frame, result, entered, homes, enterFrame_preserves_caller_memory _ _ _ _ _ entered,
-    enterFrame_preserves_wellFormed _ _ _ _ _ wellFormed entered⟩
+      MemoryBelow memory.nextIdentity memory result ∧ result.WellFormed :=
+  word_frame_setup Extracted.addScalarBody scalarLocalSpecs scalar_local_metadata.1
+    scalar_local_metadata.2 (by simp only [cil_code]) (by simp only [cil_code]) (by rfl) memory args wellFormed
 
 #print axioms scalar_local_metadata
 #print axioms scalar_frame_setup
