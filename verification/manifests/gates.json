@@ -896,547 +896,211 @@
     },
     {
       "method": "Multiply",
-      "profile": "x64-bmi2",
+      "profile": "arm64-advsimd",
       "proof": "proofs/MultiplyProfile.lean",
       "theorem": "UInt256Proof.Multiply.profile_correctness"
     },
     {
       "method": "Multiply",
-      "profile": "arm64-armbase",
+      "profile": "x64-v3",
       "proof": "proofs/MultiplyProfile.lean",
       "theorem": "UInt256Proof.Multiply.profile_correctness"
     },
     {
       "method": "Multiply",
-      "profile": "x64-vector256",
+      "profile": "x64-v3-v128",
       "proof": "proofs/MultiplyProfile.lean",
       "theorem": "UInt256Proof.Multiply.profile_correctness"
     },
     {
       "method": "Multiply",
-      "profile": "arm64-armbase-vector256",
+      "profile": "x64-v4",
       "proof": "proofs/MultiplyProfile.lean",
       "theorem": "UInt256Proof.Multiply.profile_correctness"
     },
     {
       "method": "Multiply",
-      "profile": "x64-avx2-bmi2",
-      "proof": "proofs/MultiplyProfile.lean",
-      "theorem": "UInt256Proof.Multiply.profile_correctness"
-    },
-    {
-      "method": "Multiply",
-      "profile": "x64-avx2-bmi2-vector256",
-      "proof": "proofs/MultiplyProfile.lean",
-      "theorem": "UInt256Proof.Multiply.profile_correctness"
-    },
-    {
-      "method": "Multiply",
-      "profile": "x64-avx2-vector256",
-      "proof": "proofs/MultiplyProfile.lean",
-      "theorem": "UInt256Proof.Multiply.profile_correctness"
-    },
-    {
-      "method": "Multiply",
-      "profile": "x64-avx512dq",
-      "proof": "proofs/MultiplyProfile.lean",
-      "theorem": "UInt256Proof.Multiply.profile_correctness"
-    },
-    {
-      "method": "Multiply",
-      "profile": "x64-avx512dqvl",
-      "proof": "proofs/MultiplyProfile.lean",
-      "theorem": "UInt256Proof.Multiply.profile_correctness"
-    },
-    {
-      "method": "Multiply",
-      "profile": "x64-avx512dqvl-bmi2",
-      "proof": "proofs/MultiplyProfile.lean",
-      "theorem": "UInt256Proof.Multiply.profile_correctness"
-    },
-    {
-      "method": "Multiply",
-      "profile": "x64-avx512dqvl-bmi2-vector256",
-      "proof": "proofs/MultiplyProfile.lean",
-      "theorem": "UInt256Proof.Multiply.profile_correctness"
-    },
-    {
-      "method": "Multiply",
-      "profile": "x64-avx512dqvl-vector256",
-      "proof": "proofs/MultiplyProfile.lean",
-      "theorem": "UInt256Proof.Multiply.profile_correctness"
-    },
-    {
-      "method": "Multiply",
-      "profile": "x64-bmi2-vector256",
+      "profile": "x64-v4-v128",
       "proof": "proofs/MultiplyProfile.lean",
       "theorem": "UInt256Proof.Multiply.profile_correctness"
     },
     {
       "method": "MultiplyInstance",
-      "profile": "arm64-armbase",
+      "profile": "arm64-advsimd",
       "proof": "proofs/MultiplyInstanceProfile.lean",
       "theorem": "UInt256Proof.MultiplyInstance.profile_correctness"
     },
     {
       "method": "MultiplyInstance",
-      "profile": "arm64-armbase-vector256",
+      "profile": "x64-v3",
       "proof": "proofs/MultiplyInstanceProfile.lean",
       "theorem": "UInt256Proof.MultiplyInstance.profile_correctness"
     },
     {
       "method": "MultiplyInstance",
-      "profile": "x64-avx2-bmi2",
+      "profile": "x64-v3-v128",
       "proof": "proofs/MultiplyInstanceProfile.lean",
       "theorem": "UInt256Proof.MultiplyInstance.profile_correctness"
     },
     {
       "method": "MultiplyInstance",
-      "profile": "x64-avx2-bmi2-vector256",
+      "profile": "x64-v4",
       "proof": "proofs/MultiplyInstanceProfile.lean",
       "theorem": "UInt256Proof.MultiplyInstance.profile_correctness"
     },
     {
       "method": "MultiplyInstance",
-      "profile": "x64-avx2-vector256",
-      "proof": "proofs/MultiplyInstanceProfile.lean",
-      "theorem": "UInt256Proof.MultiplyInstance.profile_correctness"
-    },
-    {
-      "method": "MultiplyInstance",
-      "profile": "x64-avx512dq",
-      "proof": "proofs/MultiplyInstanceProfile.lean",
-      "theorem": "UInt256Proof.MultiplyInstance.profile_correctness"
-    },
-    {
-      "method": "MultiplyInstance",
-      "profile": "x64-avx512dqvl",
-      "proof": "proofs/MultiplyInstanceProfile.lean",
-      "theorem": "UInt256Proof.MultiplyInstance.profile_correctness"
-    },
-    {
-      "method": "MultiplyInstance",
-      "profile": "x64-avx512dqvl-bmi2",
-      "proof": "proofs/MultiplyInstanceProfile.lean",
-      "theorem": "UInt256Proof.MultiplyInstance.profile_correctness"
-    },
-    {
-      "method": "MultiplyInstance",
-      "profile": "x64-avx512dqvl-bmi2-vector256",
-      "proof": "proofs/MultiplyInstanceProfile.lean",
-      "theorem": "UInt256Proof.MultiplyInstance.profile_correctness"
-    },
-    {
-      "method": "MultiplyInstance",
-      "profile": "x64-avx512dqvl-vector256",
-      "proof": "proofs/MultiplyInstanceProfile.lean",
-      "theorem": "UInt256Proof.MultiplyInstance.profile_correctness"
-    },
-    {
-      "method": "MultiplyInstance",
-      "profile": "x64-bmi2",
-      "proof": "proofs/MultiplyInstanceProfile.lean",
-      "theorem": "UInt256Proof.MultiplyInstance.profile_correctness"
-    },
-    {
-      "method": "MultiplyInstance",
-      "profile": "x64-bmi2-vector256",
-      "proof": "proofs/MultiplyInstanceProfile.lean",
-      "theorem": "UInt256Proof.MultiplyInstance.profile_correctness"
-    },
-    {
-      "method": "MultiplyInstance",
-      "profile": "x64-vector256",
+      "profile": "x64-v4-v128",
       "proof": "proofs/MultiplyInstanceProfile.lean",
       "theorem": "UInt256Proof.MultiplyInstance.profile_correctness"
     },
     {
       "method": "OperatorMultiplyUInt256UInt256",
-      "profile": "arm64-armbase",
+      "profile": "arm64-advsimd",
       "proof": "proofs/OperatorMultiplyUInt256UInt256Profile.lean",
       "theorem": "UInt256Proof.OperatorMultiplyUInt256UInt256.profile_correctness"
     },
     {
       "method": "OperatorMultiplyUInt256UInt256",
-      "profile": "arm64-armbase-vector256",
+      "profile": "x64-v3",
       "proof": "proofs/OperatorMultiplyUInt256UInt256Profile.lean",
       "theorem": "UInt256Proof.OperatorMultiplyUInt256UInt256.profile_correctness"
     },
     {
       "method": "OperatorMultiplyUInt256UInt256",
-      "profile": "x64-avx2-bmi2",
+      "profile": "x64-v3-v128",
       "proof": "proofs/OperatorMultiplyUInt256UInt256Profile.lean",
       "theorem": "UInt256Proof.OperatorMultiplyUInt256UInt256.profile_correctness"
     },
     {
       "method": "OperatorMultiplyUInt256UInt256",
-      "profile": "x64-avx2-bmi2-vector256",
+      "profile": "x64-v4",
       "proof": "proofs/OperatorMultiplyUInt256UInt256Profile.lean",
       "theorem": "UInt256Proof.OperatorMultiplyUInt256UInt256.profile_correctness"
     },
     {
       "method": "OperatorMultiplyUInt256UInt256",
-      "profile": "x64-avx2-vector256",
-      "proof": "proofs/OperatorMultiplyUInt256UInt256Profile.lean",
-      "theorem": "UInt256Proof.OperatorMultiplyUInt256UInt256.profile_correctness"
-    },
-    {
-      "method": "OperatorMultiplyUInt256UInt256",
-      "profile": "x64-avx512dq",
-      "proof": "proofs/OperatorMultiplyUInt256UInt256Profile.lean",
-      "theorem": "UInt256Proof.OperatorMultiplyUInt256UInt256.profile_correctness"
-    },
-    {
-      "method": "OperatorMultiplyUInt256UInt256",
-      "profile": "x64-avx512dqvl",
-      "proof": "proofs/OperatorMultiplyUInt256UInt256Profile.lean",
-      "theorem": "UInt256Proof.OperatorMultiplyUInt256UInt256.profile_correctness"
-    },
-    {
-      "method": "OperatorMultiplyUInt256UInt256",
-      "profile": "x64-avx512dqvl-bmi2",
-      "proof": "proofs/OperatorMultiplyUInt256UInt256Profile.lean",
-      "theorem": "UInt256Proof.OperatorMultiplyUInt256UInt256.profile_correctness"
-    },
-    {
-      "method": "OperatorMultiplyUInt256UInt256",
-      "profile": "x64-avx512dqvl-bmi2-vector256",
-      "proof": "proofs/OperatorMultiplyUInt256UInt256Profile.lean",
-      "theorem": "UInt256Proof.OperatorMultiplyUInt256UInt256.profile_correctness"
-    },
-    {
-      "method": "OperatorMultiplyUInt256UInt256",
-      "profile": "x64-avx512dqvl-vector256",
-      "proof": "proofs/OperatorMultiplyUInt256UInt256Profile.lean",
-      "theorem": "UInt256Proof.OperatorMultiplyUInt256UInt256.profile_correctness"
-    },
-    {
-      "method": "OperatorMultiplyUInt256UInt256",
-      "profile": "x64-bmi2",
-      "proof": "proofs/OperatorMultiplyUInt256UInt256Profile.lean",
-      "theorem": "UInt256Proof.OperatorMultiplyUInt256UInt256.profile_correctness"
-    },
-    {
-      "method": "OperatorMultiplyUInt256UInt256",
-      "profile": "x64-bmi2-vector256",
-      "proof": "proofs/OperatorMultiplyUInt256UInt256Profile.lean",
-      "theorem": "UInt256Proof.OperatorMultiplyUInt256UInt256.profile_correctness"
-    },
-    {
-      "method": "OperatorMultiplyUInt256UInt256",
-      "profile": "x64-vector256",
+      "profile": "x64-v4-v128",
       "proof": "proofs/OperatorMultiplyUInt256UInt256Profile.lean",
       "theorem": "UInt256Proof.OperatorMultiplyUInt256UInt256.profile_correctness"
     },
     {
       "method": "OperatorMultiplyUInt256UInt32",
-      "profile": "arm64-armbase",
+      "profile": "arm64-advsimd",
       "proof": "proofs/OperatorMultiplyUInt256UInt32Profile.lean",
       "theorem": "UInt256Proof.OperatorMultiplyUInt256UInt32.profile_correctness"
     },
     {
       "method": "OperatorMultiplyUInt256UInt32",
-      "profile": "arm64-armbase-vector256",
+      "profile": "x64-v3",
       "proof": "proofs/OperatorMultiplyUInt256UInt32Profile.lean",
       "theorem": "UInt256Proof.OperatorMultiplyUInt256UInt32.profile_correctness"
     },
     {
       "method": "OperatorMultiplyUInt256UInt32",
-      "profile": "x64-avx2-bmi2",
+      "profile": "x64-v3-v128",
       "proof": "proofs/OperatorMultiplyUInt256UInt32Profile.lean",
       "theorem": "UInt256Proof.OperatorMultiplyUInt256UInt32.profile_correctness"
     },
     {
       "method": "OperatorMultiplyUInt256UInt32",
-      "profile": "x64-avx2-bmi2-vector256",
+      "profile": "x64-v4",
       "proof": "proofs/OperatorMultiplyUInt256UInt32Profile.lean",
       "theorem": "UInt256Proof.OperatorMultiplyUInt256UInt32.profile_correctness"
     },
     {
       "method": "OperatorMultiplyUInt256UInt32",
-      "profile": "x64-avx2-vector256",
-      "proof": "proofs/OperatorMultiplyUInt256UInt32Profile.lean",
-      "theorem": "UInt256Proof.OperatorMultiplyUInt256UInt32.profile_correctness"
-    },
-    {
-      "method": "OperatorMultiplyUInt256UInt32",
-      "profile": "x64-avx512dq",
-      "proof": "proofs/OperatorMultiplyUInt256UInt32Profile.lean",
-      "theorem": "UInt256Proof.OperatorMultiplyUInt256UInt32.profile_correctness"
-    },
-    {
-      "method": "OperatorMultiplyUInt256UInt32",
-      "profile": "x64-avx512dqvl",
-      "proof": "proofs/OperatorMultiplyUInt256UInt32Profile.lean",
-      "theorem": "UInt256Proof.OperatorMultiplyUInt256UInt32.profile_correctness"
-    },
-    {
-      "method": "OperatorMultiplyUInt256UInt32",
-      "profile": "x64-avx512dqvl-bmi2",
-      "proof": "proofs/OperatorMultiplyUInt256UInt32Profile.lean",
-      "theorem": "UInt256Proof.OperatorMultiplyUInt256UInt32.profile_correctness"
-    },
-    {
-      "method": "OperatorMultiplyUInt256UInt32",
-      "profile": "x64-avx512dqvl-bmi2-vector256",
-      "proof": "proofs/OperatorMultiplyUInt256UInt32Profile.lean",
-      "theorem": "UInt256Proof.OperatorMultiplyUInt256UInt32.profile_correctness"
-    },
-    {
-      "method": "OperatorMultiplyUInt256UInt32",
-      "profile": "x64-avx512dqvl-vector256",
-      "proof": "proofs/OperatorMultiplyUInt256UInt32Profile.lean",
-      "theorem": "UInt256Proof.OperatorMultiplyUInt256UInt32.profile_correctness"
-    },
-    {
-      "method": "OperatorMultiplyUInt256UInt32",
-      "profile": "x64-bmi2",
-      "proof": "proofs/OperatorMultiplyUInt256UInt32Profile.lean",
-      "theorem": "UInt256Proof.OperatorMultiplyUInt256UInt32.profile_correctness"
-    },
-    {
-      "method": "OperatorMultiplyUInt256UInt32",
-      "profile": "x64-bmi2-vector256",
-      "proof": "proofs/OperatorMultiplyUInt256UInt32Profile.lean",
-      "theorem": "UInt256Proof.OperatorMultiplyUInt256UInt32.profile_correctness"
-    },
-    {
-      "method": "OperatorMultiplyUInt256UInt32",
-      "profile": "x64-vector256",
+      "profile": "x64-v4-v128",
       "proof": "proofs/OperatorMultiplyUInt256UInt32Profile.lean",
       "theorem": "UInt256Proof.OperatorMultiplyUInt256UInt32.profile_correctness"
     },
     {
       "method": "OperatorMultiplyUInt256UInt64",
-      "profile": "arm64-armbase",
+      "profile": "arm64-advsimd",
       "proof": "proofs/OperatorMultiplyUInt256UInt64Profile.lean",
       "theorem": "UInt256Proof.OperatorMultiplyUInt256UInt64.profile_correctness"
     },
     {
       "method": "OperatorMultiplyUInt256UInt64",
-      "profile": "arm64-armbase-vector256",
+      "profile": "x64-v3",
       "proof": "proofs/OperatorMultiplyUInt256UInt64Profile.lean",
       "theorem": "UInt256Proof.OperatorMultiplyUInt256UInt64.profile_correctness"
     },
     {
       "method": "OperatorMultiplyUInt256UInt64",
-      "profile": "x64-avx2-bmi2",
+      "profile": "x64-v3-v128",
       "proof": "proofs/OperatorMultiplyUInt256UInt64Profile.lean",
       "theorem": "UInt256Proof.OperatorMultiplyUInt256UInt64.profile_correctness"
     },
     {
       "method": "OperatorMultiplyUInt256UInt64",
-      "profile": "x64-avx2-bmi2-vector256",
+      "profile": "x64-v4",
       "proof": "proofs/OperatorMultiplyUInt256UInt64Profile.lean",
       "theorem": "UInt256Proof.OperatorMultiplyUInt256UInt64.profile_correctness"
     },
     {
       "method": "OperatorMultiplyUInt256UInt64",
-      "profile": "x64-avx2-vector256",
-      "proof": "proofs/OperatorMultiplyUInt256UInt64Profile.lean",
-      "theorem": "UInt256Proof.OperatorMultiplyUInt256UInt64.profile_correctness"
-    },
-    {
-      "method": "OperatorMultiplyUInt256UInt64",
-      "profile": "x64-avx512dq",
-      "proof": "proofs/OperatorMultiplyUInt256UInt64Profile.lean",
-      "theorem": "UInt256Proof.OperatorMultiplyUInt256UInt64.profile_correctness"
-    },
-    {
-      "method": "OperatorMultiplyUInt256UInt64",
-      "profile": "x64-avx512dqvl",
-      "proof": "proofs/OperatorMultiplyUInt256UInt64Profile.lean",
-      "theorem": "UInt256Proof.OperatorMultiplyUInt256UInt64.profile_correctness"
-    },
-    {
-      "method": "OperatorMultiplyUInt256UInt64",
-      "profile": "x64-avx512dqvl-bmi2",
-      "proof": "proofs/OperatorMultiplyUInt256UInt64Profile.lean",
-      "theorem": "UInt256Proof.OperatorMultiplyUInt256UInt64.profile_correctness"
-    },
-    {
-      "method": "OperatorMultiplyUInt256UInt64",
-      "profile": "x64-avx512dqvl-bmi2-vector256",
-      "proof": "proofs/OperatorMultiplyUInt256UInt64Profile.lean",
-      "theorem": "UInt256Proof.OperatorMultiplyUInt256UInt64.profile_correctness"
-    },
-    {
-      "method": "OperatorMultiplyUInt256UInt64",
-      "profile": "x64-avx512dqvl-vector256",
-      "proof": "proofs/OperatorMultiplyUInt256UInt64Profile.lean",
-      "theorem": "UInt256Proof.OperatorMultiplyUInt256UInt64.profile_correctness"
-    },
-    {
-      "method": "OperatorMultiplyUInt256UInt64",
-      "profile": "x64-bmi2",
-      "proof": "proofs/OperatorMultiplyUInt256UInt64Profile.lean",
-      "theorem": "UInt256Proof.OperatorMultiplyUInt256UInt64.profile_correctness"
-    },
-    {
-      "method": "OperatorMultiplyUInt256UInt64",
-      "profile": "x64-bmi2-vector256",
-      "proof": "proofs/OperatorMultiplyUInt256UInt64Profile.lean",
-      "theorem": "UInt256Proof.OperatorMultiplyUInt256UInt64.profile_correctness"
-    },
-    {
-      "method": "OperatorMultiplyUInt256UInt64",
-      "profile": "x64-vector256",
+      "profile": "x64-v4-v128",
       "proof": "proofs/OperatorMultiplyUInt256UInt64Profile.lean",
       "theorem": "UInt256Proof.OperatorMultiplyUInt256UInt64.profile_correctness"
     },
     {
       "method": "OperatorMultiplyUInt32UInt256",
-      "profile": "arm64-armbase",
+      "profile": "arm64-advsimd",
       "proof": "proofs/OperatorMultiplyUInt32UInt256Profile.lean",
       "theorem": "UInt256Proof.OperatorMultiplyUInt32UInt256.profile_correctness"
     },
     {
       "method": "OperatorMultiplyUInt32UInt256",
-      "profile": "arm64-armbase-vector256",
+      "profile": "x64-v3",
       "proof": "proofs/OperatorMultiplyUInt32UInt256Profile.lean",
       "theorem": "UInt256Proof.OperatorMultiplyUInt32UInt256.profile_correctness"
     },
     {
       "method": "OperatorMultiplyUInt32UInt256",
-      "profile": "x64-avx2-bmi2",
+      "profile": "x64-v3-v128",
       "proof": "proofs/OperatorMultiplyUInt32UInt256Profile.lean",
       "theorem": "UInt256Proof.OperatorMultiplyUInt32UInt256.profile_correctness"
     },
     {
       "method": "OperatorMultiplyUInt32UInt256",
-      "profile": "x64-avx2-bmi2-vector256",
+      "profile": "x64-v4",
       "proof": "proofs/OperatorMultiplyUInt32UInt256Profile.lean",
       "theorem": "UInt256Proof.OperatorMultiplyUInt32UInt256.profile_correctness"
     },
     {
       "method": "OperatorMultiplyUInt32UInt256",
-      "profile": "x64-avx2-vector256",
-      "proof": "proofs/OperatorMultiplyUInt32UInt256Profile.lean",
-      "theorem": "UInt256Proof.OperatorMultiplyUInt32UInt256.profile_correctness"
-    },
-    {
-      "method": "OperatorMultiplyUInt32UInt256",
-      "profile": "x64-avx512dq",
-      "proof": "proofs/OperatorMultiplyUInt32UInt256Profile.lean",
-      "theorem": "UInt256Proof.OperatorMultiplyUInt32UInt256.profile_correctness"
-    },
-    {
-      "method": "OperatorMultiplyUInt32UInt256",
-      "profile": "x64-avx512dqvl",
-      "proof": "proofs/OperatorMultiplyUInt32UInt256Profile.lean",
-      "theorem": "UInt256Proof.OperatorMultiplyUInt32UInt256.profile_correctness"
-    },
-    {
-      "method": "OperatorMultiplyUInt32UInt256",
-      "profile": "x64-avx512dqvl-bmi2",
-      "proof": "proofs/OperatorMultiplyUInt32UInt256Profile.lean",
-      "theorem": "UInt256Proof.OperatorMultiplyUInt32UInt256.profile_correctness"
-    },
-    {
-      "method": "OperatorMultiplyUInt32UInt256",
-      "profile": "x64-avx512dqvl-bmi2-vector256",
-      "proof": "proofs/OperatorMultiplyUInt32UInt256Profile.lean",
-      "theorem": "UInt256Proof.OperatorMultiplyUInt32UInt256.profile_correctness"
-    },
-    {
-      "method": "OperatorMultiplyUInt32UInt256",
-      "profile": "x64-avx512dqvl-vector256",
-      "proof": "proofs/OperatorMultiplyUInt32UInt256Profile.lean",
-      "theorem": "UInt256Proof.OperatorMultiplyUInt32UInt256.profile_correctness"
-    },
-    {
-      "method": "OperatorMultiplyUInt32UInt256",
-      "profile": "x64-bmi2",
-      "proof": "proofs/OperatorMultiplyUInt32UInt256Profile.lean",
-      "theorem": "UInt256Proof.OperatorMultiplyUInt32UInt256.profile_correctness"
-    },
-    {
-      "method": "OperatorMultiplyUInt32UInt256",
-      "profile": "x64-bmi2-vector256",
-      "proof": "proofs/OperatorMultiplyUInt32UInt256Profile.lean",
-      "theorem": "UInt256Proof.OperatorMultiplyUInt32UInt256.profile_correctness"
-    },
-    {
-      "method": "OperatorMultiplyUInt32UInt256",
-      "profile": "x64-vector256",
+      "profile": "x64-v4-v128",
       "proof": "proofs/OperatorMultiplyUInt32UInt256Profile.lean",
       "theorem": "UInt256Proof.OperatorMultiplyUInt32UInt256.profile_correctness"
     },
     {
       "method": "OperatorMultiplyUInt64UInt256",
-      "profile": "arm64-armbase",
+      "profile": "arm64-advsimd",
       "proof": "proofs/OperatorMultiplyUInt64UInt256Profile.lean",
       "theorem": "UInt256Proof.OperatorMultiplyUInt64UInt256.profile_correctness"
     },
     {
       "method": "OperatorMultiplyUInt64UInt256",
-      "profile": "arm64-armbase-vector256",
+      "profile": "x64-v3",
       "proof": "proofs/OperatorMultiplyUInt64UInt256Profile.lean",
       "theorem": "UInt256Proof.OperatorMultiplyUInt64UInt256.profile_correctness"
     },
     {
       "method": "OperatorMultiplyUInt64UInt256",
-      "profile": "x64-avx2-bmi2",
+      "profile": "x64-v3-v128",
       "proof": "proofs/OperatorMultiplyUInt64UInt256Profile.lean",
       "theorem": "UInt256Proof.OperatorMultiplyUInt64UInt256.profile_correctness"
     },
     {
       "method": "OperatorMultiplyUInt64UInt256",
-      "profile": "x64-avx2-bmi2-vector256",
+      "profile": "x64-v4",
       "proof": "proofs/OperatorMultiplyUInt64UInt256Profile.lean",
       "theorem": "UInt256Proof.OperatorMultiplyUInt64UInt256.profile_correctness"
     },
     {
       "method": "OperatorMultiplyUInt64UInt256",
-      "profile": "x64-avx2-vector256",
-      "proof": "proofs/OperatorMultiplyUInt64UInt256Profile.lean",
-      "theorem": "UInt256Proof.OperatorMultiplyUInt64UInt256.profile_correctness"
-    },
-    {
-      "method": "OperatorMultiplyUInt64UInt256",
-      "profile": "x64-avx512dq",
-      "proof": "proofs/OperatorMultiplyUInt64UInt256Profile.lean",
-      "theorem": "UInt256Proof.OperatorMultiplyUInt64UInt256.profile_correctness"
-    },
-    {
-      "method": "OperatorMultiplyUInt64UInt256",
-      "profile": "x64-avx512dqvl",
-      "proof": "proofs/OperatorMultiplyUInt64UInt256Profile.lean",
-      "theorem": "UInt256Proof.OperatorMultiplyUInt64UInt256.profile_correctness"
-    },
-    {
-      "method": "OperatorMultiplyUInt64UInt256",
-      "profile": "x64-avx512dqvl-bmi2",
-      "proof": "proofs/OperatorMultiplyUInt64UInt256Profile.lean",
-      "theorem": "UInt256Proof.OperatorMultiplyUInt64UInt256.profile_correctness"
-    },
-    {
-      "method": "OperatorMultiplyUInt64UInt256",
-      "profile": "x64-avx512dqvl-bmi2-vector256",
-      "proof": "proofs/OperatorMultiplyUInt64UInt256Profile.lean",
-      "theorem": "UInt256Proof.OperatorMultiplyUInt64UInt256.profile_correctness"
-    },
-    {
-      "method": "OperatorMultiplyUInt64UInt256",
-      "profile": "x64-avx512dqvl-vector256",
-      "proof": "proofs/OperatorMultiplyUInt64UInt256Profile.lean",
-      "theorem": "UInt256Proof.OperatorMultiplyUInt64UInt256.profile_correctness"
-    },
-    {
-      "method": "OperatorMultiplyUInt64UInt256",
-      "profile": "x64-bmi2",
-      "proof": "proofs/OperatorMultiplyUInt64UInt256Profile.lean",
-      "theorem": "UInt256Proof.OperatorMultiplyUInt64UInt256.profile_correctness"
-    },
-    {
-      "method": "OperatorMultiplyUInt64UInt256",
-      "profile": "x64-bmi2-vector256",
-      "proof": "proofs/OperatorMultiplyUInt64UInt256Profile.lean",
-      "theorem": "UInt256Proof.OperatorMultiplyUInt64UInt256.profile_correctness"
-    },
-    {
-      "method": "OperatorMultiplyUInt64UInt256",
-      "profile": "x64-vector256",
+      "profile": "x64-v4-v128",
       "proof": "proofs/OperatorMultiplyUInt64UInt256Profile.lean",
       "theorem": "UInt256Proof.OperatorMultiplyUInt64UInt256.profile_correctness"
     },

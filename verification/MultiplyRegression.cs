@@ -60,8 +60,9 @@ foreach (JsonNode? package in packages)
 List<(string Fixture, string Profile, string Extraction, string Proof, string Theorem, bool Negative)> jobs = [];
 foreach (string fixture in new[] { "Baseline", "AlternativeOrder", "WrongCarry", "WrongCrossProduct", "WrongHighLow", "WrongAliasing", "WrongBmiHigh" })
 {
-    string profile = fixture == "WrongBmiHigh" ? "x64-bmi2" : "scalar";
-    string profileArgument = profile == "scalar" ? profile : "@" + Path.Combine(root, "manifests/profiles", profile + ".json");
+    string profile = fixture == "WrongBmiHigh" ? "x64-v3" : "scalar";
+    string profileArgument = File.Exists(Path.Combine(root, "manifests/profiles", profile + ".json"))
+        ? "@" + Path.Combine(root, "manifests/profiles", profile + ".json") : profile;
     string build = Path.Combine(work, "build", fixture);
     string intermediate = Path.Combine(build, "obj") + Path.DirectorySeparatorChar;
     await Run("dotnet", ["build", Path.Combine(fixtures, "Nethermind.Int256.csproj"), "-c", "Release", "-p:FixtureCase=" + fixture,
