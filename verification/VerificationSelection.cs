@@ -27,7 +27,7 @@ internal static class VerificationSelection
             selected, Partition(root, selected, imports));
     }
 
-    internal const int Jobs = 32;
+    internal const int Jobs = 8;
 
     // Every job builds the shared support once, so fewer, balanced jobs beat one job per gate.
     // Each profile in a job is its own batch session, so only profiles heavier than a job are split.

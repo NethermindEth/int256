@@ -10,6 +10,10 @@ permissions:
   contents: read
   actions: read
 
+concurrency:
+  group: uint256-verification-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   select:
     name: Select verification gates
@@ -135,7 +139,7 @@ jobs:
       LEANCIL_EXPORT_CONSUMER_SUPPORT: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && format('{0}/verification/artifacts/consumer-support-export', github.workspace) || '' }}
     strategy:
       fail-fast: false
-      max-parallel: 32
+      max-parallel: 4
       matrix: ${{ fromJSON(needs.select.outputs.matrix) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -225,6 +229,7 @@ jobs:
       LEANCIL_SUITE: regressions-${{ matrix.id }}
     strategy:
       fail-fast: false
+      max-parallel: 2
       # Generated from manifests/regressions.json, which each sharded runner checks against its profiles.
       matrix: ${{ fromJSON(needs.select.outputs.regressions) }}
     steps:

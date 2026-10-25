@@ -98,8 +98,12 @@ changes skip the expensive jobs; the stable `Verify UInt256` check still runs
 and requires every selected check to pass. CI builds and kernel-checks the shared
 LeanCIL library once per run; certificate jobs validate the producer's manifest
 digest before reusing it. Consumer proof checks remain separate for every gate.
-Gates are divided into at most 32 jobs, all running concurrently; each job pays
-the shared support build once, which costs about a minute. `VerificationSelection.cs`
+Gates are divided into at most eight jobs, with four running concurrently. Regression
+suites run two at once; the separate contract audit can use one more runner. Larger
+batches share proof support across more gates. Future commits cancel obsolete verification
+runs for the same PR. These limits preserve all checks and bound runner use; they do not
+establish an end-to-end speedup. Each job pays the shared support build once.
+`VerificationSelection.cs`
 balances jobs by the measured serial seconds per gate in `manifests/gate-seconds.json`
 (module counts did not predict them; an unsampled gate takes its method's median) and
 splits a profile only when it outweighs a job. Each job builds the extractor and
