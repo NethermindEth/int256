@@ -1,7 +1,7 @@
 # UInt256 verification with LeanCIL
 
 This directory consumes LeanCIL at
-`e3126d4b6abd651ea9afd380c5f84df8d9399d14` through the pinned Lake dependency.
+`f4c1cd6b9c2e9e29f7a21a066b746b73a0a0503d` through the pinned Lake dependency.
 CIL semantics, extraction, and verification infrastructure belong to LeanCIL;
 this directory contains only UInt256 specifications and proofs.
 
@@ -9,7 +9,7 @@ Explicit initial frames use named fields with `stackBytes := 0`; helper lemmas
 over existing frames preserve the counter. Unknown numeric-local setup supplies
 the checked non-span and non-array premises. Arithmetic, overlap, termination
 and caller-memory contracts retain their statements. See LeanCIL's
-[consumer migration guide](https://github.com/NethermindEth/LeanCIL/blob/e3126d4b6abd651ea9afd380c5f84df8d9399d14/docs/CONSUMER-MIGRATION.md)
+[consumer migration guide](https://github.com/NethermindEth/LeanCIL/blob/f4c1cd6b9c2e9e29f7a21a066b746b73a0a0503d/docs/CONSUMER-MIGRATION.md)
 for the frame and instruction API changes.
 
 Profile-parametric comparison proofs use `ProfileAgreement.of_flags`, with a
