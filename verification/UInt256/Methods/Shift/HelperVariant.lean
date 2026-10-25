@@ -20,7 +20,12 @@ theorem count_invoke (profile : CIL.FeatureProfile) (program : CIL.Program) (ind
     (found : program[index]? = some (countBody profile)) (memory : Memory) (count : BitVec 32) :
     invoke program 4 index [.scalar (.i32 count)] memory =
       .ok (memory, [.scalar (.i32 (count.sshiftRight 6))]) := by
-  let frame : Frame := ⟨memory.nextIdentity, [], [], []⟩
+  let frame : Frame := {
+        activation := memory.nextIdentity
+        locals := []
+        owned := []
+        arguments := []
+        stackBytes := 0 }
   have checked : ([.scalar (.i32 count)] : List Value).mapM (checkedValue memory) = .ok [.scalar (.i32 count)] := rfl
   have setup : enterFrame (countBody profile) [.scalar (.i32 count)] memory = .ok (frame, memory) := rfl
   apply invoke_of_run found checked setup

@@ -85,7 +85,12 @@ theorem native_setup (profile : CIL.FeatureProfile) (usesLess inclusive : Bool) 
       MemoryBelow memory.nextIdentity memory entered := by
   obtain ⟨slots, owned, entered, made, homes⟩ :=
     make_numeric_locals memory memory.nextIdentity nativeSpecs call.1.1
-  let frame : Frame := ⟨memory.nextIdentity, slots, owned, []⟩
+  let frame : Frame := {
+        activation := memory.nextIdentity
+        locals := slots
+        owned := owned
+        arguments := []
+        stackBytes := 0 }
   have kinds : (nativeBody profile usesLess inclusive).localKinds = numericKinds nativeSpecs := by cases inclusive <;> rfl
   have values : (nativeBody profile usesLess inclusive).locals = numericInitializers nativeSpecs := by cases inclusive <;> rfl
   have aggregates : (nativeBody profile usesLess inclusive).vectorArgs = [] := by cases inclusive <;> rfl

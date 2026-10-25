@@ -20,7 +20,12 @@ theorem checked (equal : BitVec 256 → BitVec 256 → Bool)
       InvocationCertificate program entry (readOnlyArguments [left, right]) memory fuel final
         [.scalar (.i32 (if equal (inputValue memory left) (inputValue memory right) != negate then 1 else 0))] ∧
       ∀ id, id < memory.nextIdentity → ∀ offset, final.cells id offset = memory.cells id offset := by
-  let frame : Frame := ⟨memory.nextIdentity, [], [], []⟩
+  let frame : Frame := {
+        activation := memory.nextIdentity
+        locals := []
+        owned := []
+        arguments := []
+        stackBytes := 0 }
   have setup : enterFrame (body profile negate callee) (readOnlyArguments [left, right]) memory =
       .ok (frame, memory) := by
     simp [enterFrame, body, PrimitiveOperator.body, makeSelectedLocals, makeLocals, makeArgumentHomes, makeParameterHomes, frame,

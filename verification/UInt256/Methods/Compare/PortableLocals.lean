@@ -38,7 +38,12 @@ theorem portable_setup (profile : CIL.FeatureProfile) (callee : Nat) (program : 
       MemoryBelow memory.nextIdentity memory entered := by
   obtain ⟨slots, owned, entered, made, homes⟩ :=
     make_numeric_locals memory memory.nextIdentity portableSpecs call.1.1
-  let frame : Frame := ⟨memory.nextIdentity, slots, owned, []⟩
+  let frame : Frame := {
+        activation := memory.nextIdentity
+        locals := slots
+        owned := owned
+        arguments := []
+        stackBytes := 0 }
   have kinds : (portableBody profile callee).localKinds = numericKinds portableSpecs := by rfl
   have values : (portableBody profile callee).locals = numericInitializers portableSpecs := by rfl
   have aggregates : (portableBody profile callee).vectorArgs = [] := by rfl

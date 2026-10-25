@@ -77,7 +77,12 @@ theorem leaf_result (profile : CIL.FeatureProfile)
       read final output 32 1 = .ok (numberBytes ((~~~·) (inputValue memory input)).toNat 32) ∧
       access final output 32 1 true = .ok () ∧
       ∀ id offset, OutsideOutput output id offset → final.cells id offset = memory.cells id offset := by
-  let frame : Frame := ⟨memory.nextIdentity, [], [], []⟩
+  let frame : Frame := {
+        activation := memory.nextIdentity
+        locals := []
+        owned := []
+        arguments := []
+        stackBytes := 0 }
   obtain ⟨final, run, loaded, writable, outside⟩ := run_leaf profile program index found memory input output frame call
   have setup : enterFrame (body profile) (unaryArguments input output) memory = .ok (frame, memory) := rfl
   have checked : (unaryArguments input output).mapM (checkedValue memory) = .ok (unaryArguments input output) := by
@@ -117,7 +122,12 @@ theorem entry_result (profile : CIL.FeatureProfile) (enabled : profile.vector256
       read final output 32 1 = .ok (numberBytes ((~~~·) (inputValue memory input)).toNat 32) ∧
       access final output 32 1 true = .ok () ∧
       ∀ id offset, OutsideOutput output id offset → final.cells id offset = memory.cells id offset := by
-  let frame : Frame := ⟨memory.nextIdentity, [], [], []⟩
+  let frame : Frame := {
+        activation := memory.nextIdentity
+        locals := []
+        owned := []
+        arguments := []
+        stackBytes := 0 }
   obtain ⟨final, child, loaded, writable, outside⟩ := leaf_result profile program callee childFound memory input output call
   have checked : (unaryArguments input output).mapM (checkedValue memory) = .ok (unaryArguments input output) := by
     simp [unaryArguments, checkedValue, formValue, call.input_formed (by simp : input ∈ [input]),

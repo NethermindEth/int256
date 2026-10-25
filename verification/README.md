@@ -1,18 +1,16 @@
 # UInt256 verification with LeanCIL
 
-This migration starts from `verification/uint256-memory-safety`
-(`6c56716afa7860771c08815b8348e53313c7f8c8`), based on int256 `main`
-(`5fa8d77429c0440754bbfc851788d1ae37aba07f`). It consumes LeanCIL at
-`17f489a95f19773ddd9c9b07e3352797401c7240` through a pinned Lake dependency
-([ReadOnlySpan<byte> lookup tables](https://github.com/NethermindEth/LeanCIL/pull/55),
-[lockstep evidence checks](https://github.com/NethermindEth/LeanCIL/pull/56),
-[shared consumer support with joint kernel replay](https://github.com/NethermindEth/LeanCIL/pull/58),
-[extraction-dependent modules cached by program text](https://github.com/NethermindEth/LeanCIL/pull/61),
-[compiled portable support with batch export](https://github.com/NethermindEth/LeanCIL/pull/62),
-[method-body embedding modulo dead code](https://github.com/NethermindEth/LeanCIL/pull/67) and
-[folded closed typeof equality tests](https://github.com/NethermindEth/LeanCIL/pull/68)).
+This directory consumes LeanCIL at
+`e3126d4b6abd651ea9afd380c5f84df8d9399d14` through the pinned Lake dependency.
 CIL semantics, extraction, and verification infrastructure belong to LeanCIL;
 this directory contains only UInt256 specifications and proofs.
+
+Explicit initial frames use named fields with `stackBytes := 0`; helper lemmas
+over existing frames preserve the counter. Unknown numeric-local setup supplies
+the checked non-span and non-array premises. Arithmetic, overlap, termination
+and caller-memory contracts retain their statements. See LeanCIL's
+[consumer migration guide](https://github.com/NethermindEth/LeanCIL/blob/e3126d4b6abd651ea9afd380c5f84df8d9399d14/docs/CONSUMER-MIGRATION.md)
+for the frame and instruction API changes.
 
 ## Verification scope
 

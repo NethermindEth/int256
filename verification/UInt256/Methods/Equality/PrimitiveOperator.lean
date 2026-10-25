@@ -49,7 +49,12 @@ theorem checked {α : Type} (encode : α → CIL.Value) (equal : BitVec 256 → 
     (known : ∀ word, (encode word).hasUnspecified = false := by intros; rfl) :
     ScalarOperatorContract reversed negate encode equal program entry := by
   intro memory input word call
-  let frame : Frame := ⟨memory.nextIdentity, [], [], []⟩
+  let frame : Frame := {
+        activation := memory.nextIdentity
+        locals := []
+        owned := []
+        arguments := []
+        stackBytes := 0 }
   have setup : enterFrame (body profile reversed negate callee)
       (scalarOperatorArguments reversed input (encode word)) memory = .ok (frame, memory) := by
     simp [enterFrame, body, makeSelectedLocals, makeLocals, makeArgumentHomes, makeParameterHomes, frame,

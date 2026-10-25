@@ -9,7 +9,12 @@ def aggregate256 (value : BitVec 256) : Value :=
   .scalar (.aggregate (numberBytes value.toNat 32))
 
 def parameterFrame32 (memory : Memory) (copy : Reference) : Frame :=
-  ⟨memory.nextIdentity, [.bytes (.aggregate 32) copy], [copy.allocation], []⟩
+  {
+        activation := memory.nextIdentity
+        locals := [.bytes (.aggregate 32) copy]
+        owned := [copy.allocation]
+        arguments := []
+        stackBytes := 0 }
 
 /-- Address-taking creates a private initialized copy of the passed UInt256. -/
 theorem parameter_setup32 (body : CIL.Method) (args : List Value) (value : BitVec 256)

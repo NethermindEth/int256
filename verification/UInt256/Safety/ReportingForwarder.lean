@@ -21,11 +21,21 @@ theorem forward_binary_call (program : CIL.Program) (wrapperIndex childIndex : N
     (child : invoke program childFuel childIndex (binaryArguments left right output) memory =
       .ok (childFinal, childReturned))
     (tail : run program 2 wrapperIndex 4 (binaryArguments left right output)
-      ⟨memory.nextIdentity, [], [], []⟩ childReturned childFinal = .ok (childFinal, wrapperReturned)) :
+      {
+        activation := memory.nextIdentity
+        locals := []
+        owned := []
+        arguments := []
+        stackBytes := 0 } childReturned childFinal = .ok (childFinal, wrapperReturned)) :
     ∃ fuel, InvocationCertificate program wrapperIndex (binaryArguments left right output) memory fuel
       childFinal wrapperReturned := by
   let args := binaryArguments left right output
-  let frame : Frame := ⟨memory.nextIdentity, [], [], []⟩
+  let frame : Frame := {
+        activation := memory.nextIdentity
+        locals := []
+        owned := []
+        arguments := []
+        stackBytes := 0 }
   have fl := call.input_formed (by simp : left ∈ [left, right])
   have fr := call.input_formed (by simp : right ∈ [left, right])
   have fo := call.output_formed (by simp : output ∈ [output])
@@ -80,7 +90,12 @@ theorem forward_reporting_byte (program : CIL.Program) (wrapperIndex childIndex 
   have fetch : wrapperBody.code[4]? = some (.ret (some .unsigned8)) := by simp [code]
   have normalized : CIL.NarrowKind.unsigned8.extend bit = bit := CIL.NarrowKind.extend_ite_one_zero _ _
   have tail : run program 2 wrapperIndex 4 (binaryArguments left right output)
-      ⟨memory.nextIdentity, [], [], []⟩ [.scalar (.i32 bit)] final = .ok (final, [.scalar (.i32 bit)]) := by
+      {
+        activation := memory.nextIdentity
+        locals := []
+        owned := []
+        arguments := []
+        stackBytes := 0 } [.scalar (.i32 bit)] final = .ok (final, [.scalar (.i32 bit)]) := by
     simp [run, found, fetch, returns, step, cil_guard, observerCount, normalized, leaveFrame, checkedValue, numericValue,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   obtain ⟨fuel, certified⟩ := forward_binary_call program wrapperIndex childIndex wrapperBody found
@@ -104,7 +119,12 @@ theorem forward_reporting_pop (program : CIL.Program) (wrapperIndex childIndex :
   have popFetch : wrapperBody.code[4]? = some .pop := by simp [code]
   have retFetch : wrapperBody.code[5]? = some .ret := by simp [code]
   have tail : run program 2 wrapperIndex 4 (binaryArguments left right output)
-      ⟨memory.nextIdentity, [], [], []⟩
+      {
+        activation := memory.nextIdentity
+        locals := []
+        owned := []
+        arguments := []
+        stackBytes := 0 }
       [.scalar (.i32 (if flag (inputValue memory left) (inputValue memory right) then 1 else 0))] final =
       .ok (final, []) := by
     simp [run, found, popFetch, retFetch, returns, step, cil_guard, observerCount, pureArity, leaveFrame,

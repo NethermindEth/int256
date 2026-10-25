@@ -199,8 +199,12 @@ theorem primitive_frame_setup (ctx : PrimitiveContext) (memory : Memory) (input 
       .ok (.bytes (.aggregate 32) output, [output.allocation], entered) := by
     simp only [makeLocal, localWidth, localAlignment, home2, stored2, reduceCtorEq, ↓reduceIte,
       Bind.bind, Except.bind, Pure.pure, Except.pure]
-  let frame : Frame := ⟨memory.nextIdentity,
-    [.bytes (.aggregate 32) operand, .bytes (.aggregate 32) output], [operand.allocation, output.allocation], []⟩
+  let frame : Frame := {
+        activation := memory.nextIdentity
+        locals := [.bytes (.aggregate 32) operand, .bytes (.aggregate 32) output]
+        owned := [operand.allocation, output.allocation]
+        arguments := []
+        stackBytes := 0 }
   have setup : enterFrame (primitiveBody ctx.profile ctx.firstScalar ctx.indices.entry ctx.conversionIndex) args memory =
       .ok (frame, entered) := by
     simp only [enterFrame, primitiveBody, makeSelectedLocals, List.isEmpty_nil, ite_true, makeLocals, made, made2, makeArgumentHomes, makeParameterHomes,

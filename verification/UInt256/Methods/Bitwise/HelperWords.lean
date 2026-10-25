@@ -111,7 +111,12 @@ theorem binary_result (operation : Binary) (profile : CIL.FeatureProfile)
       access final output 32 1 true = .ok () ∧
       ∀ id, id < memory.nextIdentity → ∀ offset, OutsideOutput output id offset →
         final.cells id offset = memory.cells id offset := by
-  let frame : Frame := ⟨memory.nextIdentity, [], [], []⟩
+  let frame : Frame := {
+        activation := memory.nextIdentity
+        locals := []
+        owned := []
+        arguments := []
+        stackBytes := 0 }
   let w := fun i => wordOperation operation (inputLimb memory left i) (inputLimb memory right i)
   obtain ⟨fuel, final, tail, readback, writable, outside⟩ :=
     ScalarSafety.construct_result program index 21 constructor (binaryBody profile constructor helper)

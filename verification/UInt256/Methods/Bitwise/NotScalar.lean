@@ -49,7 +49,12 @@ theorem not_result (profile : CIL.FeatureProfile)
       ∀ id, id < memory.nextIdentity → ∀ offset, OutsideOutput output id offset →
         final.cells id offset = memory.cells id offset := by
   intro memory input output call
-  let frame : Frame := ⟨memory.nextIdentity, [], [], []⟩
+  let frame : Frame := {
+        activation := memory.nextIdentity
+        locals := []
+        owned := []
+        arguments := []
+        stackBytes := 0 }
   obtain ⟨fuel, final, tail, readback, writable, outside⟩ :=
     ScalarSafety.construct_result program index 19 constructor (notBody profile constructor)
       profile found constructorFound (by rfl) (by rfl) (by rfl) (by rfl)

@@ -392,7 +392,12 @@ theorem vector128_frame_setup (body : CIL.Method) (specs : List NumericLocalSpec
   obtain ⟨slots, owned, entered, made, homes⟩ :=
     make_numeric_locals memory memory.nextIdentity specs wf
   simp only [numericKinds, numericInitializers] at made
-  let frame : Frame := ⟨memory.nextIdentity, .root (some .null) :: slots, owned, []⟩
+  let frame : Frame := {
+        activation := memory.nextIdentity
+        locals := .root (some .null) :: slots
+        owned := owned
+        arguments := []
+        stackBytes := 0 }
 
   have setup : enterFrame body args memory = .ok (frame, entered) := by
     simp only [enterFrame, metadata.1, metadata.2,

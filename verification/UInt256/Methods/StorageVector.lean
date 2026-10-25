@@ -36,7 +36,12 @@ theorem store_template_contract (profile : CIL.FeatureProfile) (featureFirst : B
   have created : CIL.evalIntrinsic (.vector (.create64 256))
       [.i64 w0, .i64 w1, .i64 w2, .i64 w3] = some (.v256 packed) := rfl
   let args := StorageScalar.arguments output w0 w1 w2 w3
-  let frame : Frame := ⟨memory.nextIdentity, [], [], []⟩
+  let frame : Frame := {
+        activation := memory.nextIdentity
+        locals := []
+        owned := []
+        arguments := []
+        stackBytes := 0 }
   have checked : args.mapM (checkedValue memory) = .ok args := by
     simp [args, StorageScalar.arguments, checkedValue, numericValue, formValue, formed,
       checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]

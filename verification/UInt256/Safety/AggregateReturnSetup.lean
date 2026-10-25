@@ -5,7 +5,12 @@ namespace UInt256Model.Safety.AggregateReturn
 open CIL.Safety UInt256Model.Safety
 
 def frame (memory : Memory) (output : Reference) : Frame :=
-  ⟨memory.nextIdentity, [.bytes (.aggregate 32) output], [output.allocation], []⟩
+  {
+        activation := memory.nextIdentity
+        locals := [.bytes (.aggregate 32) output]
+        owned := [output.allocation]
+        arguments := []
+        stackBytes := 0 }
 
 /-- Value-returning methods allocate one private UInt256 aggregate local. -/
 theorem setup (body : CIL.Method) (args : List Value)

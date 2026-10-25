@@ -31,7 +31,12 @@ theorem scalar_result (operation : Binary) (profile : CIL.FeatureProfile)
       ∀ id, id < memory.nextIdentity → ∀ offset, OutsideOutput output id offset →
         final.cells id offset = memory.cells id offset := by
   intro memory left right output call
-  let frame : Frame := ⟨memory.nextIdentity, [], [], []⟩
+  let frame : Frame := {
+        activation := memory.nextIdentity
+        locals := []
+        owned := []
+        arguments := []
+        stackBytes := 0 }
   obtain ⟨fuel, final, tail, readback, writable, outside⟩ :=
     ScalarSafety.construct_result program index 28 constructor (scalarBody profile operation constructor)
       profile found constructorFound (by rfl) (by rfl) (by rfl) (by rfl)

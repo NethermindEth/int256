@@ -104,7 +104,7 @@ theorem scalar_frame_setup (profile : CIL.FeatureProfile) (program : CIL.Program
       PrivateWords program memory entered entered [input] [output] frame (fun _ => none) := by
   have kinds : (scalarBody profile wordIndex storageIndex).localKinds = List.replicate 9 CIL.LocalKind.word64 := by rfl
   obtain ⟨frame, entered, setup, homes, _, wf⟩ := unknown_frame_setup (scalarBody profile wordIndex storageIndex)
-    (by rfl) (by simp [kinds]) (by rfl) (by rfl) (by rfl) memory (scalarArgs input word output) call.1.1
+    (by rfl) (by simp [kinds]) (by simp [kinds]) (by simp [kinds]) (by rfl) (by rfl) (by rfl) memory (scalarArgs input word output) call.1.1
   exact ⟨frame, entered, setup, homes, wf, PrivateWords.initial call setup⟩
 
 /-- Each input limb is loaded from the original caller bytes before being

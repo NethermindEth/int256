@@ -29,10 +29,25 @@ theorem construct_prefix (program : CIL.Program) (index pc constructor : Nat)
         stored.cells id offset = memory.cells id offset) ∧
       ∀ final values,
         (∃ fuel, run program fuel index (pc + 2) args
-          ⟨memory.nextIdentity, [], [temporary.allocation], []⟩ [] stored = .ok (final, values)) →
-        ∃ fuel, run program fuel index pc args ⟨memory.nextIdentity, [], [], []⟩
+          {
+        activation := memory.nextIdentity
+        locals := []
+        owned := [temporary.allocation]
+        arguments := []
+        stackBytes := 0 } [] stored = .ok (final, values)) →
+        ∃ fuel, run program fuel index pc args {
+        activation := memory.nextIdentity
+        locals := []
+        owned := []
+        arguments := []
+        stackBytes := 0 }
           ((words w0 w1 w2 w3).reverse ++ [.reference (.address output)]) memory = .ok (final, values) := by
-  let frame : Frame := ⟨memory.nextIdentity, [], [], []⟩
+  let frame : Frame := {
+        activation := memory.nextIdentity
+        locals := []
+        owned := []
+        arguments := []
+        stackBytes := 0 }
   have readonly : CallingConditions program memory inputs [] :=
     ⟨⟨call.1.1, call.1.2.1, by simp⟩, call.2⟩
   have checked : (words w0 w1 w2 w3).mapM (checkedValue memory) = .ok (words w0 w1 w2 w3) := by
@@ -90,7 +105,12 @@ theorem construct_result (program : CIL.Program) (scalarIndex constructPC constr
     (args : List Value) (w0 w1 w2 w3 : BitVec 64)
     (call : CallingConditions program memory inputs [output]) :
     ∃ fuel final,
-      run program fuel scalarIndex constructPC args ⟨memory.nextIdentity, [], [], []⟩
+      run program fuel scalarIndex constructPC args {
+        activation := memory.nextIdentity
+        locals := []
+        owned := []
+        arguments := []
+        stackBytes := 0 }
         ((words w0 w1 w2 w3).reverse ++ [.reference (.address output)]) memory = .ok (final, []) ∧
       read final output 32 1 = .ok (numberBytes (packed w0 w1 w2 w3).toNat 32) ∧
       access final output 32 1 true = .ok () ∧
@@ -99,7 +119,12 @@ theorem construct_result (program : CIL.Program) (scalarIndex constructPC constr
   obtain ⟨temporary, stored, fresh, storedCall, readback, outside, continuation⟩ :=
     construct_prefix program scalarIndex constructPC constructorIndex scalarBody profile found constructorFound
       fetched storeFetched memory inputs output args w0 w1 w2 w3 call
-  let nextFrame : Frame := ⟨memory.nextIdentity, [], [temporary.allocation], []⟩
+  let nextFrame : Frame := {
+        activation := memory.nextIdentity
+        locals := []
+        owned := [temporary.allocation]
+        arguments := []
+        stackBytes := 0 }
   have tail : run program 1 scalarIndex (constructPC + 2) args nextFrame [] stored =
       .ok (leaveFrame nextFrame stored, []) := by
     simp [run, found, returnFetched, returns, step, cil_guard, observerCount, Except.mapError,

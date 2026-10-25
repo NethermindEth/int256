@@ -283,8 +283,12 @@ theorem arm_small_low_decision (program : CIL.Program) (method storage : Nat) (p
     have loadLow := load_numeric_local .word64 (.i64 low) low.toNat rfl lowRead
     by_cases carry : sum < low
     all_goals
+      have complementary : (low ≤ sum) = (¬ sum < low) := by
+        apply propext
+        simp only [BitVec.le_def, BitVec.lt_def, Nat.not_lt]
       simp only [carry, ite_true, ite_false] at continuation
-      cil_contract_steps [enabled, sumSlot, lowSlot, loadSum, loadLow, carry] until continuation
+      cil_contract_steps [enabled, sumSlot, lowSlot, loadSum, loadLow, complementary, carry]
+        until continuation
 
 /-- All three carry increments follow the same checked load/add/duplicate/store sequence. -/
 theorem arm_small_increment (program : CIL.Program) (method storage : Nat) (profile : CIL.FeatureProfile) (found : program[method]? = some (armSmallBody profile storage)) (enabled : profile.advSimd = true)

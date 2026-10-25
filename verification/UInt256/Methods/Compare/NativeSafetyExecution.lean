@@ -56,51 +56,111 @@ private theorem native_bitcast {body : CIL.Method} {pc : Nat} {args rest values 
   simp only [known, staticInstruction, cast, Bool.false_eq_true, ite_false, Bind.bind, Except.bind, Pure.pure,
     Except.pure]
 
-private theorem native_store0 {body : CIL.Method} {pc activation : Nat} {owned : List AllocationId}
+private theorem native_store0 {body : CIL.Method} {pc activation stackBytes : Nat} {owned : List AllocationId}
     {arguments : List (Nat × LocalSlot)} {args rest : List Value} {value : Value} {memory updated : Memory}
     {slot0 slot1 slot2 : LocalSlot} (stored : storeLocal memory slot0 value = .ok (slot0, updated)) :
-    step body (.setLocal 0) pc args ⟨activation, [slot0, slot1, slot2], owned, arguments⟩ (value :: rest) memory =
-      .ok (.next (pc + 1) rest ⟨activation, [slot0, slot1, slot2], owned, arguments⟩ updated) := by
+    step body (.setLocal 0) pc args {
+        activation := activation
+        locals := [slot0, slot1, slot2]
+        owned := owned
+        arguments := arguments
+        stackBytes := stackBytes } (value :: rest) memory =
+      .ok (.next (pc + 1) rest {
+        activation := activation
+        locals := [slot0, slot1, slot2]
+        owned := owned
+        arguments := arguments
+        stackBytes := stackBytes } updated) := by
   show (storeLocal memory slot0 value).bind _ = _
   rw [stored]; rfl
 
-private theorem native_store1 {body : CIL.Method} {pc activation : Nat} {owned : List AllocationId}
+private theorem native_store1 {body : CIL.Method} {pc activation stackBytes : Nat} {owned : List AllocationId}
     {arguments : List (Nat × LocalSlot)} {args rest : List Value} {value : Value} {memory updated : Memory}
     {slot0 slot1 slot2 : LocalSlot} (stored : storeLocal memory slot1 value = .ok (slot1, updated)) :
-    step body (.setLocal 1) pc args ⟨activation, [slot0, slot1, slot2], owned, arguments⟩ (value :: rest) memory =
-      .ok (.next (pc + 1) rest ⟨activation, [slot0, slot1, slot2], owned, arguments⟩ updated) := by
+    step body (.setLocal 1) pc args {
+        activation := activation
+        locals := [slot0, slot1, slot2]
+        owned := owned
+        arguments := arguments
+        stackBytes := stackBytes } (value :: rest) memory =
+      .ok (.next (pc + 1) rest {
+        activation := activation
+        locals := [slot0, slot1, slot2]
+        owned := owned
+        arguments := arguments
+        stackBytes := stackBytes } updated) := by
   show (storeLocal memory slot1 value).bind _ = _
   rw [stored]; rfl
 
-private theorem native_store2 {body : CIL.Method} {pc activation : Nat} {owned : List AllocationId}
+private theorem native_store2 {body : CIL.Method} {pc activation stackBytes : Nat} {owned : List AllocationId}
     {arguments : List (Nat × LocalSlot)} {args rest : List Value} {value : Value} {memory updated : Memory}
     {slot0 slot1 slot2 : LocalSlot} (stored : storeLocal memory slot2 value = .ok (slot2, updated)) :
-    step body (.setLocal 2) pc args ⟨activation, [slot0, slot1, slot2], owned, arguments⟩ (value :: rest) memory =
-      .ok (.next (pc + 1) rest ⟨activation, [slot0, slot1, slot2], owned, arguments⟩ updated) := by
+    step body (.setLocal 2) pc args {
+        activation := activation
+        locals := [slot0, slot1, slot2]
+        owned := owned
+        arguments := arguments
+        stackBytes := stackBytes } (value :: rest) memory =
+      .ok (.next (pc + 1) rest {
+        activation := activation
+        locals := [slot0, slot1, slot2]
+        owned := owned
+        arguments := arguments
+        stackBytes := stackBytes } updated) := by
   show (storeLocal memory slot2 value).bind _ = _
   rw [stored]; rfl
 
-private theorem native_read0 {body : CIL.Method} {pc activation : Nat} {owned : List AllocationId}
+private theorem native_read0 {body : CIL.Method} {pc activation stackBytes : Nat} {owned : List AllocationId}
     {arguments : List (Nat × LocalSlot)} {args stack : List Value} {value : Value} {memory : Memory}
     {slot0 slot1 slot2 : LocalSlot} (loaded : loadLocal memory slot0 = .ok value) :
-    step body (.local 0) pc args ⟨activation, [slot0, slot1, slot2], owned, arguments⟩ stack memory =
-      .ok (.next (pc + 1) (value :: stack) ⟨activation, [slot0, slot1, slot2], owned, arguments⟩ memory) := by
+    step body (.local 0) pc args {
+        activation := activation
+        locals := [slot0, slot1, slot2]
+        owned := owned
+        arguments := arguments
+        stackBytes := stackBytes } stack memory =
+      .ok (.next (pc + 1) (value :: stack) {
+        activation := activation
+        locals := [slot0, slot1, slot2]
+        owned := owned
+        arguments := arguments
+        stackBytes := stackBytes } memory) := by
   show (loadLocal memory slot0).bind _ = _
   rw [loaded]; rfl
 
-private theorem native_read1 {body : CIL.Method} {pc activation : Nat} {owned : List AllocationId}
+private theorem native_read1 {body : CIL.Method} {pc activation stackBytes : Nat} {owned : List AllocationId}
     {arguments : List (Nat × LocalSlot)} {args stack : List Value} {value : Value} {memory : Memory}
     {slot0 slot1 slot2 : LocalSlot} (loaded : loadLocal memory slot1 = .ok value) :
-    step body (.local 1) pc args ⟨activation, [slot0, slot1, slot2], owned, arguments⟩ stack memory =
-      .ok (.next (pc + 1) (value :: stack) ⟨activation, [slot0, slot1, slot2], owned, arguments⟩ memory) := by
+    step body (.local 1) pc args {
+        activation := activation
+        locals := [slot0, slot1, slot2]
+        owned := owned
+        arguments := arguments
+        stackBytes := stackBytes } stack memory =
+      .ok (.next (pc + 1) (value :: stack) {
+        activation := activation
+        locals := [slot0, slot1, slot2]
+        owned := owned
+        arguments := arguments
+        stackBytes := stackBytes } memory) := by
   show (loadLocal memory slot1).bind _ = _
   rw [loaded]; rfl
 
-private theorem native_read2 {body : CIL.Method} {pc activation : Nat} {owned : List AllocationId}
+private theorem native_read2 {body : CIL.Method} {pc activation stackBytes : Nat} {owned : List AllocationId}
     {arguments : List (Nat × LocalSlot)} {args stack : List Value} {value : Value} {memory : Memory}
     {slot0 slot1 slot2 : LocalSlot} (loaded : loadLocal memory slot2 = .ok value) :
-    step body (.local 2) pc args ⟨activation, [slot0, slot1, slot2], owned, arguments⟩ stack memory =
-      .ok (.next (pc + 1) (value :: stack) ⟨activation, [slot0, slot1, slot2], owned, arguments⟩ memory) := by
+    step body (.local 2) pc args {
+        activation := activation
+        locals := [slot0, slot1, slot2]
+        owned := owned
+        arguments := arguments
+        stackBytes := stackBytes } stack memory =
+      .ok (.next (pc + 1) (value :: stack) {
+        activation := activation
+        locals := [slot0, slot1, slot2]
+        owned := owned
+        arguments := arguments
+        stackBytes := stackBytes } memory) := by
   show (loadLocal memory slot2).bind _ = _
   rw [loaded]; rfl
 
@@ -148,7 +208,7 @@ theorem native_run (profile : CIL.FeatureProfile) (usesLess inclusive : Bool) (p
   generalize leftValue : inputValue memory left = leftBits at *
   generalize rightValue : inputValue memory right = rightBits at *
   refine ⟨(if inclusive then 28 else 27) + 1, m2, ?_, preserved⟩
-  rcases frame with ⟨activation, locals, owned, arguments⟩
+  rcases frame with ⟨activation, locals, owned, arguments, stackBytes⟩
   dsimp only at slots
   subst slots
   cases profile

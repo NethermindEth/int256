@@ -19,7 +19,12 @@ theorem checked_template (leafSigned leafScalarFirst : Bool) (program : CIL.Prog
     (found : program[index]? = some (method leafSigned leafScalarFirst)) : ScalarOperatorContract leafScalarFirst false CIL.Value.i64
     (predicate leafSigned leafScalarFirst) program index := by
   intro memory input word call
-  let frame : Frame := ⟨memory.nextIdentity, [], [], []⟩
+  let frame : Frame := {
+        activation := memory.nextIdentity
+        locals := []
+        owned := []
+        arguments := []
+        stackBytes := 0 }
   let leafBody := method leafSigned leafScalarFirst
   have kinds : leafBody.localKinds = [] := by cases leafSigned <;> cases leafScalarFirst <;> rfl
   have values : leafBody.locals = [] := by cases leafSigned <;> cases leafScalarFirst <;> rfl

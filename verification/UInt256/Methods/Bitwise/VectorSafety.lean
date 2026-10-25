@@ -71,7 +71,12 @@ theorem leaf_result (profile : CIL.FeatureProfile) (operation : Binary)
       read final output 32 1 = .ok (numberBytes (applyBinary operation (inputValue memory left) (inputValue memory right)).toNat 32) ∧
       access final output 32 1 true = .ok () ∧
       ∀ id offset, OutsideOutput output id offset → final.cells id offset = memory.cells id offset := by
-  let frame : Frame := ⟨memory.nextIdentity, [], [], []⟩
+  let frame : Frame := {
+        activation := memory.nextIdentity
+        locals := []
+        owned := []
+        arguments := []
+        stackBytes := 0 }
   obtain ⟨final, run, loaded, writable, outside⟩ := run_leaf profile operation program index found memory left right output frame call
   have setup : enterFrame (body profile operation) (binaryArguments left right output) memory = .ok (frame, memory) := rfl
   have checked : (binaryArguments left right output).mapM (checkedValue memory) = .ok (binaryArguments left right output) := by
@@ -112,7 +117,12 @@ theorem entry_result (profile : CIL.FeatureProfile) (enabled : profile.vector256
       read final output 32 1 = .ok (numberBytes (applyBinary operation (inputValue memory left) (inputValue memory right)).toNat 32) ∧
       access final output 32 1 true = .ok () ∧
       ∀ id offset, OutsideOutput output id offset → final.cells id offset = memory.cells id offset := by
-  let frame : Frame := ⟨memory.nextIdentity, [], [], []⟩
+  let frame : Frame := {
+        activation := memory.nextIdentity
+        locals := []
+        owned := []
+        arguments := []
+        stackBytes := 0 }
   obtain ⟨final, child, loaded, writable, outside⟩ := leaf_result profile operation program callee childFound memory left right output call
   have checked : (binaryArguments left right output).mapM (checkedValue memory) = .ok (binaryArguments left right output) := by
     simp [binaryArguments, checkedValue, formValue, call.input_formed (by simp : left ∈ [left,right]),

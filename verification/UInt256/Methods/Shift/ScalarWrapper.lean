@@ -16,7 +16,12 @@ theorem wrapper_correctness (profile : CIL.FeatureProfile) (direction : Directio
   intro memory input count output call
   obtain ⟨childFuel, final, certificate, value, writable, readable, outside⟩ :=
     child memory input count output call
-  let frame : Frame := ⟨memory.nextIdentity, [], [], []⟩
+  let frame : Frame := {
+        activation := memory.nextIdentity
+        locals := []
+        owned := []
+        arguments := []
+        stackBytes := 0 }
   let args := shiftArguments input count output
   have fi := call.input_formed (by simp : input ∈ [input])
   have fo := call.output_formed (by simp : output ∈ [output])

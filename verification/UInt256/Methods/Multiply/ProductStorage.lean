@@ -45,7 +45,12 @@ theorem store_product_contract (profile : CIL.FeatureProfile) (scalar : profile.
     LimbStorage.store_limbs_readable_contract profile program callee childFound memory inputs output w0 w1 w2 w3 call
   let args := [Value.reference (.address output), .scalar (.i64 w0), .scalar (.i64 w1),
     .scalar (.i64 w2), .scalar (.i64 w3)]
-  let frame : Frame := ⟨memory.nextIdentity, [], [], []⟩
+  let frame : Frame := {
+        activation := memory.nextIdentity
+        locals := []
+        owned := []
+        arguments := []
+        stackBytes := 0 }
   have formed := call.output_formed (by simp : output ∈ [output])
   have checked : args.mapM (checkedValue memory) = .ok args := by
     simp [args, checkedValue, numericValue, formValue, formed, checkedAt,

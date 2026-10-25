@@ -144,8 +144,12 @@ theorem carry_frame_setup_of_shape (shape : CarryShape body) (memory : Memory) (
     make_local_word64 middle memory.nextIdentity (BitVec.ofNat 64 0) wfMiddle
   have freshFirst := (makeLocal_fresh _ _ _ _ _ _ _ madeFirst).2 first.allocation (by simp)
   have freshSecond := (makeLocal_fresh _ _ _ _ _ _ _ madeSecond).2 second.allocation (by simp)
-  let frame : Frame := ⟨memory.nextIdentity, [.bytes .word64 first, .bytes .word64 second],
-    [first.allocation, second.allocation], []⟩
+  let frame : Frame := {
+        activation := memory.nextIdentity
+        locals := [.bytes .word64 first, .bytes .word64 second]
+        owned := [first.allocation, second.allocation]
+        arguments := []
+        stackBytes := 0 }
   have entered : enterFrame body args memory = .ok (frame, result) := by
     simp [enterFrame, shape.localKinds, shape.locals, shape.vectorArgs, shape.parameterHomes, shape.opaqueVectorLocals, makeSelectedLocals, makeLocals,
       madeFirst, madeSecond, makeArgumentHomes, makeParameterHomes, frame, Bind.bind, Except.bind,

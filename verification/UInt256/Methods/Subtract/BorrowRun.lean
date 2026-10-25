@@ -84,7 +84,12 @@ theorem borrow_invoke_succeeds_of_run (bw : BitVec 64 → BitVec 64 → BitVec 6
   have borrowWritable := (authority.after_write resultWrite).access
   obtain ⟨final, borrowWrite⟩ := write_succeeds (bytes := numberBytes (bw a b c).toNat 8)
     (by simpa only [length] using borrowWritable)
-  let frame : Frame := ⟨memory.nextIdentity, [], [], []⟩
+  let frame : Frame := {
+        activation := memory.nextIdentity
+        locals := []
+        owned := []
+        arguments := []
+        stackBytes := 0 }
   have fb := access_reference_valid _ _ _ _ _ writable
   have fo := access_reference_valid _ _ _ _ _ outputWritable
   have ran := runs a b c borrowRef output frame memory stored final fb fo

@@ -59,7 +59,12 @@ theorem signed_checked (memory : Memory) (left : Reference) (argument : CIL.Valu
         memory fuel final [.scalar (.i32
           (if negative then 0 else if inputValue memory left = bits then 1 else 0))] ∧
       ∀ id, id < memory.nextIdentity → ∀ offset, final.cells id offset = memory.cells id offset := by
-  let frame : Frame := ⟨memory.nextIdentity, [], [], []⟩
+  let frame : Frame := {
+        activation := memory.nextIdentity
+        locals := []
+        owned := []
+        arguments := []
+        stackBytes := 0 }
   have setup : enterFrame signedBody (scalarArguments left argument) memory = .ok (frame, memory) := by
     simp [enterFrame, locals, kinds, vectors, homes, makeSelectedLocals, makeLocals, makeSelectedLocalsFrom, ite_self, makeArgumentHomes, makeParameterHomes, frame,
       Bind.bind, Except.bind, Pure.pure, Except.pure]

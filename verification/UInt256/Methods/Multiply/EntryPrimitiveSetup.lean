@@ -50,7 +50,12 @@ theorem conversion_invoke (ctx : PrimitiveContext) (memory : Memory) (argument :
       final.WellFormed ∧ AccessBelow memory.nextIdentity memory final ∧
       ∀ id, id < memory.nextIdentity → ∀ offset, final.cells id offset = memory.cells id offset := by
   let args := [Value.scalar argument]
-  let frame : Frame := ⟨memory.nextIdentity, [], [], []⟩
+  let frame : Frame := {
+        activation := memory.nextIdentity
+        locals := []
+        owned := []
+        arguments := []
+        stackBytes := 0 }
   have found : ctx.program[ctx.conversionIndex]? = some (conversionBody ctx.profile ctx.narrow ctx.constructorIndex) := ctx.conversion
   have checked : (conversionWords word).mapM (checkedValue memory) = .ok (conversionWords word) := by
     simp [conversionWords, checkedValue, numericValue, Bind.bind, Except.bind, Pure.pure, Except.pure]

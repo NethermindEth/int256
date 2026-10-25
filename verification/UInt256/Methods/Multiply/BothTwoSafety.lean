@@ -93,7 +93,7 @@ theorem both_two_frame_setup (profile : CIL.FeatureProfile) (program : CIL.Progr
       PrivateWords program memory entered entered [left, right] [output] frame (fun _ => none) := by
   have kinds : (bothTwoBody profile wordIndex countIndex storageIndex).localKinds = List.replicate 14 CIL.LocalKind.word64 := by rfl
   obtain ⟨frame, entered, setup, homes, _, wf⟩ := unknown_frame_setup (bothTwoBody profile wordIndex countIndex storageIndex)
-    (by rfl) (by simp [kinds]) (by rfl) (by rfl) (by rfl) memory (productArgs left right output) call.1.1
+    (by rfl) (by simp [kinds]) (by simp [kinds]) (by simp [kinds]) (by rfl) (by rfl) (by rfl) memory (productArgs left right output) call.1.1
   exact ⟨frame, entered, setup, homes, wf, PrivateWords.initial call setup⟩
 
 def bothTwoInputs (original : Memory) (left right : Reference) :=

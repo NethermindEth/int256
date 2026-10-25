@@ -13,7 +13,12 @@ theorem not_word_checked (profile : CIL.FeatureProfile) (program : CIL.Program) 
     invoke program 6 index [.scalar (.i64 a)] memory = .ok (memory, [.scalar (.i64 (~~~a))]) := by
   rw [← BitVec.xor_allOnes]
   simp only [invoke, found]
-  change run program 6 index 0 [.scalar (.i64 a)] ⟨memory.nextIdentity, [], [], []⟩ [] memory = _
+  change run program 6 index 0 [.scalar (.i64 a)] {
+        activation := memory.nextIdentity
+        locals := []
+        owned := []
+        arguments := []
+        stackBytes := 0 } [] memory = _
   iterate 4
     apply Eq.trans
     · apply run_next found
@@ -80,7 +85,12 @@ theorem unary_result (profile : CIL.FeatureProfile)
       access final output 32 1 true = .ok () ∧
       ∀ id, id < memory.nextIdentity → ∀ offset, OutsideOutput output id offset →
         final.cells id offset = memory.cells id offset := by
-  let frame : Frame := ⟨memory.nextIdentity, [], [], []⟩
+  let frame : Frame := {
+        activation := memory.nextIdentity
+        locals := []
+        owned := []
+        arguments := []
+        stackBytes := 0 }
   obtain ⟨fuel, final, tail, readback, writable, outside⟩ :=
     ScalarSafety.construct_result program index 13 constructor (unaryBody profile constructor helper)
       profile found constructorFound (by rfl) (by rfl) (by rfl) (by rfl)

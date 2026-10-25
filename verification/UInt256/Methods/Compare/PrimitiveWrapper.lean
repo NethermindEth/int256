@@ -70,7 +70,12 @@ theorem checked {α : Type} (encode : α → CIL.Value) (widen : α → BitVec 6
       (fun input word => predicate leafSigned scalarFirst input (widen word)) program entry := by
   intro memory input word call
   let body := method narrow signed scalarFirst reversed negate callee
-  let frame : Frame := ⟨memory.nextIdentity, [], [], []⟩
+  let frame : Frame := {
+        activation := memory.nextIdentity
+        locals := []
+        owned := []
+        arguments := []
+        stackBytes := 0 }
   have setup : enterFrame body (scalarOperatorArguments (scalarFirst != reversed) input (encode word)) memory =
       .ok (frame, memory) := by
     simp [enterFrame, body, method, makeSelectedLocals, makeLocals, makeArgumentHomes, makeParameterHomes, frame,

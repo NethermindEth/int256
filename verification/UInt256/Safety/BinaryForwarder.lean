@@ -20,7 +20,12 @@ theorem forward_wrapping_binary (program : CIL.Program) (wrapperIndex childIndex
   obtain ⟨childFuel, final, certificate, value, writable, footprint⟩ :=
     child memory left right output call
   let args := binaryArguments left right output
-  let frame : Frame := ⟨memory.nextIdentity, [], [], []⟩
+  let frame : Frame := {
+        activation := memory.nextIdentity
+        locals := []
+        owned := []
+        arguments := []
+        stackBytes := 0 }
   have fl := call.input_formed (by simp : left ∈ [left, right])
   have fr := call.input_formed (by simp : right ∈ [left, right])
   have fo := call.output_formed (by simp : output ∈ [output])

@@ -16,13 +16,23 @@ theorem hardware_word_tail (program : CIL.Program) (index start : Nat) (body : C
     (wf : memory.WellFormed) (writable : access memory output 8 1 true = .ok ()) :
     ∃ final,
       run program 9 index start [.scalar (.i64 a), .scalar (.i64 b), .reference (.address output)]
-        ⟨memory.nextIdentity, [], [], []⟩ [] memory = .ok (final, [.scalar (.i64 (highProduct a b))]) ∧
+        {
+        activation := memory.nextIdentity
+        locals := []
+        owned := []
+        arguments := []
+        stackBytes := 0 } [] memory = .ok (final, [.scalar (.i64 (highProduct a b))]) ∧
       final.WellFormed ∧ read final output 8 1 = .ok (numberBytes (lowProduct a b).toNat 8) ∧
       AccessBelow memory.nextIdentity memory final ∧
       (∀ id offset, id ≠ output.allocation ∨ offset < output.offset ∨ output.offset + 8 ≤ offset →
         final.cells id offset = memory.cells id offset) := by
   let args : List Value := [.scalar (.i64 a), .scalar (.i64 b), .reference (.address output)]
-  let frame : Frame := ⟨memory.nextIdentity, [], [], []⟩
+  let frame : Frame := {
+        activation := memory.nextIdentity
+        locals := []
+        owned := []
+        arguments := []
+        stackBytes := 0 }
   have formed := access_reference_valid _ _ _ _ _ writable
   have length : (numberBytes (lowProduct a b).toNat 8).length = 8 := by simp [numberBytes]
   obtain ⟨final, written⟩ := write_succeeds (bytes := numberBytes (lowProduct a b).toNat 8)
@@ -182,7 +192,12 @@ theorem hardware_word_invoke (arm : Bool) (profile : CIL.FeatureProfile)
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   · cases arm <;> rfl
   · let args : List Value := [.scalar (.i64 a), .scalar (.i64 b), .reference (.address output)]
-    let frame : Frame := ⟨memory.nextIdentity, [], [], []⟩
+    let frame : Frame := {
+        activation := memory.nextIdentity
+        locals := []
+        owned := []
+        arguments := []
+        stackBytes := 0 }
     cases arm with
     | false =>
       change run program 11 index 0 args frame [] memory = _
