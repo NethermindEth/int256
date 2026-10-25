@@ -67,7 +67,7 @@ SelectionCheck([], allMethods, true, all: true);
         Require(full.Batches.Count(batch => batch.Groups.Any(group => group.Profile == profile.Key)) == 1, "Light profile split across jobs: " + profile.Key);
     int Shareable(BatchGroup group) => group.Methods.Sum(method => costs[full.Include.Single(gate => gate.Method == method && gate.Profile == group.Profile)].Support);
     Require(full.Batches.All(batch => batch.Groups.All(group => Shareable(group) <= Shareable(batch.Groups[^1]))),
-        "Only a job's last group exports support, so it must be the group with the most shareable modules");
+        "Groups must retain deterministic ordering by support size");
     Gate add = full.Include.Single(gate => gate.Method == "Add" && gate.Profile == "scalar");
     Gate and = full.Include.Single(gate => gate.Method == "And" && gate.Profile == "scalar");
     Require(costs[add].Weight > costs[and].Weight, "Shards balance on measured seconds, so the slower Add gate must outweigh And");
