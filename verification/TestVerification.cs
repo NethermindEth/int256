@@ -7,6 +7,7 @@
 #:include VerificationRunner.cs
 #:include ConsumerSupportSelection.cs
 #:include RegressionManifest.cs
+#:include EqualityCoverage.cs
 
 using System.Text.Json;
 
@@ -41,6 +42,49 @@ SelectionCheck(["src/Nethermind.Int256/UInt256.cs"], allMethods, true);
 SelectionCheck(["verification/manifests/gates.json"], allMethods, true);
 SelectionCheck(["verification/VerificationRunner.cs"], allMethods, true);
 SelectionCheck([], allMethods, true, all: true);
+{
+    var equality = VerificationSupport.Gates(root).Where(gate =>
+        gate.Method.StartsWith("Eq", StringComparison.Ordinal) || gate.Method.StartsWith("Ne", StringComparison.Ordinal)).ToArray();
+    Require(equality.Select(gate => gate.Method).Distinct().Order(StringComparer.Ordinal)
+        .SequenceEqual(EqualityCoverage.Helpers.Keys.Order(StringComparer.Ordinal)),
+        "Every equality overload must have an explicit regression coverage mapping");
+    foreach (var gate in equality)
+        foreach (var fixture in new[] { "Baseline", "Renamed", "EquivalentReduction" })
+        {
+            var representative = EqualityCoverage.Representative(fixture, gate.Method);
+            Require(equality.Any(candidate => candidate.Method == representative && candidate.Profile == gate.Profile),
+                "Equality representative is missing on " + gate.Profile + ": " + representative);
+        }
+    foreach (var method in equality.Select(gate => gate.Method).Where(method => method.StartsWith("Ne", StringComparison.Ordinal)))
+        Require(EqualityCoverage.Representative("WrongPolarity", method) == method,
+            "A polarity mutation must be tested at its own wrapper");
+    Require(EqualityCoverage.Representative("WrongSnapshot", "EqualsUInt256Value") == "EqualsUInt256Value",
+        "The by-value snapshot mutation needs its own counterexample");
+    var fixtures = System.Xml.Linq.XDocument.Load(Path.Combine(root, "Tests/Fixtures/Equality/Cases.props"))
+        .Descendants("EqualityCase").Select(item => (string)item.Attribute("Include")!).ToArray();
+    foreach (var profile in equality.GroupBy(gate => gate.Profile))
+    {
+        var requests = 0;
+        foreach (var fixture in fixtures)
+            foreach (var gate in profile.Where(gate => EqualityCoverage.Applicable(fixture, gate.Method, gate.Profile)))
+            {
+                var representative = EqualityCoverage.Representative(fixture, gate.Method);
+                Require(profile.Any(candidate => candidate.Method == representative &&
+                    EqualityCoverage.Applicable(fixture, candidate.Method, candidate.Profile)),
+                    "Missing applicable representative for " + fixture + "/" + gate.Method + "/" + gate.Profile);
+                if (representative != gate.Method) continue;
+                requests += fixture.StartsWith("Wrong", StringComparison.Ordinal) ? 2 : 1;
+                if (fixture is "Renamed" or "EquivalentReduction")
+                    Require(File.Exists(Path.Combine(root, "Tests/Fixtures/Equality", fixture,
+                        gate.Method + "_" + gate.Profile.Replace('-', '_') + ".lean")),
+                        "Missing representative positive fixture proof");
+            }
+        var expected = profile.Key switch { "scalar" => 48, "x64-v3" => 57, "x64-sse42" => 19,
+            _ => throw new InvalidOperationException("Review equality coverage for " + profile.Key) };
+        Require(requests == expected, "Equality regression coverage changed: " + profile.Key);
+        Console.WriteLine($"Equality representatives {profile.Key}: {requests} verification requests");
+    }
+}
 {
     // A runner missing from CI would let a pin or template change stop refuting its mutants unnoticed.
     string[] files = [.. Directory.EnumerateFiles(root, "*Regression.cs").Select(path => Path.GetFileName(path)!).Order(StringComparer.Ordinal)];

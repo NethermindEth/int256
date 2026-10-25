@@ -332,15 +332,24 @@ group's `Tests/Fixtures/<group>/README.md` maps every original case to a runner
 case, the LeanCIL test that covers it, an unfiled upstream issue draft, or names
 it as a dropped positive refactor.
 
-`EqualityRegression.cs [dir] [all|scalar|x64-v3|x64-sse42] [all|<case>]`
-covers the equality gates. Baseline and Renamed are checked against the
+`EqualityRegression.cs [dir] [all|scalar|x64-v3|x64-sse42] [all|<case>] [method]`
+covers representative equality implementations and targeted wrapper faults. The optional method
+selects one retained representative for local verification; an empty selection fails.
+All 52 production equality method/profile certificates remain registered.
+Baseline and Renamed are checked against the
 production proof or a renamed copy of it; EquivalentReduction (xor-to-zero vector
 leaf, scalar-direct vector primitive, high-half-first SSE reduction) is checked on
 the vector profiles by fixture proofs under `Tests/Fixtures/Equality/EquivalentReduction/`
 that state the production contract verbatim. Their extraction-independent leaf proofs
 live once in `Tests/Fixtures/Equality/Shared/`, so each fixture file only binds its extraction.
 WrongLane, WrongReduction, WrongReceiver, WrongSnapshot, WrongSignedEmbedding
-and WrongPolarity each get a checked refutation from `witnesses.json`.
+and WrongPolarity each get a checked refutation from `witnesses.json` and rejection of the
+production proof. Helper mutations run at direct `Equals` entries; wrapper-local polarity
+and snapshot mutations retain their own cases. Polarity counterexamples compose a checked
+child observation through the exact extracted wrapper instead of unfolding its execution again.
+The [coverage map](Tests/Fixtures/Equality/README.md) explains the representatives and limits.
+The equality matrix now issues 124 verification requests instead of 288, a 57% reduction:
+scalar 48, x64-v3 57, SSE 19. These are request counts, not measured wall-time savings.
 
 `CompareRegression.cs [dir] [all|<profile>]` covers `op<` on scalar,
 x64-v3 and x64-v4, and `CompareTo(in UInt256)` on scalar.

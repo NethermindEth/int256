@@ -1,7 +1,7 @@
 import Extracted
 import UInt256.Methods.Bindings
 import UInt256.Safety.ReadOnlyRefutation
-import UInt256.Methods.Equality.ValueScalar
+@IMPORTS@
 namespace EqualityWitness
 open CIL.Safety UInt256Model.Safety
 set_option maxRecDepth 8192
@@ -33,8 +33,9 @@ theorem call : CallingConditions Extracted.program memory @INPUTS@ [] := by
   · change StaticWorldValid [] memory
     exact empty_static_world_valid [] memory (by decide) (by decide) rfl
 theorem refuted : ¬ (@STATEMENT@) := by
+@OBSERVATION@
   apply UInt256Model.Safety.ContractRefutation.@LEMMA@
-  · rfl
+  · @OBSERVED_PROOF@
   · decide
 #print axioms refuted
 end EqualityWitness

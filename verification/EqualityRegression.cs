@@ -4,6 +4,7 @@
 #:property PublishAot=false
 #:include RegressionBatch.cs
 #:include RegressionManifest.cs
+#:include EqualityCoverage.cs
 using System.Diagnostics;
 using System.Globalization;
 using System.Numerics;
@@ -11,10 +12,13 @@ using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 
-const string Usage = "Usage: EqualityRegression.cs [verification-directory] [all|<profile>] [all|<case>]";
-if (args.Length > 3) throw new ArgumentException(Usage);
+const string Usage = "Usage: EqualityRegression.cs [verification-directory] [all|<profile>] [all|<case>] [method]";
+if (args.Length > 4) throw new ArgumentException(Usage);
 string root = Path.GetFullPath(args.Length > 0 ? args[0] : "verification");
 string selected = args.Length > 1 ? args[1] : "all", selectedCase = args.Length > 2 ? args[2] : "all";
+var selectedMethod = args.Length > 3 ? args[3] : null;
+if (selectedMethod is not null && !EqualityCoverage.Helpers.ContainsKey(selectedMethod))
+    throw new ArgumentException("Unknown equality method: " + selectedMethod);
 string work = Path.Combine(root, "artifacts/equality-regressions", selectedCase == "all" ? selected : selected + "-" + selectedCase);
 string consumer = Path.Combine(work, "consumer");
 string fixtures = Path.Combine(root, "Tests/Fixtures/Equality");
@@ -29,7 +33,6 @@ JsonObject negatives = JsonNode.Parse(File.ReadAllText(Path.Combine(fixtures, "w
 string[] cases = XDocument.Load(Path.Combine(fixtures, "Cases.props")).Descendants("EqualityCase").Select(item => (string)item.Attribute("Include")!).ToArray();
 if (selectedCase != "all" && !cases.Contains(selectedCase)) throw new ArgumentException(Usage);
 if (selectedCase != "all") cases = [selectedCase];
-string[] references = ["EqUInt256UInt256", "NeUInt256UInt256", "EqualsUInt256Ref", "EqualsUInt256Value"];
 List<string> incomplete = [], failed = [];
 
 async Task<string> Run(string executable, IEnumerable<string> arguments)
@@ -89,24 +92,6 @@ static string Statement(string proof, string theorem)
     return ("scalar", negate, name.StartsWith("op_", StringComparison.Ordinal) && parameters[0] == scalar, width, signed);
 }
 
-bool Applicable(string fixture, string method, string profile, string signature)
-{
-    var shape = Shape(signature);
-    return fixture switch
-    {
-        "Baseline" or "Renamed" => true,
-        "EquivalentReduction" => profile != "scalar",
-        _ => negatives[fixture]!["group"]!.GetValue<string>() switch
-        {
-            "reference" => references.Contains(method),
-            "snapshot" => shape.Kind == "snapshot",
-            "signed" => shape.Signed,
-            "inequality" => shape.Negate,
-            var group => throw new InvalidOperationException("Unknown witness group: " + group)
-        }
-    };
-}
-
 static BigInteger Number(JsonObject initial, int start) => Enumerable.Range(0, 32)
     .Select(i => (BigInteger)(initial[(start + i).ToString(CultureInfo.InvariantCulture)]?.GetValue<int>() ?? 0) << (8 * i))
     .Aggregate(BigInteger.Zero, (sum, value) => sum + value);
@@ -128,22 +113,46 @@ string Refutation(string fixture, string signature, string statement)
     bool actual = data["actualResult"]?.GetValue<bool>() ?? data["actualEquality"]!.GetValue<bool>() != shape.Negate;
     if (actual == expected) throw new InvalidOperationException($"{fixture} witness does not contradict the contract for {signature}");
     string observed = $"[.scalar (.i32 {(actual ? 1 : 0)})]";
+    var fuel = fixture == "WrongPolarity" ? "fuel" : "1024";
+    var observation = "";
+    var observedProof = "rfl";
+    if (fixture == "WrongPolarity")
+    {
+        var reference = $"(.reference (.address ⟨0,{left}⟩))";
+        var other = shape.Kind == "reference" ? $"(.reference (.address ⟨0,{right}⟩))"
+            : $"(.scalar (.i{shape.Width} (BitVec.ofNat {shape.Width} {bits})))";
+        var first = shape.ScalarFirst ? other : reference;
+        var second = shape.ScalarFirst ? reference : other;
+        // The mutated wrapper forwards without negation. Its complete body must still match.
+        observation = $"""
+              obtain ⟨fuel, final, observed⟩ := UInt256Proof.Equality.WrapperObservation.forward
+                Extracted.profile {shape.ScalarFirst.ToString().ToLowerInvariant()} false {actual.ToString().ToLowerInvariant()}
+                Extracted.program 0 1 1024 (by rfl) memory {first} {second}
+                (by rfl) (by rfl) (by rfl) (by rfl) ⟨_, by rfl⟩
+            """;
+        observedProof = "simpa [Except.map, scalarOperatorArguments, scalarArguments, readOnlyArguments] " +
+            "using congrArg (fun result => result.map Prod.snd) observed";
+    }
     (string head, string lemma) = shape.Kind switch
     {
         "reference" => ("UInt256Model.Safety.ReadOnlyContract",
-            $"checked_readonly_refuted _ Extracted.program _ 2 1024 memory [⟨0,{left}⟩, ⟨0,{right}⟩] {observed} rfl call"),
+            $"checked_readonly_refuted _ Extracted.program _ 2 {fuel} memory [⟨0,{left}⟩, ⟨0,{right}⟩] {observed} rfl call"),
         "snapshot" => ("UInt256Model.Safety.ReadOnlyScalarContract",
-            $"checked_readonly_scalar_refuted _ _ Extracted.program _ 1024 memory ⟨0,{left}⟩ (BitVec.ofNat 256 {snapshot}) {observed} call"),
+            $"checked_readonly_scalar_refuted _ _ Extracted.program _ {fuel} memory ⟨0,{left}⟩ (BitVec.ofNat 256 {snapshot}) {observed} call"),
         _ => ("UInt256Model.Safety.ScalarOperatorContract",
-            $"checked_scalar_operator_refuted _ _ _ _ Extracted.program _ 1024 memory ⟨0,{left}⟩ (BitVec.ofNat {shape.Width} {bits}) {observed} call")
+            $"checked_scalar_operator_refuted _ _ _ _ Extracted.program _ {fuel} memory ⟨0,{left}⟩ (BitVec.ofNat {shape.Width} {bits}) {observed} call")
     };
     if (!statement.StartsWith(head + " ", StringComparison.Ordinal)) throw new InvalidOperationException($"Unexpected production contract for {signature}: {statement}");
     string bytes = string.Concat(initial.Select(pair => $"offset = {pair.Key} then {pair.Value!.GetValue<int>()} else if id = 0 ∧ ")) + "False then 0 else 0";
     return File.ReadAllText(Path.Combine(fixtures, "RefutationTemplate.lean.in"))
+        .Replace("@IMPORTS@", fixture == "WrongPolarity"
+            ? "import UInt256.Methods.Equality.WrapperObservation"
+            : shape.Kind == "snapshot" ? "import UInt256.Methods.Equality.ValueScalar" : "")
         .Replace("@INITIAL@", bytes)
         .Replace("@INPUTS@", shape.Kind == "reference" ? $"[⟨0,{left}⟩,⟨0,{right}⟩]" : $"[⟨0,{left}⟩]")
         .Replace("@INPUT_CASES@", shape.Kind == "reference" ? "rcases member with rfl | rfl <;> exact ⟨_, rfl⟩" : "subst input; exact ⟨_, rfl⟩")
-        .Replace("@STATEMENT@", statement).Replace("@LEMMA@", lemma);
+        .Replace("@STATEMENT@", statement).Replace("@LEMMA@", lemma)
+        .Replace("@OBSERVATION@", observation).Replace("@OBSERVED_PROOF@", observedProof);
 }
 
 CopySources(root, consumer);
@@ -181,6 +190,12 @@ foreach (JsonNode? gate in gates)
 {
     string method = gate!["method"]!.GetValue<string>(), profile = gate["profile"]!.GetValue<string>();
     if (!Regex.IsMatch(method, "^(Eq|Ne)") || selected != "all" && selected != profile) continue;
+    if (!EqualityCoverage.Helpers.ContainsKey(method))
+        throw new InvalidOperationException("Equality overload needs a coverage mapping: " + method);
+    if (selectedMethod is not null && method != selectedMethod) continue;
+    var selectedFixtures = cases.Where(fixture => EqualityCoverage.Applicable(fixture, method, profile) &&
+        EqualityCoverage.Representative(fixture, method) == method).ToArray();
+    if (selectedFixtures.Length == 0) continue;
     string signature = targets.Single(target => target!["id"]!.GetValue<string>() == method)!["signature"]!.GetValue<string>();
     string profileArgument = File.Exists(Path.Combine(root, "manifests/profiles", profile + ".json"))
         ? "@" + Path.Combine(root, "manifests/profiles", profile + ".json") : profile;
@@ -188,7 +203,7 @@ foreach (JsonNode? gate in gates)
     string statement = Statement(productionProof, productionTheorem);
     string reference = Path.Combine(work, "production", method, profile);
     await Run("dotnet", [tool, "extract", production, signature, reference, profileArgument, "--assume-initialized", "Nethermind.Int256.UInt256"]);
-    foreach (string fixture in cases.Where(fixture => Applicable(fixture, method, profile, signature)))
+    foreach (string fixture in selectedFixtures)
     {
         string name = $"{method}/{profile}/{fixture}";
         string extraction = Path.Combine(work, method, profile, fixture);
@@ -225,6 +240,7 @@ foreach (JsonNode? gate in gates)
     }
 }
 // Freeze the complete consumer source snapshot before issuing any certificates.
+if (jobs.Count == 0) throw new InvalidOperationException("No representative equality checks selected");
 failed.AddRange(await RegressionBatch.Verify(root, tool, work, consumer, [.. jobs.Select(job => new RegressionCheck(job.Name, job.Extraction, job.Proof, job.Theorem,
     job.Production is null ? "checked production contract" : "checked contract refutation and production proof rejection", job.Production, job.ProductionTheorem))]));
 Console.WriteLine($"SUMMARY: {jobs.Count - failed.Count(jobs.Select(job => job.Name).Contains)} passed, {failed.Count} failed, {incomplete.Count} pending");
