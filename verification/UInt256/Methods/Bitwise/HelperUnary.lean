@@ -12,21 +12,7 @@ theorem not_word_checked (profile : CIL.FeatureProfile) (program : CIL.Program) 
     (found : program[index]? = some (notWordBody profile)) (memory : Memory) (a : BitVec 64) :
     invoke program 6 index [.scalar (.i64 a)] memory = .ok (memory, [.scalar (.i64 (~~~a))]) := by
   rw [← BitVec.xor_allOnes]
-  simp only [invoke, found]
-  change run program 6 index 0 [.scalar (.i64 a)] {
-        activation := memory.nextIdentity
-        locals := []
-        owned := []
-        arguments := []
-        stackBytes := 0 } [] memory = _
-  iterate 4
-    apply Eq.trans
-    · apply run_next found
-      · rfl
-      · rfl
-  rw [run]
-  simp only [found]
-  rfl
+  cil_checked_steps
 
 theorem not_limb_checked (profile : CIL.FeatureProfile)
     (program : CIL.Program) (index helper pc : Nat) (body : CIL.Method)
@@ -53,15 +39,7 @@ theorem not_limb_checked (profile : CIL.FeatureProfile)
   refine ⟨fuel + 2, ?_⟩
   have inputFormed := call.input_formed (reference := input) (by simp)
   have inputField := call.input_field_instruction (reference := input) (by simp) limb
-  apply Eq.trans
-  · apply run_next (target := pc + 1) (nextFrame := frame) (updated := memory)
-      (values := .reference (.address input) :: rest) found h0
-    simp [step, cil_guard, observerCount, unaryArguments, checkedValue, formValue, inputFormed, checkedAt,
-      Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-  apply Eq.trans
-  · apply run_next (target := pc + 2) (nextFrame := frame) (updated := memory)
-      (values := .scalar (.i64 (inputLimb memory input limb)) :: rest) found h1
-    bitwise_step_simp inputField
+  cil_checked_steps 2 [found, h0, h1, unaryArguments, inputFormed, inputField]
   exact finished
 
 def unaryBody (profile : CIL.FeatureProfile) (constructor helper : Nat) : CIL.Method :=

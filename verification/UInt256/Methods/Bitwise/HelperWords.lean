@@ -69,23 +69,8 @@ theorem limb_checked (operation : Binary) (profile : CIL.FeatureProfile)
   have rightFormed := call.input_formed (reference := right) (by simp)
   have leftField := call.input_field_instruction (reference := left) (by simp) limb
   have rightField := call.input_field_instruction (reference := right) (by simp) limb
-  apply Eq.trans
-  · apply run_next (target := pc + 1) (nextFrame := frame) (updated := memory)
-      (values := .reference (.address left) :: rest) found h0
-    bitwise_step_simp leftFormed
-  apply Eq.trans
-  · apply run_next (target := pc + 2) (nextFrame := frame) (updated := memory)
-      (values := .scalar (.i64 (inputLimb memory left limb)) :: rest) found h1
-    bitwise_step_simp leftField
-  apply Eq.trans
-  · apply run_next (target := pc + 3) (nextFrame := frame) (updated := memory)
-      (values := .reference (.address right) :: .scalar (.i64 (inputLimb memory left limb)) :: rest) found h2
-    bitwise_step_simp rightFormed
-  apply Eq.trans
-  · apply run_next (target := pc + 4) (nextFrame := frame) (updated := memory)
-      (values := .scalar (.i64 (inputLimb memory right limb)) ::
-        .scalar (.i64 (inputLimb memory left limb)) :: rest) found h3
-    bitwise_step_simp rightField
+  cil_checked_steps 4 [found, h0, h1, h2, h3, binaryArguments,
+    leftFormed, rightFormed, leftField, rightField]
   simpa only [Nat.add_assoc] using finished
 
 #print axioms limb_checked
@@ -139,7 +124,7 @@ theorem binary_result (operation : Binary) (profile : CIL.FeatureProfile)
     apply Eq.trans
     · apply run_next (target := 1) (values := [.reference (.address output)])
         (nextFrame := frame) (updated := memory) found (by rfl)
-      bitwise_step_simp call.output_formed (by simp : output ∈ [output])
+      cil_checked_step [binaryArguments, call.output_formed (by simp : output ∈ [output])]
     exact prefixRun
   have setup : enterFrame (binaryBody profile constructor helper) (binaryArguments left right output) memory =
       .ok (frame, memory) := rfl

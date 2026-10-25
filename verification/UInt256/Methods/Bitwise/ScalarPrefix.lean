@@ -4,6 +4,7 @@ import UInt256.Safety.LimbAccess
 import CIL.Safety.StepComposition
 import CIL.SymbolicExecution
 import CIL.Safety.GuardNormalization
+import CIL.Safety.SymbolicExecution
 
 namespace UInt256Proof.Bitwise
 open CIL.Safety UInt256Model.Safety UInt256Model.Bitwise
@@ -63,11 +64,6 @@ def scalarBody (profile : CIL.FeatureProfile) (operation : Binary) (constructor 
     .arg 0, .fieldAt 24 8, .arg 1, .fieldAt 24 8, opcode operation,
     .newAggregate constructor 4 32, .storeAggregate 32, .ret] }
 
-macro "bitwise_step_simp" facts:term,* : tactic =>
-  `(tactic| simp [step, cil_guard, observerCount, binaryArguments, checkedValue, numericValue, formValue,
-      pureArity, checkedAt, Except.mapError, Bind.bind, Except.bind,
-      Pure.pure, Except.pure, cil_code, $[$facts:term],*])
-
 /-- All four input pairs are read before construction or output writes. This
     shared prefix therefore permits arbitrary overlap of inputs and output. -/
 theorem scalar_prefix (operation : Binary) (profile : CIL.FeatureProfile)
@@ -97,18 +93,8 @@ theorem scalar_prefix (operation : Binary) (profile : CIL.FeatureProfile)
   have r2 := rightFields (2 : Fin 4)
   have r3 := rightFields (3 : Fin 4)
   simp only [Fin.val_zero, Fin.val_one, Fin.val_two, CIL.fin_val_three, Nat.reduceMul] at l0 l1 l2 l3 r0 r1 r2 r3
-  iterate 23
-    apply Eq.trans
-    · apply run_next found
-      · simp only [scalarBody]; rfl
-      · first
-        | exact word_step operation _ _ _ _ _ _ _ _
-        | exact feature_disabled _ scalar _ _ _ _ _
-        | exact scalar_branch _ _ _ _ _ _ _
-        | (bitwise_step_simp leftFormed, rightFormed, outputFormed, l0, l1, l2, l3, r0, r1, r2, r3
-           try exact ⟨rfl, rfl, rfl, rfl⟩
-           done)
-  rfl
+  cil_checked_steps 23 [found, scalarBody, binaryArguments, scalar, word_step operation,
+    leftFormed, rightFormed, outputFormed, l0, l1, l2, l3, r0, r1, r2, r3]
 
 #print axioms word_step
 #print axioms scalar_prefix

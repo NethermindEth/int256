@@ -85,11 +85,11 @@ theorem ScratchCells.known_locals {memory : Memory} {cells : List Reference}
       slots[index]? = some (LocalSlot.bytes .vector256 cell))
     (defined : ∀ (index : Nat) (value : BitVec 256), known index = some value →
       ∃ cell : Reference, cells[index]? = some cell) :
-    KnownLocals memory slots (fun index => (known index).map .v256) := by
+    LocalSnapshots memory slots (fun index => (known index).map .v256) := by
   intro index value specified
   obtain ⟨stored, remembered, rfl⟩ := Option.map_eq_some_iff.mp specified
   obtain ⟨cell, found⟩ := defined index stored remembered
-  exact ⟨.vector256, cell, stored.toNat, homes index cell found, rfl, rfl,
+  exact ⟨.vector256, cell, .v256 stored, stored.toNat, homes index cell found, rfl, rfl,
     (scratch index cell found).2 stored remembered⟩
 
 theorem CallingConditions.without_inputs {program : CIL.Program} {memory : Memory}
@@ -242,11 +242,9 @@ theorem VectorFrame.cell_store {program : CIL.Program} {original entered current
     state.authority.trans (write_preserves_access_below write _), ?_, ?_, ?_⟩, next⟩
   · simp [step, cil_guard, observerCount, staticInstruction, memoryInstruction, storeValue, referenceAt, ordinaryAccessAlignment,
       write, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-  · intro other entry specified
-    obtain ⟨kind, reference, number, slot, fits, result, loaded⟩ := state.locals other entry specified
-    have home := homes.home_bound other kind reference slot
-    exact ⟨kind, reference, number, slot, fits, result, write_preserves_disjoint_read write loaded
-      (Or.inl (Nat.ne_of_gt (Nat.lt_of_lt_of_le bounds.2 home)))⟩
+  · exact state.locals.after_write_apart write (fun other _ kind reference _ slot =>
+      Or.inl (Nat.ne_of_gt (Nat.lt_of_lt_of_le bounds.2
+        (homes.home_bound other kind reference slot))))
   · intro id old offset away
     exact (write_outside _ _ _ _ _ id offset write (Or.inl (Nat.ne_of_lt (Nat.lt_of_lt_of_le old bounds.1)))).trans
       (state.caller id old offset away)
@@ -300,7 +298,7 @@ theorem VectorFrame.after_child {program : CIL.Program} {original entered curren
     (footprint : ∀ id, id < original.nextIdentity → ∀ offset, OutsideOutput output id offset →
       after.cells id offset = original.cells id offset)
     (result : CIL.Safety.read after output 32 1 = .ok (numberBytes value.toNat 32))
-    (locals : KnownLocals after frame.locals known') :
+    (locals : LocalSnapshots after frame.locals known') :
     VectorFrame program original entered after inputs output frame known' (some value) :=
   ⟨call, state.enteredWF, state.enteredBound, Nat.le_trans state.next grown,
     state.authority.trans (authority.weaken state.next), locals,

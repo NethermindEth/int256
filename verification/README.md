@@ -131,6 +131,13 @@ metadata must satisfy that equality; the template is not an assumed helper contr
 The independent arithmetic, checked finite return and caller-memory guarantees
 remain part of each public certificate.
 
+Bitwise scalar prefixes and limb helpers use LeanCIL's checked stepping tactics.
+Equality and comparison wrappers share the same read-only forwarder composition;
+its call and return steps use LeanCIL's checked forwarder lemmas. Vector frames
+use `LocalSnapshots` to retain exact loaded values across local stores, disjoint
+output writes and calls that preserve the older memory. These shared proofs keep
+the existing overlap, finite-return and caller-memory contracts, and each gate
+still binds the actual extracted body and verifies its own public theorem.
 LeanCIL's existing authenticated support cache can reuse these compiled theorems
 and their kernel checks across different gates in the same batch. The first gate
 still checks the shared proof; subsequent gates freshly check their extraction,

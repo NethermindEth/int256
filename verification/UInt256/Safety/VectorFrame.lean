@@ -1,5 +1,5 @@
 import CIL.Safety.Equations
-import CIL.Safety.WordSnapshots
+import CIL.Safety.LocalSnapshots
 import CIL.Safety.NumericHomes
 import UInt256.Safety.CallerSetup
 import UInt256.Safety.OutputAccess
@@ -14,38 +14,12 @@ import CIL.Safety.MethodContract
 namespace UInt256Model.Safety
 open CIL.Safety
 
-/-- Remembered typed locals; a missing entry grants no initialization or value fact. -/
-def KnownLocals (memory : Memory) (slots : List LocalSlot) (known : Nat → Option CIL.Value) : Prop :=
-  ∀ index value, known index = some value →
-    ∃ kind reference number, slots[index]? = some (.bytes kind reference) ∧
-      localNumber kind value = .ok number ∧ localResult kind value = value ∧
-      CIL.Safety.read memory reference (localWidth kind) 1 = .ok (numberBytes number (localWidth kind))
-
-def rememberLocal (known : Nat → Option CIL.Value) (index : Nat) (value : CIL.Value) :
-    Nat → Option CIL.Value := fun other => if other = index then some value else known other
-
 theorem NumericHomes.writable {memory : Memory} {lower : Nat} {specs slots}
     (homes : NumericHomes memory lower specs slots) :
     WritableHomes memory lower (numericKinds specs) slots := by
   induction homes with
   | nil lower => exact .nil lower
   | cons reference spec fresh _ writable _ ih => exact .cons reference spec.kind fresh writable ih
-
-/-- Unchanged bytes of every remembered home, with retained authority, keep the snapshots. -/
-theorem KnownLocals.preserve {before after : Memory} {slots : List LocalSlot}
-    {known : Nat → Option CIL.Value} (locals : KnownLocals before slots known)
-    (wf : before.WellFormed) (authority : AccessBelow before.nextIdentity before after)
-    (unchanged : ∀ index value, known index = some value → ∀ kind reference,
-      slots[index]? = some (.bytes kind reference) → ∀ offset,
-        after.cells reference.allocation offset = before.cells reference.allocation offset) :
-    KnownLocals after slots known := by
-  intro index value specified
-  obtain ⟨kind, reference, number, slot, fits, result, loaded⟩ := locals index value specified
-  have ready := read_access loaded
-  obtain ⟨allocation, requirements⟩ := access_requirements ready
-  have old := (wf.1 _ _ requirements.present).1
-  exact ⟨kind, reference, number, slot, fits, result,
-    authority.read_eq loaded old (fun i _ => unchanged index value specified kind reference slot _)⟩
 
 /-- A frame's remembered locals, its caller-visible effects so far and the output contents. -/
 structure VectorFrame (program : CIL.Program) (original entered current : Memory)
@@ -56,7 +30,7 @@ structure VectorFrame (program : CIL.Program) (original entered current : Memory
   enteredBound : original.nextIdentity ≤ entered.nextIdentity
   next : entered.nextIdentity ≤ current.nextIdentity
   authority : AccessBelow entered.nextIdentity entered current
-  locals : KnownLocals current frame.locals known
+  locals : LocalSnapshots current frame.locals known
   caller : ∀ id, id < original.nextIdentity → ∀ offset, (stored = none ∨ OutsideOutput output id offset) →
     current.cells id offset = original.cells id offset
   result : ∀ value, stored = some value → read current output 32 1 = .ok (numberBytes value.toNat 32)
@@ -95,10 +69,7 @@ theorem VectorFrame.load {program : CIL.Program} {original entered current : Mem
     (specified : known index = some value) :
     step body (.local index) pc args frame stack current =
       .ok (.next (pc + 1) (.scalar value :: stack) frame current) := by
-  obtain ⟨kind, reference, number, slot, fits, result, loaded⟩ := state.locals index value specified
-  have stepped := step_load_numeric_local (body := body) (pc := pc) (args := args) (stack := stack)
-    kind value number fits slot loaded
-  rwa [result] at stepped
+  exact state.locals.load value specified
 
 /-- A typed local store remembers its value and changes only that private home. -/
 theorem VectorFrame.store {program : CIL.Program} {original entered current : Memory}
@@ -129,26 +100,8 @@ theorem VectorFrame.store {program : CIL.Program} {original entered current : Me
   refine ⟨after, stepped, state.call.after_write written, state.enteredWF, state.enteredBound,
     Nat.le_trans state.next (write_extends_allocations _ _ _ _ _ written).next,
     state.authority.trans (write_preserves_access_below written _), ?_, ?_, ?_⟩
-  · intro other otherValue otherSpecified
-    by_cases same : other = index
-    · subst other
-      have sameValue : value = otherValue := by simpa [rememberLocal] using otherSpecified
-      subst otherValue
-      exact ⟨kind, reference, number, slot, fits, result, readback⟩
-    · have previous : known other = some otherValue := by
-        simpa [rememberLocal, same] using otherSpecified
-      let others : Nat → Option CIL.Value := fun i => if i = index then none else known i
-      have restricted : KnownLocals current frame.locals others := by
-        intro i v specifiedI
-        by_cases hi : i = index
-        · simp [others, hi] at specifiedI
-        · exact state.locals i v (by simpa [others, hi] using specifiedI)
-      have kept := restricted.preserve state.call.1.1 (write_preserves_access_below written _)
-        (fun i v specifiedI k r slotI offset => by
-          by_cases hi : i = index
-          · simp [others, hi] at specifiedI
-          · exact outside _ (homes.distinct i index k kind r reference hi slotI slot) offset)
-      exact kept other otherValue (by simpa [others, same] using previous)
+  · simpa only [result] using
+      state.locals.after_write homes index kind reference value number fits slot written
   · intro id old offset away
     have different : id ≠ reference.allocation := by omega
     exact (outside id different offset).trans (state.caller id old offset away)
@@ -234,10 +187,8 @@ theorem VectorFrame.output_store {program : CIL.Program} {original entered curre
     state.authority.trans (write_preserves_access_below written _), ?_, ?_, ?_⟩
   · simp [step, cil_guard, observerCount, staticInstruction, memoryInstruction, storeValue, referenceAt, ordinaryAccessAlignment,
       written, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-  · intro index entry specified
-    obtain ⟨kind, reference, number, slot, fits, result, loaded⟩ := state.locals index entry specified
-    exact ⟨kind, reference, number, slot, fits, result,
-      write_preserves_disjoint_read written loaded (Or.inl (separate index kind reference slot))⟩
+  · exact state.locals.after_write_apart written
+      (fun index _ kind reference _ slot => Or.inl (separate index kind reference slot))
   · intro id old offset away
     have away := away.resolve_left (by simp)
     exact (outside id offset away).trans (state.caller id old offset (Or.inr away))
@@ -258,12 +209,7 @@ theorem VectorFrame.after_call {program : CIL.Program} {original entered current
     Nat.lt_of_lt_of_le old (Nat.le_trans state.enteredBound state.next)
   refine ⟨state.call.after_memory_below preserved wf world, state.enteredWF, state.enteredBound,
     Nat.le_trans state.next grown, state.authority.trans (preserved.accessBelow.weaken state.next), ?_, ?_, ?_⟩
-  · intro index value specified
-    obtain ⟨kind, reference, number, slot, fits, result, loaded⟩ := state.locals index value specified
-    have ready := read_access loaded
-    obtain ⟨allocation, requirements⟩ := access_requirements ready
-    exact ⟨kind, reference, number, slot, fits, result,
-      (preserved.read reference (state.call.1.1.1 _ _ requirements.present).1 _ _).trans loaded⟩
+  · exact state.locals.after_below preserved state.call.1.1
   · intro id old offset away
     exact (preserved.cells id (older id old) offset).trans (state.caller id old offset away)
   · intro value specified

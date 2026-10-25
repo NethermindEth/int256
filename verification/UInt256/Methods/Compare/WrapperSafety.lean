@@ -1,3 +1,4 @@
+import CIL.Safety.SymbolicExecution
 import UInt256.Methods.Bindings
 import UInt256.Safety.ReadOnlyExecution
 import UInt256.Safety.ReadOnlyForwarder
@@ -59,16 +60,7 @@ theorem wrapper_prefix (wrapper : Wrapper) (left right : Reference) (frame : Fra
     conv at continuation in (wrapperCall _) => cbv
     simp only [childArguments, show middleSwaps = _ from rfl, Bool.true_eq, ite_true, ite_false, readOnlyArguments, List.map_cons, List.map_nil,
       List.reverse_cons, List.reverse_nil, List.nil_append, List.cons_append] at continuation
-    repeat' first
-      | exact continuation
-      | (apply run_next_exists post
-         · simp only [cil_code]; rfl
-         · simp only [cil_code]; rfl
-         · simp (config := { implicitDefEqProofs := false })
-             [cil_code, readOnlyArguments, step, cil_guard, observerCount, checkedValue, numericValue, formValue,
-               fl, fr, pureArity, scalars, CIL.step, CIL.unary, CIL.truth, CIL.FeatureProfile.evaluate,
-               checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-           try (exact ⟨rfl, rfl, rfl, rfl⟩))
+    cil_contract_steps [readOnlyArguments, fl, fr] until continuation
 
 #print axioms wrapper_prefix
 end UInt256Proof.Compare.Safety

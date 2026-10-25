@@ -1,3 +1,4 @@
+import CIL.Safety.Forwarders
 import CIL.Safety.Equations
 import UInt256.Safety.ReadOnlyExecution
 import CIL.Safety.CallComposition
@@ -87,16 +88,10 @@ theorem compose_readOnly_binary (program : CIL.Program) (method pc callee : Nat)
   have stepped : step body (.call callee 2) pc (readOnlyArguments [left, right]) frame
       (childArguments left right).reverse entered =
       .ok (.call callee (childArguments left right) [] entered) := by
-    have count := length left right
-    simp only [step, cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, List.length_reverse, count]
-    simp only [Nat.lt_irrefl, ite_false]
-    have take : List.take 2 (childArguments left right).reverse = (childArguments left right).reverse := by
-      apply List.take_of_length_le
-      simp [count]
-    have drop : List.drop 2 (childArguments left right).reverse = [] := by
-      apply List.drop_eq_nil_of_le
-      simp [count]
-    simp [unspecifiedOperands, take, drop, known, checkedChild, Bind.bind, Except.bind, Pure.pure, Except.pure]
+    have valid := (checkedValues_valid _ _ _ checkedChild).2
+    simpa only [length left right] using step_call_loaded (body := body)
+      (callee := callee) (pc := pc) (args := readOnlyArguments [left, right])
+      (frame := frame) valid (known left right)
   let value := operation (inputValue entered left) (inputValue entered right)
   obtain ⟨suffixFuel, tail⟩ := suffixProof childFinal left right frame
     (inputValue entered left) (inputValue entered right)
@@ -164,8 +159,13 @@ theorem forward_readOnly_binary (program : CIL.Program) (method pc callee : Nat)
     refine ⟨1, ?_⟩
     obtain ⟨flag, result, normalizedFlag⟩ := normalized x y
     rw [result]
-    simp [run, lookup, forwarding, step, cil_guard, observerCount, returns, checkedValue, numericValue, normalizedFlag,
-      Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
+    apply run_return lookup forwarding
+    · apply step_return_unchanged
+      · simp [returns]
+      · rfl
+      · rfl
+      · exact ⟨flag, rfl, normalizedFlag⟩
+    · rfl
   · exact prefixProof
 
 #print axioms compose_readOnly_binary

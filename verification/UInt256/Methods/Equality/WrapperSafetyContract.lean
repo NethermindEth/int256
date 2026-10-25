@@ -1,3 +1,5 @@
+import UInt256.Safety.ReadOnlyForwarder
+import CIL.Safety.SymbolicExecution
 import UInt256.Methods.Bindings
 import UInt256.Safety.ReadOnlyExecution
 import CIL.Safety.CallComposition
@@ -48,32 +50,9 @@ theorem wrapper_prefix (outer : Bool) (left right : Reference) (frame : Frame) (
     conv in (wrapperIndex _) => cbv
     conv at continuation in (wrapperIndex _) => cbv
     conv at continuation in (wrapperCall _) => cbv
-    repeat' first
-      | exact continuation
-      | (apply run_next_exists post
-         · simp only [cil_code]; rfl
-         · simp only [cil_code]; rfl
-         · simp (config := { implicitDefEqProofs := false })
-             [cil_code, readOnlyArguments, step, cil_guard, observerCount, checkedValue, numericValue, formValue,
-               fl, fr, pureArity, scalars, CIL.step, CIL.truth, CIL.FeatureProfile.evaluate,
-               checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-           try (exact ⟨rfl, rfl, rfl, rfl⟩))
-
-theorem wrapper_return (outer : Bool) (args : List Value) (flag : BitVec 32)
-    (frame : Frame) (memory : Memory)
-    (normalized : CIL.NarrowKind.unsigned8.extend flag = flag)
-    (forwarding : (wrapperBody outer).code[wrapperCall outer + 1]? = some (.ret (some .unsigned8))) :
-    run Extracted.program 1 (wrapperIndex outer) (wrapperCall outer + 1) args frame
-      [.scalar (.i32 flag)] memory = .ok (leaveFrame frame memory, [.scalar (.i32 flag)]) := by
-  have lookup : Extracted.program[wrapperIndex outer]? = some (wrapperBody outer) := by
-    cases outer <;> rfl
-  have returns : (wrapperBody outer).returnsValue = true := by cases outer <;> rfl
-  rw [run]
-  simp [lookup, forwarding, step, cil_guard, observerCount, returns, checkedValue, numericValue, normalized,
-    Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
+    cil_contract_steps [readOnlyArguments, fl, fr] until continuation
 
 #print axioms wrapper_prefix
-#print axioms wrapper_return
 
 end UInt256Proof.Equality.Safety
 
@@ -98,71 +77,38 @@ theorem wrapper_checked (outer : Bool)
     (forwarding : (wrapperBody outer).code[wrapperCall outer + 1]? = some (.ret (some .unsigned8)))
     (child : EqualityInvocation (wrapperCallee outer)) :
     EqualityInvocation (wrapperIndex outer) := by
-  intro memory left right call
-  have lookup : Extracted.program[wrapperIndex outer]? = some (wrapperBody outer) := by
-    cases outer <;> rfl
-  have fits : FrameSetupFits (wrapperBody outer) (readOnlyArguments [left, right]) := by
+  apply forward_readOnly_binary Extracted.program (wrapperIndex outer) (wrapperCall outer)
+    (wrapperCallee outer) (wrapperBody outer)
+    (fun left right => .i32 (if left = right then 1 else 0))
+    (fun left right => readOnlyArguments [left, right])
+  · cases outer <;> rfl
+  · cases outer <;> rfl
+  · exact forwarding
+  · cases outer <;> rfl
+  · intro left right
     cases outer
     all_goals
       conv in (wrapperBody _) => cbv
-      simp [FrameSetupFits, InitializersFit, AggregateArgumentsFit, ParameterArgumentsFit, SelectedKindsFit]
-  obtain ⟨frame, entered, setup, live⟩ := call.readOnly_setup_succeeds fits
-  have enteredCall := call.after_frame_setup setup
-  obtain ⟨childFuel, childFinal, childCertificate, childCells⟩ := child entered left right enteredCall
-  have fl := enteredCall.input_formed (reference := left) (by simp)
-  have fr := enteredCall.input_formed (reference := right) (by simp)
-  have fetched : (wrapperBody outer).code[wrapperCall outer]? = some (.call (wrapperCallee outer) 2) := by
-    cases outer <;> rfl
-  have stepped : step (wrapperBody outer) (.call (wrapperCallee outer) 2) (wrapperCall outer)
-      (readOnlyArguments [left, right]) frame [.reference (.address right), .reference (.address left)] entered =
-      .ok (.call (wrapperCallee outer) (readOnlyArguments [left, right]) [] entered) := by
-    simp [step, cil_guard, observerCount, readOnlyArguments, checkedValue, formValue, fl, fr, checkedAt,
-      Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-  obtain ⟨tailFuel, tail⟩ := run_call_exists lookup fetched stepped
-    ⟨childFuel, childCertificate.1⟩ ⟨1, wrapper_return outer _ _ frame childFinal (by split <;> decide) forwarding⟩
-  let flag : BitVec 32 := if inputValue entered left = inputValue entered right then 1 else 0
-  let post : Memory → List Value → Prop :=
-    fun final values => final = leaveFrame frame childFinal ∧ values = [.scalar (.i32 flag)]
-  obtain ⟨fuel, final, values, finished, sameFinal, sameValues⟩ :=
-    wrapper_prefix outer left right frame entered enteredCall post ⟨tailFuel, _, _, tail, rfl, rfl⟩
-  subst final
-  subst values
-  have initialFlag : flag = (if inputValue memory left = inputValue memory right then 1 else 0) := by
-    simp only [flag, call.input_value_after_setup setup (by simp : left ∈ [left, right]),
-      call.input_value_after_setup setup (by simp : right ∈ [left, right])]
-  rw [initialFlag] at finished
-  have checked : (readOnlyArguments [left, right]).mapM (checkedValue memory) =
-      .ok (readOnlyArguments [left, right]) := by
-    have leftFormed := call.input_formed (reference := left) (by simp)
-    have rightFormed := call.input_formed (reference := right) (by simp)
-    simp [readOnlyArguments, checkedValue, formValue, leftFormed, rightFormed, checkedAt,
-      Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-  refine ⟨fuel, _, certify_invocation _ _ _ _ _ _ _ _ _ _ lookup checked setup live finished, ?_⟩
-  have before := enterFrame_preserves_caller_memory _ _ _ _ _ setup
-  have fresh := enterFrame_fresh _ _ _ _ _ setup
-  have after := leaveFrame_preserves_memory_below frame childFinal memory.nextIdentity
-    (fun id member => (fresh.2 id member).1)
-  intro id bound offset
-  exact (after.cells id bound offset).trans
-    ((childCells id (Nat.lt_of_lt_of_le bound fresh.1.next) offset).trans (before.cells id bound offset))
+      simp [FrameSetupFits, InitializersFit, AggregateArgumentsFit,
+        ParameterArgumentsFit, SelectedKindsFit]
+  · intros; rfl
+  · intros; rfl
+  · intros; rfl
+  · intro left right
+    refine ⟨_, rfl, ?_⟩
+    split <;> decide
+  · exact child
+  · intro memory left right frame call post continuation
+    exact wrapper_prefix outer left right frame memory call post continuation
 
 theorem equality_readOnly_contract
     (entry : EqualityInvocation Extracted.entryIndex) :
     ReadOnlyContract
       (fun values => .i32 (if values[0]?.getD 0 = values[1]?.getD 0 then 1 else 0))
       Extracted.program Extracted.entryIndex 2 := by
-  intro memory inputs arity call
-  cases inputs with
-  | nil => simp at arity
-  | cons left rest =>
-    cases rest with
-    | nil => simp at arity
-    | cons right tail =>
-      cases tail with
-      | cons _ _ => simp at arity
-      | nil =>
-        simpa only [List.map_cons, List.map_nil, List.getElem?_cons_zero,
-          List.getElem?_cons_succ, Option.getD_some] using entry memory left right call
+  exact BinaryReadOnlyInvocation.to_contract
+    (operation := fun left right => .i32 (if left = right then 1 else 0))
+    (program := Extracted.program) (method := Extracted.entryIndex) entry
 
 #print axioms equality_readOnly_contract
 #print axioms wrapper_checked
