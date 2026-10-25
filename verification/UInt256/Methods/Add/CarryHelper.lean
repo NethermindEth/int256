@@ -1,3 +1,4 @@
+import UInt256.Generated.AddTemplates
 import UInt256.Arithmetic.Carry
 import CIL.Safety.WordLocals
 import CIL.Safety.StepComposition
@@ -13,31 +14,13 @@ import UInt256.Methods.Add.CarryRun
 import CIL.Safety.MethodContract
 import UInt256.Safety.PrivateCalls
 namespace UInt256Proof.Add.CarrySafety
-def carryBody (profile : CIL.FeatureProfile) : CIL.Method := { profile := profile, returnsValue := false, locals := [.i64 0, .i64 0], localKinds := [.word64, .word64], parameterHomes := [], staticSites := [], code := [
-  .arg 0,
-  .arg 1,
-  .add,
-  .setLocal 0,
-  .local 0,
-  .arg 2,
-  .load64,
-  .add,
-  .setLocal 1,
-  .arg 2,
-  .local 0,
-  .arg 0,
-  .ltu,
-  .convI8,
-  .local 1,
-  .local 0,
-  .ltu,
-  .convI8,
-  .add,
-  .store64,
-  .arg 3,
-  .local 1,
-  .store64,
-  .ret] }
+def carryBody (profile : CIL.FeatureProfile) : CIL.Method := by_elab
+  let body ← Lean.Elab.Term.elabTermAndSynthesize
+    (← `(UInt256Proof.Generated.Add.method3
+      $(Lean.mkIdent `profile))) none
+  let some unfolded ← Lean.Meta.unfoldDefinition? body
+    | throwError "Expected generated template application"
+  return ← Lean.Meta.withTransparency .default (Lean.Meta.reduce unfolded)
 
 theorem carryBody_shape {profile : CIL.FeatureProfile} : CarryShape (carryBody profile) := ⟨rfl, rfl, rfl, rfl, rfl⟩
 end UInt256Proof.Add.CarrySafety

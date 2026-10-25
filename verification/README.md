@@ -366,3 +366,38 @@ The previous pin's negative check replaced the first `add` in the compiled
 (now the gate's `carryBody` binding) and emitted no certificate. That check was not the full mutation suite.
 Further extraction or proof-composition gaps should be reproduced upstream
 rather than hidden behind consumer copies of CIL infrastructure.
+
+## Generated Add bodies
+
+The Add ARM/SSE dispatch, small helpers, Vector128 helper and AVX2/AVX512 `PrepareAdd`
+bodies come from the pinned LeanCIL `templates` command. Their shared definitions live in
+`UInt256/Generated`; the existing proof modules specialize their flags and callee indices.
+The compiled-method gates still check the exact extraction-to-body equalities. Generating
+a template does not produce a certificate, and no arithmetic or caller-memory contract changes.
+
+Regenerate after building the implementation and pinned extractor:
+
+```sh
+dotnet build src/Nethermind.Int256/Nethermind.Int256.csproj -c Release
+dotnet build verification/.lake/packages/leancil/Extractor -c Release
+dotnet run --file verification/GenerateTemplates.cs
+dotnet run --file verification/GenerateTemplates.cs -- --check
+```
+
+The generator uses independently rechecked extractions of `AddScalar` on `scalar`,
+`arm64-advsimd` and `x64-sse42`, and `PrepareAdd` on `x64-v3` and `x64-v4`. It changes only
+the generated Lean namespace and omits unused per-PC equations with checked schema/name guards.
+The original command output, including those equations, remains in `artifacts/generated-templates`.
+Only the shared bodies are committed and included in the compiled-library audit. Specialization wrappers
+retain their previous total definitions, including exact profile metadata and callee parameters.
+The alternative masked-prepare regression body remains handwritten because it deliberately
+describes different code. Existing regression witnesses and gate registrations are retained.
+
+Fixed-flag wrappers use Lean's built-in elaboration and reduction once to materialize their
+specialized definitions; the kernel still checks the resulting ordinary terms. The `PrepareAdd`
+flag remains a parameter. This removes handwritten instruction lists, not proof obligations.
+The fixed selected-module kernel workload, including generated declarations, changes from
+17,491,210 to 17,677,369 raw heartbeats (+1.06%); this migration is a maintenance improvement,
+not a proof-speed claim. Direct template aliases without once-only specialization cost 18,564,057.
+Whole-entry Add generation is currently blocked by the reachable `get_BroadcastLookup` static-site
+metadata; the migrated helpers avoid that unsupported input without removing metadata or checks.
