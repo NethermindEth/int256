@@ -12,7 +12,7 @@ if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("LEAN_NUM_THREADS"))
 
 string action = "contracts", profile = "scalar";
 string? proof = null, theorem = null;
-int? parallel = null, groupParallel = null;
+int? parallel = null;
 List<string> methods = [];
 BatchGroup[]? groups = null;
 bool methodsSpecified = false;
@@ -30,11 +30,10 @@ for (int index = 0; index < args.Length; index++)
         case "--proof": proof = args[index]; break;
         case "--theorem": theorem = args[index]; break;
         case "--parallel": parallel = int.Parse(args[index], System.Globalization.CultureInfo.InvariantCulture); break;
-        case "--group-parallel": groupParallel = int.Parse(args[index], System.Globalization.CultureInfo.InvariantCulture); break;
         default: throw new ArgumentException($"Unknown option: {option}");
     }
 }
 if (groups is not null && methodsSpecified) throw new ArgumentException("Use either --groups-json or --method");
 if (!methodsSpecified) methods.Add("Add");
-await VerificationRunner.Run(VerificationSupport.Root, new(action, methods.ToArray(), profile, proof, theorem, parallel, groups, groupParallel),
+await VerificationRunner.Run(VerificationSupport.Root, new(action, methods.ToArray(), profile, proof, theorem, parallel, groups),
     async (command, arguments) => { await VerificationSupport.Run(VerificationSupport.Root, command, arguments); });

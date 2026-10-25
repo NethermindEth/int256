@@ -30,7 +30,7 @@ internal static class VerificationSelection
     internal const int Jobs = 8;
 
     // Every job builds the shared support once, so fewer, balanced jobs beat one job per gate.
-    // Each profile in a job is its own batch session, so only profiles heavier than a job are split.
+    // Keep profile chunks together unless their measured work outweighs a job's share.
     internal static Batch[] Partition(string root, Gate[] selected, Dictionary<string, string[]>? imports = null)
     {
         if (selected.Length == 0) return [];
@@ -42,7 +42,7 @@ internal static class VerificationSelection
             chunks.AddRange(Balance(profile, gate => cost[gate].Weight, (int)Math.Ceiling(Weight(profile) / target))
                 .Where(chunk => chunk.Count > 0));
         List<List<Gate>>[] jobs = Balance(chunks, Weight, Math.Min(Jobs, chunks.Count));
-        // Only a job's last group exports support, so it is the group with the most shareable modules.
+        // Keep extraction order stable within the shared session, using support size and profile name.
         return [.. jobs.Select((job, index) => new Batch($"job-{index}",
             [.. job.SelectMany(chunk => chunk).GroupBy(gate => gate.Profile)
                 .OrderBy(group => group.Sum(gate => cost[gate].Support))

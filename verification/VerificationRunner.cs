@@ -7,7 +7,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 
 internal sealed record VerificationOptions(string Action, string[] Methods, string Profile, string? Proof = null, string? Theorem = null,
-    int? Parallel = null, BatchGroup[]? Groups = null, int? GroupParallel = null);
+    int? Parallel = null, BatchGroup[]? Groups = null);
 
 internal static class VerificationRunner
 {
@@ -39,18 +39,13 @@ internal static class VerificationRunner
         await command("dotnet", ["build", "../src/Nethermind.Int256/Nethermind.Int256.csproj", "-c", "Release",
             "-p:GenerateDocumentationFile=true", "-p:WarningsNotAsErrors=CS1591", "-nowarn:CS1591"]);
         Stopwatch elapsed = Stopwatch.StartNew();
-        List<string>[] failed = [.. groups.Select(_ => new List<string>())];
-        Task Group(int index) => RunGroup(root, options with { Profile = groups[index].Profile, Methods = groups[index].Methods },
-            index == groups.Length - 1, inventory, gates, failed[index], command, tool);
-        // Later profiles restore the first one's support from the local cache; a session peaks near 5 GB, so run
-        // one per 8 cores and 8 GB. Hiding the export is process-wide, so exporting jobs stay sequential.
-        int concurrency = string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(ExportVariable))
-            ? options.GroupParallel ?? Math.Max(1, (int)Math.Min(Environment.ProcessorCount / 8,
-                GC.GetGCMemoryInfo().TotalAvailableMemoryBytes / (8L << 30))) : 1;
-        await Group(0);
-        await Parallel.ForEachAsync(Enumerable.Range(1, groups.Length - 1),
-            new ParallelOptions { MaxDegreeOfParallelism = concurrency }, async (index, _) => await Group(index));
-        List<string> failures = [.. failed.SelectMany(group => group)];
+        List<string> failures = [];
+        List<Request> ready = [];
+        foreach (var group in groups)
+            await ExtractGroup(root, options with { Profile = group.Profile, Methods = group.Methods },
+                inventory, gates, ready, failures, command, tool);
+        // The verifier builds the union of all selected proof support once, across profiles too.
+        if (ready.Count > 0) await VerifyBatch(root, options, ready, failures, command, tool);
         int total = groups.Sum(group => group.Methods.Length);
         Console.WriteLine($"{options.Action} finished in {elapsed.Elapsed.TotalSeconds:F1}s: {total - failures.Count} passed, {failures.Count} failed");
         if (failures.Count > 0) throw new InvalidOperationException(string.Join(Environment.NewLine, failures));
@@ -60,10 +55,9 @@ internal static class VerificationRunner
     internal static readonly string[] AuditArguments =
         ["--module", "UInt256", "--prefix", "UInt256Model", "--prefix", "UInt256Proof", "--axioms", "propext,Quot.sound,Classical.choice"];
 
-    static async Task RunGroup(string root, VerificationOptions options, bool lastGroup, JsonDocument inventory, Gate[] gates,
-        List<string> failures, Func<string, string[], Task> command, string tool)
+    static async Task ExtractGroup(string root, VerificationOptions options, JsonDocument inventory, Gate[] gates,
+        List<Request> ready, List<string> failures, Func<string, string[], Task> command, string tool)
     {
-        List<Request> ready = [];
         foreach (string method in options.Methods)
         {
             Console.WriteLine($"START extract {method}/{options.Profile}");
@@ -92,7 +86,7 @@ internal static class VerificationRunner
                 string profileArgument = File.Exists(Path.Combine(root, $"manifests/profiles/{profile}.json")) ? $"@manifests/profiles/{profile}.json" : profile;
                 await command("dotnet", [tool, "extract", "../src/artifacts/bin/Nethermind.Int256/release/Nethermind.Int256.dll",
                     targets[0].GetProperty("signature").GetString()!, output, profileArgument, "--assume-initialized", "Nethermind.Int256.UInt256"]);
-                if (options.Action == "verify") ready.Add(new(method, output, proof!, theorem!));
+                if (options.Action == "verify") ready.Add(new(method, profile, output, proof!, theorem!));
                 else Console.WriteLine($"PASS extract {method}/{profile}");
             }
             catch (Exception exception)
@@ -101,22 +95,17 @@ internal static class VerificationRunner
                 Console.Error.WriteLine(failures[^1]);
             }
         }
-        // The artifact name carries one trusted digest, so only the job's last group exports; its
-        // session writes the union of its workspaces' support.
-        bool hidden = !lastGroup && !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(ExportVariable));
-        if (ready.Count > 0) await VerifyBatch(root, options, ready, failures, command, tool, hideExport: hidden);
     }
 
-    const string ExportVariable = "LEANCIL_EXPORT_CONSUMER_SUPPORT";
-
-    sealed record Request(string Method, string Output, string Proof, string Theorem);
+    sealed record Request(string Method, string Profile, string Output, string Proof, string Theorem);
 
     // One LeanCIL session shares the source snapshot, support build and kernel replay across requests.
     static async Task VerifyBatch(string root, VerificationOptions options, List<Request> batch, List<string> failures,
-        Func<string, string[], Task> command, string tool, bool hideExport)
+        Func<string, string[], Task> command, string tool)
     {
-        string manifest = Path.Combine(root, $"artifacts/verify-batch-{options.Profile}.json");
-        string results = Path.Combine(root, $"artifacts/verify-batch-{options.Profile}-results.json");
+        var batchName = options.Groups is { Length: > 1 } ? "profiles" : options.Groups?[0].Profile ?? options.Profile;
+        string manifest = Path.Combine(root, $"artifacts/verify-batch-{batchName}.json");
+        string results = Path.Combine(root, $"artifacts/verify-batch-{batchName}-results.json");
         Directory.CreateDirectory(Path.GetDirectoryName(manifest)!);
         File.Delete(results);
         File.WriteAllText(manifest, JsonSerializer.Serialize(new
@@ -132,18 +121,12 @@ internal static class VerificationRunner
         }));
         List<string> arguments = [tool, "verify-batch", manifest, "--results", results];
         if (options.Parallel is int parallel) arguments.AddRange(["--parallel", parallel.ToString(CultureInfo.InvariantCulture)]);
-        string? export = Environment.GetEnvironmentVariable(ExportVariable);
         string? error = null;
         try
         {
-            if (hideExport) Environment.SetEnvironmentVariable(ExportVariable, null);
             await command("dotnet", [.. arguments]);
         }
         catch (Exception exception) { error = exception.Message; }
-        finally
-        {
-            if (hideExport) Environment.SetEnvironmentVariable(ExportVariable, export);
-        }
         JsonElement[] outcomes = [];
         if (File.Exists(results))
         {
@@ -154,15 +137,16 @@ internal static class VerificationRunner
         for (int index = 0; index < batch.Count; index++)
         {
             string method = batch[index].Method;
+            var profile = batch[index].Profile;
             if (index < outcomes.Length && outcomes[index].GetProperty("status").GetString() == "verified")
             {
-                Console.WriteLine($"PASS verify {method}/{options.Profile}");
+                Console.WriteLine($"PASS verify {method}/{profile}");
                 continue;
             }
             string reason = index < outcomes.Length
                 ? $"{outcomes[index].GetProperty("stage").GetString()}: {outcomes[index].GetProperty("error").GetString()}"
                 : error ?? "verify-batch produced no result";
-            failures.Add($"{method}/{options.Profile}: {reason}");
+            failures.Add($"{method}/{profile}: {reason}");
             Console.Error.WriteLine(failures[^1]);
         }
     }

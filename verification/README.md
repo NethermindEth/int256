@@ -107,9 +107,10 @@ establish an end-to-end speedup. Each job pays the shared support build once.
 balances jobs by the measured serial seconds per gate in `manifests/gate-seconds.json`
 (module counts did not predict them; an unsampled gate takes its method's median) and
 splits a profile only when it outweighs a job. Each job builds the extractor and
-production assembly once, then runs one `verify-batch` session per profile
-(`Verify.cs --groups-json`) with two workspaces in parallel. LeanCIL authenticates and reuses
-extraction-independent consumer modules locally on that runner, across profiles. Unchanged successful proofs can also be reused;
+production assembly once, then runs one `verify-batch` session for all selected profiles
+(`Verify.cs --groups-json`) with two workspaces in parallel. LeanCIL builds and replays the
+union of their extraction-independent proof support once and exports that union in one artifact.
+Unchanged successful proofs can also be reused;
 changed extraction and proof inputs are checked by the upstream verifier. Every selected method still needs
 its own certificate, and any failure fails the batch while allowing the other
 methods to report their results.
@@ -228,12 +229,10 @@ dotnet run --file verification/Verify.cs -- --action verify --method Subtract --
 The runner extracts every selected method, then checks them in one LeanCIL
 `verify-batch` session, which builds and replays the shared support once;
 `--parallel <n>` bounds its concurrent workspaces (LeanCIL default: processor
-count / 8). With `--groups-json`, the first profile runs alone to build the shared
-support, then the rest run concurrently: `--group-parallel <n>` bounds them
-(default: one per 8 cores and 8 GB of memory; sequential while exporting support).
-Each method still receives its own certificate. When
-`LEANCIL_EXPORT_CONSUMER_SUPPORT` is set, the last method runs as a single
-`verify` because support export requires one request. The regression runners
+count / 8). With `--groups-json`, all profiles share that same session and workspace limit;
+there is no separate group-concurrency setting. Each method/profile still receives its own
+certificate, and failures name the affected profile. `LEANCIL_EXPORT_CONSUMER_SUPPORT`
+exports the complete session's shared support without splitting out a request. The regression runners
 likewise submit each refutation and its `expect: rejected` production proof
 through one batch (`RegressionBatch.cs`). CI runs every regression runner,
 sharded by profile, whenever it runs the contract audit: on changes to any

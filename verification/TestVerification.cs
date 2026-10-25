@@ -208,7 +208,7 @@ try
         Require(singles.Length == 0, "Batch sessions export support themselves; no request is split out");
         Require(Environment.GetEnvironmentVariable(export) == (failure == "export" ? temporary : null), "Support export setting was not restored");
     }
-    // A job spans several profiles: one build, one session per profile, and only the last group exports.
+    // Every profile in a job shares one source snapshot, support union and authenticated export.
     File.WriteAllText(Path.Combine(temporary, "manifests/targets.json"), """
         {"methods":[{"id":"First","signature":"first"},{"id":"Second","signature":"second"},{"id":"Third","signature":"third"}]}
         """);
@@ -227,9 +227,9 @@ try
             if (command == "dotnet") calls.Add(arguments);
             if (arguments.Contains("verify-batch"))
             {
-                bool last = arguments[2].EndsWith("verify-batch-x64-v3.json", StringComparison.Ordinal);
-                Require(Environment.GetEnvironmentVariable(export) == (exporting && last ? temporary : null),
-                    "Only the last group's session may export, since one artifact name carries one digest");
+                Require(arguments[2].EndsWith("verify-batch-profiles.json", StringComparison.Ordinal), "Mixed profiles need one manifest");
+                Require(Environment.GetEnvironmentVariable(export) == (exporting ? temporary : null),
+                    "The shared session must retain its support export setting");
                 using JsonDocument manifest = JsonDocument.Parse(File.ReadAllText(arguments[2]));
                 JsonElement[] requests = [.. manifest.RootElement.GetProperty("requests").EnumerateArray()];
                 sessions.Add(string.Join(",", requests.Select(request => request.GetProperty("theorem").GetString())));
@@ -241,77 +241,57 @@ try
         await VerificationRunner.Run(temporary, new("verify", [], "scalar",
             Groups: [new("scalar", ["First", "Second"]), new("x64-v3", ["Third"])]), Command);
         Require(calls.Count(call => call[0] == "build") == 2, "A multi-profile job must build the tools once");
-        Require(sessions.SequenceEqual(["first,second", "third"]), "Each profile needs its own batch session");
+        Require(sessions.SequenceEqual(["first,second,third"]), "All profiles must share one batch session");
         Require(!calls.Any(call => call.Contains("verify")), "Batch sessions export support themselves; no request is split out");
         Require(calls.Where(call => call.Contains("extract")).Select(call => call[4]).SequenceEqual(
             ["artifacts/First/scalar", "artifacts/Second/scalar", "artifacts/Third/x64-v3"]), "Methods were extracted under the wrong profile");
     }
-    // Later profiles overlap but start only after the first, which builds the support they restore;
-    // failures still read in group order.
+    // The same method on different profiles has distinct outputs and profile-specific results.
     File.WriteAllText(Path.Combine(temporary, "manifests/gates.json"), """
         {"gates":[{"method":"First","profile":"scalar","proof":"First.lean","theorem":"first"},
-                  {"method":"Second","profile":"x64-sse42","proof":"Second.lean","theorem":"second"},
-                  {"method":"Third","profile":"x64-v3","proof":"Third.lean","theorem":"third"}]}
+                  {"method":"First","profile":"x64-v3","proof":"Third.lean","theorem":"third"}]}
         """);
-    Environment.SetEnvironmentVariable(export, null);
-    foreach (int? groupParallel in new int?[] { 1, 2 })
+    foreach (var failure in new[] { "extract", "verify", "missing" })
     {
-        object gate = new();
-        int running = 0, peak = 0;
-        bool early = false;
-        List<string> started = [], finished = [];
-        async Task Command(string command, string[] arguments)
+        Environment.SetEnvironmentVariable(export, temporary);
+        var batches = 0;
+        Task Command(string command, string[] arguments)
         {
-            if (!arguments.Contains("verify-batch")) return;
-            using JsonDocument manifest = JsonDocument.Parse(File.ReadAllText(arguments[2]));
-            string theorem = manifest.RootElement.GetProperty("requests")[0].GetProperty("theorem").GetString()!;
-            lock (gate) { early |= theorem != "first" && !finished.Contains("first"); started.Add(theorem); peak = Math.Max(peak, ++running); }
-            // Both later sessions overlap, and the third finishes before the second.
-            for (int wait = 0; groupParallel == 2 && theorem != "first" && wait < 500; wait++)
-            {
-                lock (gate) if (started.Count == 3 && (theorem == "third" || finished.Contains("third"))) break;
-                await Task.Delay(10);
-            }
-            File.WriteAllText(arguments[4], JsonSerializer.Serialize(new[] { new { status = "failed", stage = "proof checking", error = theorem } }));
-            lock (gate) { finished.Add(theorem); running--; }
+            if (arguments.Contains("extract") && arguments[5] == "x64-v3" && failure == "extract")
+                throw new InvalidOperationException("profile extraction rejected");
+            if (!arguments.Contains("verify-batch")) return Task.CompletedTask;
+            batches++;
+            Require(Environment.GetEnvironmentVariable(export) == temporary, "Export must not be hidden");
+            using var manifest = JsonDocument.Parse(File.ReadAllText(arguments[2]));
+            var requests = manifest.RootElement.GetProperty("requests").EnumerateArray().ToArray();
+            Require(requests.Length == (failure == "extract" ? 1 : 2), "Failed extractions must be excluded");
+            Require(requests[0].GetProperty("output").GetString()!.EndsWith(Path.Combine("First", "scalar")),
+                "The first request must retain its profile");
+            if (requests.Length == 2)
+                Require(requests[1].GetProperty("output").GetString()!.EndsWith(Path.Combine("First", "x64-v3")),
+                    "The second profile must have a distinct output");
+            var outcomes = new List<object> { new { status = "verified", stage = "", error = "" } };
+            if (failure == "verify") outcomes.Add(new { status = "failed", stage = "proof checking", error = "rejected" });
+            File.WriteAllText(arguments[4], JsonSerializer.Serialize(outcomes));
+            return Task.CompletedTask;
         }
         string? message = null;
         try
         {
-            await VerificationRunner.Run(temporary, new("verify", [], "scalar", GroupParallel: groupParallel,
-                Groups: [new("scalar", ["First"]), new("x64-sse42", ["Second"]), new("x64-v3", ["Third"])]), Command);
+            await VerificationRunner.Run(temporary, new("verify", [], "scalar",
+                Groups: [new("scalar", ["First"]), new("x64-v3", ["First"])]), Command);
         }
         catch (InvalidOperationException exception) { message = exception.Message; }
-        Require(!early && started.Count == 3,
-            "Later profiles must start after the first builds the shared support");
-        Require(peak == groupParallel, "Group concurrency must follow GroupParallel");
-        Require(message is not null && message.IndexOf("First/scalar", StringComparison.Ordinal) < message.IndexOf("Second/x64-sse42", StringComparison.Ordinal)
-            && message.IndexOf("Second/x64-sse42", StringComparison.Ordinal) < message.IndexOf("Third/x64-v3", StringComparison.Ordinal),
-            "Failures must be reported in group order regardless of completion order");
-    }
-    // An exporting job stays sequential: hiding the export is process-wide.
-    Environment.SetEnvironmentVariable(export, temporary);
-    {
-        int running = 0, peak = 0;
-        async Task Command(string command, string[] arguments)
-        {
-            if (!arguments.Contains("verify-batch")) return;
-            peak = Math.Max(peak, Interlocked.Increment(ref running));
-            await Task.Delay(20);
-            using JsonDocument manifest = JsonDocument.Parse(File.ReadAllText(arguments[2]));
-            File.WriteAllText(arguments[4], JsonSerializer.Serialize(manifest.RootElement.GetProperty("requests").EnumerateArray()
-                .Select(_ => new { status = "verified", stage = "", error = "" })));
-            Interlocked.Decrement(ref running);
-        }
-        await VerificationRunner.Run(temporary, new("verify", [], "scalar", GroupParallel: 3,
-            Groups: [new("scalar", ["First"]), new("x64-sse42", ["Second"]), new("x64-v3", ["Third"])]), Command);
-        Require(peak == 1, "An exporting job must not overlap sessions");
+        Require(batches == 1, "Profiles must not restart the verifier");
+        Require(message is not null && message.Contains("First/x64-v3") && !message.Contains("First/scalar"),
+            "Extraction failures, proof failures and missing results must retain the failing profile");
+        Require(Environment.GetEnvironmentVariable(export) == temporary, "Export setting must remain unchanged");
     }
     Environment.SetEnvironmentVariable(export, null);
     bool rejected = false;
     try { await VerificationRunner.Run(temporary, new("verify", [], "scalar", Groups: [new("scalar", ["First"]), new("scalar", ["Second"])]), (_, _) => Task.CompletedTask); }
     catch (ArgumentException) { rejected = true; }
-    Require(rejected, "A repeated profile would overwrite its batch manifest");
+    Require(rejected, "Repeated profile groups must be rejected before extraction");
     Environment.SetEnvironmentVariable(export, previousExport);
     {
         // A dropped module, prefix or axiom restriction would silently narrow the audit, and the elaborated audit is forgeable.
