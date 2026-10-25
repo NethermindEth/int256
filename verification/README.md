@@ -333,7 +333,8 @@ and WrongPolarity each get a checked refutation from `witnesses.json`.
 x64-v3 and x64-v4, and `CompareTo(in UInt256)` on scalar.
 ComparisonAlternative is proved per profile under
 `Tests/Fixtures/Compare/ComparisonAlternative/`; ComparisonLowFirst,
-ComparisonSigned and ThreeWayAlternative are refuted. ComparisonWrongLane mutates the
+ComparisonSigned and ThreeWayAlternative are refuted. The alternative proofs reuse checked stepping
+with the complementary order facts required by the compiled branches, at the default proof limit. ComparisonWrongLane mutates the
 Vector256-only path, which no .NET 10 profile reaches; the runner only checks that it leaves every gated extraction unchanged.
 Differences from the original group: ThreeWayAlternative (returns -7/9) is a
 refutation because the CompareTo contract is the exact -1/0/1 result; the

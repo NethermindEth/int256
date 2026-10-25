@@ -3,7 +3,7 @@ import UInt256.Methods.Compare.WrapperSafetyContract
 import UInt256.Safety.LimbAccess
 import UInt256.Safety.ProfileContracts
 import UInt256.Safety.ReadOnlyExecution
-import CIL.Safety.StepComposition
+import CIL.Safety.SymbolicExecution
 
 namespace CompareFixture
 open CIL.Safety UInt256Model.Safety UInt256Proof.Compare.Safety
@@ -19,17 +19,7 @@ def ladderResult (memory : Memory) (left right : Reference) : BitVec 32 :=
   else if inputLimb memory left 0 < inputLimb memory right 0 then 1 else 0
 
 macro "ladder_steps" count:num "with" facts:term,* : tactic =>
-  `(tactic| iterate $count:num
-    apply Eq.trans
-    · apply run_next
-      · simp only [cil_code]; rfl
-      · simp only [cil_code]; rfl
-      · simp (config := { implicitDefEqProofs := false })
-          [step, cil_guard, observerCount, readOnlyArguments, checkedValue, numericValue, formValue,
-            pureArity, scalars, CIL.step, CIL.unary, CIL.binary, checkedAt,
-            Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure, $[$facts:term],*]
-        try (exact ⟨rfl, rfl, rfl, rfl⟩)
-        done)
+  `(tactic| cil_checked_steps $count [readOnlyArguments, $facts:term,*])
 
 theorem ladder_run (memory : Memory) (left right : Reference) (frame : Frame)
     (call : CallingConditions Extracted.program memory [left, right] []) :
@@ -54,37 +44,49 @@ theorem ladder_run (memory : Memory) (left right : Reference) (frame : Frame)
   conv in wrapperLeafIndex => cbv
   refine ⟨48, ?_⟩
   by_cases a3 : inputLimb memory left 3 < inputLimb memory right 3
-  · rw [show ladderResult memory left right = 1 by simp [ladderResult, a3]]
-    ladder_steps 6 with k0, k1, fl, fr, hl0, hl1, hl2, hl3, hr0, hr1, hr2, hr3, a3
+  · have a3c := BitVec.not_le.mpr a3
+    rw [show ladderResult memory left right = 1 by simp [ladderResult, a3]]
+    ladder_steps 6 with k0, k1, fl, fr, hl0, hl1, hl2, hl3, hr0, hr1, hr2, hr3, a3, a3c
     simp [run, cil_code, step, cil_guard, observerCount, checkedValue, numericValue, CIL.NarrowKind.extend,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-  · by_cases b3 : inputLimb memory right 3 < inputLimb memory left 3
-    · rw [show ladderResult memory left right = 0 by simp [ladderResult, a3, b3]]
-      ladder_steps 11 with k0, k1, fl, fr, hl0, hl1, hl2, hl3, hr0, hr1, hr2, hr3, a3, b3
+  · have a3c := BitVec.not_lt.mp a3
+    by_cases b3 : inputLimb memory right 3 < inputLimb memory left 3
+    · have b3c := BitVec.not_le.mpr b3
+      rw [show ladderResult memory left right = 0 by simp [ladderResult, a3, b3]]
+      ladder_steps 11 with k0, k1, fl, fr, hl0, hl1, hl2, hl3, hr0, hr1, hr2, hr3, a3, a3c, b3, b3c
       simp [run, cil_code, step, cil_guard, observerCount, checkedValue, numericValue, CIL.NarrowKind.extend,
         Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-    · by_cases a2 : inputLimb memory left 2 < inputLimb memory right 2
-      · rw [show ladderResult memory left right = 1 by simp [ladderResult, a3, b3, a2]]
-        ladder_steps 16 with k0, k1, fl, fr, hl0, hl1, hl2, hl3, hr0, hr1, hr2, hr3, a3, b3, a2
+    · have b3c := BitVec.not_lt.mp b3
+      by_cases a2 : inputLimb memory left 2 < inputLimb memory right 2
+      · have a2c := BitVec.not_le.mpr a2
+        rw [show ladderResult memory left right = 1 by simp [ladderResult, a3, b3, a2]]
+        ladder_steps 16 with k0, k1, fl, fr, hl0, hl1, hl2, hl3, hr0, hr1, hr2, hr3, a3, a3c, b3, b3c, a2, a2c
         simp [run, cil_code, step, cil_guard, observerCount, checkedValue, numericValue, CIL.NarrowKind.extend,
           Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-      · by_cases b2 : inputLimb memory right 2 < inputLimb memory left 2
-        · rw [show ladderResult memory left right = 0 by simp [ladderResult, a3, b3, a2, b2]]
-          ladder_steps 21 with k0, k1, fl, fr, hl0, hl1, hl2, hl3, hr0, hr1, hr2, hr3, a3, b3, a2, b2
+      · have a2c := BitVec.not_lt.mp a2
+        by_cases b2 : inputLimb memory right 2 < inputLimb memory left 2
+        · have b2c := BitVec.not_le.mpr b2
+          rw [show ladderResult memory left right = 0 by simp [ladderResult, a3, b3, a2, b2]]
+          ladder_steps 21 with k0, k1, fl, fr, hl0, hl1, hl2, hl3, hr0, hr1, hr2, hr3, a3, a3c, b3, b3c, a2, a2c, b2, b2c
           simp [run, cil_code, step, cil_guard, observerCount, checkedValue, numericValue, CIL.NarrowKind.extend,
             Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-        · by_cases a1 : inputLimb memory left 1 < inputLimb memory right 1
-          · rw [show ladderResult memory left right = 1 by simp [ladderResult, a3, b3, a2, b2, a1]]
-            ladder_steps 26 with k0, k1, fl, fr, hl0, hl1, hl2, hl3, hr0, hr1, hr2, hr3, a3, b3, a2, b2, a1
+        · have b2c := BitVec.not_lt.mp b2
+          by_cases a1 : inputLimb memory left 1 < inputLimb memory right 1
+          · have a1c := BitVec.not_le.mpr a1
+            rw [show ladderResult memory left right = 1 by simp [ladderResult, a3, b3, a2, b2, a1]]
+            ladder_steps 26 with k0, k1, fl, fr, hl0, hl1, hl2, hl3, hr0, hr1, hr2, hr3, a3, a3c, b3, b3c, a2, a2c, b2, b2c, a1, a1c
             simp [run, cil_code, step, cil_guard, observerCount, checkedValue, numericValue, CIL.NarrowKind.extend,
               Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-          · by_cases b1 : inputLimb memory right 1 < inputLimb memory left 1
-            · rw [show ladderResult memory left right = 0 by simp [ladderResult, a3, b3, a2, b2, a1, b1]]
-              ladder_steps 31 with k0, k1, fl, fr, hl0, hl1, hl2, hl3, hr0, hr1, hr2, hr3, a3, b3, a2, b2, a1, b1
+          · have a1c := BitVec.not_lt.mp a1
+            by_cases b1 : inputLimb memory right 1 < inputLimb memory left 1
+            · have b1c := BitVec.not_le.mpr b1
+              rw [show ladderResult memory left right = 0 by simp [ladderResult, a3, b3, a2, b2, a1, b1]]
+              ladder_steps 31 with k0, k1, fl, fr, hl0, hl1, hl2, hl3, hr0, hr1, hr2, hr3, a3, a3c, b3, b3c, a2, a2c, b2, b2c, a1, a1c, b1, b1c
               simp [run, cil_code, step, cil_guard, observerCount, checkedValue, numericValue, CIL.NarrowKind.extend,
                 Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-            · rw [show ladderResult memory left right = (if inputLimb memory left 0 < inputLimb memory right 0 then 1 else 0) by simp [ladderResult, a3, b3, a2, b2, a1, b1]]
-              ladder_steps 35 with k0, k1, fl, fr, hl0, hl1, hl2, hl3, hr0, hr1, hr2, hr3, a3, b3, a2, b2, a1, b1
+            · have b1c := BitVec.not_lt.mp b1
+              rw [show ladderResult memory left right = (if inputLimb memory left 0 < inputLimb memory right 0 then 1 else 0) by simp [ladderResult, a3, b3, a2, b2, a1, b1]]
+              ladder_steps 35 with k0, k1, fl, fr, hl0, hl1, hl2, hl3, hr0, hr1, hr2, hr3, a3, a3c, b3, b3c, a2, a2c, b2, b2c, a1, a1c, b1, b1c
               simp [run, cil_code, step, cil_guard, observerCount, checkedValue, numericValue, CIL.NarrowKind.extend,
                 Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure] <;> try (split <;> rfl)
 
