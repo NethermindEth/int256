@@ -99,7 +99,8 @@ theorem executed (profile : CIL.FeatureProfile) (program : CIL.Program) (index c
     (call : CallingConditions program memory [left, right] []) :
     ∃ fuel, run program fuel index 0 (readOnlyArguments [left, right]) frame [] memory =
       .ok (leaveFrame frame memory, [.scalar (.i32 (if inputValue memory left = inputValue memory right then 1 else 0))]) := by
-  let childFrame : Frame := ⟨memory.nextIdentity, [], [], []⟩
+  let childFrame : Frame := {
+    activation := memory.nextIdentity, locals := [], owned := [], arguments := [], stackBytes := 0 }
   have fl := call.input_formed (reference := left) (by simp)
   have fr := call.input_formed (reference := right) (by simp)
   obtain ⟨childFuel, childRun⟩ := EqualityFixture.LeafVector.executed profile program callee leafFound memory left right childFrame call

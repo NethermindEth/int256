@@ -12,6 +12,10 @@ and caller-memory contracts retain their statements. See LeanCIL's
 [consumer migration guide](https://github.com/NethermindEth/LeanCIL/blob/e3126d4b6abd651ea9afd380c5f84df8d9399d14/docs/CONSUMER-MIGRATION.md)
 for the frame and instruction API changes.
 
+Profile-parametric comparison proofs use `ProfileAgreement.of_flags`, with a
+kernel-checked empty feature-read list for their extracted scalar programs.
+Fresh frames in regression fixtures follow the same named-field initialization.
+
 ## Verification scope
 
 The 188 registered method/profile gates in `manifests/gates.json` include all

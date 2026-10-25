@@ -210,7 +210,8 @@ theorem executed {α : Type} (encode : α → CIL.Value) (equal : BitVec 256 →
     (call : CallingConditions program memory [left] []) :
     ∃ fuel, run program fuel index 0 (scalarArguments left (encode right)) frame [] memory =
       .ok (leaveFrame frame memory, [.scalar (.i32 (if equal (inputValue memory left) right then 1 else 0))]) := by
-  let childFrame : Frame := ⟨memory.nextIdentity, [], [], []⟩
+  let childFrame : Frame := {
+    activation := memory.nextIdentity, locals := [], owned := [], arguments := [], stackBytes := 0 }
   have formed := call.input_formed (reference := left) (by simp)
   have numericWord := numeric right
   simp only [numericValue] at numericWord

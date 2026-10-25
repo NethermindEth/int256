@@ -109,7 +109,9 @@ theorem small_frame_setup (memory : Memory) (args : List Value) (wellFormed : me
       MemoryBelow memory.nextIdentity memory result ∧ result.WellFormed := by
   obtain ⟨slots, tailSlots, owned, result, made, homes⟩ := make_word_prefix memory
     memory.nextIdentity smallWordSpecs smallTailKinds smallTailValues wellFormed small_local_metadata.2.2
-  let frame : Frame := ⟨memory.nextIdentity, slots ++ tailSlots, owned, []⟩
+  let frame : Frame := {
+    activation := memory.nextIdentity, locals := slots ++ tailSlots, owned := owned,
+    arguments := [], stackBytes := 0 }
   have entered : enterFrame Extracted.addScalarUInt64Body args memory = .ok (frame, result) := by
     unfold enterFrame
     dsimp only

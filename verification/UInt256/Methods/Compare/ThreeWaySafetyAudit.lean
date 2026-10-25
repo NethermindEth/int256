@@ -32,7 +32,10 @@ theorem checked_threeWay_family (profile : CIL.FeatureProfile) (_valid : profile
         (values[0]?.getD 0).toNat (values[1]?.getD 0).toNat))
       (CIL.reprofile Extracted.program profile) Extracted.entryIndex 2 :=
   ReadOnlyContract.reprofile (CIL.uniform_of_profile_map _ _ Extracted.programProfiles)
-    (Extracted.program.profile_independent_agreement (by decide) _ _) checked_threeWay_contract
+    (CIL.Program.ProfileAgreement.of_flags _ _ _ (by
+      have noReads : Extracted.program.profileReads = [] := by decide +kernel
+      intro feature member
+      simp [noReads] at member)) checked_threeWay_contract
 
 #print axioms checked_threeWay_family
 
