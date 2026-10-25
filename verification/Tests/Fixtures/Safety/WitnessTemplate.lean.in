@@ -1,0 +1,45 @@
+import Extracted
+import UInt256.Safety.FixtureRefutation
+import CIL.Safety.StaticWorld
+namespace SafetyWitness
+open CIL.Safety UInt256Model.Safety
+set_option maxRecDepth 8192
+set_option maxHeartbeats 200000
+
+/-- A read-only input with nonzero limbs 0 and 1, and a writable output; each admits its end reference. -/
+def memory : Memory := {
+  allocations := fun id =>
+    if id = 0 then some {kind := .callerStack, layout := {size := @INPUT_SIZE@, alignment := 8}, sentinels := [@INPUT_SIZE@]}
+    else if id = 1 then some {kind := .callerStack, layout := {size := 32, alignment := 8}, sentinels := [32]}
+    else none
+  cells := fun id offset => ⟨if id = 0 ∧ (offset = @INPUT_BASE@ ∨ offset = @INPUT_BASE@ + 8) then 1 else 0, id == 0⟩
+  views := [⟨0, @INPUT_BASE@, 32, true, false⟩, ⟨1, 0, 32, true, true⟩]
+  nextIdentity := 2
+}
+theorem wellFormed : memory.WellFormed := by
+  constructor
+  · intro id allocation present
+    by_cases first : id = 0
+    · subst id
+      simp [memory] at present
+      subst allocation
+      exact ⟨by decide, by simp [Allocation.WellFormed, nativeLimit]⟩
+    · by_cases second : id = 1
+      · subst id
+        simp [memory] at present
+        subst allocation
+        exact ⟨by decide, by simp [Allocation.WellFormed, nativeLimit]⟩
+      · simp [memory, first, second] at present
+  · simp [memory]
+theorem call : CallingConditions Extracted.program memory [⟨0, @INPUT_BASE@⟩, ⟨0, @INPUT_BASE@⟩] [⟨1, 0⟩] := by
+  refine ⟨⟨wellFormed, ?_, ?_⟩, ?_⟩
+  · intro input member
+    simp only [List.map_cons, List.map_nil, List.mem_cons, List.not_mem_nil, or_false] at member
+    rcases member with rfl | rfl <;> exact ⟨_, rfl⟩
+  · intro output member
+    simp only [List.map_cons, List.map_nil, List.mem_cons, List.not_mem_nil, or_false] at member
+    subst output
+    rfl
+  · exact empty_static_world_valid _ _ (by decide) (by decide) rfl
+@THEOREM@
+end SafetyWitness

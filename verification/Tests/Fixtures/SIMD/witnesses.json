@@ -1,0 +1,22 @@
+[
+  { "case": "WrongAlignment", "method": "Add", "left": ["18446744073709551615", "2", "4", "6"], "right": ["1", "1", "1", "1"], "outputBase": 64, "address": 80, "actualByte": 6 },
+  { "case": "WrongAlignment", "method": "Subtract", "left": ["0", "2", "4", "6"], "right": ["1", "1", "1", "1"], "outputBase": 64, "address": 80, "actualByte": 2 },
+  { "case": "WrongAvxAlignment", "method": "Add", "left": ["18446744073709551615", "2", "4", "6"], "right": ["1", "1", "1", "1"], "outputBase": 64, "address": 72, "actualByte": 3 },
+  { "case": "WrongAvxAlignment", "method": "Subtract", "left": ["0", "2", "4", "6"], "right": ["1", "1", "1", "1"], "outputBase": 64, "address": 72, "actualByte": 1 },
+  { "case": "WrongBlend", "method": "Add", "left": ["18446744073709551615", "2", "4", "6"], "right": ["1", "1", "1", "1"], "outputBase": 64, "address": 72, "actualByte": 3 },
+  { "case": "WrongBlend", "method": "Subtract", "left": ["0", "2", "4", "6"], "right": ["1", "1", "1", "1"], "outputBase": 64, "address": 72, "actualByte": 1 },
+  { "case": "WrongTernary", "method": "Add", "left": ["18446744073709551615", "2", "4", "6"], "right": ["1", "1", "1", "1"], "outputBase": 64, "address": 72, "actualByte": 3 },
+  { "case": "WrongTernary", "method": "Subtract", "left": ["0", "2", "4", "6"], "right": ["1", "1", "1", "1"], "outputBase": 64, "address": 72, "actualByte": 1 },
+  { "case": "WrongPredicate", "method": "Add", "left": ["18446744073709551615", "18446744073709551615", "0", "0"], "right": ["1", "0", "1", "1"], "outputBase": 128, "address": 144, "actualByte": 1 },
+  { "case": "WrongPredicate", "method": "Subtract", "left": ["0", "1", "2", "2"], "right": ["1", "1", "1", "1"], "outputBase": 128, "address": 144, "actualByte": 1 },
+  { "case": "WrongTable", "method": "Add", "left": ["18446744073709551615", "18446744073709551615", "0", "0"], "right": ["1", "0", "1", "1"], "outputBase": 128, "address": 144, "actualByte": 1 },
+  { "case": "WrongTable", "method": "Subtract", "left": ["0", "1", "2", "2"], "right": ["1", "1", "1", "1"], "outputBase": 128, "address": 144, "actualByte": 1 },
+  { "case": "WrongScale", "method": "Add", "left": ["18446744073709551615", "18446744073709551615", "0", "0"], "right": ["1", "0", "1", "1"], "outputBase": 128, "address": 136, "actualByte": 255 },
+  { "case": "WrongScale", "method": "Subtract", "left": ["0", "1", "2", "2"], "right": ["1", "1", "1", "1"], "outputBase": 128, "address": 136, "actualByte": 0 },
+  { "case": "EarlyReread", "method": "Add", "left": ["18446744073709551615", "18446744073709551615", "0", "0"], "right": ["1", "0", "1", "1"], "outputBase": 8, "address": 24, "actualByte": 1 },
+  { "case": "EarlyReread", "method": "Subtract", "left": ["0", "1", "2", "2"], "right": ["1", "1", "1", "1"], "outputBase": 8, "address": 24, "actualByte": 1 },
+  { "case": "WrongTop", "method": "Add", "left": ["18446744073709551615", "18446744073709551615", "18446744073709551615", "0"], "right": ["1", "0", "0", "1"], "outputBase": 128, "address": 152, "actualByte": 1 },
+  { "case": "WrongTop", "method": "Subtract", "left": ["0", "0", "0", "2"], "right": ["1", "0", "0", "1"], "outputBase": 128, "address": 152, "actualByte": 1 },
+  { "case": "WrongFlag", "method": "Add", "left": ["0", "0", "0", "0"], "right": ["0", "0", "0", "0"], "outputBase": 128, "flag": 1 },
+  { "case": "WrongFlag", "method": "Subtract", "left": ["0", "0", "0", "0"], "right": ["0", "0", "0", "0"], "outputBase": 128, "flag": 1 }
+]

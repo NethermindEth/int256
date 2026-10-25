@@ -1,0 +1,14 @@
+name = "uint256_verification"
+version = "0.1.0"
+defaultTargets = ["UInt256"]
+
+[[require]]
+name = "leancil"
+git = "https://github.com/NethermindEth/LeanCIL.git"
+rev = "f4c1cd6b9c2e9e29f7a21a066b746b73a0a0503d"
+
+[[lean_lib]]
+name = "UInt256"
+
+[[lean_lib]]
+name = "Tests.Fixtures.Equality.Shared"

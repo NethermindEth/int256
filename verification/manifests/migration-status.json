@@ -1,0 +1,738 @@
+{
+  "leancilRevision": "d085262e7867c227c94fd7c9d798101cfa78c01a",
+  "assemblySha256": "7d44ec9be3b6cfa4b853ad25cec8d246c1ada781866e04b7f9d6dfd4c2266e4e",
+  "note": "All scalar targets extract; every registered gate and regression runner passed on LeanCIL d085262 in CI run 39875547772. Extraction is not a compiled-method certificate; upstream issues 36-40, 42, 53 and 54 are resolved.",
+  "scalar": [
+    {
+      "method": "EqualsInt32",
+      "extracted": true
+    },
+    {
+      "method": "EqualsInt64",
+      "extracted": true
+    },
+    {
+      "method": "EqualsUInt256Value",
+      "extracted": true
+    },
+    {
+      "method": "CompareToUInt256Value",
+      "extracted": true
+    },
+    {
+      "method": "CompareToUInt256Ref",
+      "extracted": true
+    },
+    {
+      "method": "EqUInt256Int32",
+      "extracted": true
+    },
+    {
+      "method": "EqInt32UInt256",
+      "extracted": true
+    },
+    {
+      "method": "EqUInt256UInt32",
+      "extracted": true
+    },
+    {
+      "method": "EqUInt32UInt256",
+      "extracted": true
+    },
+    {
+      "method": "EqUInt256Int64",
+      "extracted": true
+    },
+    {
+      "method": "EqInt64UInt256",
+      "extracted": true
+    },
+    {
+      "method": "EqUInt256UInt64",
+      "extracted": true
+    },
+    {
+      "method": "EqUInt64UInt256",
+      "extracted": true
+    },
+    {
+      "method": "NeUInt256Int32",
+      "extracted": true
+    },
+    {
+      "method": "NeInt32UInt256",
+      "extracted": true
+    },
+    {
+      "method": "NeUInt256UInt32",
+      "extracted": true
+    },
+    {
+      "method": "NeUInt32UInt256",
+      "extracted": true
+    },
+    {
+      "method": "NeUInt256Int64",
+      "extracted": true
+    },
+    {
+      "method": "NeInt64UInt256",
+      "extracted": true
+    },
+    {
+      "method": "NeUInt256UInt64",
+      "extracted": true
+    },
+    {
+      "method": "NeUInt64UInt256",
+      "extracted": true
+    },
+    {
+      "method": "OperatorXor",
+      "extracted": true
+    },
+    {
+      "method": "OperatorNot",
+      "extracted": true
+    },
+    {
+      "method": "EqUInt256UInt256",
+      "extracted": true
+    },
+    {
+      "method": "NeUInt256UInt256",
+      "extracted": true
+    },
+    {
+      "method": "LtUInt256UInt256",
+      "extracted": true
+    },
+    {
+      "method": "LtUInt256Int32",
+      "extracted": true
+    },
+    {
+      "method": "LtInt32UInt256",
+      "extracted": true
+    },
+    {
+      "method": "LtUInt256UInt32",
+      "extracted": true
+    },
+    {
+      "method": "LtUInt32UInt256",
+      "extracted": true
+    },
+    {
+      "method": "LtUInt256Int64",
+      "extracted": true
+    },
+    {
+      "method": "LtInt64UInt256",
+      "extracted": true
+    },
+    {
+      "method": "LtUInt256UInt64",
+      "extracted": true
+    },
+    {
+      "method": "LtUInt64UInt256",
+      "extracted": true
+    },
+    {
+      "method": "LeUInt256UInt256",
+      "extracted": true
+    },
+    {
+      "method": "LeUInt256Int32",
+      "extracted": true
+    },
+    {
+      "method": "LeInt32UInt256",
+      "extracted": true
+    },
+    {
+      "method": "LeUInt256UInt32",
+      "extracted": true
+    },
+    {
+      "method": "LeUInt32UInt256",
+      "extracted": true
+    },
+    {
+      "method": "LeUInt256Int64",
+      "extracted": true
+    },
+    {
+      "method": "LeInt64UInt256",
+      "extracted": true
+    },
+    {
+      "method": "LeUInt256UInt64",
+      "extracted": true
+    },
+    {
+      "method": "LeUInt64UInt256",
+      "extracted": true
+    },
+    {
+      "method": "GtUInt256UInt256",
+      "extracted": true
+    },
+    {
+      "method": "GtUInt256Int32",
+      "extracted": true
+    },
+    {
+      "method": "GtInt32UInt256",
+      "extracted": true
+    },
+    {
+      "method": "GtUInt256UInt32",
+      "extracted": true
+    },
+    {
+      "method": "GtUInt32UInt256",
+      "extracted": true
+    },
+    {
+      "method": "GtUInt256Int64",
+      "extracted": true
+    },
+    {
+      "method": "GtInt64UInt256",
+      "extracted": true
+    },
+    {
+      "method": "GtUInt256UInt64",
+      "extracted": true
+    },
+    {
+      "method": "GtUInt64UInt256",
+      "extracted": true
+    },
+    {
+      "method": "GeUInt256UInt256",
+      "extracted": true
+    },
+    {
+      "method": "GeUInt256Int32",
+      "extracted": true
+    },
+    {
+      "method": "GeInt32UInt256",
+      "extracted": true
+    },
+    {
+      "method": "GeUInt256UInt32",
+      "extracted": true
+    },
+    {
+      "method": "GeUInt32UInt256",
+      "extracted": true
+    },
+    {
+      "method": "GeUInt256Int64",
+      "extracted": true
+    },
+    {
+      "method": "GeInt64UInt256",
+      "extracted": true
+    },
+    {
+      "method": "GeUInt256UInt64",
+      "extracted": true
+    },
+    {
+      "method": "GeUInt64UInt256",
+      "extracted": true
+    },
+    {
+      "method": "OperatorOr",
+      "extracted": true
+    },
+    {
+      "method": "OperatorAnd",
+      "extracted": true
+    },
+    {
+      "method": "Not",
+      "extracted": true
+    },
+    {
+      "method": "Or",
+      "extracted": true
+    },
+    {
+      "method": "And",
+      "extracted": true
+    },
+    {
+      "method": "Xor",
+      "extracted": true
+    },
+    {
+      "method": "EqualsUInt32",
+      "extracted": true
+    },
+    {
+      "method": "EqualsUInt64",
+      "extracted": true
+    },
+    {
+      "method": "EqualsUInt256Ref",
+      "extracted": true
+    },
+    {
+      "method": "Multiply",
+      "extracted": true
+    },
+    {
+      "method": "Lsh",
+      "extracted": true
+    },
+    {
+      "method": "Rsh",
+      "extracted": true
+    },
+    {
+      "method": "OperatorMultiplyUInt256UInt32",
+      "extracted": true
+    },
+    {
+      "method": "OperatorMultiplyUInt32UInt256",
+      "extracted": true
+    },
+    {
+      "method": "OperatorMultiplyUInt256UInt64",
+      "extracted": true
+    },
+    {
+      "method": "OperatorMultiplyUInt64UInt256",
+      "extracted": true
+    },
+    {
+      "method": "OperatorMultiplyUInt256UInt256",
+      "extracted": true
+    },
+    {
+      "method": "MultiplyInstance",
+      "extracted": true
+    },
+    {
+      "method": "LeftShift",
+      "extracted": true
+    },
+    {
+      "method": "RightShift",
+      "extracted": true
+    },
+    {
+      "method": "OperatorLsh",
+      "extracted": true
+    },
+    {
+      "method": "OperatorRsh",
+      "extracted": true
+    },
+    {
+      "method": "AddOverflow",
+      "extracted": true
+    },
+    {
+      "method": "SubtractUnderflow",
+      "extracted": true
+    },
+    {
+      "method": "Add",
+      "extracted": true
+    },
+    {
+      "method": "Subtract",
+      "extracted": true
+    }
+  ],
+  "pendingGates": [],
+  "inProgress": [
+    {
+      "methods": [
+        "And",
+        "Or",
+        "Xor",
+        "Not",
+        "OperatorAnd",
+        "OperatorOr",
+        "OperatorXor",
+        "OperatorNot"
+      ],
+      "note": "All eight scalar bitwise gates verified with arithmetic, arbitrary overlap, finite return, private allocation lifetime and caller-byte preservation. Vector profiles and regression coverage remain outstanding.",
+      "supportingAuditTheorems": 727,
+      "completedScalarGates": [
+        "And",
+        "Or",
+        "Xor",
+        "Not",
+        "OperatorAnd",
+        "OperatorOr",
+        "OperatorXor",
+        "OperatorNot"
+      ],
+      "initialVerificationSeconds": {
+        "And": 80.6,
+        "Or": 33.7,
+        "Xor": 33.0
+      },
+      "prefixBindingChecks": [
+        "And/scalar",
+        "Or/scalar",
+        "Xor/scalar"
+      ],
+      "extractionRevision": "70ee20782980f35ff19b26e5fdff2f25c6e760e9",
+      "assemblySha256": "2fbe30cd2579f3a63ddcdd1f887d36294f8d4574c48898a319bc1c262d355d58",
+      "prefixElaborationMeasurement": {
+        "command": "lake env lean -j1 UInt256/Methods/Bitwise/ScalarPrefix.lean",
+        "baselineSeconds": 12.440545,
+        "optimizedSeconds": 3.6064488,
+        "note": "Single local before/after sample with dependencies built, includes startup/imports. Named checked instruction equations replace repeated dispatcher simplification. Not a full verification timing."
+      },
+      "latestVerificationSeconds": {
+        "And": 33.7,
+        "Or": 33.7,
+        "Xor": 36.4,
+        "Not": 82.6,
+        "OperatorAnd": 38.7,
+        "OperatorOr": 35.2,
+        "OperatorXor": 33.9,
+        "OperatorNot": 37.3
+      }
+    },
+    {
+      "methods": [
+        "EqualsUInt32",
+        "EqualsUInt64"
+      ],
+      "note": "Scalar compiled-method certificates passed using shared extraction-independent equality and private aggregate construction contracts. Signed primitive and operator ports remain in progress.",
+      "completedScalarGates": [
+        "EqualsUInt32",
+        "EqualsUInt64"
+      ],
+      "verificationSeconds": {
+        "EqualsUInt32": 65.6,
+        "EqualsUInt64": 35.7
+      },
+      "extractionRevision": "70ee20782980f35ff19b26e5fdff2f25c6e760e9",
+      "assemblySha256": "2fbe30cd2579f3a63ddcdd1f887d36294f8d4574c48898a319bc1c262d355d58"
+    },
+    {
+      "methods": [
+        "Multiply",
+        "MultiplyInstance",
+        "OperatorMultiplyUInt256UInt256",
+        "OperatorMultiplyUInt256UInt32",
+        "OperatorMultiplyUInt32UInt256",
+        "OperatorMultiplyUInt256UInt64",
+        "OperatorMultiplyUInt64UInt256"
+      ],
+      "note": "Independent arithmetic modules, scalar Multiply64/Math.BigMul execution, StoreLimbs and StoreProduct supporting proofs compile and match fresh extracted bodies. Full multiplication method certificates remain outstanding.",
+      "supportingAuditTheorems": 948,
+      "storageElaborationMeasurement": {
+        "command": "lake env lean -j1 UInt256/Methods/Multiply/ProductStorage.lean",
+        "baselineSeconds": 14.103,
+        "optimizedSeconds": 2.471,
+        "note": "Single local before/after sample with dependencies built, includes startup/imports. Shared checked feature/branch equations replace dispatcher simplification. Other agents were active; not a full verification timing."
+      }
+    },
+    {
+      "methods": [
+        "EqualsInt32",
+        "EqualsInt64",
+        "EqualsUInt256Value",
+        "CompareToUInt256Value",
+        "EqUInt256Int32",
+        "EqInt32UInt256",
+        "EqUInt256UInt32",
+        "EqUInt32UInt256",
+        "EqUInt256Int64",
+        "EqInt64UInt256",
+        "EqUInt256UInt64",
+        "EqUInt64UInt256",
+        "NeUInt256Int32",
+        "NeInt32UInt256",
+        "NeUInt256UInt32",
+        "NeUInt32UInt256",
+        "NeUInt256Int64",
+        "NeInt64UInt256",
+        "NeUInt256UInt64",
+        "NeUInt64UInt256",
+        "LeUInt64UInt256",
+        "Lsh",
+        "Rsh",
+        "LeftShift",
+        "RightShift",
+        "OperatorLsh",
+        "OperatorRsh"
+      ],
+      "note": "All 27 scalar compiled-method certificates passed. Includes primitive equality, value-parameter equality/comparison and six shifts. Profile-family coverage and original regression suites remain incomplete.",
+      "completedScalarGates": [
+        "EqualsInt32",
+        "EqualsInt64",
+        "EqualsUInt256Value",
+        "CompareToUInt256Value",
+        "EqUInt256Int32",
+        "EqInt32UInt256",
+        "EqUInt256UInt32",
+        "EqUInt32UInt256",
+        "EqUInt256Int64",
+        "EqInt64UInt256",
+        "EqUInt256UInt64",
+        "EqUInt64UInt256",
+        "NeUInt256Int32",
+        "NeInt32UInt256",
+        "NeUInt256UInt32",
+        "NeUInt32UInt256",
+        "NeUInt256Int64",
+        "NeInt64UInt256",
+        "NeUInt256UInt64",
+        "NeUInt64UInt256",
+        "LeUInt64UInt256",
+        "Lsh",
+        "Rsh",
+        "LeftShift",
+        "RightShift",
+        "OperatorLsh",
+        "OperatorRsh"
+      ],
+      "verificationSeconds": {
+        "EqualsInt32": 101.1,
+        "EqualsInt64": 39.5,
+        "EqualsUInt256Value": 47.5,
+        "CompareToUInt256Value": 51.0,
+        "EqUInt256Int32": 45.3,
+        "EqInt32UInt256": 36.4,
+        "EqUInt256UInt32": 34.1,
+        "EqUInt32UInt256": 35.7,
+        "EqUInt256Int64": 36.2,
+        "EqInt64UInt256": 37.2,
+        "EqUInt256UInt64": 39.4,
+        "EqUInt64UInt256": 35.6,
+        "NeUInt256Int32": 35.8,
+        "NeInt32UInt256": 35.9,
+        "NeUInt256UInt32": 37.4,
+        "NeUInt32UInt256": 35.4,
+        "NeUInt256Int64": 39.1,
+        "NeInt64UInt256": 43.2,
+        "NeUInt256UInt64": 38.9,
+        "NeUInt64UInt256": 37.8,
+        "LeUInt64UInt256": 72.0,
+        "Lsh": 134.9,
+        "Rsh": 58.9,
+        "LeftShift": 61.9,
+        "RightShift": 57.9,
+        "OperatorLsh": 60.9,
+        "OperatorRsh": 54.9
+      },
+      "supportingAuditTheorems": 986,
+      "extractionRevision": "70ee20782980f35ff19b26e5fdff2f25c6e760e9",
+      "assemblySha256": "2fbe30cd2579f3a63ddcdd1f887d36294f8d4574c48898a319bc1c262d355d58"
+    },
+    {
+      "methods": [
+        "And",
+        "Or",
+        "Xor",
+        "Not",
+        "OperatorAnd",
+        "OperatorOr",
+        "OperatorXor",
+        "OperatorNot"
+      ],
+      "profile": "x64-vector256",
+      "note": "Eight vector bitwise method certificates passed; all eight scalar bitwise gates reverified after shared return composition refactor. Scalar/vector proof files also compile family theorems for every replacement profile with the matching vector256 acceleration flag. Original mutation regression scope remains outstanding.",
+      "verificationSeconds": {
+        "And": 90.0,
+        "Or": 33.7,
+        "Xor": 33.3,
+        "Not": 41.1,
+        "OperatorAnd": 44.5,
+        "OperatorOr": 35.4,
+        "OperatorXor": 36.7,
+        "OperatorNot": 34.1
+      },
+      "supportingAuditTheorems": 1014
+    },
+    {
+      "profiles": [
+        "x64-vector256",
+        "x64-sse41"
+      ],
+      "completedCertificates": 34,
+      "authenticatedInputs": 621,
+      "note": "All 28 vector/SSE equality and six vector shift compiled-method certificates passed with family transports. Authenticated source, proof, and settings inputs matched before integration of the next batch."
+    },
+    {
+      "completedCertificates": 22,
+      "authenticatedInputs": 869,
+      "extractionRevision": "70ee20782980f35ff19b26e5fdff2f25c6e760e9",
+      "assemblySha256": "2d844a96b480caa91311eedd89c45e7115664067aadc83f72efdede18ee9c185",
+      "note": "Seven scalar multiplication, twelve accelerated ordering, and three BMI2/ARM64/vector-storage multiplication certificates passed. All authenticated inputs matched before integration. All 87 scalar targets now have registered gates; original accelerated profile and fixture migration remains incomplete."
+    },
+    {
+      "note": "98 multiplication profile certificates (7 entries x 14 profiles) passed against Release assembly 2d844a96 with proof sources identical to the current tree; the 10 earlier per-method multiplication proofs were replaced by the uniform profile proofs. Add/AddOverflow/Subtract/SubtractUnderflow scalar gates recertified after helper signature pins were removed from the bindings.",
+      "assemblySha256": "2d844a96b480caa91311eedd89c45e7115664067aadc83f72efdede18ee9c185",
+      "methods": [
+        "Multiply",
+        "MultiplyInstance",
+        "OperatorMultiplyUInt256UInt256",
+        "OperatorMultiplyUInt256UInt32",
+        "OperatorMultiplyUInt32UInt256",
+        "OperatorMultiplyUInt256UInt64",
+        "OperatorMultiplyUInt64UInt256"
+      ],
+      "completedCertificates": 98,
+      "recertifiedScalarGates": [
+        "Add",
+        "AddOverflow",
+        "Subtract",
+        "SubtractUnderflow"
+      ]
+    },
+    {
+      "profile": "arm64-advsimd",
+      "methods": [
+        "Add",
+        "AddOverflow"
+      ],
+      "completedCertificates": 2,
+      "extractionRevision": "70ee20782980f35ff19b26e5fdff2f25c6e760e9",
+      "assemblySha256": "39fdd31a85f03e141172db2a029921d8b2549304e343f5f948075e14ea022061",
+      "note": "Add and AddOverflow certified on arm64-advsimd: public entry, AddScalar dispatcher, AdvSimd AddVector128, AddScalarUInt64 and StoreLimbs, each bound by rfl body equality to extraction-independent contracts. AddOverflow proves the exact carry flag. Scalar Add/AddOverflow gates reverified.",
+      "verificationSeconds": {
+        "Add": 342.3,
+        "AddOverflow": 192.9
+      }
+    },
+    {
+      "profile": "x64-sse42",
+      "methods": [
+        "Add",
+        "AddOverflow"
+      ],
+      "completedCertificates": 2,
+      "extractionRevision": "7aec18ee49eaa33255a980ca688cfd816492be97",
+      "assemblySha256": "b251406c5895d907d410496f4609320dc0c322bac122b9e5c31ecc56df420d85",
+      "note": "Add and AddOverflow certified on x64-sse42: public entry, AddScalar dispatcher (right/left small tests, SSE4.2 guard), SSE AddVector128 with its scalar carry repair, AddWithCarry, the portable AddScalarUInt64 and StoreLimbs, each bound by rfl to extraction-independent contracts.",
+      "verificationSeconds": {
+        "Add": 1490.3,
+        "AddOverflow": 314.8
+      }
+    },
+    {
+      "profiles": [
+        "x64-sse42",
+        "arm64-advsimd"
+      ],
+      "methods": [
+        "Subtract",
+        "SubtractUnderflow"
+      ],
+      "completedCertificates": 4,
+      "extractionRevision": "7aec18ee49eaa33255a980ca688cfd816492be97",
+      "assemblySha256": "05075b6db3dcc781ccc38f92ae59c42d09031cd099282219c8c63b38e4c9de97",
+      "note": "Subtract and SubtractUnderflow certified on x64-sse42 and arm64-advsimd by one profile-parametric proof: public entries, SubtractImpl with AVX2 disabled, SubtractScalar dispatcher, SubtractVector128 (speculative path and SubtractWithBorrow repair), SubtractScalarUInt64 and StoreLimbs, each bound by rfl. SubtractUnderflow proves the exact borrow flag.",
+      "verificationSeconds": {
+        "Subtract/x64-sse42": 1718.3,
+        "SubtractUnderflow/x64-sse42": 775.5,
+        "Subtract/arm64-advsimd": 612.1,
+        "SubtractUnderflow/arm64-advsimd": 603.3
+      }
+    },
+    {
+      "profiles": [
+        "x64-avx2",
+        "x64-avx2-bmi1",
+        "x64-avx512",
+        "x64-avx512-bmi1"
+      ],
+      "methods": [
+        "Add",
+        "AddOverflow",
+        "Subtract",
+        "SubtractUnderflow"
+      ],
+      "completedCertificates": 16,
+      "extractionRevision": "7aec18ee49eaa33255a980ca688cfd816492be97",
+      "assemblySha256ByMethod": {
+        "Add": "500d4309786c245287fb904c184e556ad0df71ba505e58e9f799267414925987",
+        "AddOverflow": "500d4309786c245287fb904c184e556ad0df71ba505e58e9f799267414925987",
+        "Subtract": "9da502dcf08fe78ac4cf97cff6b134cddd46e55b74d00790579ccec5860fc248",
+        "SubtractUnderflow": "9da502dcf08fe78ac4cf97cff6b134cddd46e55b74d00790579ccec5860fc248"
+      },
+      "note": "Add, AddOverflow, Subtract and SubtractUnderflow certified on the four AVX2/AVX512 profiles. Extraction-independent contracts in UInt256/Methods/{Add,Subtract}/Vector256*.lean and UInt256/Safety/ScratchCells.lean bind every reachable body (entry, SubtractImpl or PrepareAdd/FinishAdd, and the BroadcastLookup getter) by rfl. Add/Subtract prove WrappingBinaryContract; AddOverflow/SubtractUnderflow prove ReportingBinaryContract with the exact carry/borrow flag. No previously certified proof module changed. The two assembly hashes differ only by the git commit embedded in InformationalVersion (Subtract certified at 48115c7, Add at 360078e; no src change between them). The first gate of each batch (Add/x64-avx2, Subtract/x64-avx2) includes the consumer library build.",
+      "verificationSeconds": {
+        "Add/x64-avx2": 2221.0,
+        "Add/x64-avx2-bmi1": 637.7,
+        "Add/x64-avx512": 468.5,
+        "Add/x64-avx512-bmi1": 435.5,
+        "AddOverflow/x64-avx2": 448.8,
+        "AddOverflow/x64-avx2-bmi1": 458.2,
+        "AddOverflow/x64-avx512": 429.4,
+        "AddOverflow/x64-avx512-bmi1": 352.5,
+        "Subtract/x64-avx2": 1067.7,
+        "Subtract/x64-avx2-bmi1": 483.1,
+        "Subtract/x64-avx512": 453.6,
+        "Subtract/x64-avx512-bmi1": 501.3,
+        "SubtractUnderflow/x64-avx2": 139.0,
+        "SubtractUnderflow/x64-avx2-bmi1": 406.1,
+        "SubtractUnderflow/x64-avx512": 421.4,
+        "SubtractUnderflow/x64-avx512-bmi1": 603.4
+      }
+    },
+    {
+      "fixtureGroups": [
+        "Safety",
+        "SIMD",
+        "Reporting",
+        "Profiles"
+      ],
+      "note": "Safety: 6 positives (valid call, initial-input sum, probe value) and 11 negatives (located fault refutation plus production AddScalar rejection) certified on scalar; AlignedLoad is an extractor rejection mapped upstream. SIMD: Add arm64-advsimd Baseline, Renamed, WrongAlignment and WrongTop certified. Reporting: AddOverflow and SubtractUnderflow scalar Baseline, Renamed and WrongFlag, and AddOverflow arm64-advsimd Baseline, Renamed, WrongFlag, WrongAlignment and WrongTop certified. Each fixture family keeps one positive refactor fixture: SIMD and Reporting keep EquivalentMask; the other original body-changing positives (LaneLocals, InlineCarry, ExtractedHelper, ReversedStore, FeatureExpressions) were dropped."
+    },
+    {
+      "profiles": [
+        "x64-v3",
+        "x64-v4",
+        "x64-sse42"
+      ],
+      "completedCertificates": 58,
+      "leancilRevision": "99234831740420e5aa038953829f4ba840dc6b67",
+      "note": "Non-Multiply gates retargeted to .NET 10 runtime profiles: x64-vector256 vector bitwise, shift and equality gates to x64-v3; x64-sse41 SSE equality to x64-sse42; x64-avx2/x64-avx512 ordering to x64-v3/x64-v4; Add/Subtract x64-avx2-bmi1/x64-avx512-bmi1 to x64-v3/x64-v4 (x64-avx2 and x64-avx512 without BMI1 are not deployable). The four Vector256-only ordering gates are dropped: that path needs Vector256 without AVX2. Extraction shows x64-v4 matches x64-v3 for the vector gates, and x64-sse2, arm64-advsimd and the v128 profiles match a gated body. All 58 certified locally in one session (2973.8 s); the eight Add/Subtract gates were recertified after the broadcast descriptor generalisation (732.0 s)."
+    }
+  ],
+  "remainingPorts": [],
+  "pendingValidation": [
+    "Profiles and AlignedLoad fixture groups are extractor infrastructure, mapped to LeanCIL tests rather than ported.",
+    "Three upstream drafts from the original branch are not filed.",
+    "Duplicated helpers to consolidate: Subtract SmallHelper.",
+    "Two deferred API entries remain unported.",
+    "Safety fixture expectations changed under LeanCIL for ReusedLocal and related cases; review them against the original branch."
+  ],
+  "supportingAuditTheorems": 2571,
+  "validation": {
+    "leancilRevision": "d085262e7867c227c94fd7c9d798101cfa78c01a",
+    "gates": "All 256 registered gates passed on 589426d in CI run 39875547772 (https://github.com/NethermindEth/int256/actions/runs/39875547772).",
+    "runnersTree": "589426d; its Lean sources, fixtures and runners match this tree.",
+    "runners": {
+      "EqualityRegression": "210/210",
+      "CompareRegression": "16/16",
+      "MultiplyRegression": "7/7",
+      "BitwiseRegression scalar": "36/36",
+      "BitwiseRegression x64-vector256": "36/36",
+      "BitwisePositiveRegression": "16/16",
+      "ShiftRegression scalar": "11/11",
+      "ShiftRegression x64-vector256": "11/11",
+      "ShiftPositiveRegression": "6/6",
+      "AddSubtractRegression": "12/12",
+      "SafetyRegression": "17/17",
+      "SimdRegression": "140/140"
+    }
+  }
+}

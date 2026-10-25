@@ -1,0 +1,32 @@
+[
+  {
+    "case": "WrongBorrow",
+    "profile": "scalar",
+    "leftBase": 0,
+    "rightBase": 32,
+    "outputBase": 64,
+    "address": 72,
+    "actualByte": 255,
+    "expectedByte": 254,
+    "initialBytes": {
+      "32": 1,
+      "40": 1
+    }
+  },
+  {
+    "case": "WrongAliasing",
+    "profile": "scalar",
+    "leftBase": 0,
+    "rightBase": 64,
+    "outputBase": 8,
+    "address": 16,
+    "actualByte": 3,
+    "expectedByte": 6,
+    "initialBytes": {
+      "0": 5,
+      "8": 7,
+      "64": 1,
+      "72": 1
+    }
+  }
+]

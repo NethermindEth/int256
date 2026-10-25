@@ -1,0 +1,122 @@
+import UInt256.Methods.Bindings
+import UInt256.Safety.ReadOnlyContract
+import UInt256.Safety.LimbAccess
+import CIL.Safety.StepComposition
+import UInt256.Methods.Equality.Lemmas
+import UInt256.Safety.ReadOnlyExecution
+import CIL.Safety.GuardNormalization
+
+namespace UInt256Proof.Equality.Safety
+
+open CIL.Safety UInt256Model.Safety
+
+/-- Discover the reachable leaf containing the limb reads; its body is still
+    executed and checked below, never assigned a contract by its shape. -/
+def scalarIndex : Nat := Extracted.program.findIdx fun body =>
+  body.code.any (fun op => match op with | .fieldAt _ _ => true | _ => false) &&
+  !(body.code.any fun op => match op with | .call _ _ => true | _ => false)
+
+def scalarDifference (memory : Memory) (left right : Reference) : BitVec 64 :=
+  (inputLimb memory left 0 ^^^ inputLimb memory right 0) |||
+  (inputLimb memory left 1 ^^^ inputLimb memory right 1) |||
+  (inputLimb memory left 2 ^^^ inputLimb memory right 2) |||
+  (inputLimb memory left 3 ^^^ inputLimb memory right 3)
+
+theorem scalar_run (memory : Memory) (left right : Reference) (frame : Frame)
+    (call : CallingConditions Extracted.program memory [left, right] []) :
+    ∃ fuel, run Extracted.program fuel scalarIndex 0
+      (readOnlyArguments [left, right]) frame [] memory =
+      .ok (leaveFrame frame memory,
+        [.scalar (.i32 (if scalarDifference memory left right = 0 then 1 else 0))]) := by
+  have fl := call.input_formed (reference := left) (by simp)
+  have fr := call.input_formed (reference := right) (by simp)
+  have hl := fun index rest => call.input_field_instruction (reference := left) (by simp) index rest
+  have hr := fun index rest => call.input_field_instruction (reference := right) (by simp) index rest
+  have hc (value : BitVec 32) (rest : List Value) :
+      instruction (.const32 value) rest memory = .ok (memory, .scalar (.i32 value) :: rest) := rfl
+  have hl0 := hl (0 : Fin 4)
+  have hl1 := hl (1 : Fin 4)
+  have hl2 := hl (2 : Fin 4)
+  have hl3 := hl (3 : Fin 4)
+  have hr0 := hr (0 : Fin 4)
+  have hr1 := hr (1 : Fin 4)
+  have hr2 := hr (2 : Fin 4)
+  have hr3 := hr (3 : Fin 4)
+  simp only [Fin.val_zero, Fin.val_one, Fin.val_two, CIL.fin_val_three, Nat.reduceMul] at hl0 hl1 hl2 hl3 hr0 hr1 hr2 hr3
+  conv in scalarIndex => cbv
+  refine ⟨28, ?_⟩
+  -- This is a checked sufficient execution prefix, not an assumed summary:
+  -- every fetched opcode and transition must prove before the final return.
+  iterate 26
+    apply Eq.trans
+    · apply run_next
+      · simp only [cil_code]; rfl
+      · simp only [cil_code]; rfl
+      · simp (config := { implicitDefEqProofs := false })
+          [step, cil_guard, observerCount, readOnlyArguments, checkedValue, numericValue, formValue, fl, fr,
+            hl0, hl1, hl2, hl3, hr0, hr1, hr2, hr3, hc, pureArity, scalars, CIL.step.eq_def, CIL.binary, CIL.unary, checkedAt,
+            Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
+        try (exact ⟨rfl, rfl, rfl, rfl⟩)
+        done
+  simp [run, cil_code, step, cil_guard, observerCount, checkedValue, numericValue, scalarDifference, CIL.NarrowKind.extend,
+    Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
+  split <;> rfl
+#print axioms scalar_run
+
+end UInt256Proof.Equality.Safety
+
+namespace UInt256Proof.Equality.Safety
+
+open CIL.Safety UInt256Model.Safety
+
+theorem input_limb_value (memory : Memory) (reference : Reference) :
+    UInt256Model.value (inputLimb memory reference) = inputValue memory reference :=
+  UInt256Proof.input_value (fun offset => (memory.cells reference.allocation offset).bits) reference.offset
+
+/-- The execution reduction is equivalent to equality of independently decoded
+    initial values, including when their input views partially overlap. -/
+theorem scalar_difference_zero (memory : Memory) (left right : Reference) :
+    scalarDifference memory left right = 0 ↔ inputValue memory left = inputValue memory right := by
+  have equal := xor_or_zero_value (inputLimb memory left) (inputLimb memory right)
+  rw [input_limb_value, input_limb_value] at equal
+  exact equal
+
+theorem scalar_run_value (memory : Memory) (left right : Reference) (frame : Frame)
+    (call : CallingConditions Extracted.program memory [left, right] []) :
+    ∃ fuel, run Extracted.program fuel scalarIndex 0
+      (readOnlyArguments [left, right]) frame [] memory =
+      .ok (leaveFrame frame memory,
+        [.scalar (.i32 (if inputValue memory left = inputValue memory right then 1 else 0))]) := by
+  simpa only [scalar_difference_zero] using scalar_run memory left right frame call
+
+#print axioms scalar_difference_zero
+#print axioms scalar_run_value
+
+end UInt256Proof.Equality.Safety
+
+namespace UInt256Proof.Equality.Safety
+
+open CIL.Safety UInt256Model.Safety
+
+def scalarBody : CIL.Method := Extracted.program[scalarIndex]?.getD
+  { code := [], locals := [], returnsValue := false }
+
+theorem scalar_body_found : Extracted.program[scalarIndex]? = some scalarBody := by rfl
+
+theorem scalar_frame_fits (left right : Reference) :
+    FrameSetupFits scalarBody (readOnlyArguments [left, right]) := by
+  conv in scalarBody => cbv
+  simp [FrameSetupFits, InitializersFit, AggregateArgumentsFit, ParameterArgumentsFit, SelectedKindsFit]
+
+theorem scalar_checked (memory : Memory) (left right : Reference)
+    (call : CallingConditions Extracted.program memory [left, right] []) :
+    ∃ fuel final,
+      InvocationCertificate Extracted.program scalarIndex (readOnlyArguments [left, right]) memory fuel final
+        [.scalar (.i32 (if inputValue memory left = inputValue memory right then 1 else 0))] ∧
+      ∀ id, id < memory.nextIdentity → ∀ offset, final.cells id offset = memory.cells id offset :=
+  certify_readOnly_binary Extracted.program scalarIndex scalarBody
+    (fun left right => .i32 (if left = right then 1 else 0))
+    scalar_body_found scalar_frame_fits scalar_run_value memory left right call
+#print axioms scalar_checked
+
+end UInt256Proof.Equality.Safety

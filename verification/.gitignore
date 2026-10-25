@@ -1,0 +1,8 @@
+.lake/
+artifacts/
+generated/
+!UInt256/Generated/
+!UInt256/Generated/*.lean
+**/bin/
+**/obj/
+__pycache__/
