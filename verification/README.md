@@ -16,6 +16,13 @@ Profile-parametric comparison proofs use `ProfileAgreement.of_flags`, with a
 kernel-checked empty feature-read list for their extracted scalar programs.
 Fresh frames in regression fixtures follow the same named-field initialization.
 
+The Add/Subtract Vector128 helpers use `CodeAt` placements instead of carrying
+prefixes, suffixes and their length equations through every execution lemma.
+Input setup composes LeanCIL `Segment` proofs: multiplication joins the input
+read and private store, while vector setup joins reference formation and root
+storage. The continuations retain their original frame, stack, memory and
+caller-footprint obligations; the registered contracts and profiles are unchanged.
+
 ## Verification scope
 
 The 188 registered method/profile gates in `manifests/gates.json` include all

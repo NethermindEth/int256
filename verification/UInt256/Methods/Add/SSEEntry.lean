@@ -1,3 +1,4 @@
+import CIL.Safety.SymbolicExecution
 import UInt256.Methods.Add.SSERepair
 set_option maxRecDepth 4096
 
@@ -234,27 +235,19 @@ open CIL.Safety UInt256Model.Safety UInt256Proof.AddSubtract.Safety UInt256Proof
 /-- Both SSE helper branches from entry: modular sum of the initial operands, checked return and caller bytes kept. -/
 theorem vector128_sse_entry (program : CIL.Program) (body : CIL.Method) (method : Nat) (specs : List NumericLocalSpec)
     (found : program[method]? = some body)
-    (startTail incomingTail leading correctionTail : List CIL.Op)
-    (startCode : body.code = vector128AddPrefix ++ startTail)
-    (incomingCode : body.code = incomingPrefix body.profile.advSimd ++ incomingTail)
-    (leadingLength : leading.length = 62)
-    (correctionCodeFound : body.code = leading ++ correctionCode ++ correctionTail)
+    (startCode : CodeAt body 0 vector128AddPrefix)
+    (incomingCode : CodeAt body 0 (incomingPrefix body.profile.advSimd))
+    (correctionCodeFound : CodeAt body 62 correctionCode)
     (firstFourteen : ∀ i : Fin 14, specs[i.val]? = some vector128ZeroSpec)
     (sse : body.profile.advSimd = false → body.profile.sse2 = true)
     (ssse : body.profile.advSimd = false → body.profile.ssse3 = true)
-    (earlyLeading earlyTail : List CIL.Op) (earlyLength : earlyLeading.length = 69)
-    (earlyCode : body.code = earlyLeading ++ earlyOutputCode body.profile.advSimd ++ earlyTail)
-    (propLeading propTail : List CIL.Op) (propLength : propLeading.length = 82)
-    (propCode : body.code = propLeading ++ propagationCode ++ propTail)
-    (decisionLeading decisionTail : List CIL.Op) (decisionLength : decisionLeading.length = 94)
-    (decisionCodeFound : body.code = decisionLeading ++ decisionCode body.profile.advSimd ++ decisionTail)
-    (fastLeading fastTail : List CIL.Op) (fastLength : fastLeading.length = 204)
-    (fastCode : body.code = fastLeading ++ fastOutputCode body.profile.advSimd ++ fastTail)
+    (earlyCode : CodeAt body 69 (earlyOutputCode body.profile.advSimd))
+    (propCode : CodeAt body 82 (propagationCode))
+    (decisionCodeFound : CodeAt body 94 (decisionCode body.profile.advSimd))
+    (fastCode : CodeAt body 204 (fastOutputCode body.profile.advSimd))
     (returns : body.returnsValue = true)
-    (repairDispatchLeading repairDispatchTail : List CIL.Op) (repairDispatchLength : repairDispatchLeading.length = 111)
-    (repairDispatchCode : body.code = repairDispatchLeading ++ [.feature .advSimd, .brzero 162] ++ repairDispatchTail)
-    (repairLeading repairTail : List CIL.Op) (repairLength : repairLeading.length = 162)
-    (carry storage : Nat) (repairCode : body.code = repairLeading ++ sseRepairCode carry storage ++ repairTail)
+    (repairDispatchCode : CodeAt body 111 ([.feature .advSimd, .brzero 162]))
+    (carry storage : Nat) (repairCode : CodeAt body 162 (sseRepairCode carry storage))
     (carryFound : program[carry]? = some (carryBody body.profile))
     (storageFound : program[storage]? = some (UInt256Proof.Multiply.LimbStorage.body body.profile))
     (wordSpecs : ∀ i : Fin 5, specs[14 + i.val]? = some armWordSpec)
@@ -281,7 +274,7 @@ theorem vector128_sse_entry (program : CIL.Program) (body : CIL.Method) (method 
   by_cases fast : selectedPropagation128 body.profile.advSimd flag (vector128BranchValue original left right 11)
       (vector128BranchValue original left right 12) = BitVec.ofNat 128 0
   · obtain ⟨fuel, final, returned, executed, scalar, result, writable, outside⟩ :=
-      vector128_fast_entry program body method specs found startTail incomingTail leading correctionTail startCode incomingCode leadingLength correctionCodeFound firstFourteen sse ssse earlyLeading earlyTail earlyLength earlyCode propLeading propTail propLength propCode decisionLeading decisionTail decisionLength decisionCodeFound fastLeading fastTail fastLength fastCode returns original entered [left, right] [output] left right output frame slots args
+      vector128_fast_entry program body method specs found startCode incomingCode correctionCodeFound firstFourteen sse ssse earlyCode propCode decisionCodeFound fastCode returns original entered [left, right] [output] left right output frame slots args
         call setup layout homes (by simp) (by simp) (by simp) leftArg rightArg outputArg flag flagFit flagArg fast
     exact ⟨fuel, final, returned, executed, ⟨_, scalar, (by split <;> rfl), fun reporting => vector128_snapshot_fast_flag body.profile.advSimd original left right flag reporting fast⟩,
       result, writable, outside⟩
@@ -293,19 +286,19 @@ theorem vector128_sse_entry (program : CIL.Program) (body : CIL.Method) (method 
       access final output 32 1 true = .ok () ∧
       (∀ id offset, id < original.nextIdentity → OutsideOutput output id offset →
         final.cells id offset = original.cells id offset)
-    apply vector128_dispatch_checked program body method specs found startTail incomingTail leading correctionTail startCode incomingCode leadingLength correctionCodeFound firstFourteen sse ssse earlyLeading earlyTail earlyLength earlyCode propLeading propTail propLength propCode decisionLeading decisionTail decisionLength decisionCodeFound original entered [left, right] [output] left right output frame slots args
+    apply vector128_dispatch_checked program body method specs found startCode incomingCode correctionCodeFound firstFourteen sse ssse earlyCode propCode decisionCodeFound original entered [left, right] [output] left right output frame slots args
       call setup layout homes (by simp) (by simp) (by simp) leftArg rightArg outputArg flag flagFit flagArg post
     intro current _conditionHome _conditionSlot _conditionRead _snapshots _earlyRead currentCall authority _footprint _advanced callerPreserved
     simp only [fast, ite_false]
-    apply vector128_repair_dispatch program body method found repairDispatchLeading repairDispatchTail repairDispatchLength repairDispatchCode current (vector128SavedFrame frame slots right) args post
+    apply vector128_repair_dispatch program body method found repairDispatchCode current (vector128SavedFrame frame slots right) args post
     simp only [vector128RepairStart, disabled, Bool.false_eq_true, ite_false]
     have fresh := enterFrame_fresh _ _ _ _ _ setup
-    apply vector128_sse_repair_carry program body method specs found repairLeading repairTail repairLength carry storage repairCode carryFound wordSpecs
+    apply vector128_sse_repair_carry program body method specs found carry storage repairCode carryFound wordSpecs
       original entered current (vector128SavedFrame frame slots right) (.root (some (.address right))) slots rfl left right output
       call currentCall (callerPreserved disabled) homes (enterFrame_preserves_wellFormed _ _ _ _ _ call.1.1 setup) authority
       args leftArg rightArg post
     intro carryHome results after state
-    obtain ⟨fuel, final, values, executed, result⟩ := vector128_sse_finish program body method found repairLeading repairTail repairLength
+    obtain ⟨fuel, final, values, executed, result⟩ := vector128_sse_finish program body method found
       carry storage repairCode storageFound returns original after (vector128SavedFrame frame slots right)
       left right output carryHome results args outputArg call (fun id member => (fresh.2 id member).1) state
     exact ⟨fuel, final, values, executed, ⟨_, result.flag, (by unfold UInt256Proof.Safety.addOverflow; split <;> rfl), fun _ => rfl⟩, result.value, result.writable,
@@ -320,27 +313,19 @@ open CIL.Safety UInt256Model.Safety UInt256Proof.AddSubtract.Safety UInt256Proof
 /-- Checked invocation of an SSE helper body. -/
 theorem checked_vector128_sse_contract (program : CIL.Program) (body : CIL.Method) (method : Nat) (specs : List NumericLocalSpec)
     (found : program[method]? = some body)
-    (startTail incomingTail leading correctionTail : List CIL.Op)
-    (startCode : body.code = vector128AddPrefix ++ startTail)
-    (incomingCode : body.code = incomingPrefix body.profile.advSimd ++ incomingTail)
-    (leadingLength : leading.length = 62)
-    (correctionCodeFound : body.code = leading ++ correctionCode ++ correctionTail)
+    (startCode : CodeAt body 0 vector128AddPrefix)
+    (incomingCode : CodeAt body 0 (incomingPrefix body.profile.advSimd))
+    (correctionCodeFound : CodeAt body 62 correctionCode)
     (firstFourteen : ∀ i : Fin 14, specs[i.val]? = some vector128ZeroSpec)
     (sse : body.profile.advSimd = false → body.profile.sse2 = true)
     (ssse : body.profile.advSimd = false → body.profile.ssse3 = true)
-    (earlyLeading earlyTail : List CIL.Op) (earlyLength : earlyLeading.length = 69)
-    (earlyCode : body.code = earlyLeading ++ earlyOutputCode body.profile.advSimd ++ earlyTail)
-    (propLeading propTail : List CIL.Op) (propLength : propLeading.length = 82)
-    (propCode : body.code = propLeading ++ propagationCode ++ propTail)
-    (decisionLeading decisionTail : List CIL.Op) (decisionLength : decisionLeading.length = 94)
-    (decisionCodeFound : body.code = decisionLeading ++ decisionCode body.profile.advSimd ++ decisionTail)
-    (fastLeading fastTail : List CIL.Op) (fastLength : fastLeading.length = 204)
-    (fastCode : body.code = fastLeading ++ fastOutputCode body.profile.advSimd ++ fastTail)
+    (earlyCode : CodeAt body 69 (earlyOutputCode body.profile.advSimd))
+    (propCode : CodeAt body 82 (propagationCode))
+    (decisionCodeFound : CodeAt body 94 (decisionCode body.profile.advSimd))
+    (fastCode : CodeAt body 204 (fastOutputCode body.profile.advSimd))
     (returns : body.returnsValue = true)
-    (repairDispatchLeading repairDispatchTail : List CIL.Op) (repairDispatchLength : repairDispatchLeading.length = 111)
-    (repairDispatchCode : body.code = repairDispatchLeading ++ [.feature .advSimd, .brzero 162] ++ repairDispatchTail)
-    (repairLeading repairTail : List CIL.Op) (repairLength : repairLeading.length = 162)
-    (carry storage : Nat) (repairCode : body.code = repairLeading ++ sseRepairCode carry storage ++ repairTail)
+    (repairDispatchCode : CodeAt body 111 ([.feature .advSimd, .brzero 162]))
+    (carry storage : Nat) (repairCode : CodeAt body 162 (sseRepairCode carry storage))
     (carryFound : program[carry]? = some (carryBody body.profile))
     (storageFound : program[storage]? = some (UInt256Proof.Multiply.LimbStorage.body body.profile))
     (wordSpecs : ∀ i : Fin 5, specs[14 + i.val]? = some armWordSpec)
@@ -363,7 +348,7 @@ theorem checked_vector128_sse_contract (program : CIL.Program) (body : CIL.Metho
   obtain ⟨frame, entered, slots, setup, layout, homes, preserved, enteredWF⟩ :=
     vector128_frame_setup body specs metadata vectors parameters opaqueLocals memory args call.1.1
   obtain ⟨fuel, final, returned, executed, scalar, result, writable, footprint⟩ :=
-    vector128_sse_entry program body method specs found startTail incomingTail leading correctionTail startCode incomingCode leadingLength correctionCodeFound firstFourteen sse ssse earlyLeading earlyTail earlyLength earlyCode propLeading propTail propLength propCode decisionLeading decisionTail decisionLength decisionCodeFound fastLeading fastTail fastLength fastCode returns repairDispatchLeading repairDispatchTail repairDispatchLength repairDispatchCode repairLeading repairTail repairLength carry storage repairCode carryFound storageFound wordSpecs disabled memory entered left right output frame slots args
+    vector128_sse_entry program body method specs found startCode incomingCode correctionCodeFound firstFourteen sse ssse earlyCode propCode decisionCodeFound fastCode returns repairDispatchCode carry storage repairCode carryFound storageFound wordSpecs disabled memory entered left right output frame slots args
       call setup layout homes rfl rfl rfl flag flagFit rfl
   obtain ⟨returnedValue, rfl, returnedFit, overflow⟩ := scalar
   have checked : args.mapM (checkedValue memory) = .ok args := by
@@ -410,15 +395,12 @@ theorem sse_helper_checked (profile : CIL.FeatureProfile) (disabled : profile.ad
         final.cells id offset = memory.cells id offset) := by
   let b := sseBody profile carry storage
   apply checked_vector128_sse_contract program b method armSpecs found
-    (b.code.drop 37) (b.code.drop 62) (b.code.take 62) (b.code.drop 69)
     rfl (by simp only [b, sseBody, incomingPrefix, disabled, Bool.false_eq_true, ite_false]; rfl)
-    rfl rfl armSpecs_first (fun _ => sse2) (fun _ => ssse3)
-    (b.code.take 69) (b.code.drop 82) rfl (by simp only [b, sseBody, earlyOutputCode, disabled, Bool.false_eq_true, ite_false]; rfl)
-    (b.code.take 82) (b.code.drop 94) rfl rfl
-    (b.code.take 94) (b.code.drop 111) rfl (by simp only [b, sseBody, decisionCode, disabled, Bool.false_eq_true, ite_false]; rfl)
-    (b.code.take 204) (b.code.drop 222) rfl (by simp only [b, sseBody, fastOutputCode, disabled, Bool.false_eq_true, ite_false]; rfl) rfl
-    (b.code.take 111) (b.code.drop 113) rfl rfl
-    (b.code.take 162) (b.code.drop 204) rfl carry storage rfl carryFound storageFound armSpecs_words
+    rfl armSpecs_first (fun _ => sse2) (fun _ => ssse3)
+    (by simp only [b, sseBody, earlyOutputCode, disabled, Bool.false_eq_true, ite_false]; rfl)
+    rfl (by simp only [b, sseBody, decisionCode, disabled, Bool.false_eq_true, ite_false]; rfl)
+    (by simp only [b, sseBody, fastOutputCode, disabled, Bool.false_eq_true, ite_false]; rfl) rfl
+    rfl carry storage rfl carryFound storageFound armSpecs_words
     ⟨rfl, rfl⟩ rfl rfl rfl disabled
     memory left right output flag flagFit call
 

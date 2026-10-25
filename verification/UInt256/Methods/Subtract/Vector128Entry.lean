@@ -118,22 +118,6 @@ end UInt256Proof.Subtract.Profile
 namespace UInt256Proof.Subtract.Profile
 open CIL.Safety UInt256Model.Safety UInt256Proof.AddSubtract.Safety UInt256Proof.Subtract.Safety CIL.Vector
 
-theorem subtract_incoming_leading (adv : Bool) :
-    (vector128PrefixCode ++ subtractStartCode ++ subtractIncomingCode adv).length = 63 := by
-  rw [List.length_append, subtract_incoming_length]
-  rfl
-
-theorem subtract_decision_leading (adv : Bool) :
-    (vector128PrefixCode ++ subtractStartCode ++ subtractIncomingCode adv ++ subtractDecisionCode).length = 77 := by
-  rw [List.length_append, subtract_incoming_leading]
-  rfl
-
-theorem subtract_repair_leading (adv : Bool) (borrow storage : Nat) :
-    (vector128PrefixCode ++ subtractStartCode ++ subtractIncomingCode adv ++ subtractDecisionCode ++
-      subtractRepairCode borrow storage).length = 119 := by
-  rw [List.length_append, subtract_decision_leading]
-  rfl
-
 /-- Both helper branches from entry: modular difference, exact underflow, caller bytes kept. -/
 theorem subtract_vector_entry (program : CIL.Program) (method borrow storage : Nat) (profile : CIL.FeatureProfile)
     (found : program[method]? = some (subtractVectorBody profile borrow storage))
@@ -162,52 +146,39 @@ theorem subtract_vector_entry (program : CIL.Program) (method borrow storage : N
   have owned : ∀ id ∈ saved.owned, original.nextIdentity ≤ id := fun id member => (fresh.2 id member).1
   let post := fun final returned => SubtractResult original final returned left right output
   apply vector128_inputs_checked program body method subtractVectorSpecs found
-    (subtractStartCode ++ subtractIncomingCode profile.advSimd ++ subtractDecisionCode ++ subtractRepairCode borrow storage ++ subtractFastCode)
-    (by simp only [body, subtractVectorBody, List.append_assoc]) subtract_vector_first_four
+    (by cases selected : profile.advSimd <;> simp only [CodeAt, body, subtractVectorBody, selected] <;> rfl) subtract_vector_first_four
     original entered [left, right] [output] left right frame slots args call setup layout homes
     (by simp) (by simp) leftArg rightArg post
   intro l0 l1 r0 r1 current s0 s1 s2 s3 read0 read1 read2 read3 preserved currentCall authority _
   have state := subtract_initial_state program original entered current left right output slots l0 l1 r0 r1
     s0 s1 s2 s3 read0 read1 read2 read3 preserved currentCall authority
-  apply subtract_start_checked program body method subtractVectorSpecs found vector128PrefixCode
-    (subtractIncomingCode profile.advSimd ++ subtractDecisionCode ++ subtractRepairCode borrow storage ++ subtractFastCode) rfl
-    (by simp only [body, subtractVectorBody, List.append_assoc]) subtract_vector_specs
+  apply subtract_start_checked program body method subtractVectorSpecs found (by cases selected : profile.advSimd <;> simp only [CodeAt, body, subtractVectorBody, selected] <;> rfl) subtract_vector_specs
     original entered current [left, right] [output] saved _ slots savedLayout args enteredWF homes values state post
   intro m8 s8
   apply subtract_incoming_checked program body method subtractVectorSpecs found
-    (vector128PrefixCode ++ subtractStartCode)
-    (subtractDecisionCode ++ subtractRepairCode borrow storage ++ subtractFastCode) rfl
-    (by simp only [body, subtractVectorBody, List.append_assoc]) sse ssse subtract_vector_specs
+    (by cases selected : profile.advSimd <;> simp only [CodeAt, body, subtractVectorBody, selected] <;> rfl) sse ssse subtract_vector_specs
     original entered m8 [left, right] [output] saved _ slots savedLayout args enteredWF homes values s8 post
   intro m10 s10
   apply subtract_decision_checked program body method found
-    (vector128PrefixCode ++ subtractStartCode ++ subtractIncomingCode profile.advSimd)
-    (subtractRepairCode borrow storage ++ subtractFastCode)
-    (subtract_incoming_leading _) (by simp only [body, subtractVectorBody, List.append_assoc])
+    (by cases selected : profile.advSimd <;> simp only [CodeAt, body, subtractVectorBody, selected] <;> rfl)
     original entered m10 [left, right] [output] saved _ slots savedLayout args values s10 post
   by_cases fast : subtractPropagation values = BitVec.ofNat 128 0
   · simp only [fast, ite_true]
     obtain ⟨fuel, final, returned, executed, wellFormed, flag, lowRead, highRead, writable, footprint⟩ :=
       subtract_fast_checked program body method subtractVectorSpecs found
-        (vector128PrefixCode ++ subtractStartCode ++ subtractIncomingCode profile.advSimd ++ subtractDecisionCode ++
-          subtractRepairCode borrow storage) [] (subtract_repair_leading _ _ _)
-        (by simp only [body, subtractVectorBody, List.append_assoc, List.append_nil]) rfl subtract_vector_specs
+        (by cases selected : profile.advSimd <;> simp only [CodeAt, body, subtractVectorBody, selected] <;> rfl) rfl subtract_vector_specs
         original entered m10 [left, right] [output] output saved _ slots savedLayout args call (by simp) outputArg
         homes values s10 owned
     exact ⟨fuel, final, returned, executed,
       subtract_fast_result original final left right output returned fast wellFormed flag lowRead highRead writable footprint⟩
   · simp only [fast, ite_false]
     apply subtract_repair_borrow program body method subtractVectorSpecs found
-      (vector128PrefixCode ++ subtractStartCode ++ subtractIncomingCode profile.advSimd ++ subtractDecisionCode)
-      subtractFastCode (subtract_decision_leading _) borrow storage
-      (by simp only [body, subtractVectorBody, List.append_assoc]) borrowFound subtract_word_specs
+      borrow storage (by cases selected : profile.advSimd <;> simp only [CodeAt, body, subtractVectorBody, selected] <;> rfl) borrowFound subtract_word_specs
       original entered m10 saved _ slots savedLayout left right output call s10.call s10.preserved homes enteredWF
       s10.authority args leftArg rightArg post
     intro borrowHome results after borrowState
     exact subtract_repair_finish program body method found
-      (vector128PrefixCode ++ subtractStartCode ++ subtractIncomingCode profile.advSimd ++ subtractDecisionCode)
-      subtractFastCode (subtract_decision_leading _) borrow storage
-      (by simp only [body, subtractVectorBody, List.append_assoc]) storageFound rfl original after saved
+      borrow storage (by cases selected : profile.advSimd <;> simp only [CodeAt, body, subtractVectorBody, selected] <;> rfl) storageFound rfl original after saved
       left right output borrowHome results args outputArg call owned borrowState
 
 #print axioms subtract_vector_entry

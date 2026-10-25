@@ -169,10 +169,10 @@ theorem multiply_low_inputs (ctx : Context alternative) (original entered curren
         .ok (final, returned) ∧ post final returned := by
   have found : ctx.program[ctx.indices.entry]? = some (multiplyBody ctx.profile ctx.indices) := ctx.entry
   apply run_input_to_local (argument := 0) (target := 0) state originalCall enteredWF homes left (by simp) 0
-    (by rfl) (by rfl) found (by rfl) (by rfl) (by rfl) post
+    (by rfl) (by rfl) found (by rfl) post
   intro after afterState
   apply run_input_to_local (argument := 1) (target := 1) afterState originalCall enteredWF homes right (by simp) 0
-    (by rfl) (by rfl) found (by rfl) (by rfl) (by rfl) post
+    (by rfl) (by rfl) found (by rfl) post
   exact continuation
 
 #print axioms multiply_frame_setup

@@ -1,3 +1,4 @@
+import CIL.Safety.SymbolicExecution
 import UInt256.Methods.Add.Vector128Propagation
 
 namespace UInt256Proof.Add.Safety
@@ -41,8 +42,7 @@ def decisionCode (adv : Bool) : List CIL.Op := if adv then [
 ]
 /-- Follow the actual ISA/reporting choice and store the propagation condition. -/
 theorem vector128_decision_checked (program : CIL.Program) (body : CIL.Method) (method : Nat)
-    (found : program[method]? = some body) (leading tail : List CIL.Op) (leadingLength : leading.length = 94)
-    (code : body.code = leading ++ decisionCode body.profile.advSimd ++ tail) (specs : List NumericLocalSpec) (slotSpec : specs[13]? = some vector128ZeroSpec) (boundary : Nat) (entered current : Memory)
+    (found : program[method]? = some body) (code : CodeAt body 94 (decisionCode body.profile.advSimd)) (specs : List NumericLocalSpec) (slotSpec : specs[13]? = some vector128ZeroSpec) (boundary : Nat) (entered current : Memory)
     (inputs outputs : List Reference) (frame : Frame) (root : LocalSlot) (slots : List LocalSlot)
     (layout : frame.locals = root :: slots) (args : List Value)
     (currentCall : CallingConditions program current inputs outputs)
@@ -79,7 +79,7 @@ theorem vector128_decision_checked (program : CIL.Program) (body : CIL.Method) (
   have loadHigh := fun (pc : Nat) (stack : List Value) => step_load_numeric_local
     (body := body) (args := args) (pc := pc) (stack := stack)
     .vector128 (.v128 high) high.toNat rfl highSlot highRead
-  cases selected : body.profile.advSimd <;> by_cases zero : flag = BitVec.ofNat 32 0
+  cases selected : body.profile.advSimd <;> simp only [selected] at code <;> by_cases zero : flag = BitVec.ofNat 32 0
   all_goals
     simp only [selectedPropagation128, selected, zero, and_true, and_false, ite_true, ite_false,
       Bool.false_eq_true, false_and, true_and] at stored
@@ -93,7 +93,7 @@ theorem vector128_decision_checked (program : CIL.Program) (body : CIL.Method) (
       | exact done
       | (simp (config := { failIfUnchanged := false })
            [flagFit, show (0 : BitVec 32) = BitVec.ofNat 32 0 from rfl, zero]
-         apply run_next_exists post found (by simp [code, List.getElem?_append, leadingLength, decisionCode, selected]; rfl)
+         apply run_next_exists post found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
          first
          | exact loadLow _ _
          | exact loadHigh _ _
@@ -107,8 +107,7 @@ theorem vector128_decision_checked (program : CIL.Program) (body : CIL.Method) (
 
 /-- Test only the initialized saved condition and expose both actual targets. -/
 theorem vector128_decision_branch (program : CIL.Program) (body : CIL.Method) (method : Nat)
-    (found : program[method]? = some body) (leading tail : List CIL.Op) (leadingLength : leading.length = 94)
-    (code : body.code = leading ++ decisionCode body.profile.advSimd ++ tail) (memory : Memory) (frame : Frame) (args : List Value)
+    (found : program[method]? = some body) (code : CodeAt body 94 (decisionCode body.profile.advSimd)) (memory : Memory) (frame : Frame) (args : List Value)
     (home : Reference) (condition : BitVec 128)
     (slot : frame.locals[14]? = some (.bytes .vector128 home))
     (loaded : read memory home 16 1 = .ok (numberBytes condition.toNat 16))
@@ -121,11 +120,11 @@ theorem vector128_decision_branch (program : CIL.Program) (body : CIL.Method) (m
   have load := fun (pc : Nat) (stack : List Value) => step_load_numeric_local
     (body := body) (args := args) (pc := pc) (stack := stack)
     .vector128 (.v128 condition) condition.toNat rfl slot loaded
-  cases selected : body.profile.advSimd <;> by_cases zero : condition = BitVec.ofNat 128 0
+  cases selected : body.profile.advSimd <;> simp only [selected] at code <;> by_cases zero : condition = BitVec.ofNat 128 0
   all_goals
     simp only [zero, ite_true, ite_false] at continuation
     iterate 4
-      apply run_next_exists post found (by simp [code, List.getElem?_append, leadingLength, decisionCode, selected]; rfl)
+      apply run_next_exists post found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
       first
       | exact load _ _
       | (simp (config := { implicitDefEqProofs := false })
@@ -145,17 +144,15 @@ open CIL.Safety UInt256Model.Safety UInt256Proof.AddSubtract.Safety
 /-- Complete checked helper prefix through the actual fast/repair branch, preserving all saved values and any early ARM output writes. -/
 theorem vector128_dispatch_checked (program : CIL.Program) (body : CIL.Method) (method : Nat) (specs : List NumericLocalSpec)
     (found : program[method]? = some body)
-    (startTail incomingTail leading correctionTail : List CIL.Op)
-    (startCode : body.code = vector128AddPrefix ++ startTail)
-    (incomingCode : body.code = incomingPrefix body.profile.advSimd ++ incomingTail)
-    (leadingLength : leading.length = 62)
-    (correctionCodeFound : body.code = leading ++ correctionCode ++ correctionTail)
+    (startCode : CodeAt body 0 vector128AddPrefix)
+    (incomingCode : CodeAt body 0 (incomingPrefix body.profile.advSimd))
+    (correctionCodeFound : CodeAt body 62 correctionCode)
     (firstFourteen : ∀ i : Fin 14, specs[i.val]? = some vector128ZeroSpec)
     (sse : body.profile.advSimd = false → body.profile.sse2 = true)
-    (ssse : body.profile.advSimd = false → body.profile.ssse3 = true)     (earlyLeading earlyTail : List CIL.Op) (earlyLength : earlyLeading.length = 69)
-    (earlyCode : body.code = earlyLeading ++ earlyOutputCode body.profile.advSimd ++ earlyTail)     (propLeading propTail : List CIL.Op) (propLength : propLeading.length = 82)
-    (propCode : body.code = propLeading ++ propagationCode ++ propTail)     (decisionLeading decisionTail : List CIL.Op) (decisionLength : decisionLeading.length = 94)
-    (decisionCodeFound : body.code = decisionLeading ++ decisionCode body.profile.advSimd ++ decisionTail) (original entered : Memory)
+    (ssse : body.profile.advSimd = false → body.profile.ssse3 = true)
+    (earlyCode : CodeAt body 69 (earlyOutputCode body.profile.advSimd))
+    (propCode : CodeAt body 82 (propagationCode))
+    (decisionCodeFound : CodeAt body 94 (decisionCode body.profile.advSimd)) (original entered : Memory)
     (inputs outputs : List Reference) (left right output : Reference)
     (frame : Frame) (slots : List LocalSlot) (args : List Value)
     (call : CallingConditions program original inputs outputs)
@@ -194,7 +191,7 @@ theorem vector128_dispatch_checked (program : CIL.Program) (body : CIL.Method) (
     ∃ fuel result returned,
       run program fuel method 0 args frame [] entered =
         .ok (result, returned) ∧ post result returned := by
-  apply vector128_ready_checked program body method specs found startTail incomingTail leading correctionTail startCode incomingCode leadingLength correctionCodeFound (fun i => firstFourteen ⟨i.val, by omega⟩) sse ssse earlyLeading earlyTail earlyLength earlyCode propLeading propTail propLength propCode original entered inputs outputs left right output frame slots args
+  apply vector128_ready_checked program body method specs found startCode incomingCode correctionCodeFound (fun i => firstFourteen ⟨i.val, by omega⟩) sse ssse earlyCode propCode original entered inputs outputs left right output frame slots args
     call setup layout homes leftMember rightMember outputMember leftArg rightArg outputArg post
   intro current snapshots outputRead currentCall authority footprint advanced callerPreserved
   obtain ⟨lowHome, lowSlot, lowRead⟩ := snapshots 11
@@ -205,7 +202,7 @@ theorem vector128_dispatch_checked (program : CIL.Program) (body : CIL.Method) (
   have actualHigh : (vector128SavedFrame frame slots right).locals[13]? = some (.bytes .vector128 highHome) := by
     change slots[12]? = some (.bytes .vector128 highHome)
     exact highSlot
-  apply vector128_decision_checked program body method found decisionLeading decisionTail decisionLength decisionCodeFound specs (firstFourteen 13) original.nextIdentity entered current inputs outputs
+  apply vector128_decision_checked program body method found decisionCodeFound specs (firstFourteen 13) original.nextIdentity entered current inputs outputs
     (vector128SavedFrame frame slots right) (.root (some (.address right))) slots rfl args currentCall
     (enterFrame_preserves_wellFormed _ _ _ _ _ call.1.1 setup) homes authority flag flagFit flagArg
     (vector128BranchValue original left right 11) (vector128BranchValue original left right 12)
@@ -229,7 +226,7 @@ theorem vector128_dispatch_checked (program : CIL.Program) (body : CIL.Method) (
     intro enabled
     exact ⟨(preserved.read output old 16 1).trans (outputRead enabled).1,
       (preserved.read { output with offset := output.offset + 16 } old 16 1).trans (outputRead enabled).2⟩
-  apply vector128_decision_branch program body method found decisionLeading decisionTail decisionLength decisionCodeFound after (vector128SavedFrame frame slots right) args conditionHome
+  apply vector128_decision_branch program body method found decisionCodeFound after (vector128SavedFrame frame slots right) args conditionHome
     _ conditionSlot conditionRead post
   exact continuation after conditionHome conditionTail conditionRead retained retainedOutput afterCall afterAuthority
     (fun id offset bound outside => (preserved.cells id bound offset).trans (footprint id offset bound outside))

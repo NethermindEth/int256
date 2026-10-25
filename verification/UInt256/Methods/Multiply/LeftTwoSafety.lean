@@ -159,16 +159,16 @@ theorem left_two_inputs (profile : CIL.FeatureProfile) (program : CIL.Program) (
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
   apply run_input_to_local (argument := 0) (target := 0) state originalCall enteredWF homes left (by simp) 1
-    (by rfl) (by rfl) found (by rfl) (by rfl) (by rfl) post
+    (by rfl) (by rfl) found (by rfl) post
   intro m0 state0
   apply run_input_to_local (argument := 1) (target := 1) state0 originalCall enteredWF homes right (by simp) 0
-    (by rfl) (by rfl) found (by rfl) (by rfl) (by rfl) post
+    (by rfl) (by rfl) found (by rfl) post
   intro m1 state1
   apply run_input_to_local (argument := 1) (target := 2) state1 originalCall enteredWF homes right (by simp) 1
-    (by rfl) (by rfl) found (by rfl) (by rfl) (by rfl) post
+    (by rfl) (by rfl) found (by rfl) post
   intro m2 state2
   apply run_input_to_local (argument := 1) (target := 3) state2 originalCall enteredWF homes right (by simp) 2
-    (by rfl) (by rfl) found (by rfl) (by rfl) (by rfl) post
+    (by rfl) (by rfl) found (by rfl) post
   exact continuation
 
 #print axioms left_two_frame_setup

@@ -1,3 +1,4 @@
+import CIL.Safety.SymbolicExecution
 import CIL.Safety.Equations
 import CIL.Safety.ReturnMemory
 import UInt256.Methods.Add.Vector128Decision
@@ -48,8 +49,7 @@ open CIL.Safety UInt256Model.Safety UInt256Proof.AddSubtract.Safety
 
 /-- The fast suffix returns the saved high-lane carry bit and retires its frame. -/
 theorem vector128_fast_return (program : CIL.Program) (body : CIL.Method) (method : Nat)
-    (found : program[method]? = some body) (leading tail : List CIL.Op) (leadingLength : leading.length = 204)
-    (code : body.code = leading ++ fastOutputCode body.profile.advSimd ++ tail) (returns : body.returnsValue = true) (memory : Memory) (frame : Frame) (args : List Value)
+    (found : program[method]? = some body) (code : CodeAt body 204 (fastOutputCode body.profile.advSimd)) (returns : body.returnsValue = true) (memory : Memory) (frame : Frame) (args : List Value)
     (home : Reference) (mask : BitVec 128)
     (slot : frame.locals[7]? = some (.bytes .vector128 home))
     (loaded : read memory home 16 1 = .ok (numberBytes mask.toNat 16)) :
@@ -59,9 +59,9 @@ theorem vector128_fast_return (program : CIL.Program) (body : CIL.Method) (metho
   have load := fun (pc : Nat) (stack : List Value) => step_load_numeric_local
     (body := body) (args := args) (pc := pc) (stack := stack)
     .vector128 (.v128 mask) mask.toNat rfl slot loaded
-  cases selected : body.profile.advSimd <;> iterate 6
+  cases selected : body.profile.advSimd <;> simp only [selected] at code <;> iterate 6
     apply Eq.trans
-    · apply run_next found (by simp [code, List.getElem?_append, leadingLength, fastOutputCode, selected]; rfl)
+    · apply run_next found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
       first
       | exact load _ _
       | (simp (config := { implicitDefEqProofs := false })
@@ -69,7 +69,7 @@ theorem vector128_fast_return (program : CIL.Program) (body : CIL.Method) (metho
             CIL.Intrinsic.available, CIL.Vector.intrinsic_extract128,
             checkedValue, numericValue, Bind.bind, Except.bind, Pure.pure, Except.pure]
          first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)
-  all_goals have fetched : body.code[221]? = some (.ret (some .unsigned8)) := by simp [code, List.getElem?_append, leadingLength, fastOutputCode, selected]
+  all_goals have fetched : body.code[221]? = some (.ret (some .unsigned8)) := by (conv => lhs; arg 2; whnf); cil_lookup [code]
   all_goals by_cases carry : CIL.Vector.lane64 mask 1 > BitVec.ofNat 64 0
   all_goals simp [run, found, fetched, returns, step, cil_guard, observerCount, checkedValue, numericValue, CIL.NarrowKind.extend, carry,
     Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
@@ -84,8 +84,7 @@ def vector128FastOutputStart (body : CIL.Method) : Nat := if body.profile.advSim
 
 /-- SSE writes the saved result halves on the fast path; ARM has already written them. -/
 theorem vector128_fast_output (program : CIL.Program) (body : CIL.Method) (method : Nat)
-    (found : program[method]? = some body) (leading tail : List CIL.Op) (leadingLength : leading.length = 204)
-    (code : body.code = leading ++ fastOutputCode body.profile.advSimd ++ tail) (original entered current : Memory)
+    (found : program[method]? = some body) (code : CodeAt body 204 (fastOutputCode body.profile.advSimd)) (original entered current : Memory)
     (inputs outputs : List Reference) (output : Reference) (frame : Frame) (args : List Value)
     (call : CallingConditions program original inputs outputs)
     (currentCall : CallingConditions program current inputs outputs)
@@ -116,7 +115,7 @@ theorem vector128_fast_output (program : CIL.Program) (body : CIL.Method) (metho
     ∃ fuel result returned,
       run program fuel method (vector128FastOutputStart body) args frame [] current =
         .ok (result, returned) ∧ post result returned := by
-  cases selected : body.profile.advSimd
+  cases selected : body.profile.advSimd <;> simp only [selected] at code
   case true =>
     have disabled : body.profile.advSimd = true := selected
     simp only [vector128FastOutputStart, selected, ite_true]
@@ -142,7 +141,7 @@ theorem vector128_fast_output (program : CIL.Program) (body : CIL.Method) (metho
     simp only [vector128FastOutputStart, selected, Bool.false_eq_true, ite_false]
     all_goals repeat' first
       | exact done
-      | (apply run_next_exists post found (by simp [code, List.getElem?_append, leadingLength, fastOutputCode, selected]; rfl)
+      | (apply run_next_exists post found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
          first
          | exact loadLow _ _
          | exact loadHigh _ _
@@ -154,8 +153,7 @@ theorem vector128_fast_output (program : CIL.Program) (body : CIL.Method) (metho
 
 /-- Follow the actual fast-path feature guard before selecting output stores. -/
 theorem vector128_fast_output_dispatch (program : CIL.Program) (body : CIL.Method) (method : Nat)
-    (found : program[method]? = some body) (leading tail : List CIL.Op) (leadingLength : leading.length = 204)
-    (code : body.code = leading ++ fastOutputCode body.profile.advSimd ++ tail) (memory : Memory) (frame : Frame) (args : List Value)
+    (found : program[method]? = some body) (code : CodeAt body 204 (fastOutputCode body.profile.advSimd)) (memory : Memory) (frame : Frame) (args : List Value)
     (post : Memory → List Value → Prop)
     (continuation : ∃ fuel result returned,
       run program fuel method (vector128FastOutputStart body) args frame [] memory =
@@ -163,10 +161,10 @@ theorem vector128_fast_output_dispatch (program : CIL.Program) (body : CIL.Metho
     ∃ fuel result returned,
       run program fuel method 204 args frame [] memory =
         .ok (result, returned) ∧ post result returned := by
-  cases selected : body.profile.advSimd <;> simp only [vector128FastOutputStart, selected, Bool.false_eq_true, ite_false, ite_true] at continuation ⊢
+  cases selected : body.profile.advSimd <;> simp only [selected] at code <;> simp only [vector128FastOutputStart, selected, Bool.false_eq_true, ite_false, ite_true] at continuation ⊢
   all_goals repeat' first
     | exact continuation
-    | (apply run_next_exists post found (by simp [code, List.getElem?_append, leadingLength, fastOutputCode, selected]; rfl)
+    | (apply run_next_exists post found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
        simp (config := { implicitDefEqProofs := false })
          [localResult, checkedIntrinsic, step, cil_guard, observerCount, selected, pureArity, scalars, CIL.step.eq_def, CIL.FeatureProfile.evaluate,
            numericValue, checkedValue, Bind.bind, Except.bind, Pure.pure, Except.pure]

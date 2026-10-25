@@ -1,3 +1,4 @@
+import CIL.Safety.SymbolicExecution
 import UInt256.Methods.Add.Vector128EarlyOutput
 
 namespace UInt256Proof.Add.Safety
@@ -18,8 +19,7 @@ def propagationCode : List CIL.Op := [
 ]
 /-- Detect a carry that propagated through a corrected zero lane, using saved initialized vectors after any overlapping early output write. -/
 theorem vector128_propagation_checked (program : CIL.Program) (body : CIL.Method) (method : Nat) (specs : List NumericLocalSpec)
-    (found : program[method]? = some body) (leading tail : List CIL.Op) (leadingLength : leading.length = 82)
-    (code : body.code = leading ++ propagationCode ++ tail)
+    (found : program[method]? = some body) (code : CodeAt body 82 (propagationCode))
     (slotsSpec : specs[11]? = some vector128ZeroSpec ∧ specs[12]? = some vector128ZeroSpec) (boundary : Nat) (entered current : Memory)
     (inputs outputs : List Reference) (frame : Frame) (root : LocalSlot) (slots : List LocalSlot)
     (layout : frame.locals = root :: slots) (args : List Value)
@@ -65,7 +65,7 @@ theorem vector128_propagation_checked (program : CIL.Program) (body : CIL.Method
   all_goals
     repeat' first
       | exact done
-      | (apply run_next_exists post found (by simp [code, List.getElem?_append, leadingLength, propagationCode]; rfl)
+      | (apply run_next_exists post found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
          first
          | exact loadResult _ _
          | exact loadIncoming _ _
@@ -85,8 +85,7 @@ open CIL.Safety UInt256Model.Safety UInt256Proof.AddSubtract.Safety
 
 /-- Compose both propagation masks while retaining every earlier vector home and all older caller storage, including ARM's early output readbacks. -/
 theorem vector128_propagation_pair (program : CIL.Program) (body : CIL.Method) (method : Nat) (specs : List NumericLocalSpec)
-    (found : program[method]? = some body) (leading tail : List CIL.Op) (leadingLength : leading.length = 82)
-    (code : body.code = leading ++ propagationCode ++ tail)
+    (found : program[method]? = some body) (code : CodeAt body 82 (propagationCode))
     (slotsSpec : specs[11]? = some vector128ZeroSpec ∧ specs[12]? = some vector128ZeroSpec) (boundary : Nat) (entered current : Memory)
     (inputs outputs : List Reference) (frame : Frame) (root : LocalSlot) (slots : List LocalSlot)
     (layout : frame.locals = root :: slots) (args : List Value)
@@ -127,7 +126,7 @@ theorem vector128_propagation_pair (program : CIL.Program) (body : CIL.Method) (
   have actualHigh : frame.locals[11]? = some (.bytes .vector128 highHome) := by simpa [layout] using highSlot
   have actualLowIncoming : frame.locals[8]? = some (.bytes .vector128 lowIncoming) := by simpa [layout] using lowIncomingSlot
   have actualHighIncoming : frame.locals[9]? = some (.bytes .vector128 highIncoming) := by simpa [layout] using highIncomingSlot
-  apply vector128_propagation_checked program body method specs found leading tail leadingLength code slotsSpec boundary entered current inputs outputs frame root slots layout args
+  apply vector128_propagation_checked program body method specs found code slotsSpec boundary entered current inputs outputs frame root slots layout args
     currentCall enteredWF homes authority false low incomingLow lowHome lowIncoming actualLow actualLowIncoming lowRead lowIncomingRead post
   intro lowMask middle lowLocal lowLoaded preserved middleCall middleAuthority firstWrite
   have lowTail : slots[11]? = some (.bytes .vector128 lowMask) := by simpa [layout] using lowLocal
@@ -135,7 +134,7 @@ theorem vector128_propagation_pair (program : CIL.Program) (body : CIL.Method) (
     highHome lowMask highSlot lowTail _ _ firstWrite highRead
   have savedIncoming := vector128_prior_read specs entered current middle boundary slots homes 8 11 (by decide)
     highIncoming lowMask highIncomingSlot lowTail _ _ firstWrite highIncomingRead
-  apply vector128_propagation_checked program body method specs found leading tail leadingLength code slotsSpec boundary entered middle inputs outputs frame root slots layout args
+  apply vector128_propagation_checked program body method specs found code slotsSpec boundary entered middle inputs outputs frame root slots layout args
     middleCall enteredWF homes middleAuthority true high incomingHigh highHome highIncoming actualHigh actualHighIncoming savedHigh savedIncoming post
   intro highMask after highLocal highLoaded kept afterCall afterAuthority secondWrite
   have highTail : slots[12]? = some (.bytes .vector128 highMask) := by simpa [layout] using highLocal
@@ -169,16 +168,14 @@ def vector128BranchValue (memory : Memory) (left right : Reference) (i : Fin 13)
 /-- Entry through the propagation decision, with all thirteen saved values tied to the initial inputs and early ARM output readbacks still valid. -/
 theorem vector128_ready_checked (program : CIL.Program) (body : CIL.Method) (method : Nat) (specs : List NumericLocalSpec)
     (found : program[method]? = some body)
-    (startTail incomingTail leading correctionTail : List CIL.Op)
-    (startCode : body.code = vector128AddPrefix ++ startTail)
-    (incomingCode : body.code = incomingPrefix body.profile.advSimd ++ incomingTail)
-    (leadingLength : leading.length = 62)
-    (correctionCodeFound : body.code = leading ++ correctionCode ++ correctionTail)
+    (startCode : CodeAt body 0 vector128AddPrefix)
+    (incomingCode : CodeAt body 0 (incomingPrefix body.profile.advSimd))
+    (correctionCodeFound : CodeAt body 62 correctionCode)
     (firstThirteen : ∀ i : Fin 13, specs[i.val]? = some vector128ZeroSpec)
     (sse : body.profile.advSimd = false → body.profile.sse2 = true)
-    (ssse : body.profile.advSimd = false → body.profile.ssse3 = true)     (earlyLeading earlyTail : List CIL.Op) (earlyLength : earlyLeading.length = 69)
-    (earlyCode : body.code = earlyLeading ++ earlyOutputCode body.profile.advSimd ++ earlyTail)     (propLeading propTail : List CIL.Op) (propLength : propLeading.length = 82)
-    (propCode : body.code = propLeading ++ propagationCode ++ propTail) (original entered : Memory)
+    (ssse : body.profile.advSimd = false → body.profile.ssse3 = true)
+    (earlyCode : CodeAt body 69 (earlyOutputCode body.profile.advSimd))
+    (propCode : CodeAt body 82 (propagationCode)) (original entered : Memory)
     (inputs outputs : List Reference) (left right output : Reference)
     (frame : Frame) (slots : List LocalSlot) (args : List Value)
     (call : CallingConditions program original inputs outputs)
@@ -210,14 +207,14 @@ theorem vector128_ready_checked (program : CIL.Program) (body : CIL.Method) (met
     ∃ fuel result returned,
       run program fuel method 0 args frame [] entered =
         .ok (result, returned) ∧ post result returned := by
-  apply vector128_output_prefix program body method specs found startTail incomingTail leading correctionTail startCode incomingCode leadingLength correctionCodeFound (fun i => firstThirteen ⟨i.val, by omega⟩) sse ssse earlyLeading earlyTail earlyLength earlyCode original entered inputs outputs left right output frame slots args call setup
+  apply vector128_output_prefix program body method specs found startCode incomingCode correctionCodeFound (fun i => firstThirteen ⟨i.val, by omega⟩) sse ssse earlyCode original entered inputs outputs left right output frame slots args call setup
     layout homes leftMember rightMember outputMember leftArg rightArg outputArg post
   intro current snapshots outputRead currentCall authority footprint advanced callerPreserved
   obtain ⟨lowHome, lowSlot, lowRead⟩ := snapshots 9
   obtain ⟨highHome, highSlot, highRead⟩ := snapshots 10
   obtain ⟨lowIncoming, lowIncomingSlot, lowIncomingRead⟩ := snapshots 7
   obtain ⟨highIncoming, highIncomingSlot, highIncomingRead⟩ := snapshots 8
-  apply vector128_propagation_pair program body method specs found propLeading propTail propLength propCode ⟨firstThirteen 11, firstThirteen 12⟩ original.nextIdentity entered current inputs outputs
+  apply vector128_propagation_pair program body method specs found propCode ⟨firstThirteen 11, firstThirteen 12⟩ original.nextIdentity entered current inputs outputs
     (vector128SavedFrame frame slots right) (.root (some (.address right))) slots rfl args currentCall
     (enterFrame_preserves_wellFormed _ _ _ _ _ call.1.1 setup) homes authority
     (vector128SnapshotValue original left right 9) (vector128SnapshotValue original left right 10)

@@ -155,8 +155,7 @@ def incoming128End (body : CIL.Method) (upper : Bool) : Nat :=
 /-- Follow the selected ISA's actual incoming-mask instructions and initialize its private slot. -/
 
 theorem vector128_incoming_checked (program : CIL.Program) (body : CIL.Method) (method : Nat) (specs : List NumericLocalSpec)
-    (found : program[method]? = some body) (tail : List CIL.Op)
-    (code : body.code = incomingPrefix body.profile.advSimd ++ tail)
+    (found : program[method]? = some body) (code : CodeAt body 0 (incomingPrefix body.profile.advSimd))
     (sse : body.profile.advSimd = false → body.profile.sse2 = true)
     (ssse : body.profile.advSimd = false → body.profile.ssse3 = true)
     (slotsSpec : specs[7]? = some vector128ZeroSpec ∧ specs[8]? = some vector128ZeroSpec) (boundary : Nat) (entered current : Memory)
@@ -207,26 +206,26 @@ theorem vector128_incoming_checked (program : CIL.Program) (body : CIL.Method) (
       run program fuel method (incoming128End body upper - 1) args frame
         (.scalar (.v128 (if upper then incoming128High low high else incoming128Low low)) :: stack)
         current = .ok (result, returned) ∧ post result returned := by
-    cases selected : body.profile.advSimd <;> cases upper <;>
+    cases selected : body.profile.advSimd <;> simp only [selected] at code <;> cases upper <;>
       simp only [incoming128End, selected, Bool.false_eq_true, ite_false, ite_true, Nat.reduceSub] at done ⊢
     all_goals
-      apply run_next_exists post found (by simp [code, incomingPrefix, selected]; rfl)
+      apply run_next_exists post found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
       · exact stored _ _ _
       · exact done
   have finishedMath := finished
   rw [← incomingRaw_eq body.profile.advSimd upper low high] at finished
-  cases selected : body.profile.advSimd <;> cases upper <;> simp only [Bool.false_eq_true, ite_false, ite_true] at stored finished finishedMath ⊢
+  cases selected : body.profile.advSimd <;> simp only [selected] at code <;> cases upper <;> simp only [Bool.false_eq_true, ite_false, ite_true] at stored finished finishedMath ⊢
   all_goals
     simp only [Nat.reduceAdd] at stored
     simp only [incomingRaw, Nat.reduceSub, incoming128Start, incoming128End, selected, Bool.false_eq_true, ite_false, ite_true] at finished finishedMath ⊢
     repeat' first
       | exact finished
       | with_reducible exact finishedMath
-      | (apply run_next_exists post found (by simp [code, incomingPrefix, selected]; rfl)
+      | (apply run_next_exists post found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
          first
          | exact loadLow _ _
          | exact loadHigh _ _
-         
+
          | (simp (config := { implicitDefEqProofs := false })
              [show (BitVec.setWidth 8 (8 : BitVec 32)).toNat = 8 from rfl, step, cil_guard, observerCount, selected, sse, ssse, pureArity, scalars, CIL.step.eq_def, CIL.Intrinsic.available,
                CIL.Vector.intrinsic_zero128, CIL.Vector.intrinsic_adv_extract,
@@ -238,8 +237,7 @@ theorem vector128_incoming_checked (program : CIL.Program) (body : CIL.Method) (
 
 /-- The feature guard and ARM-only final jump follow the selected extraction. -/
 theorem vector128_incoming_dispatch (program : CIL.Program) (body : CIL.Method) (method : Nat)
-    (found : program[method]? = some body) (tail : List CIL.Op)
-    (code : body.code = incomingPrefix body.profile.advSimd ++ tail) (memory : Memory) (frame : Frame) (args stack : List Value)
+    (found : program[method]? = some body) (code : CodeAt body 0 (incomingPrefix body.profile.advSimd)) (memory : Memory) (frame : Frame) (args stack : List Value)
     (post : Memory → List Value → Prop)
     (continuation : ∃ fuel result returned,
       run program fuel method (incoming128Start body false) args frame stack memory =
@@ -247,18 +245,17 @@ theorem vector128_incoming_dispatch (program : CIL.Program) (body : CIL.Method) 
     ∃ fuel result returned,
       run program fuel method (37) args frame stack memory =
         .ok (result, returned) ∧ post result returned := by
-  cases selected : body.profile.advSimd <;> simp only [incoming128Start, selected, Bool.false_eq_true, ite_false, ite_true] at continuation ⊢
+  cases selected : body.profile.advSimd <;> simp only [selected] at code <;> simp only [incoming128Start, selected, Bool.false_eq_true, ite_false, ite_true] at continuation ⊢
   all_goals repeat' first
     | exact continuation
-    | (apply run_next_exists post found (by simp [code, incomingPrefix, selected]; rfl)
+    | (apply run_next_exists post found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
        simp (config := { implicitDefEqProofs := false })
          [step, cil_guard, observerCount, selected, pureArity, scalars, CIL.step.eq_def, CIL.FeatureProfile.evaluate,
            checkedValue, numericValue, Bind.bind, Except.bind, Pure.pure, Except.pure]
        first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)
 
 theorem vector128_incoming_join (program : CIL.Program) (body : CIL.Method) (method : Nat)
-    (found : program[method]? = some body) (tail : List CIL.Op)
-    (code : body.code = incomingPrefix body.profile.advSimd ++ tail) (memory : Memory) (frame : Frame) (args stack : List Value)
+    (found : program[method]? = some body) (code : CodeAt body 0 (incomingPrefix body.profile.advSimd)) (memory : Memory) (frame : Frame) (args stack : List Value)
     (post : Memory → List Value → Prop)
     (continuation : ∃ fuel result returned,
       run program fuel method (62) args frame stack memory =
@@ -266,10 +263,10 @@ theorem vector128_incoming_join (program : CIL.Program) (body : CIL.Method) (met
     ∃ fuel result returned,
       run program fuel method (incoming128End body true) args frame stack memory =
         .ok (result, returned) ∧ post result returned := by
-  cases selected : body.profile.advSimd <;> simp only [incoming128End, selected, Bool.false_eq_true, ite_false, ite_true] at continuation ⊢
+  cases selected : body.profile.advSimd <;> simp only [selected] at code <;> simp only [incoming128End, selected, Bool.false_eq_true, ite_false, ite_true] at continuation ⊢
   all_goals repeat' first
     | exact continuation
-    | (apply run_next_exists post found (by simp [code, incomingPrefix, selected]; rfl)
+    | (apply run_next_exists post found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
        simp (config := { implicitDefEqProofs := false })
          [step, cil_guard, observerCount, pureArity, scalars, CIL.step.eq_def, checkedValue, numericValue,
            Bind.bind, Except.bind, Pure.pure, Except.pure]
@@ -284,8 +281,7 @@ open CIL.Safety UInt256Model.Safety CIL.Vector
 
 /-- Both selected incoming-mask blocks preserve every earlier initialized vector home, including the initial operands, upper sum and generated masks. -/
 theorem vector128_incoming_pair (program : CIL.Program) (body : CIL.Method) (method : Nat) (specs : List NumericLocalSpec)
-    (found : program[method]? = some body) (tail : List CIL.Op)
-    (code : body.code = incomingPrefix body.profile.advSimd ++ tail)
+    (found : program[method]? = some body) (code : CodeAt body 0 (incomingPrefix body.profile.advSimd))
     (sse : body.profile.advSimd = false → body.profile.sse2 = true)
     (ssse : body.profile.advSimd = false → body.profile.ssse3 = true)
     (slotsSpec : specs[7]? = some vector128ZeroSpec ∧ specs[8]? = some vector128ZeroSpec) (boundary : Nat) (entered current : Memory)
@@ -323,8 +319,8 @@ theorem vector128_incoming_pair (program : CIL.Program) (body : CIL.Method) (met
     simpa [layout, Nat.add_assoc, Nat.add_comm, Nat.add_left_comm] using lowSlot
   have actualHigh : frame.locals[7]? = some (.bytes .vector128 highHome) := by
     simpa [layout, Nat.add_assoc, Nat.add_comm, Nat.add_left_comm] using highSlot
-  apply vector128_incoming_dispatch program body method found tail code current frame args stack post
-  apply vector128_incoming_checked program body method specs found tail code sse ssse slotsSpec boundary entered current inputs outputs frame root slots layout args
+  apply vector128_incoming_dispatch program body method found code current frame args stack post
+  apply vector128_incoming_checked program body method specs found code sse ssse slotsSpec boundary entered current inputs outputs frame root slots layout args
     currentCall enteredWF homes authority false low high stack lowHome highHome actualLow actualHigh lowRead highRead post
   intro lowIncoming middle lowLocal lowLoaded preserved middleCall middleAuthority firstWrite
   have lowTail : slots[7]? = some (.bytes .vector128 lowIncoming) := by simpa [layout, Nat.add_assoc, Nat.add_comm, Nat.add_left_comm] using lowLocal
@@ -332,7 +328,7 @@ theorem vector128_incoming_pair (program : CIL.Program) (body : CIL.Method) (met
     lowHome lowIncoming lowSlot lowTail _ _ firstWrite lowRead
   have savedHigh := vector128_prior_read specs entered current middle boundary slots homes (6) (7) (by omega)
     highHome lowIncoming highSlot lowTail _ _ firstWrite highRead
-  apply vector128_incoming_checked program body method specs found tail code sse ssse slotsSpec boundary entered middle inputs outputs frame root slots layout args
+  apply vector128_incoming_checked program body method specs found code sse ssse slotsSpec boundary entered middle inputs outputs frame root slots layout args
     middleCall enteredWF homes middleAuthority true low high stack lowHome highHome actualLow actualHigh savedLow savedHigh post
   intro highIncoming after highLocal highLoaded kept afterCall afterAuthority secondWrite
   have highTail : slots[8]? = some (.bytes .vector128 highIncoming) := by simpa [layout, Nat.add_assoc, Nat.add_comm, Nat.add_left_comm] using highLocal
@@ -346,7 +342,7 @@ theorem vector128_incoming_pair (program : CIL.Program) (body : CIL.Method) (met
       reference highIncoming slot highTail _ _ secondWrite
       (vector128_prior_read specs entered current middle boundary slots homes i (7) bound
         reference lowIncoming slot lowTail _ _ firstWrite loaded)
-  apply vector128_incoming_join program body method found tail code after frame args stack post
+  apply vector128_incoming_join program body method found code after frame args stack post
   exact continuation lowIncoming highIncoming after lowTail highTail lower highLoaded earlier
     (preserved.trans kept) afterCall afterAuthority
     (Nat.le_trans (write_extends_allocations _ _ _ _ _ firstWrite).next

@@ -1,3 +1,4 @@
+import CIL.Safety.SymbolicExecution
 import UInt256.Methods.Add.Vector128Start
 import UInt256.Methods.AddSubtract.Vector128Incoming
 
@@ -8,8 +9,7 @@ def correctionCode : List CIL.Op := [.local 8, .intrinsic (.vector (.sub64 128))
   .local 5, .local 9, .intrinsic (.vector (.sub64 128)) 2, .setLocal 11]
 /-- Apply the incoming all-ones carry mask to either half and initialize its speculative result home using the actual extracted subtraction/store block. -/
 theorem vector128_correction_checked (program : CIL.Program) (body : CIL.Method) (method : Nat) (specs : List NumericLocalSpec)
-    (found : program[method]? = some body) (leading tail : List CIL.Op) (prefixLength : leading.length = 62)
-    (code : body.code = leading ++ correctionCode ++ tail)
+    (found : program[method]? = some body) (code : CodeAt body 62 (correctionCode))
     (slotsSpec : specs[9]? = some vector128ZeroSpec ∧ specs[10]? = some vector128ZeroSpec) (boundary : Nat) (entered current : Memory)
     (inputs outputs : List Reference) (frame : Frame) (root : LocalSlot) (slots : List LocalSlot)
     (layout : frame.locals = root :: slots) (args : List Value)
@@ -56,7 +56,7 @@ theorem vector128_correction_checked (program : CIL.Program) (body : CIL.Method)
   all_goals
     repeat' first
       | exact done
-      | (apply run_next_exists post found (by simp [code, List.getElem?_append, prefixLength, correctionCode]; rfl)
+      | (apply run_next_exists post found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
          first
          | exact loadIncoming _ _
          | exact loadSum _ _
@@ -75,8 +75,7 @@ open CIL.Safety UInt256Model.Safety UInt256Proof.AddSubtract.Safety
 
 /-- Both speculative result stores retain the earlier operand, sum and mask snapshots. -/
 theorem vector128_correction_pair (program : CIL.Program) (body : CIL.Method) (method : Nat) (specs : List NumericLocalSpec)
-    (found : program[method]? = some body) (leading tail : List CIL.Op) (prefixLength : leading.length = 62)
-    (code : body.code = leading ++ correctionCode ++ tail)
+    (found : program[method]? = some body) (code : CodeAt body 62 (correctionCode))
     (slotsSpec : specs[9]? = some vector128ZeroSpec ∧ specs[10]? = some vector128ZeroSpec) (boundary : Nat) (entered current : Memory)
     (inputs outputs : List Reference) (frame : Frame) (root : LocalSlot) (slots : List LocalSlot)
     (layout : frame.locals = root :: slots) (args : List Value)
@@ -116,7 +115,7 @@ theorem vector128_correction_pair (program : CIL.Program) (body : CIL.Method) (m
     simpa [layout] using lowSlot
   have actualHigh : frame.locals[9]? = some (.bytes .vector128 highHome) := by
     simpa [layout] using highSlot
-  apply vector128_correction_checked program body method specs found leading tail prefixLength code slotsSpec boundary entered current inputs outputs frame root slots layout args
+  apply vector128_correction_checked program body method specs found code slotsSpec boundary entered current inputs outputs frame root slots layout args
     currentCall enteredWF homes authority false low high incomingLow sumHome lowHome actualSum actualLow sumRead lowRead post
   intro lowResult middle lowLocal lowLoaded preserved middleCall middleAuthority firstWrite
   have lowTail : slots[9]? = some (.bytes .vector128 lowResult) := by simpa [layout] using lowLocal
@@ -124,7 +123,7 @@ theorem vector128_correction_pair (program : CIL.Program) (body : CIL.Method) (m
     sumHome lowResult sumSlot lowTail _ _ firstWrite sumRead
   have savedHigh := vector128_prior_read specs entered current middle boundary slots homes 8 9 (by decide)
     highHome lowResult highSlot lowTail _ _ firstWrite highRead
-  apply vector128_correction_checked program body method specs found leading tail prefixLength code slotsSpec boundary entered middle inputs outputs frame root slots layout args
+  apply vector128_correction_checked program body method specs found code slotsSpec boundary entered middle inputs outputs frame root slots layout args
     middleCall enteredWF homes middleAuthority true low high incomingHigh sumHome highHome actualSum actualHigh savedSum savedHigh post
   intro highResult after highLocal highLoaded kept afterCall afterAuthority secondWrite
   have highTail : slots[10]? = some (.bytes .vector128 highResult) := by simpa [layout] using highLocal
@@ -168,11 +167,9 @@ def vector128SnapshotValue (memory : Memory) (left right : Reference) (i : Fin 1
 /-- Complete checked execution from entry to the first output-stage instruction. -/
 theorem vector128_snapshots_checked (program : CIL.Program) (body : CIL.Method) (method : Nat) (specs : List NumericLocalSpec)
     (found : program[method]? = some body)
-    (startTail incomingTail leading correctionTail : List CIL.Op)
-    (startCode : body.code = vector128AddPrefix ++ startTail)
-    (incomingCode : body.code = incomingPrefix body.profile.advSimd ++ incomingTail)
-    (leadingLength : leading.length = 62)
-    (correctionCodeFound : body.code = leading ++ correctionCode ++ correctionTail)
+    (startCode : CodeAt body 0 vector128AddPrefix)
+    (incomingCode : CodeAt body 0 (incomingPrefix body.profile.advSimd))
+    (correctionCodeFound : CodeAt body 62 correctionCode)
     (firstEleven : ∀ i : Fin 11, specs[i.val]? = some vector128ZeroSpec)
     (sse : body.profile.advSimd = false → body.profile.sse2 = true)
     (ssse : body.profile.advSimd = false → body.profile.ssse3 = true) (original entered : Memory)
@@ -201,18 +198,18 @@ theorem vector128_snapshots_checked (program : CIL.Program) (body : CIL.Method) 
       run program fuel method 0 args frame [] entered =
         .ok (result, returned) ∧ post result returned := by
   have enteredWF := enterFrame_preserves_wellFormed _ _ _ _ _ call.1.1 setup
-  apply vector128_start_checked program body method specs found startTail startCode (fun i => firstEleven ⟨i.val, by omega⟩) original entered inputs outputs left right frame slots args call setup
+  apply vector128_start_checked program body method specs found startCode (fun i => firstEleven ⟨i.val, by omega⟩) original entered inputs outputs left right frame slots args call setup
     layout homes leftMember rightMember leftArg rightArg post
   intro locations sum lowMask highMask prepared located sumSlot lowSlot highSlot sumRead lowRead highRead
     inputReads p0 c0 a0 n0
-  apply UInt256Proof.AddSubtract.Safety.vector128_incoming_pair program body method specs found incomingTail incomingCode sse ssse ⟨firstEleven 7, firstEleven 8⟩ original.nextIdentity entered prepared inputs outputs
+  apply UInt256Proof.AddSubtract.Safety.vector128_incoming_pair program body method specs found incomingCode sse ssse ⟨firstEleven 7, firstEleven 8⟩ original.nextIdentity entered prepared inputs outputs
     (vector128SavedFrame frame slots right) (.root (some (.address right))) slots rfl args c0 enteredWF homes a0
     (vector128SnapshotValue original left right 5) (vector128SnapshotValue original left right 6)
     [.scalar (.v128 (halfSum (inputHalf original left 0) (inputHalf original right 0)))]
     lowMask highMask lowSlot highSlot lowRead highRead post
   intro lowIncoming highIncoming incoming lowIncomingSlot highIncomingSlot lowIncomingRead highIncomingRead
     keptIncoming p1 c1 a1 n1
-  apply vector128_correction_pair program body method specs found leading correctionTail leadingLength correctionCodeFound ⟨firstEleven 9, firstEleven 10⟩ original.nextIdentity entered incoming inputs outputs
+  apply vector128_correction_pair program body method specs found correctionCodeFound ⟨firstEleven 9, firstEleven 10⟩ original.nextIdentity entered incoming inputs outputs
     (vector128SavedFrame frame slots right) (.root (some (.address right))) slots rfl args c1 enteredWF homes a1
     (halfSum (inputHalf original left 0) (inputHalf original right 0))
     (vector128SnapshotValue original left right 4)

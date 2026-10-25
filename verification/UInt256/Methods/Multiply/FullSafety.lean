@@ -267,22 +267,22 @@ theorem full_inputs (profile : CIL.FeatureProfile) (program : CIL.Program) (meth
       run program fuel methodIndex 0 (productArgs left right output) frame [] current =
         .ok (final, returned) ∧ post final returned := by
   apply run_input_to_local (argument := 0) (target := 0) state originalCall enteredWF homes left (by simp) 0
-    (by rfl) (by rfl) found (by rfl) (by rfl) (by rfl) post
+    (by rfl) (by rfl) found (by rfl) post
   intro m0 state0
   apply run_input_to_local (argument := 1) (target := 1) state0 originalCall enteredWF homes right (by simp) 0
-    (by rfl) (by rfl) found (by rfl) (by rfl) (by rfl) post
+    (by rfl) (by rfl) found (by rfl) post
   intro m1 state1
   apply run_input_to_local (argument := 0) (target := 2) state1 originalCall enteredWF homes left (by simp) 1
-    (by rfl) (by rfl) found (by rfl) (by rfl) (by rfl) post
+    (by rfl) (by rfl) found (by rfl) post
   intro m2 state2
   apply run_input_to_local (argument := 1) (target := 3) state2 originalCall enteredWF homes right (by simp) 1
-    (by rfl) (by rfl) found (by rfl) (by rfl) (by rfl) post
+    (by rfl) (by rfl) found (by rfl) post
   intro m3 state3
   apply run_input_to_local (argument := 0) (target := 4) state3 originalCall enteredWF homes left (by simp) 2
-    (by rfl) (by rfl) found (by rfl) (by rfl) (by rfl) post
+    (by rfl) (by rfl) found (by rfl) post
   intro m4 state4
   apply run_input_to_local (argument := 1) (target := 5) state4 originalCall enteredWF homes right (by simp) 2
-    (by rfl) (by rfl) found (by rfl) (by rfl) (by rfl) post
+    (by rfl) (by rfl) found (by rfl) post
   exact continuation
 
 #print axioms full_frame_setup

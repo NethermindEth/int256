@@ -1,3 +1,4 @@
+import CIL.Safety.SymbolicExecution
 import UInt256.Methods.Add.ARMRepairCarry
 
 namespace UInt256Proof.Add.Safety
@@ -5,8 +6,7 @@ open CIL.Safety UInt256Model.Safety UInt256Proof.AddSubtract.Safety
 
 /-- The ARM repair suffix returns the updated high-lane carry bit and retires its frame. -/
 theorem vector128_arm_repair_return (program : CIL.Program) (body : CIL.Method) (method : Nat)
-    (found : program[method]? = some body) (leading tail : List CIL.Op) (leadingLength : leading.length = 113)
-    (code : body.code = leading ++ armRepairCode ++ tail) (returns : body.returnsValue = true) (enabled : body.profile.advSimd = true)
+    (found : program[method]? = some body) (code : CodeAt body 113 (armRepairCode)) (returns : body.returnsValue = true) (enabled : body.profile.advSimd = true)
     (memory : Memory) (frame : Frame) (args : List Value)
     (home : Reference) (mask : BitVec 128)
     (slot : frame.locals[7]? = some (.bytes .vector128 home))
@@ -22,7 +22,7 @@ theorem vector128_arm_repair_return (program : CIL.Program) (body : CIL.Method) 
       .vector128 (.v128 mask) mask.toNat rfl slot loaded
     iterate 6
       apply Eq.trans
-      · apply run_next found (by simp [code, List.getElem?_append, leadingLength, armRepairCode]; rfl)
+      · apply run_next found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
         first
         | exact load _ _
         | (simp (config := { implicitDefEqProofs := false })
@@ -30,7 +30,7 @@ theorem vector128_arm_repair_return (program : CIL.Program) (body : CIL.Method) 
               CIL.Intrinsic.available, CIL.Vector.intrinsic_extract128,
               checkedValue, numericValue, Bind.bind, Except.bind, Pure.pure, Except.pure]
            first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)
-    have fetched : body.code[161]? = some (.ret (some .unsigned8)) := by simp [code, List.getElem?_append, leadingLength, armRepairCode]
+    have fetched : body.code[161]? = some (.ret (some .unsigned8)) := by (conv => lhs; arg 2; whnf); cil_lookup [code]
     by_cases carry : CIL.Vector.lane64 mask 1 > BitVec.ofNat 64 0
     all_goals simp [run, found, fetched, returns, step, cil_guard, observerCount, checkedValue, numericValue, CIL.NarrowKind.extend, carry,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
@@ -43,8 +43,7 @@ open CIL.Safety UInt256Model.Safety UInt256Proof.AddSubtract.Safety
 
 /-- Replace only the high output half, preserving the initialized low half and every private snapshot even when the original caller views overlap. -/
 theorem vector128_arm_repair_output (program : CIL.Program) (body : CIL.Method) (method : Nat)
-    (found : program[method]? = some body) (leading tail : List CIL.Op) (leadingLength : leading.length = 113)
-    (code : body.code = leading ++ armRepairCode ++ tail) (returns : body.returnsValue = true) (enabled : body.profile.advSimd = true)
+    (found : program[method]? = some body) (code : CodeAt body 113 (armRepairCode)) (returns : body.returnsValue = true) (enabled : body.profile.advSimd = true)
     (original entered current : Memory) (inputs outputs : List Reference)
     (output : Reference) (frame : Frame) (args : List Value)
     (call : CallingConditions program original inputs outputs)
@@ -86,7 +85,7 @@ theorem vector128_arm_repair_output (program : CIL.Program) (body : CIL.Method) 
     simp only [Fin.val_one, Nat.mul_one] at address
     repeat' first
       | exact done
-      | (apply run_next_exists post found (by simp [code, List.getElem?_append, leadingLength, armRepairCode]; rfl)
+      | (apply run_next_exists post found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
          first
          | exact loadHigh _ _
          | (simp (config := { implicitDefEqProofs := false })
@@ -103,8 +102,7 @@ open CIL.Safety UInt256Model.Safety UInt256Proof.AddSubtract.Safety
 
 /-- Complete repaired output/return suffix. -/
 theorem vector128_arm_repair_suffix (program : CIL.Program) (body : CIL.Method) (method : Nat)
-    (found : program[method]? = some body) (leading tail : List CIL.Op) (leadingLength : leading.length = 113)
-    (code : body.code = leading ++ armRepairCode ++ tail) (returns : body.returnsValue = true) (enabled : body.profile.advSimd = true)
+    (found : program[method]? = some body) (code : CodeAt body 113 (armRepairCode)) (returns : body.returnsValue = true) (enabled : body.profile.advSimd = true)
     (original entered current : Memory) (inputs outputs : List Reference)
     (output : Reference) (frame : Frame) (args : List Value)
     (call : CallingConditions program original inputs outputs)
@@ -131,10 +129,10 @@ theorem vector128_arm_repair_suffix (program : CIL.Program) (body : CIL.Method) 
         [.scalar (.i32 (if CIL.Vector.lane64 carry 1 > BitVec.ofNat 64 0 then 1 else 0))]) :
     ∃ fuel final returned,
       run program fuel method 149 args frame [] current = .ok (final, returned) ∧ post final returned := by
-  apply vector128_arm_repair_output program body method found leading tail leadingLength code returns enabled original entered current inputs outputs output frame args
+  apply vector128_arm_repair_output program body method found code returns enabled original entered current inputs outputs output frame args
     call currentCall member authority argument low high highHome highSlot highRead lowRead post
   intro after outputRead afterCall afterAuthority outside privateReads advanced
-  exact ⟨7, _, _, vector128_arm_repair_return program body method found leading tail leadingLength code returns enabled after frame args carryHome carry carrySlot
+  exact ⟨7, _, _, vector128_arm_repair_return program body method found code returns enabled after frame args carryHome carry carrySlot
     (privateReads carryHome 16 1 _ carryBound carryRead),
     continuation after outputRead afterCall afterAuthority outside advanced⟩
 
@@ -146,8 +144,7 @@ open CIL.Safety UInt256Model.Safety UInt256Proof.AddSubtract.Safety
 
 /-- Repaired output halves encode the independent initial-input sum, and caller value/access/footprint guarantees survive the private frame return. -/
 theorem vector128_arm_repair_result (program : CIL.Program) (body : CIL.Method) (method : Nat)
-    (found : program[method]? = some body) (leading tail : List CIL.Op) (leadingLength : leading.length = 113)
-    (code : body.code = leading ++ armRepairCode ++ tail) (returns : body.returnsValue = true) (enabled : body.profile.advSimd = true)
+    (found : program[method]? = some body) (code : CodeAt body 113 (armRepairCode)) (returns : body.returnsValue = true) (enabled : body.profile.advSimd = true)
     (original entered current : Memory) (inputs outputs : List Reference)
     (output : Reference) (frame : Frame) (args : List Value)
     (call : CallingConditions program original inputs outputs)
@@ -179,7 +176,7 @@ theorem vector128_arm_repair_result (program : CIL.Program) (body : CIL.Method) 
     access final output 32 1 true = .ok () ∧
     (∀ id offset, id < original.nextIdentity → OutsideOutput output id offset →
       final.cells id offset = current.cells id offset)
-  apply vector128_arm_repair_suffix program body method found leading tail leadingLength code returns enabled original entered current inputs outputs output frame args
+  apply vector128_arm_repair_suffix program body method found code returns enabled original entered current inputs outputs output frame args
     call currentCall member authority argument low high highHome highSlot highRead lowRead
     carryHome carry carrySlot carryBound carryRead post
   intro after outputRead afterCall afterAuthority outside advanced
@@ -206,9 +203,9 @@ open CIL.Safety UInt256Model.Safety UInt256Proof.AddSubtract.Safety
 
 /-- Complete ARM repair branch from saved initial-input snapshots to normal return, retaining the independent sum and caller memory guarantees. -/
 theorem vector128_arm_repair_run (program : CIL.Program) (body : CIL.Method) (method : Nat) (specs : List NumericLocalSpec)
-    (found : program[method]? = some body) (leading tail : List CIL.Op) (leadingLength : leading.length = 113)
-    (code : body.code = leading ++ armRepairCode ++ tail)
-    (repairSpecs : ∀ i : Fin 4, specs[19 + i.val]? = some vector128ZeroSpec)  (baseSpecs : ∀ i : Fin 14, specs[i.val]? = some vector128ZeroSpec)     (returns : body.returnsValue = true)  (enabled : body.profile.advSimd = true)
+    (found : program[method]? = some body) (code : CodeAt body 113 (armRepairCode))
+    (repairSpecs : ∀ i : Fin 4, specs[19 + i.val]? = some vector128ZeroSpec)  (baseSpecs : ∀ i : Fin 14, specs[i.val]? = some vector128ZeroSpec)
+    (returns : body.returnsValue = true)  (enabled : body.profile.advSimd = true)
     (original entered current : Memory) (inputs outputs : List Reference)
     (left right output : Reference) (frame : Frame) (root : LocalSlot) (slots : List LocalSlot)
     (layout : frame.locals = root :: slots) (args : List Value)
@@ -235,7 +232,7 @@ theorem vector128_arm_repair_run (program : CIL.Program) (body : CIL.Method) (me
     access final output 32 1 true = .ok () ∧
     (∀ id offset, id < original.nextIdentity → OutsideOutput output id offset →
       final.cells id offset = current.cells id offset)
-  apply vector128_arm_repair_checked program body method specs found leading tail leadingLength code repairSpecs baseSpecs enabled original.nextIdentity entered current inputs outputs frame root slots layout args
+  apply vector128_arm_repair_checked program body method specs found code repairSpecs baseSpecs enabled original.nextIdentity entered current inputs outputs frame root slots layout args
     currentCall enteredWF homes authority flag flagFit flagArg (vector128DecisionValues body.profile.advSimd original left right flag) rfl snapshots post
   intro after repaired preserved afterCall afterAuthority advanced
   obtain ⟨carryHome, carrySlot, carryRead⟩ := repaired 6
@@ -248,7 +245,7 @@ theorem vector128_arm_repair_run (program : CIL.Program) (body : CIL.Method) (me
   have old : output.allocation < original.nextIdentity := (call.1.1.1 _ _ present).1
   have savedLow := (preserved.read output old 16 1).trans lowRead
   obtain ⟨fuel, final, returned, executed, scalar, result, writable, outside⟩ :=
-    vector128_arm_repair_result program body method found leading tail leadingLength code returns enabled original entered after inputs outputs output frame args
+    vector128_arm_repair_result program body method found code returns enabled original entered after inputs outputs output frame args
       call afterCall member afterAuthority outputArg (vector128SnapshotValue original left right 9)
       (armRepairSnapshot (vector128DecisionValues body.profile.advSimd original left right flag) 10)
       highHome actualHigh highRead savedLow carryHome
@@ -269,8 +266,7 @@ def vector128RepairStart (body : CIL.Method) : Nat := if body.profile.advSimd th
 
 /-- Follow the extracted repair ISA guard without changing memory or locals. -/
 theorem vector128_repair_dispatch (program : CIL.Program) (body : CIL.Method) (method : Nat)
-    (found : program[method]? = some body) (leading tail : List CIL.Op) (leadingLength : leading.length = 111)
-    (code : body.code = leading ++ [.feature .advSimd, .brzero 162] ++ tail) (memory : Memory) (frame : Frame) (args : List Value)
+    (found : program[method]? = some body) (code : CodeAt body 111 ([.feature .advSimd, .brzero 162])) (memory : Memory) (frame : Frame) (args : List Value)
     (post : Memory → List Value → Prop)
     (continuation : ∃ fuel result returned,
       run program fuel method (vector128RepairStart body) args frame [] memory =
@@ -281,7 +277,7 @@ theorem vector128_repair_dispatch (program : CIL.Program) (body : CIL.Method) (m
   cases selected : body.profile.advSimd <;> simp only [vector128RepairStart, selected, Bool.false_eq_true, ite_false, ite_true] at continuation ⊢
   all_goals repeat' first
     | exact continuation
-    | (apply run_next_exists post found (by simp [code, List.getElem?_append, leadingLength]; rfl)
+    | (apply run_next_exists post found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
        simp (config := { implicitDefEqProofs := false })
          [step, cil_guard, observerCount, selected, pureArity, scalars, CIL.step.eq_def, CIL.FeatureProfile.evaluate,
            numericValue, checkedValue, Bind.bind, Except.bind, Pure.pure, Except.pure]

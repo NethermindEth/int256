@@ -1,3 +1,4 @@
+import CIL.Safety.SymbolicExecution
 import UInt256.Methods.Add.ARMRepairMasks
 
 namespace UInt256Proof.Add.Safety
@@ -8,8 +9,7 @@ def repaired128Carry (carry propagation full repair : BitVec 128) : BitVec 128 :
 
 /-- Update the saved high carry mask from initialized private snapshots. -/
 theorem vector128_arm_repair_carry (program : CIL.Program) (body : CIL.Method) (method : Nat) (specs : List NumericLocalSpec)
-    (found : program[method]? = some body) (leading tail : List CIL.Op) (leadingLength : leading.length = 113)
-    (code : body.code = leading ++ armRepairCode ++ tail)
+    (found : program[method]? = some body) (code : CodeAt body 113 (armRepairCode))
     (repairSpecs : ∀ i : Fin 4, specs[19 + i.val]? = some vector128ZeroSpec)  (baseSpecs : ∀ i : Fin 14, specs[i.val]? = some vector128ZeroSpec)  (enabled : body.profile.advSimd = true)
     (boundary : Nat) (entered current : Memory)
     (inputs outputs : List Reference) (frame : Frame) (root : LocalSlot) (slots : List LocalSlot)
@@ -64,7 +64,7 @@ theorem vector128_arm_repair_carry (program : CIL.Program) (body : CIL.Method) (
       .vector128 (.v128 repair) repair.toNat rfl repairSlot repairRead
     repeat' first
       | exact done
-      | (apply run_next_exists post found (by simp [code, List.getElem?_append, leadingLength, armRepairCode]; rfl)
+      | (apply run_next_exists post found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
          first
          | exact load_carry _ _
          | exact load_propagation _ _
@@ -85,8 +85,7 @@ open CIL.Safety UInt256Model.Safety UInt256Proof.AddSubtract.Safety CIL.Vector
 
 /-- Compose the carry-mask and high-result overwrites, retaining every other private vector and the exact initialized values of both updated homes. -/
 theorem vector128_arm_update_pair (program : CIL.Program) (body : CIL.Method) (method : Nat) (specs : List NumericLocalSpec)
-    (found : program[method]? = some body) (leading tail : List CIL.Op) (leadingLength : leading.length = 113)
-    (code : body.code = leading ++ armRepairCode ++ tail)
+    (found : program[method]? = some body) (code : CodeAt body 113 (armRepairCode))
     (repairSpecs : ∀ i : Fin 4, specs[19 + i.val]? = some vector128ZeroSpec)  (baseSpecs : ∀ i : Fin 14, specs[i.val]? = some vector128ZeroSpec)   (enabled : body.profile.advSimd = true)
     (boundary : Nat) (entered current : Memory)
     (inputs outputs : List Reference) (frame : Frame) (root : LocalSlot) (slots : List LocalSlot)
@@ -126,7 +125,7 @@ theorem vector128_arm_update_pair (program : CIL.Program) (body : CIL.Method) (m
         run program fuel method 149 args frame [] after = .ok (final, returned) ∧ post final returned) :
     ∃ fuel final returned,
       run program fuel method 137 args frame [] current = .ok (final, returned) ∧ post final returned := by
-  apply vector128_arm_repair_carry program body method specs found leading tail leadingLength code repairSpecs baseSpecs enabled boundary entered current inputs outputs frame root slots layout args
+  apply vector128_arm_repair_carry program body method specs found code repairSpecs baseSpecs enabled boundary entered current inputs outputs frame root slots layout args
     currentCall enteredWF homes authority carry carryHome carrySlot carryRead
     propagation propagationHome propagationSlot propagationRead full fullHome fullSlot fullRead
     repair repairHome repairSlot repairRead post
@@ -138,7 +137,7 @@ theorem vector128_arm_update_pair (program : CIL.Program) (body : CIL.Method) (m
   have savedRepair := vector128_other_read specs entered current middle boundary slots homes 22 6 (by decide)
     repairHome updatedCarry repairTail carryTail _ _ firstWrite repairRead
   have actualHigh : frame.locals[11]? = some (.bytes .vector128 highHome) := by simpa [layout] using highSlot
-  apply vector128_arm_repair_value program body method specs found leading tail leadingLength code repairSpecs baseSpecs enabled boundary entered middle inputs outputs frame root slots layout args
+  apply vector128_arm_repair_value program body method specs found code repairSpecs baseSpecs enabled boundary entered middle inputs outputs frame root slots layout args
     middleCall enteredWF homes middleAuthority true high repair highHome repairHome actualHigh repairSlot savedHigh savedRepair post
   intro updatedHigh after updatedHighSlot updatedHighRead kept afterCall afterAuthority secondWrite
   have highTail : slots[10]? = some (.bytes .vector128 updatedHigh) := by simpa [layout] using updatedHighSlot
@@ -204,8 +203,7 @@ def repair128Mask (high lowPropagation highPropagation : BitVec 128) : BitVec 12
 
 /-- All repair-mask preparation, retaining the fourteen original snapshots. -/
 theorem vector128_arm_prepare (program : CIL.Program) (body : CIL.Method) (method : Nat) (specs : List NumericLocalSpec)
-    (found : program[method]? = some body) (leading tail : List CIL.Op) (leadingLength : leading.length = 113)
-    (code : body.code = leading ++ armRepairCode ++ tail)
+    (found : program[method]? = some body) (code : CodeAt body 113 (armRepairCode))
     (repairSpecs : ∀ i : Fin 4, specs[19 + i.val]? = some vector128ZeroSpec)  (baseSpecs : ∀ i : Fin 14, specs[i.val]? = some vector128ZeroSpec)   (enabled : body.profile.advSimd = true)
     (boundary : Nat) (entered current : Memory)
     (inputs outputs : List Reference) (frame : Frame) (root : LocalSlot) (slots : List LocalSlot)
@@ -246,7 +244,7 @@ theorem vector128_arm_prepare (program : CIL.Program) (body : CIL.Method) (metho
   have actualHigh : frame.locals[13]? = some (.bytes .vector128 highHome) := by simpa [layout] using highSlot
   have actualCondition : frame.locals[14]? = some (.bytes .vector128 conditionHome) := by simpa [layout] using conditionSlot
   rw [condition] at conditionRead
-  apply vector128_arm_repair_mask program body method specs found leading tail leadingLength code repairSpecs enabled boundary entered current inputs outputs frame root slots layout args
+  apply vector128_arm_repair_mask program body method specs found code repairSpecs enabled boundary entered current inputs outputs frame root slots layout args
     currentCall enteredWF homes authority flag flagFit argument (values 11) (values 12) lowHome highHome
     actualLow actualHigh lowRead highRead conditionHome actualCondition conditionRead post
   intro propagationHome first propagationSlot propagationRead firstPreserved firstCall firstAuthority firstWrite
@@ -259,13 +257,13 @@ theorem vector128_arm_prepare (program : CIL.Program) (body : CIL.Method) (metho
     obtain ⟨reference, slot, loaded⟩ := snapshots i
     exact ⟨reference, slot, vector128_prior_read specs entered current first boundary slots homes i.val 19 (by omega)
       reference propagationHome slot propagationTail _ _ firstWrite loaded⟩
-  apply vector128_arm_extra_pair program body method specs found leading tail leadingLength code repairSpecs baseSpecs enabled boundary entered first inputs outputs frame root slots layout args
+  apply vector128_arm_extra_pair program body method specs found code repairSpecs baseSpecs enabled boundary entered first inputs outputs frame root slots layout args
     firstCall enteredWF homes firstAuthority (values 10) (incoming128High (values 11) (values 12))
     resultHome propagationHome resultSlot propagationTail savedResult propagationRead post
   intro fullHome extraHome second fullSlot extraSlot fullRead extraRead kept secondPreserved secondCall secondAuthority secondNext
   have savedPropagation := kept 19 (by decide) propagationHome _ propagationTail propagationRead
   have actualExtra : frame.locals[22]? = some (.bytes .vector128 extraHome) := by simpa [layout] using extraSlot
-  apply vector128_arm_repair_value program body method specs found leading tail leadingLength code repairSpecs baseSpecs enabled boundary entered second inputs outputs frame root slots layout args
+  apply vector128_arm_repair_value program body method specs found code repairSpecs baseSpecs enabled boundary entered second inputs outputs frame root slots layout args
     secondCall enteredWF homes secondAuthority false (incoming128High (values 11) (values 12))
     (incoming128Low (full128 (values 10) &&& incoming128High (values 11) (values 12)))
     propagationHome extraHome propagationSlot actualExtra savedPropagation extraRead post
@@ -297,8 +295,7 @@ def armRepairSnapshot (values : Fin 14 → BitVec 128) (i : Fin 14) : BitVec 128
 
 /-- Complete ARM private repair state from the selected propagation condition through both overwrites, retaining all unaffected original snapshots. -/
 theorem vector128_arm_repair_checked (program : CIL.Program) (body : CIL.Method) (method : Nat) (specs : List NumericLocalSpec)
-    (found : program[method]? = some body) (leading tail : List CIL.Op) (leadingLength : leading.length = 113)
-    (code : body.code = leading ++ armRepairCode ++ tail)
+    (found : program[method]? = some body) (code : CodeAt body 113 (armRepairCode))
     (repairSpecs : ∀ i : Fin 4, specs[19 + i.val]? = some vector128ZeroSpec)  (baseSpecs : ∀ i : Fin 14, specs[i.val]? = some vector128ZeroSpec)    (enabled : body.profile.advSimd = true)
     (boundary : Nat) (entered current : Memory)
     (inputs outputs : List Reference) (frame : Frame) (root : LocalSlot) (slots : List LocalSlot)
@@ -323,7 +320,7 @@ theorem vector128_arm_repair_checked (program : CIL.Program) (body : CIL.Method)
         run program fuel method 149 args frame [] after = .ok (final, returned) ∧ post final returned) :
     ∃ fuel final returned,
       run program fuel method 113 args frame [] current = .ok (final, returned) ∧ post final returned := by
-  apply vector128_arm_prepare program body method specs found leading tail leadingLength code repairSpecs baseSpecs enabled boundary entered current inputs outputs frame root slots layout args
+  apply vector128_arm_prepare program body method specs found code repairSpecs baseSpecs enabled boundary entered current inputs outputs frame root slots layout args
     currentCall enteredWF homes authority flag flagFit argument values condition snapshots post
   intro fullHome repairHome middle fullSlot repairSlot fullRead repairRead saved preserved middleCall middleAuthority advanced
   obtain ⟨carryHome, carrySlot, carryRead⟩ := saved 6
@@ -336,7 +333,7 @@ theorem vector128_arm_repair_checked (program : CIL.Program) (body : CIL.Method)
   have actualPropagation : frame.locals[13]? = some (.bytes .vector128 propagationHome) := by simpa [layout] using propagationSlot
   have actualFull : frame.locals[21]? = some (.bytes .vector128 fullHome) := by simpa [layout] using fullSlot
   have actualRepair : frame.locals[23]? = some (.bytes .vector128 repairHome) := by simpa [layout] using repairSlot
-  apply vector128_arm_update_pair program body method specs found leading tail leadingLength code repairSpecs baseSpecs enabled boundary entered middle inputs outputs frame root slots layout args
+  apply vector128_arm_update_pair program body method specs found code repairSpecs baseSpecs enabled boundary entered middle inputs outputs frame root slots layout args
     middleCall enteredWF homes middleAuthority (values 6) carryHome actualCarry carryRead
     (values 12) propagationHome actualPropagation propagationRead (full128 (values 10)) fullHome actualFull fullRead
     (repair128Mask (values 10) (values 11) (values 12)) repairHome actualRepair repairRead

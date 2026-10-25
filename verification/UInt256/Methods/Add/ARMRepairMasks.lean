@@ -1,3 +1,4 @@
+import CIL.Safety.SymbolicExecution
 import CIL.Safety.ReturnArity
 import UInt256.Methods.Add.Vector128FastEntry
 
@@ -59,8 +60,7 @@ open CIL.Safety UInt256Model.Safety UInt256Proof.AddSubtract.Safety CIL.Vector C
 
 /-- ARM reuses the saved sum-only condition or extracts the two propagation lanes, depending on the reporting flag, then initializes repair local20. -/
 theorem vector128_arm_repair_mask (program : CIL.Program) (body : CIL.Method) (method : Nat) (specs : List NumericLocalSpec)
-    (found : program[method]? = some body) (leading tail : List CIL.Op) (leadingLength : leading.length = 113)
-    (code : body.code = leading ++ armRepairCode ++ tail)
+    (found : program[method]? = some body) (code : CodeAt body 113 (armRepairCode))
     (repairSpecs : ∀ i : Fin 4, specs[19 + i.val]? = some vector128ZeroSpec) (enabled : body.profile.advSimd = true) (boundary : Nat) (entered current : Memory)
     (inputs outputs : List Reference) (frame : Frame) (root : LocalSlot) (slots : List LocalSlot)
     (layout : frame.locals = root :: slots) (args : List Value)
@@ -117,7 +117,7 @@ theorem vector128_arm_repair_mask (program : CIL.Program) (body : CIL.Method) (m
         | exact done
         | (simp (config := { failIfUnchanged := false })
              [flagFit, show (0 : BitVec 32) = BitVec.ofNat 32 0 from rfl, zero]
-           apply run_next_exists post found (by simp [code, List.getElem?_append, leadingLength, armRepairCode]; rfl)
+           apply run_next_exists post found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
            first
            | exact loadCondition _ _
            | exact loadLow _ _
@@ -140,8 +140,7 @@ def full128 (result : BitVec 128) : BitVec 128 :=
   CIL.Vector.zip128 (fun x y => CIL.Vector.mask64 (x == y)) result (~~~0)
 
 theorem vector128_arm_full_mask (program : CIL.Program) (body : CIL.Method) (method : Nat) (specs : List NumericLocalSpec)
-    (found : program[method]? = some body) (leading tail : List CIL.Op) (leadingLength : leading.length = 113)
-    (code : body.code = leading ++ armRepairCode ++ tail)
+    (found : program[method]? = some body) (code : CodeAt body 113 (armRepairCode))
     (repairSpecs : ∀ i : Fin 4, specs[19 + i.val]? = some vector128ZeroSpec) (enabled : body.profile.advSimd = true)
     (boundary : Nat) (entered current : Memory)
     (inputs outputs : List Reference) (frame : Frame) (root : LocalSlot) (slots : List LocalSlot)
@@ -178,7 +177,7 @@ theorem vector128_arm_full_mask (program : CIL.Program) (body : CIL.Method) (met
     have ones : CIL.evalIntrinsic (.vector (.ones 128)) [] = some (.v128 (~~~0)) := by rfl
     repeat' first
       | exact done
-      | (apply run_next_exists post found (by simp [code, List.getElem?_append, leadingLength, armRepairCode]; rfl)
+      | (apply run_next_exists post found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
          first
          | exact load_result _ _
          | exact stored _ _ _
@@ -191,8 +190,7 @@ theorem vector128_arm_full_mask (program : CIL.Program) (body : CIL.Method) (met
 #print axioms vector128_arm_full_mask
 
 theorem vector128_arm_extra_mask (program : CIL.Program) (body : CIL.Method) (method : Nat) (specs : List NumericLocalSpec)
-    (found : program[method]? = some body) (leading tail : List CIL.Op) (leadingLength : leading.length = 113)
-    (code : body.code = leading ++ armRepairCode ++ tail)
+    (found : program[method]? = some body) (code : CodeAt body 113 (armRepairCode))
     (repairSpecs : ∀ i : Fin 4, specs[19 + i.val]? = some vector128ZeroSpec) (enabled : body.profile.advSimd = true)
     (boundary : Nat) (entered current : Memory)
     (inputs outputs : List Reference) (frame : Frame) (root : LocalSlot) (slots : List LocalSlot)
@@ -235,7 +233,7 @@ theorem vector128_arm_extra_mask (program : CIL.Program) (body : CIL.Method) (me
     have ones : CIL.evalIntrinsic (.vector (.ones 128)) [] = some (.v128 (~~~0)) := by rfl
     repeat' first
       | exact done
-      | (apply run_next_exists post found (by simp [code, List.getElem?_append, leadingLength, armRepairCode]; rfl)
+      | (apply run_next_exists post found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
          first
          | exact load_full _ _
          | exact load_propagation _ _
@@ -255,8 +253,7 @@ open CIL.Safety UInt256Model.Safety UInt256Proof.AddSubtract.Safety CIL.Vector C
 
 /-- Both extra-propagation stores, preserving all earlier private snapshots. -/
 theorem vector128_arm_extra_pair (program : CIL.Program) (body : CIL.Method) (method : Nat) (specs : List NumericLocalSpec)
-    (found : program[method]? = some body) (leading tail : List CIL.Op) (leadingLength : leading.length = 113)
-    (code : body.code = leading ++ armRepairCode ++ tail)
+    (found : program[method]? = some body) (code : CodeAt body 113 (armRepairCode))
     (repairSpecs : ∀ i : Fin 4, specs[19 + i.val]? = some vector128ZeroSpec)  (baseSpecs : ∀ i : Fin 14, specs[i.val]? = some vector128ZeroSpec)  (enabled : body.profile.advSimd = true)
     (boundary : Nat) (entered current : Memory)
     (inputs outputs : List Reference) (frame : Frame) (root : LocalSlot) (slots : List LocalSlot)
@@ -287,13 +284,13 @@ theorem vector128_arm_extra_pair (program : CIL.Program) (body : CIL.Method) (me
       run program fuel method 122 args frame [] current = .ok (final, returned) ∧ post final returned := by
   have actualResult : frame.locals[11]? = some (.bytes .vector128 resultHome) := by simpa [layout] using resultSlot
   have actualPropagation : frame.locals[20]? = some (.bytes .vector128 propagationHome) := by simpa [layout] using propagationSlot
-  apply vector128_arm_full_mask program body method specs found leading tail leadingLength code repairSpecs enabled boundary entered current inputs outputs frame root slots layout args
+  apply vector128_arm_full_mask program body method specs found code repairSpecs enabled boundary entered current inputs outputs frame root slots layout args
     currentCall enteredWF homes authority result resultHome actualResult resultRead post
   intro fullHome middle fullSlot fullRead preserved middleCall middleAuthority firstWrite
   have fullTail : slots[20]? = some (.bytes .vector128 fullHome) := by simpa [layout] using fullSlot
   have savedPropagation := vector128_prior_read specs entered current middle boundary slots homes 19 20 (by decide)
     propagationHome fullHome propagationSlot fullTail _ _ firstWrite propagationRead
-  apply vector128_arm_extra_mask program body method specs found leading tail leadingLength code repairSpecs enabled boundary entered middle inputs outputs frame root slots layout args
+  apply vector128_arm_extra_mask program body method specs found code repairSpecs enabled boundary entered middle inputs outputs frame root slots layout args
     middleCall enteredWF homes middleAuthority (full128 result) fullHome fullSlot fullRead
     propagation propagationHome actualPropagation savedPropagation post
   intro extraHome after extraSlot extraRead kept afterCall afterAuthority secondWrite
@@ -321,8 +318,7 @@ open CIL.Safety UInt256Model.Safety UInt256Proof.AddSubtract.Safety CIL.Vector C
 
 /-- Check the repair OR or high-result subtraction, including an initialized readback when the subtraction overwrites its existing private home. -/
 theorem vector128_arm_repair_value (program : CIL.Program) (body : CIL.Method) (method : Nat) (specs : List NumericLocalSpec)
-    (found : program[method]? = some body) (leading tail : List CIL.Op) (leadingLength : leading.length = 113)
-    (code : body.code = leading ++ armRepairCode ++ tail)
+    (found : program[method]? = some body) (code : CodeAt body 113 (armRepairCode))
     (repairSpecs : ∀ i : Fin 4, specs[19 + i.val]? = some vector128ZeroSpec)  (baseSpecs : ∀ i : Fin 14, specs[i.val]? = some vector128ZeroSpec)  (enabled : body.profile.advSimd = true)
     (boundary : Nat) (entered current : Memory)
     (inputs outputs : List Reference) (frame : Frame) (root : LocalSlot) (slots : List LocalSlot)
@@ -372,7 +368,7 @@ theorem vector128_arm_repair_value (program : CIL.Program) (body : CIL.Method) (
     all_goals
       repeat' first
         | exact done
-        | (apply run_next_exists post found (by simp [code, List.getElem?_append, leadingLength, armRepairCode]; rfl)
+        | (apply run_next_exists post found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
            first
            | exact loadLeft _ _
            | exact loadRight _ _

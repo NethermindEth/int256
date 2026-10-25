@@ -1,3 +1,5 @@
+import CIL.Safety.Segment
+import CIL.Safety.SymbolicExecution
 import CIL.Safety.Equations
 import UInt256.Methods.Add.Vector128ArithmeticDefinitions
 import UInt256.Safety.OutputAccess
@@ -113,7 +115,7 @@ def vector128ZeroSpec : NumericLocalSpec := ⟨.vector128, .v128 0, 0, rfl⟩
 
 /-- Each actual half-load/private-store pair captures initial caller bytes. -/
 theorem vector128_operand_checked (program : CIL.Program) (body : CIL.Method) (method : Nat) (specs : List NumericLocalSpec)
-    (found : program[method]? = some body) (tail : List CIL.Op) (code : body.code = vector128PrefixCode ++ tail)
+    (found : program[method]? = some body) (code : CodeAt body 0 (vector128PrefixCode))
     (firstFour : ∀ i : Fin 4, specs[i.val]? = some vector128ZeroSpec)
     (original entered current : Memory)
     (inputs outputs : List Reference) (input : Reference) (frame : Frame)
@@ -160,7 +162,7 @@ theorem vector128_operand_checked (program : CIL.Program) (body : CIL.Method) (m
     simp only [Nat.mul_zero, Nat.mul_one, Nat.add_zero] at reading
     repeat' first
       | exact done
-      | (apply run_next_exists post found (by simp [code, vector128PrefixCode]; rfl)
+      | (apply run_next_exists post found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
          first
          | exact stored _ _ _
          | (simp (config := { implicitDefEqProofs := false })
@@ -179,7 +181,7 @@ def vector128SavedFrame (frame : Frame) (slots : List LocalSlot) (right : Refere
 
 /-- Both input references pass the checked formation operations before the right reference is saved in its root and the left one is duplicated. -/
 theorem vector128_reference_prefix (program : CIL.Program) (body : CIL.Method) (method : Nat)
-    (found : program[method]? = some body) (tail : List CIL.Op) (code : body.code = vector128PrefixCode ++ tail)
+    (found : program[method]? = some body) (code : CodeAt body 0 (vector128PrefixCode))
     (memory : Memory) (left right : Reference)
     (frame : Frame) (slots : List LocalSlot) (initial : Option ManagedReference)
     (layout : frame.locals = .root initial :: slots) (args : List Value)
@@ -196,18 +198,28 @@ theorem vector128_reference_prefix (program : CIL.Program) (body : CIL.Method) (
       run program fuel method 0 args frame [] memory = .ok (result, returned) ∧
       post result returned := by
 
-  repeat' first
-    | exact continuation
-    | (apply run_next_exists post found (by simp [code, vector128PrefixCode]; rfl)
-       simp (config := { implicitDefEqProofs := false })
-         [step, cil_guard, observerCount, leftArg, rightArg, checkedValue, formValue, leftFormed, rightFormed,
-           staticInstruction, memoryInstruction, storeLocal, layout, vector128SavedFrame,
-           checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-       first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)
+  have references := code.take 6
+  have saved := (code.drop 6).take 2
+  have formed : Segment program method 0 6
+      (SegmentState.exact args ⟨frame, [], memory⟩)
+      (SegmentState.exact args
+        ⟨frame, [.reference (.address right), .reference (.address left)], memory⟩) := by
+    cil_segment 6 [found, references, leftArg, rightArg, leftFormed, rightFormed]
+  have rooted : Segment program method 6 8
+      (SegmentState.exact args
+        ⟨frame, [.reference (.address right), .reference (.address left)], memory⟩)
+      (SegmentState.exact args ⟨vector128SavedFrame frame slots right,
+        [.reference (.address left), .reference (.address left)], memory⟩) := by
+    unfold vector128SavedFrame
+    cil_segment 2 [found, saved, layout, rightFormed, storeLocal]
+  apply (formed.trans rooted).run_exists args ⟨frame, [], memory⟩ ⟨rfl, rfl⟩ post
+  intro after valid
+  rcases valid with ⟨_, rfl⟩
+  exact continuation
 
 /-- The extracted signed offset computes the upper half within the live input allocation and its permitted view, before any load is attempted. -/
 theorem vector128_left_upper (program : CIL.Program) (body : CIL.Method) (method : Nat)
-    (found : program[method]? = some body) (tail : List CIL.Op) (code : body.code = vector128PrefixCode ++ tail)
+    (found : program[method]? = some body) (code : CodeAt body 0 (vector128PrefixCode))
     (memory : Memory) (inputs outputs : List Reference)
     (left : Reference) (frame : Frame) (args : List Value)
     (call : CallingConditions program memory inputs outputs)
@@ -224,7 +236,7 @@ theorem vector128_left_upper (program : CIL.Program) (body : CIL.Method) (method
 
   repeat' first
     | exact continuation
-    | (apply run_next_exists post found (by simp [code, vector128PrefixCode]; rfl)
+    | (apply run_next_exists post found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
        simp (config := { implicitDefEqProofs := false })
          [step, cil_guard, observerCount, staticInstruction, memoryInstruction, CIL.offsetValue, referenceAt, advanced,
            checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
@@ -232,7 +244,7 @@ theorem vector128_left_upper (program : CIL.Program) (body : CIL.Method) (method
 
 /-- Reload the tracked right-input root and, for the upper half, perform the checked offset instruction before the next vector load. -/
 theorem vector128_right_reference (program : CIL.Program) (body : CIL.Method) (method : Nat)
-    (found : program[method]? = some body) (tail : List CIL.Op) (code : body.code = vector128PrefixCode ++ tail)
+    (found : program[method]? = some body) (code : CodeAt body 0 (vector128PrefixCode))
     (memory : Memory) (inputs outputs : List Reference)
     (right : Reference) (frame : Frame) (args : List Value)
     (slot : frame.locals[0]? = some (.root (some (.address right))))
@@ -254,7 +266,7 @@ theorem vector128_right_reference (program : CIL.Program) (body : CIL.Method) (m
   all_goals
     repeat' first
       | exact continuation
-      | (apply run_next_exists post found (by simp [code, vector128PrefixCode]; rfl)
+      | (apply run_next_exists post found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
          simp (config := { implicitDefEqProofs := false })
            [step, cil_guard, observerCount, slot, loadLocal, formValue, formed, staticInstruction, memoryInstruction,
              CIL.offsetValue, referenceAt, advanced, checkedAt, Except.mapError,
@@ -271,7 +283,7 @@ open CIL.Safety UInt256Model.Safety
 
 /-- Save all four initial input halves before arithmetic or caller output writes. -/
 theorem vector128_inputs_checked (program : CIL.Program) (body : CIL.Method) (method : Nat) (specs : List NumericLocalSpec)
-    (found : program[method]? = some body) (tail : List CIL.Op) (code : body.code = vector128PrefixCode ++ tail)
+    (found : program[method]? = some body) (code : CodeAt body 0 (vector128PrefixCode))
     (firstFour : ∀ i : Fin 4, specs[i.val]? = some vector128ZeroSpec)
     (original entered : Memory)
     (inputs outputs : List Reference) (left right : Reference)
@@ -309,24 +321,24 @@ theorem vector128_inputs_checked (program : CIL.Program) (body : CIL.Method) (me
   let saved := vector128SavedFrame frame slots right
   have savedLayout : saved.locals = .root (some (.address right)) :: slots := rfl
   have savedRoot : saved.locals[0]? = some (.root (some (.address right))) := rfl
-  apply vector128_reference_prefix program body method found tail code entered left right frame slots (some .null) layout args leftArg rightArg
+  apply vector128_reference_prefix program body method found code entered left right frame slots (some .null) layout args leftArg rightArg
     (enteredCall.input_formed leftMember) (enteredCall.input_formed rightMember) post
-  apply vector128_operand_checked program body method specs found tail code firstFour original entered entered inputs outputs left saved
+  apply vector128_operand_checked program body method specs found code firstFour original entered entered inputs outputs left saved
     (.root (some (.address right))) slots args [.reference (.address left)] savedLayout
     call enteredCall leftMember enteredCall.1.1 homes preserved authority false false post
   intro l0 m0 s0 read0 p0 c0 a0 w0
-  apply vector128_left_upper program body method found tail code m0 inputs outputs left saved args c0 leftMember post
-  apply vector128_operand_checked program body method specs found tail code firstFour original entered m0 inputs outputs left saved
+  apply vector128_left_upper program body method found code m0 inputs outputs left saved args c0 leftMember post
+  apply vector128_operand_checked program body method specs found code firstFour original entered m0 inputs outputs left saved
     (.root (some (.address right))) slots args [] savedLayout
     call c0 leftMember enteredCall.1.1 homes p0 a0 false true post
   intro l1 m1 s1 read1 p1 c1 a1 w1
-  apply vector128_right_reference program body method found tail code m1 inputs outputs right saved args savedRoot c1 rightMember false post
-  apply vector128_operand_checked program body method specs found tail code firstFour original entered m1 inputs outputs right saved
+  apply vector128_right_reference program body method found code m1 inputs outputs right saved args savedRoot c1 rightMember false post
+  apply vector128_operand_checked program body method specs found code firstFour original entered m1 inputs outputs right saved
     (.root (some (.address right))) slots args [] savedLayout
     call c1 rightMember enteredCall.1.1 homes p1 a1 true false post
   intro r0 m2 s2 read2 p2 c2 a2 w2
-  apply vector128_right_reference program body method found tail code m2 inputs outputs right saved args savedRoot c2 rightMember true post
-  apply vector128_operand_checked program body method specs found tail code firstFour original entered m2 inputs outputs right saved
+  apply vector128_right_reference program body method found code m2 inputs outputs right saved args savedRoot c2 rightMember true post
+  apply vector128_operand_checked program body method specs found code firstFour original entered m2 inputs outputs right saved
     (.root (some (.address right))) slots args [] savedLayout
     call c2 rightMember enteredCall.1.1 homes p2 a2 true true post
   intro r1 after s3 read3 p3 c3 a3 w3

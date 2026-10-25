@@ -1,3 +1,4 @@
+import CIL.Safety.SymbolicExecution
 import UInt256.Methods.Add.Vector128FastOutput
 import UInt256.Methods.Add.Vector128FastArithmetic
 import UInt256.Safety.HalfValue
@@ -76,8 +77,7 @@ open CIL.Safety UInt256Model.Safety UInt256Proof.AddSubtract.Safety
 
 /-- Complete checked fast suffix, with initialized output halves and the exact saved high-mask flag. -/
 theorem vector128_fast_suffix (program : CIL.Program) (body : CIL.Method) (method : Nat)
-    (found : program[method]? = some body) (leading tail : List CIL.Op) (leadingLength : leading.length = 204)
-    (code : body.code = leading ++ fastOutputCode body.profile.advSimd ++ tail)
+    (found : program[method]? = some body) (code : CodeAt body 204 (fastOutputCode body.profile.advSimd))
     (returns : body.returnsValue = true) (original entered current : Memory)
     (inputs outputs : List Reference) (output : Reference) (frame : Frame) (args : List Value)
     (call : CallingConditions program original inputs outputs)
@@ -110,12 +110,12 @@ theorem vector128_fast_suffix (program : CIL.Program) (body : CIL.Method) (metho
     ∃ fuel result returned,
       run program fuel method 204 args frame [] current =
         .ok (result, returned) ∧ post result returned := by
-  apply vector128_fast_output_dispatch program body method found leading tail leadingLength code current frame args post
-  apply vector128_fast_output program body method found leading tail leadingLength code original entered current inputs outputs output frame args
+  apply vector128_fast_output_dispatch program body method found code current frame args post
+  apply vector128_fast_output program body method found code original entered current inputs outputs output frame args
     call currentCall member authority argument low high lowHome highHome lowSlot highSlot
     highBound lowRead highRead earlyRead post
   intro after outputRead afterCall afterAuthority outside privateReads advanced
-  exact ⟨7, _, _, vector128_fast_return program body method found leading tail leadingLength code returns after frame args carryHome carry carrySlot
+  exact ⟨7, _, _, vector128_fast_return program body method found code returns after frame args carryHome carry carrySlot
     (privateReads carryHome 16 1 _ carryBound carryRead),
     continuation after outputRead afterCall afterAuthority outside advanced⟩
 
@@ -127,8 +127,7 @@ open CIL.Safety UInt256Model.Safety UInt256Proof.AddSubtract.Safety
 
 /-- Complete fast suffix with initial-input arithmetic and surviving caller memory guarantees. -/
 theorem vector128_fast_result (program : CIL.Program) (body : CIL.Method) (method : Nat)
-    (found : program[method]? = some body) (leading tail : List CIL.Op) (leadingLength : leading.length = 204)
-    (code : body.code = leading ++ fastOutputCode body.profile.advSimd ++ tail)
+    (found : program[method]? = some body) (code : CodeAt body 204 (fastOutputCode body.profile.advSimd))
     (returns : body.returnsValue = true) (original entered current : Memory)
     (inputs outputs : List Reference) (output : Reference) (frame : Frame) (args : List Value)
     (call : CallingConditions program original inputs outputs)
@@ -167,7 +166,7 @@ theorem vector128_fast_result (program : CIL.Program) (body : CIL.Method) (metho
     access final output 32 1 true = .ok () ∧
     (∀ id offset, id < original.nextIdentity → OutsideOutput output id offset →
       final.cells id offset = current.cells id offset)
-  apply vector128_fast_suffix program body method found leading tail leadingLength code returns original entered current inputs outputs output frame args
+  apply vector128_fast_suffix program body method found code returns original entered current inputs outputs output frame args
     call currentCall member authority argument low high lowHome highHome lowSlot highSlot
     highBound lowRead highRead earlyRead carryHome carry carrySlot carryBound carryRead post
   intro after outputRead afterCall afterAuthority outside advanced
@@ -196,18 +195,16 @@ open CIL.Safety UInt256Model.Safety UInt256Proof.AddSubtract.Safety
 /-- Checked execution from helper entry for the mathematical fast case. -/
 theorem vector128_fast_entry (program : CIL.Program) (body : CIL.Method) (method : Nat) (specs : List NumericLocalSpec)
     (found : program[method]? = some body)
-    (startTail incomingTail leading correctionTail : List CIL.Op)
-    (startCode : body.code = vector128AddPrefix ++ startTail)
-    (incomingCode : body.code = incomingPrefix body.profile.advSimd ++ incomingTail)
-    (leadingLength : leading.length = 62)
-    (correctionCodeFound : body.code = leading ++ correctionCode ++ correctionTail)
+    (startCode : CodeAt body 0 vector128AddPrefix)
+    (incomingCode : CodeAt body 0 (incomingPrefix body.profile.advSimd))
+    (correctionCodeFound : CodeAt body 62 correctionCode)
     (firstFourteen : ∀ i : Fin 14, specs[i.val]? = some vector128ZeroSpec)
     (sse : body.profile.advSimd = false → body.profile.sse2 = true)
-    (ssse : body.profile.advSimd = false → body.profile.ssse3 = true)     (earlyLeading earlyTail : List CIL.Op) (earlyLength : earlyLeading.length = 69)
-    (earlyCode : body.code = earlyLeading ++ earlyOutputCode body.profile.advSimd ++ earlyTail)     (propLeading propTail : List CIL.Op) (propLength : propLeading.length = 82)
-    (propCode : body.code = propLeading ++ propagationCode ++ propTail)     (decisionLeading decisionTail : List CIL.Op) (decisionLength : decisionLeading.length = 94)
-    (decisionCodeFound : body.code = decisionLeading ++ decisionCode body.profile.advSimd ++ decisionTail)     (fastLeading fastTail : List CIL.Op) (fastLength : fastLeading.length = 204)
-    (fastCode : body.code = fastLeading ++ fastOutputCode body.profile.advSimd ++ fastTail)
+    (ssse : body.profile.advSimd = false → body.profile.ssse3 = true)
+    (earlyCode : CodeAt body 69 (earlyOutputCode body.profile.advSimd))
+    (propCode : CodeAt body 82 (propagationCode))
+    (decisionCodeFound : CodeAt body 94 (decisionCode body.profile.advSimd))
+    (fastCode : CodeAt body 204 (fastOutputCode body.profile.advSimd))
     (returns : body.returnsValue = true) (original entered : Memory)
     (inputs outputs : List Reference) (left right output : Reference)
     (frame : Frame) (slots : List LocalSlot) (args : List Value)
@@ -235,7 +232,7 @@ theorem vector128_fast_entry (program : CIL.Program) (body : CIL.Method) (method
     access final output 32 1 true = .ok () ∧
     (∀ id offset, id < original.nextIdentity → OutsideOutput output id offset →
       final.cells id offset = original.cells id offset)
-  apply vector128_dispatch_checked program body method specs found startTail incomingTail leading correctionTail startCode incomingCode leadingLength correctionCodeFound firstFourteen sse ssse earlyLeading earlyTail earlyLength earlyCode propLeading propTail propLength propCode decisionLeading decisionTail decisionLength decisionCodeFound original entered inputs outputs left right output frame slots args
+  apply vector128_dispatch_checked program body method specs found startCode incomingCode correctionCodeFound firstFourteen sse ssse earlyCode propCode decisionCodeFound original entered inputs outputs left right output frame slots args
     call setup layout homes leftMember rightMember outputMember leftArg rightArg outputArg flag flagFit flagArg post
   intro current conditionHome conditionSlot conditionRead snapshots earlyRead currentCall authority footprint advanced _callerPreserved
   simp only [fast, ite_true]
@@ -244,7 +241,7 @@ theorem vector128_fast_entry (program : CIL.Program) (body : CIL.Method) (method
   obtain ⟨carryHome, carrySlot, carryRead⟩ := snapshots 6
   have fresh := enterFrame_fresh _ _ _ _ _ setup
   obtain ⟨fuel, final, returned, executed, scalar, result, writable, outside⟩ :=
-    vector128_fast_result program body method found fastLeading fastTail fastLength fastCode returns original entered current inputs outputs output
+    vector128_fast_result program body method found fastCode returns original entered current inputs outputs output
       (vector128SavedFrame frame slots right) args call currentCall outputMember authority outputArg
       (vector128SnapshotValue original left right 9) (vector128SnapshotValue original left right 10)
       lowHome highHome lowSlot highSlot (homes.home_bound 10 .vector128 highHome highSlot)

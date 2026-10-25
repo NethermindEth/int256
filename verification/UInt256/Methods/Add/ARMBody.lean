@@ -259,15 +259,13 @@ theorem arm_helper_checked (profile : CIL.FeatureProfile) (enabled : profile.adv
     rw [enabled] at disabled
     contradiction
   apply checked_vector128_arm_contract program b method armSpecs found
-    (b.code.drop 37) (b.code.drop 62) (b.code.take 62) (b.code.drop 69)
     rfl (by simp only [b, armBody, incomingPrefix, enabled, ite_true]; rfl)
-    rfl rfl armSpecs_first (fun disabled => (disabledFalse disabled).elim) (fun disabled => (disabledFalse disabled).elim)
-    (b.code.take 69) (b.code.drop 82) rfl (by simp only [b, armBody, earlyOutputCode, enabled, ite_true]; rfl)
-    (b.code.take 82) (b.code.drop 94) rfl rfl
-    (b.code.take 94) (b.code.drop 111) rfl (by simp only [b, armBody, decisionCode, enabled, ite_true]; rfl)
-    (b.code.take 204) (b.code.drop 222) rfl (by simp only [b, armBody, fastOutputCode, enabled, ite_true]; rfl) rfl
-    (b.code.take 111) (b.code.drop 113) rfl rfl
-    (b.code.take 113) (b.code.drop 162) rfl rfl armSpecs_repair ⟨rfl,rfl⟩ rfl rfl rfl enabled
+    rfl armSpecs_first (fun disabled => (disabledFalse disabled).elim)
+    (fun disabled => (disabledFalse disabled).elim)
+    (by simp only [b, armBody, earlyOutputCode, enabled, ite_true]; rfl)
+    rfl (by simp only [b, armBody, decisionCode, enabled, ite_true]; rfl)
+    (by simp only [b, armBody, fastOutputCode, enabled, ite_true]; rfl) rfl
+    rfl rfl armSpecs_repair ⟨rfl,rfl⟩ rfl rfl rfl enabled
     memory left right output flag flagFit call
 #print axioms arm_helper_checked
 end UInt256Proof.Add.Safety

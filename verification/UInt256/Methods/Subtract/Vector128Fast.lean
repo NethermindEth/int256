@@ -1,3 +1,4 @@
+import CIL.Safety.SymbolicExecution
 import CIL.Safety.Equations
 import UInt256.Methods.Subtract.Vector128Start
 import UInt256.Safety.OutputHalves
@@ -18,8 +19,7 @@ open CIL.Safety UInt256Model.Safety UInt256Proof.AddSubtract.Safety CIL.Vector
 
 /-- The fast suffix returns the saved top-lane borrow mask and retires its frame. -/
 theorem subtract_fast_return (program : CIL.Program) (body : CIL.Method) (method : Nat)
-    (found : program[method]? = some body) (leading tail : List CIL.Op) (leadingLength : leading.length = 119)
-    (code : body.code = leading ++ subtractFastCode ++ tail) (returns : body.returnsValue = true)
+    (found : program[method]? = some body) (code : CodeAt body 119 (subtractFastCode)) (returns : body.returnsValue = true)
     (memory : Memory) (frame : Frame) (root : LocalSlot) (slots : List LocalSlot) (layout : frame.locals = root :: slots)
     (args : List Value) (values : Fin 4 → BitVec 128) (snapshots : SubtractSnapshots memory slots values 10) :
     run program 7 method 134 args frame [] memory =
@@ -28,7 +28,7 @@ theorem subtract_fast_return (program : CIL.Program) (body : CIL.Method) (method
   have load := snapshots.load frame root layout 7 (by decide) body
   iterate 6
     apply Eq.trans
-    · apply run_next found (by simp [code, List.getElem?_append, leadingLength, subtractFastCode]; rfl)
+    · apply run_next found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
       first
       | exact load _ _ _
       | (simp (config := { implicitDefEqProofs := false })
@@ -37,15 +37,14 @@ theorem subtract_fast_return (program : CIL.Program) (body : CIL.Method) (method
             checkedValue, numericValue, Bind.bind, Except.bind, Pure.pure, Except.pure]
          first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)
   have fetched : body.code[140]? = some (.ret (some .unsigned8)) := by
-    simp [code, List.getElem?_append, leadingLength, subtractFastCode]
+    cil_lookup [code]
   by_cases borrow : lane64 (subtractSnapshot values 7) 1 > BitVec.ofNat 64 0
   all_goals simp [run, found, fetched, returns, step, cil_guard, observerCount, checkedValue, numericValue, CIL.NarrowKind.extend, borrow,
     Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 /-- Store the speculative halves through the checked output view and return the top borrow. -/
 theorem subtract_fast_checked (program : CIL.Program) (body : CIL.Method) (method : Nat) (specs : List NumericLocalSpec)
-    (found : program[method]? = some body) (leading tail : List CIL.Op) (leadingLength : leading.length = 119)
-    (code : body.code = leading ++ subtractFastCode ++ tail) (returns : body.returnsValue = true)
+    (found : program[method]? = some body) (code : CodeAt body 119 (subtractFastCode)) (returns : body.returnsValue = true)
     (vectorSpecs : ∀ i : Fin 10, specs[i.val]? = some vector128ZeroSpec)
     (original entered current : Memory) (inputs outputs : List Reference) (output : Reference)
     (frame : Frame) (root : LocalSlot) (slots : List LocalSlot) (layout : frame.locals = root :: slots)
@@ -84,7 +83,7 @@ theorem subtract_fast_checked (program : CIL.Program) (body : CIL.Method) (metho
   have formed := state.call.output_formed member
   have address := middleCall.output_half_address member 1
   simp only [Fin.val_one, Nat.mul_one] at address
-  have returned := subtract_fast_return program body method found leading tail leadingLength code returns
+  have returned := subtract_fast_return program body method found code returns
     after frame root slots layout args values afterSnapshots
   let post : Memory → List Value → Prop := fun final values' =>
     final = leaveFrame frame after ∧
@@ -95,7 +94,7 @@ theorem subtract_fast_checked (program : CIL.Program) (body : CIL.Method) (metho
       .ok (result, values') ∧ post result values' := by
     repeat' first
       | exact done
-      | (apply run_next_exists post found (by simp [code, List.getElem?_append, leadingLength, subtractFastCode]; rfl)
+      | (apply run_next_exists post found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
          first
          | exact a4 _ _ _
          | exact a8 _ _ _

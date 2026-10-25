@@ -1,3 +1,4 @@
+import CIL.Safety.SymbolicExecution
 import CIL.StepEquations
 import CIL.Safety.Equations
 import UInt256.Methods.AddSubtract.Vector128Inputs
@@ -157,8 +158,7 @@ open CIL.Safety UInt256Model.Safety UInt256Proof.AddSubtract.Safety CIL.Vector
 
 /-- Lane differences and borrow masks from the four saved halves. -/
 theorem subtract_start_checked (program : CIL.Program) (body : CIL.Method) (method : Nat) (specs : List NumericLocalSpec)
-    (found : program[method]? = some body) (leading tail : List CIL.Op) (leadingLength : leading.length = 22)
-    (code : body.code = leading ++ subtractStartCode ++ tail)
+    (found : program[method]? = some body) (code : CodeAt body 22 (subtractStartCode))
     (vectorSpecs : ∀ i : Fin 10, specs[i.val]? = some vector128ZeroSpec)
     (original entered current : Memory) (inputs outputs : List Reference)
     (frame : Frame) (root : LocalSlot) (slots : List LocalSlot) (layout : frame.locals = root :: slots)
@@ -204,7 +204,7 @@ theorem subtract_start_checked (program : CIL.Program) (body : CIL.Method) (meth
   rw [e7] at st7
   repeat' first
     | exact done
-    | (apply run_next_exists post found (by simp [code, List.getElem?_append, leadingLength, subtractStartCode]; rfl)
+    | (apply run_next_exists post found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
        first
        | ((with_reducible show step _ (.local 1) _ _ _ _ _ = _); exact a0 _ _ _)
        | ((with_reducible show step _ (.local 3) _ _ _ _ _ = _); exact a2 _ _ _)
@@ -232,8 +232,7 @@ open CIL.Safety UInt256Model.Safety UInt256Proof.AddSubtract.Safety CIL.Vector
 
 /-- The selected ISA's incoming-borrow instructions store both shifted masks. -/
 theorem subtract_incoming_checked (program : CIL.Program) (body : CIL.Method) (method : Nat) (specs : List NumericLocalSpec)
-    (found : program[method]? = some body) (leading tail : List CIL.Op) (leadingLength : leading.length = 38)
-    (code : body.code = leading ++ subtractIncomingCode body.profile.advSimd ++ tail)
+    (found : program[method]? = some body) (code : CodeAt body 38 (subtractIncomingCode body.profile.advSimd))
     (sse : body.profile.advSimd = false → body.profile.sse2 = true)
     (ssse : body.profile.advSimd = false → body.profile.ssse3 = true)
     (vectorSpecs : ∀ i : Fin 10, specs[i.val]? = some vector128ZeroSpec)
@@ -263,12 +262,12 @@ theorem subtract_incoming_checked (program : CIL.Program) (body : CIL.Method) (m
   rw [e7] at b7
   rw [e8] at st8
   rw [e9] at st9
-  cases selected : body.profile.advSimd
+  cases selected : body.profile.advSimd <;> simp only [selected] at code
   · rw [← incoming128_sse_low] at st8
     rw [← incoming128_sse_high] at st9
     repeat' first
       | exact done
-      | (apply run_next_exists post found (by simp [code, List.getElem?_append, leadingLength, subtractIncomingCode, selected]; rfl)
+      | (apply run_next_exists post found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
          first
          | ((with_reducible show step _ (.local 7) _ _ _ _ _ = _); exact a6 _ _ _)
          | ((with_reducible show step _ (.local 7) _ _ _ _ _ = _); exact b6 _ _ _)
@@ -286,7 +285,7 @@ theorem subtract_incoming_checked (program : CIL.Program) (body : CIL.Method) (m
     rw [← incoming128_arm_high] at st9
     repeat' first
       | exact done
-      | (apply run_next_exists post found (by simp [code, List.getElem?_append, leadingLength, subtractIncomingCode, selected]; rfl)
+      | (apply run_next_exists post found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
          first
          | ((with_reducible show step _ (.local 7) _ _ _ _ _ = _); exact a6 _ _ _)
          | ((with_reducible show step _ (.local 7) _ _ _ _ _ = _); exact b6 _ _ _)
@@ -301,8 +300,7 @@ theorem subtract_incoming_checked (program : CIL.Program) (body : CIL.Method) (m
 
 /-- Branch on the actual coalesced propagation test without writing memory. -/
 theorem subtract_decision_checked (program : CIL.Program) (body : CIL.Method) (method : Nat)
-    (found : program[method]? = some body) (leading tail : List CIL.Op) (leadingLength : leading.length = 63)
-    (code : body.code = leading ++ subtractDecisionCode ++ tail)
+    (found : program[method]? = some body) (code : CodeAt body 63 (subtractDecisionCode))
     (original entered current : Memory) (inputs outputs : List Reference)
     (frame : Frame) (root : LocalSlot) (slots : List LocalSlot) (layout : frame.locals = root :: slots)
     (args : List Value) (values : Fin 4 → BitVec 128)
@@ -322,7 +320,7 @@ theorem subtract_decision_checked (program : CIL.Program) (body : CIL.Method) (m
     simp only [zero, ite_true, ite_false] at continuation
     unfold subtractPropagation at zero
     iterate 14
-      apply run_next_exists post found (by simp [code, List.getElem?_append, leadingLength, subtractDecisionCode]; rfl)
+      apply run_next_exists post found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
       first
       | exact a4 _ _ _
       | exact a5 _ _ _

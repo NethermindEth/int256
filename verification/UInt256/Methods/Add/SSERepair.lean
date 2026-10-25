@@ -1,3 +1,4 @@
+import CIL.Safety.SymbolicExecution
 import CIL.Safety.Equations
 import UInt256.Methods.Add.CarryContract
 import UInt256.Methods.Add.ARMBody
@@ -56,8 +57,8 @@ open CIL.Safety UInt256Model.Safety UInt256Proof.AddSubtract.Safety UInt256Proof
 
 /-- Initialize the private carry word before the SSE scalar repair cascade. -/
 theorem vector128_sse_repair_start (program : CIL.Program) (body : CIL.Method) (method : Nat) (specs : List NumericLocalSpec)
-    (found : program[method]? = some body) (leading tail : List CIL.Op) (leadingLength : leading.length = 162)
-    (carry storage : Nat) (code : body.code = leading ++ sseRepairCode carry storage ++ tail)
+    (found : program[method]? = some body)
+    (carry storage : Nat) (code : CodeAt body 162 (sseRepairCode carry storage))
     (carrySpec : specs[14]? = some armWordSpec)
     (boundary : Nat) (entered current : Memory)
     (inputs outputs : List Reference) (frame : Frame) (root : LocalSlot) (slots : List LocalSlot)
@@ -83,7 +84,7 @@ theorem vector128_sse_repair_start (program : CIL.Program) (body : CIL.Method) (
   have done := continuation reference after slot loaded retained afterCall afterAuthority written
   repeat' first
     | exact done
-    | (apply run_next_exists post found (by simp [code, List.getElem?_append, leadingLength, sseRepairCode]; rfl)
+    | (apply run_next_exists post found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
        first
        | exact stored _ _ _
        | (simp (config := { implicitDefEqProofs := false })
@@ -99,8 +100,8 @@ open CIL.Safety UInt256Model.Safety UInt256Proof.AddSubtract.Safety UInt256Proof
 
 /-- Load both operand limbs and the two private word addresses for one carry call. -/
 theorem vector128_sse_carry_segment (program : CIL.Program) (body : CIL.Method) (method : Nat)
-    (found : program[method]? = some body) (leading tail : List CIL.Op) (leadingLength : leading.length = 162)
-    (carry storage : Nat) (code : body.code = leading ++ sseRepairCode carry storage ++ tail)
+    (found : program[method]? = some body)
+    (carry storage : Nat) (code : CodeAt body 162 (sseRepairCode carry storage))
     (segment : Fin 4) (left right : Reference) (args : List Value)
     (leftArg : args[0]? = some (.reference (.address left)))
     (rightArg : args[1]? = some (.reference (.address right)))
@@ -129,7 +130,7 @@ theorem vector128_sse_carry_segment (program : CIL.Program) (body : CIL.Method) 
     simp only [Nat.reduceMul, Nat.reduceAdd] at leftRead rightRead resultSlot continuation ⊢
     repeat' first
       | exact continuation
-      | (apply run_next_exists post found (by simp [code, List.getElem?_append, leadingLength, sseRepairCode]; rfl)
+      | (apply run_next_exists post found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
          simp (config := { implicitDefEqProofs := false })
            [step, cil_guard, observerCount, checkedValue, numericValue, formValue, leftArg, rightArg, leftFormed, rightFormed,
              carryFormed, resultFormed, carrySlot, resultSlot, localAddress, leftRead, rightRead,
@@ -144,8 +145,8 @@ open CIL.Safety UInt256Model.Safety UInt256Proof.AddSubtract.Safety UInt256Proof
 
 /-- One fetched carry call composes with the checked carry-helper contract. -/
 theorem vector128_sse_indexed_carry (program : CIL.Program) (body : CIL.Method) (method : Nat)
-    (found : program[method]? = some body) (leading tail : List CIL.Op) (leadingLength : leading.length = 162)
-    (carry storage : Nat) (code : body.code = leading ++ sseRepairCode carry storage ++ tail)
+    (found : program[method]? = some body)
+    (carry storage : Nat) (code : CodeAt body 162 (sseRepairCode carry storage))
     (carryFound : program[carry]? = some (carryBody body.profile))
     (index : Fin 4) (args : List Value) (frame : Frame) (memory : Memory)
     (a b c : BitVec 64) (carryHome resultHome : Reference)
@@ -172,7 +173,7 @@ theorem vector128_sse_indexed_carry (program : CIL.Program) (body : CIL.Method) 
     obtain ⟨index, bound⟩ := index
     have cases : index = 0 ∨ index = 1 ∨ index = 2 ∨ index = 3 := by omega
     rcases cases with rfl | rfl | rfl | rfl
-    all_goals simp [code, List.getElem?_append, leadingLength, sseRepairCode]
+    all_goals (conv => lhs; arg 2; whnf); all_goals cil_lookup [code]
   have stepped : step body (.call carry 4) (171 + 7 * index.val) args frame
       [.reference (.address resultHome), .reference (.address carryHome), .scalar (.i64 b), .scalar (.i64 a)] memory =
       .ok (.call carry [.scalar (.i64 a), .scalar (.i64 b), .reference (.address carryHome),
@@ -190,8 +191,8 @@ theorem vector128_sse_indexed_carry (program : CIL.Program) (body : CIL.Method) 
 
 /-- Caller views discharge both limb loads; checked homes discharge the carry call. -/
 theorem vector128_sse_carry_segment_checked (program : CIL.Program) (body : CIL.Method) (method : Nat)
-    (found : program[method]? = some body) (leading tail : List CIL.Op) (leadingLength : leading.length = 162)
-    (carry storage : Nat) (code : body.code = leading ++ sseRepairCode carry storage ++ tail)
+    (found : program[method]? = some body)
+    (carry storage : Nat) (code : CodeAt body 162 (sseRepairCode carry storage))
     (carryFound : program[carry]? = some (carryBody body.profile))
     (segment : Fin 4) (left right output : Reference) (args : List Value)
     (leftArg : args[0]? = some (.reference (.address left)))
@@ -217,13 +218,13 @@ theorem vector128_sse_carry_segment_checked (program : CIL.Program) (body : CIL.
     ∃ fuel result returned,
       run program fuel method (165 + 7 * segment.val) args frame [] memory =
         .ok (result, returned) ∧ post result returned := by
-  apply vector128_sse_carry_segment program body method found leading tail leadingLength carry storage code
+  apply vector128_sse_carry_segment program body method found carry storage code
     segment left right args leftArg rightArg frame memory _ _ carryHome resultHome
     (call.input_formed (by simp)) (call.input_formed (by simp))
     (fun rest => call.input_field_instruction (by simp) _ rest)
     (fun rest => call.input_field_instruction (by simp) _ rest) carrySlot resultSlot
     (access_reference_valid _ _ _ _ _ carryWrite) (access_reference_valid _ _ _ _ _ resultWrite) post
-  exact vector128_sse_indexed_carry program body method found leading tail leadingLength carry storage code carryFound
+  exact vector128_sse_indexed_carry program body method found carry storage code carryFound
     segment args frame memory _ _ c carryHome resultHome call.1.1 incoming carryRead carryWrite resultWrite disjoint
     post continuation
 
@@ -235,8 +236,8 @@ open CIL.Safety UInt256Model.Safety UInt256Proof.AddSubtract.Safety UInt256Proof
 
 /-- Advance the carry invariant through one actual SSE repair call. -/
 theorem vector128_sse_carry_next (program : CIL.Program) (body : CIL.Method) (method : Nat)
-    (found : program[method]? = some body) (leading tail : List CIL.Op) (leadingLength : leading.length = 162)
-    (carry storage : Nat) (code : body.code = leading ++ sseRepairCode carry storage ++ tail)
+    (found : program[method]? = some body)
+    (carry storage : Nat) (code : CodeAt body 162 (sseRepairCode carry storage))
     (carryFound : program[carry]? = some (carryBody body.profile))
     {original before : Memory} {frame : Frame}
     {left right output carryHome : Reference} {results : Fin 4 → Reference} (index : Fin 4)
@@ -253,7 +254,7 @@ theorem vector128_sse_carry_next (program : CIL.Program) (body : CIL.Method) (me
     ∃ fuel result returned,
       run program fuel method (165 + 7 * index.val) args frame [] before =
         .ok (result, returned) ∧ post result returned := by
-  apply vector128_sse_carry_segment_checked program body method found leading tail leadingLength carry storage code
+  apply vector128_sse_carry_segment_checked program body method found carry storage code
     carryFound index left right output args leftArg rightArg frame before
     (scalarCarryValue original left right index.val) carryHome (results index) state.call
     state.carrySlot (state.resultSlots index) state.carryBound state.carryRead state.carryWrite
@@ -265,8 +266,8 @@ theorem vector128_sse_carry_next (program : CIL.Program) (body : CIL.Method) (me
 
 /-- All four carry calls keep the initial operands, private homes and completed limbs. -/
 theorem vector128_sse_carry_all (program : CIL.Program) (body : CIL.Method) (method : Nat)
-    (found : program[method]? = some body) (leading tail : List CIL.Op) (leadingLength : leading.length = 162)
-    (carry storage : Nat) (code : body.code = leading ++ sseRepairCode carry storage ++ tail)
+    (found : program[method]? = some body)
+    (carry storage : Nat) (code : CodeAt body 162 (sseRepairCode carry storage))
     (carryFound : program[carry]? = some (carryBody body.profile))
     {original before : Memory} {frame : Frame}
     {left right output carryHome : Reference} {results : Fin 4 → Reference}
@@ -281,16 +282,16 @@ theorem vector128_sse_carry_all (program : CIL.Program) (body : CIL.Method) (met
         run program fuel method 193 args frame [] after = .ok (result, returned) ∧ post result returned) :
     ∃ fuel result returned,
       run program fuel method 165 args frame [] before = .ok (result, returned) ∧ post result returned := by
-  apply vector128_sse_carry_next program body method found leading tail leadingLength carry storage code carryFound
+  apply vector128_sse_carry_next program body method found carry storage code carryFound
     0 state args leftArg rightArg post
   intro _ first
-  apply vector128_sse_carry_next program body method found leading tail leadingLength carry storage code carryFound
+  apply vector128_sse_carry_next program body method found carry storage code carryFound
     1 first args leftArg rightArg post
   intro _ second
-  apply vector128_sse_carry_next program body method found leading tail leadingLength carry storage code carryFound
+  apply vector128_sse_carry_next program body method found carry storage code carryFound
     2 second args leftArg rightArg post
   intro _ third
-  exact vector128_sse_carry_next program body method found leading tail leadingLength carry storage code carryFound
+  exact vector128_sse_carry_next program body method found carry storage code carryFound
     3 third args leftArg rightArg post continuation
 
 #print axioms vector128_sse_carry_next
@@ -383,8 +384,8 @@ open CIL.Safety UInt256Model.Safety UInt256Proof.AddSubtract.Safety UInt256Proof
 
 /-- From pc 162, zero the carry and run all four checked carry calls on the initial limbs. -/
 theorem vector128_sse_repair_carry (program : CIL.Program) (body : CIL.Method) (method : Nat) (specs : List NumericLocalSpec)
-    (found : program[method]? = some body) (leading tail : List CIL.Op) (leadingLength : leading.length = 162)
-    (carry storage : Nat) (code : body.code = leading ++ sseRepairCode carry storage ++ tail)
+    (found : program[method]? = some body)
+    (carry storage : Nat) (code : CodeAt body 162 (sseRepairCode carry storage))
     (carryFound : program[carry]? = some (carryBody body.profile))
     (wordSpecs : ∀ i : Fin 5, specs[14 + i.val]? = some armWordSpec)
     (original entered current : Memory)
@@ -406,13 +407,13 @@ theorem vector128_sse_repair_carry (program : CIL.Program) (body : CIL.Method) (
         run program fuel method 193 args frame [] after = .ok (final, returned) ∧ post final returned) :
     ∃ fuel final returned,
       run program fuel method 162 args frame [] current = .ok (final, returned) ∧ post final returned := by
-  apply vector128_sse_repair_start program body method specs found leading tail leadingLength carry storage code
+  apply vector128_sse_repair_start program body method specs found carry storage code
     (wordSpecs 0) original.nextIdentity entered current [left, right] [output]
     frame root slots layout args currentCall enteredWF homes authority post
   intro carryHome after carrySlot carryRead retained afterCall afterAuthority _written
   obtain ⟨results, ready⟩ := vector128_sse_carry_ready program specs wordSpecs original entered after frame root slots layout
     left right output carryHome call afterCall (preserved.trans retained) homes enteredWF afterAuthority carrySlot carryRead
-  exact vector128_sse_carry_all program body method found leading tail leadingLength carry storage code carryFound
+  exact vector128_sse_carry_all program body method found carry storage code carryFound
     ready args leftArg rightArg post (continuation carryHome results)
 
 #print axioms vector128_sse_repair_carry
@@ -423,8 +424,8 @@ open CIL.Safety UInt256Model.Safety UInt256Proof.AddSubtract.Safety UInt256Proof
 
 /-- Push the output reference and the four completed sum words for the storage call. -/
 theorem vector128_sse_store_prefix (program : CIL.Program) (body : CIL.Method) (method : Nat)
-    (found : program[method]? = some body) (leading tail : List CIL.Op) (leadingLength : leading.length = 162)
-    (carry storage : Nat) (code : body.code = leading ++ sseRepairCode carry storage ++ tail)
+    (found : program[method]? = some body)
+    (carry storage : Nat) (code : CodeAt body 162 (sseRepairCode carry storage))
     (output : Reference) (args : List Value)
     (outputArg : args[2]? = some (.reference (.address output)))
     (frame : Frame) (memory : Memory) (results : Fin 4 → Reference) (words : Fin 4 → BitVec 64)
@@ -451,7 +452,7 @@ theorem vector128_sse_store_prefix (program : CIL.Program) (body : CIL.Method) (
   have r3 := load_local_word64_of_read (reads 3)
   repeat' first
     | exact continuation
-    | (apply run_next_exists post found (by simp [code, List.getElem?_append, leadingLength, sseRepairCode]; rfl)
+    | (apply run_next_exists post found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
        simp (config := { implicitDefEqProofs := false })
          [step, cil_guard, observerCount, checkedValue, formValue, outputArg, outputFormed, s0, s1, s2, s3, r0, r1, r2, r3,
            checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
@@ -459,8 +460,8 @@ theorem vector128_sse_store_prefix (program : CIL.Program) (body : CIL.Method) (
 
 /-- Return the final carry word as the unsigned overflow flag and retire the frame. -/
 theorem vector128_sse_return (program : CIL.Program) (body : CIL.Method) (method : Nat)
-    (found : program[method]? = some body) (leading tail : List CIL.Op) (leadingLength : leading.length = 162)
-    (carry storage : Nat) (code : body.code = leading ++ sseRepairCode carry storage ++ tail)
+    (found : program[method]? = some body)
+    (carry storage : Nat) (code : CodeAt body 162 (sseRepairCode carry storage))
     (returns : body.returnsValue = true)
     (args : List Value) (frame : Frame) (memory : Memory)
     (carryHome : Reference) (carryWord : BitVec 64)
@@ -471,13 +472,13 @@ theorem vector128_sse_return (program : CIL.Program) (body : CIL.Method) (method
   have reading := load_local_word64_of_read loaded
   iterate 4
     apply Eq.trans
-    · apply run_next found (by simp [code, List.getElem?_append, leadingLength, sseRepairCode]; rfl)
+    · apply run_next found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
       simp (config := { implicitDefEqProofs := false })
         [step, cil_guard, observerCount, slot, reading, checkedValue, numericValue, pureArity, scalars,
           CIL.step.eq_def, CIL.binary, CIL.unary, instruction, Bind.bind, Except.bind, Pure.pure, Except.pure]
       first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
   have fetched : body.code[203]? = some (.ret (some .unsigned8)) := by
-    simp [code, List.getElem?_append, leadingLength, sseRepairCode]
+    cil_lookup [code]
   by_cases positive : BitVec.ofNat 64 0 < carryWord
   all_goals simp [run, found, fetched, returns, step, cil_guard, observerCount, checkedValue, numericValue, CIL.NarrowKind.extend,
     scalarOverflowFlag, positive, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
@@ -491,8 +492,8 @@ open CIL.Safety UInt256Model.Safety UInt256Proof.AddSubtract.Safety UInt256Proof
 
 /-- Store the four ripple words through the checked limb helper and return the exact carry. -/
 theorem vector128_sse_finish (program : CIL.Program) (body : CIL.Method) (method : Nat)
-    (found : program[method]? = some body) (leading tail : List CIL.Op) (leadingLength : leading.length = 162)
-    (carry storage : Nat) (code : body.code = leading ++ sseRepairCode carry storage ++ tail)
+    (found : program[method]? = some body)
+    (carry storage : Nat) (code : CodeAt body 162 (sseRepairCode carry storage))
     (storageFound : program[storage]? = some (UInt256Proof.Multiply.LimbStorage.body body.profile))
     (returns : body.returnsValue = true)
     (original current : CIL.Safety.Memory) (frame : Frame)
@@ -507,7 +508,7 @@ theorem vector128_sse_finish (program : CIL.Program) (body : CIL.Method) (method
   let words := scalarSumWord original left right
   let post := fun final values => AddResult original final values left right output
   have formed := state.call.output_formed (by simp : output ∈ [output])
-  apply vector128_sse_store_prefix program body method found leading tail leadingLength carry storage code
+  apply vector128_sse_store_prefix program body method found carry storage code
     output args outputArg frame current results words formed state.resultSlots (fun i => state.completed i i.isLt) post
   obtain ⟨childFuel, stored, invoked, valid, outside, authority, value, _⟩ :=
     UInt256Proof.Multiply.LimbStorage.store_limbs_readable_contract body.profile program storage storageFound
@@ -528,10 +529,10 @@ theorem vector128_sse_finish (program : CIL.Program) (body : CIL.Method) (method
     Ne.symm (Nat.ne_of_lt (Nat.lt_of_lt_of_le outputOld state.carryFresh))
   have carryRead := authority.read_eq state.carryRead carryOld
     (fun i _ => outside _ _ (Or.inl distinct))
-  have returned := vector128_sse_return program body method found leading tail leadingLength carry storage code returns
+  have returned := vector128_sse_return program body method found carry storage code returns
     args frame stored carryHome _ state.carrySlot carryRead
   obtain ⟨fuel, executed⟩ := run_call_exists found
-    (by simp [code, List.getElem?_append, leadingLength, sseRepairCode]) stepped ⟨childFuel, invoked⟩ ⟨5, returned⟩
+    (by (conv => lhs; arg 2; whnf); cil_lookup [code]) stepped ⟨childFuel, invoked⟩ ⟨5, returned⟩
   refine ⟨fuel, leaveFrame frame stored, _, executed, ?_⟩
   have retained := leaveFrame_preserves_memory_below frame stored original.nextIdentity owned
   have bytes : (fun offset => ((leaveFrame frame stored).cells output.allocation offset).bits) =
