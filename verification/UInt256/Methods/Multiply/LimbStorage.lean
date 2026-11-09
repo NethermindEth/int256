@@ -3,7 +3,7 @@ import UInt256.Safety.OutputReadability
 import CIL.Safety.StepComposition
 import CIL.Safety.GuardNormalization
 import CIL.Safety.ValueBitCasts
-import CIL.SymbolicExecution
+import CIL.Safety.SymbolicExecution
 
 namespace UInt256Proof.Multiply.LimbStorage
 open CIL.Safety UInt256Model.Safety
@@ -37,8 +37,7 @@ private theorem s_asRef {body : CIL.Method} {pc : Nat} {args : List Value} {fram
     {rest : List Value} {m : Memory} {r : Reference} (formed : form m r = .ok r) :
     step body (.memory .asRef) pc args frame (.reference (.address r) :: rest) m =
       .ok (.next (pc + 1) (.reference (.address r) :: rest) frame m) := by
-  unfold step staticInstruction memoryInstruction
-  simp only [cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, formValue, formed, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
+  cil_checked_step [formed]
 
 private theorem s_store64 {body : CIL.Method} {pc : Nat} {args : List Value} {frame : Frame}
     {rest : List Value} {m m' : Memory} {r : Reference} {bits : BitVec 64}

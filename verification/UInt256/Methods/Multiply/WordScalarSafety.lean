@@ -33,7 +33,7 @@ def scalarWordBody (profile : CIL.FeatureProfile) : CIL.Method :=
     .unsupported "Unreachable under selected profile",
     .unsupported "Unreachable under selected profile",
     .unsupported "Unreachable under selected profile",
-    .arg 0, .arg 1, .arg 2, .memory .bigMul64, .ret] }
+    .arg 0, .arg 1, .arg 2, .memory (.bigMul64 false), .ret] }
 
 private theorem feature_step (body : CIL.Method) (feature : CIL.Feature) (pc : Nat)
     (args rest : List Value) (frame : Frame) (memory : Memory) :
@@ -103,7 +103,7 @@ theorem scalar_word_invoke (profile : CIL.FeatureProfile)
       apply Eq.trans
       · apply run_next (target := 26) (values := [.scalar (.i64 (highProduct a b))])
           (nextFrame := frame) (updated := final) found (by rfl)
-        simp [step, cil_guard, observerCount, staticInstruction, memoryInstruction, storeValue, referenceAt, normalized,
+        simp [step, cil_guard, observerCount, staticInstruction, memoryInstruction, wideArithmeticInstruction, storeValue, referenceAt, normalized,
           BitVec.toNat_mul, CIL.WideMultiply.high64, highProduct, checkedAt,
           Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
       · simp [run, found, scalarWordBody, step, cil_guard, observerCount, highProduct, leaveFrame, frame, checkedValue, numericValue,

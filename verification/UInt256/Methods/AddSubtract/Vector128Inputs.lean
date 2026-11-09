@@ -1,5 +1,5 @@
 import CIL.Safety.Segment
-import CIL.Safety.SymbolicExecution
+import CIL.Safety.MethodContract
 import CIL.Safety.Equations
 import UInt256.Methods.Add.Vector128ArithmeticDefinitions
 import UInt256.Safety.OutputAccess
@@ -160,15 +160,7 @@ theorem vector128_operand_checked (program : CIL.Program) (body : CIL.Method) (m
       Fin.val_zero, Fin.val_one] at stored reading done ⊢
   all_goals
     simp only [Nat.mul_zero, Nat.mul_one, Nat.add_zero] at reading
-    repeat' first
-      | exact done
-      | (apply run_next_exists post found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
-         first
-         | exact stored _ _ _
-         | (simp (config := { implicitDefEqProofs := false })
-             [step, cil_guard, observerCount, staticInstruction, memoryInstruction, reading, checkedAt, Except.mapError,
-               Bind.bind, Except.bind, Pure.pure, Except.pure]
-            first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
+    cil_contract_steps [found, code, reading, stored] until done
 
 #print axioms vector128_operand_checked
 end UInt256Proof.AddSubtract.Safety
@@ -234,13 +226,7 @@ theorem vector128_left_upper (program : CIL.Program) (body : CIL.Method) (method
   have advanced := call.input_half_address member 1
   simp only [Fin.val_one, Nat.mul_one] at advanced
 
-  repeat' first
-    | exact continuation
-    | (apply run_next_exists post found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
-       simp (config := { implicitDefEqProofs := false })
-         [step, cil_guard, observerCount, staticInstruction, memoryInstruction, CIL.offsetValue, referenceAt, advanced,
-           checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-       first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)
+  cil_contract_steps [found, code, advanced] until continuation
 
 /-- Reload the tracked right-input root and, for the upper half, perform the checked offset instruction before the next vector load. -/
 theorem vector128_right_reference (program : CIL.Program) (body : CIL.Method) (method : Nat)
@@ -264,14 +250,7 @@ theorem vector128_right_reference (program : CIL.Program) (body : CIL.Method) (m
   cases upper <;> simp only [Bool.false_eq_true, ite_false, ite_true, Nat.mul_zero,
     Nat.mul_one, Nat.add_zero] at continuation ⊢
   all_goals
-    repeat' first
-      | exact continuation
-      | (apply run_next_exists post found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
-         simp (config := { implicitDefEqProofs := false })
-           [step, cil_guard, observerCount, slot, loadLocal, formValue, formed, staticInstruction, memoryInstruction,
-             CIL.offsetValue, referenceAt, advanced, checkedAt, Except.mapError,
-             Bind.bind, Except.bind, Pure.pure, Except.pure]
-         first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)
+    cil_contract_steps [found, code, slot, formed, advanced] until continuation
 
 #print axioms vector128_reference_prefix
 #print axioms vector128_left_upper
