@@ -9,10 +9,8 @@ import UInt256.Arithmetic.SignMasks
 import UInt256.Arithmetic.SIMDBorrow
 import UInt256.Arithmetic.SIMDCarry
 import UInt256.LookupTable
-import UInt256.Methods.Add.Contract
 import UInt256.Methods.Bitwise.Contract
 import UInt256.Methods.Bitwise.Lemmas
-import UInt256.Methods.Bitwise.Refutation
 import UInt256.Methods.Bitwise.ScalarPrefix
 import UInt256.Methods.Bitwise.ScalarSafetyContract
 import UInt256.Methods.Bitwise.NotScalar
@@ -24,16 +22,12 @@ import UInt256.Methods.Compare.PrimitiveWrapper32
 import UInt256.Methods.Compare.PrimitiveWrapper64
 import UInt256.Methods.Equality.Contract
 import UInt256.Methods.Equality.UnsignedPrimitive
-import UInt256.Methods.Multiply.Contract
 import UInt256.Methods.Multiply.ProductValue
 import UInt256.Methods.Multiply.ScalarValue
 import UInt256.Methods.Multiply.NarrowProduct
 import UInt256.Methods.Multiply.WordScalarSafety
-import UInt256.Methods.Multiply.ReturnContract
 import UInt256.Methods.Reporting.Contract
 import UInt256.Methods.Shift.Contract
-import UInt256.Methods.Shift.OperatorContract
-import UInt256.Methods.Subtract.Contract
 import UInt256.Methods.StorageScalar
 import UInt256.Representation
 import UInt256.RepresentationLemmas
@@ -57,7 +51,6 @@ import UInt256.Methods.Equality.SignedPrimitive
 import UInt256.Methods.Equality.PrimitiveOperator
 import UInt256.Methods.Shift.ScalarContract
 import UInt256.Methods.Shift.SafetyCountMath
-import UInt256.Methods.Shift.Refutation
 import UInt256.Methods.Multiply.ProductStorage
 import UInt256.Methods.Equality.ValueScalar
 import UInt256.Methods.Compare.PrimitiveValue

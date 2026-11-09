@@ -1,3 +1,4 @@
+import CIL.Safety.SymbolicExecution
 import CIL.Safety.Equations
 import UInt256.Safety.FourLimbWrites
 import UInt256.Safety.OutputReadability
@@ -20,12 +21,6 @@ def body (profile : CIL.FeatureProfile) : CIL.Method :=
 def arguments (output : Reference) (w0 w1 w2 w3 : BitVec 64) : List Value :=
   [.reference (.address output), .scalar (.i64 w0), .scalar (.i64 w1),
     .scalar (.i64 w2), .scalar (.i64 w3)]
-
-macro "constructor_step" facts:term,* : tactic =>
-  `(tactic| simp [step, cil_guard, observerCount, arguments, checkedValue, numericValue, formValue,
-    pureArity, instruction, storeValue, referenceAt, ordinaryAccessAlignment,
-    checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure,
-    cil_code, $[$facts:term],*])
 
 /-- The complete constructor body is checked once, independently of extraction.
     Readback, caller permissions and the write footprint share this execution. -/
@@ -59,15 +54,8 @@ theorem constructor_safe (profile : CIL.FeatureProfile) (program : CIL.Program) 
   · simp [arguments, checkedValue, numericValue, formValue, checkedAt, f0,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   · rfl
-  · iterate 12
-      apply Eq.trans
-      · apply run_next found
-        · simp only [body]; rfl
-        · constructor_step f0, f1, f2, f3, a0, a1, a2, a3, h0, h1, h2, h3
-          try exact ⟨rfl, rfl, rfl, rfl⟩
-          done
-    simp [run, found, body, step, cil_guard, observerCount, leaveFrame, Except.mapError,
-      Bind.bind, Except.bind, Pure.pure, Except.pure]
+  · cil_checked_steps [found, body, arguments, f0, f1, f2, f3,
+      a0, a1, a2, a3, h0, h1, h2, h3]
 
 #print axioms constructor_safe
 
@@ -108,7 +96,8 @@ theorem constructor_contract (profile : CIL.FeatureProfile) (program : CIL.Progr
     exact vector256_bytes_roundtrip bytes length
   have readback : read result output 32 1 = .ok (numberBytes (packed w0 w1 w2 w3).toNat 32) := by
     rw [encoded]; exact loaded
-  exact ⟨result, executed, valid, outside, authority, readback, loadLocal_of_read readback⟩
+  exact ⟨result, executed, valid, outside, authority, readback,
+    loadLocal_of_read (kind := .aggregate 32) readback⟩
 
 #print axioms constructor_contract
 end UInt256Proof.ConstructorSafety

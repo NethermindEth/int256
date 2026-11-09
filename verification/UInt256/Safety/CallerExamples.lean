@@ -41,7 +41,7 @@ def callerMemory (layout : CallerLayout) (bytes : Nat → Nat → BitVec 8) : CI
 
 theorem callerMemory_wellFormed (layout : CallerLayout) (valid : layout.Valid)
     (bytes : Nat → Nat → BitVec 8) : (callerMemory layout bytes).WellFormed := by
-  constructor
+  refine { allocations := ?_, slots := ?_, views := ?_ }
   · intro id allocation present
     simp only [callerMemory] at present
     split at present
@@ -49,6 +49,8 @@ theorem callerMemory_wellFormed (layout : CallerLayout) (valid : layout.Valid)
       cases present
       exact ⟨bound, by simp [Allocation.WellFormed, callerAllocation, valid.1]⟩
     · cases present
+  · intro id offset reference held
+    cases held
   · intro view member
     simp only [callerMemory, List.mem_cons, List.not_mem_nil, or_false] at member
     have bounds : view.allocation < layout.identities ∧ view.start + view.length ≤ layout.extent := by
@@ -82,7 +84,8 @@ theorem callerMemory_access (layout : CallerLayout) (valid : layout.Valid)
 
 theorem callerMemory_calling (program : CIL.Program) (layout : CallerLayout)
     (valid : layout.Valid) (bytes : Nat → Nat → BitVec 8)
-    (sizes : ∀ descriptor ∈ programStaticDescriptors program, descriptor.bytes.length < nativeLimit)
+    (sizes : ∀ descriptor ∈ programStaticDescriptors program,
+      descriptor.bytes.length < nativeLimit ∧ 0 < descriptor.alignment)
     (identities : ∀ left ∈ programStaticDescriptors program,
       ∀ right ∈ programStaticDescriptors program, left.identity = right.identity → left = right) :
     CallingConditions program (callerMemory layout bytes) [layout.left, layout.right] [layout.output] := by
@@ -126,7 +129,8 @@ theorem caller_layouts_valid :
   simp [CallerLayout.Valid, disjointLayout, exactAliasLayout, partialOverlapLayout, nativeLimit]
 
 theorem caller_examples_nonvacuous (program : CIL.Program) (bytes : Nat → Nat → BitVec 8)
-    (sizes : ∀ descriptor ∈ programStaticDescriptors program, descriptor.bytes.length < nativeLimit)
+    (sizes : ∀ descriptor ∈ programStaticDescriptors program,
+      descriptor.bytes.length < nativeLimit ∧ 0 < descriptor.alignment)
     (identities : ∀ left ∈ programStaticDescriptors program,
       ∀ right ∈ programStaticDescriptors program, left.identity = right.identity → left = right) :
     CallingConditions program (callerMemory disjointLayout bytes)

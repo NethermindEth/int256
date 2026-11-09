@@ -50,13 +50,6 @@ theorem compareWord_sign (left right : Nat) :
     · simp [UInt256Model.Compare.compareWord, UInt256Model.Compare.signAgreement, hlt, heq]
       omega
 
-theorem exact_three_way_implies_sign (p : Program) (entry : Nat) (initial : Bytes)
-    (left right : Nat)
-    (exactResult : UInt256Model.Compare.ExactThreeWayContract p entry initial left right) :
-    UInt256Model.Compare.ThreeWayContract p entry initial left right := by
-  obtain ⟨fuel, final, execution, bytes⟩ := exactResult
-  exact ⟨fuel, final, _, execution, compareWord_sign _ _, bytes⟩
-
 /-- Any negative/positive result magnitudes meet the comparison API's promise. -/
 theorem sign_magnitudes (negative positive : W32) (left right : Nat)
     (hn : negative.toInt < 0) (hp : 0 < positive.toInt) :

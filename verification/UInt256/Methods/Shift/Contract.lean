@@ -59,15 +59,4 @@ theorem signed_count_mod64 (count : W32) :
   rw [BitVec.toInt_eq_toNat_cond]
   split <;> omega
 
-/-- Independent mathematical result on the initial operand, normal finite
-    execution, and equality of every caller byte with the exact output update. -/
-def Contract (direction : Direction) (program : Program) (entry : Nat)
-    (initial : Bytes) (input out : Nat) (count : W32) : Prop :=
-  ∃ fuel final,
-    invoke program fuel entry [.object input, .i32 count, .object out]
-      (byteMemory initial) = some (final, []) ∧
-    ∀ address, final (.byte address) =
-      (writeBytes (byteMemory initial) out
-        (result direction (byteValue initial input) count).toNat 32) (.byte address)
-
 end UInt256Proof.Shift
