@@ -187,7 +187,7 @@ theorem prepare_masks (program : CIL.Program) (method : Nat) (profile : CIL.Feat
   prep_pure
   prep_pure
   prep_pure
-  rw [masked_incoming]
+  rw [show BitVec.signExtend 64 (0xFFFFFFFF#32) = 0xFFFFFFFFFFFFFFFF#64 from rfl, masked_incoming]
   apply VectorFrame.run_cell_store post state scratch originalCall homes layout 2 rfl found (by rfl)
   intro current state scratch
   exact continuation current state scratch
