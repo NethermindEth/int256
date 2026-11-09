@@ -46,33 +46,11 @@ theorem store_template_contract (profile : CIL.FeatureProfile) (featureFirst : B
     simp [args, StorageScalar.arguments, checkedValue, numericValue, formValue, formed,
       checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   have setup : enterFrame (template profile featureFirst padding) args memory = .ok (frame, memory) := rfl
-  have enabled (pc : Nat) (stack : List Value) :
-      step (template profile featureFirst padding) (.feature .vector256Accelerated) pc args frame stack memory =
-        .ok (.next (pc + 1) (.scalar (.i32 1) :: stack) frame memory) := by
-    change Except.ok (FrameAction.next (pc + 1)
-      (.scalar (.i32 (if profile.vector256Accelerated then 1 else 0)) :: stack) frame memory) = _
-    rw [vector]
-    rfl
   refine ⟨13, after, invoke_of_run found checked setup ?_, valid, outside,
     write_preserves_access_below written _, ?_, ⟨_, loaded⟩⟩
-  · cases featureFirst
-    all_goals
-      iterate 11
-          apply Eq.trans
-          · apply run_next found (by rfl)
-            first
-            | exact enabled _ _
-            | rfl
-            | (simp (config := { implicitDefEqProofs := false }) only
-                [List.drop, List.getElem?_cons_zero, StorageScalar.arguments, step, checkedValue, formValue, checkedAt, formed, pureArity, instruction, staticInstruction, memoryInstruction, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-               first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)
-      change run program 2 index 11 args frame [.scalar (.v256 packed), .reference (.address output)] memory = _
-      apply Eq.trans
-      · apply run_next (target := 12) (values := []) (nextFrame := frame) (updated := after) found (by rfl)
-        simp only [step, cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, staticInstruction, memoryInstruction, storeValue, referenceAt, ordinaryAccessAlignment,
-          written, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-      exact run_return found (by rfl) (by rfl) (by rfl)
-
+  · cases featureFirst <;>
+      cil_checked_steps [found, template, args, StorageScalar.arguments, frame,
+        vector, formed, created, written, storeValue, referenceAt, ordinaryAccessAlignment]
   · rw [inputValue_of_encoded_read loaded]
     apply BitVec.eq_of_toNat_eq
     have bound := packed.isLt
