@@ -39,34 +39,9 @@ theorem run_leaf (profile : CIL.FeatureProfile)
   have fl := call.input_formed (reference := input) (by simp)
   have fo := call.output_formed (reference := output) (by simp)
   have hl := input_encoded program memory [input] [output] call input (by simp)
-  iterate 4
-    apply Eq.trans
-    · apply run_next found
-      · simp only [body]; rfl
-      · simp (config := { implicitDefEqProofs := false })
-            [step, cil_guard, observerCount, unaryArguments, checkedValue, formValue, fl, fo, hl,
-             pureArity, instruction, staticInstruction, memoryInstruction, dereference,
-             aggregate_to_vector, checkedAt,
-             Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-        try exact ⟨rfl,rfl,rfl,rfl⟩
-        done
-  apply Eq.trans
-  · apply run_next found (by rfl)
-    exact intrinsic_step _ _ _ _ _ _ (inputValue memory input)
-  iterate 2
-    apply Eq.trans
-    · apply run_next found
-      · simp only [body]; rfl
-      · simp (config := { implicitDefEqProofs := false })
-            [step, cil_guard, observerCount,
-             pureArity, instruction, staticInstruction, memoryInstruction, referenceAt,
-             vector_to_aggregate, length, written, checkedAt,
-             Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-        try exact ⟨rfl,rfl,rfl,rfl⟩
-        done
-  apply run_return found (by rfl)
-  · rfl
-  · rfl
+  cil_checked_steps [found, body, unaryArguments, fl, fo, hl, intrinsic_step,
+    aggregate_to_vector, vector_to_aggregate, length, written, bits,
+    instruction, checkedAt, dereference, storeValue, referenceAt, ordinaryAccessAlignment]
 
 theorem leaf_result (profile : CIL.FeatureProfile)
     (program : CIL.Program) (index : Nat) (found : program[index]? = some (body profile))

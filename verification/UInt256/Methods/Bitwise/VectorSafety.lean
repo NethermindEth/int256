@@ -45,22 +45,9 @@ theorem run_leaf (profile : CIL.FeatureProfile) (operation : Binary)
   have fo := call.output_formed (reference := output) (by simp)
   have hl := input_encoded program memory [left,right] [output] call left (by simp)
   have hr := input_encoded program memory [left,right] [output] call right (by simp)
-  iterate 10
-    apply Eq.trans
-    · apply run_next found
-      · simp only [body]; rfl
-      · first
-        | exact intrinsic_step operation _ _ _ _ _ _ _ _
-        | (simp (config := { implicitDefEqProofs := false })
-            [step, cil_guard, observerCount, binaryArguments, checkedValue, formValue, fl, fr, fo, hl, hr,
-             pureArity, instruction, staticInstruction, memoryInstruction, dereference, referenceAt,
-             aggregate_to_vector, vector_to_aggregate, length, written, bits, checkedAt,
-             Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-           try exact ⟨rfl,rfl,rfl,rfl⟩
-           done)
-  apply run_return found (by rfl)
-  · rfl
-  · rfl
+  cil_checked_steps [found, body, binaryArguments, fl, fr, fo, hl, hr,
+    intrinsic_step, aggregate_to_vector, vector_to_aggregate, length, written, bits,
+    instruction, checkedAt, dereference, storeValue, referenceAt, ordinaryAccessAlignment]
 
 theorem leaf_result (profile : CIL.FeatureProfile) (operation : Binary)
     (program : CIL.Program) (index : Nat) (found : program[index]? = some (body profile operation))
