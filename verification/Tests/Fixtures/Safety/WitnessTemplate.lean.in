@@ -17,7 +17,7 @@ def memory : Memory := {
   nextIdentity := 2
 }
 theorem wellFormed : memory.WellFormed := by
-  constructor
+  refine { allocations := ?_, slots := by simp [memory], views := ?_ }
   · intro id allocation present
     by_cases first : id = 0
     · subst id

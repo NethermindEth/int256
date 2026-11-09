@@ -19,5 +19,8 @@
   "armBase64": false,
   "vector256Accelerated": false,
   "x86Base64": true,
-  "vector128Accelerated": true
+  "vector128Accelerated": true,
+  "avx512Vbmi": false,
+  "aes": false,
+  "armAes": false
 }
