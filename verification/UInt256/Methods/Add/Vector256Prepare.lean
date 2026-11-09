@@ -43,14 +43,9 @@ macro "prep_pure" : tactic => `(tactic|
    have formed1 := access_reference_valid _ _ _ _ _ (scratch 1 s1 rfl).1
    have formed2 := access_reference_valid _ _ _ _ _ (scratch 2 s2 rfl).1
    have formed3 := access_reference_valid _ _ _ _ _ (scratch 3 s3 rfl).1
-   apply run_next_exists post found (by rfl)
-   · simp (config := { implicitDefEqProofs := false })
-       [step, cil_guard, observerCount, pureArity, prepareArguments, checkedValue, numericValue, formValue, formedLeft, formedRight,
-         formedOutput, formed0, formed1, formed2, formed3, staticInstruction, memoryInstruction, checkedAt,
-         profileEq, features.avx, features.avx2, features.wideF, features.wide, CIL.FeatureProfile.evaluate,
-         scalars, checkedIntrinsic, CIL.Intrinsic.available, CIL.step.eq_def, CIL.binary, CIL.unary, CIL.truth,
-         instruction, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-     try (first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)))
+   cil_contract_steps 1 [found, prepareArguments, formedLeft, formedRight, formedOutput,
+     formed0, formed1, formed2, formed3, profileEq, features.avx, features.avx2,
+     features.wideF, features.wide, CIL.FeatureProfile.evaluate]))
 
 set_option hygiene false in
 macro "prep_store" : tactic => `(tactic|
@@ -170,7 +165,7 @@ theorem prepare_masks (program : CIL.Program) (method : Nat) (profile : CIL.Feat
     prep_pure
     prep_pure
     prep_pure
-    rw [ternary_carry_lanes]
+    rw [show (63#32).toNat % 64 = 63 from rfl, ternary_carry_lanes]
     apply VectorFrame.run_cell_store post state scratch originalCall homes layout 1 rfl found (by rfl)
     intro current state scratch
     prep_pure
@@ -179,7 +174,7 @@ theorem prepare_masks (program : CIL.Program) (method : Nat) (profile : CIL.Feat
     prep_pure
     prep_pure
     prep_pure
-    rw [align_carry]
+    rw [show ((3#32).setWidth 8).toNat = 3 from rfl, align_carry]
     apply VectorFrame.run_cell_store post state scratch originalCall homes layout 2 rfl found (by rfl)
     intro current state scratch
     prep_pure
