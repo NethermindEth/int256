@@ -44,14 +44,8 @@ set_option hygiene false in
 /-- One pure instruction of `FinishAdd`; expects `post found features profileEq state output`. -/
 macro "finish_pure" : tactic => `(tactic|
   (have formedOutput := state.call.output_formed (reference := output) (by simp)
-   apply run_next_exists post found (by rfl)
-   · simp (config := { implicitDefEqProofs := false })
-       [step, cil_guard, observerCount, pureArity.eq_def, finishArguments, checkedValue, numericValue, formValue, formedOutput,
-         staticInstruction, memoryInstruction, checkedAt, profileEq, features.avx, features.avx2,
-         CIL.FeatureProfile.evaluate, scalars, checkedIntrinsic, CIL.Intrinsic.available, CIL.step.eq_def,
-         CIL.binary.eq_def, CIL.unary.eq_def, CIL.truth, instruction.eq_def, Except.mapError, Bind.bind, Except.bind, Pure.pure,
-         Except.pure]
-     try (first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)))
+   cil_contract_steps 1 [found, finishArguments, formedOutput, profileEq,
+     features.avx, features.avx2, CIL.FeatureProfile.evaluate]))
 
 set_option hygiene false in
 macro "finish_store" : tactic => `(tactic|
@@ -67,7 +61,7 @@ theorem finish_index (program : CIL.Program) (method lookup : Nat) (profile : CI
     (features : AddProfile profile avx512)
     (memory entered current : Memory) (output : Reference) (frame : Frame)
     (originalCall : CallingConditions program memory [] [output])
-    (homes : WritableHomes entered memory.nextIdentity (finishAddBody profile lookup).localKinds frame.locals)
+    (homes : CompleteWritableHomes entered memory.nextIdentity (finishAddBody profile lookup).localKinds frame.locals)
     (sum carry propagation : BitVec 256)
     (state : VectorFrame program memory entered current [] output frame (fun _ => none) none)
     (post : Memory → List Value → Prop)
@@ -112,7 +106,7 @@ theorem finish_tail (program : CIL.Program) (method lookup : Nat) (profile : CIL
     (features : AddProfile profile avx512)
     (memory entered current : Memory) (output : Reference) (frame : Frame)
     (originalCall : CallingConditions program memory [] [output])
-    (homes : WritableHomes entered memory.nextIdentity (finishAddBody profile lookup).localKinds frame.locals)
+    (homes : CompleteWritableHomes entered memory.nextIdentity (finishAddBody profile lookup).localKinds frame.locals)
     (sum carry propagation : BitVec 256)
     (state : VectorFrame program memory entered current [] output frame (finishLocals carry propagation) none)
     (post : Memory → List Value → Prop)
@@ -128,24 +122,10 @@ theorem finish_tail (program : CIL.Program) (method lookup : Nat) (profile : CIL
   obtain ⟨added, row⟩ := UInt256Proof.AddSubtract.Vector256.table_row current reference state.call.1.1 loaded
     (UInt256Proof.SIMD.cascadeIndex (CIL.Vector.moveMask64 carry) (CIL.Vector.moveMask64 propagation))
     (UInt256Proof.SIMD.cascade_index_bound _ _)
-  apply run_next_exists post found (by rfl)
-  · simp [step, cil_guard, observerCount, staticInstruction, memoryInstruction, formValue, formed, checkedAt, Except.mapError,
-      Bind.bind, Except.bind, Pure.pure, Except.pure]
-    exact ⟨rfl, rfl, rfl, rfl⟩
-  apply run_next_exists post found (by rfl)
-  · simp [step, cil_guard, observerCount, staticInstruction, memoryInstruction, formValue, formed, checkedAt, Except.mapError,
-      Bind.bind, Except.bind, Pure.pure, Except.pure]
-    exact ⟨rfl, rfl, rfl, rfl⟩
+  cil_contract_steps 2 [found, formed]
   finish_load
   finish_pure
-  apply run_next_exists post found (by rfl)
-  · simp only [step, cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, staticInstruction, memoryInstruction, referenceAt, CIL.offsetValue, checkedAt,
-      Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-    rw [added]
-  apply run_next_exists post found (by rfl)
-  · simp [step, cil_guard, observerCount, staticInstruction, memoryInstruction, row,
-      Bind.bind, Except.bind, Pure.pure, Except.pure]
-    try exact ⟨rfl, rfl, rfl, rfl⟩
+  cil_contract_steps 2 [found, added, row]
   finish_store
   finish_pure
   finish_pure
@@ -187,9 +167,9 @@ theorem finish_invoke (program : CIL.Program) (method lookup : Nat) (profile : C
   obtain ⟨frame, entered, setup, numeric, _, _⟩ := numeric_frame_setup
     (finishAddBody profile lookup) finishSpecs rfl rfl rfl rfl rfl memory
     (finishArguments sum carry propagation output) originalCall.1.1
-  have homes : WritableHomes entered memory.nextIdentity
+  have homes : CompleteWritableHomes entered memory.nextIdentity
       (finishAddBody profile lookup).localKinds frame.locals :=
-    UInt256Model.Safety.NumericHomes.writable numeric
+    CIL.Safety.NumericHomes.complete numeric
   have owned : ∀ id ∈ frame.owned, memory.nextIdentity ≤ id := fun id member =>
     ((enterFrame_fresh _ _ _ _ _ setup).2 id member).1
   let post : Memory → List Value → Prop := fun final returned =>
