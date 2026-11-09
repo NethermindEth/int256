@@ -186,6 +186,35 @@ string temporary = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "uint256-ba
 try
 {
     Directory.CreateDirectory(Path.Combine(temporary, "manifests"));
+    {
+        string source = Path.Combine(temporary, "snapshot-source"), consumer = Path.Combine(source, "artifacts/consumer");
+        string package = Path.Combine(source, ".lake/packages/sample");
+        Directory.CreateDirectory(package);
+        File.WriteAllText(Path.Combine(source, "Proof.lean"), "theorem sample : True := True.intro");
+        File.WriteAllText(Path.Combine(source, "Ignored.cs"), "not a proof source");
+        await VerificationSupport.RunChecked(source, "git", ["init", package]);
+        await VerificationSupport.RunChecked(source, "git", ["-C", package, "config", "user.name", "Fixture"]);
+        await VerificationSupport.RunChecked(source, "git", ["-C", package, "config", "user.email", "fixture@example.invalid"]);
+        string cloned = Path.Combine(consumer, ".lake/packages/sample");
+        for (int revision = 0; revision < 2; revision++)
+        {
+            File.WriteAllText(Path.Combine(package, "source.lean"), revision.ToString());
+            await VerificationSupport.RunChecked(source, "git", ["-C", package, "add", "source.lean"]);
+            await VerificationSupport.RunChecked(source, "git", ["-C", package, "commit", "-m", "fixture"]);
+            string head = (await VerificationSupport.RunChecked(source, "git", ["-C", package, "rev-parse", "HEAD"])).Trim();
+            File.WriteAllText(Path.Combine(source, "lake-manifest.json"),
+                JsonSerializer.Serialize(new { packages = new[] { new { name = "sample", rev = head } } }));
+            await VerificationSupport.PrepareConsumer(source, consumer);
+            Require(File.ReadAllText(Path.Combine(consumer, "Proof.lean")) == File.ReadAllText(Path.Combine(source, "Proof.lean")),
+                "Consumer snapshots must retain proof sources");
+            Require(!File.Exists(Path.Combine(consumer, "Ignored.cs")) && !Directory.Exists(Path.Combine(consumer, "artifacts")),
+                "Consumer snapshots must exclude build inputs and their own artifacts");
+            Require((await VerificationSupport.RunChecked(source, "git", ["-C", cloned, "rev-parse", "HEAD"])).Trim() == head,
+                "Consumer dependencies must follow the pinned revision, including a revision absent from the previous clone");
+        }
+        await VerificationSupport.PrepareConsumer(source, consumer);
+        Console.WriteLine("Regression snapshot and dependency refresh checks passed.");
+    }
     File.WriteAllText(Path.Combine(temporary, "manifests/targets.json"), """
         {"methods":[{"id":"First","signature":"first"},{"id":"Second","signature":"second"}]}
         """);
@@ -358,5 +387,7 @@ finally
 {
     string parent = Path.GetFullPath(Path.GetTempPath()).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
     if (!temporary.StartsWith(parent, StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("Unexpected temporary directory");
+    foreach (string file in Directory.EnumerateFiles(temporary, "*", SearchOption.AllDirectories))
+        File.SetAttributes(file, FileAttributes.Normal);
     Directory.Delete(temporary, recursive: true);
 }

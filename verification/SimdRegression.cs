@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: MIT
 #:property PublishAot=false
 #:include RegressionBatch.cs
+#:include VerificationSupport.cs
 #:include RegressionManifest.cs
-using System.Diagnostics;
 using System.Globalization;
 using System.Numerics;
 using System.Text.Json.Nodes;
@@ -60,47 +60,10 @@ static bool Negative(string name, string method, string profile) => name switch
 };
 bool Selected(string key, string value) => !filters.TryGetValue(key, out string? wanted) || wanted == value;
 
-async Task<string> Run(string executable, IEnumerable<string> arguments)
-{
-    ProcessStartInfo start = new(executable) { WorkingDirectory = root, RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
-    foreach (string argument in arguments) start.ArgumentList.Add(argument);
-    using Process process = Process.Start(start) ?? throw new InvalidOperationException(executable);
-    Task<string> stdout = process.StandardOutput.ReadToEndAsync(), stderr = process.StandardError.ReadToEndAsync();
-    await process.WaitForExitAsync();
-    string output = await stdout + await stderr;
-    if (process.ExitCode != 0 || output.Contains("IDE0005", StringComparison.Ordinal)) throw new InvalidOperationException(output);
-    return output;
-}
+Task<string> Run(string executable, IEnumerable<string> arguments, bool disableIntrinsics = false) =>
+    VerificationSupport.RunChecked(root, executable, arguments, disableIntrinsics);
 
-void CopySources(string source, string destination)
-{
-    Directory.CreateDirectory(destination);
-    foreach (string file in Directory.EnumerateFiles(source))
-        if (Path.GetExtension(file) is ".lean" or ".json" or ".toml" || Path.GetFileName(file) == "lean-toolchain")
-            File.Copy(file, Path.Combine(destination, Path.GetFileName(file)), true);
-    foreach (string child in Directory.EnumerateDirectories(source))
-    {
-        string name = Path.GetFileName(child);
-        if (name is ".lake" or ".git" or "artifacts" or "generated" or "bin" or "obj" or ".work") continue;
-        if ((File.GetAttributes(child) & FileAttributes.ReparsePoint) != 0)
-            throw new InvalidOperationException("Source snapshot cannot contain links: " + child);
-        CopySources(child, Path.Combine(destination, name));
-    }
-}
-CopySources(root, consumer);
-JsonArray packages = JsonNode.Parse(File.ReadAllText(Path.Combine(root, "lake-manifest.json")))!["packages"]!.AsArray();
-foreach (JsonNode? package in packages)
-{
-    string name = package!["name"]!.GetValue<string>();
-    string destination = Path.Combine(consumer, ".lake/packages", name);
-    await DropStaleClone(destination, package["rev"]!.GetValue<string>());
-    if (!Directory.Exists(destination))
-    {
-        Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
-        await Run("git", ["clone", "--no-hardlinks", Path.Combine(root, ".lake/packages", name), destination]);
-    }
-    await Run("git", ["-C", destination, "checkout", "--detach", package["rev"]!.GetValue<string>()]);
-}
+await VerificationSupport.PrepareConsumer(root, consumer);
 
 Dictionary<string, string> builds = [];
 async Task<string> Build(string group, string fixture)
@@ -196,7 +159,7 @@ foreach (var (group, item, methods, profiles) in groups)
         if (cases.Count == 0) continue;
         string prefix = $"{group}/{method}/{profile}";
         Gate? gate = gates.Where(node => node!["method"]!.GetValue<string>() == method && node["profile"]!.GetValue<string>() == profile)
-            .Select(node => new Gate(Path.Combine(consumer, node!["proof"]!.GetValue<string>()), node["theorem"]!.GetValue<string>())).SingleOrDefault();
+            .Select(node => new Gate(method, profile, Path.Combine(consumer, node!["proof"]!.GetValue<string>()), node["theorem"]!.GetValue<string>())).SingleOrDefault();
         if (gate is null)
         {
             foreach (var (name, _) in cases) incomplete.Add($"{prefix}/{name}");
@@ -245,18 +208,3 @@ failed.AddRange(await RegressionBatch.Verify(root, tool, work, consumer, [.. job
 if (incomplete.Count != 0) Console.WriteLine("INCOMPLETE: " + string.Join(", ", incomplete));
 if (failed.Count != 0) Console.WriteLine("FAILED: " + string.Join(", ", failed));
 Environment.ExitCode = incomplete.Count == 0 && failed.Count == 0 ? 0 : 1;
-
-// Re-clone when a reused snapshot predates a pin change; the package source is a partial clone and cannot serve fetches.
-static async Task DropStaleClone(string repository, string revision)
-{
-    if (!Directory.Exists(repository)) return;
-    ProcessStartInfo start = new("git") { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
-    foreach (string argument in new[] { "-C", repository, "cat-file", "-e", revision + "^{commit}" }) start.ArgumentList.Add(argument);
-    using Process probe = Process.Start(start) ?? throw new InvalidOperationException("git");
-    await Task.WhenAll(probe.StandardOutput.ReadToEndAsync(), probe.StandardError.ReadToEndAsync(), probe.WaitForExitAsync());
-    if (probe.ExitCode == 0) return;
-    foreach (string file in Directory.EnumerateFiles(repository, "*", SearchOption.AllDirectories)) File.SetAttributes(file, FileAttributes.Normal);
-    Directory.Delete(repository, true);
-}
-
-internal sealed record Gate(string Proof, string Theorem);

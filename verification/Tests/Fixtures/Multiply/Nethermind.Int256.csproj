@@ -13,6 +13,7 @@
   </Target>
   <Import Project="Fixtures.props" />
   <ItemGroup>
-    <Compile Include="$(FixtureCase).cs" />
+    <Compile Include="$(FixtureCase).cs" Condition="'$(FixtureCase)' != 'Baseline'" />
+    <Compile Include="../Common/Multiply/Multiply.cs" Condition="'$(FixtureCase)' == 'Baseline'" />
   </ItemGroup>
 </Project>
