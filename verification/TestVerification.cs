@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 #:property PublishAot=false
 #:include VerificationSupport.cs
+#:include ProofBindings.cs
 #:include VerificationSelection.cs
 #:include VerificationRunner.cs
 #:include ConsumerSupportSelection.cs
@@ -10,12 +11,38 @@
 #:include EqualityCoverage.cs
 
 using System.Text.Json;
+using System.Security.Cryptography;
+using System.Text;
 
 string root = VerificationSupport.Root;
 string[] allMethods = VerificationSupport.Gates(root).Select(gate => gate.Method).ToArray();
 void Require(bool condition, string message)
 {
     if (!condition) throw new InvalidOperationException(message);
+}
+{
+    Gate[] gates = VerificationSupport.Gates(root);
+    Dictionary<string, string> sources = ProofBindings.Sources(gates);
+    Require(sources.Count == 63, "Every templated primitive binding must be generated");
+    string text = string.Concat(sources.OrderBy(pair => pair.Key, StringComparer.Ordinal)
+        .Select(pair => pair.Key + "\n" + pair.Value));
+    Require(Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text))) ==
+        "C4087B52643B59C1E8E4913674EB2DFB44455E995FC7A078DE11DB9B46172226",
+        "Generated bindings must retain the reviewed contracts, body checks and profile theorems");
+    Require(sources.SequenceEqual(ProofBindings.Sources([.. gates.Reverse()])),
+        "Binding generation must not depend on registry ordering");
+    Gate selected = gates.Single(gate => gate.Method == "EqUInt256UInt32" && gate.Profile == "scalar");
+    foreach (Gate[] invalid in new[]
+        {
+            gates.Where(gate => gate != selected).ToArray(), gates.Append(selected).ToArray(),
+            gates.Select(gate => gate == selected ? gate with { Profile = "x64-v4" } : gate).ToArray()
+        })
+    {
+        bool rejected = false;
+        try { ProofBindings.Sources(invalid); }
+        catch (InvalidOperationException) { rejected = true; }
+        Require(rejected, "Missing, duplicate and unsupported-profile binding gates must be rejected");
+    }
 }
 void SelectionCheck(string[] paths, string[] expected, bool contracts, bool all = false)
 {
@@ -186,6 +213,23 @@ string temporary = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "uint256-ba
 try
 {
     Directory.CreateDirectory(Path.Combine(temporary, "manifests"));
+    {
+        string generated = Path.Combine(temporary, "generated-bindings");
+        Gate[] gates = VerificationSupport.Gates(root);
+        bool CheckFails()
+        {
+            try { ProofBindings.Write(generated, gates, check: true); return false; }
+            catch (InvalidOperationException) { return true; }
+        }
+        Require(CheckFails(), "Check mode must reject missing binding sources");
+        ProofBindings.Write(generated, gates);
+        ProofBindings.Write(generated, gates, check: true);
+        string proof = Path.Combine(generated, "proofs/EqUInt256UInt32Scalar.lean");
+        File.AppendAllText(proof, "-- altered source\n");
+        Require(CheckFails(), "Check mode must reject altered binding sources");
+        ProofBindings.Write(generated, gates);
+        ProofBindings.Write(generated, gates, check: true);
+    }
     {
         string source = Path.Combine(temporary, "snapshot-source"), consumer = Path.Combine(source, "artifacts/consumer");
         string package = Path.Combine(source, ".lake/packages/sample");

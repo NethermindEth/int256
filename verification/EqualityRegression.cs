@@ -4,6 +4,7 @@
 #:property PublishAot=false
 #:include RegressionBatch.cs
 #:include VerificationSupport.cs
+#:include ProofBindings.cs
 #:include RegressionManifest.cs
 #:include EqualityCoverage.cs
 using System.Globalization;

@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 #:property PublishAot=false
 #:include VerificationSupport.cs
+#:include ProofBindings.cs
 #:include VerificationRunner.cs
 
 using System.Text.Json;

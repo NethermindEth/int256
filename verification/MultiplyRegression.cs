@@ -4,6 +4,7 @@
 #:property PublishAot=false
 #:include RegressionBatch.cs
 #:include VerificationSupport.cs
+#:include ProofBindings.cs
 using System.Text.Json.Nodes;
 
 if (args.Length > 1) throw new ArgumentException("Usage: MultiplyRegression.cs [verification-directory]");

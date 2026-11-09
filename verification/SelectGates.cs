@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 #:property PublishAot=false
 #:include VerificationSupport.cs
+#:include ProofBindings.cs
 #:include VerificationSelection.cs
 #:include RegressionManifest.cs
 

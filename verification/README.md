@@ -97,6 +97,15 @@ import closure are neither built nor audited. It produces no assembly certificat
 package, reuses source-bound certified artifacts where available, kernel-checks
 new consumer modules, audits axioms, and records the assembly,
 extraction and proof identities in `artifacts/Add/scalar/verified.json`.
+The 63 templated primitive equality and comparison bindings under `proofs/` are generated from
+`ProofBindings.cs`. Edit its shared templates rather than the generated files.
+Selection, verification and regression snapshots materialize these bindings before reading
+their imports or capturing proof sources. Their contracts, checked method-body equalities and
+profile theorems are part of the generated Lean source that the verifier hashes and checks.
+`dotnet run --file verification/GenerateBindings.cs` materializes them explicitly;
+adding `-- --check` checks that every generated source matches its template and registered gate.
+Other proof bindings remain handwritten.
+
 Generated artifacts are ignored. CI runs all registered gates on main and on
 manual dispatch. On PRs, `SelectGates.cs` walks each proof's local import graph
 and selects gates affected by changed Lean sources. Production C# and shared

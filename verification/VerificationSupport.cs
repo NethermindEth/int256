@@ -53,6 +53,7 @@ internal static class VerificationSupport
 
     internal static async Task PrepareConsumer(string root, string consumer)
     {
+        ProofBindings.Prepare(root);
         CopySources(root, consumer);
         JsonArray packages = JsonNode.Parse(File.ReadAllText(Path.Combine(root, "lake-manifest.json")))!["packages"]!.AsArray();
         string packageRoot = Path.GetFullPath(Path.Combine(consumer, ".lake/packages"));

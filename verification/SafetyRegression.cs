@@ -4,6 +4,7 @@
 #:property PublishAot=false
 #:include RegressionBatch.cs
 #:include VerificationSupport.cs
+#:include ProofBindings.cs
 using System.Text.Json.Nodes;
 using System.Xml.Linq;
 

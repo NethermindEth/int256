@@ -14,6 +14,7 @@ internal static class VerificationRunner
     internal static async Task Run(string root, VerificationOptions options, Func<string, string[], Task> command)
     {
         if (options.Action is not ("contracts" or "verify" or "extract")) throw new ArgumentException("Expected contracts, extract or verify");
+        ProofBindings.Prepare(root);
         await command("lake", ["update"]);
         const string tool = ".lake/packages/leancil/Extractor/bin/Nethermind.LeanCIL.dll";
         if (options.Action == "contracts")

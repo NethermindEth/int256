@@ -8,6 +8,7 @@ internal static class VerificationSelection
 {
     internal static Selection Select(string root, IEnumerable<string> paths, bool all = false)
     {
+        ProofBindings.Prepare(root);
         string[] changed = paths.Select(path => path.Replace('\\', '/')).Where(path =>
             path.Length > 0 && !Regex.IsMatch(path, @"\.(md|txt)$|(^|/)(LICENSE|NOTICE|THIRD-PARTY-NOTICES)$", RegexOptions.IgnoreCase)).ToArray();
         bool full = all || changed.Any(path =>

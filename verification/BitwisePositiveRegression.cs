@@ -2,6 +2,7 @@
 #:property PublishAot=false
 #:include RegressionBatch.cs
 #:include VerificationSupport.cs
+#:include ProofBindings.cs
 using System.Text.Json.Nodes;
 
 string root = Path.GetFullPath(args.Length > 0 ? args[0] : "verification");
