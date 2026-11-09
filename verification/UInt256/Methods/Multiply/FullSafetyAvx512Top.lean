@@ -21,14 +21,8 @@ theorem full_avx512_top (profile : CIL.FeatureProfile) (program : CIL.Program)
   have formedRight := state.call.input_formed (by simp : right ∈ [left, right])
   have loadedLeft := input_vector_snapshot state originalCall left (by simp)
   have loadedRight := input_vector_snapshot state originalCall right (by simp)
-  iterate 16
-    apply run_next_exists post found (by rfl)
-    simp (config := { implicitDefEqProofs := false })
-      [step, cil_guard, observerCount, pureArity, productArgs, checkedValue, numericValue, formValue, formedLeft, formedRight,
-        staticInstruction, memoryInstruction, loadedLeft, loadedRight, checkedAt, profileEq, enabled,
-        CIL.FeatureProfile.evaluate, scalars, CIL.step.eq_def, Except.mapError,
-        Bind.bind, Except.bind, Pure.pure, Except.pure]
-    first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
+  cil_contract_steps 16 [found, productArgs, formedLeft, formedRight, loadedLeft, loadedRight,
+    profileEq, enabled, CIL.FeatureProfile.evaluate]
   obtain ⟨stored, reference, slot, stepped, storedState, readback, _⟩ := state.store_vector enteredWF homes
     22 (by rfl) rightBits 34 (productArgs left right output) [.scalar (.v256 leftBits)] (body := (fullBody profile wordIndex countIndex storageIndex))
   apply run_next_exists post found (by change some _ = _; simp only [enabled, ↓reduceIte] <;> rfl) stepped

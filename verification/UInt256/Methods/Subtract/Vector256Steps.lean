@@ -32,7 +32,7 @@ macro "impl_pure" : tactic => `(tactic|
    apply run_next_exists post found (by rfl)
    · simp (config := { implicitDefEqProofs := false })
        [step, cil_guard, observerCount, pureArity, binaryArguments, checkedValue, numericValue, formValue, formedLeft, formedRight,
-         formedOutput, staticInstruction, memoryInstruction, checkedAt, profileEq, features.avx, features.avx2,
+         formedOutput, staticInstruction, memoryInstruction, otherMemoryInstruction, checkedAt, profileEq, features.avx, features.avx2,
          features.wideF, features.wide, features.bits, CIL.FeatureProfile.evaluate, scalars, checkedIntrinsic,
          CIL.Intrinsic.available, CIL.step.eq_def, CIL.binary, CIL.unary, CIL.truth, instruction,
          Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]

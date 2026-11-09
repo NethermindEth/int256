@@ -400,24 +400,10 @@ theorem impl_slow_tail (program : CIL.Program) (method lookup : Nat) (profile : 
   obtain ⟨added, row⟩ := UInt256Proof.AddSubtract.Vector256.table_row current reference state.call.1.1 loaded
     (UInt256Proof.SIMD.cascadeIndex (CIL.Vector.moveMask64 (borrowLanes a b)) (CIL.Vector.moveMask64 (equalLanes a b)))
     (UInt256Proof.SIMD.cascade_index_bound _ _)
-  apply run_next_exists post found (by rfl)
-  · simp [step, cil_guard, observerCount, staticInstruction, memoryInstruction, formValue, formed, checkedAt, Except.mapError,
-      Bind.bind, Except.bind, Pure.pure, Except.pure]
-    exact ⟨rfl, rfl, rfl, rfl⟩
-  apply run_next_exists post found (by rfl)
-  · simp [step, cil_guard, observerCount, staticInstruction, memoryInstruction, formValue, formed, checkedAt, Except.mapError,
-      Bind.bind, Except.bind, Pure.pure, Except.pure]
-    exact ⟨rfl, rfl, rfl, rfl⟩
+  cil_contract_steps 2 [found, formed]
   impl_load
   impl_pure
-  apply run_next_exists post found (by rfl)
-  · simp only [step, cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, staticInstruction, memoryInstruction, referenceAt, CIL.offsetValue, checkedAt,
-      Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-    rw [added]
-  apply run_next_exists post found (by rfl)
-  · simp [step, cil_guard, observerCount, staticInstruction, memoryInstruction, row,
-      Bind.bind, Except.bind, Pure.pure, Except.pure]
-    try exact ⟨rfl, rfl, rfl, rfl⟩
+  cil_contract_steps 2 [found, added, row]
   impl_store
   impl_pure
   impl_pure
@@ -448,7 +434,7 @@ theorem impl_slow_tail (program : CIL.Program) (method lookup : Nat) (profile : 
     have bit := bextr_bit (CIL.Vector.moveMask64 (equalLanes a b) + 2#32 * CIL.Vector.moveMask64 (borrowLanes a b))
     simp only [BitVec.toNat_setWidth] at bit
     apply run_next_exists post found (by rfl)
-    · simp [step, cil_guard, observerCount, staticInstruction, memoryInstruction, bit,
+    · simp [step, cil_guard, observerCount, staticInstruction, memoryInstruction, otherMemoryInstruction, bit,
         Bind.bind, Except.bind, Pure.pure, Except.pure]
       try exact ⟨rfl, rfl, rfl, rfl⟩
     exact ⟨1, _, _, impl_return program method lookup profile true found 111 rfl _ frame stored _
