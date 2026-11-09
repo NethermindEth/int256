@@ -15,7 +15,7 @@ theorem multiply_small_branch (ctx : Context alternative) (word : WordContract c
     (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (originalCall : CallingConditions ctx.program original [left, right] [output])
     (enteredWF : entered.WellFormed)
-    (homes : WritableHomes entered original.nextIdentity (multiplyBody ctx.profile ctx.indices).localKinds frame.locals)
+    (homes : CompleteWritableHomes entered original.nextIdentity (multiplyBody ctx.profile ctx.indices).localKinds frame.locals)
     (owned : ∀ id ∈ frame.owned, original.nextIdentity ≤ id)
     (state : PrivateWords ctx.program original entered current [left, right] [output] frame
       (multiplyInputs original left right))
@@ -335,7 +335,7 @@ theorem multiply_dispatch (ctx : Context alternative) (word : WordContract ctx.p
     (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (originalCall : CallingConditions ctx.program original [left, right] [output])
     (enteredWF : entered.WellFormed)
-    (homes : WritableHomes entered original.nextIdentity (multiplyBody ctx.profile ctx.indices).localKinds frame.locals)
+    (homes : CompleteWritableHomes entered original.nextIdentity (multiplyBody ctx.profile ctx.indices).localKinds frame.locals)
     (owned : ∀ id ∈ frame.owned, original.nextIdentity ≤ id)
     (state : PrivateWords ctx.program original entered current [left, right] [output] frame
       (multiplyInputs original left right)) :

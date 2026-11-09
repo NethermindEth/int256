@@ -29,7 +29,7 @@ theorem run_word_call {program : CIL.Program} {wordIndex method pc : Nat} {body 
     (contract : WordContract program wordIndex)
     (state : PrivateWords program original entered current inputs outputs frame known)
     (originalCall : CallingConditions program original inputs outputs)
-    (homes : WritableHomes entered original.nextIdentity kinds frame.locals)
+    (homes : CompleteWritableHomes entered original.nextIdentity kinds frame.locals)
     (index : Nat) (reference : Reference) (a b : BitVec 64)
     (slot : frame.locals[index]? = some (.bytes .word64 reference))
     (ready : access current reference 8 1 true = .ok ())

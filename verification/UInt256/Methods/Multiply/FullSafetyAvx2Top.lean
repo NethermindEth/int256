@@ -26,7 +26,7 @@ theorem full_avx2_inputs (profile : CIL.FeatureProfile) (program : CIL.Program)
     (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (originalCall : CallingConditions program original [left, right] [output])
     (enteredWF : entered.WellFormed)
-    (homes : WritableHomes entered original.nextIdentity (fullBody profile wordIndex countIndex storageIndex).localKinds frame.locals)
+    (homes : CompleteWritableHomes entered original.nextIdentity (fullBody profile wordIndex countIndex storageIndex).localKinds frame.locals)
     (state : PrivateWords program original entered current [left, right] [output] frame
       (fullInputs original left right))
     (post : Memory → List Value → Prop)
@@ -47,7 +47,7 @@ theorem full_avx2_inputs (profile : CIL.FeatureProfile) (program : CIL.Program)
     apply run_next_exists post found (by change some _ = _; first | (simp only [noAvx512, avx2, Bool.false_eq_true, ↓reduceIte] <;> rfl) | rfl)
     simp (config := { implicitDefEqProofs := false })
       [step, cil_guard, observerCount, pureArity, productArgs, checkedValue, numericValue, formValue, formedLeft,
-        staticInstruction, memoryInstruction, loadedLeft, checkedAt, profileEq, noAvx512, avx2,
+        staticInstruction, memoryInstruction, otherMemoryInstruction, referenceAddInstruction, displaceReference, loadedLeft, checkedAt, profileEq, noAvx512, avx2,
         CIL.FeatureProfile.evaluate, scalars, Except.mapError,
         Bind.bind, Except.bind, Pure.pure, Except.pure]
     first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
@@ -61,7 +61,7 @@ theorem full_avx2_inputs (profile : CIL.FeatureProfile) (program : CIL.Program)
     apply run_next_exists post found (by change some _ = _; first | (simp only [noAvx512, avx2, Bool.false_eq_true, ↓reduceIte] <;> rfl) | rfl)
     simp (config := { implicitDefEqProofs := false })
       [step, cil_guard, observerCount, pureArity, productArgs, checkedValue, numericValue, formValue, formedRight,
-        staticInstruction, memoryInstruction, loadedRight, checkedAt, profileEq, avx2,
+        staticInstruction, memoryInstruction, otherMemoryInstruction, referenceAddInstruction, displaceReference, loadedRight, checkedAt, profileEq, avx2,
         CIL.Intrinsic.available, scalars, checkedIntrinsic, eval_reverse256, Except.mapError,
         Bind.bind, Except.bind, Pure.pure, Except.pure]
     first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
@@ -69,7 +69,7 @@ theorem full_avx2_inputs (profile : CIL.FeatureProfile) (program : CIL.Program)
     middleState.store_vector enteredWF homes 24 (by rfl) (reverseInputPack original right)
       55 (productArgs left right output) [] (body := (fullBody profile wordIndex countIndex storageIndex))
   have preservedLeft := write_preserves_disjoint_read written leftRead
-    (Or.inl (homes.distinct 23 24 .vector256 .vector256 leftHome rightHome (by decide) leftSlot rightSlot))
+    (Or.inl (homes.writable.distinct 23 24 .vector256 .vector256 leftHome rightHome (by decide) leftSlot rightSlot))
   exact run_next_exists post found (by change some _ = _; first | (simp only [noAvx512, avx2, Bool.false_eq_true, ↓reduceIte] <;> rfl) | rfl) storedRight
     (continuation after afterState ⟨leftHome, rightHome, leftSlot, rightSlot, preservedLeft, rightRead⟩)
 
@@ -99,7 +99,7 @@ theorem full_avx2_cross (profile : CIL.FeatureProfile) (program : CIL.Program)
     (noAvx512 : profile.avx512DQVL = false) (avx2 : profile.avx2 = true)
     (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (enteredWF : entered.WellFormed)
-    (homes : WritableHomes entered original.nextIdentity (fullBody profile wordIndex countIndex storageIndex).localKinds frame.locals)
+    (homes : CompleteWritableHomes entered original.nextIdentity (fullBody profile wordIndex countIndex storageIndex).localKinds frame.locals)
     (state : PrivateWords program original entered current [left, right] [output] frame
       (fullInputs original left right))
     (operands : AvxOperands original current frame left right)
@@ -156,10 +156,10 @@ theorem full_avx2_cross (profile : CIL.FeatureProfile) (program : CIL.Program)
     state.store_vector enteredWF homes 25 (by rfl) (avxCrossPack original left right)
       71 (productArgs left right output) [] (body := (fullBody profile wordIndex countIndex storageIndex))
   have leftRead := write_preserves_disjoint_read written operands.leftRead
-    (Or.inl (homes.distinct 23 25 .vector256 .vector256 operands.leftHome crossHome
+    (Or.inl (homes.writable.distinct 23 25 .vector256 .vector256 operands.leftHome crossHome
       (by decide) operands.leftSlot crossSlot))
   have rightRead := write_preserves_disjoint_read written operands.rightRead
-    (Or.inl (homes.distinct 24 25 .vector256 .vector256 operands.rightHome crossHome
+    (Or.inl (homes.writable.distinct 24 25 .vector256 .vector256 operands.rightHome crossHome
       (by decide) operands.rightSlot crossSlot))
   exact run_next_exists post found (by change some _ = _; first | (simp only [noAvx512, avx2, Bool.false_eq_true, ↓reduceIte] <;> rfl) | rfl) stored
     (continuation after afterState
@@ -178,7 +178,7 @@ theorem full_avx2_finish (profile : CIL.FeatureProfile) (program : CIL.Program)
     (noAvx512 : profile.avx512DQVL = false) (avx2 : profile.avx2 = true)
     (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (enteredWF : entered.WellFormed)
-    (homes : WritableHomes entered original.nextIdentity (fullBody profile wordIndex countIndex storageIndex).localKinds frame.locals)
+    (homes : CompleteWritableHomes entered original.nextIdentity (fullBody profile wordIndex countIndex storageIndex).localKinds frame.locals)
     (state : PrivateWords program original entered current [left, right] [output] frame
       (fullInputs original left right))
     (vectors : AvxCrossState original current frame left right)

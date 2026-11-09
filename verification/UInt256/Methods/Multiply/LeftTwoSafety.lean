@@ -121,12 +121,13 @@ theorem left_two_frame_setup (profile : CIL.FeatureProfile) (program : CIL.Progr
     (call : CallingConditions program memory [left, right] [output]) :
     ∃ frame entered,
       enterFrame (leftTwoBody profile wordIndex countIndex storageIndex) (productArgs left right output) memory = .ok (frame, entered) ∧
-      WritableHomes entered memory.nextIdentity (leftTwoBody profile wordIndex countIndex storageIndex).localKinds frame.locals ∧
+      CompleteWritableHomes entered memory.nextIdentity (leftTwoBody profile wordIndex countIndex storageIndex).localKinds frame.locals ∧
       entered.WellFormed ∧
       PrivateWords program memory entered entered [left, right] [output] frame (fun _ => none) := by
   have kinds : (leftTwoBody profile wordIndex countIndex storageIndex).localKinds = List.replicate 18 CIL.LocalKind.word64 := by rfl
   obtain ⟨frame, entered, setup, homes, _, wf⟩ := unknown_frame_setup (leftTwoBody profile wordIndex countIndex storageIndex)
-    (by rfl) (by simp [kinds]) (by simp [kinds]) (by simp [kinds]) (by rfl) (by rfl) (by rfl) memory (productArgs left right output) call.1.1
+    (by rfl) (by simp [kinds]) (by simp [kinds]) (by simp [kinds])
+    (by simp [kinds]) (by simp [kinds]) (by simp [kinds]) (by rfl) (by rfl) (by rfl) memory (productArgs left right output) call.1.1
   exact ⟨frame, entered, setup, homes, wf, PrivateWords.initial call setup⟩
 
 def leftTwoInputs (original : Memory) (left right : Reference) :=
@@ -138,7 +139,7 @@ theorem left_two_inputs (profile : CIL.FeatureProfile) (program : CIL.Program) (
     (found : program[index]? = some (leftTwoBody profile wordIndex countIndex storageIndex)) (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (originalCall : CallingConditions program original [left, right] [output])
     (enteredWF : entered.WellFormed)
-    (homes : WritableHomes entered original.nextIdentity (leftTwoBody profile wordIndex countIndex storageIndex).localKinds frame.locals)
+    (homes : CompleteWritableHomes entered original.nextIdentity (leftTwoBody profile wordIndex countIndex storageIndex).localKinds frame.locals)
     (state : PrivateWords program original entered current [left, right] [output] frame (fun _ => none))
     (post : Memory → List Value → Prop)
     (continuation : ∀ after,
@@ -186,7 +187,7 @@ theorem left_two_top (profile : CIL.FeatureProfile) (program : CIL.Program) (ind
     (found : program[index]? = some (leftTwoBody profile wordIndex countIndex storageIndex)) (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (originalCall : CallingConditions program original [left, right] [output])
     (enteredWF : entered.WellFormed)
-    (homes : WritableHomes entered original.nextIdentity (leftTwoBody profile wordIndex countIndex storageIndex).localKinds frame.locals)
+    (homes : CompleteWritableHomes entered original.nextIdentity (leftTwoBody profile wordIndex countIndex storageIndex).localKinds frame.locals)
     (state : PrivateWords program original entered current [left, right] [output] frame
       (leftTwoInputs original left right))
     (post : Memory → List Value → Prop)
@@ -243,7 +244,7 @@ theorem left_two_first_products (profile : CIL.FeatureProfile) (program : CIL.Pr
     (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (originalCall : CallingConditions program original [left, right] [output])
     (enteredWF : entered.WellFormed)
-    (homes : WritableHomes entered original.nextIdentity (leftTwoBody profile wordIndex countIndex storageIndex).localKinds frame.locals)
+    (homes : CompleteWritableHomes entered original.nextIdentity (leftTwoBody profile wordIndex countIndex storageIndex).localKinds frame.locals)
     (state : PrivateWords program original entered current [left, right] [output] frame
       (rememberWord (leftTwoInputs original left right) 4 (leftTwoTop original left right)))
     (post : Memory → List Value → Prop)
@@ -334,7 +335,7 @@ theorem left_two_second_column (profile : CIL.FeatureProfile) (program : CIL.Pro
     (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (originalCall : CallingConditions program original [left, right] [output])
     (enteredWF : entered.WellFormed)
-    (homes : WritableHomes entered original.nextIdentity (leftTwoBody profile wordIndex countIndex storageIndex).localKinds frame.locals)
+    (homes : CompleteWritableHomes entered original.nextIdentity (leftTwoBody profile wordIndex countIndex storageIndex).localKinds frame.locals)
     (state : PrivateWords program original entered current [left, right] [output] frame
       (leftTwoFirstProducts original left right))
     (post : Memory → List Value → Prop)
@@ -395,7 +396,7 @@ theorem left_two_middle_column (profile : CIL.FeatureProfile) (program : CIL.Pro
     (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (originalCall : CallingConditions program original [left, right] [output])
     (enteredWF : entered.WellFormed)
-    (homes : WritableHomes entered original.nextIdentity (leftTwoBody profile wordIndex countIndex storageIndex).localKinds frame.locals)
+    (homes : CompleteWritableHomes entered original.nextIdentity (leftTwoBody profile wordIndex countIndex storageIndex).localKinds frame.locals)
     (state : PrivateWords program original entered current [left, right] [output] frame
       (leftTwoSecondColumn original left right))
     (post : Memory → List Value → Prop)
@@ -455,7 +456,7 @@ theorem left_two_upper_product (profile : CIL.FeatureProfile) (program : CIL.Pro
     (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (originalCall : CallingConditions program original [left, right] [output])
     (enteredWF : entered.WellFormed)
-    (homes : WritableHomes entered original.nextIdentity (leftTwoBody profile wordIndex countIndex storageIndex).localKinds frame.locals)
+    (homes : CompleteWritableHomes entered original.nextIdentity (leftTwoBody profile wordIndex countIndex storageIndex).localKinds frame.locals)
     (state : PrivateWords program original entered current [left, right] [output] frame
       (leftTwoMiddleWords original left right))
     (post : Memory → List Value → Prop)
@@ -496,7 +497,7 @@ theorem left_two_upper_accumulate (profile : CIL.FeatureProfile) (program : CIL.
     (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (originalCall : CallingConditions program original [left, right] [output])
     (enteredWF : entered.WellFormed)
-    (homes : WritableHomes entered original.nextIdentity (leftTwoBody profile wordIndex countIndex storageIndex).localKinds frame.locals)
+    (homes : CompleteWritableHomes entered original.nextIdentity (leftTwoBody profile wordIndex countIndex storageIndex).localKinds frame.locals)
     (state : PrivateWords program original entered current [left, right] [output] frame
       (leftTwoUpperProduct original left right))
     (post : Memory → List Value → Prop)
@@ -545,7 +546,7 @@ theorem left_two_final (profile : CIL.FeatureProfile) (program : CIL.Program) (i
     (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (originalCall : CallingConditions program original [left, right] [output])
     (enteredWF : entered.WellFormed)
-    (homes : WritableHomes entered original.nextIdentity (leftTwoBody profile wordIndex countIndex storageIndex).localKinds frame.locals)
+    (homes : CompleteWritableHomes entered original.nextIdentity (leftTwoBody profile wordIndex countIndex storageIndex).localKinds frame.locals)
     (state : PrivateWords program original entered current [left, right] [output] frame
       (leftTwoUpperWords original left right))
     (post : Memory → List Value → Prop)

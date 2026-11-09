@@ -82,24 +82,9 @@ theorem portable_small_input_prefix (program : CIL.Program) (method storage : Na
     have s3 := stores 3
     dsimp at f0 f1 f2 f3 l0 l1 l2 l3 s0 s1 s2 s3
     simp only [show (3 : Fin 4).val = 3 from rfl] at f3 l3 s3
-    repeat'
-      first
-      | exact continuation
-      | simp (config := { failIfUnchanged := false })
-        apply run_next_exists post
-        · simp only [found, portableSmallBody]; rfl
-        · simp only [found, portableSmallBody]; rfl
-        · first
-          | exact s0 _ _
-          | exact s1 _ _
-          | exact s2 _ _
-          | exact s3 _ _
-          | simp (config := { implicitDefEqProofs := false })
-              [armSmallArguments, found, step, cil_guard, observerCount, checkedValue, numericValue, formValue,
-                f0, f1, f2, f3, l0, l1, l2, l3, pureArity, scalars, CIL.step.eq_def, disabled, localResult,
-                CIL.FeatureProfile.evaluate, CIL.truth, checkedAt, Except.mapError,
-                Bind.bind, Except.bind, Pure.pure, Except.pure]
-            try (first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)
+    cil_contract_steps [found, portableSmallBody, armSmallArguments, disabled,
+      CIL.FeatureProfile.evaluate, f0, f1, f2, f3, l0, l1, l2, l3,
+      s0, s1, s2, s3] until continuation
 
 theorem portable_small_save {program : CIL.Program} {profile : CIL.FeatureProfile} {storage : Nat} {original entered current : Memory}
     {input output : Reference} {frame : Frame}
@@ -473,18 +458,7 @@ theorem PortableSmallState.finish (program : CIL.Program) (method storage : Nat)
     have done := finishing (portableSiteCall ⟨_, bound⟩) (by rfl) (by rfl) (by rfl) (by rfl)
     simp only [portableSiteWords, portableSiteZeros, portableSiteCall, portableSiteStart] at done ⊢
     try dsimp only [Fin.isValue] at done
-    repeat' first
-      | exact done
-      | (apply run_next_exists post found (by rfl)
-         first
-         | exact l1 _ _
-         | exact l2 _ _
-         | exact l3 _ _
-         | exact l4 _ _
-         | (simp (config := { implicitDefEqProofs := false })
-             [step, cil_guard, observerCount, instruction, argument, checkedValue, formValue, formed, numericValue, pureArity, scalars,
-               CIL.step.eq_def, CIL.unary, Bind.bind, Except.bind, Pure.pure, Except.pure]
-            try (first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)))
+    cil_contract_steps [found, l1, l2, l3, l4, formed, argument] until done
 
 #print axioms PortableSmallState.finish
 end UInt256Proof.Add.Safety

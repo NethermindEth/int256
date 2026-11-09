@@ -54,18 +54,8 @@ theorem vector128_correction_checked (program : CIL.Program) (body : CIL.Method)
     .vector128 (.v128 high) high.toNat rfl sumSlot sumRead
   cases upper <;> simp only [Bool.false_eq_true, ite_false, ite_true] at stored loadIncoming done ⊢
   all_goals
-    repeat' first
-      | exact done
-      | (apply run_next_exists post found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
-         first
-         | exact loadIncoming _ _
-         | exact loadSum _ _
-         | exact stored _ _ _
-         | (simp (config := { implicitDefEqProofs := false })
-             [step, cil_guard, observerCount, pureArity, scalars, CIL.step.eq_def, CIL.Intrinsic.available,
-               CIL.Vector.intrinsic_sub128, corrected128, checkedValue, numericValue,
-               Bind.bind, Except.bind, Pure.pure, Except.pure]
-            first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
+    cil_contract_steps [found, code, loadIncoming, loadSum, stored,
+      CIL.Vector.intrinsic_sub128, corrected128] until done
 
 #print axioms vector128_correction_checked
 end UInt256Proof.Add.Safety

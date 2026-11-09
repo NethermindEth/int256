@@ -54,9 +54,9 @@ theorem impl_contract (program : CIL.Program) (method lookup : Nat) (profile : C
     (binaryArguments left right output) call.1.1
   rw [setup] at setup'
   cases setup'
-  have writable : WritableHomes entered memory.nextIdentity
+  have writable : CompleteWritableHomes entered memory.nextIdentity
       (subtractImplBody profile avx512 bmi1 lookup).localKinds frame.locals :=
-    UInt256Model.Safety.NumericHomes.writable homes
+    CIL.Safety.NumericHomes.complete homes
   have owned : ∀ id ∈ frame.owned, memory.nextIdentity ≤ id := fun id member =>
     ((enterFrame_fresh _ _ _ _ _ setup).2 id member).1
   have state := VectorFrame.initial call setup

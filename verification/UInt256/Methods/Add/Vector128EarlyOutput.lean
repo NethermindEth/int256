@@ -124,17 +124,9 @@ theorem vector128_early_output (program : CIL.Program) (body : CIL.Method) (meth
     have address := middleCall.output_half_address member 1
     simp only [Fin.val_one, Nat.mul_one] at address
     simp only [vector128EarlyOutputStart, selected, ite_true]
-    all_goals repeat' first
-      | exact done
-      | (apply run_next_exists post found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
-         first
-         | exact loadLow _ _
-         | exact loadHigh _ _
-         | (simp (config := { implicitDefEqProofs := false })
-             [localResult, step, cil_guard, observerCount, argument, checkedValue, formValue, formed, staticInstruction, memoryInstruction,
-               storeValue, referenceAt, firstWrite, secondWrite, address, CIL.offsetValue,
-               checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-            first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
+    simp only [localResult] at loadLow loadHigh
+    all_goals cil_contract_steps [found, code, loadLow, loadHigh, argument, formed,
+      firstWrite, secondWrite, address, storeValue, referenceAt, ordinaryAccessAlignment] until done
 
 #print axioms vector128_early_output
 end UInt256Proof.Add.Safety

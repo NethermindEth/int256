@@ -10,7 +10,7 @@ theorem PrivateWords.store_vector {program : CIL.Program} {original entered curr
     {kinds : List CIL.LocalKind}
     (state : PrivateWords program original entered current inputs outputs frame known)
     (enteredWF : entered.WellFormed)
-    (homes : WritableHomes entered original.nextIdentity kinds frame.locals)
+    (homes : CompleteWritableHomes entered original.nextIdentity kinds frame.locals)
     (index : Nat) (specified : kinds[index]? = some .vector256) (value : BitVec 256)
     (pc : Nat) (args rest : List Value) :
     ∃ after reference,
@@ -31,7 +31,7 @@ theorem PrivateWords.store_vector {program : CIL.Program} {original entered curr
   refine ⟨state.call.after_write written, state.enteredBound,
     Nat.le_trans state.next (write_extends_allocations _ _ _ _ _ written).next,
     state.authority.trans (authority.weaken state.next),
-    state.snapshots.after_other_kind_write homes index .vector256 reference (by decide) slot written, ?_⟩
+    state.snapshots.after_other_kind_write homes.writable index .vector256 reference (by decide) slot written, ?_⟩
   intro id old offset
   exact (preserved.cells id old offset).trans (state.caller id old offset)
 

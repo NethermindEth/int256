@@ -232,12 +232,13 @@ theorem full_frame_setup (profile : CIL.FeatureProfile) (program : CIL.Program) 
     (call : CallingConditions program memory [left, right] [output]) :
     ∃ frame entered,
       enterFrame (fullBody profile wordIndex countIndex storageIndex alternative) (productArgs left right output) memory = .ok (frame, entered) ∧
-      WritableHomes entered memory.nextIdentity (fullBody profile wordIndex countIndex storageIndex alternative).localKinds frame.locals ∧
+      CompleteWritableHomes entered memory.nextIdentity (fullBody profile wordIndex countIndex storageIndex alternative).localKinds frame.locals ∧
       entered.WellFormed ∧
       PrivateWords program memory entered entered [left, right] [output] frame (fun _ => none) := by
   have kinds : (fullBody profile wordIndex countIndex storageIndex alternative).localKinds = (List.replicate 22 CIL.LocalKind.word64 ++ List.replicate 4 CIL.LocalKind.vector256) := by rfl
   obtain ⟨frame, entered, setup, homes, _, wf⟩ := unknown_frame_setup (fullBody profile wordIndex countIndex storageIndex alternative)
-    (by rfl) (by simp [kinds]) (by simp [kinds]) (by simp [kinds]) (by rfl) (by rfl) (by rfl) memory (productArgs left right output) call.1.1
+    (by rfl) (by simp [kinds]) (by simp [kinds]) (by simp [kinds])
+    (by simp [kinds]) (by simp [kinds]) (by simp [kinds]) (by rfl) (by rfl) (by rfl) memory (productArgs left right output) call.1.1
   exact ⟨frame, entered, setup, homes, wf, PrivateWords.initial call setup⟩
 
 def fullInputs (original : Memory) (left right : Reference) :=
@@ -254,7 +255,7 @@ theorem full_inputs (profile : CIL.FeatureProfile) (program : CIL.Program) (meth
     (found : program[methodIndex]? = some (fullBody profile wordIndex countIndex storageIndex alternative)) (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (originalCall : CallingConditions program original [left, right] [output])
     (enteredWF : entered.WellFormed)
-    (homes : WritableHomes entered original.nextIdentity (fullBody profile wordIndex countIndex storageIndex alternative).localKinds frame.locals)
+    (homes : CompleteWritableHomes entered original.nextIdentity (fullBody profile wordIndex countIndex storageIndex alternative).localKinds frame.locals)
     (state : PrivateWords program original entered current [left, right] [output] frame (fun _ => none))
     (post : Memory → List Value → Prop)
     (continuation : ∀ after,
@@ -298,7 +299,7 @@ theorem full_scalar_top (profile : CIL.FeatureProfile) (program : CIL.Program) (
     (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (originalCall : CallingConditions program original [left, right] [output])
     (enteredWF : entered.WellFormed)
-    (homes : WritableHomes entered original.nextIdentity (fullBody profile wordIndex countIndex storageIndex alternative).localKinds frame.locals)
+    (homes : CompleteWritableHomes entered original.nextIdentity (fullBody profile wordIndex countIndex storageIndex alternative).localKinds frame.locals)
     (state : PrivateWords program original entered current [left, right] [output] frame
       (fullInputs original left right))
     (post : Memory → List Value → Prop)
@@ -431,7 +432,7 @@ theorem full_second_column (profile : CIL.FeatureProfile) (program : CIL.Program
     (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (originalCall : CallingConditions program original [left, right] [output])
     (enteredWF : entered.WellFormed)
-    (homes : WritableHomes entered original.nextIdentity (fullBody profile wordIndex countIndex storageIndex alternative).localKinds frame.locals)
+    (homes : CompleteWritableHomes entered original.nextIdentity (fullBody profile wordIndex countIndex storageIndex alternative).localKinds frame.locals)
     (state : PrivateWords program original entered current [left, right] [output] frame
       (fullPrepared original left right))
     (post : Memory → List Value → Prop)
@@ -525,7 +526,7 @@ theorem full_middle_column (profile : CIL.FeatureProfile) (program : CIL.Program
     (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (originalCall : CallingConditions program original [left, right] [output])
     (enteredWF : entered.WellFormed)
-    (homes : WritableHomes entered original.nextIdentity (fullBody profile wordIndex countIndex storageIndex alternative).localKinds frame.locals)
+    (homes : CompleteWritableHomes entered original.nextIdentity (fullBody profile wordIndex countIndex storageIndex alternative).localKinds frame.locals)
     (state : PrivateWords program original entered current [left, right] [output] frame
       (fullSecondColumn original left right))
     (post : Memory → List Value → Prop)
@@ -576,7 +577,7 @@ def FullTopContract (profile : CIL.FeatureProfile) (program : CIL.Program) (meth
     (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (_originalCall : CallingConditions program original [left, right] [output])
     (_enteredWF : entered.WellFormed)
-    (_homes : WritableHomes entered original.nextIdentity (fullBody profile wordIndex countIndex storageIndex).localKinds frame.locals)
+    (_homes : CompleteWritableHomes entered original.nextIdentity (fullBody profile wordIndex countIndex storageIndex).localKinds frame.locals)
     (_state : PrivateWords program original entered current [left, right] [output] frame
       (fullInputs original left right))
     (post : Memory → List Value → Prop)
@@ -605,7 +606,7 @@ theorem full_first_upper (profile : CIL.FeatureProfile) (program : CIL.Program) 
     (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (originalCall : CallingConditions program original [left, right] [output])
     (enteredWF : entered.WellFormed)
-    (homes : WritableHomes entered original.nextIdentity (fullBody profile wordIndex countIndex storageIndex alternative).localKinds frame.locals)
+    (homes : CompleteWritableHomes entered original.nextIdentity (fullBody profile wordIndex countIndex storageIndex alternative).localKinds frame.locals)
     (state : PrivateWords program original entered current [left, right] [output] frame
       (fullMiddleWords original left right))
     (post : Memory → List Value → Prop)
@@ -655,7 +656,7 @@ theorem full_upper (profile : CIL.FeatureProfile) (program : CIL.Program) (metho
     (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (originalCall : CallingConditions program original [left, right] [output])
     (enteredWF : entered.WellFormed)
-    (homes : WritableHomes entered original.nextIdentity (fullBody profile wordIndex countIndex storageIndex alternative).localKinds frame.locals)
+    (homes : CompleteWritableHomes entered original.nextIdentity (fullBody profile wordIndex countIndex storageIndex alternative).localKinds frame.locals)
     (state : PrivateWords program original entered current [left, right] [output] frame
       (fullFirstUpperWords original left right))
     (post : Memory → List Value → Prop)
@@ -711,7 +712,7 @@ theorem full_final (profile : CIL.FeatureProfile) (program : CIL.Program) (metho
     (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (originalCall : CallingConditions program original [left, right] [output])
     (enteredWF : entered.WellFormed)
-    (homes : WritableHomes entered original.nextIdentity (fullBody profile wordIndex countIndex storageIndex alternative).localKinds frame.locals)
+    (homes : CompleteWritableHomes entered original.nextIdentity (fullBody profile wordIndex countIndex storageIndex alternative).localKinds frame.locals)
     (state : PrivateWords program original entered current [left, right] [output] frame
       (fullUpperWords original left right))
     (post : Memory → List Value → Prop)

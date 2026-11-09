@@ -141,12 +141,13 @@ theorem multiply_frame_setup (ctx : Context alternative) (memory : Memory) (left
     (call : CallingConditions ctx.program memory [left, right] [output]) :
     ∃ frame entered,
       enterFrame (multiplyBody ctx.profile ctx.indices) (productArgs left right output) memory = .ok (frame, entered) ∧
-      WritableHomes entered memory.nextIdentity (multiplyBody ctx.profile ctx.indices).localKinds frame.locals ∧
+      CompleteWritableHomes entered memory.nextIdentity (multiplyBody ctx.profile ctx.indices).localKinds frame.locals ∧
       entered.WellFormed ∧
       PrivateWords ctx.program memory entered entered [left, right] [output] frame (fun _ => none) := by
   have kinds : (multiplyBody ctx.profile ctx.indices).localKinds = List.replicate 8 CIL.LocalKind.word64 := by rfl
   obtain ⟨frame, entered, setup, homes, _, wf⟩ := unknown_frame_setup (multiplyBody ctx.profile ctx.indices)
-    (by rfl) (by simp [kinds]) (by simp [kinds]) (by simp [kinds]) (by rfl) (by rfl) (by rfl) memory (productArgs left right output) call.1.1
+    (by rfl) (by simp [kinds]) (by simp [kinds]) (by simp [kinds])
+    (by simp [kinds]) (by simp [kinds]) (by simp [kinds]) (by rfl) (by rfl) (by rfl) memory (productArgs left right output) call.1.1
   exact ⟨frame, entered, setup, homes, wf, PrivateWords.initial call setup⟩
 
 def multiplyLowInputs (original : Memory) (left right : Reference) :=
@@ -155,7 +156,7 @@ def multiplyLowInputs (original : Memory) (left right : Reference) :=
 theorem multiply_low_inputs (ctx : Context alternative) (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (originalCall : CallingConditions ctx.program original [left, right] [output])
     (enteredWF : entered.WellFormed)
-    (homes : WritableHomes entered original.nextIdentity (multiplyBody ctx.profile ctx.indices).localKinds frame.locals)
+    (homes : CompleteWritableHomes entered original.nextIdentity (multiplyBody ctx.profile ctx.indices).localKinds frame.locals)
     (state : PrivateWords ctx.program original entered current [left, right] [output] frame (fun _ => none))
     (post : Memory → List Value → Prop)
     (continuation : ∀ after,
@@ -191,7 +192,7 @@ theorem multiply_upper_mask (ctx : Context alternative) (rightSide : Bool)
     (known : Nat → Option (BitVec 64))
     (originalCall : CallingConditions ctx.program original [left, right] [output])
     (enteredWF : entered.WellFormed)
-    (homes : WritableHomes entered original.nextIdentity (multiplyBody ctx.profile ctx.indices).localKinds frame.locals)
+    (homes : CompleteWritableHomes entered original.nextIdentity (multiplyBody ctx.profile ctx.indices).localKinds frame.locals)
     (state : PrivateWords ctx.program original entered current [left, right] [output] frame known)
     (post : Memory → List Value → Prop)
     (continuation : ∀ after,
@@ -233,7 +234,7 @@ theorem multiply_tail_mask (ctx : Context alternative) (rightSide : Bool)
     (known : Nat → Option (BitVec 64))
     (originalCall : CallingConditions ctx.program original [left, right] [output])
     (enteredWF : entered.WellFormed)
-    (homes : WritableHomes entered original.nextIdentity (multiplyBody ctx.profile ctx.indices).localKinds frame.locals)
+    (homes : CompleteWritableHomes entered original.nextIdentity (multiplyBody ctx.profile ctx.indices).localKinds frame.locals)
     (state : PrivateWords ctx.program original entered current [left, right] [output] frame known)
     (knownUpper : known (if rightSide then 3 else 2) = some (inputUpper original (if rightSide then right else left)))
     (post : Memory → List Value → Prop)
@@ -290,7 +291,7 @@ def multiplyInputs (original : Memory) (left right : Reference) :=
 theorem multiply_prepare (ctx : Context alternative) (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (originalCall : CallingConditions ctx.program original [left, right] [output])
     (enteredWF : entered.WellFormed)
-    (homes : WritableHomes entered original.nextIdentity (multiplyBody ctx.profile ctx.indices).localKinds frame.locals)
+    (homes : CompleteWritableHomes entered original.nextIdentity (multiplyBody ctx.profile ctx.indices).localKinds frame.locals)
     (state : PrivateWords ctx.program original entered current [left, right] [output] frame (fun _ => none))
     (post : Memory → List Value → Prop)
     (continuation : ∀ after,

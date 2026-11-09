@@ -146,7 +146,7 @@ theorem VectorFrame.run_store_scratch {program : CIL.Program} {original entered 
     (state : VectorFrame program original entered current inputs output frame known stored)
     (scratch : ScratchCells current cells cellValues)
     (originalCall : CallingConditions program original inputs [output])
-    (homes : WritableHomes entered upper kinds frame.locals) (bound : original.nextIdentity ≤ upper)
+    (homes : CompleteWritableHomes entered upper kinds frame.locals) (bound : original.nextIdentity ≤ upper)
     (layout : ScratchLayout original.nextIdentity upper cells)
     (found : program[method]? = some body) (fetched : body.code[pc]? = some (.setLocal index))
     (specified : kinds[index]? = some kind) (fits : localNumber kind value = .ok number)
@@ -185,7 +185,7 @@ theorem VectorFrame.output_store_scratch {program : CIL.Program} {original enter
     (state : VectorFrame program original entered current inputs output frame known stored)
     (scratch : ScratchCells current cells cellValues)
     (originalCall : CallingConditions program original inputs [output])
-    (homes : WritableHomes entered original.nextIdentity kinds frame.locals)
+    (homes : CompleteWritableHomes entered original.nextIdentity kinds frame.locals)
     (layout : ScratchLayout original.nextIdentity upper cells)
     (body : CIL.Method) (pc : Nat) (args rest : List Value) (value : BitVec 256) :
     ∃ after,
@@ -204,7 +204,7 @@ theorem VectorFrame.output_store_scratch {program : CIL.Program} {original enter
   have mine : step body (.memory .store256) pc args frame
       (.scalar (.v256 value) :: .reference (.address output) :: rest) current =
       .ok (.next (pc + 1) rest frame written) := by
-    simp [step, cil_guard, observerCount, staticInstruction, memoryInstruction, storeValue, referenceAt, ordinaryAccessAlignment,
+    simp [step, cil_guard, observerCount, staticInstruction, memoryInstruction, otherMemoryInstruction, storeValue, referenceAt, ordinaryAccessAlignment,
       write, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   rw [stepped] at mine
   have same : after = written := by
@@ -224,7 +224,7 @@ theorem VectorFrame.cell_store {program : CIL.Program} {original entered current
     (state : VectorFrame program original entered current inputs output frame known stored)
     (scratch : ScratchCells current cells cellValues)
     (originalCall : CallingConditions program original inputs [output])
-    (homes : WritableHomes entered upper kinds frame.locals)
+    (homes : CompleteWritableHomes entered upper kinds frame.locals)
     (layout : ScratchLayout original.nextIdentity upper cells)
     {index : Nat} {cell : Reference} (cellFound : cells[index]? = some cell)
     (body : CIL.Method) (pc : Nat) (args rest : List Value) (value : BitVec 256) :
@@ -240,11 +240,11 @@ theorem VectorFrame.cell_store {program : CIL.Program} {original entered current
   refine ⟨after, ?_, ⟨state.call.after_write write, state.enteredWF, state.enteredBound,
     Nat.le_trans state.next (write_extends_allocations _ _ _ _ _ write).next,
     state.authority.trans (write_preserves_access_below write _), ?_, ?_, ?_⟩, next⟩
-  · simp [step, cil_guard, observerCount, staticInstruction, memoryInstruction, storeValue, referenceAt, ordinaryAccessAlignment,
+  · simp [step, cil_guard, observerCount, staticInstruction, memoryInstruction, otherMemoryInstruction, storeValue, referenceAt, ordinaryAccessAlignment,
       write, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   · exact state.locals.after_write_apart write (fun other _ kind reference _ slot =>
       Or.inl (Nat.ne_of_gt (Nat.lt_of_lt_of_le bounds.2
-        (homes.home_bound other kind reference slot))))
+        (homes.writable.home_bound other kind reference slot))))
   · intro id old offset away
     exact (write_outside _ _ _ _ _ id offset write (Or.inl (Nat.ne_of_lt (Nat.lt_of_lt_of_le old bounds.1)))).trans
       (state.caller id old offset away)
@@ -318,7 +318,7 @@ theorem run_cell_load {program : CIL.Program} {body : CIL.Method} {method pc : N
       run program fuel method pc args frame (.reference (.address cell) :: stack) current =
         .ok (result, returned) ∧ post result returned := by
   apply run_next_exists post found fetched _ continuation
-  simp [step, cil_guard, observerCount, staticInstruction, memoryInstruction, scratch_load loaded,
+  simp [step, cil_guard, observerCount, staticInstruction, memoryInstruction, otherMemoryInstruction, scratch_load loaded,
     Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 /-- A 256-bit store to a scratch cell; the continuation receives the updated frame and cells. -/
@@ -332,7 +332,7 @@ theorem VectorFrame.run_cell_store {program : CIL.Program} {original entered cur
     (state : VectorFrame program original entered current inputs output frame known stored)
     (scratch : ScratchCells current cells cellValues)
     (originalCall : CallingConditions program original inputs [output])
-    (homes : WritableHomes entered upper kinds frame.locals)
+    (homes : CompleteWritableHomes entered upper kinds frame.locals)
     (layout : ScratchLayout original.nextIdentity upper cells)
     (index : Nat) {cell : Reference} (cellFound : cells[index]? = some cell)
     (found : program[method]? = some body) (fetched : body.code[pc]? = some (.memory .store256))
@@ -359,7 +359,7 @@ theorem VectorFrame.run_output_store {program : CIL.Program} {original entered c
     (state : VectorFrame program original entered current inputs output frame known stored)
     (scratch : ScratchCells current cells cellValues)
     (originalCall : CallingConditions program original inputs [output])
-    (homes : WritableHomes entered original.nextIdentity kinds frame.locals)
+    (homes : CompleteWritableHomes entered original.nextIdentity kinds frame.locals)
     (layout : ScratchLayout original.nextIdentity upper cells)
     (found : program[method]? = some body) (fetched : body.code[pc]? = some (.memory .store256))
     (continuation : ∀ after,

@@ -63,19 +63,9 @@ theorem vector128_propagation_checked (program : CIL.Program) (body : CIL.Method
     .vector128 (.v128 incoming) incoming.toNat rfl incomingSlot incomingRead
   cases upper <;> simp only [Bool.false_eq_true, ite_false, ite_true] at stored loadResult loadIncoming done ⊢
   all_goals
-    repeat' first
-      | exact done
-      | (apply run_next_exists post found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
-         first
-         | exact loadResult _ _
-         | exact loadIncoming _ _
-         | exact stored _ _ _
-         | (simp (config := { implicitDefEqProofs := false })
-             [step, cil_guard, observerCount, pureArity, scalars, CIL.step.eq_def, CIL.Intrinsic.available,
-               CIL.Vector.intrinsic_zero128, CIL.Vector.intrinsic_eq128, CIL.Vector.intrinsic_and128,
-               propagating128, checkedValue, numericValue,
-               Bind.bind, Except.bind, Pure.pure, Except.pure]
-            first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
+    cil_contract_steps [found, code, loadResult, loadIncoming, stored,
+      CIL.Vector.intrinsic_zero128, CIL.Vector.intrinsic_eq128,
+      CIL.Vector.intrinsic_and128, propagating128] until done
 
 #print axioms vector128_propagation_checked
 end UInt256Proof.Add.Safety

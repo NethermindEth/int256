@@ -146,8 +146,8 @@ theorem vector128_fast_output (program : CIL.Program) (body : CIL.Method) (metho
          | exact loadLow _ _
          | exact loadHigh _ _
          | (simp (config := { implicitDefEqProofs := false })
-             [localResult, step, cil_guard, observerCount, argument, checkedValue, formValue, formed, staticInstruction, memoryInstruction,
-               storeValue, referenceAt, firstWrite, secondWrite, address, CIL.offsetValue,
+             [localResult, step, cil_guard, observerCount, argument, checkedValue, formValue, formed, staticInstruction, memoryInstruction, otherMemoryInstruction, referenceAddInstruction, displaceReference,
+               storeValue, referenceAt, ordinaryAccessAlignment, firstWrite, secondWrite, address, CIL.offsetValue,
                checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
             first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
 

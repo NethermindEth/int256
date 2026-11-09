@@ -99,12 +99,13 @@ theorem scalar_frame_setup (profile : CIL.FeatureProfile) (program : CIL.Program
     (call : CallingConditions program memory [input] [output]) :
     ∃ frame entered,
       enterFrame (scalarBody profile wordIndex storageIndex) (scalarArgs input word output) memory = .ok (frame, entered) ∧
-      WritableHomes entered memory.nextIdentity (scalarBody profile wordIndex storageIndex).localKinds frame.locals ∧
+      CompleteWritableHomes entered memory.nextIdentity (scalarBody profile wordIndex storageIndex).localKinds frame.locals ∧
       entered.WellFormed ∧
       PrivateWords program memory entered entered [input] [output] frame (fun _ => none) := by
   have kinds : (scalarBody profile wordIndex storageIndex).localKinds = List.replicate 9 CIL.LocalKind.word64 := by rfl
   obtain ⟨frame, entered, setup, homes, _, wf⟩ := unknown_frame_setup (scalarBody profile wordIndex storageIndex)
-    (by rfl) (by simp [kinds]) (by simp [kinds]) (by simp [kinds]) (by rfl) (by rfl) (by rfl) memory (scalarArgs input word output) call.1.1
+    (by rfl) (by simp [kinds]) (by simp [kinds]) (by simp [kinds])
+    (by simp [kinds]) (by simp [kinds]) (by simp [kinds]) (by rfl) (by rfl) (by rfl) memory (scalarArgs input word output) call.1.1
   exact ⟨frame, entered, setup, homes, wf, PrivateWords.initial call setup⟩
 
 /-- Each input limb is loaded from the original caller bytes before being
@@ -114,7 +115,7 @@ theorem scalar_input_save (profile : CIL.FeatureProfile) (program : CIL.Program)
     (word : BitVec 64) (frame : Frame) (known : Nat → Option (BitVec 64)) (index : Fin 3)
     (originalCall : CallingConditions program original [input] [output])
     (enteredWF : entered.WellFormed)
-    (homes : WritableHomes entered original.nextIdentity (scalarBody profile wordIndex storageIndex).localKinds frame.locals)
+    (homes : CompleteWritableHomes entered original.nextIdentity (scalarBody profile wordIndex storageIndex).localKinds frame.locals)
     (state : PrivateWords program original entered current [input] [output] frame known)
     (post : Memory → List Value → Prop)
     (continuation : ∀ after,
@@ -151,13 +152,7 @@ theorem scalar_input_save (profile : CIL.FeatureProfile) (program : CIL.Program)
   rcases cases with rfl | rfl | rfl
   all_goals
     dsimp at reading stored done
-    iterate 2
-      apply run_next_exists post found (by rfl)
-      simp (config := { implicitDefEqProofs := false })
-        [step, cil_guard, observerCount, pureArity, scalarArgs, checkedValue, formValue, formed, reading,
-          checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-      first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
-    exact run_next_exists post found (by rfl) stored done
+    cil_contract_steps [found, scalarArgs, formed, reading, stored] until done
 
 #print axioms scalar_frame_setup
 #print axioms scalar_input_save
@@ -179,7 +174,7 @@ theorem scalar_inputs (profile : CIL.FeatureProfile) (program : CIL.Program) (me
     (word : BitVec 64) (frame : Frame)
     (originalCall : CallingConditions program original [input] [output])
     (enteredWF : entered.WellFormed)
-    (homes : WritableHomes entered original.nextIdentity (scalarBody profile wordIndex storageIndex).localKinds frame.locals)
+    (homes : CompleteWritableHomes entered original.nextIdentity (scalarBody profile wordIndex storageIndex).localKinds frame.locals)
     (state : PrivateWords program original entered current [input] [output] frame (fun _ => none))
     (post : Memory → List Value → Prop)
     (continuation : ∀ after,
@@ -204,7 +199,7 @@ theorem scalar_first_product (profile : CIL.FeatureProfile) (program : CIL.Progr
     (original entered current : Memory) (input output : Reference) (word : BitVec 64) (frame : Frame)
     (originalCall : CallingConditions program original [input] [output])
     (enteredWF : entered.WellFormed)
-    (homes : WritableHomes entered original.nextIdentity (scalarBody profile wordIndex storageIndex).localKinds frame.locals)
+    (homes : CompleteWritableHomes entered original.nextIdentity (scalarBody profile wordIndex storageIndex).localKinds frame.locals)
     (state : PrivateWords program original entered current [input] [output] frame (scalarInputs original input))
     (post : Memory → List Value → Prop)
     (continuation : ∀ after,
@@ -233,15 +228,7 @@ theorem scalar_first_product (profile : CIL.FeatureProfile) (program : CIL.Progr
   have load0 := fun (pc : Nat) (stack : List Value) => state.snapshots.load
     (body := (scalarBody profile wordIndex storageIndex)) (args := scalarArgs input word output) (pc := pc) (stack := stack)
     (index := 0) (inputLimb original input 0) (by simp [scalarInputs, rememberWord])
-  iterate 5
-    apply run_next_exists post found (by rfl)
-    first
-    | exact load0 _ _
-    | simp (config := { implicitDefEqProofs := false })
-        [step, cil_guard, observerCount, pureArity, scalarArgs, checkedValue, numericValue, formValue, inputFormed,
-          localAddress, slot, referenceFormed, reading, checkedAt, Except.mapError,
-          Bind.bind, Except.bind, Pure.pure, Except.pure]
-      first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
+  cil_contract_steps 5 [found, scalarArgs, inputFormed, slot, referenceFormed, localAddress, reading, load0]
   apply run_word_call contract state originalCall homes 4 reference word (inputLimb original input 0)
     slot writable post found (by rfl)
   · simp [step, cil_guard, observerCount, checkedValue, numericValue, formValue, referenceFormed,
@@ -270,7 +257,7 @@ theorem scalar_next_product (profile : CIL.FeatureProfile) (program : CIL.Progra
     (frame : Frame) (known : Nat → Option (BitVec 64)) (rest : List Value)
     (originalCall : CallingConditions program original [input] [output])
     (enteredWF : entered.WellFormed)
-    (homes : WritableHomes entered original.nextIdentity (scalarBody profile wordIndex storageIndex).localKinds frame.locals)
+    (homes : CompleteWritableHomes entered original.nextIdentity (scalarBody profile wordIndex storageIndex).localKinds frame.locals)
     (state : PrivateWords program original entered current [input] [output] frame known)
     (saved : known (ladderInput second) = some limb)
     (post : Memory → List Value → Prop)
@@ -292,14 +279,7 @@ theorem scalar_next_product (profile : CIL.FeatureProfile) (program : CIL.Progra
   cases second
   all_goals
     dsimp [ladderStart, ladderInput] at load continuation ⊢
-    iterate 3
-      apply run_next_exists post found (by rfl)
-      first
-      | exact load _ _
-      | simp (config := { implicitDefEqProofs := false })
-          [step, cil_guard, observerCount, scalarArgs, checkedValue, numericValue, formValue, localAddress, slot, formed,
-            checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-        first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
+    cil_contract_steps 3 [found, scalarArgs, slot, formed, localAddress, load]
     apply run_word_call contract state originalCall homes 5 reference word limb slot writable post found (by rfl)
     · simp [step, cil_guard, observerCount, checkedValue, numericValue, formValue, formed,
         checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
@@ -313,7 +293,7 @@ theorem scalar_accumulate (profile : CIL.FeatureProfile) (program : CIL.Program)
     (original entered current : Memory) (input output : Reference) (word low high incoming : BitVec 64)
     (frame : Frame) (known : Nat → Option (BitVec 64)) (rest : List Value)
     (enteredWF : entered.WellFormed)
-    (homes : WritableHomes entered original.nextIdentity (scalarBody profile wordIndex storageIndex).localKinds frame.locals)
+    (homes : CompleteWritableHomes entered original.nextIdentity (scalarBody profile wordIndex storageIndex).localKinds frame.locals)
     (state : PrivateWords program original entered current [input] [output] frame known)
     (savedLow : known 5 = some low) (savedCarry : known 3 = some incoming)
     (post : Memory → List Value → Prop)
@@ -400,7 +380,7 @@ theorem scalar_products (profile : CIL.FeatureProfile) (program : CIL.Program) (
     (original entered current : Memory) (input output : Reference) (word : BitVec 64) (frame : Frame)
     (originalCall : CallingConditions program original [input] [output])
     (enteredWF : entered.WellFormed)
-    (homes : WritableHomes entered original.nextIdentity (scalarBody profile wordIndex storageIndex).localKinds frame.locals)
+    (homes : CompleteWritableHomes entered original.nextIdentity (scalarBody profile wordIndex storageIndex).localKinds frame.locals)
     (state : PrivateWords program original entered current [input] [output] frame (fun _ => none))
     (post : Memory → List Value → Prop)
     (continuation : ∀ after,
@@ -451,7 +431,7 @@ theorem scalar_output_with_storage (profile : CIL.FeatureProfile) (program : CIL
     (word : BitVec 64) (frame : Frame)
     (originalCall : CallingConditions program original [input] [output])
     (enteredWF : entered.WellFormed)
-    (homes : WritableHomes entered original.nextIdentity (scalarBody profile wordIndex storageIndex).localKinds frame.locals)
+    (homes : CompleteWritableHomes entered original.nextIdentity (scalarBody profile wordIndex storageIndex).localKinds frame.locals)
     (owned : ∀ id ∈ frame.owned, original.nextIdentity ≤ id)
     (state : PrivateWords program original entered current [input] [output] frame
       (scalarProducts original input word)) :
@@ -533,7 +513,7 @@ theorem scalar_output (profile : CIL.FeatureProfile) (program : CIL.Program) (me
     (word : BitVec 64) (frame : Frame)
     (originalCall : CallingConditions program original [input] [output])
     (enteredWF : entered.WellFormed)
-    (homes : WritableHomes entered original.nextIdentity (scalarBody profile wordIndex storageIndex).localKinds frame.locals)
+    (homes : CompleteWritableHomes entered original.nextIdentity (scalarBody profile wordIndex storageIndex).localKinds frame.locals)
     (owned : ∀ id ∈ frame.owned, original.nextIdentity ≤ id)
     (state : PrivateWords program original entered current [input] [output] frame
       (scalarProducts original input word)) :

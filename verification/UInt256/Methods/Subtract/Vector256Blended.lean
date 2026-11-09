@@ -148,7 +148,7 @@ theorem impl_inputs (program : CIL.Program) (method lookup : Nat) (profile : CIL
     (features : ImplProfile profile false bmi1)
     (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (originalCall : CallingConditions program original [left, right] [output])
-    (homes : WritableHomes entered original.nextIdentity
+    (homes : CompleteWritableHomes entered original.nextIdentity
       (subtractBlendImplBody profile bmi1 lookup).localKinds frame.locals)
     (state : VectorFrame program original entered current [left, right] output frame (fun _ => none) none)
     (post : Memory → List Value → Prop)
@@ -197,7 +197,7 @@ theorem impl_masks (program : CIL.Program) (method lookup : Nat) (profile : CIL.
     (features : ImplProfile profile false bmi1)
     (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (originalCall : CallingConditions program original [left, right] [output])
-    (homes : WritableHomes entered original.nextIdentity
+    (homes : CompleteWritableHomes entered original.nextIdentity
       (subtractBlendImplBody profile bmi1 lookup).localKinds frame.locals)
     (a b : BitVec 256)
     (state : VectorFrame program original entered current [left, right] output frame (differenceLocals a b) none)
@@ -237,7 +237,7 @@ theorem impl_decision (program : CIL.Program) (method lookup : Nat) (profile : C
     (features : ImplProfile profile false bmi1)
     (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (originalCall : CallingConditions program original [left, right] [output])
-    (homes : WritableHomes entered original.nextIdentity
+    (homes : CompleteWritableHomes entered original.nextIdentity
       (subtractBlendImplBody profile bmi1 lookup).localKinds frame.locals)
     (a b : BitVec 256)
     (state : VectorFrame program original entered current [left, right] output frame (maskLocals a b) none)
@@ -333,7 +333,7 @@ theorem impl_index (program : CIL.Program) (method lookup : Nat) (profile : CIL.
     (features : ImplProfile profile false bmi1)
     (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (originalCall : CallingConditions program original [left, right] [output])
-    (homes : WritableHomes entered original.nextIdentity
+    (homes : CompleteWritableHomes entered original.nextIdentity
       (subtractBlendImplBody profile bmi1 lookup).localKinds frame.locals)
     (a b : BitVec 256) (value : BitVec 256)
     (state : VectorFrame program original entered current [left, right] output frame (equalLocals a b) (some value))
@@ -379,7 +379,7 @@ theorem impl_slow_tail (program : CIL.Program) (method lookup : Nat) (profile : 
     (features : ImplProfile profile false bmi1)
     (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (originalCall : CallingConditions program original [left, right] [output])
-    (homes : WritableHomes entered original.nextIdentity
+    (homes : CompleteWritableHomes entered original.nextIdentity
       (subtractBlendImplBody profile bmi1 lookup).localKinds frame.locals)
     (a b : BitVec 256) (value : BitVec 256)
     (state : VectorFrame program original entered current [left, right] output frame (slowLocals a b) (some value))
@@ -471,9 +471,9 @@ theorem impl_contract (program : CIL.Program) (method lookup : Nat) (profile : C
     (binaryArguments left right output) call.1.1
   rw [setup] at setup'
   cases setup'
-  have writable : WritableHomes entered memory.nextIdentity
+  have writable : CompleteWritableHomes entered memory.nextIdentity
       (subtractBlendImplBody profile bmi1 lookup).localKinds frame.locals :=
-    UInt256Model.Safety.NumericHomes.writable homes
+    CIL.Safety.NumericHomes.complete homes
   have owned : ∀ id ∈ frame.owned, memory.nextIdentity ≤ id := fun id member =>
     ((enterFrame_fresh _ _ _ _ _ setup).2 id member).1
   have state := VectorFrame.initial call setup

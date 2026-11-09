@@ -88,12 +88,13 @@ theorem both_two_frame_setup (profile : CIL.FeatureProfile) (program : CIL.Progr
     (call : CallingConditions program memory [left, right] [output]) :
     ∃ frame entered,
       enterFrame (bothTwoBody profile wordIndex countIndex storageIndex) (productArgs left right output) memory = .ok (frame, entered) ∧
-      WritableHomes entered memory.nextIdentity (bothTwoBody profile wordIndex countIndex storageIndex).localKinds frame.locals ∧
+      CompleteWritableHomes entered memory.nextIdentity (bothTwoBody profile wordIndex countIndex storageIndex).localKinds frame.locals ∧
       entered.WellFormed ∧
       PrivateWords program memory entered entered [left, right] [output] frame (fun _ => none) := by
   have kinds : (bothTwoBody profile wordIndex countIndex storageIndex).localKinds = List.replicate 14 CIL.LocalKind.word64 := by rfl
   obtain ⟨frame, entered, setup, homes, _, wf⟩ := unknown_frame_setup (bothTwoBody profile wordIndex countIndex storageIndex)
-    (by rfl) (by simp [kinds]) (by simp [kinds]) (by simp [kinds]) (by rfl) (by rfl) (by rfl) memory (productArgs left right output) call.1.1
+    (by rfl) (by simp [kinds]) (by simp [kinds]) (by simp [kinds])
+    (by simp [kinds]) (by simp [kinds]) (by simp [kinds]) (by rfl) (by rfl) (by rfl) memory (productArgs left right output) call.1.1
   exact ⟨frame, entered, setup, homes, wf, PrivateWords.initial call setup⟩
 
 def bothTwoInputs (original : Memory) (left right : Reference) :=
@@ -104,7 +105,7 @@ theorem both_two_inputs (profile : CIL.FeatureProfile) (program : CIL.Program) (
     (found : program[index]? = some (bothTwoBody profile wordIndex countIndex storageIndex)) (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (originalCall : CallingConditions program original [left, right] [output])
     (enteredWF : entered.WellFormed)
-    (homes : WritableHomes entered original.nextIdentity (bothTwoBody profile wordIndex countIndex storageIndex).localKinds frame.locals)
+    (homes : CompleteWritableHomes entered original.nextIdentity (bothTwoBody profile wordIndex countIndex storageIndex).localKinds frame.locals)
     (state : PrivateWords program original entered current [left, right] [output] frame (fun _ => none))
     (post : Memory → List Value → Prop)
     (continuation : ∀ after,
@@ -173,7 +174,7 @@ theorem both_two_first_products (profile : CIL.FeatureProfile) (program : CIL.Pr
     (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (originalCall : CallingConditions program original [left, right] [output])
     (enteredWF : entered.WellFormed)
-    (homes : WritableHomes entered original.nextIdentity (bothTwoBody profile wordIndex countIndex storageIndex).localKinds frame.locals)
+    (homes : CompleteWritableHomes entered original.nextIdentity (bothTwoBody profile wordIndex countIndex storageIndex).localKinds frame.locals)
     (state : PrivateWords program original entered current [left, right] [output] frame
       (bothTwoInputs original left right))
     (post : Memory → List Value → Prop)
@@ -243,7 +244,7 @@ theorem both_two_second_column (profile : CIL.FeatureProfile) (program : CIL.Pro
     (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (originalCall : CallingConditions program original [left, right] [output])
     (enteredWF : entered.WellFormed)
-    (homes : WritableHomes entered original.nextIdentity (bothTwoBody profile wordIndex countIndex storageIndex).localKinds frame.locals)
+    (homes : CompleteWritableHomes entered original.nextIdentity (bothTwoBody profile wordIndex countIndex storageIndex).localKinds frame.locals)
     (state : PrivateWords program original entered current [left, right] [output] frame
       (bothTwoFirstProducts original left right))
     (post : Memory → List Value → Prop)
@@ -300,7 +301,7 @@ theorem both_two_final_column (profile : CIL.FeatureProfile) (program : CIL.Prog
     (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (originalCall : CallingConditions program original [left, right] [output])
     (enteredWF : entered.WellFormed)
-    (homes : WritableHomes entered original.nextIdentity (bothTwoBody profile wordIndex countIndex storageIndex).localKinds frame.locals)
+    (homes : CompleteWritableHomes entered original.nextIdentity (bothTwoBody profile wordIndex countIndex storageIndex).localKinds frame.locals)
     (state : PrivateWords program original entered current [left, right] [output] frame
       (bothTwoSecondColumn original left right))
     (post : Memory → List Value → Prop)

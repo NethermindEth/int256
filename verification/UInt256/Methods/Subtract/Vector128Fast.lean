@@ -102,7 +102,7 @@ theorem subtract_fast_checked (program : CIL.Program) (body : CIL.Method) (metho
          | exact b9 _ _ _
          | (simp (config := { implicitDefEqProofs := false })
              [localResult, step, cil_guard, observerCount, argument, checkedValue, formValue, formed, instruction, staticInstruction,
-               memoryInstruction, storeValue, referenceAt, firstWrite, secondWrite, address, CIL.offsetValue,
+               memoryInstruction, otherMemoryInstruction, referenceAddInstruction, displaceReference, storeValue, referenceAt, ordinaryAccessAlignment, firstWrite, secondWrite, address, CIL.offsetValue,
                checkedIntrinsic, pureArity, scalars, CIL.step.eq_def, CIL.Intrinsic.available,
                CIL.Vector.intrinsic_add128, numericValue,
                checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]

@@ -89,8 +89,8 @@ theorem vector128_arm_repair_output (program : CIL.Program) (body : CIL.Method) 
          first
          | exact loadHigh _ _
          | (simp (config := { implicitDefEqProofs := false })
-             [localResult, step, cil_guard, observerCount, argument, checkedValue, formValue, formed, staticInstruction, memoryInstruction,
-               storeValue, referenceAt, written, address, CIL.offsetValue,
+             [localResult, step, cil_guard, observerCount, argument, checkedValue, formValue, formed, staticInstruction, memoryInstruction, otherMemoryInstruction, referenceAddInstruction, displaceReference,
+               storeValue, referenceAt, ordinaryAccessAlignment, written, address, CIL.offsetValue,
                checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
             first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
 

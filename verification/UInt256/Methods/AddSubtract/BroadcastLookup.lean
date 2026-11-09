@@ -36,10 +36,11 @@ theorem lookup_invoke (program : CIL.Program) (index : Nat) (profile : CIL.Featu
   have selected : (broadcastDescriptor identity assembly) ∈ programStaticDescriptors program :=
     program_static_sites_valid program index _ found (0, (broadcastDescriptor identity assembly)) (by simp [lookupBody])
   obtain ⟨after, reference, resolved, afterWorld, binding⟩ :=
-    staticReference_valid_result (broadcastDescriptor identity assembly) _ memory wf world selected
+    staticReference_valid_result (broadcastDescriptor identity assembly) _ memory wf world selected (by simp [broadcastDescriptor])
   have below := staticReference_preserves_memory_below _ _ _ _ resolved
   have afterWF := staticReference_preserves_wellFormed _ _ _ _ wf resolved
-  obtain ⟨offset, allocation, present, live, kind, size, loaded⟩ := binding
+  obtain ⟨offset, allocation, present, live, kind, size, _, contents, loaded, known⟩ := binding
+  rw [known rfl] at loaded
   rw [bytes] at size loaded
   have length : broadcastTable.length = 512 := by decide +kernel
   rw [length] at size loaded

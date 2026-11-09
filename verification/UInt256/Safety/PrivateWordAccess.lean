@@ -24,7 +24,7 @@ theorem PrivateWords.home {program : CIL.Program} {original entered current : Me
     {kinds : List CIL.LocalKind}
     (state : PrivateWords program original entered current inputs outputs frame known)
     (enteredWF : entered.WellFormed)
-    (homes : WritableHomes entered original.nextIdentity kinds frame.locals)
+    (homes : CompleteWritableHomes entered original.nextIdentity kinds frame.locals)
     (index : Nat) (specified : kinds[index]? = some .word64) :
     ∃ reference, frame.locals[index]? = some (.bytes .word64 reference) ∧
       access current reference 8 1 true = .ok () ∧ form current reference = .ok reference := by

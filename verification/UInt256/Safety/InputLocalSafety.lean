@@ -13,7 +13,7 @@ theorem run_input_to_local {program : CIL.Program} {method pc argument target : 
     {known : Nat → Option (BitVec 64)} {args rest : List Value} {kinds : List CIL.LocalKind}
     (state : PrivateWords program original entered current inputs outputs frame known)
     (originalCall : CallingConditions program original inputs outputs) (enteredWF : entered.WellFormed)
-    (homes : WritableHomes entered original.nextIdentity kinds frame.locals)
+    (homes : CompleteWritableHomes entered original.nextIdentity kinds frame.locals)
     (input : Reference) (member : input ∈ inputs) (limb : Fin 4)
     (arg : args[argument]? = some (.reference (.address input)))
     (kind : kinds[target]? = some .word64)

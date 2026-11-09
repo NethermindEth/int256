@@ -82,15 +82,8 @@ theorem vector128_sse_repair_start (program : CIL.Program) (body : CIL.Method) (
     vector128_local_store program body specs boundary entered current inputs outputs frame root slots layout currentCall
       enteredWF homes authority 14 armWordSpec carrySpec (.i64 0) 0 rfl
   have done := continuation reference after slot loaded retained afterCall afterAuthority written
-  repeat' first
-    | exact done
-    | (apply run_next_exists post found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
-       first
-       | exact stored _ _ _
-       | (simp (config := { implicitDefEqProofs := false })
-           [step, cil_guard, observerCount, pureArity, scalars, CIL.step.eq_def, CIL.unary, checkedValue, numericValue,
-             Bind.bind, Except.bind, Pure.pure, Except.pure]
-          first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
+  cil_contract_steps 2 [found, code]
+  exact run_next_exists post found (by cil_lookup [code]) (stored _ _ _) done
 
 #print axioms vector128_sse_repair_start
 end UInt256Proof.Add.Safety
@@ -128,14 +121,8 @@ theorem vector128_sse_carry_segment (program : CIL.Program) (body : CIL.Method) 
   rcases cases with rfl | rfl | rfl | rfl
   all_goals
     simp only [Nat.reduceMul, Nat.reduceAdd] at leftRead rightRead resultSlot continuation ⊢
-    repeat' first
-      | exact continuation
-      | (apply run_next_exists post found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
-         simp (config := { implicitDefEqProofs := false })
-           [step, cil_guard, observerCount, checkedValue, numericValue, formValue, leftArg, rightArg, leftFormed, rightFormed,
-             carryFormed, resultFormed, carrySlot, resultSlot, localAddress, leftRead, rightRead,
-             pureArity, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-         first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)
+    cil_contract_steps [found, code, leftArg, rightArg, leftFormed, rightFormed,
+      carryFormed, resultFormed, carrySlot, resultSlot, localAddress, leftRead, rightRead] until continuation
 
 #print axioms vector128_sse_carry_segment
 end UInt256Proof.Add.Safety
@@ -183,7 +170,7 @@ theorem vector128_sse_indexed_carry (program : CIL.Program) (body : CIL.Method) 
     try exact ⟨rfl, rfl⟩
   apply run_call_of_contract_formed (carry_helper_contract carryFound) ⟨a, b, c, carryHome, resultHome⟩ found fetched stepped rfl
     ⟨wellFormed, incoming, carryRead, carryWrite, resultWrite, disjoint⟩ wellFormed
-  rintro after _ - formed world framed ⟨_, rfl, math⟩
+  rintro after _ - formed world _ framed ⟨_, rfl, math⟩
   simpa only [show 171 + 7 * index.val + 1 = 172 + 7 * index.val by omega, carryContract, List.append_nil] using
     continuation after formed world framed math
 
@@ -450,13 +437,8 @@ theorem vector128_sse_store_prefix (program : CIL.Program) (body : CIL.Method) (
   have r1 := load_local_word64_of_read (reads 1)
   have r2 := load_local_word64_of_read (reads 2)
   have r3 := load_local_word64_of_read (reads 3)
-  repeat' first
-    | exact continuation
-    | (apply run_next_exists post found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
-       simp (config := { implicitDefEqProofs := false })
-         [step, cil_guard, observerCount, checkedValue, formValue, outputArg, outputFormed, s0, s1, s2, s3, r0, r1, r2, r3,
-           checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-       first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)
+  cil_contract_steps [found, code, outputArg, outputFormed,
+    s0, s1, s2, s3, r0, r1, r2, r3] until continuation
 
 /-- Return the final carry word as the unsigned overflow flag and retire the frame. -/
 theorem vector128_sse_return (program : CIL.Program) (body : CIL.Method) (method : Nat)

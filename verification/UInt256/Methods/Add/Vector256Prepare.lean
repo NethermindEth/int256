@@ -66,7 +66,7 @@ theorem prepare_inputs (program : CIL.Program) (method : Nat) (profile : CIL.Fea
     (found : program[method]? = some (prepareAddBody profile avx512)) (features : AddProfile profile avx512)
     (original memory entered current : Memory) (left right output s0 s1 s2 s3 : Reference) (frame : Frame)
     (originalCall : CallingConditions program original [left, right] [output])
-    (homes : WritableHomes entered memory.nextIdentity (prepareAddBody profile avx512).localKinds frame.locals)
+    (homes : CompleteWritableHomes entered memory.nextIdentity (prepareAddBody profile avx512).localKinds frame.locals)
     (bound : original.nextIdentity ≤ memory.nextIdentity)
     (layout : ScratchLayout original.nextIdentity memory.nextIdentity [s0, s1, s2, s3])
     (state : VectorFrame program original entered current [left, right] output frame (fun _ => none) none)
@@ -117,7 +117,7 @@ theorem prepare_masks (program : CIL.Program) (method : Nat) (profile : CIL.Feat
     (found : program[method]? = some (prepareAddBody profile avx512)) (features : AddProfile profile avx512)
     (original memory entered current : Memory) (left right output s0 s1 s2 s3 : Reference) (frame : Frame)
     (originalCall : CallingConditions program original [left, right] [output])
-    (homes : WritableHomes entered memory.nextIdentity (prepareAddBody profile avx512).localKinds frame.locals)
+    (homes : CompleteWritableHomes entered memory.nextIdentity (prepareAddBody profile avx512).localKinds frame.locals)
     (bound : original.nextIdentity ≤ memory.nextIdentity)
     (layout : ScratchLayout original.nextIdentity memory.nextIdentity [s0, s1, s2, s3])
     (a b : BitVec 256)
@@ -191,7 +191,7 @@ theorem prepare_tail (program : CIL.Program) (method : Nat) (profile : CIL.Featu
     (found : program[method]? = some (prepareAddBody profile avx512)) (features : AddProfile profile avx512)
     (original memory entered current : Memory) (left right output s0 s1 s2 s3 : Reference) (frame : Frame)
     (originalCall : CallingConditions program original [left, right] [output])
-    (homes : WritableHomes entered memory.nextIdentity (prepareAddBody profile avx512).localKinds frame.locals)
+    (homes : CompleteWritableHomes entered memory.nextIdentity (prepareAddBody profile avx512).localKinds frame.locals)
     (bound : original.nextIdentity ≤ memory.nextIdentity)
     (layout : ScratchLayout original.nextIdentity memory.nextIdentity [s0, s1, s2, s3])
     (a b : BitVec 256) (known : Nat → Option CIL.Value)
@@ -255,9 +255,9 @@ theorem prepare_invoke (program : CIL.Program) (method : Nat) (profile : CIL.Fea
   let b := inputValue original right
   obtain ⟨frame, entered, setup, numeric, below, _⟩ := numeric_frame_setup
     (prepareAddBody profile avx512) prepareSpecs rfl rfl rfl rfl rfl memory args call.1.1
-  have homes : WritableHomes entered memory.nextIdentity
+  have homes : CompleteWritableHomes entered memory.nextIdentity
       (prepareAddBody profile avx512).localKinds frame.locals :=
-    UInt256Model.Safety.NumericHomes.writable numeric
+    CIL.Safety.NumericHomes.complete numeric
   have owned : ∀ id ∈ frame.owned, memory.nextIdentity ≤ id := fun id member =>
     ((enterFrame_fresh _ _ _ _ _ setup).2 id member).1
   have ownedOriginal : ∀ id ∈ frame.owned, original.nextIdentity ≤ id := fun id member =>

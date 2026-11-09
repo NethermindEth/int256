@@ -34,7 +34,7 @@ theorem PrivateWords.store {program : CIL.Program} {original entered current : M
     {kinds : List CIL.LocalKind}
     (state : PrivateWords program original entered current inputs outputs frame known)
     (enteredWF : entered.WellFormed)
-    (homes : WritableHomes entered original.nextIdentity kinds frame.locals)
+    (homes : CompleteWritableHomes entered original.nextIdentity kinds frame.locals)
     (index : Nat) (specified : kinds[index]? = some .word64) (value : BitVec 64)
     (pc : Nat) (args stack : List Value) :
     ∃ after,
@@ -45,7 +45,7 @@ theorem PrivateWords.store {program : CIL.Program} {original entered current : M
   obtain ⟨allocation, requirements⟩ := access_requirements ready
   have writable := state.authority.access ready (enteredWF.1 _ _ requirements.present).1
   obtain ⟨after, stepped, snapshots, wf, preserved, authority, written⟩ :=
-    state.snapshots.store homes state.call.1.1 reference value slot writable
+    state.snapshots.store homes.writable state.call.1.1 reference value slot writable
       (body := body) (pc := pc) (args := args) (stack := stack)
   refine ⟨after, stepped, state.call.after_write written, state.enteredBound,
     Nat.le_trans state.next (write_extends_allocations _ _ _ _ _ written).next,
@@ -61,7 +61,7 @@ theorem PrivateWords.after_word_call {program : CIL.Program} {original entered c
     {kinds : List CIL.LocalKind}
     (state : PrivateWords program original entered current inputs outputs frame known)
     (originalCall : CallingConditions program original inputs outputs)
-    (homes : WritableHomes entered original.nextIdentity kinds frame.locals)
+    (homes : CompleteWritableHomes entered original.nextIdentity kinds frame.locals)
     (fuel method : Nat) (args returned : List Value)
     (invoked : invoke program fuel method args current = .ok (after, returned))
     (index : Nat) (reference : Reference) (value : BitVec 64)
@@ -72,7 +72,7 @@ theorem PrivateWords.after_word_call {program : CIL.Program} {original entered c
     (outside : ∀ id, id < current.nextIdentity → id ≠ reference.allocation → ∀ offset,
       after.cells id offset = current.cells id offset) :
     PrivateWords program original entered after inputs outputs frame (rememberWord known index value) := by
-  have homeBound := homes.home_bound index .word64 reference slot
+  have homeBound := homes.writable.home_bound index .word64 reference slot
   have caller (id : Nat) (old : id < original.nextIdentity) (offset : Nat) :
       after.cells id offset = original.cells id offset :=
     (outside id (Nat.lt_of_lt_of_le old (Nat.le_trans state.enteredBound state.next))
@@ -87,7 +87,7 @@ theorem PrivateWords.after_word_call {program : CIL.Program} {original entered c
   exact ⟨call, state.enteredBound,
     Nat.le_trans state.next (invoke_preserves_caller_allocations program fuel method args returned current after invoked).next,
     state.authority.trans (authority.weaken state.next),
-    state.snapshots.after_effect homes state.call.1.1 index reference value slot loaded authority outside, caller⟩
+    state.snapshots.after_effect homes.writable state.call.1.1 index reference value slot loaded authority outside, caller⟩
 
 #print axioms PrivateWords.initial
 #print axioms PrivateWords.store

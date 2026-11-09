@@ -14,7 +14,7 @@ theorem run_local_word_call {program : CIL.Program} {method pc callee : Nat} {bo
     (state : PrivateWords program original entered current inputs outputs frame known)
     (originalCall : CallingConditions program original inputs outputs)
     (enteredWF : entered.WellFormed)
-    (homes : WritableHomes entered original.nextIdentity body.localKinds frame.locals)
+    (homes : CompleteWritableHomes entered original.nextIdentity body.localKinds frame.locals)
     (left right target result : Nat) (a b stored returned : BitVec 64)
     (leftKnown : known left = some a) (rightKnown : known right = some b)
     (targetKind : body.localKinds[target]? = some .word64)

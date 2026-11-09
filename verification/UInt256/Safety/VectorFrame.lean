@@ -14,13 +14,6 @@ import CIL.Safety.MethodContract
 namespace UInt256Model.Safety
 open CIL.Safety
 
-theorem NumericHomes.writable {memory : Memory} {lower : Nat} {specs slots}
-    (homes : NumericHomes memory lower specs slots) :
-    WritableHomes memory lower (numericKinds specs) slots := by
-  induction homes with
-  | nil lower => exact .nil lower
-  | cons reference spec fresh _ writable _ ih => exact .cons reference spec.kind fresh writable ih
-
 /-- A frame's remembered locals, its caller-visible effects so far and the output contents. -/
 structure VectorFrame (program : CIL.Program) (original entered current : Memory)
     (inputs : List Reference) (output : Reference) (frame : Frame)
@@ -77,7 +70,7 @@ theorem VectorFrame.store {program : CIL.Program} {original entered current : Me
     {known : Nat → Option CIL.Value} {stored : Option (BitVec 256)}
     (state : VectorFrame program original entered current inputs output frame known stored)
     (originalCall : CallingConditions program original inputs [output])
-    {kinds : List CIL.LocalKind} (homes : WritableHomes entered original.nextIdentity kinds frame.locals)
+    {kinds : List CIL.LocalKind} (homes : CompleteWritableHomes entered original.nextIdentity kinds frame.locals)
     {body : CIL.Method} {pc index : Nat} {args stack : List Value}
     (kind : CIL.LocalKind) (value : CIL.Value) (number : Nat)
     (specified : kinds[index]? = some kind) (fits : localNumber kind value = .ok number)
@@ -101,7 +94,7 @@ theorem VectorFrame.store {program : CIL.Program} {original entered current : Me
     Nat.le_trans state.next (write_extends_allocations _ _ _ _ _ written).next,
     state.authority.trans (write_preserves_access_below written _), ?_, ?_, ?_⟩
   · simpa only [result] using
-      state.locals.after_write homes index kind reference value number fits slot written
+      state.locals.after_write homes.writable index kind reference value number fits slot written
   · intro id old offset away
     have different : id ≠ reference.allocation := by omega
     exact (outside id different offset).trans (state.caller id old offset away)
@@ -141,7 +134,7 @@ theorem VectorFrame.run_store {program : CIL.Program} {original entered current 
     (post : Memory → List Value → Prop)
     (state : VectorFrame program original entered current inputs output frame known stored)
     (originalCall : CallingConditions program original inputs [output])
-    (homes : WritableHomes entered original.nextIdentity kinds frame.locals)
+    (homes : CompleteWritableHomes entered original.nextIdentity kinds frame.locals)
     (found : program[method]? = some body) (fetched : body.code[pc]? = some (.setLocal index))
     (specified : kinds[index]? = some kind) (fits : localNumber kind value = .ok number)
     (result : localResult kind value = value)
@@ -163,7 +156,7 @@ theorem VectorFrame.output_store {program : CIL.Program} {original entered curre
     {kinds : List CIL.LocalKind}
     (state : VectorFrame program original entered current inputs output frame known stored)
     (originalCall : CallingConditions program original inputs [output])
-    (homes : WritableHomes entered original.nextIdentity kinds frame.locals)
+    (homes : CompleteWritableHomes entered original.nextIdentity kinds frame.locals)
     (body : CIL.Method) (pc : Nat) (args rest : List Value) (value : BitVec 256) :
     ∃ after,
       step body (.memory .store256) pc args frame
@@ -181,12 +174,11 @@ theorem VectorFrame.output_store {program : CIL.Program} {original entered curre
   have separate (index : Nat) (kind : CIL.LocalKind) (reference : Reference)
       (slot : frame.locals[index]? = some (.bytes kind reference)) :
       reference.allocation ≠ output.allocation := fun same =>
-    Nat.lt_irrefl _ (Nat.lt_of_lt_of_le (same ▸ outputOld) (homes.home_bound index kind reference slot))
+    Nat.lt_irrefl _ (Nat.lt_of_lt_of_le (same ▸ outputOld) (homes.writable.home_bound index kind reference slot))
   refine ⟨after, ?_, afterCall, state.enteredWF, state.enteredBound,
     Nat.le_trans state.next (write_extends_allocations _ _ _ _ _ written).next,
     state.authority.trans (write_preserves_access_below written _), ?_, ?_, ?_⟩
-  · simp [step, cil_guard, observerCount, staticInstruction, memoryInstruction, storeValue, referenceAt, ordinaryAccessAlignment,
-      written, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
+  · cil_checked_step [written, storeValue, referenceAt, ordinaryAccessAlignment]
   · exact state.locals.after_write_apart written
       (fun index _ kind reference _ slot => Or.inl (separate index kind reference slot))
   · intro id old offset away

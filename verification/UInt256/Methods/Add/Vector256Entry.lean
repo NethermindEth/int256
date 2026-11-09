@@ -55,7 +55,7 @@ theorem entry_prepare (program : CIL.Program) (method prepare : Nat) (body : CIL
     (memory entered : Memory) (left right output : Reference) (frame : Frame)
     (call : CallingConditions program memory [left, right] [output])
     (setup : enterFrame body (binaryArguments left right output) memory = .ok (frame, entered))
-    (homes : WritableHomes entered memory.nextIdentity (entrySpecs.map NumericLocalSpec.kind) frame.locals)
+    (homes : CompleteWritableHomes entered memory.nextIdentity (entrySpecs.map NumericLocalSpec.kind) frame.locals)
     (post : Memory → List Value → Prop)
     (continuation : ∀ after,
       VectorFrame program memory entered after [left, right] output frame
@@ -88,7 +88,7 @@ theorem entry_prepare (program : CIL.Program) (method prepare : Nat) (body : CIL
     ⟨four_cells (P := fun _ cell => memory.nextIdentity ≤ cell.allocation ∧ cell.allocation < entered.nextIdentity)
       ⟨bound0, live h0 ready0⟩ ⟨bound1, live h1 ready1⟩ ⟨bound2, live h2 ready2⟩ ⟨bound3, live h3 ready3⟩,
      fun i j first second different hi hj =>
-      homes.distinct i j .vector256 .vector256 first second different (slots i first hi) (slots j second hj)⟩
+      homes.writable.distinct i j .vector256 .vector256 first second different (slots i first hi) (slots j second hj)⟩
   have scratch : ScratchCells entered [h0, h1, h2, h3] (fun _ => none) :=
     four_cells (P := fun index cell => access entered cell 32 1 true = .ok () ∧
         ∀ value, (fun _ => none : Nat → Option (BitVec 256)) index = some value →
@@ -149,11 +149,11 @@ theorem entry_setup (program : CIL.Program) (body : CIL.Method) (memory : Memory
     ∃ frame entered,
       enterFrame body (binaryArguments left right output) memory = .ok (frame, entered) ∧
       LiveState program (binaryArguments left right output) frame [] entered ∧
-      WritableHomes entered memory.nextIdentity (entrySpecs.map NumericLocalSpec.kind) frame.locals ∧
+      CompleteWritableHomes entered memory.nextIdentity (entrySpecs.map NumericLocalSpec.kind) frame.locals ∧
       ∀ id ∈ frame.owned, memory.nextIdentity ≤ id := by
   obtain ⟨frame, entered, setup, numeric, _, _⟩ := numeric_frame_setup body entrySpecs kinds initializers
     arguments parameters opaqueLocals memory (binaryArguments left right output) call.1.1
-  exact ⟨frame, entered, setup, call.binary_entry_live setup, UInt256Model.Safety.NumericHomes.writable numeric,
+  exact ⟨frame, entered, setup, call.binary_entry_live setup, CIL.Safety.NumericHomes.complete numeric,
     fun id member => ((enterFrame_fresh _ _ _ _ _ setup).2 id member).1⟩
 
 set_option hygiene false in

@@ -9,45 +9,6 @@ namespace UInt256Proof.Multiply.LimbStorage
 open CIL.Safety UInt256Model.Safety
 set_option maxRecDepth 4096
 
-private theorem s_arg {body : CIL.Method} {pc i : Nat} {args : List Value} {frame : Frame}
-    {stack : List Value} {m : Memory} {r : Reference}
-    (h : args[i]? = some (.reference (.address r))) (formed : form m r = .ok r) :
-    step body (.arg i) pc args frame stack m = .ok (.next (pc + 1) (.reference (.address r) :: stack) frame m) := by
-  unfold step
-  simp only [cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, h, checkedValue, formValue, formed, checkedAt, Except.mapError, Bind.bind, Except.bind,
-    Pure.pure, Except.pure]
-
-private theorem s_skipInit {body : CIL.Method} {pc : Nat} {args : List Value} {frame : Frame}
-    {rest : List Value} {m : Memory} {r : Reference} (formed : form m r = .ok r) :
-    step body .skipInit pc args frame (.reference (.address r) :: rest) m = .ok (.next (pc + 1) rest frame m) := by
-  unfold step instruction
-  simp only [cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, show pureArity .skipInit = none from rfl, formValue, formed, checkedAt, Except.mapError,
-    Bind.bind, Except.bind, Pure.pure, Except.pure]
-
-private theorem s_fieldAddress {body : CIL.Method} {pc offset : Nat} {args : List Value} {frame : Frame}
-    {rest : List Value} {m : Memory} {r result : Reference}
-    (added : add m r 1 (BitVec.ofNat 64 offset) = .ok result) :
-    step body (.fieldAddress offset) pc args frame (.reference (.address r) :: rest) m =
-      .ok (.next (pc + 1) (.reference (.address result) :: rest) frame m) := by
-  unfold step instruction
-  simp only [cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, show pureArity (.fieldAddress offset) = none from rfl, added, checkedAt, Except.mapError,
-    Bind.bind, Except.bind, Pure.pure, Except.pure]
-
-private theorem s_asRef {body : CIL.Method} {pc : Nat} {args : List Value} {frame : Frame}
-    {rest : List Value} {m : Memory} {r : Reference} (formed : form m r = .ok r) :
-    step body (.memory .asRef) pc args frame (.reference (.address r) :: rest) m =
-      .ok (.next (pc + 1) (.reference (.address r) :: rest) frame m) := by
-  cil_checked_step [formed]
-
-private theorem s_store64 {body : CIL.Method} {pc : Nat} {args : List Value} {frame : Frame}
-    {rest : List Value} {m m' : Memory} {r : Reference} {bits : BitVec 64}
-    (written : write m r (numberBytes bits.toNat 8) 1 = .ok m') :
-    step body .store64 pc args frame (.scalar (.i64 bits) :: .reference (.address r) :: rest) m =
-      .ok (.next (pc + 1) rest frame m') := by
-  unfold step instruction storeValue
-  simp only [cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, show pureArity .store64 = none from rfl, referenceAt, ordinaryAccessAlignment, written, checkedAt,
-    Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-
 def body (profile : CIL.FeatureProfile) : CIL.Method :=
   { profile := profile, locals := [], returnsValue := false, code := [
     .arg 0, .skipInit, .arg 0, .fieldAddress 0, .memory .asRef, .arg 1, .store64,
@@ -58,12 +19,6 @@ def body (profile : CIL.FeatureProfile) : CIL.Method :=
 def arguments (output : Reference) (w0 w1 w2 w3 : BitVec 64) : List Value :=
   [.reference (.address output), .scalar (.i64 w0), .scalar (.i64 w1),
     .scalar (.i64 w2), .scalar (.i64 w3)]
-
-macro "limb_storage_step" facts:term,* : tactic =>
-  `(tactic| simp [step, cil_guard, observerCount, arguments, checkedValue, numericValue, formValue,
-    pureArity, instruction, staticInstruction, memoryInstruction, storeValue, referenceAt, ordinaryAccessAlignment,
-    checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure,
-    cil_code, $[$facts:term],*])
 
 /-- The complete limb storage body is checked once, independently of extraction.
     Readback, caller permissions and the write footprint share this execution. -/
@@ -88,34 +43,13 @@ theorem store_limbs_safe (profile : CIL.FeatureProfile) (program : CIL.Program) 
   have f1 := c1.output_formed (by simp : output ∈ [output])
   have f2 := c2.output_formed (by simp : output ∈ [output])
   have f3 := c3.output_formed (by simp : output ∈ [output])
-  apply invoke_of_run found
-  · simp [arguments, checkedValue, numericValue, formValue, checkedAt, f0,
-      Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-  · rfl
-  · refine (run_next found rfl (s_arg (by rfl) f0)).trans ?_
-    refine (run_next found rfl (s_skipInit f0)).trans ?_
-    refine (run_next found rfl (s_arg (by rfl) f0)).trans ?_
-    refine (run_next found rfl (s_fieldAddress (call.output_limb_address (by simp : output ∈ [output]) 0))).trans ?_
-    refine (run_next found rfl (s_asRef (call.output_limb_formed (by simp : output ∈ [output]) 0))).trans ?_
-    refine (run_next found rfl (rfl)).trans ?_
-    refine (run_next found rfl (s_store64 h0)).trans ?_
-    refine (run_next found rfl (s_arg (by rfl) f1)).trans ?_
-    refine (run_next found rfl (s_fieldAddress (c1.output_limb_address (by simp : output ∈ [output]) 1))).trans ?_
-    refine (run_next found rfl (s_asRef (c1.output_limb_formed (by simp : output ∈ [output]) 1))).trans ?_
-    refine (run_next found rfl (rfl)).trans ?_
-    refine (run_next found rfl (s_store64 h1)).trans ?_
-    refine (run_next found rfl (s_arg (by rfl) f2)).trans ?_
-    refine (run_next found rfl (s_fieldAddress (c2.output_limb_address (by simp : output ∈ [output]) 2))).trans ?_
-    refine (run_next found rfl (s_asRef (c2.output_limb_formed (by simp : output ∈ [output]) 2))).trans ?_
-    refine (run_next found rfl (rfl)).trans ?_
-    refine (run_next found rfl (s_store64 h2)).trans ?_
-    refine (run_next found rfl (s_arg (by rfl) f3)).trans ?_
-    refine (run_next found rfl (s_fieldAddress (c3.output_limb_address (by simp : output ∈ [output]) 3))).trans ?_
-    refine (run_next found rfl (s_asRef (c3.output_limb_formed (by simp : output ∈ [output]) 3))).trans ?_
-    refine (run_next found rfl (rfl)).trans ?_
-    refine (run_next found rfl (s_store64 h3)).trans ?_
-    refine (run_return found rfl rfl rfl).trans ?_
-    rfl
+  have member : output ∈ [output] := by simp
+  cil_checked_steps [found, body, arguments, f0, f1, f2, f3, h0, h1, h2, h3,
+    call.output_limb_address member 0, c1.output_limb_address member 1,
+    c2.output_limb_address member 2, c3.output_limb_address member 3,
+    call.output_limb_formed member 0, c1.output_limb_formed member 1,
+    c2.output_limb_formed member 2, c3.output_limb_formed member 3,
+    storeValue, referenceAt, ordinaryAccessAlignment]
 
 #print axioms store_limbs_safe
 

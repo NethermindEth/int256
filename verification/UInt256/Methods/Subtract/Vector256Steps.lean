@@ -1,3 +1,4 @@
+import CIL.Safety.SymbolicExecution
 import UInt256.Methods.Subtract.Vector256Bodies
 import UInt256.Methods.Subtract.Vector256Math
 import UInt256.Safety.VectorFrame
@@ -116,12 +117,8 @@ private theorem step_add_offset {body : CIL.Method} {pc : Nat} {args rest : List
     step body (.memory (.add 32 false)) pc args frame
       (.scalar (.i64 offset) :: .reference (.address reference) :: rest) memory =
       .ok (.next (pc + 1) (.reference (.address result) :: rest) frame memory) := by
-  refine step_memory ?_ rfl
-  show (checkedAt (.address reference) 0 (add memory reference 32 (BitVec.ofInt 64 (offset.toNat : Int))) >>=
-    fun address => pure (memory, Value.reference (.address address) :: rest) :
-      ExecutionResult (Memory × List Value)) = _
-  rw [added]
-  rfl
+  cil_checked_step [added, memoryInstruction, referenceAddInstruction, displaceReference,
+    referenceAt, CIL.offsetValue]
 
 private theorem step_load256 {body : CIL.Method} {pc : Nat} {args rest : List Value}
     {frame : Frame} {memory : Memory} {reference : Reference} {value : CIL.Value}
@@ -182,7 +179,7 @@ theorem impl_inputs (program : CIL.Program) (method lookup : Nat) (profile : CIL
     (features : ImplProfile profile avx512 bmi1)
     (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (originalCall : CallingConditions program original [left, right] [output])
-    (homes : WritableHomes entered original.nextIdentity
+    (homes : CompleteWritableHomes entered original.nextIdentity
       (subtractImplBody profile avx512 bmi1 lookup).localKinds frame.locals)
     (state : VectorFrame program original entered current [left, right] output frame (fun _ => none) none)
     (post : Memory → List Value → Prop)
@@ -236,7 +233,7 @@ theorem impl_masks (program : CIL.Program) (method lookup : Nat) (profile : CIL.
     (features : ImplProfile profile avx512 bmi1)
     (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (originalCall : CallingConditions program original [left, right] [output])
-    (homes : WritableHomes entered original.nextIdentity
+    (homes : CompleteWritableHomes entered original.nextIdentity
       (subtractImplBody profile avx512 bmi1 lookup).localKinds frame.locals)
     (a b : BitVec 256)
     (state : VectorFrame program original entered current [left, right] output frame (differenceLocals a b) none)
@@ -318,7 +315,7 @@ theorem impl_decision (program : CIL.Program) (method lookup : Nat) (profile : C
     (features : ImplProfile profile avx512 bmi1)
     (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (originalCall : CallingConditions program original [left, right] [output])
-    (homes : WritableHomes entered original.nextIdentity
+    (homes : CompleteWritableHomes entered original.nextIdentity
       (subtractImplBody profile avx512 bmi1 lookup).localKinds frame.locals)
     (a b : BitVec 256)
     (state : VectorFrame program original entered current [left, right] output frame (maskLocals a b) none)
@@ -424,7 +421,7 @@ theorem impl_index (program : CIL.Program) (method lookup : Nat) (profile : CIL.
     (features : ImplProfile profile avx512 bmi1)
     (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (originalCall : CallingConditions program original [left, right] [output])
-    (homes : WritableHomes entered original.nextIdentity
+    (homes : CompleteWritableHomes entered original.nextIdentity
       (subtractImplBody profile avx512 bmi1 lookup).localKinds frame.locals)
     (a b : BitVec 256) (value : BitVec 256)
     (state : VectorFrame program original entered current [left, right] output frame (equalLocals a b) (some value))
@@ -481,7 +478,7 @@ theorem impl_slow_tail (program : CIL.Program) (method lookup : Nat) (profile : 
     (features : ImplProfile profile avx512 bmi1)
     (original entered current : Memory) (left right output : Reference) (frame : Frame)
     (originalCall : CallingConditions program original [left, right] [output])
-    (homes : WritableHomes entered original.nextIdentity
+    (homes : CompleteWritableHomes entered original.nextIdentity
       (subtractImplBody profile avx512 bmi1 lookup).localKinds frame.locals)
     (a b : BitVec 256) (value : BitVec 256)
     (state : VectorFrame program original entered current [left, right] output frame (slowLocals a b) (some value))
