@@ -107,7 +107,8 @@ string Refutation(string fixture, string signature, string statement)
                 Extracted.program 0 1 1024 (by rfl) memory {first} {second}
                 (by rfl) (by rfl) (by rfl) (by rfl) ⟨_, by rfl⟩
             """;
-        observedProof = "simpa [Except.map, scalarOperatorArguments, scalarArguments, readOnlyArguments] " +
+        observedProof = "simpa [Extracted.entryIndex, Except.map, scalarOperatorArguments, " +
+            "scalarArguments, readOnlyArguments] " +
             "using congrArg (fun result => result.map Prod.snd) observed";
     }
     (string head, string lemma) = shape.Kind switch

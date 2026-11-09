@@ -22,16 +22,17 @@ theorem load_input {program : CIL.Program} {memory : Memory} {inputs outputs : L
   simp [instruction, cil_guard, observerCount, dereference, ordinaryAccessAlignment, loaded, inputBytes, checkedAt,
     Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
-theorem cast_input (memory : Memory) (input : Reference) (rest : List Value) :
-    memoryInstruction (.bitcastValue (.aggregate 32) .vector256)
-      (.scalar (.aggregate (inputBytes memory input)) :: rest) memory =
-      .ok (memory, .scalar (.v256 (inputValue memory input)) :: rest) := by
-  simp [memoryInstruction, bitcastValue, valueSnapshot, snapshotValue, CIL.SnapshotShape.width,
-    inputBytes, List.map_map, Function.comp_def, byteNumber_snapshot, inputValue,
-    Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
+/-- Reinterpreting the input's bytes as a vector preserves its UInt256 value. -/
+theorem cast_input (memory : Memory) (input : Reference) :
+    bitcastValue (.aggregate 32) .vector256 (.aggregate (inputBytes memory input)) =
+      .ok (.v256 (inputValue memory input)) := by
+  simp [bitcastValue, valueSnapshot, snapshotValue, CIL.SnapshotShape.width,
+    inputBytes, List.map_map, Function.comp_def, inputValue, Pure.pure, Except.pure]
 
   rw [byteNumber_snapshot (fun offset => (memory.cells input.allocation offset).bits) input.offset 32]
   rfl
+
+#print axioms cast_input
 
 def body (narrow : Bool) (profile : CIL.FeatureProfile) : CIL.Method :=
   { profile := profile, returnsValue := true, locals := [], code := [
@@ -64,17 +65,8 @@ theorem run64 (profile : CIL.FeatureProfile) (program : CIL.Program) (index : Na
   have casted := cast_input memory left
   generalize valueEq : inputValue memory left = value at *
   refine ⟨8, ?_⟩
-  iterate 6
-    apply Eq.trans
-    · apply run_next found
-      · simp only [body]; rfl
-      · simp (config := { implicitDefEqProofs := false })
-          [body, step, cil_guard, observerCount, scalarArguments, checkedValue, numericValue, formValue, formed,
-            loaded, casted, staticInstruction, checkedIntrinsic, pureArity, scalars, CIL.step.eq_def, CIL.Intrinsic.available,
-            eval_scalar32, eval_scalar64, eval_xor, eval_zero, eval_equal,
-            checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-        try exact ⟨rfl, rfl, rfl, rfl⟩
-        done
+  cil_checked_steps 6 [body, scalarArguments, formed, loaded, casted,
+    eval_scalar32, eval_scalar64, eval_equal]
   simp [run, found, body, step, cil_guard, observerCount, checkedValue, numericValue, CIL.NarrowKind.extend,
     Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   split <;> rename_i h <;> simp [h, eq_comm]
@@ -93,17 +85,8 @@ theorem run32 (profile : CIL.FeatureProfile) (program : CIL.Program) (index : Na
   have casted := cast_input memory left
   generalize valueEq : inputValue memory left = value at *
   refine ⟨8, ?_⟩
-  iterate 6
-    apply Eq.trans
-    · apply run_next found
-      · simp only [body]; rfl
-      · simp (config := { implicitDefEqProofs := false })
-          [body, step, cil_guard, observerCount, scalarArguments, checkedValue, numericValue, formValue, formed,
-            loaded, casted, staticInstruction, checkedIntrinsic, pureArity, scalars, CIL.step.eq_def, CIL.Intrinsic.available,
-            eval_scalar32, eval_scalar64, eval_xor, eval_zero, eval_equal,
-            checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-        try exact ⟨rfl, rfl, rfl, rfl⟩
-        done
+  cil_checked_steps 6 [body, scalarArguments, formed, loaded, casted,
+    eval_scalar32, eval_scalar64, eval_equal]
   simp [run, found, body, step, cil_guard, observerCount, checkedValue, numericValue, CIL.NarrowKind.extend,
     Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   split <;> rename_i h <;> simp [h, eq_comm]
