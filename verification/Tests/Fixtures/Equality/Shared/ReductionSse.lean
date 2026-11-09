@@ -75,23 +75,12 @@ theorem sse_run (profile : CIL.FeatureProfile) (program : CIL.Program) (index : 
   generalize valueLeft : inputValue memory left = vl at *
   generalize valueRight : inputValue memory right = vr at *
   refine ⟨26, ?_⟩
-  iterate 25
-    apply Eq.trans
-    · apply run_next found
-      · simp only [body]; rfl
-      · simp (config := { implicitDefEqProofs := false })
-          [body, step, cil_guard, observerCount, checkedIntrinsic, readOnlyArguments, checkedValue, numericValue, formValue, fl, fr,
-            hl0, hr0, hl1, hr1, al1, ar1,
-            locals, storeLocal, loadLocal, pureArity, scalars, staticInstruction, memoryInstruction,
-            CIL.step.eq_def, CIL.Intrinsic.available, intrinsic_equal128, intrinsic_xor128, intrinsic_or128, intrinsic_zero128,
-            difference, instruction, CIL.offsetValue, referenceAt,
-             checkedAt,
-            Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-        try (exact ⟨rfl, rfl, rfl, rfl⟩)
-        done
+  cil_checked_steps 25 [body, readOnlyArguments, fl, fr, hl0, hr0, hl1, hr1, al1, ar1,
+    locals, intrinsic_equal128, intrinsic_xor128, intrinsic_or128, intrinsic_zero128, difference]
   split <;> simp [run, found, body, step, cil_guard, observerCount, checkedValue, numericValue, leaveFrame, CIL.NarrowKind.extend, * ,
     Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-
+  · exact difference.mp ‹_›
+  · exact fun equal => ‹¬ _› (difference.mpr equal)
 
 #print axioms sse_run
 end EqualityFixture.LeafSse
