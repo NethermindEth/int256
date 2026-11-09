@@ -47,15 +47,9 @@ theorem store_limbs_safe (profile : CIL.FeatureProfile) (program : CIL.Program) 
   · simp [arguments, checkedValue, numericValue, formValue, checkedAt, f0,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   · rfl
-  · iterate 22
-      apply Eq.trans
-      · apply run_next found
-        · simp only [body]; rfl
-        · limb_storage_step f0, f1, f2, f3, l1, l2, l3, a0, a1, a2, a3, h0, h1, h2, h3
-          try exact ⟨rfl, rfl, rfl, rfl⟩
-          done
-    simp [run, found, body, step, cil_guard, observerCount, leaveFrame, Except.mapError,
-      Bind.bind, Except.bind, Pure.pure, Except.pure]
+  · cil_checked_steps [found, body, arguments, storeValue, referenceAt, ordinaryAccessAlignment,
+      f0, f1, f2, f3,
+      l1, l2, l3, a0, a1, a2, a3, h0, h1, h2, h3]
 
 /-- Reversed limb storage: same caller-visible contract with the word arguments reversed. -/
 theorem store_limbs_readable_contract (profile : CIL.FeatureProfile)

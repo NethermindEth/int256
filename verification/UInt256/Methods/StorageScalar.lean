@@ -38,12 +38,6 @@ private theorem limb_address {program : CIL.Program} {memory : Memory}
   obtain ⟨allocation, ready⟩ := access_requirements (call.1.2.2 (wordView output) (by simp))
   exact ready.add_slice call.1.1 8 index.val 8 (by omega) (by dsimp [wordView] at ready ⊢; omega)
 
-macro "storage_step" facts:term,* : tactic =>
-  `(tactic| simp [step, cil_guard, observerCount, arguments, checkedValue, numericValue, formValue,
-    pureArity, instruction, staticInstruction, memoryInstruction, CIL.offsetValue, storeValue, referenceAt, ordinaryAccessAlignment,
-    checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure,
-    cil_code, $[$facts:term],*])
-
 /-- The complete constructor body is checked once, independently of extraction.
     Readback, caller permissions and the write footprint share this execution. -/
 theorem store_limbs_safe (profile : CIL.FeatureProfile) (scalar : profile.vector256Accelerated = false) (program : CIL.Program) (index : Nat)
@@ -76,18 +70,9 @@ theorem store_limbs_safe (profile : CIL.FeatureProfile) (scalar : profile.vector
   · simp [arguments, checkedValue, numericValue, formValue, checkedAt, f0,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   · rfl
-  · iterate 23
-      apply Eq.trans
-      · apply run_next found
-        · simp only [body]; rfl
-        · first
-          | exact UInt256Proof.Bitwise.feature_disabled (body profile) scalar _ _ _ _ _
-          | exact UInt256Proof.Bitwise.scalar_branch _ _ _ _ _ _ _
-          | storage_step f0, f1, f2, f3, a0, a1, a2, a3, h0, h1, h2, h3
-            try exact ⟨rfl, rfl, rfl, rfl⟩
-            done
-    simp [run, found, body, step, cil_guard, observerCount, leaveFrame, Except.mapError,
-      Bind.bind, Except.bind, Pure.pure, Except.pure]
+  · cil_checked_steps [found, body, arguments, storeValue, referenceAt, ordinaryAccessAlignment,
+      scalar, f0, f1, f2, f3,
+      a0, a1, a2, a3, h0, h1, h2, h3]
 
 #print axioms store_limbs_safe
 
@@ -128,7 +113,7 @@ theorem store_limbs_contract (profile : CIL.FeatureProfile) (scalar : profile.ve
     exact vector256_bytes_roundtrip bytes length
   have readback : read result output 32 1 = .ok (numberBytes (packed w0 w1 w2 w3).toNat 32) := by
     rw [encoded]; exact loaded
-  exact ⟨result, executed, valid, outside, authority, readback, loadLocal_of_read readback⟩
+  exact ⟨result, executed, valid, outside, authority, readback, loadLocal_of_read (kind := .aggregate 32) readback⟩
 
 #print axioms store_limbs_contract
 
