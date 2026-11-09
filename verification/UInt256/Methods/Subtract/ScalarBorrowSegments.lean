@@ -41,7 +41,7 @@ theorem scalar_indexed_borrow (contract : BorrowHelperContract Extracted.program
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     exact ⟨rfl, rfl, rfl⟩
   · exact ⟨wellFormed, incoming, borrowRead, borrowWrite, resultWrite, disjoint⟩
-  · rintro after _ - formed world framed ⟨_, rfl, math⟩
+  · rintro after _ - formed world _ framed ⟨_, rfl, math⟩
     exact continuation after formed world framed math
 
 theorem scalar_borrow_segment_checked (contract : BorrowHelperContract Extracted.program Extracted.subtractWithBorrowIndex) (segment : Fin 3) (left right output : Reference)
