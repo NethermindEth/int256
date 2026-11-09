@@ -285,19 +285,13 @@ Boolean return normalization. Extraction output remains ignored; the expected
 UInt256 helper bodies in `PrimitiveLeaf` are checked against that output by each
 gate. The extractor and CIL semantics remain upstream.
 
-`manifests/migration-status.json` records the extraction inventory and its tested
-LeanCIL revision separately from completed gates. All 87 scalar targets now
-extract. The pinned revision includes the fixes for multiplication (`Math.BigMul`,
-#36), unmanaged aggregate byref operations (#37), aggregate/vector bitcasts
-(#38), generated translation proof composition (#39), aggregate proof helpers
-(#40), authenticated local consumer reuse (#42), `ReadOnlySpan<byte>`
-static lookup tables (#53) and linear per-site evidence checks (#54).
+`manifests/gates.json` registers 188 method/profile pairs covering all 87 scalar targets
+and distinct accelerated implementations. Extraction admission is separate from certification:
+a certificate requires a successful proof of the selected contract for the extracted method.
+The migration inventory records its own tested revision and validation evidence.
 
-All scalar ports have registered certificates, and `remainingPorts` is empty.
-All 256 gates were recertified on LeanCIL `17f489a` in CI run 39696707787, and every
-regression runner passed; `migration-status.json` records the per-runner counts. `BitwiseRegression.cs`
-and `ShiftRegression.cs` take a profile argument (default `scalar`), so a
-complete run also passes `x64-v3`.
+`BitwiseRegression.cs` and `ShiftRegression.cs` take a profile argument (default `scalar`),
+so a complete run also passes `x64-v3`.
 
 ## Regression fixtures
 
