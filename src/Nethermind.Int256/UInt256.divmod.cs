@@ -2243,6 +2243,9 @@ public readonly partial struct UInt256
             nd0 = d0 << shift;
             nd1 = (d1 << shift) | (d0 >> rshift);
             nd2 = (d2 << shift) | (d1 >> rshift);
+
+            // Same zero leading digit test as the 256-bit reducer, on the limbs before the shift.
+            if (u7 < d2 && (u7 != 0 || (u6 != 0 ? u6 : (u5 != 0 ? u5 : u4)) < d2)) uLen--;
         }
 
         ref ulong un0 = ref unBuf.w0;
@@ -2462,6 +2465,12 @@ public readonly partial struct UInt256
             nd1 = (d1 << shift) | (d0 >> rshift);
             nd2 = (d2 << shift) | (d1 >> rshift);
             nd3 = (d3 << shift) | (d2 >> rshift);
+
+            // The no-shift test before normalisation: a top limb below d3 keeps the extra limb at zero
+            // (d3 < 2^rshift) and the next window below nd3, so the leading quotient digit is zero. A
+            // product of operands already below d always passes. u7 >= d3 is the only test that
+            // unreduced full-width operands pay; u7 == 0 passes it and picks the lower top limb.
+            if (u7 < d3 && (u7 != 0 || (u6 != 0 ? u6 : (u5 != 0 ? u5 : u4)) < d3)) uLen--;
         }
 
         ref ulong un0 = ref unBuf.w0;
