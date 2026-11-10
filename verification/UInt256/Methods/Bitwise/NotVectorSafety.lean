@@ -35,13 +35,12 @@ theorem run_leaf (profile : CIL.FeatureProfile)
     (by rw [length]; decide) (by rw [length]; decide)
   simp only [Nat.add_zero, length] at written readback
   refine ⟨final, ?_, readback, retained.1.writable (wordView output) (by simp), outside⟩
-  simp only [bits, BitVec.toNat_not] at written length
   have fl := call.input_formed (reference := input) (by simp)
   have fo := call.output_formed (reference := output) (by simp)
   have hl := input_encoded program memory [input] [output] call input (by simp)
-  cil_checked_steps [found, body, unaryArguments, fl, fo, hl, intrinsic_step,
-    aggregate_to_vector, vector_to_aggregate, length, written, bits,
-    instruction, checkedAt, dereference, storeValue, referenceAt, ordinaryAccessAlignment]
+  have inputSnapshot := loadSnapshot_aggregate_of_read hl
+  cil_checked_steps [found, body, unaryArguments, fl, fo, inputSnapshot, intrinsic_step,
+    aggregate_to_vector, vector_to_aggregate, length, written, bits]
 
 theorem leaf_result (profile : CIL.FeatureProfile)
     (program : CIL.Program) (index : Nat) (found : program[index]? = some (body profile))

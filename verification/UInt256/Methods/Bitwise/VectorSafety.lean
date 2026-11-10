@@ -45,9 +45,10 @@ theorem run_leaf (profile : CIL.FeatureProfile) (operation : Binary)
   have fo := call.output_formed (reference := output) (by simp)
   have hl := input_encoded program memory [left,right] [output] call left (by simp)
   have hr := input_encoded program memory [left,right] [output] call right (by simp)
-  cil_checked_steps [found, body, binaryArguments, fl, fr, fo, hl, hr,
-    intrinsic_step, aggregate_to_vector, vector_to_aggregate, length, written, bits,
-    instruction, checkedAt, dereference, storeValue, referenceAt, ordinaryAccessAlignment]
+  have leftSnapshot := loadSnapshot_aggregate_of_read hl
+  have rightSnapshot := loadSnapshot_aggregate_of_read hr
+  cil_checked_steps [found, body, binaryArguments, fl, fr, fo, leftSnapshot, rightSnapshot,
+    intrinsic_step, aggregate_to_vector, vector_to_aggregate, length, written, bits]
 
 theorem leaf_result (profile : CIL.FeatureProfile) (operation : Binary)
     (program : CIL.Program) (index : Nat) (found : program[index]? = some (body profile operation))
