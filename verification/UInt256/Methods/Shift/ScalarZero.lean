@@ -32,8 +32,12 @@ theorem shift_zero_output (memory : Memory) (inputs outputs : List Reference)
   have done := continuation after loaded afterCall outside
   have formed := call.output_formed member
   have found := bodyFound
-  cil_contract_steps [argument, formed, writtenZero, formValue, instruction, ordinaryAccessAlignment,
-    staticInstruction, memoryInstruction, storeValue, referenceAt] until done
+  have initialized : step (scalarBody profile direction storage) (.initAggregate 32) 15 args frame
+      [.reference (.address output)] memory = .ok (.next 16 [] frame after) := by
+    rw [step_initAggregate_reference_eq]
+    simp only [referenceAt, ordinaryAccessAlignment, writtenZero, checkedAt, Except.mapError,
+      Bind.bind, Except.bind, Pure.pure, Except.pure]
+  cil_contract_steps [argument, formed, initialized] until done
 
 /-- The zero branch returns normally and retires only private frame storage. -/
 theorem shift_zero_finish (memory : Memory) (inputs outputs : List Reference)

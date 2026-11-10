@@ -102,7 +102,7 @@ theorem shift_negative_count_guard (memory : Memory) (frame : Frame) (args : Lis
         .ok (final, returned) ∧ post final returned := by
   have found := bodyFound
   cil_contract_steps 4 [argument]
-  exact continuation
+  simpa only [bne_iff_ne, BitVec.ofNat_eq_ofNat] using continuation
 
 /-- Reset the whole-limb count only on the selected negative-count route. -/
 theorem shift_negative_count_reset (boundary : Nat) (entered current : Memory)
