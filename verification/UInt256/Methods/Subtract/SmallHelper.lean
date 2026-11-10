@@ -9,6 +9,9 @@ import UInt256.Safety.CallerSetup
 import UInt256.Arithmetic.Borrow
 import UInt256.Methods.Reporting.Arithmetic
 import UInt256.Methods.Multiply.LimbStorage
+import CIL.Safety.WeakestPrecondition
+
+/-! Checked small-word subtraction retains saved inputs and returns the exact borrow flag. -/
 
 namespace UInt256Proof.Subtract.Profile
 
@@ -234,13 +237,10 @@ theorem small_input_prefix_checked (program : CIL.Program) (method storage : Nat
     (homes : WordHomes entered original.nextIdentity smallWordSpecs frame.locals)
     (post : Memory → List Value → Prop)
     (continuation : ∀ after, SmallSaved program original entered after input output word frame.locals 4 →
-      ∃ fuel result returned,
-        run program fuel method 16 (smallArguments input output word) frame
-          [.scalar (.i64 word), .scalar (.i64 (inputLimb original input 0))] after = .ok (result, returned) ∧
-        post result returned) :
-    ∃ fuel result returned,
-      run program fuel method 0 (smallArguments input output word) frame [] entered = .ok (result, returned) ∧
-        post result returned := by
+      WP (fun fuel => run program fuel method 16 (smallArguments input output word) frame
+          [.scalar (.i64 word), .scalar (.i64 (inputLimb original input 0))] after) post) :
+    WP (fun fuel => run program fuel method 0
+      (smallArguments input output word) frame [] entered) post := by
   have enteredCall := call.after_frame_setup setup
   have initial : SmallSaved program original entered entered input output word frame.locals 0 :=
     ⟨enteredCall, enterFrame_preserves_caller_memory _ _ _ _ _ setup,
@@ -358,16 +358,14 @@ theorem small_branch_prefix (program : CIL.Program) (method storage : Nat) (prof
     (reads : ∀ i, read memory (homes i) 8 1 = .ok (numberBytes
       (if h : i.val < 3 then words ⟨i.val + 1, by omega⟩ else words 0 - word).toNat 8))
     (post : Memory → List Value → Prop)
-    (continuation : ∃ fuel result returned,
-      run program fuel method
+    (continuation : WP (fun fuel => run program fuel method
         (smallStoreCall (smallSelectedBranch words word).val) (smallArguments input output word) frame
         [.scalar (.i64 (smallDifference words word 3)), .scalar (.i64 (smallDifference words word 2)),
          .scalar (.i64 (smallDifference words word 1)), .scalar (.i64 (smallDifference words word 0)),
-         .reference (.address output)] memory = .ok (result, returned) ∧ post result returned) :
-    ∃ fuel result returned,
-      run program fuel method 16
+         .reference (.address output)] memory) post) :
+    WP (fun fuel => run program fuel method 16
         (smallArguments input output word) frame [.scalar (.i64 word), .scalar (.i64 (words 0))]
-        memory = .ok (result, returned) ∧ post result returned := by
+        memory) post := by
   have s0 := slots 0
   have s1 := slots 1
   have s2 := slots 2
@@ -503,12 +501,10 @@ theorem small_finish (program : CIL.Program) (method storage : Nat) (profile : C
       [.scalar (.i64 (words 3)), .scalar (.i64 (words 2)), .scalar (.i64 (words 1)),
         .scalar (.i64 (words 0)), .reference (.address output)] current =
       .ok (.call storage (UInt256Proof.Multiply.LimbStorage.arguments output (words 0) (words 1) (words 2) (words 3)) [] current) := by
-    simp [step, cil_guard, observerCount, UInt256Proof.Multiply.LimbStorage.arguments, checkedValue, numericValue,
-      formValue, formed, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-    try exact ⟨rfl, rfl⟩
+    cil_checked_step [UInt256Proof.Multiply.LimbStorage.arguments, formed]
   have returned := small_return program method storage profile found branch (smallArguments input output word) frame stored
-  obtain ⟨fuel, executed⟩ := run_call_exists found fetched stepped ⟨childFuel, invoked⟩ ⟨2, returned⟩
-  refine ⟨fuel, leaveFrame frame stored, _, executed, ?_⟩
+  apply run_call_post found fetched stepped ⟨childFuel, invoked⟩
+  refine ⟨2, leaveFrame frame stored, _, returned, ?_⟩
   obtain ⟨allocation, present, _, _⟩ := formed_reference_live _ _ _
     (call.output_formed (by simp : output ∈ [output]))
   have old := (call.1.1.1 _ _ present).1

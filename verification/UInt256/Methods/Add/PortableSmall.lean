@@ -2,6 +2,9 @@ import UInt256.Generated.AddTemplates
 import CIL.Safety.Equations
 import UInt256.Methods.Add.ARMSmallContract
 import CIL.Safety.MethodContract
+import CIL.Safety.WeakestPrecondition
+
+/-! Checked scalar addition preserves saved inputs across private stores and limb helper calls. -/
 
 namespace UInt256Proof.Add.Safety
 
@@ -60,14 +63,10 @@ theorem portable_small_input_prefix (program : CIL.Program) (method storage : Na
         frame (.scalar (.i64 (words i)) :: rest) (states i.val) =
           .ok (.next (pc + 1) rest frame (states (i.val + 1))))
     (post : Memory → List Value → Prop)
-    (continuation : ∃ fuel result returned,
-      run program fuel method 55
-        (armSmallArguments input output word) frame [] (states 4) = .ok (result, returned) ∧
-      post result returned) :
-    ∃ fuel result returned,
-      run program fuel method 0
-        (armSmallArguments input output word) frame [] (states 0) = .ok (result, returned) ∧
-      post result returned := by
+    (continuation : WP (fun fuel => run program fuel method 55
+        (armSmallArguments input output word) frame [] (states 4)) post) :
+    WP (fun fuel => run program fuel method 0
+        (armSmallArguments input output word) frame [] (states 0)) post := by
     have f0 := formed 0
     have f1 := formed 1
     have f2 := formed 2
@@ -123,14 +122,10 @@ theorem portable_small_input_prefix_checked (program : CIL.Program) (method stor
     (homes : NumericHomes entered original.nextIdentity armSmallSpecs frame.locals)
     (post : CIL.Safety.Memory → List Value → Prop)
     (continuation : ∀ after, ARMSmallSaved program original entered after input output frame 4 →
-      ∃ fuel result returned,
-        run program fuel method 55
-          (armSmallArguments input output word) frame [] after = .ok (result, returned) ∧
-        post result returned) :
-    ∃ fuel result returned,
-      run program fuel method 0
-        (armSmallArguments input output word) frame [] entered = .ok (result, returned) ∧
-      post result returned := by
+      WP (fun fuel => run program fuel method 55
+          (armSmallArguments input output word) frame [] after) post) :
+    WP (fun fuel => run program fuel method 0
+        (armSmallArguments input output word) frame [] entered) post := by
   have enteredCall := call.after_frame_setup setup
   have initial : ARMSmallSaved program original entered entered input output frame 0 :=
     ⟨enteredCall, enterFrame_preserves_caller_memory _ _ _ _ _ setup,
@@ -193,12 +188,10 @@ theorem portable_small_prepare (program : CIL.Program) (method storage : Nat) (p
     (post : Memory → List Value → Prop)
     (continuation : ∀ after, PortableSmallState program original entered after input output frame
       (inputLimb original input) (inputLimb original input 0 + word) →
-      ∃ fuel final returned,
-        run program fuel method 59
-          (armSmallArguments input output word) frame [] after = .ok (final, returned) ∧ post final returned) :
-    ∃ fuel final returned,
-      run program fuel method 55
-        (armSmallArguments input output word) frame [] current = .ok (final, returned) ∧ post final returned := by
+      WP (fun fuel => run program fuel method 59
+          (armSmallArguments input output word) frame [] after) post) :
+    WP (fun fuel => run program fuel method 55
+        (armSmallArguments input output word) frame [] current) post := by
   obtain ⟨lowHome, lowSlot, lowRead⟩ := saved.completed 0 (by decide)
   obtain ⟨sumHome, after, sumSlot, sumRead, sumPreserved, _, _, sumWritten, sumStep⟩ :=
     portable_small_private_store program profile storage original.nextIdentity entered current [input] [output] frame
@@ -232,12 +225,9 @@ theorem portable_small_low_decision (program : CIL.Program) (method storage : Na
     (lowRead : read memory lowHome 8 1 = .ok (numberBytes low.toNat 8))
     (sumRead : read memory sumHome 8 1 = .ok (numberBytes sum.toNat 8))
     (post : Memory → List Value → Prop)
-    (continuation : ∃ fuel final returned,
-      run program fuel method (if sum < low then 70 else 62)
-        args frame [] memory = .ok (final, returned) ∧ post final returned) :
-    ∃ fuel final returned,
-      run program fuel method 59 args frame [] memory =
-        .ok (final, returned) ∧ post final returned := by
+    (continuation : WP (fun fuel => run program fuel method (if sum < low then 70 else 62)
+        args frame [] memory) post) :
+    WP (fun fuel => run program fuel method 59 args frame [] memory) post := by
   have loadSum := load_numeric_local .word64 (.i64 sum) sum.toNat rfl sumRead
   have loadLow := load_numeric_local .word64 (.i64 low) low.toNat rfl lowRead
   by_cases carry : sum < low
@@ -261,13 +251,11 @@ theorem portable_small_increment (program : CIL.Program) (method storage : Nat) 
       args frame (.scalar (.i64 (word + 1)) :: rest) before =
         .ok (.next (pc + 1) rest frame after))
     (post : Memory → List Value → Prop)
-    (continuation : ∃ fuel final returned,
-      run program fuel method
+    (continuation : WP (fun fuel => run program fuel method
         (if word + 1 = BitVec.ofNat 64 0 then portableIncrementZero segment else portableIncrementStart segment + 7)
-        args frame [] after = .ok (final, returned) ∧ post final returned) :
-    ∃ fuel final returned,
-      run program fuel method (portableIncrementStart segment)
-        args frame [] before = .ok (final, returned) ∧ post final returned := by
+        args frame [] after) post) :
+    WP (fun fuel => run program fuel method (portableIncrementStart segment)
+        args frame [] before) post := by
   obtain ⟨segment, bound⟩ := segment
   have cases : segment = 0 ∨ segment = 1 ∨ segment = 2 := by omega
   have load := fun (pc : Nat) => step_load_word64 (body := portableSmallBody profile storage) (pc := pc)
@@ -338,14 +326,12 @@ theorem PortableSmallState.increment (program : CIL.Program) (method storage : N
     (continuation : ∀ after,
       PortableSmallState program original entered after input output frame
         (armIncrementWord words ⟨segment.val + 1, by omega⟩) sum →
-      ∃ fuel final returned,
-        run program fuel method
+      WP (fun fuel => run program fuel method
           (if words ⟨segment.val + 1, by omega⟩ + 1 = BitVec.ofNat 64 0
             then portableIncrementZero segment else portableIncrementStart segment + 7)
-          args frame [] after = .ok (final, returned) ∧ post final returned) :
-    ∃ fuel final returned,
-      run program fuel method (portableIncrementStart segment) args frame [] current =
-        .ok (final, returned) ∧ post final returned := by
+          args frame [] after) post) :
+    WP (fun fuel => run program fuel method (portableIncrementStart segment)
+      args frame [] current) post := by
   let index : Fin 4 := ⟨segment.val + 1, by omega⟩
   obtain ⟨home, slot, loaded⟩ := state.limbs index
   obtain ⟨after, updated, stored⟩ := state.store_limb (profile := profile) (storage := storage) index (words index + 1) enteredWF homes
@@ -368,11 +354,9 @@ theorem portable_small_store_return (program : CIL.Program) (method storage : Na
       AccessBelow memory.nextIdentity memory stored →
       inputValue stored output = UInt256Model.value words →
       post (leaveFrame frame stored) [.scalar (.i32 flag)]) :
-    ∃ fuel final returned,
-      run program fuel method callPc args frame
+    WP (fun fuel => run program fuel method callPc args frame
         [.scalar (.i64 (words 3)), .scalar (.i64 (words 2)), .scalar (.i64 (words 1)),
-          .scalar (.i64 (words 0)), .reference (.address output)] memory =
-            .ok (final, returned) ∧ post final returned := by
+          .scalar (.i64 (words 0)), .reference (.address output)] memory) post := by
   obtain ⟨childFuel, stored, invoked, valid, outside, authority, value, readable⟩ :=
     UInt256Proof.Multiply.LimbStorage.store_limbs_readable_contract profile program storage storageFound
       memory inputs output (words 0) (words 1) (words 2) (words 3) call
@@ -381,9 +365,7 @@ theorem portable_small_store_return (program : CIL.Program) (method storage : Na
       [.scalar (.i64 (words 3)), .scalar (.i64 (words 2)), .scalar (.i64 (words 1)),
         .scalar (.i64 (words 0)), .reference (.address output)] memory =
       .ok (.call storage (UInt256Proof.Multiply.LimbStorage.arguments output (words 0) (words 1) (words 2) (words 3)) [] memory) := by
-    simp [step, cil_guard, observerCount, UInt256Proof.Multiply.LimbStorage.arguments, checkedValue, numericValue,
-      formValue, formed, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-    try exact ⟨rfl, rfl⟩
+    cil_checked_step [UInt256Proof.Multiply.LimbStorage.arguments, formed]
   have returned : run program 2 method (callPc + 1) args frame [] stored =
       .ok (leaveFrame frame stored, [.scalar (.i32 flag)]) := by
     have constStep : step (portableSmallBody profile storage) (.const32 flag) (callPc + 1) args frame [] stored =
@@ -394,8 +376,8 @@ theorem portable_small_store_return (program : CIL.Program) (method storage : Na
     have returns : (portableSmallBody profile storage).returnsValue = true := by rfl
     simp [run, found, retAt, returns, step, cil_guard, observerCount, checkedValue, numericValue, flagFit, List.mapM, List.mapM.loop, Option.bind,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-  obtain ⟨fuel, executed⟩ := run_call_exists found callAt stepped ⟨childFuel, invoked⟩ ⟨2, returned⟩
-  refine ⟨fuel, leaveFrame frame stored, [.scalar (.i32 flag)], executed, ?_⟩
+  apply run_call_post found callAt stepped ⟨childFuel, invoked⟩
+  refine ⟨2, leaveFrame frame stored, [.scalar (.i32 flag)], returned, ?_⟩
   apply continuation stored valid outside authority
   simpa only [UInt256Model.value] using value
 
@@ -436,9 +418,8 @@ theorem PortableSmallState.finish (program : CIL.Program) (method storage : Nat)
       AccessBelow current.nextIdentity current stored →
       inputValue stored output = UInt256Model.value (portableSiteWords site words sum) →
       post (leaveFrame frame stored) [.scalar (.i32 (portableSiteFlag site))]) :
-    ∃ fuel final returned,
-      run program fuel method (portableSiteStart site) args frame [] current =
-        .ok (final, returned) ∧ post final returned := by
+    WP (fun fuel => run program fuel method (portableSiteStart site)
+      args frame [] current) post := by
   obtain ⟨h1, s1, r1⟩ := state.limbs 1
   obtain ⟨h2, s2, r2⟩ := state.limbs 2
   obtain ⟨h3, s3, r3⟩ := state.limbs 3
