@@ -1,12 +1,14 @@
 import UInt256.Safety.UnaryContract
+import UInt256.Safety.ReadOnlyContract
+import CIL.Safety.Forwarders
 import UInt256.Safety.AggregateReturnSetup
 import UInt256.Safety.Contract
 import UInt256.Safety.OutputReadability
-import CIL.Safety.StepComposition
 import CIL.Safety.ReturnMemory
-import CIL.Safety.CallComposition
-import CIL.Safety.GuardNormalization
+import CIL.Safety.WeakestPrecondition
 import CIL.Safety.SymbolicExecution
+
+/-! Aggregate wrappers return a checked helper's initialized private local and retire its home. -/
 
 namespace UInt256Model.Safety.AggregateReturn
 open CIL.Safety UInt256Model.Safety
@@ -81,31 +83,26 @@ theorem binary_disjoint_checked (operation : BitVec 256 → BitVec 256 → BitVe
       (fresh_disjoint call fresh left (by simp)) (fresh_disjoint call fresh right (by simp))
   let bits := operation (inputValue entered left) (inputValue entered right)
   let bytes := numberBytes bits.toNat 32
-  have hl := childCall.input_formed (reference := left) (by simp)
-  have hr := childCall.input_formed (reference := right) (by simp)
-  have ho := childCall.output_formed (reference := output) (by simp)
-  have stepped : step (binaryBody profile callee) (.call callee 3) 3 (binaryArgs left right)
-      (frame memory output) (binaryArguments left right output).reverse entered =
-      .ok (.call callee (binaryArguments left right output) [] entered) := by
-    simp [step, cil_guard, observerCount, binaryArguments, checkedValue, formValue, hl, hr, ho, checkedAt,
-      Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-  have tail : run program 2 index 4 (binaryArgs left right) (frame memory output) [] childResult =
-      .ok (leaveFrame (frame memory output) childResult, [.scalar (.aggregate bytes)]) := by
-    apply Eq.trans
-    · apply run_next (target := 5) (values := [.scalar (.aggregate bytes)])
-        (nextFrame := frame memory output) (updated := childResult) found (by rfl)
-      exact step_load_aggregate (size := 32) (reference := output) (by rfl) readback
-    · apply run_return found (by rfl)
-      · rfl
-      · rfl
-  obtain ⟨fuel, finish⟩ := run_call_exists found (by rfl) stepped ⟨childFuel, childCert.1⟩ ⟨2, tail⟩
-  have executed := (binary_prefix profile callee program index fuel found memory entered left right output childCall).trans finish
-  have checked : (binaryArgs left right).mapM (checkedValue memory) = .ok (binaryArgs left right) := by
-    simp [binaryArgs, checkedValue, formValue, call.input_formed (by simp : left ∈ [left, right]),
-      call.input_formed (by simp : right ∈ [left, right]), checkedAt,
-      Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-  have live := checked_entry_live_state _ _ _ _ _ _ _ call.1.1 call.2 checked entry
-  refine ⟨fuel + 3, _, bytes, certify_invocation _ _ _ _ _ _ _ _ _ _ found checked entry live executed,
+  have checked := checkedValues_of_valid call.readOnly_arguments_valid
+  have returned : WP (Execution (fun fuel =>
+      invoke program fuel index (binaryArgs left right) memory))
+      (fun result => result =
+        (leaveFrame (frame memory output) childResult, [.scalar (.aggregate bytes)])) := by
+    apply WP.enter found checked entry
+    apply WP.of_prefix (fun fuel =>
+      binary_prefix profile callee program index fuel found memory entered left right output childCall)
+    apply WP.call found (by rfl)
+      (step_call_loaded childCall.binary_arguments_valid rfl)
+      (helperPost := fun result => result = (childResult, []))
+      (WP.exact_iff.mpr ⟨childFuel, childCert.1⟩)
+    intro final values same
+    obtain ⟨rfl, rfl⟩ := Prod.mk.inj same
+    apply WP.step found (by rfl)
+      (step_load_aggregate (size := 32) (reference := output) (by rfl) readback)
+    exact WP.returned found (by rfl) rfl rfl rfl
+
+  obtain ⟨fuel, invoked⟩ := WP.exact_iff.mp returned
+  refine ⟨fuel, _, bytes, InvocationCertificate.of_invoke call.1.1 call.2 invoked,
     by simp [bytes, numberBytes], ?_, ?_⟩
   · simp only [bytes, byteNumber_numberBytes, bits,
       show (256 : Nat)^32 = 2^256 from rfl, Nat.mod_eq_of_lt (BitVec.isLt _),
@@ -195,28 +192,26 @@ theorem unary_disjoint_checked (operation : BitVec 256 → BitVec 256) (profile 
   let bytes := numberBytes bits.toNat 32
   have hl := childCall.input_formed (reference := input) (by simp)
   have ho := childCall.output_formed (reference := output) (by simp)
-  have stepped : step (unaryBody profile callee) (.call callee 2) 2 (unaryArgs input)
-      (frame memory output) (unaryArguments input output).reverse entered =
-      .ok (.call callee (unaryArguments input output) [] entered) := by
-    simp [step, cil_guard, observerCount, unaryArguments, checkedValue, formValue, hl, ho, checkedAt,
-      Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-  have tail : run program 2 index 3 (unaryArgs input) (frame memory output) [] childResult =
-      .ok (leaveFrame (frame memory output) childResult, [.scalar (.aggregate bytes)]) := by
-    apply Eq.trans
-    · apply run_next (target := 4) (values := [.scalar (.aggregate bytes)])
-        (nextFrame := frame memory output) (updated := childResult) found (by rfl)
-      exact step_load_aggregate (size := 32) (reference := output) (by rfl) readback
-    · apply run_return found (by rfl)
-      · rfl
-      · rfl
-  obtain ⟨fuel, finish⟩ := run_call_exists found (by rfl) stepped ⟨childFuel, childCert.1⟩ ⟨2, tail⟩
-  have executed := (unary_prefix profile callee program index fuel found memory entered input output childCall).trans finish
-  have checked : (unaryArgs input).mapM (checkedValue memory) = .ok (unaryArgs input) := by
-    simp [unaryArgs, checkedValue, formValue, call.input_formed (by simp : input ∈ [input]),
-      checkedAt,
-      Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-  have live := checked_entry_live_state _ _ _ _ _ _ _ call.1.1 call.2 checked entry
-  refine ⟨fuel + 2, _, bytes, certify_invocation _ _ _ _ _ _ _ _ _ _ found checked entry live executed,
+  have checked := checkedValues_of_valid call.readOnly_arguments_valid
+  have returned : WP (Execution (fun fuel =>
+      invoke program fuel index (unaryArgs input) memory))
+      (fun result => result =
+        (leaveFrame (frame memory output) childResult, [.scalar (.aggregate bytes)])) := by
+    apply WP.enter found checked entry
+    apply WP.of_prefix (fun fuel =>
+      unary_prefix profile callee program index fuel found memory entered input output childCall)
+    apply WP.call found (by rfl)
+      (by cil_checked_step [unaryArguments, hl, ho])
+      (helperPost := fun result => result = (childResult, []))
+      (WP.exact_iff.mpr ⟨childFuel, childCert.1⟩)
+    intro final values same
+    obtain ⟨rfl, rfl⟩ := Prod.mk.inj same
+    apply WP.step found (by rfl)
+      (step_load_aggregate (size := 32) (reference := output) (by rfl) readback)
+    exact WP.returned found (by rfl) rfl rfl rfl
+
+  obtain ⟨fuel, invoked⟩ := WP.exact_iff.mp returned
+  refine ⟨fuel, _, bytes, InvocationCertificate.of_invoke call.1.1 call.2 invoked,
     by simp [bytes, numberBytes], ?_, ?_⟩
   · simp only [bytes, byteNumber_numberBytes, bits,
       show (256 : Nat)^32 = 2^256 from rfl, Nat.mod_eq_of_lt (BitVec.isLt _),
