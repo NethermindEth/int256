@@ -2243,6 +2243,9 @@ public readonly partial struct UInt256
             nd0 = d0 << shift;
             nd1 = (d1 << shift) | (d0 >> rshift);
             nd2 = (d2 << shift) | (d1 >> rshift);
+
+            // Same zero leading digit as the 256-bit reducer for a product of reduced operands.
+            if (Unsafe.Add(ref unBuf.w0, uLen) == 0 && Unsafe.Add(ref unBuf.w0, uLen - 1) < nd2) uLen--;
         }
 
         ref ulong un0 = ref unBuf.w0;
@@ -2462,6 +2465,10 @@ public readonly partial struct UInt256
             nd1 = (d1 << shift) | (d0 >> rshift);
             nd2 = (d2 << shift) | (d1 >> rshift);
             nd3 = (d3 << shift) | (d2 >> rshift);
+
+            // A product of operands already below d stays below d * 2^256 after the shift, so its
+            // leading quotient digit is zero as well. Unreduced operands put bits in the extra limb.
+            if (Unsafe.Add(ref unBuf.w0, uLen) == 0 && Unsafe.Add(ref unBuf.w0, uLen - 1) < nd3) uLen--;
         }
 
         ref ulong un0 = ref unBuf.w0;
