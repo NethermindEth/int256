@@ -172,7 +172,8 @@ theorem prepare_masks (program : CIL.Program) (method : Nat) (profile : CIL.Feat
     prep_pure
     prep_pure
     prep_pure
-    rw [align_carry]
+    rw [show CIL.Vector.alignRight64 (generatedCarry a b) 0 3 =
+      incomingCarry (generatedCarry a b) from align_carry _]
     apply VectorFrame.run_cell_store post state scratch originalCall homes layout 2 rfl found (by rfl)
     intro current state scratch
     prep_pure
