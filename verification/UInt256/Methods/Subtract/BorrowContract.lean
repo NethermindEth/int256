@@ -36,7 +36,7 @@ theorem borrow_contract_of_run (bw : BitVec 64 → BitVec 64 → BitVec 64 → B
     borrow_invoke_succeeds_of_run bw found shape runs a b c borrowRef output memory readable writable
       outputWritable disjoint
   rw [correct a b c incoming] at borrowBytes
-  exact ⟨fuel, final, [], invoked, framed, (), rfl, outputBytes, borrowBytes,
+  exact WP.adequate.mpr ⟨fuel, final, [], invoked, framed, (), rfl, outputBytes, borrowBytes,
     UInt256Proof.borrow_bound a b c, UInt256Proof.borrow_word_nat a b c incoming⟩
 
 /-- The production helper body satisfies the parent contract at any index that fetches it. -/

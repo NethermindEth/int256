@@ -34,6 +34,7 @@ theorem carry_contract_of_run (cw : BitVec 64 → BitVec 64 → BitVec 64 → Bi
     (correct : ∀ a b c : BitVec 64, c.toNat ≤ 1 → cw a b c = UInt256Proof.carry a b c) :
     CarryHelperContract program index := by
   rintro ⟨a, b, c, carryRef, output⟩ memory ⟨wellFormed, incoming, carryReadable, carryWritable, outputWritable, disjoint⟩
+  apply WP.adequate.mpr
   obtain ⟨fuel, result, invoked, _, _, framed, outputBytes, carryBytes⟩ :=
     carry_invoke_succeeds_of_run cw found shape runs a b c carryRef output memory wellFormed carryReadable
       carryWritable outputWritable
