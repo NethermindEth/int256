@@ -252,6 +252,16 @@ public readonly partial struct UInt256
     [SkipLocalsInit]
     public static void AddMod(in UInt256 x, in UInt256 y, in UInt256 m, out UInt256 res)
     {
+        // Top limbs no larger than a nonzero modulus top limb put both operands below 2m, which covers
+        // operands already reduced for field arithmetic. Three scalar compares replace the zero and one
+        // gates and the full-width LessThanBoth test on that path.
+        ulong mTop = m.u3;
+        if (mTop != 0 && x.u3 <= mTop && y.u3 <= mTop)
+        {
+            AddModBelowTwiceModulus(in x, in y, in m, out res);
+            return;
+        }
+
         if (m.IsZero) ThrowDivideByZeroException();
         if (m.IsOne)
         {
@@ -552,6 +562,18 @@ public readonly partial struct UInt256
         }
 
         DivideImpl(in x, in y, out res, out _);
+    }
+
+    // x < 2m and y < 2m: one conditional subtraction each brings them below m, and one more after the sum.
+    [SkipLocalsInit]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void AddModBelowTwiceModulus(in UInt256 x, in UInt256 y, in UInt256 m, out UInt256 res)
+    {
+        UInt256 xr = SubtractUnderflow(in x, in m, out UInt256 xd) ? x : xd;
+        UInt256 yr = SubtractUnderflow(in y, in m, out UInt256 yd) ? y : yd;
+        bool carry = AddOverflow(in xr, in yr, out UInt256 sum);
+        bool borrow = SubtractUnderflow(in sum, in m, out UInt256 difference);
+        res = carry || !borrow ? difference : sum;
     }
 
     [SkipLocalsInit]
