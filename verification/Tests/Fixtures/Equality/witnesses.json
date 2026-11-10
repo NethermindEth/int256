@@ -39,6 +39,13 @@
       "scalarBits": 0,
       "actualResult": true
     },
+    "WrongNarrowing": {
+      "group": "reference",
+      "initialBytes": {},
+      "leftBase": 0,
+      "rightBase": 64,
+      "actualResult": false
+    },
     "WrongReceiver": {
       "group": "reference",
       "initialBytes": { "64": 1 },

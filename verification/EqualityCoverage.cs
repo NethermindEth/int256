@@ -35,6 +35,7 @@ internal static class EqualityCoverage
                 helper == "EqualsUInt256Ref" || method == "EqualsUInt256Value",
             "WrongSignedEmbedding" => helper is "EqualsInt32" or "EqualsInt64",
             "WrongPolarity" => method.StartsWith("Ne", StringComparison.Ordinal),
+            "WrongNarrowing" => method == "EqUInt256UInt256",
             "WrongSnapshot" => method == "EqualsUInt256Value",
             _ => throw new InvalidOperationException("Equality fixture needs a coverage mapping: " + fixture)
         };
@@ -52,7 +53,7 @@ internal static class EqualityCoverage
             "WrongLane" or "WrongReduction" or "WrongReceiver" => "EqualsUInt256Ref",
             "WrongSignedEmbedding" => helper,
             // These faults are in the wrappers themselves, not in a shared helper.
-            "WrongPolarity" or "WrongSnapshot" => method,
+            "WrongPolarity" or "WrongNarrowing" or "WrongSnapshot" => method,
             _ => throw new InvalidOperationException("Equality fixture needs a coverage mapping: " + fixture)
         };
     }

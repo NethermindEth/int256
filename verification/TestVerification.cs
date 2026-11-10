@@ -87,6 +87,8 @@ SelectionCheck([], allMethods, true, all: true);
             "A polarity mutation must be tested at its own wrapper");
     Require(EqualityCoverage.Representative("WrongSnapshot", "EqualsUInt256Value") == "EqualsUInt256Value",
         "The by-value snapshot mutation needs its own counterexample");
+    Require(EqualityCoverage.Representative("WrongNarrowing", "EqUInt256UInt256") == "EqUInt256UInt256",
+        "The narrowing mutation must be tested at its own wrapper");
     var fixtures = System.Xml.Linq.XDocument.Load(Path.Combine(root, "Tests/Fixtures/Equality/Cases.props"))
         .Descendants("EqualityCase").Select(item => (string)item.Attribute("Include")!).ToArray();
     foreach (var profile in equality.GroupBy(gate => gate.Profile))
@@ -106,7 +108,7 @@ SelectionCheck([], allMethods, true, all: true);
                         gate.Method + "_" + gate.Profile.Replace('-', '_') + ".lean")),
                         "Missing representative positive fixture proof");
             }
-        var expected = profile.Key switch { "scalar" => 48, "x64-v3" => 57, "x64-sse42" => 19,
+        var expected = profile.Key switch { "scalar" => 50, "x64-v3" => 59, "x64-sse42" => 21,
             _ => throw new InvalidOperationException("Review equality coverage for " + profile.Key) };
         Require(requests == expected, "Equality regression coverage changed: " + profile.Key);
         Console.WriteLine($"Equality representatives {profile.Key}: {requests} verification requests");

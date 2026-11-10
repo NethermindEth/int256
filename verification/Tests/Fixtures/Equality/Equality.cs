@@ -47,7 +47,12 @@ public readonly partial struct UInt256
     public static bool operator !=(ulong a, in UInt256 b) => !b.Equals(a);
 #endif
 
+#if WRONG_NARROWING
+    public static bool operator ==(in UInt256 a, in UInt256 b)
+        => unchecked((byte)(a.Equals(b) ? 256 : 0)) != 0;
+#else
     public static bool operator ==(in UInt256 a, in UInt256 b) => a.Equals(b);
+#endif
 
 #if WRONG_POLARITY
     public static bool operator !=(in UInt256 a, in UInt256 b) => a == b;

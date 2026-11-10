@@ -17,6 +17,7 @@ and that all wrapper-local polarity mutations and the snapshot mutation remain s
 | WrongReceiver | `EqualsUInt256Ref` on all three profiles, where the receiver is changed |
 | WrongSignedEmbedding | `EqualsInt32` and `EqualsInt64` on scalar and AVX, where the signed conversion is changed |
 | WrongPolarity | Every registered inequality operator on its profile; the mutation changes each wrapper itself |
+| WrongNarrowing | `EqUInt256UInt256` on all three profiles; truncating the encoded true result `256` to a byte changes it to false |
 | WrongSnapshot | `EqualsUInt256Value` on all three profiles; this changes the by-value receiver handling |
 
 All selected negative cases prove a concrete checked counterexample and require the production
@@ -39,13 +40,12 @@ mutated wrapper body (no negation), then contradict the production contract. Hel
 remain checked against the compiled extraction, and each selected production-proof rejection
 still exercises the verifier end to end.
 
-| Profile | Previous cases / requests | Representative cases / requests |
-| --- | ---: | ---: |
-| scalar | 80 / 112 | 33 / 48 |
-| x64-v3 | 104 / 136 | 42 / 57 |
-| x64-sse42 | 26 / 40 | 14 / 19 |
-| Total | 210 / 288 | 89 / 124 |
+| Profile | Representative cases / requests |
+| --- | ---: |
+| scalar | 34 / 50 |
+| x64-v3 | 43 / 59 |
+| x64-sse42 | 15 / 21 |
+| Total | 92 / 130 |
 
-Request count falls 57%; CI timings will establish the wall-time improvement. The representative
-positive proof files replace the removed redundant bindings. Shared leaf proofs remain in
-`Shared/`, while each retained binding states the production contract verbatim.
+Shared leaf proofs live in `Shared/`, while each retained binding states the production contract
+verbatim.
