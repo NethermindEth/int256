@@ -212,8 +212,8 @@ theorem subtract_repair_next (program : CIL.Program) (body : CIL.Method) (method
   apply subtract_repair_segment_checked program body method found borrow storage code
     borrowFound index left right output args leftArg rightArg frame before
     (scalarBorrowValue original left right index.val) borrowHome (results index) state.call
-    state.borrowSlot (state.resultSlots index) state.borrowBound state.borrowRead state.borrowWrite
-    (state.resultWrites index) (Or.inl (Ne.symm (state.borrowSeparate index))) post
+    state.flagSlot (state.resultSlots index) state.flagBound state.flagRead state.flagWrite
+    (state.resultWrites index) (Or.inl (Ne.symm (state.flagSeparate index))) post
   intro after formed world framed math
   apply continuation after
   refine state.advance index ?_ formed world framed
@@ -327,8 +327,8 @@ theorem subtract_repair_ready (program : CIL.Program) (specs : List NumericLocal
     · exact Ne.symm (Nat.ne_of_lt (homes.ordered _ _ .word64 .word64 _ _ (by omega) (resultSlots j) (resultSlots i)))
   · intro i
     exact (resultFacts i).2.2.1
-  · intro i impossible
-    omega
+  · intro index value impossible
+    simp [UInt256Proof.AddSubtract.Safety.completedLocals] at impossible
 
 #print axioms subtract_repair_word_home
 #print axioms subtract_repair_ready
@@ -383,10 +383,9 @@ theorem subtract_repair_store_prefix (program : CIL.Program) (body : CIL.Method)
     (borrow storage : Nat) (code : CodeAt body 77 (subtractRepairCode borrow storage))
     (output : Reference) (args : List Value)
     (outputArg : args[2]? = some (.reference (.address output)))
-    (frame : Frame) (memory : Memory) (results : Fin 4 → Reference) (words : Fin 4 → BitVec 64)
+    (frame : Frame) (memory : Memory) (words : Fin 4 → BitVec 64)
     (outputFormed : form memory output = .ok output)
-    (slots : ∀ i, frame.locals[i.val + 12]? = some (.bytes .word64 (results i)))
-    (reads : ∀ i, read memory (results i) 8 1 = .ok (numberBytes (words i).toNat 8))
+    (snapshots : LocalSnapshots memory frame.locals (completedLocals words 12 4))
     (post : Memory → List Value → Prop)
     (continuation : ∃ fuel result returned,
       run program fuel method 113 args frame
@@ -395,18 +394,11 @@ theorem subtract_repair_store_prefix (program : CIL.Program) (body : CIL.Method)
         post result returned) :
     ∃ fuel result returned,
       run program fuel method 108 args frame [] memory = .ok (result, returned) ∧ post result returned := by
-  have s0 := slots 0
-  have s1 := slots 1
-  have s2 := slots 2
-  have s3 := slots 3
-  dsimp at s0 s1 s2 s3
-  simp only [CIL.fin_val_three, Nat.reduceAdd] at s3
-  have r0 := load_local_word64_of_read (reads 0)
-  have r1 := load_local_word64_of_read (reads 1)
-  have r2 := load_local_word64_of_read (reads 2)
-  have r3 := load_local_word64_of_read (reads 3)
+  have loading (i : Fin 4) (pc : Nat) (stack : List Value) := snapshots.load
+    (body := body) (args := args) (pc := pc) (stack := stack) (index := i.val + 12)
+    (.i64 (words i)) (by simp [completedLocals, i.isLt])
   cil_contract_steps [found, code, outputArg, outputFormed,
-    s0, s1, s2, s3, r0, r1, r2, r3] until continuation
+    loading 0, loading 1, loading 2, loading 3] until continuation
 
 /-- Return the final borrow word as the unsigned underflow flag and retire the frame. -/
 theorem subtract_repair_return (program : CIL.Program) (body : CIL.Method) (method : Nat)
@@ -459,7 +451,7 @@ theorem subtract_repair_finish (program : CIL.Program) (body : CIL.Method) (meth
   let post := fun final values => SubtractResult original final values left right output
   have formed := state.call.output_formed (by simp : output ∈ [output])
   apply subtract_repair_store_prefix program body method found borrow storage code
-    output args outputArg frame current results words formed state.resultSlots (fun i => state.completed i i.isLt) post
+    output args outputArg frame current words formed state.snapshots post
   obtain ⟨childFuel, stored, invoked, valid, outside, authority, value, _⟩ :=
     UInt256Proof.Multiply.LimbStorage.store_limbs_readable_contract body.profile program storage storageFound
       current [left, right] output (words 0) (words 1) (words 2) (words 3) state.call
@@ -473,14 +465,14 @@ theorem subtract_repair_finish (program : CIL.Program) (body : CIL.Method) (meth
   obtain ⟨outputAllocation, outputPresent, _, _⟩ := formed_reference_live _ _ _
     (call.output_formed (by simp : output ∈ [output]))
   have outputOld := (call.1.1.1 _ _ outputPresent).1
-  obtain ⟨borrowAllocation, borrowPresent, _, _⟩ := access_within_allocation _ _ _ _ _ state.borrowWrite
+  obtain ⟨borrowAllocation, borrowPresent, _, _⟩ := access_within_allocation _ _ _ _ _ state.flagWrite
   have borrowOld := (state.call.1.1.1 _ _ borrowPresent).1
   have distinct : borrowHome.allocation ≠ output.allocation :=
-    Ne.symm (Nat.ne_of_lt (Nat.lt_of_lt_of_le outputOld state.borrowFresh))
-  have borrowRead := authority.read_eq state.borrowRead borrowOld
+    Ne.symm (Nat.ne_of_lt (Nat.lt_of_lt_of_le outputOld state.flagFresh))
+  have borrowRead := authority.read_eq state.flagRead borrowOld
     (fun i _ => outside _ _ (Or.inl distinct))
   have returned := subtract_repair_return program body method found borrow storage code returns
-    args frame stored borrowHome _ state.borrowSlot borrowRead
+    args frame stored borrowHome _ state.flagSlot borrowRead
   obtain ⟨fuel, executed⟩ := run_call_exists found
     (by (conv => lhs; arg 2; whnf); cil_lookup [code]) stepped ⟨childFuel, invoked⟩ ⟨5, returned⟩
   refine ⟨fuel, leaveFrame frame stored, _, executed, ?_⟩

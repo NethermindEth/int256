@@ -16,10 +16,10 @@ def scalarStoreCall : Nat :=
     | _ => false
 
 theorem scalar_store_prefix (left right output : Reference) (extra : List Value)
-    (frame : Frame) (memory : Memory) (results : Fin 4 → Reference) (words : Fin 4 → BitVec 64)
+    (frame : Frame) (memory : Memory) (words : Fin 4 → BitVec 64)
     (outputFormed : form memory output = .ok output)
-    (slots : ∀ i, frame.locals[i.val + 3]? = some (.bytes .word64 (results i)))
-    (reads : ∀ i, read memory (results i) 8 1 = .ok (numberBytes (words i).toNat 8))
+    (snapshots : LocalSnapshots memory frame.locals
+      (UInt256Proof.AddSubtract.Safety.completedLocals words 3 4))
     (post : Memory → List Value → Prop)
     (continuation : ∃ fuel result returned,
       run Extracted.program fuel Extracted.addScalarIndex scalarStoreCall
@@ -34,27 +34,22 @@ theorem scalar_store_prefix (left right output : Reference) (extra : List Value)
   simp [List.range_succ, List.findIdx] at continuation
   conv in (scalarCarryCall _) => cbv
   simp only [Nat.reduceAdd]
-  have s0 := slots 0
-  have s1 := slots 1
-  have s2 := slots 2
-  have s3 := slots 3
-  dsimp at s0 s1 s2 s3
-  simp only [CIL.fin_val_three, Nat.reduceAdd] at s3
-  have r0 := load_local_word64_of_read (reads 0)
-  have r1 := load_local_word64_of_read (reads 1)
-  have r2 := load_local_word64_of_read (reads 2)
-  have r3 := load_local_word64_of_read (reads 3)
-  repeat'
-    first
-    | exact continuation
-    | apply run_next_exists post
-      · simp only [cil_code]; rfl
-      · simp only [cil_code]; rfl
-      · simp (config := { implicitDefEqProofs := false })
-          [cil_code, step, cil_guard, observerCount, checkedValue, formValue, outputFormed, s0, s1, s2, s3, r0, r1, r2, r3,
-            checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-        first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
-
+  have loading (i : Fin 4) (pc : Nat) (stack : List Value) := snapshots.load
+    (body := Extracted.addScalarBody) (args :=
+      [.reference (.address left), .reference (.address right), .reference (.address output)] ++ extra)
+    (pc := pc) (stack := stack) (index := i.val + 3) (.i64 (words i))
+    (by simp [UInt256Proof.AddSubtract.Safety.completedLocals, i.isLt])
+  iterate 5
+    apply run_next_exists post (body := Extracted.addScalarBody)
+    · rfl
+    · rfl
+    · first
+      | exact loading 0 _ _
+      | exact loading 1 _ _
+      | exact loading 2 _ _
+      | exact loading 3 _ _
+      | cil_checked_step [outputFormed]
+  exact continuation
 theorem scalar_return (args : List Value) (frame : Frame) (memory : Memory)
     (carryHome : Reference) (carry : BitVec 64)
     (slot : frame.locals[2]? = some (.bytes .word64 carryHome))
@@ -120,8 +115,8 @@ theorem scalar_finish (original entered current : CIL.Safety.Memory) (frame : Fr
   let words := scalarSumWord original left right
   let post := fun final values => ScalarResult original final values left right output
   have formed := state.call.output_formed (by simp : output ∈ [output])
-  apply scalar_store_prefix left right output [.scalar (.i32 0)] frame current results words
-    formed state.resultSlots (fun i => state.completed i i.isLt) post
+  apply scalar_store_prefix left right output [.scalar (.i32 0)] frame current words
+    formed state.snapshots post
   apply run_store_limbs storage_contract [left, right] output (words 0) (words 1) (words 2) (words 3) post
     (body := Extracted.addScalarBody) (op := .call Extracted.storeLimbsIndex 5)
   · simp only [cil_code]
@@ -137,18 +132,18 @@ theorem scalar_finish (original entered current : CIL.Safety.Memory) (frame : Fr
     obtain ⟨outputAllocation, outputPresent, _, _⟩ := formed_reference_live _ _ _
       (call.output_formed (by simp : output ∈ [output]))
     have outputOld := (call.1.1.1 _ _ outputPresent).1
-    obtain ⟨carryAllocation, carryPresent, _, _⟩ := access_within_allocation _ _ _ _ _ state.carryWrite
+    obtain ⟨carryAllocation, carryPresent, _, _⟩ := access_within_allocation _ _ _ _ _ state.flagWrite
     have carryOld := (state.call.1.1.1 _ _ carryPresent).1
     have distinct : carryHome.allocation ≠ output.allocation :=
-      Ne.symm (Nat.ne_of_lt (Nat.lt_of_lt_of_le outputOld state.carryFresh))
-    have carryRead := authority.read_eq state.carryRead carryOld
+      Ne.symm (Nat.ne_of_lt (Nat.lt_of_lt_of_le outputOld state.flagFresh))
+    have carryRead := authority.read_eq state.flagRead carryOld
       (fun i _ => outside _ _ (Or.inl distinct))
     have fresh := enterFrame_fresh _ _ _ _ _ setup
     have retained := leaveFrame_preserves_memory_below frame stored original.nextIdentity
       (fun id member => (fresh.2 id member).1)
     refine ⟨Extracted.addScalarBody.code.length + 1, leaveFrame frame stored,
       [.scalar (.i32 (scalarOverflowFlag (scalarCarryValue original left right 4)))],
-      scalar_return _ _ _ _ _ state.carrySlot carryRead, ?_⟩
+      scalar_return _ _ _ _ _ state.flagSlot carryRead, ?_⟩
     have bytes : (fun offset => ((leaveFrame frame stored).cells output.allocation offset).bits) =
         (fun offset => (stored.cells output.allocation offset).bits) := by
       funext offset

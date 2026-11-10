@@ -1,3 +1,4 @@
+import UInt256.Methods.AddSubtract.RippleState
 import UInt256.Arithmetic.Borrow
 import CIL.Safety.WordLocals
 import CIL.Safety.StepComposition
@@ -98,31 +99,16 @@ def scalarBorrowValue (memory : CIL.Safety.Memory) (left right : Reference) : Na
         (scalarBorrowValue memory left right n)
     else 0
 
-structure ScalarBorrowState (original current : CIL.Safety.Memory) (frame : Frame)
-    (left right output borrowHome : Reference) (results : Fin 4 → Reference) (done : Nat) (borrowIndex : Nat := 1) (resultBase : Nat := 2) : Prop where
-  call : CallingConditions program current [left, right] [output]
-  inputBytes : ∀ reference ∈ [left, right],
-    (fun offset => (current.cells reference.allocation offset).bits) =
-      (fun offset => (original.cells reference.allocation offset).bits)
-  borrowSlot : frame.locals[borrowIndex]? = some (.bytes .word64 borrowHome)
-  resultSlots : ∀ i, frame.locals[i.val + resultBase]? = some (.bytes .word64 (results i))
-  borrowWrite : access current borrowHome 8 1 true = .ok ()
-  resultWrites : ∀ i, access current (results i) 8 1 true = .ok ()
-  borrowRead : read current borrowHome 8 1 = .ok (numberBytes (scalarBorrowValue original left right done).toNat 8)
-  borrowBound : (scalarBorrowValue original left right done).toNat ≤ 1
-  callerSeparate : ∀ reference ∈ [left, right],
-    reference.allocation ≠ borrowHome.allocation ∧ ∀ i, reference.allocation ≠ (results i).allocation
-  borrowSeparate : ∀ i, (results i).allocation ≠ borrowHome.allocation
-  resultSeparate : ∀ i j, i ≠ j → (results i).allocation ≠ (results j).allocation
-  borrowFresh : original.nextIdentity ≤ borrowHome.allocation
-  resultsFresh : ∀ i, original.nextIdentity ≤ (results i).allocation
-  callerCells : ∀ id, id < original.nextIdentity → ∀ offset,
-    current.cells id offset = original.cells id offset
-  completed : ∀ i, i.val < done → read current (results i) 8 1 =
-    .ok (numberBytes (inputLimb original left i - inputLimb original right i -
-      scalarBorrowValue original left right i.val).toNat 8)
+/-- Subtraction borrows and difference limbs instantiate shared private ripple-call evidence. -/
+abbrev ScalarBorrowState (original current : CIL.Safety.Memory) (frame : Frame)
+    (left right output borrowHome : Reference) (results : Fin 4 → Reference)
+    (done : Nat) (borrowIndex : Nat := 1) (resultBase : Nat := 2) : Prop :=
+  UInt256Proof.AddSubtract.Safety.RippleState program original current frame left right output
+    borrowHome results (scalarBorrowValue original left right)
+    (fun i => inputLimb original left i - inputLimb original right i -
+      scalarBorrowValue original left right i.val) done borrowIndex resultBase
 
-/-- A checked borrow call advances the parent invariant, keeping inputs and completed words. -/
+/-- The checked helper updates both outputs and preserves every other remembered result. -/
 theorem ScalarBorrowState.advance {original before after : CIL.Safety.Memory} {frame : Frame}
     {left right output borrowHome : Reference} {results : Fin 4 → Reference} {borrowIndex resultBase : Nat} (index : Fin 4)
     (state : ScalarBorrowState (program := program) original before frame left right output borrowHome results index.val borrowIndex resultBase)
@@ -132,42 +118,10 @@ theorem ScalarBorrowState.advance {original before after : CIL.Safety.Memory} {f
     (world : StaticWorldPreserved program before after)
     (framed : Confined [(borrowHome, 8), (results index, 8)] before after) :
     ScalarBorrowState (program := program) original after frame left right output borrowHome results (index.val + 1) borrowIndex resultBase := by
-  have separate : ∀ reference ∈ [left, right],
-      reference.allocation ≠ borrowHome.allocation ∧ reference.allocation ≠ (results index).allocation :=
-    fun reference member => ⟨(state.callerSeparate reference member).1,
-      (state.callerSeparate reference member).2 index⟩
-  have borrowOld : borrowHome.allocation < before.nextIdentity := by
-    obtain ⟨allocation, present, _, _⟩ := access_within_allocation _ _ _ _ _ state.borrowWrite
-    exact (state.call.1.1.1 _ _ present).1
-  have resultOld : ∀ i, (results i).allocation < before.nextIdentity := by
-    intro i
-    obtain ⟨allocation, present, _, _⟩ := access_within_allocation _ _ _ _ _ (state.resultWrites i)
-    exact (state.call.1.1.1 _ _ present).1
-  refine ⟨private_calling_conditions framed formed world state.call separate, ?_, state.borrowSlot, state.resultSlots,
-    (framed.access_write _ borrowOld _ _).trans state.borrowWrite,
-    fun i => (framed.access_write _ (resultOld i) _ _).trans (state.resultWrites i), ?_, ?_,
-    state.callerSeparate, state.borrowSeparate, state.resultSeparate,
-    state.borrowFresh, state.resultsFresh, ?_, ?_⟩
-  · intro reference member
-    exact (private_input_bytes framed state.call member (separate reference member).1
-      (separate reference member).2).trans (state.inputBytes reference member)
+  apply UInt256Proof.AddSubtract.Safety.RippleState.advance index state ?_ ?_
+    math.outputBytes formed world framed
   · simpa only [scalarBorrowValue, dite_eq_left index.isLt] using math.borrowBytes
   · simpa only [scalarBorrowValue, dite_eq_left index.isLt] using math.borrowBound
-  · intro id old offset
-    have belowBorrow := Nat.lt_of_lt_of_le old state.borrowFresh
-    have belowResult := Nat.lt_of_lt_of_le old (state.resultsFresh index)
-    exact (framed.cells_apart (Nat.lt_trans belowBorrow borrowOld)
-      (by simp [Nat.ne_of_lt belowBorrow, Nat.ne_of_lt belowResult]) offset).trans
-      (state.callerCells id old offset)
-  · intro i done
-    by_cases same : i = index
-    · subst i
-      exact math.outputBytes
-    · have earlier : i.val < index.val := by
-        have different : i.val ≠ index.val := fun h => same (Fin.ext h)
-        omega
-      exact framed.read_apart state.call.1.1 (state.completed i earlier)
-        (by simp [Apart, state.borrowSeparate i, state.resultSeparate i index same])
 
 def scalarUnderflowFlag (borrow : BitVec 64) : BitVec 32 :=
   if BitVec.ofNat 64 0 < borrow then BitVec.ofNat 32 1 else BitVec.ofNat 32 0

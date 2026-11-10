@@ -23,8 +23,8 @@ theorem scalar_borrow_run_next (contract : BorrowHelperContract Extracted.progra
     simpa only [index, Nat.add_assoc] using state.resultSlots index
   apply scalar_borrow_segment_checked contract segment left right output frame before
     (scalarBorrowValue original left right (segment.val + 1)) borrowHome (results index) state.call
-    state.borrowSlot slot state.borrowBound state.borrowRead state.borrowWrite (state.resultWrites index)
-    (Or.inl (Ne.symm (state.borrowSeparate index))) post
+    state.flagSlot slot state.flagBound state.flagRead state.flagWrite (state.resultWrites index)
+    (Or.inl (Ne.symm (state.flagSeparate index))) post
   intro after formed world framed math
   have leftSame : inputLimb before left index = inputLimb original left index := by
     simp only [inputLimb, state.inputBytes left (by simp)]
@@ -116,8 +116,8 @@ theorem scalar_borrow_initial_state {original entered current : CIL.Safety.Memor
         (by omega) (facts i).1 (facts j).1)
     · exact Ne.symm (Nat.ne_of_lt (homes.ordered (j.val + 2) (i.val + 2) (results j) (results i)
         (by omega) (facts j).1 (facts i).1))
-  · intro i impossible
-    omega
+  · intro index value impossible
+    simp [UInt256Proof.AddSubtract.Safety.completedLocals] at impossible
 
 #print axioms scalar_borrow_initial_state
 
@@ -248,14 +248,14 @@ theorem scalar_general_borrows (contract : BorrowHelperContract Extracted.progra
     simp only [inputLimb, state.inputBytes left (by simp)]
   apply scalar_borrow_prefix left right output frame before prepared _ (inputLimb original left 0)
     (inputLimb original right 0) large rightHome borrowHome (results 0)
-    (state.call.input_formed (by simp)) leftRead rightSlot state.borrowSlot (state.resultSlots 0)
-    savedRight (access_reference_valid _ _ _ _ _ state.borrowWrite)
+    (state.call.input_formed (by simp)) leftRead rightSlot state.flagSlot (state.resultSlots 0)
+    savedRight (access_reference_valid _ _ _ _ _ state.flagWrite)
     (access_reference_valid _ _ _ _ _ (state.resultWrites 0)) stored post
   apply scalar_indexed_borrow contract 0 (binaryArguments left right output) frame prepared
     (inputLimb original left 0) (inputLimb original right 0)
     (scalarBorrowValue original left right 0) borrowHome (results 0)
-    state.call.1.1 state.borrowBound state.borrowRead state.borrowWrite (state.resultWrites 0)
-    (Or.inl (Ne.symm (state.borrowSeparate 0))) post
+    state.call.1.1 state.flagBound state.flagRead state.flagWrite (state.resultWrites 0)
+    (Or.inl (Ne.symm (state.flagSeparate 0))) post
   intro after formed world framed math
   exact scalar_borrow_run_remaining contract (state.advance 0 math formed world framed) post (fun final completed =>
     continuation borrowHome results final completed)

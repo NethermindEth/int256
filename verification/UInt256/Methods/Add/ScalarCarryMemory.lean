@@ -124,8 +124,8 @@ theorem scalar_carry_run_next (contract : CarryHelperContract Extracted.program 
     simpa only [index, Nat.add_assoc] using state.resultSlots index
   apply scalar_carry_segment_checked contract segment left right output extra frame before
     (scalarCarryValue original left right (segment.val + 1)) carryHome (results index) state.call
-    state.carrySlot slot state.carryBound state.carryRead state.carryWrite (state.resultWrites index)
-    (Or.inl (Ne.symm (state.carrySeparate index))) post
+    state.flagSlot slot state.flagBound state.flagRead state.flagWrite (state.resultWrites index)
+    (Or.inl (Ne.symm (state.flagSeparate index))) post
   intro after formed world framed math
   apply continuation after
   refine state.advance index ?_ formed world framed
@@ -212,8 +212,8 @@ theorem ScalarCarryReady.initial_state {original entered current : CIL.Safety.Me
         (by omega) (facts i).1 (facts j).1)
     · exact Ne.symm (Nat.ne_of_lt (homes.ordered (j.val + 3) (i.val + 3) (results j) (results i)
         (by omega) (facts j).1 (facts i).1))
-  · intro i impossible
-    omega
+  · intro index value impossible
+    simp [UInt256Proof.AddSubtract.Safety.completedLocals] at impossible
 
 #print axioms ScalarCarryReady.initial_state
 
