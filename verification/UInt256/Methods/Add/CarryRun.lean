@@ -225,8 +225,4 @@ theorem carry_invoke_succeeds_of_run (cw : BitVec 64 → BitVec 64 → BitVec 64
     rw [returned.read carry carryOld 8 1]
     exact carryRead disjoint
 
-#print axioms carry_body_succeeds_of_run
-#print axioms carry_frame_setup_of_shape
-#print axioms carry_invoke_succeeds_of_run
-
 end UInt256Proof.Add.CarrySafety

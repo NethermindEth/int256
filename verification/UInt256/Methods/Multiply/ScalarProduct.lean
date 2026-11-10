@@ -62,4 +62,3 @@ theorem scalar_conservation (a : Limbs) (word : W64) :
   omega
 
 end UInt256Proof.Multiply
-#print axioms UInt256Proof.Multiply.scalarCarry_nat

@@ -36,7 +36,6 @@ theorem subtract_scalar_frame_setup (profile : CIL.FeatureProfile) (vectorIndex 
   word_frame_setup (subtractScalarBody profile vectorIndex smallIndex) subtractScalarSpecs (by rfl) (by rfl)
     (by rfl) (by rfl) (by rfl) memory args wellFormed
 
-#print axioms subtract_scalar_frame_setup
 end UInt256Proof.Subtract.Profile
 
 namespace UInt256Proof.Subtract.Profile
@@ -154,10 +153,6 @@ theorem subtract_scalar_next (original entered current : Memory) (frame : Frame)
   obtain ⟨currentAllocation, currentReady⟩ := access_requirements currentWrite
   exact Nat.le_trans fresh (Nat.le_of_lt (currentWF.1 _ _ currentReady.present).1)
 
-#print axioms subtract_scalar_right_store
-#print axioms subtract_scalar_prefix
-#print axioms subtract_scalar_upper_branch
-#print axioms subtract_scalar_next
 end UInt256Proof.Subtract.Profile
 
 namespace UInt256Proof.Subtract.Profile
@@ -279,9 +274,6 @@ theorem subtract_scalar_small_route (program : CIL.Program) (method vectorIndex 
              checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
           try (first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)))
 
-#print axioms subtract_result_retire
-#print axioms subtract_input_small_value
-#print axioms subtract_scalar_small_route
 end UInt256Proof.Subtract.Profile
 
 namespace UInt256Proof.Subtract.Profile
@@ -352,7 +344,6 @@ theorem subtract_scalar_vector_route (program : CIL.Program) (method vectorIndex
              checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
          try (first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
 
-#print axioms subtract_scalar_vector_route
 end UInt256Proof.Subtract.Profile
 
 namespace UInt256Proof.Subtract.Profile
@@ -426,6 +417,4 @@ theorem checked_subtract_scalar_contract (program : CIL.Program) (method vectorI
     certify_invocation program method (subtractScalarBody profile vectorIndex smallIndex)
       args memory frame entered fuel final returned found checked setup live executed, result⟩
 
-#print axioms subtract_scalar_entry
-#print axioms checked_subtract_scalar_contract
 end UInt256Proof.Subtract.Profile

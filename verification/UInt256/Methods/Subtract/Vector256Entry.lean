@@ -25,6 +25,4 @@ theorem subtract_underflow_contract (program : CIL.Program) (profile : CIL.Featu
   forward_reporting_byte program 0 1 _ _ _ entryFound rfl rfl rfl rfl rfl rfl
     (impl_contract program 1 2 profile avx512 bmi1 implFound lookupFound features)
 
-#print axioms subtract_contract
-#print axioms subtract_underflow_contract
 end UInt256Proof.Subtract.Vector256

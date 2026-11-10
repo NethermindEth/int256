@@ -11,5 +11,4 @@ theorem left_flow (profile : CIL.FeatureProfile) (storage : Nat) :
       ∀ callee ∈ op.callees, callee = storage := by
   simp [scalarBody, CIL.Op.targets, CIL.Op.callees]
 
-#print axioms left_flow
 end UInt256Proof.Shift.Variant

@@ -78,9 +78,6 @@ theorem scalar_right_prefix_checked (memory entered : CIL.Safety.Memory)
   rw [afterCall.input_field_instruction (by simp) index rest]
   simp only [inputLimb, call.input_bytes_of_memory_below preserved (reference := right) (by simp)]
 
-#print axioms scalar_right_store
-#print axioms scalar_right_prefix_checked
-
 end UInt256Proof.Safety
 
 namespace UInt256Proof.Safety
@@ -177,9 +174,6 @@ theorem scalar_left_prefix_checked (memory entered before : CIL.Safety.Memory)
     rw [ready.call.input_field_instruction (by simp) index rest]
     simp only [inputLimb, call.input_bytes_of_memory_below ready.preserved (reference := left) (by simp)]
 
-#print axioms scalar_left_store
-#print axioms scalar_left_prefix_checked
-
 /-- The scalar helper's actual invocation arguments on the public scalar path. -/
 def scalarArguments (left right output : Reference) : List Value :=
   binaryArguments left right output ++ [.scalar (.i32 0)]
@@ -225,7 +219,5 @@ theorem scalar_large_right_prefix (memory : CIL.Safety.Memory) (left right outpu
     (scalarArguments left right output) frame [] entered = .ok (result, returned) at finished
   simpa only [invoke, cil_code, checked, setup, Except.mapError, Bind.bind, Except.bind]
     using finished
-
-#print axioms scalar_large_right_prefix
 
 end UInt256Proof.Safety

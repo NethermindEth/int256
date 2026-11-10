@@ -44,7 +44,4 @@ theorem CallingConditions.new_aggregate256 {program : CIL.Program} {body : CIL.M
     (call.after_memory_below preserved wf world).with_writable_output writable,
     loaded, preserved, fresh⟩
 
-#print axioms CallingConditions.with_writable_output
-#print axioms CallingConditions.new_aggregate256
-
 end UInt256Model.Safety

@@ -87,6 +87,4 @@ theorem scalar_right_prefix_checked (memory entered : Memory) (left right output
              Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
           first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
 
-#print axioms scalar_right_store
-#print axioms scalar_right_prefix_checked
 end UInt256Proof.Subtract.Safety

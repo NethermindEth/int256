@@ -39,7 +39,6 @@ theorem arm_small_parent_call (program : CIL.Program) (method vectorIndex smallI
     exact ⟨fuel, leaveFrame frame final, returned, executed,
       continuation childFuel final returned certified result⟩
 
-#print axioms arm_small_parent_call
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -104,10 +103,6 @@ theorem arm_scalar_watermark (original entered current : Memory) (frame : Frame)
   obtain ⟨currentAllocation, currentReady⟩ := access_requirements retained
   exact Nat.le_trans fresh (Nat.le_of_lt (currentWF.1 _ _ currentReady.present).1)
 
-#print axioms arm_scalar_small_value
-#print axioms arm_scalar_small_values
-#print axioms arm_scalar_select_input
-#print axioms arm_scalar_watermark
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -171,10 +166,6 @@ theorem arm_scalar_vector_finish (program : CIL.Program) (method vectorIndex sma
   rw [keptLeft, keptRight] at exactFlag
   rw [exactFlag]
 
-#print axioms arm_scalar_vector_finish
-
-#print axioms arm_scalar_retire
-#print axioms arm_scalar_small_finish
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -248,7 +239,6 @@ theorem arm_scalar_entry (program : CIL.Program) (method vectorIndex smallIndex 
       exact arm_scalar_vector_finish program method vectorIndex smallIndex storage profile found vectorFound smallFound storageFound enabled original current (armScalarSavedFrame frame left)
         left right output flag flagFit call currentCall originalPreserved next (owned left)
 
-#print axioms arm_scalar_entry
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -277,5 +267,4 @@ theorem checked_arm_scalar_contract (program : CIL.Program) (method vectorIndex 
     certify_invocation program method (armScalarBody profile vectorIndex smallIndex)
       args memory frame entered fuel final returned found checked setup live executed, result⟩
 
-#print axioms checked_arm_scalar_contract
 end UInt256Proof.Add.Safety

@@ -86,10 +86,6 @@ theorem checked_unary_return_refuted (program : CIL.Program) (entry observedFuel
   exact different result
 
 
-#print axioms checked_unary_refuted
-#print axioms checked_unary_return_refuted
-#print axioms checked_binary_refuted
-#print axioms checked_binary_return_refuted
 end UInt256Model.Safety.ContractRefutation
 
 namespace UInt256Model.Safety.ContractRefutation
@@ -110,5 +106,4 @@ theorem checked_binary_byte_refuted (program : CIL.Program) (entry observedFuel 
     (fun outcome => (inputValue outcome.1 output).extractLsb' (8 * byteIndex) 8) actual observed certificate.1
   rw [result] at observation
   exact different observation.symm
-#print axioms checked_binary_byte_refuted
 end UInt256Model.Safety.ContractRefutation

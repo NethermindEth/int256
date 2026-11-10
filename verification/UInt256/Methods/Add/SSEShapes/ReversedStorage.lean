@@ -79,6 +79,4 @@ theorem store_limbs_readable_contract (profile : CIL.FeatureProfile)
   · exact ⟨_, r2⟩
   · exact ⟨_, r3⟩
 
-#print axioms store_limbs_safe
-#print axioms store_limbs_readable_contract
 end UInt256Proof.Add.SSEShapes.ReversedStorage

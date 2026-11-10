@@ -75,6 +75,4 @@ theorem store_limbs_readable_contract (profile : CIL.FeatureProfile)
         (w0.toNat + w1.toNat * 2^64 + w2.toNat * 2^128 + w3.toNat * 2^192) ∧
       (∃ bytes, read result output 32 1 = .ok bytes) :=
   store_template_contract profile false 20 vector program index found memory inputs output w0 w1 w2 w3 call
-#print axioms store_limbs_readable_contract
-#print axioms store_template_contract
 end UInt256Proof.StorageVector

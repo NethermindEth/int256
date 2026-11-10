@@ -67,7 +67,6 @@ theorem vector128_propagation_checked (program : CIL.Program) (body : CIL.Method
       CIL.Vector.intrinsic_zero128, CIL.Vector.intrinsic_eq128,
       CIL.Vector.intrinsic_and128, propagating128] until done
 
-#print axioms vector128_propagation_checked
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -143,7 +142,6 @@ theorem vector128_propagation_pair (program : CIL.Program) (body : CIL.Method) (
     (Nat.le_trans (write_extends_allocations _ _ _ _ _ firstWrite).next
       (write_extends_allocations _ _ _ _ _ secondWrite).next)
 
-#print axioms vector128_propagation_pair
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -239,5 +237,4 @@ theorem vector128_ready_checked (program : CIL.Program) (body : CIL.Method) (met
     (Nat.le_trans advanced next)
     (fun disabled => (callerPreserved disabled).trans preserved)
 
-#print axioms vector128_ready_checked
 end UInt256Proof.Add.Safety

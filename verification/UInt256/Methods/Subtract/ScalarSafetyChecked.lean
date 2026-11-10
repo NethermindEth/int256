@@ -84,8 +84,6 @@ theorem scalar_return (args : List Value) (frame : Frame) (memory : Memory)
     scalarUnderflowFlag, CIL.NarrowKind.extend, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   split <;> rfl
 
-#print axioms scalar_return
-#print axioms scalar_store_prefix
 end UInt256Proof.Subtract.Safety
 
 namespace UInt256Proof.Subtract.Safety
@@ -145,8 +143,6 @@ theorem scalar_finish (original entered current : CIL.Safety.Memory) (frame : Fr
     · intro id old offset untouched
       exact (retained.cells id old offset).trans ((outside id offset untouched).trans (state.callerCells id old offset))
 
-#print axioms scalar_finish
-
 end UInt256Proof.Subtract.Safety
 
 namespace UInt256Proof.Subtract.Safety
@@ -179,7 +175,6 @@ theorem scalar_general_checked (contract : BorrowHelperContract Extracted.progra
     by simpa only [invoke, found, checked, setup, Except.mapError, Bind.bind, Except.bind] using finished,
     satisfied⟩
 
-#print axioms scalar_general_checked
 end UInt256Proof.Subtract.Safety
 
 namespace UInt256Proof.Subtract.Safety
@@ -203,6 +198,4 @@ theorem scalar_checked (contract : BorrowHelperContract Extracted.program Extrac
   · obtain ⟨fuel, final, values, executed, result⟩ := scalar_general_checked contract memory left right output call small
     exact ⟨fuel, final, values, executed, result.as_subtract⟩
 
-#print axioms ScalarResult.as_subtract
-#print axioms scalar_checked
 end UInt256Proof.Subtract.Safety

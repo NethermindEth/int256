@@ -88,5 +88,4 @@ theorem inclusive_entry_checked (leaf : BinaryReadOnlyInvocation (fun x y => .i3
     simp [run, lookup, returned, returns, step, cil_guard, observerCount, inclusiveValue, checkedValue, numericValue,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure] <;> split <;> rfl
 
-#print axioms inclusive_entry_checked
 end UInt256Proof.Compare.Safety

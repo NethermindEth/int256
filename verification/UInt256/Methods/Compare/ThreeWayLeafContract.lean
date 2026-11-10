@@ -39,7 +39,4 @@ theorem threeWay_checked (profile : CIL.FeatureProfile) (program : CIL.Program) 
   · intro memory left right frame call
     simpa only [threeWay_result_math] using threeWay_run profile program index found memory left right frame call
 
-#print axioms threeWay_checked
-
-#print axioms threeWay_result_math
 end UInt256Proof.Compare.ThreeWayLeaf

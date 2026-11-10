@@ -90,8 +90,6 @@ theorem ladder_run (memory : Memory) (left right : Reference) (frame : Frame)
               simp [run, cil_code, step, cil_guard, observerCount, checkedValue, numericValue, CIL.NarrowKind.extend,
                 Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure] <;> try (split <;> rfl)
 
-#print axioms ladder_run
-
 theorem limb_ladder {α : Type} (x y : BitVec 64) (less greater equal : α) :
     (if x < y then less else if y < x then greater else equal) =
       if x = y then equal else if x < y then less else greater := by
@@ -136,9 +134,6 @@ theorem ladder_checked : BinaryReadOnlyInvocation lessValue Extracted.program wr
       simpa only [ladder_result_math] using ladder_run memory left right frame call)
     memory left right call
 
-#print axioms limb_ladder
-#print axioms ladder_result_math
-#print axioms ladder_checked
 end CompareFixture
 
 open UInt256Model.Safety UInt256Proof.Compare.Safety in
@@ -150,5 +145,3 @@ theorem CompareFixture.correct :
   have entry : BinaryReadOnlyInvocation lessValue Extracted.program Extracted.entryIndex :=
     entry_checked CompareFixture.ladder_checked
   simpa only [lessValue] using entry.to_contract
-
-#print axioms CompareFixture.correct

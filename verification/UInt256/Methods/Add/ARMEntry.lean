@@ -82,7 +82,6 @@ theorem vector128_arm_entry (program : CIL.Program) (body : CIL.Method) (method 
     exact ⟨fuel, final, returned, executed, ⟨_, scalar, fun _ => rfl⟩, result, writable,
       fun id offset bound untouched => (outside id offset bound untouched).trans (footprint id offset bound untouched)⟩
 
-#print axioms vector128_arm_entry
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -141,5 +140,4 @@ theorem checked_vector128_arm_contract (program : CIL.Program) (body : CIL.Metho
       fuel final [.scalar (.i32 returnedValue)] found checked setup live executed,
     result, overflow, writable, footprint⟩
 
-#print axioms checked_vector128_arm_contract
 end UInt256Proof.Add.Safety

@@ -57,11 +57,4 @@ theorem fast_flag_value (a b : BitVec 256)
     (by rwa [UInt256Proof.value_decode, UInt256Proof.value_decode])
   rwa [UInt256Proof.value_decode, UInt256Proof.value_decode] at result
 
-#print axioms ternary_carry_lanes
-#print axioms align_carry
-#print axioms parent_of_full
-#print axioms fast_sum_value
-#print axioms cascade_sum_value
-#print axioms cascade_flag_value
-#print axioms fast_flag_value
 end UInt256Proof.Add.Vector256

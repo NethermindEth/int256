@@ -41,5 +41,4 @@ theorem refuted : ¬ UInt256Model.Safety.ShiftContract .@DIRECTION@ Extracted.pr
     (BitVec.ofNat 256 @ACTUAL@) call
   · rfl
   · decide
-#print axioms refuted
 end ShiftWitness

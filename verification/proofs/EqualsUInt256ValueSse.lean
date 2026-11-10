@@ -11,7 +11,6 @@ import UInt256.Methods.ValueForwarder32
   · intro left right _; split <;> simp
   · rfl
   · exact UInt256Proof.Equality.ReferenceSseWrapper.checked Extracted.profile Extracted.program 1 2 rfl rfl rfl rfl
-#print axioms UInt256Proof.Equality.EqualsUInt256Value.sse_correctness
 
 
 theorem UInt256Proof.Equality.EqualsUInt256Value.sse_family (profile : CIL.FeatureProfile)
@@ -21,5 +20,3 @@ theorem UInt256Proof.Equality.EqualsUInt256Value.sse_family (profile : CIL.Featu
       (fun left right => .i32 (if left = right then 1 else 0)) (CIL.reprofile Extracted.program profile) 0 :=
   UInt256Model.Safety.ReadOnlyScalarContract.reprofile UInt256Proof.Equality.ProfileBindings.uniform
     (UInt256Proof.Equality.ProfileBindings.reference_agreement profile vector sse) UInt256Proof.Equality.EqualsUInt256Value.sse_correctness
-
-#print axioms UInt256Proof.Equality.EqualsUInt256Value.sse_family

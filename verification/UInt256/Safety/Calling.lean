@@ -124,12 +124,4 @@ theorem CallingConditions.binary_setup_succeeds {program : CIL.Program}
       LiveState program (binaryArguments left right output) frame [] entered :=
   enterFrame_live_succeeds _ _ _ _ call.1.1 call.binary_arguments_valid call.2 fits
 
-#print axioms byteNumber_snapshot
-#print axioms CallingConditions.of_requirements
-#print axioms CallingConditions.input_snapshot
-#print axioms CallingConditions.input_load
-#print axioms CallingConditions.binary_arguments_valid
-#print axioms CallingConditions.binary_entry_live
-#print axioms CallingConditions.binary_setup_succeeds
-
 end UInt256Model.Safety

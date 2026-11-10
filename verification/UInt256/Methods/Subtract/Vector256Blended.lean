@@ -141,8 +141,6 @@ theorem blend_incoming (mask : BitVec 256) :
   rw [← CIL.Vector.pack256_lanes mask]
   exact (UInt256Proof.Add.Safety.incomingCarry_packed _ _ _ _).trans (incoming_packed _ _ _ _).symm
 
-#print axioms blend_incoming
-
 theorem impl_inputs (program : CIL.Program) (method lookup : Nat) (profile : CIL.FeatureProfile)
     (bmi1 : Bool) (found : program[method]? = some (subtractBlendImplBody profile bmi1 lookup))
     (features : ImplProfile profile false bmi1)
@@ -190,8 +188,6 @@ theorem impl_inputs (program : CIL.Program) (method lookup : Nat) (profile : CIL
   impl_store
   exact continuation current state
 
-#print axioms impl_inputs
-
 theorem impl_masks (program : CIL.Program) (method lookup : Nat) (profile : CIL.FeatureProfile)
     (bmi1 : Bool) (found : program[method]? = some (subtractBlendImplBody profile bmi1 lookup))
     (features : ImplProfile profile false bmi1)
@@ -229,8 +225,6 @@ theorem impl_masks (program : CIL.Program) (method lookup : Nat) (profile : CIL.
     blend_incoming]
   impl_store
   exact continuation current state
-
-#print axioms impl_masks
 
 theorem impl_decision (program : CIL.Program) (method lookup : Nat) (profile : CIL.FeatureProfile)
     (bmi1 : Bool) (found : program[method]? = some (subtractBlendImplBody profile bmi1 lookup))
@@ -288,8 +282,6 @@ theorem impl_decision (program : CIL.Program) (method lookup : Nat) (profile : C
     impl_pure
     exact slow decided current state
 
-#print axioms impl_decision
-
 /-- The byte return keeps a 0/1 flag. -/
 theorem impl_return (program : CIL.Program) (method lookup : Nat) (profile : CIL.FeatureProfile)
     (bmi1 : Bool) (found : program[method]? = some (subtractBlendImplBody profile bmi1 lookup))
@@ -324,9 +316,6 @@ theorem impl_fast_return (program : CIL.Program) (method lookup : Nat) (profile 
   impl_pure
   exact ⟨1, _, _, impl_return program method lookup profile bmi1 found 119 rfl _ frame current _
     (by split <;> rfl), continuation⟩
-
-#print axioms impl_return
-#print axioms impl_fast_return
 
 theorem impl_index (program : CIL.Program) (method lookup : Nat) (profile : CIL.FeatureProfile)
     (bmi1 : Bool) (found : program[method]? = some (subtractBlendImplBody profile bmi1 lookup))
@@ -370,8 +359,6 @@ theorem impl_index (program : CIL.Program) (method lookup : Nat) (profile : CIL.
   impl_pure
   impl_store
   exact continuation current state
-
-#print axioms impl_index
 
 theorem impl_slow_tail (program : CIL.Program) (method lookup : Nat) (profile : CIL.FeatureProfile)
     (bmi1 : Bool) (found : program[method]? = some (subtractBlendImplBody profile bmi1 lookup))
@@ -508,8 +495,6 @@ theorem impl_contract (program : CIL.Program) (method lookup : Nat) (profile : C
   simpa only [decide_eq_true_eq] using
     certify_invocation program method _ _ memory frame entered fuel final _ found checked setup live ran
 
-#print axioms impl_contract
-
 /-- Blended AVX2 `Subtract`: wrapped difference of the initial operands; the borrow flag is discarded. -/
 theorem subtract_contract (program : CIL.Program) (profile : CIL.FeatureProfile) (bmi1 : Bool)
     (entryFound : program[0]? = some (subtractEntryBody profile 1))
@@ -530,6 +515,4 @@ theorem subtract_underflow_contract (program : CIL.Program) (profile : CIL.Featu
   forward_reporting_byte program 0 1 _ _ _ entryFound rfl rfl rfl rfl rfl rfl
     (impl_contract program 1 2 profile bmi1 implFound lookupFound features)
 
-#print axioms subtract_contract
-#print axioms subtract_underflow_contract
 end UInt256Proof.Subtract.Vector256.Blended

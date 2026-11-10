@@ -73,7 +73,4 @@ theorem inequality_readOnly_contract
         simpa only [List.map_cons, List.map_nil, List.getElem?_cons_zero,
           List.getElem?_cons_succ, Option.getD_some] using inequality_entry_checked child memory left right call
 
-#print axioms inequality_readOnly_contract
-#print axioms inequality_entry_checked
-
 end UInt256Proof.Equality.Safety

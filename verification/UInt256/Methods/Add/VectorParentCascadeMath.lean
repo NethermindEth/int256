@@ -29,7 +29,4 @@ theorem vector_cascade_sum (a b : Limbs) :
   change pack256 _ _ _ _ = _
   rw [← UInt256Proof.Equality.value_pack, UInt256Proof.sumWords_sum]
 
-#print axioms vector_generated_mask
-#print axioms vector_propagated_mask
-#print axioms vector_cascade_sum
 end UInt256Proof.Add.Safety

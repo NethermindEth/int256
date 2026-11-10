@@ -23,6 +23,4 @@ theorem checked_add_contract (contract : CarryHelperContract Extracted.program E
   exact ⟨fuel, final, certify_invocation _ _ _ _ _ _ _ _ _ _ lookup checked setup live finished,
     result.value, result.writable, result.footprint⟩
 
-#print axioms checked_add_contract
-
 end UInt256Proof.Safety

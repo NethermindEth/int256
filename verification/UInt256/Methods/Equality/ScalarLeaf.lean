@@ -62,7 +62,6 @@ theorem scalar_run (memory : Memory) (left right : Reference) (frame : Frame)
   refine ⟨28, ?_⟩
   cil_checked_steps [readOnlyArguments, fl, fr, hl, hr]
   simp [scalarDifference]
-#print axioms scalar_run
 
 end UInt256Proof.Equality.ScalarLeaf
 
@@ -94,9 +93,6 @@ theorem scalar_run_value (memory : Memory) (left right : Reference) (frame : Fra
         [.scalar (.i32 (if inputValue memory left = inputValue memory right then 1 else 0))]) := by
   simpa only [scalar_difference_zero] using scalar_run profile program index found memory left right frame call
 
-#print axioms scalar_difference_zero
-#print axioms scalar_run_value
-
 end UInt256Proof.Equality.ScalarLeaf
 
 namespace UInt256Proof.Equality.ScalarLeaf
@@ -120,6 +116,5 @@ theorem scalar_checked (memory : Memory) (left right : Reference)
   certify_readOnly_binary program index (body profile)
     (fun left right => .i32 (if left = right then 1 else 0))
     found (scalar_frame_fits profile) (scalar_run_value profile program index found) memory left right call
-#print axioms scalar_checked
 
 end UInt256Proof.Equality.ScalarLeaf

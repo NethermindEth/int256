@@ -19,5 +19,4 @@ theorem checked (profile : CIL.FeatureProfile) (program : CIL.Program) (index ca
     (by intro left right _; split <;> simp) found
     (ReferenceScalar.checked profile program callee leaf vector sse childFound leafFound)
 
-#print axioms checked
 end UInt256Proof.Equality.ValueScalar

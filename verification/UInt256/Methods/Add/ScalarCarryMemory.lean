@@ -60,8 +60,6 @@ theorem scalar_carry_store (memory entered before : CIL.Safety.Memory)
     cases sameWrite
     exact stepped
 
-#print axioms scalar_carry_store
-
 /-- Execute the both-large prefix and its first mathematical carry call from
     the state established by the two operand prefixes. -/
 theorem scalar_first_carry_checked (contract : CarryHelperContract Extracted.program Extracted.addWithCarryIndex) (memory entered before : CIL.Safety.Memory)
@@ -98,8 +96,6 @@ theorem scalar_first_carry_checked (contract : CarryHelperContract Extracted.pro
     carryHome resultHome ready.lowWords.call.1.1 ready.carryRead ready.carryWrite ready.resultWrite
     ready.disjoint post (fun after formed world framed math =>
       continuation carryHome resultHome prepared after ready formed world framed math)
-
-#print axioms scalar_first_carry_checked
 
 end UInt256Proof.Safety
 
@@ -150,9 +146,6 @@ theorem scalar_carry_run_remaining (contract : CarryHelperContract Extracted.pro
   apply scalar_carry_run_next contract 1 second extra post
   intro _ third
   exact scalar_carry_run_next contract 2 third extra post continuation
-
-#print axioms scalar_carry_run_next
-#print axioms scalar_carry_run_remaining
 
 end UInt256Proof.Safety
 
@@ -215,8 +208,6 @@ theorem ScalarCarryReady.initial_state {original entered current : CIL.Safety.Me
   · intro index value impossible
     simp [UInt256Proof.AddSubtract.Safety.completedLocals] at impossible
 
-#print axioms ScalarCarryReady.initial_state
-
 /-- Execute the actual scalar invocation through all four carry calls on the
     both-large branch. Only final storage, flag production and return remain. -/
 theorem scalar_general_carries (contract : CarryHelperContract Extracted.program Extracted.addWithCarryIndex) (memory : CIL.Safety.Memory) (left right output : Reference)
@@ -249,7 +240,5 @@ theorem scalar_general_carries (contract : CarryHelperContract Extracted.program
   have firstDone := initial.advance 0 math' formed world framed
   exact scalar_carry_run_remaining contract firstDone [.scalar (.i32 0)] post
     (fun final completed => continuation frame entered carryHome results final setup completed)
-
-#print axioms scalar_general_carries
 
 end UInt256Proof.Safety

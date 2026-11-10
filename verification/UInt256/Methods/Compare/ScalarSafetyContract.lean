@@ -48,6 +48,4 @@ theorem scalar_checked (memory : Memory) (left right : Reference)
     (fun left right => .i32 (if left.toNat < right.toNat then 1 else 0))
     scalar_body_found scalar_frame_fits scalar_run_value memory left right call
 
-#print axioms scalar_result_math
-#print axioms scalar_checked
 end UInt256Proof.Compare.Safety

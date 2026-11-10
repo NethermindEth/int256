@@ -86,5 +86,4 @@ theorem threeWay_run (memory : Memory) (left right : Reference) (frame : Frame)
       simp [run, cil_code, step, cil_guard, observerCount, checkedValue, numericValue, threeWayResult, h3, lt,
         Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
-#print axioms threeWay_run
 end UInt256Proof.Compare.Safety

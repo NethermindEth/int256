@@ -124,6 +124,3 @@ theorem softwareHigh_correct (a b : W64) : softwareHigh a b = highProduct a b :=
   omega
 
 end UInt256Proof.Multiply
-
-#print axioms UInt256Proof.Multiply.softwareLow_correct
-#print axioms UInt256Proof.Multiply.softwareHigh_correct

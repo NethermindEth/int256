@@ -161,5 +161,4 @@ theorem arm_helper_checked_with_flag (profile : CIL.FeatureProfile) (enabled : p
     rfl rfl armSpecs_repair ⟨rfl,rfl⟩ rfl rfl rfl enabled
     memory left right output flag flagFit call
 
-#print axioms arm_helper_checked_with_flag
 end UInt256Proof.Add.Safety

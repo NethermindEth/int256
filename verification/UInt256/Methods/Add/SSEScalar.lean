@@ -132,11 +132,6 @@ theorem sse_scalar_upper_branch (program : CIL.Program) (method vectorIndex smal
         show (0 : BitVec 64) = BitVec.ofNat 64 0 from rfl, zero,
         Bind.bind, Except.bind, Pure.pure, Except.pure]
 
-#print axioms sse_scalar_frame_setup
-#print axioms sse_scalar_dispatch
-#print axioms sse_scalar_save_low
-#print axioms sse_scalar_upper_loads
-#print axioms sse_scalar_upper_branch
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -185,8 +180,6 @@ theorem portable_small_contract (program : CIL.Program) (smallIndex storage : Na
   fun memory input output word call =>
     checked_portable_small_contract program smallIndex storage profile smallFound storageFound disabled memory input output word call
 
-#print axioms sse_helper_contract
-#print axioms portable_small_contract
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -328,9 +321,6 @@ theorem sse_scalar_vector_finish (program : CIL.Program) (method vectorIndex sma
            checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
        try (first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
 
-#print axioms sse_scalar_small_call
-#print axioms sse_scalar_small_finish
-#print axioms sse_scalar_vector_finish
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -447,8 +437,4 @@ theorem checked_sse_scalar_contract (program : CIL.Program) (method vectorIndex 
     (portable_small_contract program smallIndex storage profile smallFound storageFound disabled)
     disabled sse42 memory left right output flag flagFit call
 
-#print axioms sse_input_limb_kept
-#print axioms sse_scalar_entry
-#print axioms checked_sse_scalar_contract_of
-#print axioms checked_sse_scalar_contract
 end UInt256Proof.Add.Safety

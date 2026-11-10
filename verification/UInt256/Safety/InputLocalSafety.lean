@@ -46,5 +46,4 @@ theorem run_input_to_local {program : CIL.Program} {method pc argument target : 
   rcases valid with ⟨_, rfl⟩
   exact WP.adequate.mpr (continuation after next)
 
-#print axioms run_input_to_local
 end UInt256Model.Safety

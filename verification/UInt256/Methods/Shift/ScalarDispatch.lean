@@ -62,5 +62,4 @@ theorem shift_count_dispatch (boundary : Nat) (entered current : Memory)
           resetSlot resetRead (preserved.trans retained) afterCall afterAuthority
           (Nat.le_trans next (write_extends_allocations _ _ _ _ _ resetWrite).next)
 
-#print axioms shift_count_dispatch
 end UInt256Proof.Shift.Safety

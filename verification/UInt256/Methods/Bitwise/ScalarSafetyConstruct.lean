@@ -92,7 +92,6 @@ theorem construct_prefix (program : CIL.Program) (index pc constructor : Nat)
         (.reference (.address temporary) :: words w0 w1 w2 w3) updated = .ok (constructed, []) := invoked
     exact run_construct_exists found fetched stepped ⟨13, child⟩ loaded ⟨fuel + 1, tail⟩
 
-#print axioms construct_prefix
 theorem construct_result (program : CIL.Program) (scalarIndex constructPC constructorIndex : Nat)
     (scalarBody : CIL.Method) (profile : CIL.FeatureProfile)
     (found : program[scalarIndex]? = some scalarBody)
@@ -140,5 +139,4 @@ theorem construct_result (program : CIL.Program) (scalarIndex constructPC constr
     (after.access output old 32 1 true).trans (storedCall.1.writable (wordView output) (by simp)), ?_⟩
   intro id bound offset beyond
   exact (after.cells id bound offset).trans (outside id bound offset beyond)
-#print axioms construct_result
 end UInt256Proof.Bitwise.ScalarSafety

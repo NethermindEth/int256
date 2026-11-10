@@ -12,6 +12,4 @@ theorem vector_family_correctness (profile : CIL.FeatureProfile)
     UInt256Model.Safety.WrappingUnaryContract (~~~·) (CIL.reprofile Extracted.program profile) 0 :=
   UInt256Proof.Bitwise.NotVectorSafety.correctness profile enabled (CIL.reprofile Extracted.program profile) 0 1 (by rfl) (by rfl)
 
-#print axioms vector_correctness
-#print axioms vector_family_correctness
 end UInt256Proof.Not

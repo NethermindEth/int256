@@ -39,6 +39,4 @@ theorem ShiftContract.reprofile {direction : UInt256Proof.Shift.Direction}
   exact ⟨fuel, final, invocationCertificate_uniform_reprofile _ _ _ uniform agreement
     _ _ _ _ _ _ certificate, postcondition⟩
 
-#print axioms ShiftContract.reprofile
-
 end UInt256Model.Safety

@@ -48,7 +48,4 @@ theorem carry_helper_contract {profile : CIL.FeatureProfile} (found : program[in
     CarryHelperContract program index :=
   carry_contract_of_run carryWord found carryBody_shape (carry_run_of_memory_steps found) carryWord_correct
 
-#print axioms carry_contract_of_run
-#print axioms carry_helper_contract
-
 end UInt256Proof.Add.CarrySafety

@@ -17,5 +17,3 @@ theorem EqualityFixture.correct :
   · rfl
   · exact fun m l r c => by simpa using ((UInt256Proof.Equality.ReferenceOperator.checked (fun a b => decide (a = b)) Extracted.profile false Extracted.program 1 2 rfl
     (fun m l r c => by simpa using (UInt256Proof.Equality.ReferenceVectorWrapper.checked Extracted.profile Extracted.program 2 3 rfl rfl rfl) m l r c))) m l r c
-
-#print axioms EqualityFixture.correct

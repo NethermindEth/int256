@@ -44,7 +44,4 @@ theorem borrow_helper_contract {profile : CIL.FeatureProfile} (found : program[i
     BorrowHelperContract program index :=
   borrow_contract_of_run borrowWord found borrowBody_shape (borrow_run_of_memory_steps found) borrowWord_correct
 
-#print axioms borrow_contract_of_run
-#print axioms borrow_helper_contract
-
 end UInt256Proof.Subtract.Profile

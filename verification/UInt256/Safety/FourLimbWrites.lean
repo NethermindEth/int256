@@ -51,6 +51,4 @@ theorem write_four_limbs (program : CIL.Program) (memory : Memory)
     have keep2_3 := write_preserves_disjoint_read h3 r2 (Or.inr (Or.inl (by simp [length])))
     simpa only [length, Nat.add_zero] using And.intro keep0_3 (And.intro keep1_3 (And.intro keep2_3 r3))
 
-#print axioms write_four_limbs
-
 end UInt256Model.Safety

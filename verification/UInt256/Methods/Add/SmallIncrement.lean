@@ -113,9 +113,6 @@ theorem SmallSaved.carry_state {original entered current : CIL.Safety.Memory}
   · intro i
     exact Ne.symm (Nat.ne_of_lt (homes.ordered i.val 4 _ _ i.isLt (facts i).1 sumPrefix))
 
-#print axioms SmallCarryState.store
-#print axioms SmallSaved.carry_state
-
 end UInt256Proof.Safety
 
 namespace UInt256Proof.Safety
@@ -201,8 +198,5 @@ theorem SmallCarryState.increment {original current : CIL.Safety.Memory} {frame 
   rw [shape] at updated
   exact small_increment_prefix segment input output (homes index) word (words index) frame current after
     (state.slots index) (state.reads index) stored post (continuation after updated)
-
-#print axioms small_increment_prefix
-#print axioms SmallCarryState.increment
 
 end UInt256Proof.Safety

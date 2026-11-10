@@ -287,8 +287,8 @@ production proof. Helper mutations run at direct `Equals` entries; wrapper-local
 and snapshot mutations retain their own cases. Polarity counterexamples compose a checked
 child observation through the exact extracted wrapper instead of unfolding its execution again.
 The [coverage map](Tests/Fixtures/Equality/README.md) explains the representatives and limits.
-The equality matrix issues 124 verification requests:
-scalar 48, x64-v3 57, SSE 19. These are request counts, not measured wall-time savings.
+The equality matrix issues 130 verification requests:
+scalar 50, x64-v3 59, SSE 21. These are request counts, not measured wall-time savings.
 
 `CompareRegression.cs [dir] [all|<profile>]` covers `op<` on scalar,
 x64-v3 and x64-v4, and `CompareTo(in UInt256)` on scalar.

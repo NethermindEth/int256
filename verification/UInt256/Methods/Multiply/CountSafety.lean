@@ -131,5 +131,4 @@ theorem count_carry_invoke (profile : CIL.FeatureProfile) (program : CIL.Program
     exact (write_outside _ _ _ _ _ id offset outputWritten
       (by simpa only [length] using outside)).trans (preserved.cells id bound offset)
 
-#print axioms count_carry_invoke
 end UInt256Proof.Multiply.CountSafety

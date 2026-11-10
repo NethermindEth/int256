@@ -73,7 +73,4 @@ theorem entry_checked (leaf : BinaryReadOnlyInvocation lessValue Extracted.progr
   intro memory left right call
   exact greater_checked leaf memory right left call.swap_binary_inputs
 
-#print axioms less_checked
-#print axioms greater_checked
-#print axioms entry_checked
 end UInt256Proof.Compare.Safety

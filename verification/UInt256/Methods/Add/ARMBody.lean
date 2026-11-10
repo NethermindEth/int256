@@ -52,5 +52,4 @@ theorem arm_helper_checked (profile : CIL.FeatureProfile) (enabled : profile.adv
     (by simp only [b, armBody, fastOutputCode, enabled, ite_true]; rfl) rfl
     rfl rfl armSpecs_repair ⟨rfl,rfl⟩ rfl rfl rfl enabled
     memory left right output flag flagFit call
-#print axioms arm_helper_checked
 end UInt256Proof.Add.Safety

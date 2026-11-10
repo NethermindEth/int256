@@ -39,5 +39,4 @@ theorem refuted : ¬ UInt256Model.Safety.ReadOnlyScalarContract CIL.Value.i32
     (.aggregate (numberBytes @ACTUAL@ 32)) call
   · rfl
   · decide
-#print axioms refuted
 end ShiftWitness

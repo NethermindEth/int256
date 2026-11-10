@@ -104,10 +104,6 @@ theorem SmallCarryState.nonzero_prefix {original current : CIL.Safety.Memory} {f
               checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
           first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
 
-#print axioms small_carry_dispatch
-#print axioms small_zero_dispatch
-#print axioms SmallCarryState.nonzero_prefix
-
 theorem SmallCarryState.overflow_prefix {original current : CIL.Safety.Memory} {frame : Frame}
     {input output sumHome : Reference} {homes : Fin 4 → Reference}
     {words : Fin 4 → BitVec 64} {sum : BitVec 64}
@@ -141,7 +137,5 @@ theorem SmallCarryState.overflow_prefix {original current : CIL.Safety.Memory} {
             slot, reading, pureArity, scalars, CIL.step,
             checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
         first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
-
-#print axioms SmallCarryState.overflow_prefix
 
 end UInt256Proof.Safety

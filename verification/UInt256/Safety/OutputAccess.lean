@@ -96,9 +96,4 @@ theorem CallingConditions.output_field_instruction {program : CIL.Program}
       Except.bind, Pure.pure, Except.pure]
   · simpa only [length] using readback
 
-#print axioms CallingConditions.after_write
-#print axioms CallingConditions.output_limb_address
-#print axioms CallingConditions.write_output_slice
-#print axioms CallingConditions.output_field_instruction
-
 end UInt256Model.Safety

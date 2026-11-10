@@ -40,5 +40,4 @@ theorem parameter_setup32 (body : CIL.Method) (args : List Value) (value : BitVe
   exact ⟨copy, entered, setup, (call.after_frame_setup setup).with_readable_input loaded,
     inputValue_of_encoded_read loaded, before, fresh⟩
 
-#print axioms parameter_setup32
 end UInt256Model.Safety

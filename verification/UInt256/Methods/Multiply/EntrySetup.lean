@@ -176,8 +176,6 @@ theorem multiply_low_inputs (ctx : Context alternative) (original entered curren
     (by rfl) (by rfl) found (by rfl) post
   exact continuation
 
-#print axioms multiply_frame_setup
-#print axioms multiply_low_inputs
 end UInt256Proof.Multiply.Entry
 
 namespace UInt256Proof.Multiply.Entry
@@ -272,8 +270,6 @@ theorem multiply_tail_mask (ctx : Context alternative) (rightSide : Bool)
         first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
     exact run_next_exists post found (by rfl) stored (continuation after next)
 
-#print axioms multiply_upper_mask
-#print axioms multiply_tail_mask
 end UInt256Proof.Multiply.Entry
 
 namespace UInt256Proof.Multiply.Entry
@@ -314,7 +310,6 @@ theorem multiply_prepare (ctx : Context alternative) (original entered current :
   apply multiply_tail_mask ctx true original entered m3 left right output frame _ originalCall enteredWF homes state3 (by rfl) post
   exact continuation
 
-#print axioms multiply_prepare
 end UInt256Proof.Multiply.Entry
 
 namespace UInt256Proof.Multiply.Entry
@@ -344,9 +339,6 @@ theorem small_product_value (memory : Memory) (left right : Reference)
   rw [Nat.mul_comm (highProduct (inputLimb memory left 0) (inputLimb memory right 0)).toNat]
   exact product_decomposition (inputLimb memory left 0) (inputLimb memory right 0)
 
-#print axioms input_upper_zero
-#print axioms input_tail_single
-#print axioms small_product_value
 end UInt256Proof.Multiply.Entry
 
 

@@ -25,8 +25,4 @@ theorem checked_entry_setup : ∀ (memory : Memory) (left right output : Referen
   intro memory left right output call
   exact call.binary_setup_succeeds (entry_frame_fits left right output)
 
-#print axioms entry_frame_fits
-#print axioms checked_entry_setup
-#print axioms program_frames_fit
-
 end UInt256Proof.Safety

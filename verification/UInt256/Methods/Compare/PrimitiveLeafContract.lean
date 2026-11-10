@@ -49,6 +49,4 @@ theorem checked_template (leafSigned leafScalarFirst : Bool) (program : CIL.Prog
   have certificate := certify_invocation _ _ _ _ _ _ _ _ _ _ found checked setup live finished
   simpa using certificate
 
-#print axioms result_math
-#print axioms checked_template
 end UInt256Proof.Compare.PrimitiveLeaf

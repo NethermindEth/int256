@@ -65,6 +65,4 @@ theorem native_checked (profile : CIL.FeatureProfile) (usesLess inclusive : Bool
   exact (after.cells id bound offset).trans
     ((preserved.cells id bound offset).trans (before.cells id bound offset))
 
-#print axioms native_result_math
-#print axioms native_checked
 end UInt256Proof.Compare.Safety

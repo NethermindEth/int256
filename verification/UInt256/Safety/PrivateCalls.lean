@@ -57,7 +57,4 @@ theorem private_calling_conditions {program : CIL.Program} {first second : Refer
   obtain ⟨notFirst, notSecond⟩ := separate reference inputMember
   simp [Apart, wordView, notFirst, notSecond]
 
-#print axioms CallingConditions.after_preserving_inputs
-#print axioms private_input_bytes
-#print axioms private_calling_conditions
 end UInt256Model.Safety

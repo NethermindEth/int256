@@ -88,5 +88,4 @@ theorem primitive_construct (memory : Memory) (left home : Reference) (argument 
   exact (tailCells id bound offset).trans
     ((outside id offset (Or.inl distinct)).trans (preserved.cells id old offset))
 
-#print axioms primitive_construct
 end UInt256Proof.Equality.PrimitiveFinish

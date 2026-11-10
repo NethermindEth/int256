@@ -33,5 +33,4 @@ theorem run_output_call {program : CIL.Program} {method pc callee : Nat} {body :
   obtain ⟨fuel, ran⟩ := run_call_exists found fetched stepped ⟨childFuel, invoked⟩ ⟨1, finished⟩
   exact ⟨fuel, leaveFrame frame final, [], ran, state.finish_output originalCall owned expected result⟩
 
-#print axioms run_output_call
 end UInt256Model.Safety

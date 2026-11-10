@@ -36,5 +36,4 @@ theorem refuted : ¬ @CONTRACT@ @OPERATION@ Extracted.program 0 := by
     memory @REFERENCES@ @BYTE_INDEX@ @ACTUAL@ call
   · rfl
   · decide
-#print axioms refuted
 end FixtureWitness

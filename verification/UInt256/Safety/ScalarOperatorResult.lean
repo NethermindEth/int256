@@ -15,5 +15,4 @@ theorem ScalarOperatorContract.result_congr {α : Type} {first negate : Bool}
   have positive (flag : Bool) : (flag != false) = flag := by cases flag <;> rfl
   exact ⟨fuel, final, by simpa only [meaning, positive] using certificate, cells⟩
 
-#print axioms ScalarOperatorContract.result_congr
 end UInt256Model.Safety

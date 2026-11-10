@@ -44,5 +44,4 @@ theorem wrapper_correctness (profile : CIL.FeatureProfile) (direction : Directio
     (checked_entry_live_state _ _ _ _ _ _ _ call.1.1 call.2 checked setup) (leading.trans finished),
     value, writable, readable, outside⟩
 
-#print axioms wrapper_correctness
 end UInt256Proof.Shift.Safety

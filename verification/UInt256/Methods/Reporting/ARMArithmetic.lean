@@ -66,5 +66,4 @@ theorem arm_outgoing_flag (a b : Limbs) : armOutgoingFlag a b = finalCarry a b :
   rw [c1, c2, c3, c4]
   exact BitVec.or_assoc _ _ _
 
-#print axioms arm_outgoing_flag
 end UInt256Proof.Reporting

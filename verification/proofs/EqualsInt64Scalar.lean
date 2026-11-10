@@ -10,8 +10,6 @@ theorem UInt256Proof.Equality.EqualsInt64.scalar_correctness :
   UInt256Proof.Equality.SignedPrimitive.checked64 Extracted.profile Extracted.program 0 1 rfl
     (UInt256Proof.Equality.UnsignedPrimitive.checked64 Extracted.profile Extracted.program 1 2 3 rfl rfl rfl rfl)
 
-#print axioms UInt256Proof.Equality.EqualsInt64.scalar_correctness
-
 theorem UInt256Proof.Equality.EqualsInt64.scalar_family (profile : CIL.FeatureProfile)
     (vector : Extracted.profile.vector256Accelerated = profile.vector256Accelerated) :
     UInt256Model.Safety.ScalarOperatorContract false false CIL.Value.i64
@@ -19,5 +17,3 @@ theorem UInt256Proof.Equality.EqualsInt64.scalar_family (profile : CIL.FeaturePr
       (CIL.reprofile Extracted.program profile) 0 :=
   UInt256Model.Safety.ScalarOperatorContract.reprofile UInt256Proof.Equality.ProfileBindings.uniform
     (UInt256Proof.Equality.ProfileBindings.primitive_agreement profile vector) UInt256Proof.Equality.EqualsInt64.scalar_correctness
-
-#print axioms UInt256Proof.Equality.EqualsInt64.scalar_family

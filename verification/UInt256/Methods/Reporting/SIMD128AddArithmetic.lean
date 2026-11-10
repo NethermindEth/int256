@@ -46,6 +46,4 @@ theorem unpropagated_high_flag (a b : Limbs)
   unfold finalCarry
   rw [c1, c2, c3, c4]
 
-#print axioms repaired_high_flag
-#print axioms unpropagated_high_flag
 end UInt256Proof.Reporting

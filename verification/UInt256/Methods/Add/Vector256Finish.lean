@@ -217,8 +217,4 @@ theorem finish_contract (program : CIL.Program) (method lookup : Nat) (profile :
   fun memory output call sum carry propagation =>
     finish_invoke program method lookup profile avx512 found lookupFound features memory output call sum carry propagation
 
-#print axioms finish_index
-#print axioms finish_tail
-#print axioms finish_invoke
-#print axioms finish_contract
 end UInt256Proof.Add.Vector256

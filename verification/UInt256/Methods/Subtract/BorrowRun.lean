@@ -118,5 +118,4 @@ theorem borrow_invoke_succeeds_of_run (bw : BitVec 64 → BitVec 64 → BitVec 6
   · exact Or.inr (Or.inr (by simpa only [length] using before))
   · exact Or.inr (Or.inl (by simpa only [length] using after))
 
-#print axioms borrow_invoke_succeeds_of_run
 end UInt256Proof.Subtract.Profile

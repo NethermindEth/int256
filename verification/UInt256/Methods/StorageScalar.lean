@@ -74,8 +74,6 @@ theorem store_limbs_safe (profile : CIL.FeatureProfile) (scalar : profile.vector
       scalar, f0, f1, f2, f3,
       a0, a1, a2, a3, h0, h1, h2, h3]
 
-#print axioms store_limbs_safe
-
 def packed (w0 w1 w2 w3 : BitVec 64) : BitVec 256 := BitVec.ofNat 256
   (w0.toNat + w1.toNat * 2^64 + w2.toNat * 2^128 + w3.toNat * 2^192)
 
@@ -115,8 +113,6 @@ theorem store_limbs_contract (profile : CIL.FeatureProfile) (scalar : profile.ve
     rw [encoded]; exact loaded
   exact ⟨result, executed, valid, outside, authority, readback, loadLocal_of_read (kind := .aggregate 32) readback⟩
 
-#print axioms store_limbs_contract
-
 theorem store_limbs_readable_contract (profile : CIL.FeatureProfile)
     (scalar : profile.vector256Accelerated = false) (program : CIL.Program) (index : Nat)
     (found : program[index]? = some (body profile))
@@ -144,5 +140,4 @@ theorem store_limbs_readable_contract (profile : CIL.FeatureProfile)
   · exact ⟨_, r2⟩
   · exact ⟨_, r3⟩
 
-#print axioms store_limbs_readable_contract
 end UInt256Proof.StorageScalar

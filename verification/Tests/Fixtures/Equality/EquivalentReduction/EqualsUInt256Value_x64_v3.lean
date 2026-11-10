@@ -11,5 +11,3 @@ theorem EqualityFixture.correct :
   · intro left right _; split <;> simp
   · rfl
   · exact fun m l r c => by simpa using ((EqualityFixture.LeafVectorWrapper.checked Extracted.profile Extracted.program 1 2 rfl rfl rfl)) m l r c
-
-#print axioms EqualityFixture.correct

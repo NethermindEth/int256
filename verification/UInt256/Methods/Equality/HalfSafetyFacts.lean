@@ -47,8 +47,4 @@ theorem input_half_difference_zero (memory : Memory) (left right : Reference) :
   simp only [BitVec.or_eq_zero_iff (w := 128), BitVec.xor_eq_zero_iff (w := 128),
     input_halves_equal]
 
-#print axioms input_halves
-#print axioms input_halves_equal
-#print axioms input_half_difference_zero
-
 end UInt256Proof.Equality.Safety

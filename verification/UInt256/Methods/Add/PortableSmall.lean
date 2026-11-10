@@ -159,11 +159,6 @@ theorem portable_small_input_prefix_checked (program : CIL.Program) (method stor
     · exact step2 pc rest
     · exact step3 pc rest
 
-#print axioms portable_small_frame_setup
-#print axioms portable_small_private_store
-#print axioms portable_small_input_prefix
-#print axioms portable_small_save
-#print axioms portable_small_input_prefix_checked
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -281,9 +276,6 @@ theorem portable_small_increment (program : CIL.Program) (method storage : Nat) 
       simp [step, cil_guard, observerCount, checkedValue, numericValue, pureArity, scalars, CIL.step.eq_def, CIL.truth,
         BitVec.ofNat_eq_ofNat, zero', Bind.bind, Except.bind, Pure.pure, Except.pure]
 
-#print axioms portable_small_prepare
-#print axioms portable_small_low_decision
-#print axioms portable_small_increment
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -382,9 +374,6 @@ theorem portable_small_store_return (program : CIL.Program) (method storage : Na
   apply continuation stored valid outside authority
   simpa only [UInt256Model.value] using value
 
-#print axioms PortableSmallState.store_limb
-#print axioms PortableSmallState.increment
-#print axioms portable_small_store_return
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -442,7 +431,6 @@ theorem PortableSmallState.finish (program : CIL.Program) (method storage : Nat)
     try dsimp only [Fin.isValue] at done
     cil_contract_steps [found, l1, l2, l3, l4, formed, argument] until done
 
-#print axioms PortableSmallState.finish
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -504,11 +492,6 @@ theorem portable_site_overflow (words : Fin 4 → BitVec 64) (word : BitVec 64) 
   · simp [portableSiteFlag, armSmallResult, armCarryResult, armIncrementWord, carry, first, second, third]
     all_goals decide
 
-#print axioms portable_site_no_carry
-#print axioms portable_site_first
-#print axioms portable_site_second
-#print axioms portable_site_third
-#print axioms portable_site_overflow
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -639,7 +622,4 @@ theorem checked_portable_small_contract (program : CIL.Program) (method storage 
     certify_invocation program method (portableSmallBody profile storage)
       args memory frame entered fuel final returned found checked setup live executed, result⟩
 
-#print axioms PortableSmallState.exit
-#print axioms portable_small_entry
-#print axioms checked_portable_small_contract
 end UInt256Proof.Add.Safety

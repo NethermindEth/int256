@@ -55,9 +55,6 @@ theorem scalar_borrow_run_remaining (contract : BorrowHelperContract Extracted.p
   intro _ third
   exact scalar_borrow_run_next contract 2 third post continuation
 
-#print axioms scalar_borrow_run_next
-#print axioms scalar_borrow_run_remaining
-
 end UInt256Proof.Subtract.Safety
 
 namespace UInt256Proof.Subtract.Safety
@@ -119,8 +116,6 @@ theorem scalar_borrow_initial_state {original entered current : CIL.Safety.Memor
   · intro index value impossible
     simp [UInt256Proof.AddSubtract.Safety.completedLocals] at impossible
 
-#print axioms scalar_borrow_initial_state
-
 end UInt256Proof.Subtract.Safety
 
 namespace UInt256Proof.Subtract.Safety
@@ -167,7 +162,6 @@ theorem scalar_borrow_store (original entered before : CIL.Safety.Memory)
   cases sameWrite
   exact stepped
 
-#print axioms scalar_borrow_store
 end UInt256Proof.Subtract.Safety
 
 namespace UInt256Proof.Subtract.Safety
@@ -215,7 +209,6 @@ theorem scalar_borrow_prefix (left right output : Reference) (frame : Frame) (be
               checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
           first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
 
-#print axioms scalar_borrow_prefix
 /-- Execute the scalar body through its complete large-operand borrow chain.
     The continuation receives the four checked result words before output stores. -/
 theorem scalar_general_borrows (contract : BorrowHelperContract Extracted.program Extracted.subtractWithBorrowIndex) (original entered : Memory) (left right output : Reference) (frame : Frame)
@@ -260,5 +253,4 @@ theorem scalar_general_borrows (contract : BorrowHelperContract Extracted.progra
   exact scalar_borrow_run_remaining contract (state.advance 0 math formed world framed) post (fun final completed =>
     continuation borrowHome results final completed)
 
-#print axioms scalar_general_borrows
 end UInt256Proof.Subtract.Safety

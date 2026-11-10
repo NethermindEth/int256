@@ -61,5 +61,4 @@ theorem forward (profile : CIL.FeatureProfile) (reversed negate flag : Bool)
   exact ⟨tailFuel + 2, leaveFrame frame final, invoke_of_run found checked setup
     ((run_next found (by rfl) firstStep).trans
       ((run_next found (by rfl) secondStep).trans tail))⟩
-#print axioms forward
 end UInt256Proof.Equality.WrapperObservation

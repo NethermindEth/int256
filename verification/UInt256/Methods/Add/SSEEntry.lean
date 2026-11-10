@@ -89,7 +89,6 @@ theorem vector128_sse_entry (program : CIL.Program) (body : CIL.Method) (method 
     exact ⟨fuel, final, values, executed, ⟨_, result.flag, (by unfold UInt256Proof.Safety.addOverflow; split <;> rfl), fun _ => rfl⟩, result.value, result.writable,
       fun id offset bound untouched => result.footprint id bound offset untouched⟩
 
-#print axioms vector128_sse_entry
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -148,7 +147,6 @@ theorem checked_vector128_sse_contract (program : CIL.Program) (body : CIL.Metho
       fuel final [.scalar (.i32 returnedValue)] found checked setup live executed,
     result, returnedFit, overflow, writable, footprint⟩
 
-#print axioms checked_vector128_sse_contract
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -189,6 +187,4 @@ theorem sse_helper_checked (profile : CIL.FeatureProfile) (disabled : profile.ad
     ⟨rfl, rfl⟩ rfl rfl rfl disabled
     memory left right output flag flagFit call
 
-#print axioms armSpecs_words
-#print axioms sse_helper_checked
 end UInt256Proof.Add.Safety

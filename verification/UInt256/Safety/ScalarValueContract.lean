@@ -29,5 +29,4 @@ theorem ScalarValueContract.reprofile {α : Type} {encode : α → CIL.Value}
   exact ⟨fuel, final, invocationCertificate_uniform_reprofile _ _ _ uniform agreement
     _ _ _ _ _ _ certificate, preserved⟩
 
-#print axioms ScalarValueContract.reprofile
 end UInt256Model.Safety

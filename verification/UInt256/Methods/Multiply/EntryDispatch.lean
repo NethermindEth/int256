@@ -63,7 +63,6 @@ theorem multiply_small_branch (ctx : Context alternative) (word : WordContract c
     Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   try rfl
 
-#print axioms multiply_small_branch
 end UInt256Proof.Multiply.Entry
 
 namespace UInt256Proof.Multiply.Entry
@@ -125,7 +124,6 @@ theorem multiply_left_two_branch (ctx : Context alternative) (word : WordContrac
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     rfl
 
-#print axioms multiply_left_two_branch
 end UInt256Proof.Multiply.Entry
 
 namespace UInt256Proof.Multiply.Entry
@@ -171,7 +169,6 @@ theorem multiply_both_two_branch (ctx : Context alternative) (word : WordContrac
     Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   try rfl
 
-#print axioms multiply_both_two_branch
 end UInt256Proof.Multiply.Entry
 
 namespace UInt256Proof.Multiply.Entry
@@ -212,7 +209,6 @@ theorem multiply_full_branch (ctx : Context alternative) (word : WordContract ct
     Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   try rfl
 
-#print axioms multiply_full_branch
 end UInt256Proof.Multiply.Entry
 
 namespace UInt256Proof.Multiply.Entry
@@ -262,7 +258,6 @@ theorem multiply_large_dispatch (ctx : Context alternative) (word : WordContract
       · simp only [rightZero, ite_false]
         exact multiply_full_branch ctx word top original entered current left right output frame originalCall owned state
 
-#print axioms multiply_large_dispatch
 end UInt256Proof.Multiply.Entry
 
 namespace UInt256Proof.Multiply.Entry
@@ -326,7 +321,6 @@ theorem multiply_scalar_branch (ctx : Context alternative) (word : WordContract 
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     rfl
 
-#print axioms multiply_scalar_branch
 end UInt256Proof.Multiply.Entry
 
 namespace UInt256Proof.Multiply.Entry
@@ -378,7 +372,6 @@ theorem multiply_dispatch (ctx : Context alternative) (word : WordContract ctx.p
       · simp only [leftZero, ite_false]
         exact multiply_large_dispatch ctx word top original entered current left right output frame originalCall owned state
 
-#print axioms multiply_dispatch
 end UInt256Proof.Multiply.Entry
 
 namespace UInt256Proof.Multiply.Entry
@@ -413,7 +406,6 @@ theorem multiply_invoke (ctx : Context alternative) (word : WordContract ctx.pro
   refine ⟨fuel, final, ?_, result⟩
   exact invoke_of_run found checked setup ran
 
-#print axioms multiply_invoke
 end UInt256Proof.Multiply.Entry
 
 

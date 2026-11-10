@@ -89,5 +89,4 @@ theorem primitive_checked (memory : Memory) (left : Reference) (argument : CIL.V
   intro id bound offset
   exact (cells id bound offset).trans (before.cells id bound offset)
 
-#print axioms primitive_checked
 end UInt256Proof.Equality.PrimitiveFinish

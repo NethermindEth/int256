@@ -23,9 +23,6 @@ theorem checked_threeWay_binding :
         (values[0]?.getD 0).toNat (values[1]?.getD 0).toNat))
       Extracted.program Extracted.entryIndex 2 := checked_threeWay_contract
 
-#print axioms checked_threeWay_contract
-#print axioms checked_threeWay_binding
-
 theorem checked_threeWay_family (profile : CIL.FeatureProfile) (_valid : profile.Valid) :
     ReadOnlyContract
       (fun values => .i32 (UInt256Model.Compare.compareWord
@@ -36,7 +33,5 @@ theorem checked_threeWay_family (profile : CIL.FeatureProfile) (_valid : profile
       have noReads : Extracted.program.profileReads = [] := by decide +kernel
       intro feature member
       simp [noReads] at member)) checked_threeWay_contract
-
-#print axioms checked_threeWay_family
 
 end UInt256Proof.Compare.Safety

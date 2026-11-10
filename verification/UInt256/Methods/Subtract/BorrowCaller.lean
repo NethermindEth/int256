@@ -8,5 +8,4 @@ open UInt256Proof.Subtract.Profile
 theorem borrow_production_contract : BorrowHelperContract Extracted.program Extracted.subtractWithBorrowIndex :=
   borrow_helper_contract (profile := Extracted.profile) rfl
 
-#print axioms borrow_production_contract
 end UInt256Proof.Subtract.Safety

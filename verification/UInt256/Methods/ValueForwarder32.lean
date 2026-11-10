@@ -80,5 +80,4 @@ theorem checked (profile : CIL.FeatureProfile) (program : CIL.Program) (index ca
   exact (after.cells id bound offset).trans
     ((cells id (Nat.lt_trans bound growth) offset).trans (before.cells id bound offset))
 
-#print axioms checked
 end UInt256Proof.ValueForwarder32

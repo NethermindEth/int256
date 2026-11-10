@@ -14,5 +14,4 @@ theorem correctness (profile : CIL.FeatureProfile) (program : CIL.Program) (inde
     (by intro _ _ impossible; contradiction) found
     (ThreeWayLeaf.threeWay_checked profile program callee childFound)
 
-#print axioms correctness
 end UInt256Proof.Compare.ThreeWayValue

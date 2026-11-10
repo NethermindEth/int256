@@ -19,5 +19,4 @@ theorem ScalarResult.modular_difference {original final : CIL.Safety.Memory} {va
     inputValue final output = inputValue original left - inputValue original right :=
   result.value.trans (scalar_difference_value original left right)
 
-#print axioms ScalarResult.modular_difference
 end UInt256Proof.Subtract.Safety

@@ -57,5 +57,4 @@ theorem shift_nonzero_finish (whole : Fin 4) (memory : Memory) (frame : Frame)
       (outputWords.getD 2 0) (outputWords.getD 3 0) = _ at packed
     exact result.trans (packed.symm.trans (shift_output_value direction whole words count))
 
-#print axioms shift_nonzero_finish
 end UInt256Proof.Shift.Safety

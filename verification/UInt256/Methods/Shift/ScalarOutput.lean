@@ -76,8 +76,6 @@ theorem shift_output_arguments (whole : Fin 4) (memory : Memory) (frame : Frame)
     cil_contract_steps [argument, formed, maskSlot, complementSlot, slots, loadMask, loadComplement, loadWord]
       until continuation
 
-#print axioms shift_output_arguments
-
 /-- The bounded whole-limb count selects exactly its checked output route. -/
 theorem shift_output_dispatch (whole : Fin 4) (memory : Memory) (frame : Frame)
     (args : List Value) (home : Reference)
@@ -100,7 +98,6 @@ theorem shift_output_dispatch (whole : Fin 4) (memory : Memory) (frame : Frame)
     simp only [outputStart] at continuation
     cil_contract_steps [slot, load] until continuation
 
-#print axioms shift_output_dispatch
 end UInt256Proof.Shift.Safety
 
 set_option maxHeartbeats 1000000
@@ -142,5 +139,4 @@ theorem shift_output_value (direction : Direction) (whole : Fin 4) (words : Fin 
   · exact right_pack_two words _ bound
   · exact right_pack_three words _ bound
 
-#print axioms shift_output_value
 end UInt256Proof.Shift.Safety

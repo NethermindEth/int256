@@ -172,8 +172,6 @@ theorem left_two_inputs (profile : CIL.FeatureProfile) (program : CIL.Program) (
     (by rfl) (by rfl) found (by rfl) post
   exact continuation
 
-#print axioms left_two_frame_setup
-#print axioms left_two_inputs
 end UInt256Proof.Multiply.LeftTwo
 
 
@@ -223,7 +221,6 @@ theorem left_two_top (profile : CIL.FeatureProfile) (program : CIL.Program) (ind
     22 (productArgs left right output) [.scalar (.i64 (inputLimb original left 0))] (body := (leftTwoBody profile wordIndex countIndex storageIndex))
   exact run_next_exists post found (by rfl) stored (continuation after next)
 
-#print axioms left_two_top
 end UInt256Proof.Multiply.LeftTwo
 
 
@@ -304,7 +301,6 @@ theorem left_two_first_products (profile : CIL.FeatureProfile) (program : CIL.Pr
     32 (productArgs left right output) [.scalar (.i64 (inputLimb original left 0))] (body := (leftTwoBody profile wordIndex countIndex storageIndex))
   exact run_next_exists post found (by rfl) stored1 (continuation m3 state3)
 
-#print axioms left_two_first_products
 end UInt256Proof.Multiply.LeftTwo
 
 
@@ -387,7 +383,6 @@ theorem left_two_second_column (profile : CIL.FeatureProfile) (program : CIL.Pro
     (counting_local_effect profile program countIndex countFound state2.snapshots state2.call.1.1 9 _ _ (localWord k2 9) (by rfl)) post
   exact fun after valid => WP.adequate.mpr (continuation after valid)
 
-#print axioms left_two_second_column
 end UInt256Proof.Multiply.LeftTwo
 
 
@@ -450,7 +445,6 @@ theorem left_two_middle_column (profile : CIL.FeatureProfile) (program : CIL.Pro
     (counting_local_effect profile program countIndex countFound state1.snapshots state1.call.1.1 9 _ _ (localWord k1 9) (by rfl)) post
   exact fun after valid => WP.adequate.mpr (continuation after valid)
 
-#print axioms left_two_middle_column
 end UInt256Proof.Multiply.LeftTwo
 
 
@@ -544,8 +538,6 @@ theorem left_two_upper_accumulate (profile : CIL.FeatureProfile) (program : CIL.
     (localWord k1 4 + localWord k1 14) 78 (productArgs left right output) [] (body := (leftTwoBody profile wordIndex countIndex storageIndex))
   exact run_next_exists post found (by rfl) stored (continuation after next)
 
-#print axioms left_two_upper_product
-#print axioms left_two_upper_accumulate
 end UInt256Proof.Multiply.LeftTwo
 
 
@@ -606,7 +598,6 @@ theorem left_two_final (profile : CIL.FeatureProfile) (program : CIL.Program) (i
     (localWord k2 4 + (localWord k2 16 + localWord k2 9)) 94 (productArgs left right output) [] (body := (leftTwoBody profile wordIndex countIndex storageIndex))
   exact run_next_exists post found (by rfl) stored (continuation after next)
 
-#print axioms left_two_final
 end UInt256Proof.Multiply.LeftTwo
 namespace UInt256Proof.Multiply.LeftTwo
 open CIL.Safety UInt256Model.Safety
@@ -630,7 +621,6 @@ theorem left_two_words_correct (original : Memory) (left right : Reference)
         left2, left3, countCarry, lowProduct, BitVec.add_assoc]
   rw [words, product_limbs_correct, input_limbs_value, input_limbs_value]
 
-#print axioms left_two_words_correct
 end UInt256Proof.Multiply.LeftTwo
 namespace UInt256Proof.Multiply.LeftTwo
 open CIL.Safety UInt256Model.Safety UInt256Proof.Multiply.Calls
@@ -702,7 +692,6 @@ theorem left_two_output (profile : CIL.FeatureProfile) (program : CIL.Program) (
       run program fuel index 95 (productArgs left right output) frame [] current =
         .ok (final, returned) ∧ ProductResult original final left right output returned :=
   left_two_output_with_storage profile program index wordIndex countIndex storageIndex (ProductStorage.scalar_contract profile scalar program storageIndex limbIndex storageFound limbsFound) found original entered current left right output frame originalCall owned state leftUpper
-#print axioms left_two_output
 end UInt256Proof.Multiply.LeftTwo
 
 namespace UInt256Proof.Multiply.LeftTwo
@@ -767,5 +756,4 @@ theorem left_two_invoke (profile : CIL.FeatureProfile) (program : CIL.Program) (
       invoke program fuel index (productArgs left right output) memory = .ok (final, []) ∧
       ProductResult memory final left right output [] :=
   left_two_invoke_with_storage profile program index wordIndex countIndex storageIndex (ProductStorage.scalar_contract profile scalar program storageIndex limbIndex storageFound limbsFound) found countFound contract memory left right output call leftUpper
-#print axioms left_two_invoke
 end UInt256Proof.Multiply.LeftTwo

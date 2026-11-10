@@ -83,10 +83,6 @@ theorem table_row (memory : Memory) (reference : Reference) (wf : memory.WellFor
     rw [same] at row
     simpa [numericOfWidth] using load_scalar_of_read (by decide) row
 
-#print axioms table_row
-#print axioms table_rows
-#print axioms lookup_invoke
-
 open UInt256Model.Safety in
 /-- Calling the table getter keeps every remembered frame fact and yields a readable table span. -/
 theorem run_lookup {program : CIL.Program} {original entered current : Memory}
@@ -117,5 +113,4 @@ theorem run_lookup {program : CIL.Program} {original entered current : Memory}
   obtain ⟨total, ran⟩ := run_call_exists found fetched stepped ⟨4, invoked⟩ ⟨fuel, finished⟩
   exact ⟨total, result, returned, ran, satisfied⟩
 
-#print axioms run_lookup
 end UInt256Proof.AddSubtract.Vector256

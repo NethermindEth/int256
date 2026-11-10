@@ -156,8 +156,6 @@ theorem both_two_inputs (profile : CIL.FeatureProfile) (program : CIL.Program) (
     10 (productArgs left right output) [.scalar (.i64 (inputLimb original left 0))] (body := (bothTwoBody profile wordIndex countIndex storageIndex))
   exact run_next_exists post found (by rfl) store2 (continuation m2 state2)
 
-#print axioms both_two_frame_setup
-#print axioms both_two_inputs
 end UInt256Proof.Multiply.BothTwo
 namespace UInt256Proof.Multiply.BothTwo
 open CIL.Safety UInt256Model.Safety UInt256Proof.Multiply.Calls
@@ -234,7 +232,6 @@ theorem both_two_first_products (profile : CIL.FeatureProfile) (program : CIL.Pr
     19 (productArgs left right output) [] (body := (bothTwoBody profile wordIndex countIndex storageIndex))
   exact run_next_exists post found (by rfl) stored1 (continuation m3 state3)
 
-#print axioms both_two_first_products
 end UInt256Proof.Multiply.BothTwo
 namespace UInt256Proof.Multiply.BothTwo
 open CIL.Safety UInt256Model.Safety UInt256Proof.Multiply.Calls
@@ -294,7 +291,6 @@ theorem both_two_second_column (profile : CIL.FeatureProfile) (program : CIL.Pro
     (counting_local_effect profile program countIndex countFound state2.snapshots state2.call.1.1 7 _ _ (localWord k2 7) (by rfl)) post
   exact fun after valid => WP.adequate.mpr (continuation after valid)
 
-#print axioms both_two_second_column
 end UInt256Proof.Multiply.BothTwo
 namespace UInt256Proof.Multiply.BothTwo
 open CIL.Safety UInt256Model.Safety UInt256Proof.Multiply.Calls
@@ -371,7 +367,6 @@ theorem both_two_final_column (profile : CIL.FeatureProfile) (program : CIL.Prog
     (counting_local_effect profile program countIndex countFound state3.snapshots state3.call.1.1 7 _ _ (localWord k3 7) (by rfl)) post
   exact fun after valid => WP.adequate.mpr (continuation after valid)
 
-#print axioms both_two_final_column
 end UInt256Proof.Multiply.BothTwo
 
 namespace UInt256Proof.Multiply.BothTwo
@@ -399,7 +394,6 @@ theorem both_two_words_correct (original : Memory) (left right : Reference)
         left2, left3, right2, right3, countCarry, BitVec.add_assoc]
   rw [words, product_limbs_correct, input_limbs_value, input_limbs_value]
 
-#print axioms both_two_words_correct
 end UInt256Proof.Multiply.BothTwo
 
 namespace UInt256Proof.Multiply.BothTwo
@@ -475,7 +469,6 @@ theorem both_two_output (profile : CIL.FeatureProfile) (program : CIL.Program) (
       run program fuel index 63 (productArgs left right output) frame [] current =
         .ok (final, returned) ∧ ProductResult original final left right output returned :=
   both_two_output_with_storage profile program index wordIndex countIndex storageIndex (ProductStorage.scalar_contract profile scalar program storageIndex limbIndex storageFound limbsFound) found original entered current left right output frame originalCall owned state leftUpper rightUpper
-#print axioms both_two_output
 end UInt256Proof.Multiply.BothTwo
 namespace UInt256Proof.Multiply.BothTwo
 open CIL.Safety UInt256Model.Safety UInt256Proof.Multiply.Calls
@@ -531,5 +524,4 @@ theorem both_two_invoke (profile : CIL.FeatureProfile) (program : CIL.Program) (
       invoke program fuel index (productArgs left right output) memory = .ok (final, []) ∧
       ProductResult memory final left right output [] :=
   both_two_invoke_with_storage profile program index wordIndex countIndex storageIndex (ProductStorage.scalar_contract profile scalar program storageIndex limbIndex storageFound limbsFound) found countFound contract memory left right output call leftUpper rightUpper
-#print axioms both_two_invoke
 end UInt256Proof.Multiply.BothTwo

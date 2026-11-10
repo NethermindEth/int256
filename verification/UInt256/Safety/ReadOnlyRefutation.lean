@@ -64,8 +64,4 @@ theorem checked_ordered_scalar_refuted {α : Type} (scalarFirst : Bool)
     (scalarOperatorArguments scalarFirst input (encode scalar)) memory final _ Prod.snd actual observed certificate.1
   exact different result.symm
 
-#print axioms checked_readonly_refuted
-#print axioms checked_readonly_scalar_refuted
-#print axioms checked_scalar_operator_refuted
-#print axioms checked_ordered_scalar_refuted
 end UInt256Model.Safety.ContractRefutation

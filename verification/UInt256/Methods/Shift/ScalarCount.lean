@@ -134,8 +134,4 @@ theorem shift_negative_count_reset (boundary : Nat) (entered current : Memory)
   cil_contract_steps 1 []
   exact run_next_exists post found rfl (stored _ _ _) done
 
-#print axioms shift_negative_count_reset
-#print axioms shift_negative_count_guard
-#print axioms shift_count_guard
-#print axioms shift_count_start
 end UInt256Proof.Shift.Safety

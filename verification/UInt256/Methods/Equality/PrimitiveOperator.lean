@@ -88,7 +88,4 @@ theorem checked {α : Type} (encode : α → CIL.Value) (equal : BitVec 256 → 
   refine ⟨fuel, _, certify_invocation _ _ _ _ _ _ _ _ _ _ found checked setup live finished, ?_⟩
   simpa only [leaveFrame, frame, List.foldl_nil] using cells
 
-#print axioms returned
-#print axioms prefix_trace
-#print axioms checked
 end UInt256Proof.Equality.PrimitiveOperator

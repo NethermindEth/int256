@@ -104,6 +104,4 @@ theorem RippleState.advance {program original before after frame left right outp
       simp [Apart, state.flagSeparate previous, state.resultSeparate previous index distinct]
     next impossible => simp at specified
 
-#print axioms completedLocals_next
-#print axioms RippleState.advance
 end UInt256Proof.AddSubtract.Safety

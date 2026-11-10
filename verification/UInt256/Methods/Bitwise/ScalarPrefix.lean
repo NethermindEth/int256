@@ -96,6 +96,4 @@ theorem scalar_prefix (operation : Binary) (profile : CIL.FeatureProfile)
   cil_checked_steps 23 [found, scalarBody, binaryArguments, scalar, word_step operation,
     leftFormed, rightFormed, outputFormed, l0, l1, l2, l3, r0, r1, r2, r3]
 
-#print axioms word_step
-#print axioms scalar_prefix
 end UInt256Proof.Bitwise

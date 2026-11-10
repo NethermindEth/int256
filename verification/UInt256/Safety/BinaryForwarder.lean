@@ -24,5 +24,4 @@ theorem forward_wrapping_binary (program : CIL.Program) (wrapperIndex childIndex
         Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure])
   exact ⟨fuel, final, certified, value, writable, footprint⟩
 
-#print axioms forward_wrapping_binary
 end UInt256Model.Safety

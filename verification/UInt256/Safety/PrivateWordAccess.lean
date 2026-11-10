@@ -33,6 +33,4 @@ theorem PrivateWords.home {program : CIL.Program} {original entered current : Me
   have writable := state.authority.access ready (enteredWF.1 _ _ requirements.present).1
   exact ⟨reference, slot, writable, access_reference_valid _ _ _ _ _ writable⟩
 
-#print axioms PrivateWords.input_field
-#print axioms PrivateWords.home
 end UInt256Model.Safety

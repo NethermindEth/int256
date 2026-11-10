@@ -112,5 +112,4 @@ theorem scalar_word_invoke (profile : CIL.FeatureProfile)
     apply write_outside _ _ _ _ _ _ _ written
     simpa only [length] using outside
 
-#print axioms scalar_word_invoke
 end UInt256Proof.Multiply

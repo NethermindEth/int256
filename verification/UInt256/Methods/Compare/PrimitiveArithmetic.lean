@@ -62,5 +62,4 @@ theorem limbs_result_math (signed scalarFirst : Bool) (a : Limbs) (word : BitVec
     (a 1 = 0 ∧ a 2 = 0 ∧ a 3 = 0)
     (small_value a) (large_value a word) (signed_nonnegative word)
 
-#print axioms limbs_result_math
 end UInt256Proof.Compare.PrimitiveSafety

@@ -33,6 +33,4 @@ theorem CallingConditions.store_private_aggregate {program : CIL.Program}
     rw [preserved.cells reference.allocation (older reference member) offset]
   simp only [inputValue, same]
 
-#print axioms CallingConditions.store_private_aggregate
-
 end UInt256Model.Safety

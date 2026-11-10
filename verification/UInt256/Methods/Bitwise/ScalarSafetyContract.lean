@@ -73,7 +73,4 @@ theorem scalar_correctness (operation : Binary) (profile : CIL.FeatureProfile)
   simpa only [show (256 : Nat)^32 = 2^256 from rfl, Nat.mod_eq_of_lt (BitVec.isLt _),
     BitVec.ofNat_toNat, BitVec.setWidth_eq] using decoded.symm
 
-#print axioms scalar_correctness
-#print axioms packed_operation
-#print axioms scalar_result
 end UInt256Proof.Bitwise

@@ -63,15 +63,11 @@ theorem prefix64 (profile : CIL.FeatureProfile) (program : CIL.Program) (index s
     PrimitivePrefix program index 10 (.i64 right) right := by
   primitive_prefix found, inactive
 
-#print axioms prefix64
-
 theorem prefix32 (profile : CIL.FeatureProfile) (program : CIL.Program) (index scalarIndex constructorIndex : Nat)
     (inactive : profile.vector256Accelerated = false)
     (found : program[index]? = some (body32 profile scalarIndex constructorIndex)) (right : BitVec 32) :
     PrimitivePrefix program index 11 (.i32 right) (BitVec.zeroExtend 64 right) := by
   primitive_prefix found, inactive
-
-#print axioms prefix32
 
 theorem checked64 (profile : CIL.FeatureProfile) (program : CIL.Program) (index scalarIndex constructorIndex : Nat)
     (inactive : profile.vector256Accelerated = false)
@@ -86,8 +82,6 @@ theorem checked64 (profile : CIL.FeatureProfile) (program : CIL.Program) (index 
     primitive_checked program index 10 scalarIndex constructorIndex (body64 profile scalarIndex constructorIndex) profile
       found rfl rfl rfl rfl rfl rfl scalarFound constructorFound rfl rfl rfl rfl rfl memory left (.i64 right) right
       rfl (prefix64 profile program index scalarIndex constructorIndex inactive found right) call
-
-#print axioms checked64
 
 set_option maxHeartbeats 800000 in
 theorem checked32 (profile : CIL.FeatureProfile) (program : CIL.Program) (index scalarIndex constructorIndex : Nat)
@@ -106,5 +100,4 @@ theorem checked32 (profile : CIL.FeatureProfile) (program : CIL.Program) (index 
       found rfl rfl rfl rfl rfl rfl scalarFound constructorFound rfl rfl rfl rfl rfl memory left (.i32 right) (BitVec.zeroExtend 64 right)
       rfl (prefix32 profile program index scalarIndex constructorIndex inactive found right) call
 
-#print axioms checked32
 end UInt256Proof.Equality.UnsignedPrimitive

@@ -37,4 +37,3 @@ theorem narrow_low_tail (a b tail : W64) :
   simpa only [BitVec.add_assoc] using congrArg (fun word => word + tail) (narrow_low_split a b)
 
 end UInt256Proof.Multiply
-#print axioms UInt256Proof.Multiply.narrow_low_correct

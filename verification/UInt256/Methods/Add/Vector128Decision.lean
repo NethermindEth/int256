@@ -134,8 +134,6 @@ theorem vector128_decision_branch (program : CIL.Program) (body : CIL.Method) (m
              checkedValue, numericValue, Bind.bind, Except.bind, Pure.pure, Except.pure]
          try (first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
     simpa only [List.reverse_nil, show (0 : BitVec 128) = BitVec.ofNat 128 0 from rfl, zero, ite_true, ite_false] using continuation
-#print axioms vector128_decision_checked
-#print axioms vector128_decision_branch
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -233,5 +231,4 @@ theorem vector128_dispatch_checked (program : CIL.Program) (body : CIL.Method) (
     (Nat.le_trans advanced (write_extends_allocations _ _ _ _ _ written).next)
     (fun disabled => (callerPreserved disabled).trans preserved)
 
-#print axioms vector128_dispatch_checked
 end UInt256Proof.Add.Safety

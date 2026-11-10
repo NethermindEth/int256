@@ -36,6 +36,4 @@ theorem PrivateWords.input_limb {program : CIL.Program} {original entered curren
     inputLimb current input index = inputLimb original input index := by
   simp only [inputLimb, state.input_bytes originalCall input member]
 
-#print axioms PrivateWords.input_value
-#print axioms PrivateWords.input_limb
 end UInt256Model.Safety

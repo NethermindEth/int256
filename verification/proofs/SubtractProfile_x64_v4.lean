@@ -7,5 +7,4 @@ namespace UInt256Proof.Subtract
 theorem profile_correctness : UInt256Model.Safety.WrappingBinaryContract (· - ·) Extracted.program 0 :=
   Vector256.subtract_contract Extracted.program Extracted.profile true true rfl rfl rfl
     ⟨rfl, rfl, rfl, rfl, rfl⟩
-#print axioms profile_correctness
 end UInt256Proof.Subtract

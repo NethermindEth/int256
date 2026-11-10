@@ -73,8 +73,6 @@ theorem small_input_prefix (input output : Reference) (word : BitVec 64)
               Bind.bind, Except.bind, Pure.pure, Except.pure]
           first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
 
-#print axioms small_input_prefix
-
 end UInt256Proof.Safety
 
 namespace UInt256Proof.Safety
@@ -123,9 +121,6 @@ theorem small_frame_setup (memory : Memory) (args : List Value) (wellFormed : me
     enterFrame_preserves_caller_memory _ _ _ _ _ entered,
     enterFrame_preserves_wellFormed _ _ _ _ _ wellFormed entered⟩
 
-#print axioms small_local_metadata
-#print axioms small_frame_setup
-
 theorem small_word_local {memory : Memory} {lower : Nat} {frame : Frame} {slots tailSlots}
     (layout : frame.locals = slots ++ tailSlots)
     (homes : WordHomes memory lower smallWordSpecs slots)
@@ -139,8 +134,6 @@ theorem small_word_local {memory : Memory} {lower : Nat} {frame : Frame} {slots 
   have inside := (List.getElem?_eq_some_iff.mp slot).1
   exact ⟨reference, by rw [layout, List.getElem?_append_left inside]; exact slot,
     bound, loaded, writable⟩
-
-#print axioms small_word_local
 
 end UInt256Proof.Safety
 
@@ -189,7 +182,5 @@ theorem small_private_store (original entered current : CIL.Safety.Memory)
   rw [written] at sameWrite
   cases sameWrite
   exact stepped
-
-#print axioms small_private_store
 
 end UInt256Proof.Safety

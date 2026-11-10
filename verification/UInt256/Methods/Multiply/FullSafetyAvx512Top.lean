@@ -45,5 +45,4 @@ theorem full_avx512_top (profile : CIL.FeatureProfile) (program : CIL.Program)
     exact ⟨rfl, rfl, rfl, rfl⟩
   exact continuation after finalState
 
-#print axioms full_avx512_top
 end UInt256Proof.Multiply.Full

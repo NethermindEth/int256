@@ -38,7 +38,4 @@ theorem mask_result_math (left right : UInt256Model.Limbs) :
   simp only [Nat.shiftLeft_eq, show (2 : Nat)^1 = 2 from rfl, Nat.mod_eq_of_lt shiftedSmall,
     Nat.mod_eq_of_lt sumSmall, Nat.mul_comm (lessMask left right) 2, masks_sum_lt]
 
-#print axioms mask_result_math
-
-#print axioms mask_invoke
 end UInt256Proof.Compare.Safety

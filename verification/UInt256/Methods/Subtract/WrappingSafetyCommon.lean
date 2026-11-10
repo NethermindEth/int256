@@ -120,7 +120,4 @@ theorem wrapping_contract_of_reporting
     exact (retained.cells id bound offset).trans
       ((resultFootprint id (Nat.lt_of_lt_of_le bound fresh.1.next) offset outside).trans (before.cells id bound offset))
 
-#print axioms wrapping_prefix
-#print axioms wrapping_return
-#print axioms wrapping_contract_of_reporting
 end UInt256Proof.Subtract.Safety

@@ -103,8 +103,6 @@ theorem signed_checked (memory : Memory) (left : Reference) (argument : CIL.Valu
         (scalarArguments left argument) memory frame memory fuel _ _ lookup checked setup live finished
     · simp [leaveFrame, frame]
 
-#print axioms signed_checked
-
 
 
 def body32 (profile : CIL.FeatureProfile) (callee : Nat) : CIL.Method := { profile := profile, returnsValue := true, locals := [], localKinds := [], parameterHomes := [], staticSites := [], code := [
@@ -162,11 +160,6 @@ theorem positive64 (profile : CIL.FeatureProfile) (program : CIL.Program) (entry
     SignedPositive program entry 6 (.i64 right) := by
   positive_steps found, positive
 
-#print axioms negative32
-#print axioms positive32
-#print axioms negative64
-#print axioms positive64
-
 
 theorem checked32 (profile : CIL.FeatureProfile) (program : CIL.Program) (entry callee : Nat)
     (found : program[entry]? = some (body32 profile callee))
@@ -187,7 +180,6 @@ theorem checked32 (profile : CIL.FeatureProfile) (program : CIL.Program) (entry 
   by_cases sign : word.toInt < 0 <;>
     simpa [scalarOperatorArguments, sign] using result
 
-#print axioms checked32
 theorem checked64 (profile : CIL.FeatureProfile) (program : CIL.Program) (entry callee : Nat)
     (found : program[entry]? = some (body64 profile callee))
     (child : ScalarOperatorContract false false CIL.Value.i64
@@ -207,5 +199,4 @@ theorem checked64 (profile : CIL.FeatureProfile) (program : CIL.Program) (entry 
   by_cases sign : word.toInt < 0 <;>
     simpa [scalarOperatorArguments, sign] using result
 
-#print axioms checked64
 end UInt256Proof.Equality.SignedPrimitive

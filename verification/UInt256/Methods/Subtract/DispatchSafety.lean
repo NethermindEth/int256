@@ -9,5 +9,4 @@ theorem checked_dispatch_contract (contract : BorrowHelperContract Extracted.pro
     Extracted.program Extracted.subtractVector256Index :=
   dispatch_contract_of_scalar (scalar_checked contract)
 
-#print axioms checked_dispatch_contract
 end UInt256Proof.Subtract.Safety

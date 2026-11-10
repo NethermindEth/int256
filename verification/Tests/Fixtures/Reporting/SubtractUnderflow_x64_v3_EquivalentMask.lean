@@ -10,5 +10,4 @@ theorem correctness :
   UInt256Proof.Subtract.Vector256.Blended.subtract_underflow_contract Extracted.program Extracted.profile true
     rfl rfl rfl ⟨rfl, rfl, rfl, rfl, rfl⟩
 
-#print axioms correctness
 end UInt256Proof.Fixture.Reporting.SubtractUnderflow_x64_v3_EquivalentMask

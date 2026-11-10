@@ -35,8 +35,6 @@ theorem multiply_checked_contract (ctx : Context alternative) (word : WordContra
   intro memory left right output call
   obtain ⟨fuel, final, certificate, result⟩ := multiply_checked_result ctx word top memory left right output call
   exact ⟨fuel, final, certificate, result.value, result.writable, result.footprint⟩
-#print axioms multiply_checked_result
-#print axioms multiply_checked_contract
 end UInt256Proof.Multiply.Entry
 
 namespace UInt256Proof.Multiply.Entry
@@ -54,7 +52,6 @@ theorem scalar_correctness (ctx : Context alternative)
   obtain ⟨final, invoked, valid, loaded, authority, outside⟩ :=
     scalar_word_invoke ctx.profile bmi arm ctx.program ctx.indices.word wordFound memory a b output wf writable
   exact ⟨9, final, invoked, valid, loaded, authority, fun id _ offset bound => outside id offset bound⟩
-#print axioms scalar_correctness
 end UInt256Proof.Multiply.Entry
 namespace UInt256Proof.Multiply.Entry
 variable {alternative : Bool}
@@ -80,8 +77,6 @@ theorem initialized_result (ctx : Context alternative) (word : Calls.WordContrac
   exact ⟨fuel, final, cert, output_encoded final output _ result.readable result.value,
     result.writable, result.footprint⟩
 
-#print axioms output_encoded
-#print axioms initialized_result
 end UInt256Proof.Multiply.Entry
 
 namespace UInt256Proof.Multiply.Entry
@@ -104,7 +99,6 @@ theorem scalar_initialized_result (ctx : Context alternative)
     UInt256Model.Safety.AggregateReturn.InitializedBinaryResult (· * ·) ctx.program ctx.indices.entry :=
   initialized_result ctx (scalar_word_contract ctx wordFound bmi arm)
     (Full.scalar_top_contract_order ctx.profile ctx.program ctx.indices.full ctx.indices.word ctx.indices.count ctx.indices.storage ctx.full avx512 avx2)
-#print axioms scalar_initialized_result
 end UInt256Proof.Multiply.Entry
 
 

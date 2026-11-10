@@ -98,6 +98,4 @@ theorem scalar_contract (profile : CIL.FeatureProfile) (scalar : profile.vector2
   store_product_contract profile scalar program index callee found childFound
 
 
-#print axioms scalar_contract
-#print axioms store_product_contract
 end UInt256Proof.Multiply.ProductStorage

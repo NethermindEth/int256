@@ -76,12 +76,6 @@ theorem smallOverflow_cases (memory : CIL.Safety.Memory) (input : CIL.Safety.Ref
   unfold smallOverflow
   simp only [BitVec.ofNat_eq_ofNat, Nat.reducePow, ← overflow]
 
-#print axioms incrementedWords_next
-#print axioms small_stopped_words
-#print axioms small_overflow_words
-#print axioms small_result_value
-#print axioms smallOverflow_cases
-
 end UInt256Proof.Safety
 
 namespace UInt256Proof.Safety
@@ -157,9 +151,6 @@ theorem small_overflow_finish (original entered current : CIL.Safety.Memory)
     call setup state.call state.preserved.cells math
   simpa [words, smallBranchFlag, show (3 : Fin 4).val = 3 from rfl,
     show (4 : Fin 5).val = 4 from rfl, flag] using finished
-
-#print axioms small_stopped_finish
-#print axioms small_overflow_finish
 
 end UInt256Proof.Safety
 
@@ -261,9 +252,5 @@ theorem small_checked (memory : CIL.Safety.Memory) (input output : Reference) (w
   · have flag : smallOverflow memory input word = 0 := by simp [smallOverflow_cases, carry]
     rw [flag]
     exact small_no_carry_checked memory input output word call carry
-
-#print axioms SmallCarryState.increment_count
-#print axioms small_zero_value
-#print axioms small_checked
 
 end UInt256Proof.Safety

@@ -40,6 +40,4 @@ theorem negation_return (args : List Value) (flag : BitVec 32) (frame : Frame) (
 
   split <;> rfl
 
-#print axioms negation_return
-
 end UInt256Proof.Equality.Safety

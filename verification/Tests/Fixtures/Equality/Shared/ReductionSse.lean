@@ -82,7 +82,6 @@ theorem sse_run (profile : CIL.FeatureProfile) (program : CIL.Program) (index : 
   · exact difference.mp ‹_›
   · exact fun equal => ‹¬ _› (difference.mpr equal)
 
-#print axioms sse_run
 end EqualityFixture.LeafSse
 
 
@@ -121,9 +120,6 @@ theorem sse_checked (profile : CIL.FeatureProfile) (program : CIL.Program) (inde
     (fun memory left right frame roots call =>
       sse_run profile program index found memory left right frame (some .null) (some .null) roots call)
     memory left right call
-
-#print axioms sse_frame_roots
-#print axioms sse_checked
 
 end EqualityFixture.LeafSse
 
@@ -201,6 +197,4 @@ theorem checked (profile : CIL.FeatureProfile) (program : CIL.Program) (index ca
     (by intro left right; simp [body, FrameSetupFits, InitializersFit, AggregateArgumentsFit, ParameterArgumentsFit])
     (executed profile program index callee vector sse found leafFound) memory left right call
 
-#print axioms executed
-#print axioms checked
 end EqualityFixture.LeafSseWrapper

@@ -38,7 +38,4 @@ theorem vector_fast_overflow (a b : Limbs)
   simp only [operationMask, UInt256Proof.Reporting.flag32_positive,
     UInt256Proof.Reporting.packed_top_flag, flag]
 
-#print axioms vector_fast_overflow
-#print axioms vector_cascade_overflow
-#print axioms vector_full_guard
 end UInt256Proof.Add.Safety

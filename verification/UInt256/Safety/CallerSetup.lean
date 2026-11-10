@@ -29,9 +29,6 @@ theorem CallingConditions.input_bytes_of_memory_below {program : CIL.Program}
   funext offset
   rw [preserved.cells reference.allocation (call.1.1.1 _ _ present).1 offset]
 
-#print axioms CallingConditions.after_memory_below
-#print axioms CallingConditions.input_bytes_of_memory_below
-
 theorem CallingConditions.after_frame_setup {program : CIL.Program}
     {memory entered : CIL.Safety.Memory} {inputs outputs : List Reference}
     {body : CIL.Method} {args : List CIL.Safety.Value} {frame : Frame}
@@ -70,9 +67,5 @@ theorem CallingConditions.input_field_after_setup {program : CIL.Program}
       .ok (entered, .scalar (.i64 (inputLimb memory reference index)) :: rest) := by
   rw [(call.after_frame_setup setup).input_field_instruction member index rest]
   simp only [inputLimb, call.input_bytes_after_setup setup member]
-
-#print axioms CallingConditions.after_frame_setup
-#print axioms CallingConditions.input_value_after_setup
-#print axioms CallingConditions.input_field_after_setup
 
 end UInt256Model.Safety

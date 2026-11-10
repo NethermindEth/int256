@@ -34,9 +34,6 @@ theorem input_half_high (memory : CIL.Safety.Memory) (reference : Reference) :
     Nat.reduceAdd] using
     halfValue_two_words (fun offset => (memory.cells reference.allocation offset).bits) (reference.offset + 16)
 
-#print axioms halfValue_two_words
-#print axioms input_half_low
-#print axioms input_half_high
 end UInt256Model.Safety
 
 namespace UInt256Model.Safety
@@ -77,7 +74,4 @@ theorem output_value_of_packed_halves (memory : CIL.Safety.Memory) (output : Ref
   simp only [Nat.mul_add, ← Nat.mul_assoc]
   omega
 
-#print axioms read_half_number
-#print axioms output_value_of_half_reads
-#print axioms output_value_of_packed_halves
 end UInt256Model.Safety

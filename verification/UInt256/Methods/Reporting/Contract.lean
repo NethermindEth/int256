@@ -28,6 +28,3 @@ theorem subtract_flag_iff (a b : BitVec 256) :
   simp only [flag, decide_eq_true_eq]
 
 end UInt256Proof.Reporting
-
-#print axioms UInt256Proof.Reporting.add_flag_iff
-#print axioms UInt256Proof.Reporting.subtract_flag_iff

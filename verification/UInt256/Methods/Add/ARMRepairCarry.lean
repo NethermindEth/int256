@@ -77,7 +77,6 @@ theorem vector128_arm_repair_carry (program : CIL.Program) (body : CIL.Method) (
                checkedValue, numericValue, Bind.bind, Except.bind, Pure.pure, Except.pure]
             first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
 
-#print axioms vector128_arm_repair_carry
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -156,7 +155,6 @@ theorem vector128_arm_update_pair (program : CIL.Program) (body : CIL.Method) (m
     (Nat.le_trans (write_extends_allocations _ _ _ _ _ firstWrite).next
       (write_extends_allocations _ _ _ _ _ secondWrite).next)
 
-#print axioms vector128_arm_update_pair
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -188,10 +186,6 @@ theorem vector128_snapshot_high_carry (memory : Memory) (left right : Reference)
   simp only [vector128SnapshotValue, show (6 : Fin 11).val = 6 from rfl,
     input_half_high, halfCarry, halfSum, zip128, lane128_0, lane128_1, carryMask]
 
-#print axioms vector128_arm_extra_value
-#print axioms vector128_arm_repaired_high
-#print axioms vector128_arm_repaired_carry
-#print axioms vector128_snapshot_high_carry
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -282,7 +276,6 @@ theorem vector128_arm_prepare (program : CIL.Program) (body : CIL.Method) (metho
     (Nat.le_trans (write_extends_allocations _ _ _ _ _ firstWrite).next
       (Nat.le_trans secondNext (write_extends_allocations _ _ _ _ _ thirdWrite).next))
 
-#print axioms vector128_arm_prepare
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -357,7 +350,6 @@ theorem vector128_arm_repair_checked (program : CIL.Program) (body : CIL.Method)
         exact kept i.val carry high reference _ slot loaded
   exact continuation after complete (preserved.trans finalPreserved) afterCall afterAuthority (Nat.le_trans advanced next)
 
-#print axioms vector128_arm_repair_checked
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -400,10 +392,6 @@ theorem vector128_repaired_snapshot_carry (advSimd : Bool) (memory : Memory) (le
   rw [vector128_snapshot_high_carry, vector128_branch_high, vector128_snapshot_high, vector128_decision_repair_mask]
   exact vector128_arm_repaired_carry _ _
 
-#print axioms vector128_decision_values_old
-#print axioms vector128_decision_repair_mask
-#print axioms vector128_repaired_snapshot_high
-#print axioms vector128_repaired_snapshot_carry
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -439,6 +427,4 @@ theorem vector128_snapshot_repaired_flag (advSimd : Bool) (memory : Memory) (lef
   change (finalCarry (inputLimb memory left) (inputLimb memory right) ≠ BitVec.ofNat 64 0) ↔ _ at overflow
   simp only [overflow]
 
-#print axioms vector128_snapshot_fast_flag
-#print axioms vector128_snapshot_repaired_flag
 end UInt256Proof.Add.Safety

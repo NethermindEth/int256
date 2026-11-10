@@ -14,5 +14,3 @@ theorem EqualityFixture.correct :
   UInt256Proof.Equality.PrimitiveOperator.checked CIL.Value.i64 _ Extracted.profile false true Extracted.program 0 1 rfl (fun _ => rfl)
     (UInt256Proof.Equality.PrimitiveOperator.checked CIL.Value.i64 _ Extracted.profile false false Extracted.program 1 2 rfl (fun _ => rfl)
     (UInt256Proof.Equality.VectorPrimitiveWrapper.checked64 Extracted.profile Extracted.program 2 3 rfl rfl rfl))
-
-#print axioms EqualityFixture.correct

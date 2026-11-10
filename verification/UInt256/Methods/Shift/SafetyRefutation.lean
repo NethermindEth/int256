@@ -47,6 +47,4 @@ theorem checked_operator_refuted (program : CIL.Program) (entry observedFuel : N
     have values := Except.ok.inj (by simpa only [execution, Except.map] using observed)
     exact different (Value.scalar.inj (List.cons.inj values).1).symm
 
-#print axioms checked_result_refuted
-#print axioms checked_operator_refuted
 end UInt256Proof.Shift

@@ -86,7 +86,4 @@ theorem run_store_limbs (contract : LimbStorageContract program index arguments)
   intro stored valid outside authority value _
   exact continuation stored valid outside authority value
 
-#print axioms run_store_limbs_readable
-#print axioms run_store_limbs
-
 end UInt256Proof.Safety

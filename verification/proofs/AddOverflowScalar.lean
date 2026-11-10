@@ -7,5 +7,3 @@ theorem UInt256Proof.Add.overflow_scalar_correctness :
       (fun left right => decide (2^256 ≤ left.toNat + right.toNat))
       Extracted.program Extracted.entryIndex :=
   UInt256Proof.Safety.checked_overflow_binding
-
-#print axioms UInt256Proof.Add.overflow_scalar_correctness

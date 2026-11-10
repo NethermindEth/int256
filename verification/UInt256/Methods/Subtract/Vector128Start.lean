@@ -148,9 +148,6 @@ theorem SubtractVectorState.retain {program : CIL.Program} {original entered cur
     SubtractVectorState program original entered current inputs outputs slots values fewer :=
   ⟨state.call, state.preserved, state.authority, fun i lower => state.snapshots i (by omega)⟩
 
-#print axioms SubtractVectorState.store
-#print axioms SubtractVectorState.load
-#print axioms SubtractVectorState.retain
 end UInt256Proof.Subtract.Profile
 
 namespace UInt256Proof.Subtract.Profile
@@ -224,7 +221,6 @@ theorem subtract_start_checked (program : CIL.Program) (body : CIL.Method) (meth
              Bind.bind, Except.bind, Pure.pure, Except.pure]
           first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
 
-#print axioms subtract_start_checked
 end UInt256Proof.Subtract.Profile
 
 namespace UInt256Proof.Subtract.Profile
@@ -340,6 +336,4 @@ theorem subtract_decision_checked (program : CIL.Program) (body : CIL.Method) (m
       | exact continuation
       | (exfalso; simp only [show (0 : BitVec 128) = BitVec.ofNat 128 0 from rfl] at *; simp_all)
 
-#print axioms subtract_incoming_checked
-#print axioms subtract_decision_checked
 end UInt256Proof.Subtract.Profile

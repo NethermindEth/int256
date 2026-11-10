@@ -105,5 +105,4 @@ theorem impl_contract (program : CIL.Program) (method lookup : Nat) (profile : C
   simpa only [decide_eq_true_eq] using
     certify_invocation program method _ _ memory frame entered fuel final _ found checked setup live ran
 
-#print axioms impl_contract
 end UInt256Proof.Subtract.Vector256

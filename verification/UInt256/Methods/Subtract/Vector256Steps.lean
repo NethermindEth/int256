@@ -221,8 +221,6 @@ theorem impl_inputs (program : CIL.Program) (method lookup : Nat) (profile : CIL
   impl_store
   exact continuation current state
 
-#print axioms impl_inputs
-
 /-- Locals 0-4 after the borrow mask and its incoming shift. -/
 def maskLocals (left right : BitVec 256) : Nat → Option CIL.Value :=
   rememberLocal (rememberLocal (differenceLocals left right) 3 (.v256 (borrowLanes left right))) 4
@@ -301,8 +299,6 @@ theorem impl_masks (program : CIL.Program) (method lookup : Nat) (profile : CIL.
     impl_step
     exact continuation current state
 
-#print axioms impl_masks
-
 /-- The first output store writes the speculative difference. -/
 def speculative (left right : BitVec 256) : BitVec 256 :=
   CIL.Vector.zip256 (· + ·) (CIL.Vector.zip256 (· - ·) left right) (borrowIncoming (borrowLanes left right))
@@ -365,8 +361,6 @@ theorem impl_decision (program : CIL.Program) (method lookup : Nat) (profile : C
     impl_step
     exact slow decided current state
 
-#print axioms impl_decision
-
 /-- The byte return keeps a 0/1 flag. -/
 theorem impl_return (program : CIL.Program) (method lookup : Nat) (profile : CIL.FeatureProfile)
     (avx512 bmi1 : Bool) (found : program[method]? = some (subtractImplBody profile avx512 bmi1 lookup))
@@ -404,9 +398,6 @@ theorem impl_fast_return (program : CIL.Program) (method lookup : Nat) (profile 
   impl_step
   exact ⟨1, _, _, impl_return program method lookup _ avx512 bmi1 found 124 rfl _ frame current _
     (by split <;> rfl), continuation⟩
-
-#print axioms impl_return
-#print axioms impl_fast_return
 
 /-- Locals after forming the cascade sum and table index from the two lane masks. -/
 def slowLocals (left right : BitVec 256) : Nat → Option CIL.Value :=
@@ -458,8 +449,6 @@ theorem impl_index (program : CIL.Program) (method lookup : Nat) (profile : CIL.
   impl_step
   impl_store
   exact continuation current state
-
-#print axioms impl_index
 
 theorem bextr_bit (x : BitVec 32) :
     (((CIL.Vector.bextr32 x 4 1).setWidth 8).setWidth 32).toNat ≤ 1 := by

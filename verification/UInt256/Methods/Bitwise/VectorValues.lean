@@ -19,6 +19,4 @@ theorem vector_to_aggregate (bits : BitVec 256) :
   simp [bitcastValue, CIL.Value.hasUnspecified, valueSnapshot, snapshotValue, CIL.SnapshotShape.width,
     List.map_map, Function.comp_def, Pure.pure, Except.pure]
 
-#print axioms aggregate_to_vector
-#print axioms vector_to_aggregate
 end UInt256Proof.Bitwise.VectorValues

@@ -10,4 +10,3 @@ theorem productLimbs_value (a b : Limbs) :
       show (3 : Fin 4).val = 3 from rfl, Nat.reduceEqDiff, ↓reduceIte]
   rfl
 end UInt256Proof.Multiply
-#print axioms UInt256Proof.Multiply.productLimbs_value

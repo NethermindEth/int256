@@ -35,8 +35,6 @@ theorem shift_zero_output (memory : Memory) (inputs outputs : List Reference)
   cil_contract_steps [argument, formed, writtenZero, formValue, instruction, ordinaryAccessAlignment,
     staticInstruction, memoryInstruction, storeValue, referenceAt] until done
 
-#print axioms shift_zero_output
-
 /-- The zero branch returns normally and retires only private frame storage. -/
 theorem shift_zero_finish (memory : Memory) (inputs outputs : List Reference)
     (frame : Frame) (args : List Value) (output : Reference) (boundary : Nat)
@@ -65,5 +63,4 @@ theorem shift_zero_finish (memory : Memory) (inputs outputs : List Reference)
   · intro id old offset untouched
     exact (retired.cells id old offset).trans (outside id offset untouched)
 
-#print axioms shift_zero_finish
 end UInt256Proof.Shift.Safety

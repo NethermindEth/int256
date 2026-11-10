@@ -108,10 +108,6 @@ theorem arm_small_sum (program : CIL.Program) (method storage : Nat) (profile : 
                Bind.bind, Except.bind, Pure.pure, Except.pure]
             try (first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)))
 
-#print axioms arm_small_sum
-
-#print axioms arm_small_input_prefix
-
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -202,10 +198,6 @@ theorem arm_small_increment (program : CIL.Program) (method storage : Nat) (prof
                  Bind.bind, Except.bind, Pure.pure, Except.pure]
               try (first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)))
 
-#print axioms arm_small_increment
-
-#print axioms arm_small_flag_zero
-#print axioms arm_small_low_decision
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -313,9 +305,4 @@ theorem arm_small_output_arguments (program : CIL.Program) (method storage : Nat
                Bind.bind, Except.bind, Pure.pure, Except.pure]
             try (first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)))
 
-#print axioms arm_small_output_arguments
-
-#print axioms arm_small_increment_branch
-#print axioms arm_small_final_flag
-#print axioms arm_small_return
 end UInt256Proof.Add.Safety

@@ -16,5 +16,4 @@ theorem checked32 : ScalarOperatorContract wrapperScalarFirst wrapperNegate CIL.
   PrimitiveWrapper.checked32 wrapperSigned32 leafSigned leafScalarFirst wrapperReversed wrapperNegate
     Extracted.program Extracted.entryIndex leafIndex (by rfl) (by rfl)
 
-#print axioms checked32
 end UInt256Proof.Compare.PrimitiveSafety

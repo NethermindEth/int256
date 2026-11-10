@@ -9,5 +9,4 @@ theorem vector_contract (profile : CIL.FeatureProfile) (vector : profile.vector2
     (found : program[index]? = some (vectorBody profile)) : Contract program index :=
   UInt256Proof.StorageVector.store_template_contract profile true 7 vector program index found
 
-#print axioms vector_contract
 end UInt256Proof.Multiply.ProductStorage

@@ -10,5 +10,4 @@ theorem correctness : ShiftContract .left Extracted.program 0 :=
   wrapper_correctness Extracted.profile .left Extracted.program 0 1 (by rfl)
     (vector_helper_contract Extracted.profile (by rfl) Extracted.program 1 2 3 (by decide) (by rfl) (by rfl) (by rfl))
 
-#print axioms correctness
 end UInt256Proof.Shift.Fixture

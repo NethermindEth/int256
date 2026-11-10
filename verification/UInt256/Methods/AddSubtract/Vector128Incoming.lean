@@ -272,9 +272,6 @@ theorem vector128_incoming_join (program : CIL.Program) (body : CIL.Method) (met
            Bind.bind, Except.bind, Pure.pure, Except.pure]
        first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)
 
-#print axioms vector128_incoming_checked
-#print axioms vector128_incoming_dispatch
-#print axioms vector128_incoming_join
 end UInt256Proof.AddSubtract.Safety
 namespace UInt256Proof.AddSubtract.Safety
 open CIL.Safety UInt256Model.Safety CIL.Vector
@@ -348,5 +345,4 @@ theorem vector128_incoming_pair (program : CIL.Program) (body : CIL.Method) (met
     (Nat.le_trans (write_extends_allocations _ _ _ _ _ firstWrite).next
       (write_extends_allocations _ _ _ _ _ secondWrite).next)
 
-#print axioms vector128_incoming_pair
 end UInt256Proof.AddSubtract.Safety

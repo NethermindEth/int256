@@ -96,8 +96,3 @@ theorem small_underflow_iff (a : Limbs) (b : W64) :
   omega
 
 end UInt256Proof.Reporting
-
-#print axioms UInt256Proof.Reporting.finalCarry_overflow
-#print axioms UInt256Proof.Reporting.finalBorrow_underflow
-#print axioms UInt256Proof.Reporting.small_overflow_iff
-#print axioms UInt256Proof.Reporting.small_underflow_iff

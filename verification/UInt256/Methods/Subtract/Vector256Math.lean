@@ -184,14 +184,4 @@ theorem slow_flag_value (bmi1 : Bool) (a b : Limbs) :
     rw [UInt256Proof.Reporting.packed_bextr_cascade, ← ite_not]
     exact flag_select equivalent _ _
 
-#print axioms flag_select
-#print axioms fast_flag_value
-#print axioms slow_flag_value
-#print axioms ternary_borrow_lanes
-#print axioms align_incoming
-#print axioms permute_incoming
-#print axioms fast_difference
-#print axioms fast_flag
-#print axioms cascade_difference
-#print axioms cascade_flag
 end UInt256Proof.Subtract.Vector256

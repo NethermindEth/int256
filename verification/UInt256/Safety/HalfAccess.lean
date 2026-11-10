@@ -41,8 +41,4 @@ theorem CallingConditions.input_half_formed {program : CIL.Program}
   exact read_reference_valid _ _ _ _ _
     (read_slice call.1.1 (call.input_snapshot member) (16 * index.val) 16 (by decide) (by omega))
 
-#print axioms CallingConditions.input_half_address
-#print axioms CallingConditions.input_half_load
-#print axioms CallingConditions.input_half_formed
-
 end UInt256Model.Safety

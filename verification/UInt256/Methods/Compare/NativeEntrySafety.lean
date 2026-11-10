@@ -42,5 +42,4 @@ theorem native_entry_checked (profile : CIL.FeatureProfile) (usesLess inclusive 
     · rfl
     · exact plainLoads_unchanged _ _
     · exact continuation
-#print axioms native_entry_checked
 end UInt256Proof.Compare.Safety

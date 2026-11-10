@@ -106,8 +106,6 @@ theorem prepare_inputs (program : CIL.Program) (method : Nat) (profile : CIL.Fea
   intro current state scratch
   exact continuation current state scratch
 
-#print axioms prepare_inputs
-
 theorem prepare_masks (program : CIL.Program) (method : Nat) (profile : CIL.FeatureProfile) (avx512 : Bool)
     (found : program[method]? = some (prepareAddBody profile avx512)) (features : AddProfile profile avx512)
     (original memory entered current : Memory) (left right output s0 s1 s2 s3 : Reference) (frame : Frame)
@@ -180,8 +178,6 @@ theorem prepare_masks (program : CIL.Program) (method : Nat) (profile : CIL.Feat
     prep_pure
     exact continuation current state scratch
 
-#print axioms prepare_masks
-
 theorem prepare_tail (program : CIL.Program) (method : Nat) (profile : CIL.FeatureProfile) (avx512 : Bool)
     (found : program[method]? = some (prepareAddBody profile avx512)) (features : AddProfile profile avx512)
     (original memory entered current : Memory) (left right output s0 s1 s2 s3 : Reference) (frame : Frame)
@@ -223,8 +219,6 @@ theorem prepare_tail (program : CIL.Program) (method : Nat) (profile : CIL.Featu
   have fetched : (prepareAddBody profile avx512).code[68]? = some .ret := rfl
   refine ⟨1, _, _, ?_, continuation current state scratch⟩
   simp [run, found, fetched, returns, step, cil_guard, observerCount, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-
-#print axioms prepare_tail
 
 /-- `PrepareAdd`: speculative sum in the output, lane vectors in the caller cells, other caller bytes kept. -/
 theorem prepare_invoke (program : CIL.Program) (method : Nat) (profile : CIL.FeatureProfile) (avx512 : Bool)
@@ -310,8 +304,6 @@ theorem prepare_invoke (program : CIL.Program) (method : Nat) (profile : CIL.Fea
     (invoke_preserves_caller_allocations program fuel method args [] memory final certificate.1).next,
     authority, footprint, result, cells⟩
 
-#print axioms prepare_invoke
-
 /-- What a compiled `PrepareAdd` guarantees its caller, independent of its body. -/
 def PrepareContract (program : CIL.Program) (method : Nat) : Prop :=
   ∀ (original memory : Memory) (left right output s0 s1 s2 s3 : Reference),
@@ -338,5 +330,4 @@ theorem prepare_contract (program : CIL.Program) (method : Nat) (profile : CIL.F
     prepare_invoke program method profile avx512 found features original memory left right output s0 s1 s2 s3
       originalCall call grown same layout scratch
 
-#print axioms prepare_contract
 end UInt256Proof.Add.Vector256

@@ -22,8 +22,7 @@ exact method bodies by `rfl`, so a body-changing refactor needs
 `<Method>_<profile>_<Case>.lean` in this directory. EquivalentMask is the one
 positive refactor fixture kept for this family; the other original body-changing
 positives (LaneLocals, InlineCarry, ExtractedHelper, ReversedStore,
-FeatureExpressions) were dropped. Per-runner results are in
-`manifests/migration-status.json`.
+FeatureExpressions) were dropped.
 
 Every case is a consumer contract or proof property, so every case is ported as
 `SIMD/<Method>/<profile>/<Case>`; none is delegated to LeanCIL.

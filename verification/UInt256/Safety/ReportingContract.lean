@@ -29,5 +29,4 @@ theorem ReportingBinaryContract.reprofile
   exact ⟨fuel, final, invocationCertificate_uniform_reprofile _ _ _ uniform agreement
     _ _ _ _ _ _ certificate, preserved⟩
 
-#print axioms ReportingBinaryContract.reprofile
 end UInt256Model.Safety

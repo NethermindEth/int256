@@ -80,5 +80,4 @@ theorem run_local_word_call {program : CIL.Program} {method pc callee : Nat} {bo
   simpa only [Nat.add_assoc, Nat.reduceAdd, List.cons_append, List.nil_append] using
     WP.step found code4 written (continuation prepared preparedState)
 
-#print axioms run_local_word_call
 end UInt256Model.Safety

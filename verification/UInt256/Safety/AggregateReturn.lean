@@ -122,8 +122,6 @@ theorem binary_checked (operation : BitVec 256 → BitVec 256 → BitVec 256) (p
     (child : InitializedBinaryResult operation program callee) : BinaryContract operation program index :=
   binary_disjoint_checked operation profile program index callee found
     (fun memory left right output call _ _ => child memory left right output call)
-#print axioms binary_checked
-#print axioms binary_prefix
 end UInt256Model.Safety.AggregateReturn
 
 namespace UInt256Model.Safety.AggregateReturn
@@ -231,7 +229,5 @@ theorem unary_checked (operation : BitVec 256 → BitVec 256) (profile : CIL.Fea
     (child : InitializedUnaryResult operation program callee) : UnaryContract operation program index :=
   unary_disjoint_checked operation profile program index callee found
     (fun memory input output call _ => child memory input output call)
-#print axioms unary_checked
-#print axioms unary_prefix
 end UInt256Model.Safety.AggregateReturn
 

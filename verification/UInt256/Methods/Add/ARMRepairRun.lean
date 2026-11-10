@@ -35,7 +35,6 @@ theorem vector128_arm_repair_return (program : CIL.Program) (body : CIL.Method) 
     all_goals simp [run, found, fetched, returns, step, cil_guard, observerCount, checkedValue, numericValue, CIL.NarrowKind.extend, carry,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
-#print axioms vector128_arm_repair_return
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -94,7 +93,6 @@ theorem vector128_arm_repair_output (program : CIL.Program) (body : CIL.Method) 
                checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
             first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
 
-#print axioms vector128_arm_repair_output
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -136,7 +134,6 @@ theorem vector128_arm_repair_suffix (program : CIL.Program) (body : CIL.Method) 
     (privateReads carryHome 16 1 _ carryBound carryRead),
     continuation after outputRead afterCall afterAuthority outside advanced⟩
 
-#print axioms vector128_arm_repair_suffix
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -195,7 +192,6 @@ theorem vector128_arm_repair_result (program : CIL.Program) (body : CIL.Method) 
   · intro id offset earlier untouched
     exact (teardown.cells id earlier offset).trans (outside id offset untouched)
 
-#print axioms vector128_arm_repair_result
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -256,7 +252,6 @@ theorem vector128_arm_repair_run (program : CIL.Program) (body : CIL.Method) (me
   exact ⟨fuel, final, returned, executed, scalar, result, writable,
     fun id offset bound untouched => (outside id offset bound untouched).trans (preserved.cells id bound offset)⟩
 
-#print axioms vector128_arm_repair_run
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -283,5 +278,4 @@ theorem vector128_repair_dispatch (program : CIL.Program) (body : CIL.Method) (m
            numericValue, checkedValue, Bind.bind, Except.bind, Pure.pure, Except.pure]
        first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)
 
-#print axioms vector128_repair_dispatch
 end UInt256Proof.Add.Safety

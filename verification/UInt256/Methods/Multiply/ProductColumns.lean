@@ -58,4 +58,3 @@ theorem product_conservation (a b : Limbs) :
     List.sum_cons, List.sum_nil, Nat.add_zero]
   omega
 end UInt256Proof.Multiply
-#print axioms UInt256Proof.Multiply.product_conservation

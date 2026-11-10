@@ -74,7 +74,6 @@ theorem vector128_fast_return (program : CIL.Program) (body : CIL.Method) (metho
   all_goals simp [run, found, fetched, returns, step, cil_guard, observerCount, checkedValue, numericValue, CIL.NarrowKind.extend, carry,
     Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
-#print axioms vector128_fast_return
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -170,6 +169,4 @@ theorem vector128_fast_output_dispatch (program : CIL.Program) (body : CIL.Metho
            numericValue, checkedValue, Bind.bind, Except.bind, Pure.pure, Except.pure]
        first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)
 
-#print axioms vector128_fast_output
-#print axioms vector128_fast_output_dispatch
 end UInt256Proof.Add.Safety

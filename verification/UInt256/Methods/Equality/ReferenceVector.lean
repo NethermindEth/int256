@@ -58,6 +58,4 @@ theorem checked (profile : CIL.FeatureProfile) (program : CIL.Program) (index : 
     (by intro left right; simp [body, FrameSetupFits, InitializersFit, AggregateArgumentsFit, ParameterArgumentsFit, SelectedKindsFit])
     (executed profile program index found) memory left right call
 
-#print axioms executed
-#print axioms checked
 end UInt256Proof.Equality.ReferenceVector

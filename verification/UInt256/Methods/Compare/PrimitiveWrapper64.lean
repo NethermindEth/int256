@@ -23,6 +23,4 @@ theorem checked64 (leafSigned scalarFirst reversed negate : Bool) (program : CIL
   checked CIL.Value.i64 id false false leafSigned scalarFirst reversed negate program entry callee
     found leafFound (fun _ => rfl) (prefix64 scalarFirst reversed negate program entry callee found)
 
-#print axioms prefix64
-#print axioms checked64
 end UInt256Proof.Compare.PrimitiveWrapper

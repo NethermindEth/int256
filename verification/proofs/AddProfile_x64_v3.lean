@@ -7,5 +7,4 @@ namespace UInt256Proof.Add
 theorem profile_correctness : UInt256Model.Safety.WrappingBinaryContract (· + ·) Extracted.program 0 :=
   Vector256.add_contract Extracted.program Extracted.profile false rfl rfl rfl rfl
     ⟨rfl, rfl, rfl, rfl⟩
-#print axioms profile_correctness
 end UInt256Proof.Add

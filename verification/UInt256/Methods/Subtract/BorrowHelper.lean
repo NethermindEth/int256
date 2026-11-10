@@ -55,7 +55,6 @@ theorem borrowWord_correct (a b c : BitVec 64) (incoming : c.toNat ≤ 1) :
   simpa only [borrowWord, UInt256Proof.extend_subtract_choice] using
     UInt256Proof.borrow_expression a b c incoming
 
-#print axioms borrowWord_correct
 end UInt256Proof.Subtract.Profile
 
 namespace UInt256Proof.Subtract.Profile
@@ -71,7 +70,6 @@ theorem borrow_run_of_memory_steps (found : program[index]? = some (borrowBody p
   cil_checked_steps [borrowFormed, outputFormed, borrowStored, beforeRead, afterRead, resultWrite, borrowWrite,
     borrowWord, formValue, instruction, storeValue, referenceAt]
 
-#print axioms borrow_run_of_memory_steps
 end UInt256Proof.Subtract.Profile
 
 namespace UInt256Proof.Subtract.Profile
@@ -167,8 +165,4 @@ theorem scalar_flag_underflow (memory : Memory) (left right : Reference) :
   simp only [scalarUnderflowFlag, same, UInt256Proof.Reporting.word_positive,
     underflow, BitVec.ofNat_eq_ofNat]
 
-#print axioms ScalarBorrowState.advance
-#print axioms scalar_difference_words
-#print axioms scalar_difference_value
-#print axioms scalar_flag_underflow
 end UInt256Proof.Subtract.Profile

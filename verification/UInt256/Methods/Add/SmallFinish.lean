@@ -93,9 +93,6 @@ theorem small_no_carry_prefix (input output sumHome : Reference) (word : BitVec 
             checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
         first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
 
-#print axioms small_return
-#print axioms small_no_carry_prefix
-
 end UInt256Proof.Safety
 
 namespace UInt256Proof.Safety
@@ -175,9 +172,6 @@ theorem small_no_carry_value (memory : CIL.Safety.Memory) (input : Reference) (w
   simpa [UInt256Model.value, UInt256Proof.smallResult, UInt256Proof.singleLimb,
     show (3 : Fin 4).val = 3 from rfl, noCarry] using sum
 
-#print axioms small_store_finish
-#print axioms small_no_carry_value
-
 theorem small_no_carry_checked (memory : CIL.Safety.Memory)
     (input output : Reference) (word : BitVec 64)
     (call : CallingConditions Extracted.program memory [input] [output])
@@ -201,7 +195,5 @@ theorem small_no_carry_checked (memory : CIL.Safety.Memory)
   let words := fun i : Fin 4 => if i.val = 0 then inputLimb memory input 0 + word else inputLimb memory input i
   exact small_store_finish 0 memory entered after frame input output word words call setup saved.call
     saved.preserved.cells (small_no_carry_value memory input word noCarry)
-
-#print axioms small_no_carry_checked
 
 end UInt256Proof.Safety

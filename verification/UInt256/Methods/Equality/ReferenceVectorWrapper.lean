@@ -56,5 +56,4 @@ theorem checked (profile : CIL.FeatureProfile) (program : CIL.Program) (index ca
       exact continuation
   exact forwarded memory left right call
 
-#print axioms checked
 end UInt256Proof.Equality.ReferenceVectorWrapper

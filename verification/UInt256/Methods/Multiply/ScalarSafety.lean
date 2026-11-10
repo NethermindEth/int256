@@ -154,8 +154,6 @@ theorem scalar_input_save (profile : CIL.FeatureProfile) (program : CIL.Program)
     dsimp at reading stored done
     cil_contract_steps [found, scalarArgs, formed, reading, stored] until done
 
-#print axioms scalar_frame_setup
-#print axioms scalar_input_save
 end UInt256Proof.Multiply.ScalarSafety
 
 namespace UInt256Proof.Multiply.ScalarSafety
@@ -242,8 +240,6 @@ theorem scalar_first_product (profile : CIL.FeatureProfile) (program : CIL.Progr
     [.scalar (.i64 (inputLimb original input 3))] (body := (scalarBody profile wordIndex storageIndex))
   exact run_next_exists post found (by rfl) stored (continuation after finalState)
 
-#print axioms scalar_inputs
-#print axioms scalar_first_product
 end UInt256Proof.Multiply.ScalarSafety
 namespace UInt256Proof.Multiply.ScalarSafety
 open CIL.Safety UInt256Model.Safety UInt256Proof.Multiply.Calls
@@ -358,8 +354,6 @@ theorem scalar_accumulate (profile : CIL.FeatureProfile) (program : CIL.Program)
     · simpa only [← flag] using storeCarry
     exact done
 
-#print axioms scalar_next_product
-#print axioms scalar_accumulate
 end UInt256Proof.Multiply.ScalarSafety
 
 namespace UInt256Proof.Multiply.ScalarSafety
@@ -418,7 +412,6 @@ theorem scalar_products (profile : CIL.FeatureProfile) (program : CIL.Program) (
     (by simp [rememberWord, scalarCarry]) post
   exact continuation
 
-#print axioms scalar_products
 end UInt256Proof.Multiply.ScalarSafety
 
 namespace UInt256Proof.Multiply.ScalarSafety
@@ -525,7 +518,6 @@ theorem scalar_output (profile : CIL.FeatureProfile) (program : CIL.Program) (me
         [.scalar (.i64 (inputLimb original input 3))] current = .ok (final, returned) ∧
       ScalarResult original final input output word returned :=
   scalar_output_with_storage profile program methodIndex wordIndex storageIndex (ProductStorage.scalar_contract profile scalar program storageIndex limbIndex storageFound limbsFound) found original entered current input output word frame originalCall enteredWF homes owned state
-#print axioms scalar_output
 end UInt256Proof.Multiply.ScalarSafety
 namespace UInt256Proof.Multiply.ScalarSafety
 open CIL.Safety UInt256Model.Safety UInt256Proof.Multiply.Calls
@@ -633,7 +625,6 @@ theorem scalar_one_with_storage (profile : CIL.FeatureProfile) (program : CIL.Pr
   simpa using
     (inputValue_of_encoded_read readback).trans same
 
-#print axioms scalar_zero_with_storage
 theorem scalar_one (profile : CIL.FeatureProfile) (program : CIL.Program) (methodIndex wordIndex storageIndex limbIndex : Nat)
     (_scalar : profile.vector256Accelerated = false)
     (found : program[methodIndex]? = some (scalarBody profile wordIndex storageIndex))
@@ -647,7 +638,6 @@ theorem scalar_one (profile : CIL.FeatureProfile) (program : CIL.Program) (metho
       run program fuel methodIndex 17 (scalarArgs input 1 output) frame [] current =
         .ok (final, returned) ∧ ScalarResult original final input output 1 returned :=
   scalar_one_with_storage profile program methodIndex wordIndex storageIndex (ProductStorage.scalar_contract profile _scalar program storageIndex limbIndex _storageFound _limbsFound) found original entered current input output frame known originalCall owned state
-#print axioms scalar_one
 end UInt256Proof.Multiply.ScalarSafety
 
 namespace UInt256Proof.Multiply.ScalarSafety
@@ -705,5 +695,4 @@ theorem scalar_invoke (profile : CIL.FeatureProfile) (program : CIL.Program) (me
       invoke program fuel methodIndex (scalarArgs input word output) memory = .ok (final, []) ∧
       ScalarResult memory final input output word [] :=
   scalar_invoke_with_storage profile program methodIndex wordIndex storageIndex (ProductStorage.scalar_contract profile scalar program storageIndex limbIndex storageFound limbsFound) found contract memory input output word call
-#print axioms scalar_invoke
 end UInt256Proof.Multiply.ScalarSafety

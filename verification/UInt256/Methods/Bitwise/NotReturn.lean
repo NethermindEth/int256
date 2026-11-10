@@ -13,5 +13,4 @@ theorem unary_correctness (profile : CIL.FeatureProfile)
   unary_checked (~~~·) profile program index callee found
     (not_result profile scalar program callee constructor childFound constructorFound)
 
-#print axioms unary_correctness
 end UInt256Proof.Bitwise.ReturnSafety

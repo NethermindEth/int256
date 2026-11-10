@@ -35,6 +35,5 @@ theorem PrivateWords.store_vector {program : CIL.Program} {original entered curr
   intro id old offset
   exact (preserved.cells id old offset).trans (state.caller id old offset)
 
-#print axioms PrivateWords.store_vector
 end UInt256Model.Safety
 

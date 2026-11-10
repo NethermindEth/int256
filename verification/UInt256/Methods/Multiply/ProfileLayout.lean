@@ -67,7 +67,4 @@ theorem profile_top_contract (ctx : Context) (ready : profileTopReady ctx.profil
     obtain ⟨⟨⟨avx2, dq⟩, foundation⟩, wide⟩ := ready
     exact Full.full_avx512_top ctx.profile ctx.program _ _ _ _ ctx.full vl avx2 dq foundation wide
 
-#print axioms profile_storage_contract
-#print axioms profile_word_contract
-#print axioms profile_top_contract
 end UInt256Proof.Multiply.Entry

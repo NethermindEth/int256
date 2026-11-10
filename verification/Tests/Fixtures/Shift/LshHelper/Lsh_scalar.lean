@@ -8,5 +8,4 @@ open UInt256Model.Safety UInt256Proof.Shift.Safety UInt256Proof.Shift.Variant
 theorem correctness : ShiftContract .left Extracted.program 0 :=
   scalar_helper_contract Extracted.profile (by rfl) Extracted.program 0 1 2 (by decide) (by rfl) (by rfl) (by rfl)
 
-#print axioms correctness
 end UInt256Proof.Shift.Fixture
