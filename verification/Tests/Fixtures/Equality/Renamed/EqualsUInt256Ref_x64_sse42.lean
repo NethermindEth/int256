@@ -17,4 +17,3 @@ theorem EqualityFixture.correct :
   intro memory left right call
   simpa using ((UInt256Proof.Equality.ReferenceOperator.checked (fun a b => decide (a = b)) Extracted.profile false Extracted.program 0 1 rfl
     (fun m l r c => by simpa using (UInt256Proof.Equality.ReferenceSseWrapper.checked Extracted.profile Extracted.program 1 2 rfl rfl rfl rfl) m l r c))) memory left right call
-

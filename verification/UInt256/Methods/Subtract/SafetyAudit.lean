@@ -6,4 +6,3 @@ theorem UInt256Proof.Subtract.Safety.checked_wrapping_binding :
       Extracted.program Extracted.entryIndex := by
   with_reducible exact
     (UInt256Proof.Subtract.Safety.checked_wrapping_contract UInt256Proof.Subtract.Safety.borrow_production_contract)
-

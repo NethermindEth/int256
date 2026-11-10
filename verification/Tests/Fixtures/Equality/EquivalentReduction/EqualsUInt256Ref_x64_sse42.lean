@@ -11,4 +11,3 @@ theorem EqualityFixture.correct :
   apply (by simpa using UInt256Proof.Equality.ReferenceOperator.readOnly_contract (fun a b => decide (a = b)) Extracted.program 0)
   intro memory left right call
   simpa using ((EqualityFixture.LeafSseWrapper.checked Extracted.profile Extracted.program 0 1 rfl rfl rfl rfl)) memory left right call
-

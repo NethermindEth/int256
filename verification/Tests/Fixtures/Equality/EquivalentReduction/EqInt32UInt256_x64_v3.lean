@@ -9,4 +9,3 @@ theorem EqualityFixture.correct :
   UInt256Proof.Equality.PrimitiveOperator.checked CIL.Value.i32 _ Extracted.profile true false Extracted.program 0 1 rfl (fun _ => rfl)
     (UInt256Proof.Equality.SignedPrimitive.checked32 Extracted.profile Extracted.program 1 2 rfl
     (EqualityFixture.LeafPrimitiveWrapper.checked32 Extracted.profile Extracted.program 2 3 rfl rfl rfl))
-

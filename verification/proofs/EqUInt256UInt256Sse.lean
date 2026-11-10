@@ -18,4 +18,3 @@ theorem UInt256Proof.Equality.EqUInt256UInt256.sse_family (profile : CIL.Feature
     UInt256Model.Safety.ReadOnlyContract (fun values => .i32 (if values[0]?.getD 0 = values[1]?.getD 0 then 1 else 0)) (CIL.reprofile Extracted.program profile) 0 2 :=
   UInt256Model.Safety.ReadOnlyContract.reprofile UInt256Proof.Equality.ProfileBindings.uniform
     (UInt256Proof.Equality.ProfileBindings.reference_agreement profile vector sse) UInt256Proof.Equality.EqUInt256UInt256.sse_correctness
-

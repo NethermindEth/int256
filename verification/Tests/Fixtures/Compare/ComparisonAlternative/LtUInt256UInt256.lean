@@ -145,4 +145,3 @@ theorem CompareFixture.correct :
   have entry : BinaryReadOnlyInvocation lessValue Extracted.program Extracted.entryIndex :=
     entry_checked CompareFixture.ladder_checked
   simpa only [lessValue] using entry.to_contract
-

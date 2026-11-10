@@ -6,4 +6,3 @@ theorem UInt256Proof.Compare.CompareToUInt256Ref.scalar_correctness :
         (values[0]?.getD 0).toNat (values[1]?.getD 0).toNat))
       Extracted.program Extracted.entryIndex 2 :=
   UInt256Proof.Compare.Safety.checked_threeWay_binding
-

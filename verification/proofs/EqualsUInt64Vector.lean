@@ -16,4 +16,3 @@ theorem UInt256Proof.Equality.EqualsUInt64.vector_family (profile : CIL.FeatureP
       (fun input word => decide (input = BitVec.ofNat 256 word.toNat)) (CIL.reprofile Extracted.program profile) 0 :=
   UInt256Model.Safety.ScalarOperatorContract.reprofile UInt256Proof.Equality.ProfileBindings.uniform
     (UInt256Proof.Equality.ProfileBindings.primitive_agreement profile vector) UInt256Proof.Equality.EqualsUInt64.vector_correctness
-

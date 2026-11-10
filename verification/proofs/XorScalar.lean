@@ -15,5 +15,3 @@ end UInt256Proof.Xor
 theorem UInt256Proof.Xor.scalar_family_correctness (profile : CIL.FeatureProfile) (disabled : profile.vector256Accelerated = false) :
     UInt256Model.Safety.WrappingBinaryContract (UInt256Model.Bitwise.applyBinary .xor) (CIL.reprofile Extracted.program profile) 0 :=
   UInt256Proof.Bitwise.scalar_correctness .xor profile disabled (CIL.reprofile Extracted.program profile) 0 1 (by rfl) (by rfl)
-
-

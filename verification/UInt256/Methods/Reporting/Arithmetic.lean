@@ -96,4 +96,3 @@ theorem small_underflow_iff (a : Limbs) (b : W64) :
   omega
 
 end UInt256Proof.Reporting
-

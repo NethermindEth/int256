@@ -19,4 +19,3 @@ theorem UInt256Proof.Equality.EqualsUInt256Value.vector_family (profile : CIL.Fe
       (fun left right => .i32 (if left = right then 1 else 0)) (CIL.reprofile Extracted.program profile) 0 :=
   UInt256Model.Safety.ReadOnlyScalarContract.reprofile UInt256Proof.Equality.ProfileBindings.uniform
     (UInt256Proof.Equality.ProfileBindings.reference_agreement profile vector sse) UInt256Proof.Equality.EqualsUInt256Value.vector_correctness
-

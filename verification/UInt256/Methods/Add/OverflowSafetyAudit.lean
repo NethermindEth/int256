@@ -5,4 +5,3 @@ theorem UInt256Proof.Safety.checked_overflow_binding :
       (fun left right => decide (2^256 ≤ left.toNat + right.toNat))
       Extracted.program Extracted.entryIndex := by
   with_reducible exact UInt256Proof.Safety.checked_overflow_contract
-

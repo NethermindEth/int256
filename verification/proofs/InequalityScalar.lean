@@ -6,4 +6,3 @@ theorem UInt256Proof.Equality.scalar_inequality_correctness :
       (fun values => .i32 (if values[0]?.getD 0 ≠ values[1]?.getD 0 then 1 else 0))
       Extracted.program Extracted.entryIndex 2 :=
   UInt256Proof.Equality.Safety.checked_inequality_binding
-

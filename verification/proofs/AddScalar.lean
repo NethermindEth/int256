@@ -7,4 +7,3 @@ theorem UInt256Proof.Add.scalar_correctness :
     UInt256Model.Safety.WrappingBinaryContract (· + ·) Extracted.program Extracted.entryIndex :=
   UInt256Proof.Safety.checked_add_contract
     (UInt256Proof.Add.CarrySafety.carry_helper_contract (profile := Extracted.profile) rfl)
-

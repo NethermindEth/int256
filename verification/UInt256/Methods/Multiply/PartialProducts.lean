@@ -43,6 +43,3 @@ theorem retained_products_value (left right : Limbs) :
   exact retained_products_correct left right
 
 end UInt256Proof.Multiply
-
-
-

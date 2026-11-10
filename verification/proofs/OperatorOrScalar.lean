@@ -15,5 +15,3 @@ end UInt256Proof.OperatorOr
 theorem UInt256Proof.OperatorOr.scalar_family_correctness (profile : CIL.FeatureProfile) (disabled : profile.vector256Accelerated = false) :
     UInt256Proof.Bitwise.ReturnSafety.BinaryContract (UInt256Model.Bitwise.applyBinary .or) (CIL.reprofile Extracted.program profile) 0 :=
   UInt256Proof.Bitwise.ReturnSafety.binary_correctness .or profile disabled (CIL.reprofile Extracted.program profile) 0 1 2 (by rfl) (by rfl) (by rfl)
-
-
