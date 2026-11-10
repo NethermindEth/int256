@@ -9,5 +9,4 @@ theorem underflow_profile_correctness :
       Extracted.program 0 :=
   Vector256.subtract_underflow_contract Extracted.program Extracted.profile false true rfl rfl rfl
     ⟨rfl, rfl, rfl, rfl, rfl⟩
-#print axioms underflow_profile_correctness
 end UInt256Proof.Subtract

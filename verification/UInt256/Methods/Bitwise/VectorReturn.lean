@@ -31,6 +31,4 @@ theorem unary_correctness (profile : CIL.FeatureProfile)
     NotVectorSafety.entry_result profile enabled program callee leaf childFound leafFound memory input output call
   exact ⟨fuel, final, certificate, loaded, writable, fun id _ offset away => outside id offset away⟩
 
-#print axioms binary_correctness
-#print axioms unary_correctness
 end UInt256Proof.Bitwise.VectorReturn

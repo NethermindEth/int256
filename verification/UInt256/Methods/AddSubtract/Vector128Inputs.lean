@@ -59,9 +59,6 @@ theorem vector128_input_load (program : CIL.Program) (original current : Memory)
   rw [currentCall.input_half_load member half]
   simp only [inputHalf, call.input_bytes_of_memory_below preserved member]
 
-#print axioms vector128_local_store
-#print axioms vector128_input_load
-
 /-- A write to a later private home preserves an earlier snapshot. -/
 theorem vector128_prior_read (specs : List NumericLocalSpec) (entered before after : Memory) (boundary : Nat)
     (slots : List LocalSlot) (homes : NumericHomes entered boundary specs slots)
@@ -75,7 +72,6 @@ theorem vector128_prior_read (specs : List NumericLocalSpec) (entered before aft
   have ordered := homes.ordered i j .vector128 .vector128 source target earlier sourceSlot targetSlot
   exact write_preserves_disjoint_read written loaded (Or.inl (Nat.ne_of_lt ordered))
 
-#print axioms vector128_prior_read
 end UInt256Proof.AddSubtract.Safety
 
 namespace UInt256Proof.AddSubtract.Safety
@@ -162,7 +158,6 @@ theorem vector128_operand_checked (program : CIL.Program) (body : CIL.Method) (m
     simp only [Nat.mul_zero, Nat.mul_one, Nat.add_zero] at reading
     cil_contract_steps [found, code, reading, stored] until done
 
-#print axioms vector128_operand_checked
 end UInt256Proof.AddSubtract.Safety
 
 namespace UInt256Proof.AddSubtract.Safety
@@ -252,9 +247,6 @@ theorem vector128_right_reference (program : CIL.Program) (body : CIL.Method) (m
   all_goals
     cil_contract_steps [found, code, slot, formed, advanced] until continuation
 
-#print axioms vector128_reference_prefix
-#print axioms vector128_left_upper
-#print axioms vector128_right_reference
 end UInt256Proof.AddSubtract.Safety
 
 namespace UInt256Proof.AddSubtract.Safety
@@ -342,7 +334,6 @@ theorem vector128_inputs_checked (program : CIL.Program) (body : CIL.Method) (me
         (Nat.le_trans (write_extends_allocations _ _ _ _ _ w2).next
           (write_extends_allocations _ _ _ _ _ w3).next)))
 
-#print axioms vector128_inputs_checked
 end UInt256Proof.AddSubtract.Safety
 
 namespace UInt256Proof.AddSubtract.Safety
@@ -364,7 +355,6 @@ theorem vector128_other_read (specs : List NumericLocalSpec) (entered before aft
   · have ordered := homes.ordered j i .vector128 .vector128 target source (by omega) targetSlot sourceSlot
     exact write_preserves_disjoint_read written loaded (Or.inl (Nat.ne_of_gt ordered))
 
-#print axioms vector128_other_read
 end UInt256Proof.AddSubtract.Safety
 
 namespace UInt256Proof.AddSubtract.Safety
@@ -399,5 +389,4 @@ theorem vector128_frame_setup (body : CIL.Method) (specs : List NumericLocalSpec
     enterFrame_preserves_caller_memory _ _ _ _ _ setup,
     enterFrame_preserves_wellFormed _ _ _ _ _ wf setup⟩
 
-#print axioms vector128_frame_setup
 end UInt256Proof.AddSubtract.Safety

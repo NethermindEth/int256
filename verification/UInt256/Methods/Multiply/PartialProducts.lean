@@ -46,4 +46,3 @@ end UInt256Proof.Multiply
 
 
 
-#print axioms UInt256Proof.Multiply.retained_products_value

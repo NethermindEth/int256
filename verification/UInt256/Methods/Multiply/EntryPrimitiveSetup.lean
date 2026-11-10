@@ -108,5 +108,4 @@ theorem conversion_invoke (ctx : PrimitiveContext) (memory : Memory) (argument :
   exact (retained.cells id old offset).trans
     ((outside id offset (Or.inl distinct)).trans (preserved.cells id old offset))
 
-#print axioms conversion_invoke
 end UInt256Proof.Multiply.Entry

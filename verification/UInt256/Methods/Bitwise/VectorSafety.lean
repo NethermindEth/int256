@@ -145,8 +145,4 @@ theorem correctness (profile : CIL.FeatureProfile) (enabled : profile.vector256A
   simpa only [show (256 : Nat)^32 = 2^256 from rfl, Nat.mod_eq_of_lt (BitVec.isLt _),
     BitVec.ofNat_toNat, BitVec.setWidth_eq] using decoded.symm
 
-#print axioms run_leaf
-#print axioms leaf_result
-#print axioms entry_result
-#print axioms correctness
 end UInt256Proof.Bitwise.VectorSafety

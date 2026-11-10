@@ -91,13 +91,6 @@ theorem limb_fast_underflow (a b : Limbs) (none : NoBorrowPropagation a b) :
   · have less : (value a).toNat < (value b).toNat := underflow.mp (by simpa using zero)
     simp [zero, less]
 
-#print axioms pack128_and
-#print axioms pack128_or
-#print axioms limb_propagation
-#print axioms limb_fast_low
-#print axioms limb_fast_high
-#print axioms limb_fast_flag
-#print axioms limb_fast_underflow
 end UInt256Proof.Subtract.Profile
 
 namespace UInt256Proof.Subtract.Profile
@@ -117,5 +110,4 @@ theorem subtract_input_values (memory : Memory) (left right : Reference) :
   · exact (input_half_low memory right).symm
   · exact (input_half_high memory right).symm
 
-#print axioms subtract_input_values
 end UInt256Proof.Subtract.Profile

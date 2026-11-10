@@ -39,9 +39,6 @@ theorem arm_small_private_store (program : CIL.Program) (profile : CIL.FeaturePr
   checked_numeric_store program (armSmallBody profile storage) armSmallSpecs boundary
     entered current inputs outputs frame call enteredWF homes authority index spec specified value number fits
 
-#print axioms arm_small_local_metadata
-#print axioms arm_small_frame_setup
-#print axioms arm_small_private_store
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -159,11 +156,6 @@ theorem ARMSmallSaved.after_later_write {program : CIL.Program} {original entere
     (homes.ordered i.val index .word64 kind home reference (by omega) homeSlot slot)
   exact ⟨home, homeSlot, write_preserves_disjoint_read written loaded (Or.inl separate)⟩
 
-#print axioms ARMSmallSaved.after_later_write
-
-#print axioms arm_small_input_prefix_checked
-#print axioms arm_small_input_spec
-#print axioms ARMSmallSaved.save
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -234,8 +226,6 @@ theorem arm_small_ready_prefix (program : CIL.Program) (method storage : Nat) (p
   exact arm_small_prepare program method storage profile found enabled original entered current input output word frame
     (enterFrame_preserves_wellFormed _ _ _ _ _ call.1.1 setup) homes saved post continuation
 
-#print axioms arm_small_prepare
-#print axioms arm_small_ready_prefix
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -282,7 +272,6 @@ theorem arm_small_store_return (program : CIL.Program) (method storage : Nat) (p
   refine ⟨fuel, leaveFrame frame stored, [.scalar (.i32 flag)], executed, ?_⟩
   apply continuation stored valid outside authority
   simpa only [UInt256Model.value] using value
-#print axioms arm_small_store_return
 end UInt256Proof.Add.Safety
 namespace UInt256Proof.Add.Safety
 open CIL.Safety UInt256Model.Safety
@@ -403,12 +392,6 @@ theorem ARMSmallState.increment (program : CIL.Program) (method storage : Nat) (
   exact arm_small_increment program method storage profile found enabled segment current after frame args home (words index) slot loaded
     (fun pc rest => stored pc args rest) post (continuation after updated)
 
-#print axioms ARMSmallState.store_flag
-#print axioms ARMSmallState.increment
-
-#print axioms arm_small_other_read
-#print axioms ARMSmallReady.state
-#print axioms ARMSmallState.store_limb
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -484,6 +467,4 @@ theorem ARMSmallState.output (program : CIL.Program) (method storage : Nat) (pro
     (armSmallOutputWords words sum) flag state.call state.flagRoundtrip state.flagFits flagSlot flagRead flagOld
     (Nat.ne_of_gt (Nat.lt_of_lt_of_le outputOld fresh)) post continuation
 
-#print axioms ARMSmallState.final_flag
-#print axioms ARMSmallState.output
 end UInt256Proof.Add.Safety

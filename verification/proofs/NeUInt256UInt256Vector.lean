@@ -13,7 +13,6 @@ import UInt256.Methods.Equality.ReferenceOperator
     simpa using UInt256Proof.Equality.ReferenceOperator.checked (fun a b => decide (a = b)) Extracted.profile false Extracted.program 1 2 rfl (by
       intro m2 l2 r2 c2
       simpa using UInt256Proof.Equality.ReferenceVectorWrapper.checked Extracted.profile Extracted.program 2 3 rfl rfl rfl m2 l2 r2 c2) m l r c) memory left right call
-#print axioms UInt256Proof.Equality.NeUInt256UInt256.vector_correctness
 
 
 theorem UInt256Proof.Equality.NeUInt256UInt256.vector_family (profile : CIL.FeatureProfile)
@@ -23,4 +22,3 @@ theorem UInt256Proof.Equality.NeUInt256UInt256.vector_family (profile : CIL.Feat
   UInt256Model.Safety.ReadOnlyContract.reprofile UInt256Proof.Equality.ProfileBindings.uniform
     (UInt256Proof.Equality.ProfileBindings.reference_agreement profile vector sse) UInt256Proof.Equality.NeUInt256UInt256.vector_correctness
 
-#print axioms UInt256Proof.Equality.NeUInt256UInt256.vector_family

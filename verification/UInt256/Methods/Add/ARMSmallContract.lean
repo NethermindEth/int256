@@ -126,10 +126,6 @@ theorem arm_small_computed_prefix (program : CIL.Program) (method storage : Nat)
   exact ready.compute program method storage profile found enabled (armSmallArguments input output word)
     (enterFrame_preserves_wellFormed _ _ _ _ _ call.1.1 setup) homes post continuation
 
-#print axioms ARMSmallReady.compute
-#print axioms arm_small_computed_prefix
-
-#print axioms ARMSmallState.carry
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -176,9 +172,6 @@ theorem arm_small_result_flag (words : Fin 4 → BitVec 64) (word : BitVec 64) :
   all_goals
     simp [armSmallResult, armCarryResult, armIncrementWord, carry, first, second, third]
 
-#print axioms arm_small_result_words
-#print axioms arm_small_result_value
-#print axioms arm_small_result_flag
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -233,7 +226,6 @@ theorem arm_small_entry (program : CIL.Program) (method storage : Nat) (profile 
     exact (retired.cells id old offset).trans
       ((outside id offset untouched).trans (state.preserved.cells id old offset))
 
-#print axioms arm_small_entry
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -261,5 +253,4 @@ theorem checked_arm_small_contract (program : CIL.Program) (method storage : Nat
     certify_invocation program method (armSmallBody profile storage)
       args memory frame entered fuel final returned found checked setup live executed, result⟩
 
-#print axioms checked_arm_small_contract
 end UInt256Proof.Add.Safety

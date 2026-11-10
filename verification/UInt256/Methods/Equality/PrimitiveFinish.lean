@@ -56,8 +56,6 @@ include lookup retFetched returns in
   rcases boolean with rfl | rfl <;>
     simp [run, lookup, retFetched, step, cil_guard, observerCount, returns, checkedValue, numericValue, CIL.NarrowKind.extend,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-#print axioms primitive_store_prefix
-#print axioms primitive_return
 
 end UInt256Proof.Equality.PrimitiveFinish
 
@@ -124,7 +122,5 @@ theorem primitive_finish (memory : Memory) (left home : Reference) (right : CIL.
   exact (after.cells id bound offset).trans
     ((childCells id (Nat.lt_trans (Nat.lt_of_lt_of_le bound privateHome) homeBound) offset).trans
       (preserved.cells id (Nat.lt_of_lt_of_le bound privateHome) offset))
-
-#print axioms primitive_finish
 
 end UInt256Proof.Equality.PrimitiveFinish

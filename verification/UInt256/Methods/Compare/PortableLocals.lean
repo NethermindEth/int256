@@ -55,7 +55,6 @@ theorem portable_setup (profile : CIL.FeatureProfile) (callee : Nat) (program : 
   exact ⟨frame, entered, setup, homes, call.after_frame_setup setup,
     enterFrame_preserves_caller_memory _ _ _ _ _ setup⟩
 
-#print axioms portable_setup
 end UInt256Proof.Compare.Safety
 
 namespace UInt256Proof.Compare.Safety
@@ -110,5 +109,4 @@ theorem portable_local_writes (memory : Memory) (frame : Frame) (lower : Nat)
           load_numeric_local .word32 (.i32 less) less.toNat rfl r2,
           below0, below0.trans below1, (below0.trans below1).trans below2⟩
 
-#print axioms portable_local_writes
 end UInt256Proof.Compare.Safety

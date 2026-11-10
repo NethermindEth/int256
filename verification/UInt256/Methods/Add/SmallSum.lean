@@ -64,9 +64,6 @@ theorem SmallSaved.save {original entered current : CIL.Safety.Memory}
     intro offset _
     exact write_word_outside written _ _ (Or.inl different)
 
-#print axioms small_input_spec
-#print axioms SmallSaved.save
-
 theorem small_input_prefix_checked (original entered : CIL.Safety.Memory)
     (input output : Reference) (word : BitVec 64) (frame : Frame) (slots tailSlots)
     (call : CallingConditions Extracted.program original [input] [output])
@@ -117,8 +114,6 @@ theorem small_input_prefix_checked (original entered : CIL.Safety.Memory)
     · exact step2 pc rest
     · exact step3 pc rest
 
-#print axioms small_input_prefix_checked
-
 theorem small_saved_invocation (memory : CIL.Safety.Memory)
     (input output : Reference) (word : BitVec 64)
     (call : CallingConditions Extracted.program memory [input] [output])
@@ -149,8 +144,6 @@ theorem small_saved_invocation (memory : CIL.Safety.Memory)
       checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   refine ⟨fuel, result, returned, ?_, satisfied⟩
   simpa only [invoke, cil_code, checked, setup, Except.mapError, Bind.bind, Except.bind] using finished
-
-#print axioms small_saved_invocation
 
 end UInt256Proof.Safety
 
@@ -238,9 +231,6 @@ theorem SmallSaved.sum_store {original entered current : CIL.Safety.Memory}
   intro offset _
   exact write_word_outside written _ _ (Or.inl different)
 
-#print axioms small_sum_prefix
-#print axioms SmallSaved.sum_store
-
 theorem small_sum_invocation (memory : CIL.Safety.Memory)
     (input output : Reference) (word : BitVec 64)
     (call : CallingConditions Extracted.program memory [input] [output])
@@ -277,7 +267,5 @@ theorem small_sum_invocation (memory : CIL.Safety.Memory)
   exact small_sum_prefix input output lowHome sumHome word (inputLimb memory input 0)
     frame before after fullSlot sumSlot lowBefore lowAfter sumRead stored post
     (continuation frame entered slots tailSlots sumHome after setup layout homes updated sumSlot sumRead)
-
-#print axioms small_sum_invocation
 
 end UInt256Proof.Safety

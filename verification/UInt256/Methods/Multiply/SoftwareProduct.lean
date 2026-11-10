@@ -36,4 +36,3 @@ theorem software_upper_bound (al ah bl bh : Nat)
   omega
 
 end UInt256Proof.Multiply
-#print axioms UInt256Proof.Multiply.software_product

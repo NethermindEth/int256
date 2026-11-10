@@ -41,5 +41,4 @@ theorem native_entry_checked (profile : CIL.FeatureProfile) (usesLess inclusive 
              [readOnlyArguments, step, cil_guard, observerCount, checkedValue, formValue,
                fl, fr, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
            try (exact ⟨rfl, rfl, rfl, rfl⟩))
-#print axioms native_entry_checked
 end UInt256Proof.Compare.Safety

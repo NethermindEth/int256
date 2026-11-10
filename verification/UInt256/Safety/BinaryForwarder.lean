@@ -31,5 +31,4 @@ theorem forward_wrapping_binary (program : CIL.Program) (wrapperIndex childIndex
     kinds locals parameters vectors memory left right output call final [] [] childFuel certificate.1 tail
   exact ⟨fuel, final, certified, value, writable, footprint⟩
 
-#print axioms forward_wrapping_binary
 end UInt256Model.Safety

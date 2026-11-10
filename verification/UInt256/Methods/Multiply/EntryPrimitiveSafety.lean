@@ -84,7 +84,6 @@ theorem primitive_multiply_finish (ctx : PrimitiveContext) (word : Calls.WordCon
   exact (retained.cells id old offset).trans
     (outside id (Nat.lt_of_lt_of_le old bound) offset (Or.inl (Nat.ne_of_lt (Nat.lt_of_lt_of_le old privateOutput))))
 
-#print axioms primitive_multiply_finish
 end UInt256Proof.Multiply.Entry
 
 namespace UInt256Proof.Multiply.Entry
@@ -170,7 +169,6 @@ theorem primitive_body (ctx : PrimitiveContext) (wordContract : Calls.WordContra
     ((storedBelow.cells id beforeOperand offset).trans
       (preserved id (Nat.lt_trans beforeOperand operandBound) offset))
 
-#print axioms primitive_body
 end UInt256Proof.Multiply.Entry
 namespace UInt256Proof.Multiply.Entry
 open CIL.Safety UInt256Model.Safety
@@ -216,7 +214,6 @@ theorem primitive_frame_setup (ctx : PrimitiveContext) (memory : Memory) (input 
     (before2.access operand bound 32 1 true).trans writable,
     (call.after_frame_setup setup).with_writable_output writable2,
     enterFrame_preserves_caller_memory _ _ _ _ _ setup⟩
-#print axioms primitive_frame_setup
 end UInt256Proof.Multiply.Entry
 namespace UInt256Proof.Multiply.Entry
 open CIL.Safety UInt256Model.Safety
@@ -258,7 +255,6 @@ theorem primitive_checked (ctx : PrimitiveContext) (wordContract : Calls.WordCon
   intro id old offset
   exact (cells id old offset).trans (before.cells id old offset)
 
-#print axioms primitive_checked
 end UInt256Proof.Multiply.Entry
 
 
@@ -327,8 +323,4 @@ theorem primitive32_correctness (ctx : PrimitiveContext) (narrow : ctx.narrow = 
   primitive32_with_contracts ctx narrow (scalar_word_contract ctx.toContext wordFound bmi arm)
     (Full.scalar_top_contract ctx.profile ctx.program ctx.indices.full ctx.indices.word ctx.indices.count ctx.indices.storage ctx.full avx512 avx2)
 
-#print axioms conversion_prefix64
-#print axioms conversion_prefix32
-#print axioms primitive64_correctness
-#print axioms primitive32_correctness
 end UInt256Proof.Multiply.Entry

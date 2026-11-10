@@ -89,8 +89,6 @@ theorem masked_incoming (mask : BitVec 256) :
   rw [UInt256Proof.Subtract.Vector256.permute_incoming, ← CIL.Vector.pack256_lanes mask, incomingCarry_packed,
     UInt256Proof.Subtract.Vector256.incoming_packed]
 
-#print axioms masked_incoming
-
 theorem prepare_inputs (program : CIL.Program) (method : Nat) (profile : CIL.FeatureProfile)
     (found : program[method]? = some (prepareMaskedBody profile)) (features : AddProfile profile false)
     (original memory entered current : Memory) (left right output s0 s1 s2 s3 : Reference) (frame : Frame)
@@ -139,8 +137,6 @@ theorem prepare_inputs (program : CIL.Program) (method : Nat) (profile : CIL.Fea
   apply VectorFrame.run_cell_store post state scratch originalCall homes layout 0 rfl found (by rfl)
   intro current state scratch
   exact continuation current state scratch
-
-#print axioms prepare_inputs
 
 theorem prepare_masks (program : CIL.Program) (method : Nat) (profile : CIL.FeatureProfile)
     (found : program[method]? = some (prepareMaskedBody profile)) (features : AddProfile profile false)
@@ -192,8 +188,6 @@ theorem prepare_masks (program : CIL.Program) (method : Nat) (profile : CIL.Feat
   intro current state scratch
   exact continuation current state scratch
 
-#print axioms prepare_masks
-
 theorem prepare_tail (program : CIL.Program) (method : Nat) (profile : CIL.FeatureProfile)
     (found : program[method]? = some (prepareMaskedBody profile)) (features : AddProfile profile false)
     (original memory entered current : Memory) (left right output s0 s1 s2 s3 : Reference) (frame : Frame)
@@ -235,8 +229,6 @@ theorem prepare_tail (program : CIL.Program) (method : Nat) (profile : CIL.Featu
   have fetched : (prepareMaskedBody profile).code[73]? = some .ret := rfl
   refine ⟨1, _, _, ?_, continuation current state scratch⟩
   simp [run, found, fetched, returns, step, cil_guard, observerCount, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-
-#print axioms prepare_tail
 
 /-- `PrepareAdd`: speculative sum in the output, lane vectors in the caller cells, other caller bytes kept. -/
 theorem prepare_invoke (program : CIL.Program) (method : Nat) (profile : CIL.FeatureProfile)
@@ -322,16 +314,12 @@ theorem prepare_invoke (program : CIL.Program) (method : Nat) (profile : CIL.Fea
     (invoke_preserves_caller_allocations program fuel method args [] memory final certificate.1).next,
     authority, footprint, result, cells⟩
 
-#print axioms prepare_invoke
-
 theorem prepare_contract (program : CIL.Program) (method : Nat) (profile : CIL.FeatureProfile)
     (found : program[method]? = some (prepareMaskedBody profile)) (features : AddProfile profile false) :
     PrepareContract program method :=
   fun original memory left right output s0 s1 s2 s3 originalCall call grown same layout scratch =>
     prepare_invoke program method profile found features original memory left right output s0 s1 s2 s3
       originalCall call grown same layout scratch
-
-#print axioms prepare_contract
 
 /-- AVX2 `Add` whose `PrepareAdd` masks the permuted carries with a constant lane mask. -/
 theorem add_contract (program : CIL.Program) (profile : CIL.FeatureProfile)
@@ -357,6 +345,4 @@ theorem add_overflow_contract (program : CIL.Program) (profile : CIL.FeatureProf
     (finish_contract program 1 2 profile false finishFound lookupFound features)
     (prepare_contract program 3 profile prepareFound features) features
 
-#print axioms add_contract
-#print axioms add_overflow_contract
 end UInt256Proof.Add.Vector256.Masked

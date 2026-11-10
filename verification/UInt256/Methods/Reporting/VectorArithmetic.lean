@@ -132,10 +132,4 @@ theorem packed_bextr_cascade : ∀ p0 p1 p2 p3 g0 g1 g2 g3 : Bool,
         BitVec.ofNat 32 16 = BitVec.ofNat 32 0 then BitVec.ofNat 32 0 else BitVec.ofNat 32 1 := by
   decide
 
-#print axioms finalCarry_boolean
-#print axioms finalBorrow_boolean
-#print axioms packed_final_flag
-#print axioms cascade_add_flag
-#print axioms cascade_subtract_flag
-
 end UInt256Proof.Reporting

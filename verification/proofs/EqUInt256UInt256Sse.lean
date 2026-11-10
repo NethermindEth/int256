@@ -9,7 +9,6 @@ import UInt256.Methods.Equality.ReferenceOperator
   intro memory left right call
   simpa using UInt256Proof.Equality.ReferenceOperator.checked (fun a b => decide (a = b)) Extracted.profile false Extracted.program 0 1 rfl
     (fun m l r c => by simpa using UInt256Proof.Equality.ReferenceSseWrapper.checked Extracted.profile Extracted.program 1 2 rfl rfl rfl rfl m l r c) memory left right call
-#print axioms UInt256Proof.Equality.EqUInt256UInt256.sse_correctness
 
 
 
@@ -20,4 +19,3 @@ theorem UInt256Proof.Equality.EqUInt256UInt256.sse_family (profile : CIL.Feature
   UInt256Model.Safety.ReadOnlyContract.reprofile UInt256Proof.Equality.ProfileBindings.uniform
     (UInt256Proof.Equality.ProfileBindings.reference_agreement profile vector sse) UInt256Proof.Equality.EqUInt256UInt256.sse_correctness
 
-#print axioms UInt256Proof.Equality.EqUInt256UInt256.sse_family

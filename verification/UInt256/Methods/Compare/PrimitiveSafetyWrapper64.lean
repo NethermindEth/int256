@@ -9,5 +9,4 @@ theorem checked64 : ScalarOperatorContract wrapperScalarFirst wrapperNegate CIL.
   PrimitiveWrapper.checked64 leafSigned leafScalarFirst wrapperReversed wrapperNegate
     Extracted.program Extracted.entryIndex leafIndex (by rfl) (by rfl)
 
-#print axioms checked64
 end UInt256Proof.Compare.PrimitiveSafety

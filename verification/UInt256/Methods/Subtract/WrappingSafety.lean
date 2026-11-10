@@ -8,5 +8,4 @@ theorem checked_wrapping_contract (contract : BorrowHelperContract Extracted.pro
     Extracted.program Extracted.entryIndex :=
   wrapping_contract_of_reporting (checked_dispatch_contract contract)
 
-#print axioms checked_wrapping_contract
 end UInt256Proof.Subtract.Safety

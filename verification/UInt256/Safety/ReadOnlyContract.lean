@@ -37,7 +37,4 @@ theorem CallingConditions.readOnly_setup_succeeds {program : CIL.Program}
       LiveState program (readOnlyArguments inputs) frame [] entered :=
   enterFrame_live_succeeds _ _ _ _ call.1.1 call.readOnly_arguments_valid call.2 fits
 
-#print axioms CallingConditions.readOnly_arguments_valid
-#print axioms CallingConditions.readOnly_setup_succeeds
-
 end UInt256Model.Safety

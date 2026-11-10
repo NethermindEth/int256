@@ -156,13 +156,4 @@ theorem partial_output_unknown_tail (bytes : Nat → Nat → BitVec 8) :
 theorem partial_output_initialized_overlap (bytes : Nat → Nat → BitVec 8) :
     ((callerMemory partialOverlapLayout bytes).cells 0 40).initialized = true := by rfl
 
-#print axioms callerMemory_wellFormed
-#print axioms callerMemory_access
-#print axioms callerMemory_calling
-#print axioms caller_layouts_valid
-#print axioms caller_examples_nonvacuous
-#print axioms disjoint_output_unknown
-#print axioms partial_output_unknown_tail
-#print axioms partial_output_initialized_overlap
-
 end UInt256Model.Safety

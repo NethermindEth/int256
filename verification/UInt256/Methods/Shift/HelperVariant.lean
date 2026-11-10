@@ -189,6 +189,4 @@ theorem vector_helper_contract (profile : CIL.FeatureProfile) (vector : profile.
     (fun program storage found => UInt256Proof.StorageVector.store_limbs_readable_contract profile vector program storage found)
     program index storage helper distinct found storageFound helperFound
 
-#print axioms scalar_helper_contract
-#print axioms vector_helper_contract
 end UInt256Proof.Shift.Variant

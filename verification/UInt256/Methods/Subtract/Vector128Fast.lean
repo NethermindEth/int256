@@ -122,6 +122,4 @@ theorem subtract_fast_checked (program : CIL.Program) (body : CIL.Method) (metho
   exact (teardown.cells id earlier offset).trans ((outside id offset untouched).trans
     (state.preserved.cells id earlier offset))
 
-#print axioms subtract_fast_return
-#print axioms subtract_fast_checked
 end UInt256Proof.Subtract.Profile

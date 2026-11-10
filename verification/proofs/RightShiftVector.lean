@@ -16,6 +16,4 @@ theorem vector_family_correctness (profile : CIL.FeatureProfile)
       (storage := 2) (by rfl) (UInt256Proof.StorageVector.store_limbs_readable_contract profile storageProfile _ _ (by rfl)))
 
 
-#print axioms vector_correctness
-#print axioms vector_family_correctness
 end UInt256Proof.RightShift

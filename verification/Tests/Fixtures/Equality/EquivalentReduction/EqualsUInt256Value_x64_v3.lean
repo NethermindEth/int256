@@ -12,4 +12,3 @@ theorem EqualityFixture.correct :
   · rfl
   · exact fun m l r c => by simpa using ((EqualityFixture.LeafVectorWrapper.checked Extracted.profile Extracted.program 1 2 rfl rfl rfl)) m l r c
 
-#print axioms EqualityFixture.correct

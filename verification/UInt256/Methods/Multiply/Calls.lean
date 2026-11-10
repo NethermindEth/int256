@@ -56,7 +56,6 @@ theorem run_word_call {program : CIL.Program} {wordIndex method pc : Nat} {body 
   obtain ⟨fuel, finished⟩ := run_call_exists found fetched stepped ⟨childFuel, invoked⟩ ⟨parentFuel, resumed⟩
   exact ⟨fuel, final, returned, finished, satisfied⟩
 
-#print axioms run_word_call
 end UInt256Proof.Multiply.Calls
 namespace UInt256Proof.Multiply.Calls
 open CIL.Safety UInt256Model.Safety
@@ -97,6 +96,4 @@ theorem counting_local_effect (profile : CIL.FeatureProfile) (program : CIL.Prog
   exact ⟨fuel, after, ran, valid, readback, access, fun id old different offset =>
     outside id old offset (Or.inl different)⟩
 
-#print axioms widening_local_effect
-#print axioms counting_local_effect
 end UInt256Proof.Multiply.Calls

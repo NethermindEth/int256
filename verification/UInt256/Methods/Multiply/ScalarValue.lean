@@ -34,4 +34,3 @@ theorem scalar_limbs_correct (a : Limbs) (word : W64) :
   exact (scalarLimbs_value a word).trans (equal.trans (scalar_retained_value a word).symm)
 
 end UInt256Proof.Multiply
-#print axioms UInt256Proof.Multiply.scalar_limbs_correct

@@ -68,5 +68,4 @@ theorem run_local_word_call {program : CIL.Program} {method pc callee : Nat} {bo
     ⟨tailFuel, by simpa only [Nat.add_assoc, Nat.reduceAdd, List.cons_append, List.nil_append] using resumed⟩
   exact ⟨fuel, final, values, ran, satisfied⟩
 
-#print axioms run_local_word_call
 end UInt256Model.Safety

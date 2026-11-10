@@ -12,4 +12,3 @@ theorem EqualityFixture.correct :
   intro memory left right call
   simpa using ((EqualityFixture.LeafSseWrapper.checked Extracted.profile Extracted.program 0 1 rfl rfl rfl rfl)) memory left right call
 
-#print axioms EqualityFixture.correct

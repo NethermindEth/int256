@@ -38,5 +38,4 @@ theorem setup (body : CIL.Method) (args : List Value)
   exact ⟨output, entered, enteredFrame,
     (call.after_frame_setup enteredFrame).with_writable_output writable, before, fresh⟩
 
-#print axioms setup
 end UInt256Model.Safety.AggregateReturn

@@ -71,7 +71,6 @@ theorem vector128_arm_parent_call (program : CIL.Program) (method vectorIndex sm
              checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
          try (first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
 
-#print axioms vector128_arm_parent_call
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -94,9 +93,6 @@ theorem arm_scalar_frame_setup (profile : CIL.FeatureProfile) (vectorIndex small
       MemoryBelow memory.nextIdentity memory result ∧ result.WellFormed :=
   word_frame_setup _ armScalarLocalSpecs (arm_scalar_local_metadata profile vectorIndex smallIndex).1
     (arm_scalar_local_metadata profile vectorIndex smallIndex).2 (by rfl) (by rfl) (by rfl) memory args wellFormed
-
-#print axioms arm_scalar_local_metadata
-#print axioms arm_scalar_frame_setup
 
 end UInt256Proof.Add.Safety
 
@@ -229,14 +225,6 @@ theorem arm_scalar_upper_branch (program : CIL.Program) (method vectorIndex smal
         show (0 : BitVec 64) = BitVec.ofNat 64 0 from rfl, zero,
         Bind.bind, Except.bind, Pure.pure, Except.pure]
 
-#print axioms arm_scalar_upper_branch
-
-#print axioms arm_scalar_word_store
-#print axioms arm_scalar_upper_loads
-
-#print axioms arm_scalar_dispatch
-#print axioms arm_scalar_save_source
-#print axioms arm_scalar_low_load
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -315,10 +303,6 @@ theorem arm_scalar_initial_prefix (program : CIL.Program) (method vectorIndex sm
   have done := continuation home after slot loaded preserved afterCall authority
   exact run_next_exists post found (by rfl) (stored 6 args []) done
 
-#print axioms arm_scalar_initial_prefix
-
-#print axioms arm_scalar_slots
-#print axioms arm_scalar_private_store
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -387,8 +371,6 @@ theorem arm_scalar_dispatch_prefix (program : CIL.Program) (method vectorIndex s
     left right afterCall leftMember rightMember leftArg rightArg post
     (continuation home after slot loaded preserved afterCall authority)
 
-#print axioms arm_scalar_decisions
-#print axioms arm_scalar_dispatch_prefix
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -468,8 +450,4 @@ theorem arm_scalar_small_arguments (program : CIL.Program) (method vectorIndex s
                checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
             try (first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)))
 
-#print axioms arm_scalar_small_arguments
-
-#print axioms arm_scalar_saved_replace
-#print axioms arm_scalar_swap_prefix
 end UInt256Proof.Add.Safety

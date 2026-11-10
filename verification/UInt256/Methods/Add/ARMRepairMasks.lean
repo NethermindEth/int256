@@ -130,7 +130,6 @@ theorem vector128_arm_repair_mask (program : CIL.Program) (body : CIL.Method) (m
                  checkedValue, numericValue, Bind.bind, Except.bind, Pure.pure, Except.pure]
               first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
 
-#print axioms vector128_arm_repair_mask
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -187,8 +186,6 @@ theorem vector128_arm_full_mask (program : CIL.Program) (body : CIL.Method) (met
                checkedValue, numericValue, Bind.bind, Except.bind, Pure.pure, Except.pure]
             first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
 
-#print axioms vector128_arm_full_mask
-
 theorem vector128_arm_extra_mask (program : CIL.Program) (body : CIL.Method) (method : Nat) (specs : List NumericLocalSpec)
     (found : program[method]? = some body) (code : CodeAt body 113 (armRepairCode))
     (repairSpecs : ∀ i : Fin 4, specs[19 + i.val]? = some vector128ZeroSpec) (enabled : body.profile.advSimd = true)
@@ -243,8 +240,6 @@ theorem vector128_arm_extra_mask (program : CIL.Program) (body : CIL.Method) (me
                CIL.Intrinsic.available, ones, CIL.Vector.intrinsic_zero128, CIL.Vector.intrinsic_and128, CIL.Vector.intrinsic_adv_extract, incoming128_arm_low,
                checkedValue, numericValue, Bind.bind, Except.bind, Pure.pure, Except.pure]
             first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
-
-#print axioms vector128_arm_extra_mask
 
 end UInt256Proof.Add.Safety
 
@@ -310,7 +305,6 @@ theorem vector128_arm_extra_pair (program : CIL.Program) (body : CIL.Method) (me
     (Nat.le_trans (write_extends_allocations _ _ _ _ _ firstWrite).next
       (write_extends_allocations _ _ _ _ _ secondWrite).next)
 
-#print axioms vector128_arm_extra_pair
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -379,5 +373,4 @@ theorem vector128_arm_repair_value (program : CIL.Program) (body : CIL.Method) (
                  checkedValue, numericValue, Bind.bind, Except.bind, Pure.pure, Except.pure]
               first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
 
-#print axioms vector128_arm_repair_value
 end UInt256Proof.Add.Safety

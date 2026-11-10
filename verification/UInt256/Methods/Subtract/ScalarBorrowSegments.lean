@@ -91,6 +91,4 @@ theorem scalar_borrow_segment_checked (contract : BorrowHelperContract Extracted
              Pure.pure, Except.pure]
          first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)
 
-#print axioms scalar_indexed_borrow
-#print axioms scalar_borrow_segment_checked
 end UInt256Proof.Subtract.Safety

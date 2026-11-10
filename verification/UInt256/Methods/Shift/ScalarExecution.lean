@@ -87,5 +87,4 @@ theorem shift_body (original entered current : Memory) (input output : Reference
       exact (outside id old offset untouched).trans
         ((kept.cells id old offset).trans ((preserved.trans retained).cells id old offset))
 
-#print axioms shift_body
 end UInt256Proof.Shift.Safety

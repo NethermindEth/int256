@@ -70,12 +70,4 @@ theorem vector128_fast_words (advSimd : Bool) (a b : Limbs) (flag : BitVec 32)
   · rw [← repaired_of_no_propagation a b (vector128_fast_no_propagation advSimd a b flag fast),
       repaired_hi_words, arm_repair_words]
 
-#print axioms vector128_reporting_fast_carry
-#print axioms vector128_low_propagation
-#print axioms vector128_high_propagation
-#print axioms vector128_reporting_fast_guard
-#print axioms vector128_low_corrected
-#print axioms vector128_high_corrected
-#print axioms vector128_fast_no_propagation
-#print axioms vector128_fast_words
 end UInt256Proof.Add.Safety

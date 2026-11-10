@@ -134,7 +134,4 @@ theorem forward_reporting_pop (program : CIL.Program) (wrapperIndex childIndex :
     final _ _ childFuel certificate.1 tail
   exact ⟨fuel, final, certified, value, writable, footprint⟩
 
-#print axioms forward_binary_call
-#print axioms forward_reporting_byte
-#print axioms forward_reporting_pop
 end UInt256Model.Safety

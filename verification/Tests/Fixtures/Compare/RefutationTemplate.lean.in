@@ -36,5 +36,4 @@ theorem refuted : ¬ (@STATEMENT@) := by
   apply UInt256Model.Safety.ContractRefutation.@LEMMA@
   · rfl
   · decide
-#print axioms refuted
 end CompareWitness

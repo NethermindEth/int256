@@ -59,6 +59,4 @@ theorem shift_zero_count (count : BitVec 32)
       · omega
     exact effectiveCount_large count nonnegative bound
 
-#print axioms shift_selected_count
-#print axioms shift_zero_count
 end UInt256Proof.Shift.Safety

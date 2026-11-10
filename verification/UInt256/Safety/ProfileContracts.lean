@@ -66,10 +66,4 @@ theorem WrappingBinaryContract.reprofile {operation : BitVec 256 → BitVec 256 
   exact ⟨fuel, final, invocationCertificate_uniform_reprofile _ _ _ uniform agreement
     _ _ _ _ _ _ certificate, postcondition⟩
 
-#print axioms callingConditions_reprofile
-#print axioms ReadOnlyContract.reprofile
-#print axioms ReadOnlyScalarContract.reprofile
-#print axioms ReadOnlyValueContract.reprofile
-#print axioms ScalarOperatorContract.reprofile
-#print axioms WrappingBinaryContract.reprofile
 end UInt256Model.Safety

@@ -33,8 +33,6 @@ theorem word_checked (operation : Binary) (profile : CIL.FeatureProfile)
   · rw [wordOperation, ← or_identity]; cil_checked_steps
   · rw [wordOperation, ← xor_identity]; cil_checked_steps
 
-#print axioms word_checked
-
 theorem limb_checked (operation : Binary) (profile : CIL.FeatureProfile)
     (program : CIL.Program) (index helper pc : Nat) (body : CIL.Method)
     (found : program[index]? = some body)
@@ -72,8 +70,6 @@ theorem limb_checked (operation : Binary) (profile : CIL.FeatureProfile)
   cil_checked_steps 4 [found, h0, h1, h2, h3, binaryArguments,
     leftFormed, rightFormed, leftField, rightField]
   simpa only [Nat.add_assoc] using finished
-
-#print axioms limb_checked
 
 def binaryBody (profile : CIL.FeatureProfile) (constructor helper : Nat) : CIL.Method :=
   { profile := profile, returnsValue := false, locals := [], code := [
@@ -138,8 +134,6 @@ theorem binary_result (operation : Binary) (profile : CIL.FeatureProfile)
   change read final output 32 1 = .ok (numberBytes _ 32) at readback
   simpa only [w, packed_operation] using readback
 
-#print axioms binary_result
-
 theorem binary_correctness (operation : Binary) (profile : CIL.FeatureProfile)
     (program : CIL.Program) (index constructor helper : Nat)
     (found : program[index]? = some (binaryBody profile constructor helper))
@@ -156,5 +150,4 @@ theorem binary_correctness (operation : Binary) (profile : CIL.FeatureProfile)
   simpa only [show (256 : Nat)^32 = 2^256 from rfl, Nat.mod_eq_of_lt (BitVec.isLt _),
     BitVec.ofNat_toNat, BitVec.setWidth_eq] using decoded.symm
 
-#print axioms binary_correctness
 end UInt256Proof.Bitwise.Helper

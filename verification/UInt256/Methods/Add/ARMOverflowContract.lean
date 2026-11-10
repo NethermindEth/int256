@@ -155,8 +155,4 @@ theorem checked_arm_add_overflow_contract (program : CIL.Program) (entry scalar 
     checked_arm_scalar_contract program scalar vector small storage profile scalarFound vectorFound smallFound storageFound enabled
       memory left right output 1 rfl call
 
-#print axioms reporting_entry_prefix
-#print axioms reporting_entry_return
-#print axioms add_overflow_contract_of_scalar
-#print axioms checked_arm_add_overflow_contract
 end UInt256Proof.Add.Safety

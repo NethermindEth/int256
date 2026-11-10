@@ -44,7 +44,4 @@ theorem output_value_of_limb_reads (memory : CIL.Safety.Memory) (output : Refere
   simp only [Nat.mul_add, ← Nat.mul_assoc]
   omega
 
-#print axioms read_limb_number
-#print axioms output_value_of_limb_reads
-
 end UInt256Model.Safety

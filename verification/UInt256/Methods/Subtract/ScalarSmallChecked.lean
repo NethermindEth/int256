@@ -56,9 +56,6 @@ theorem scalar_small_return (args : List Value) (flag : BitVec 32)
   simp [found, fetched, returning, step, cil_guard, observerCount, checkedValue, numericValue, normalized,
     Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
-#print axioms scalar_small_prefix
-#print axioms scalar_small_return
-
 end UInt256Proof.Subtract.Safety
 
 namespace UInt256Proof.Subtract.Safety
@@ -136,8 +133,6 @@ theorem scalar_small_finish (original entered current : CIL.Safety.Memory)
     exact (retained.cells id old offset).trans
       ((result.footprint id (Nat.lt_of_lt_of_le old next) offset outside).trans (preserved.cells id old offset))
 
-#print axioms scalar_small_finish
-
 end UInt256Proof.Subtract.Safety
 
 namespace UInt256Proof.Subtract.Safety
@@ -205,5 +200,4 @@ theorem scalar_right_small_checked (memory : CIL.Safety.Memory) (left right outp
   have found : Extracted.program[scalarIndex]? = some scalarBody := by rfl
   simpa only [invoke, found, checked, setup, Except.mapError, Bind.bind, Except.bind] using finished
 
-#print axioms scalar_right_small_checked
 end UInt256Proof.Subtract.Safety

@@ -114,10 +114,6 @@ theorem unary_result (profile : CIL.FeatureProfile)
   rw [packedNot] at readback
   exact readback
 
-#print axioms not_word_checked
-#print axioms not_limb_checked
-#print axioms unary_result
-
 theorem unary_correctness (profile : CIL.FeatureProfile)
     (program : CIL.Program) (index constructor helper : Nat)
     (found : program[index]? = some (unaryBody profile constructor helper))
@@ -133,5 +129,4 @@ theorem unary_correctness (profile : CIL.FeatureProfile)
   simpa only [show (256 : Nat)^32 = 2^256 from rfl, Nat.mod_eq_of_lt (BitVec.isLt _),
     BitVec.ofNat_toNat, BitVec.setWidth_eq] using decoded.symm
 
-#print axioms unary_correctness
 end UInt256Proof.Bitwise.Helper

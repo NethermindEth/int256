@@ -33,5 +33,4 @@ theorem scalar_correctness (memory : Memory) (input : Reference) (count : BitVec
     value, writable, readable, footprint⟩
 
 
-#print axioms scalar_correctness
 end UInt256Proof.Shift.Safety

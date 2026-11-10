@@ -46,8 +46,6 @@ theorem CallingConditions.swap_binary_inputs {program : CIL.Program}
   apply call.1.2.1 view
   simpa [or_comm] using member
 
-#print axioms CallingConditions.swap_binary_inputs
-
 /-- Compose a checked prefix, child invocation and proved post-call execution.
 The post-call execution preserves memory except for retiring the parent frame. -/
 theorem compose_readOnly_binary (program : CIL.Program) (method pc callee : Nat) (body : CIL.Method)
@@ -168,6 +166,4 @@ theorem forward_readOnly_binary (program : CIL.Program) (method pc callee : Nat)
     · rfl
   · exact prefixProof
 
-#print axioms compose_readOnly_binary
-#print axioms forward_readOnly_binary
 end UInt256Model.Safety

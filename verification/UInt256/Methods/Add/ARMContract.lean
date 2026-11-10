@@ -115,10 +115,6 @@ theorem scalar_entry_dispatch (program : CIL.Program) (method scalarIndex : Nat)
   exact ⟨fuel, leaveFrame frame final, [], executed,
     continuation childFuel final [.scalar (.i32 returnedFlag)] certified result.toARMScalarPost⟩
 
-#print axioms scalar_entry_dispatch
-
-#print axioms scalar_entry_prefix
-#print axioms scalar_entry_return
 end UInt256Proof.Add.Safety
 namespace UInt256Proof.Add.Safety
 open CIL.Safety UInt256Model.Safety
@@ -171,7 +167,6 @@ theorem add_contract_of_scalar (program : CIL.Program) (method scalarIndex : Nat
     found checked setup live executed
   exact ⟨fuel, final, certified, value, writable, footprint⟩
 
-#print axioms add_contract_of_scalar
 end UInt256Proof.Add.Safety
 namespace UInt256Proof.Add.Safety
 open CIL.Safety UInt256Model.Safety
@@ -189,5 +184,4 @@ theorem checked_arm_add_contract (program : CIL.Program) (entry scalar vector sm
   simpa only [vector128Arguments, binaryArguments, List.cons_append, List.nil_append] using
     checked_arm_scalar_contract program scalar vector small storage profile scalarFound vectorFound smallFound storageFound enabled
       memory left right output 0 rfl call
-#print axioms checked_arm_add_contract
 end UInt256Proof.Add.Safety

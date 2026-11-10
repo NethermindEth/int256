@@ -59,8 +59,6 @@ theorem scalar_right_prefix (left right output : Reference) (extra : List Value)
               checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
           first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
 
-#print axioms scalar_right_prefix
-
 end UInt256Proof.Safety
 
 namespace UInt256Proof.Safety
@@ -119,7 +117,5 @@ theorem scalar_left_prefix (left right output : Reference) (extra : List Value)
               pureArity, scalars, CIL.step.eq_def, CIL.binary, CIL.unary, firstRead, upper1, upper2, upper3,
               checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
           first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
-
-#print axioms scalar_left_prefix
 
 end UInt256Proof.Safety

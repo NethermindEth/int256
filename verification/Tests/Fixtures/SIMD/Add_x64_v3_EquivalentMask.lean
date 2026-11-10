@@ -9,5 +9,4 @@ theorem correctness :
   UInt256Proof.Add.Vector256.Masked.add_contract Extracted.program Extracted.profile
     rfl rfl rfl rfl ⟨rfl, rfl, rfl, rfl⟩
 
-#print axioms correctness
 end UInt256Proof.Fixture.SIMD.Add_x64_v3_EquivalentMask

@@ -14,5 +14,4 @@ private def primitiveContext : PrimitiveContext := ⟨context, 0, (profileIndice
 theorem profile_correctness : UInt256Model.Safety.OrderedScalarContract false CIL.Value.i64 (fun input word => encoded (input * BitVec.ofNat 256 word.toNat)) Extracted.program 0 :=
   UInt256Model.Safety.OrderedScalarContract.of_embeds fullEmbeds <|
   primitive64_with_contracts primitiveContext rfl (profile_word_contract context rfl) (profile_top_contract context rfl)
-#print axioms profile_correctness
 end UInt256Proof.OperatorMultiplyUInt256UInt64

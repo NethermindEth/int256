@@ -68,7 +68,6 @@ foreach (XElement entry in registry)
             theorem refuted : ¬ WrappingBinaryContract (· + ·) Extracted.program 0 :=
               UInt256Model.Safety.ContractRefutation.checked_binary_fault_refuted Extracted.program 0 1024 (· + ·) memory
                 {arguments} {located} call (by decide) (by rfl)
-            #print axioms refuted
             """;
     }
     else
@@ -82,7 +81,6 @@ foreach (XElement entry in registry)
                   .ok (inputValue memory {input} + inputValue memory {input}, []) ∧
                 (invoke Extracted.program 1024 {probe} [.reference (.address {input})] memory).map Prod.snd =
                   .ok [.scalar (.i64 {(string)entry.Attribute("ProbeValue")!})] := ⟨call, by rfl, by rfl⟩
-            #print axioms accepted
             """;
     }
     string source = File.ReadAllText(Path.Combine(fixtures, "WitnessTemplate.lean.in"))

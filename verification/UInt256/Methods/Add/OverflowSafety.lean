@@ -10,5 +10,4 @@ theorem checked_overflow_contract : ReportingBinaryContract (· + ·)
   overflow_contract_of_child (overflow_scalar_checked
     (UInt256Proof.Add.CarrySafety.carry_helper_contract (profile := Extracted.profile) rfl))
 
-#print axioms checked_overflow_contract
 end UInt256Proof.Safety

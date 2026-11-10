@@ -70,6 +70,4 @@ theorem shift_complement_count (boundary : Nat) (entered current : Memory)
   cil_contract_steps 3 [countSlot, load]
   exact run_next_exists post found rfl (stored _ _ _) done
 
-#print axioms shift_mask_count
-#print axioms shift_complement_count
 end UInt256Proof.Shift.Safety

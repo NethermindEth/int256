@@ -35,5 +35,4 @@ theorem refuted : ¬ @CONTRACT@ @ARGUMENTS@ Extracted.program 0 := by
     memory @REFERENCES@ @WITNESS@ call
   · rfl
   · decide
-#print axioms refuted
 end FixtureWitness

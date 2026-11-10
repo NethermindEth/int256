@@ -374,18 +374,4 @@ theorem VectorFrame.run_output_store {program : CIL.Program} {original entered c
     state.output_store_scratch scratch originalCall homes layout body pc args rest value
   exact run_next_exists post found fetched stepped (continuation after next cellsNext)
 
-#print axioms run_cell_load
-#print axioms VectorFrame.run_cell_store
-#print axioms VectorFrame.run_output_store
-#print axioms ScratchCells.write_cell
-#print axioms scratch_load
-#print axioms ScratchCells.known_locals
-#print axioms CallingConditions.retained
-#print axioms VectorFrame.initial_from
-#print axioms VectorFrame.run_store_scratch
-#print axioms VectorFrame.output_store_scratch
-#print axioms VectorFrame.cell_store
-#print axioms VectorFrame.finish_read
-#print axioms VectorFrame.finish_child
-#print axioms VectorFrame.after_child
 end UInt256Model.Safety

@@ -289,10 +289,6 @@ theorem small_input_prefix_checked (program : CIL.Program) (method storage : Nat
   refine run_next_exists post found rfl rfl ?_
   exact done
 
-#print axioms small_frame_setup
-#print axioms small_private_store
-#print axioms SmallSaved.save
-#print axioms small_input_prefix_checked
 end UInt256Proof.Subtract.Profile
 
 
@@ -451,9 +447,6 @@ theorem small_selected_flag (words : Fin 4 → BitVec 64) (word : BitVec 64) :
     simp [BitVec.ofNat_eq_ofNat, smallBranchFlag, smallSelectedBranch, h0, h1, h2, h3,
       show (3 : Fin 5).val = 3 from rfl, show (4 : Fin 5).val = 4 from rfl]
 
-#print axioms small_return
-#print axioms small_branch_prefix
-#print axioms small_selected_flag
 end UInt256Proof.Subtract.Profile
 
 namespace UInt256Proof.Subtract.Profile
@@ -576,8 +569,4 @@ theorem SmallResult.underflow {original final : Memory} {values : List Value}
   rw [originalValue, scalarValue] at flag
   simpa only [small_selected_flag, flag] using result.flag
 
-#print axioms small_finish
-#print axioms small_checked
-#print axioms SmallResult.modular_difference
-#print axioms SmallResult.underflow
 end UInt256Proof.Subtract.Profile

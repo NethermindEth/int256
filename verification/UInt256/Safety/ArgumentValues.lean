@@ -23,8 +23,6 @@ theorem inputValue_of_encoded_read {memory : Memory} {reference : Reference}
   rw [← encoded]
   simp
 
-#print axioms inputValue_of_encoded_read
-
 /-- A proved initialized copy can be passed as an additional read-only input. -/
 theorem CallingConditions.with_readable_input {program : CIL.Program}
     {memory : Memory} {inputs outputs : List Reference} {reference : Reference}
@@ -38,8 +36,6 @@ theorem CallingConditions.with_readable_input {program : CIL.Program}
   rcases member with member | rfl
   · exact call.1.2.1 view member
   · exact ⟨bytes, loaded⟩
-
-#print axioms CallingConditions.with_readable_input
 
 end UInt256Model.Safety
 
@@ -61,5 +57,4 @@ theorem input_encoded (program : CIL.Program) (memory : Memory) (inputs outputs 
 
 
 
-#print axioms input_encoded
 end UInt256Model.Safety

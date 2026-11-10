@@ -64,5 +64,4 @@ theorem shift_store_return (whole : Fin 4) (memory : Memory) (inputs : List Refe
   · intro id old offset untouched
     exact (retained.cells id old offset).trans (outside id offset untouched)
 
-#print axioms shift_store_return
 end UInt256Proof.Shift.Safety

@@ -72,9 +72,6 @@ theorem scalar_small_return (swapped : Bool) (args : List Value) (flag : BitVec 
     simp [cil_code, step, cil_guard, observerCount, checkedValue, numericValue, normalized,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
-#print axioms scalar_small_prefix
-#print axioms scalar_small_return
-
 end UInt256Proof.Safety
 
 namespace UInt256Proof.Safety
@@ -152,8 +149,6 @@ theorem scalar_small_finish (swapped : Bool) (original entered current : CIL.Saf
     exact (retained.cells id old offset).trans
       ((result.footprint id (Nat.lt_of_lt_of_le old next) offset outside).trans (preserved.cells id old offset))
 
-#print axioms scalar_small_finish
-
 end UInt256Proof.Safety
 
 namespace UInt256Proof.Safety
@@ -207,9 +202,5 @@ theorem scalar_private_next (original entered current : CIL.Safety.Memory) (fram
   have currentWrite := authority.access writable (enteredWF.1 _ _ ready.present).1
   obtain ⟨currentAllocation, currentReady⟩ := access_requirements currentWrite
   exact Nat.le_trans fresh (Nat.le_of_lt (currentWF.1 _ _ currentReady.present).1)
-
-#print axioms input_small_value
-#print axioms scalar_small_values
-#print axioms scalar_private_next
 
 end UInt256Proof.Safety

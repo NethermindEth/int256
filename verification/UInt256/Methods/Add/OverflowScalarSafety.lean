@@ -44,5 +44,4 @@ theorem overflow_scalar_checked (contract : CarryHelperContract Extracted.progra
     fuel memory (checked 0) (checked 1) setup
   exact ⟨fuel, final, values, same.symm.trans invoked, result⟩
 
-#print axioms overflow_scalar_checked
 end UInt256Proof.Safety

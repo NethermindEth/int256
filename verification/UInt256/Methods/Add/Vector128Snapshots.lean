@@ -57,7 +57,6 @@ theorem vector128_correction_checked (program : CIL.Program) (body : CIL.Method)
     cil_contract_steps [found, code, loadIncoming, loadSum, stored,
       CIL.Vector.intrinsic_sub128, corrected128] until done
 
-#print axioms vector128_correction_checked
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -132,7 +131,6 @@ theorem vector128_correction_pair (program : CIL.Program) (body : CIL.Method) (m
     (Nat.le_trans (write_extends_allocations _ _ _ _ _ firstWrite).next
       (write_extends_allocations _ _ _ _ _ secondWrite).next)
 
-#print axioms vector128_correction_pair
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -232,5 +230,4 @@ theorem vector128_snapshots_checked (program : CIL.Program) (body : CIL.Method) 
     · exact ⟨highResult, highResultSlot, highResultRead⟩
   exact continuation after snapshots (p0.trans (p1.trans p2)) c2 a2 (Nat.le_trans n0 (Nat.le_trans n1 n2))
 
-#print axioms vector128_snapshots_checked
 end UInt256Proof.Add.Safety

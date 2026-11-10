@@ -34,8 +34,6 @@ theorem subtract_word_specs : ∀ i : Fin 5, subtractVectorSpecs[10 + i.val]? = 
 theorem subtract_vector_first_four : ∀ i : Fin 4, subtractVectorSpecs[i.val]? = some vector128ZeroSpec :=
   fun i => subtract_vector_specs ⟨i.val, by omega⟩
 
-#print axioms subtract_vector_specs
-#print axioms subtract_word_specs
 end UInt256Proof.Subtract.Profile
 
 namespace UInt256Proof.Subtract.Profile
@@ -111,8 +109,6 @@ theorem subtract_fast_result (original final : Memory) (left right output : Refe
     rw [limb_fast_underflow a b none, input_limbs_value, input_limbs_value]
     rfl
 
-#print axioms subtract_initial_state
-#print axioms subtract_fast_result
 end UInt256Proof.Subtract.Profile
 
 namespace UInt256Proof.Subtract.Profile
@@ -181,7 +177,6 @@ theorem subtract_vector_entry (program : CIL.Program) (method borrow storage : N
       borrow storage (by cases selected : profile.advSimd <;> simp only [CodeAt, body, subtractVectorBody, selected] <;> rfl) storageFound rfl original after saved
       left right output borrowHome results args outputArg call owned borrowState
 
-#print axioms subtract_vector_entry
 end UInt256Proof.Subtract.Profile
 
 namespace UInt256Proof.Subtract.Profile
@@ -217,5 +212,4 @@ theorem checked_subtract_vector_contract (program : CIL.Program) (method borrow 
     certify_invocation program method _ args memory frame entered fuel final returned found checked setup live executed,
     result⟩
 
-#print axioms checked_subtract_vector_contract
 end UInt256Proof.Subtract.Profile

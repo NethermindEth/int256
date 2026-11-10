@@ -8,7 +8,6 @@ import UInt256.Methods.Equality.ReferenceOperator
   apply (by simpa using UInt256Proof.Equality.ReferenceOperator.readOnly_contract (fun a b => decide (a = b)) Extracted.program 0)
   intro memory left right call
   simpa using UInt256Proof.Equality.ReferenceSseWrapper.checked Extracted.profile Extracted.program 0 1 rfl rfl rfl rfl memory left right call
-#print axioms UInt256Proof.Equality.EqualsUInt256Ref.sse_correctness
 
 
 
@@ -19,4 +18,3 @@ theorem UInt256Proof.Equality.EqualsUInt256Ref.sse_family (profile : CIL.Feature
   UInt256Model.Safety.ReadOnlyContract.reprofile UInt256Proof.Equality.ProfileBindings.uniform
     (UInt256Proof.Equality.ProfileBindings.reference_agreement profile vector sse) UInt256Proof.Equality.EqualsUInt256Ref.sse_correctness
 
-#print axioms UInt256Proof.Equality.EqualsUInt256Ref.sse_family

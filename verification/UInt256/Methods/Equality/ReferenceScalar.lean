@@ -60,5 +60,4 @@ theorem checked (profile : CIL.FeatureProfile) (program : CIL.Program) (index ca
       exact tail
   exact forwarded memory left right call
 
-#print axioms checked
 end UInt256Proof.Equality.ReferenceScalar

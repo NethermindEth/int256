@@ -134,8 +134,6 @@ theorem entry_prepare (program : CIL.Program) (method prepare : Nat) (body : CIL
   obtain ⟨total, composed⟩ := run_call_exists found f9 stepped ⟨childFuel, invoked⟩ ⟨fuel, by simpa using ran⟩
   exact ⟨total, final, values, composed, satisfied⟩
 
-#print axioms entry_prepare
-
 set_option hygiene false in
 macro "entry_load" : tactic => `(tactic|
   apply VectorFrame.run_load post state found (by rfl) (by rfl))
@@ -231,8 +229,6 @@ theorem add_tail (program : CIL.Program) (profile : CIL.FeatureProfile) (avx512 
     obtain ⟨total, ran⟩ := run_call_exists found rfl stepped ⟨childFuel, invoked⟩ ⟨2, tail⟩
     exact ⟨total, _, _, ran, rfl, by rw [ha, hb]; exact value.trans (cascade_sum_value a b), access, kept⟩
 
-#print axioms add_tail
-
 /-- Caller guarantees of the AddOverflow entry: exact initial-operand carry and the Add guarantees. -/
 def overflowFlag (memory : Memory) (left right : Reference) : BitVec 32 :=
   if 2^256 ≤ (inputValue memory left).toNat + (inputValue memory right).toNat then 1 else 0
@@ -309,8 +305,6 @@ theorem overflow_tail (program : CIL.Program) (profile : CIL.FeatureProfile) (av
     unfold overflowFlag
     rw [ha, hb, ← cascade_flag_value a b]
     rfl
-
-#print axioms overflow_tail
 
 theorem binary_checked {program : CIL.Program} {memory : Memory} {left right output : Reference}
     (call : CallingConditions program memory [left, right] [output]) :
@@ -394,8 +388,4 @@ theorem add_overflow_contract (program : CIL.Program) (profile : CIL.FeatureProf
     (finish_contract program 1 2 profile avx512 finishFound lookupFound features)
     (prepare_contract program 3 profile avx512 prepareFound features) features
 
-#print axioms add_contract_of_callees
-#print axioms add_overflow_contract_of_callees
-#print axioms add_contract
-#print axioms add_overflow_contract
 end UInt256Proof.Add.Vector256

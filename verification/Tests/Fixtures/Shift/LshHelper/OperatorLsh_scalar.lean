@@ -13,5 +13,4 @@ theorem correctness : ReadOnlyScalarContract CIL.Value.i32
     (wrapper_correctness Extracted.profile .left Extracted.program 1 2 (by rfl)
       (scalar_helper_contract Extracted.profile (by rfl) Extracted.program 2 3 4 (by decide) (by rfl) (by rfl) (by rfl)))
 
-#print axioms correctness
 end UInt256Proof.Shift.Fixture

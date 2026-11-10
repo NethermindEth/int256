@@ -8,4 +8,3 @@ theorem UInt256Proof.Equality.scalar_correctness :
       Extracted.program Extracted.entryIndex 2 :=
   UInt256Proof.Equality.Safety.checked_equality_binding
 
-#print axioms UInt256Proof.Equality.scalar_correctness

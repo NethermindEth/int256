@@ -8,7 +8,6 @@ theorem UInt256Proof.Compare.GtUInt256UInt256.avx512_correctness :
       Extracted.program 0 2 := by
   have proof := UInt256Proof.Compare.Safety.native_entry_checked Extracted.profile false false Extracted.program 0 1 rfl rfl rfl rfl rfl rfl
   simpa [UInt256Proof.Compare.Safety.nativePredicate] using proof.to_contract
-#print axioms UInt256Proof.Compare.GtUInt256UInt256.avx512_correctness
 
 
 theorem UInt256Proof.Compare.GtUInt256UInt256.avx512_family (profile : CIL.FeatureProfile) (valid : profile.Valid)
@@ -19,4 +18,3 @@ theorem UInt256Proof.Compare.GtUInt256UInt256.avx512_family (profile : CIL.Featu
       (fun values => .i32 (if (values[0]?.getD 0).toNat > (values[1]?.getD 0).toNat then 1 else 0))
       (CIL.reprofile Extracted.program profile) 0 2 :=
   UInt256Model.Safety.ReadOnlyContract.reprofile UInt256Proof.Compare.ProfileBindings.uniform (UInt256Proof.Compare.ProfileBindings.agreement profile valid native avx2 vector) UInt256Proof.Compare.GtUInt256UInt256.avx512_correctness
-#print axioms UInt256Proof.Compare.GtUInt256UInt256.avx512_family

@@ -71,6 +71,4 @@ theorem readOnly_contract (equal : BitVec 256 → BitVec 256 → Bool) (program 
   subst tail
   simpa using child memory left right call
 
-#print axioms checked
-#print axioms readOnly_contract
 end UInt256Proof.Equality.ReferenceOperator

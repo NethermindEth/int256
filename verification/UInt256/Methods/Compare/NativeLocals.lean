@@ -102,7 +102,6 @@ theorem native_setup (profile : CIL.FeatureProfile) (usesLess inclusive : Bool) 
   exact ⟨frame, entered, setup, homes, call.after_frame_setup setup,
     enterFrame_preserves_caller_memory _ _ _ _ _ setup⟩
 
-#print axioms native_setup
 end UInt256Proof.Compare.Safety
 
 namespace UInt256Proof.Compare.Safety
@@ -157,5 +156,4 @@ theorem native_local_writes (memory : Memory) (frame : Frame) (lower : Nat)
           load_numeric_local .vector256 (.v256 less) less.toNat rfl r2,
           below0, below0.trans below1, (below0.trans below1).trans below2⟩
 
-#print axioms native_local_writes
 end UInt256Proof.Compare.Safety

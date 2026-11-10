@@ -6,4 +6,3 @@ theorem UInt256Proof.Safety.checked_overflow_binding :
       Extracted.program Extracted.entryIndex := by
   with_reducible exact UInt256Proof.Safety.checked_overflow_contract
 
-#print axioms UInt256Proof.Safety.checked_overflow_binding

@@ -62,5 +62,4 @@ theorem wrapper_prefix (wrapper : Wrapper) (left right : Reference) (frame : Fra
       List.reverse_cons, List.reverse_nil, List.nil_append, List.cons_append] at continuation
     cil_contract_steps [readOnlyArguments, fl, fr] until continuation
 
-#print axioms wrapper_prefix
 end UInt256Proof.Compare.Safety

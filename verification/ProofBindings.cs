@@ -96,7 +96,6 @@ internal static class ProofBindings
               simpa only [show wrapperScalarFirst = {{first}} from rfl] using
                 ScalarOperatorContract.result_congr meaning checked{{width}}
 
-            #print axioms scalar_correctness
             end UInt256Proof.Compare.{{method}}
             """ + "\n";
     }
@@ -135,8 +134,6 @@ internal static class ProofBindings
                 Extracted.profile {{first}} {{negated}} Extracted.program 0 1 rfl (fun _ => rfl)
             {{checkedHelper}}
 
-            #print axioms {{theorem}}_correctness
-
             """ + (vector ? "\n\n" : "\n") + $$"""
             theorem {{theorem}}_family (profile : CIL.FeatureProfile)
                 (vector : Extracted.profile.vector256Accelerated = profile.vector256Accelerated) :
@@ -145,7 +142,6 @@ internal static class ProofBindings
               UInt256Model.Safety.ScalarOperatorContract.reprofile UInt256Proof.Equality.ProfileBindings.uniform
                 (UInt256Proof.Equality.ProfileBindings.primitive_agreement profile vector) {{theorem}}_correctness
 
-            #print axioms {{theorem}}_family
             """ + "\n";
     }
 }

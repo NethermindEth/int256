@@ -85,7 +85,6 @@ theorem vector128_sse_repair_start (program : CIL.Program) (body : CIL.Method) (
   cil_contract_steps 2 [found, code]
   exact run_next_exists post found (by cil_lookup [code]) (stored _ _ _) done
 
-#print axioms vector128_sse_repair_start
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -124,7 +123,6 @@ theorem vector128_sse_carry_segment (program : CIL.Program) (body : CIL.Method) 
     cil_contract_steps [found, code, leftArg, rightArg, leftFormed, rightFormed,
       carryFormed, resultFormed, carrySlot, resultSlot, localAddress, leftRead, rightRead] until continuation
 
-#print axioms vector128_sse_carry_segment
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -174,8 +172,6 @@ theorem vector128_sse_indexed_carry (program : CIL.Program) (body : CIL.Method) 
   simpa only [show 171 + 7 * index.val + 1 = 172 + 7 * index.val by omega, carryContract, List.append_nil] using
     continuation after kept.formed kept.staticWorld call.framed call.post
 
-#print axioms vector128_sse_indexed_carry
-
 /-- Caller views discharge both limb loads; checked homes discharge the carry call. -/
 theorem vector128_sse_carry_segment_checked (program : CIL.Program) (body : CIL.Method) (method : Nat)
     (found : program[method]? = some body)
@@ -215,7 +211,6 @@ theorem vector128_sse_carry_segment_checked (program : CIL.Program) (body : CIL.
     segment args frame memory _ _ c carryHome resultHome call.1.1 incoming carryRead carryWrite resultWrite disjoint
     post continuation
 
-#print axioms vector128_sse_carry_segment_checked
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -281,8 +276,6 @@ theorem vector128_sse_carry_all (program : CIL.Program) (body : CIL.Method) (met
   exact vector128_sse_carry_next program body method found carry storage code carryFound
     3 third args leftArg rightArg post continuation
 
-#print axioms vector128_sse_carry_next
-#print axioms vector128_sse_carry_all
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -362,8 +355,6 @@ theorem vector128_sse_carry_ready (program : CIL.Program) (specs : List NumericL
   · intro i impossible
     omega
 
-#print axioms vector128_sse_word_home
-#print axioms vector128_sse_carry_ready
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -403,7 +394,6 @@ theorem vector128_sse_repair_carry (program : CIL.Program) (body : CIL.Method) (
   exact vector128_sse_carry_all program body method found carry storage code carryFound
     ready args leftArg rightArg post (continuation carryHome results)
 
-#print axioms vector128_sse_repair_carry
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -465,8 +455,6 @@ theorem vector128_sse_return (program : CIL.Program) (body : CIL.Method) (method
   all_goals simp [run, found, fetched, returns, step, cil_guard, observerCount, checkedValue, numericValue, CIL.NarrowKind.extend,
     scalarOverflowFlag, positive, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
-#print axioms vector128_sse_store_prefix
-#print axioms vector128_sse_return
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -531,5 +519,4 @@ theorem vector128_sse_finish (program : CIL.Program) (body : CIL.Method) (method
   · intro id old offset untouched
     exact (retained.cells id old offset).trans ((outside id offset untouched).trans (state.callerCells id old offset))
 
-#print axioms vector128_sse_finish
 end UInt256Proof.Add.Safety

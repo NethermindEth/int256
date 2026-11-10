@@ -119,7 +119,4 @@ theorem dispatch_contract_of_scalar
     exact (retained.cells id bound offset).trans
       ((result.footprint id (Nat.lt_of_lt_of_le bound fresh.1.next) offset outside).trans (before.cells id bound offset))
 
-#print axioms dispatch_prefix
-#print axioms dispatch_return
-#print axioms dispatch_contract_of_scalar
 end UInt256Proof.Subtract.Safety

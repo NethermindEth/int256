@@ -10,8 +10,6 @@ theorem UInt256Proof.Compare.LtUInt256UInt256.avx2_correctness :
       Extracted.program Extracted.entryIndex 2 :=
   UInt256Proof.Compare.Safety.checked_less_binding
 
-#print axioms UInt256Proof.Compare.LtUInt256UInt256.avx2_correctness
-
 
 theorem UInt256Proof.Compare.LtUInt256UInt256.avx2_family (profile : CIL.FeatureProfile) (valid : profile.Valid)
     (native : Extracted.profile.avx512FVL = profile.avx512FVL)
@@ -21,4 +19,3 @@ theorem UInt256Proof.Compare.LtUInt256UInt256.avx2_family (profile : CIL.Feature
       (fun values => .i32 (if (values[0]?.getD 0).toNat < (values[1]?.getD 0).toNat then 1 else 0))
       (CIL.reprofile Extracted.program profile) Extracted.entryIndex 2 :=
   UInt256Model.Safety.ReadOnlyContract.reprofile UInt256Proof.Compare.ProfileBindings.uniform (UInt256Proof.Compare.ProfileBindings.agreement profile valid native avx2 vector) UInt256Proof.Compare.LtUInt256UInt256.avx2_correctness
-#print axioms UInt256Proof.Compare.LtUInt256UInt256.avx2_family

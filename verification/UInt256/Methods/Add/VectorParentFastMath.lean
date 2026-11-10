@@ -47,7 +47,4 @@ theorem vector_fast_sum (a b : Limbs)
   simpa only [carryMask, addGenerate, packedLimbs,
     ← UInt256Proof.Equality.value_pack, UInt256Proof.sumWords_sum] using corrected
 
-#print axioms vector_generated_packed
-#print axioms vector_propagation_packed
-#print axioms vector_fast_sum
 end UInt256Proof.Add.Safety

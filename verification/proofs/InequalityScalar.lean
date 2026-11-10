@@ -7,4 +7,3 @@ theorem UInt256Proof.Equality.scalar_inequality_correctness :
       Extracted.program Extracted.entryIndex 2 :=
   UInt256Proof.Equality.Safety.checked_inequality_binding
 
-#print axioms UInt256Proof.Equality.scalar_inequality_correctness

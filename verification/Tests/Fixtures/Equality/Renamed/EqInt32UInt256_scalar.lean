@@ -16,4 +16,3 @@ theorem EqualityFixture.correct :
     (UInt256Proof.Equality.PrimitiveOperator.checked CIL.Value.i32 _ Extracted.profile false false Extracted.program 2 3 rfl (fun _ => rfl)
     (UInt256Proof.Equality.UnsignedPrimitive.checked32 Extracted.profile Extracted.program 3 4 5 rfl rfl rfl rfl)))
 
-#print axioms EqualityFixture.correct

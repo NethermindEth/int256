@@ -27,9 +27,6 @@ theorem scalar_frame_setup (memory : Memory) (args : List Value) (wellFormed : m
   word_frame_setup Extracted.addScalarBody scalarLocalSpecs scalar_local_metadata.1
     scalar_local_metadata.2 (by simp only [cil_code]) (by simp only [cil_code]) (by rfl) memory args wellFormed
 
-#print axioms scalar_local_metadata
-#print axioms scalar_frame_setup
-
 /-- Any word selected by the extracted initializer metadata can be updated by
     the actual local-store instruction, retaining its frame identity and exact
     byte readback. Null reference-root slots cannot satisfy `specified`. -/
@@ -49,7 +46,5 @@ theorem scalar_store_local {memory : Memory} {lower : Nat} {frame : Frame}
   obtain ⟨result, stepped, written, loaded⟩ := step_store_word64_same_frame
     (body := Extracted.addScalarBody) (pc := pc) (args := args) (rest := rest) value slot writable
   exact ⟨reference, result, slot, bound, stepped, written, loaded⟩
-
-#print axioms scalar_store_local
 
 end UInt256Proof.Safety

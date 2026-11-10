@@ -21,5 +21,4 @@ theorem input_vector_snapshot {program : CIL.Program} {original entered current 
   rw [state.call.input_load member, pack_limbs_value, input_limbs_value]
   simp only [inputValue, bytes]
 
-#print axioms input_vector_snapshot
 end UInt256Proof.Multiply.VectorInputs

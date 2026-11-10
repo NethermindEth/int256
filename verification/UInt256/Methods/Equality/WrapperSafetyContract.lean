@@ -52,8 +52,6 @@ theorem wrapper_prefix (outer : Bool) (left right : Reference) (frame : Frame) (
     conv at continuation in (wrapperCall _) => cbv
     cil_contract_steps [readOnlyArguments, fl, fr] until continuation
 
-#print axioms wrapper_prefix
-
 end UInt256Proof.Equality.Safety
 
 namespace UInt256Proof.Equality.Safety
@@ -109,8 +107,5 @@ theorem equality_readOnly_contract
   exact BinaryReadOnlyInvocation.to_contract
     (operation := fun left right => .i32 (if left = right then 1 else 0))
     (program := Extracted.program) (method := Extracted.entryIndex) entry
-
-#print axioms equality_readOnly_contract
-#print axioms wrapper_checked
 
 end UInt256Proof.Equality.Safety

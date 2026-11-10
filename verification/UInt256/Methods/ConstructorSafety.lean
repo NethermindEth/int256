@@ -57,8 +57,6 @@ theorem constructor_safe (profile : CIL.FeatureProfile) (program : CIL.Program) 
   · cil_checked_steps [found, body, arguments, f0, f1, f2, f3,
       a0, a1, a2, a3, h0, h1, h2, h3]
 
-#print axioms constructor_safe
-
 def packed (w0 w1 w2 w3 : BitVec 64) : BitVec 256 := BitVec.ofNat 256
   (w0.toNat + w1.toNat * 2^64 + w2.toNat * 2^128 + w3.toNat * 2^192)
 
@@ -99,5 +97,4 @@ theorem constructor_contract (profile : CIL.FeatureProfile) (program : CIL.Progr
   exact ⟨result, executed, valid, outside, authority, readback,
     loadLocal_of_read (kind := .aggregate 32) readback⟩
 
-#print axioms constructor_contract
 end UInt256Proof.ConstructorSafety

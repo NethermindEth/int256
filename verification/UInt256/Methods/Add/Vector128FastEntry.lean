@@ -63,13 +63,6 @@ theorem vector128_snapshot_fast_words (memory : Memory) (left right : Reference)
   simpa only [vector128_snapshot_low, vector128_snapshot_high] using
     vector128_fast_words advSimd (inputLimb memory left) (inputLimb memory right) flag fast
 
-#print axioms vector128_snapshot_fast_words
-#print axioms vector128_snapshot_low
-#print axioms vector128_snapshot_high
-#print axioms vector128_snapshot_incoming_low
-#print axioms vector128_snapshot_incoming_high
-#print axioms vector128_branch_low
-#print axioms vector128_branch_high
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -119,7 +112,6 @@ theorem vector128_fast_suffix (program : CIL.Program) (body : CIL.Method) (metho
     (privateReads carryHome 16 1 _ carryBound carryRead),
     continuation after outputRead afterCall afterAuthority outside advanced⟩
 
-#print axioms vector128_fast_suffix
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -186,7 +178,6 @@ theorem vector128_fast_result (program : CIL.Program) (body : CIL.Method) (metho
   · intro id offset earlier untouched
     exact (teardown.cells id earlier offset).trans (outside id offset untouched)
 
-#print axioms vector128_fast_result
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -251,5 +242,4 @@ theorem vector128_fast_entry (program : CIL.Program) (body : CIL.Method) (method
   exact ⟨fuel, final, returned, executed, scalar, result, writable,
     fun id offset old untouched => (outside id offset old untouched).trans (footprint id offset old untouched)⟩
 
-#print axioms vector128_fast_entry
 end UInt256Proof.Add.Safety

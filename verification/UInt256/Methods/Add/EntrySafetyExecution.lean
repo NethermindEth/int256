@@ -107,8 +107,4 @@ theorem entry_run_checked (contract : CarryHelperContract Extracted.program Extr
   subst values
   exact ⟨fuel, final, finished, result⟩
 
-#print axioms entry_scalar_prefix
-#print axioms entry_scalar_return
-#print axioms entry_run_checked
-
 end UInt256Proof.Safety

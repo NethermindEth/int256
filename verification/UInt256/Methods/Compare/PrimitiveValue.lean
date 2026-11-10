@@ -84,7 +84,4 @@ theorem correctness (program : CIL.Program) (index callee : Nat)
   exact (after.cells id bound offset).trans
     ((cells id (Nat.lt_of_lt_of_le bound growth.1.next) offset).trans (before.cells id bound offset))
 
-#print axioms value_prefix
-#print axioms returned
-#print axioms correctness
 end UInt256Proof.Compare.PrimitiveValue

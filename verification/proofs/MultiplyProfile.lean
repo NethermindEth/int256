@@ -12,5 +12,4 @@ private def context : Context :=
 theorem profile_correctness : UInt256Model.Safety.WrappingBinaryContract (· * ·) Extracted.program 0 :=
   UInt256Model.Safety.WrappingBinaryContract.of_embeds fullEmbeds <|
   multiply_checked_contract context (profile_word_contract context rfl) (profile_top_contract context rfl)
-#print axioms profile_correctness
 end UInt256Proof.Multiply

@@ -6,4 +6,3 @@ theorem UInt256Proof.Subtract.underflow_scalar_correctness :
       Extracted.program Extracted.entryIndex :=
   UInt256Proof.Subtract.Safety.checked_underflow_binding
 
-#print axioms UInt256Proof.Subtract.underflow_scalar_correctness

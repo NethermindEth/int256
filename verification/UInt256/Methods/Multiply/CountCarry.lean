@@ -38,4 +38,3 @@ theorem countCarry_nat (a b count : W64) (bound : count.toNat + 1 < 2^64) :
   simp only [countCarry, BitVec.toNat_add]
   exact Nat.mod_eq_of_lt (by omega)
 end UInt256Proof.Multiply
-#print axioms UInt256Proof.Multiply.sum_decomposition

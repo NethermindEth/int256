@@ -65,8 +65,6 @@ theorem subtract_flag_return (program : CIL.Program) (method : Nat) (body : CIL.
   split <;> simp [run, found, fetched, returns, step, cil_guard, observerCount, checkedValue, numericValue,
     Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure] <;> rfl
 
-#print axioms subtract_forward_prefix
-#print axioms subtract_flag_return
 end UInt256Proof.Subtract.Profile
 
 namespace UInt256Proof.Subtract.Profile
@@ -168,9 +166,6 @@ theorem subtract_impl_contract (program : CIL.Program) (method scalarIndex : Nat
     certify_invocation _ _ _ _ _ _ _ _ _ _ found (subtract_checked_arguments program memory left right output call)
       setup live finished
 
-#print axioms subtract_forward_result
-#print axioms subtract_checked_arguments
-#print axioms subtract_impl_contract
 end UInt256Proof.Subtract.Profile
 
 namespace UInt256Proof.Subtract.Profile
@@ -268,9 +263,6 @@ theorem subtract_underflow_contract (program : CIL.Program) (method impl : Nat) 
     certify_invocation _ _ _ _ _ _ _ _ _ _ found (subtract_checked_arguments program memory left right output call)
       setup live finished
 
-#print axioms subtract_reporting_invoke
-#print axioms subtract_wrapping_contract
-#print axioms subtract_underflow_contract
 end UInt256Proof.Subtract.Profile
 
 namespace UInt256Proof.Subtract.Profile
@@ -330,7 +322,4 @@ theorem checked_accelerated_underflow_contract (program : CIL.Program) (entry im
     (checked_accelerated_impl_contract program impl scalar vector borrow small storage profile noAvx2 sse ssse sse42
       implFound scalarFound vectorFound borrowFound smallFound storageFound)
 
-#print axioms checked_accelerated_impl_contract
-#print axioms checked_accelerated_subtract_contract
-#print axioms checked_accelerated_underflow_contract
 end UInt256Proof.Subtract.Profile

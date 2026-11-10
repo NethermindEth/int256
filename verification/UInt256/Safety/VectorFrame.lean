@@ -245,10 +245,4 @@ theorem VectorFrame.input_value {program : CIL.Program} {original entered curren
   funext offset
   rw [state.caller input.allocation old offset (Or.inl rfl)]
 
-#print axioms VectorFrame.input_value
-#print axioms VectorFrame.run_load
-#print axioms VectorFrame.run_store
-#print axioms VectorFrame.output_store
-#print axioms VectorFrame.after_call
-#print axioms VectorFrame.finish
 end UInt256Model.Safety

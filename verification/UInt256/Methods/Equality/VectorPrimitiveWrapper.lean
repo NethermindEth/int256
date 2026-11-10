@@ -121,9 +121,6 @@ theorem checked {α : Type} (encode : α → CIL.Value) (equal : BitVec 256 → 
   simpa only [ScalarOperatorContract, ReadOnlyScalarContract, scalarOperatorArguments,
     Bool.false_eq_true, ite_false, Bool.bne_false] using result
 
-#print axioms executed
-#print axioms checked
-
 
 
 
@@ -142,7 +139,6 @@ theorem checked32 (profile : CIL.FeatureProfile) (program : CIL.Program) (index 
   intro memory left right frame call
   simpa only [decide_eq_true_eq, widen] using VectorPrimitive.run32 profile program callee leafFound memory left right frame call
 
-#print axioms checked32
 theorem checked64 (profile : CIL.FeatureProfile) (program : CIL.Program) (index callee : Nat)
     (vector : profile.vector256Accelerated = true)
     (found : program[index]? = some (body false profile callee))
@@ -156,5 +152,4 @@ theorem checked64 (profile : CIL.FeatureProfile) (program : CIL.Program) (index 
   intro memory left right frame call
   simpa only [decide_eq_true_eq, widen] using VectorPrimitive.run64 profile program callee leafFound memory left right frame call
 
-#print axioms checked64
 end UInt256Proof.Equality.VectorPrimitiveWrapper

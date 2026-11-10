@@ -8,4 +8,3 @@ theorem UInt256Proof.Subtract.Safety.checked_underflow_binding :
   with_reducible exact
     (UInt256Proof.Subtract.Safety.checked_underflow_contract UInt256Proof.Subtract.Safety.borrow_production_contract)
 
-#print axioms UInt256Proof.Subtract.Safety.checked_underflow_binding

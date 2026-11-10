@@ -7,4 +7,3 @@ theorem UInt256Proof.Compare.CompareToUInt256Ref.scalar_correctness :
       Extracted.program Extracted.entryIndex 2 :=
   UInt256Proof.Compare.Safety.checked_threeWay_binding
 
-#print axioms UInt256Proof.Compare.CompareToUInt256Ref.scalar_correctness

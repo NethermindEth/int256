@@ -52,5 +52,4 @@ theorem shift_counts (boundary : Nat) (entered current : Memory)
     (Nat.le_trans (write_extends_allocations _ _ _ _ _ firstWrite).next
       (write_extends_allocations _ _ _ _ _ secondWrite).next)
 
-#print axioms shift_counts
 end UInt256Proof.Shift.Safety

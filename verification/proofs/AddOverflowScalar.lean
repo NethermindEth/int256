@@ -8,4 +8,3 @@ theorem UInt256Proof.Add.overflow_scalar_correctness :
       Extracted.program Extracted.entryIndex :=
   UInt256Proof.Safety.checked_overflow_binding
 
-#print axioms UInt256Proof.Add.overflow_scalar_correctness

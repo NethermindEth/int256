@@ -29,6 +29,4 @@ theorem checked32 (signed leafSigned scalarFirst reversed negate : Bool) (progra
   checked CIL.Value.i32 (widen32 signed) true signed leafSigned scalarFirst reversed negate program entry callee
     found leafFound (fun _ => rfl) (prefix32 signed scalarFirst reversed negate program entry callee found)
 
-#print axioms prefix32
-#print axioms checked32
 end UInt256Proof.Compare.PrimitiveWrapper

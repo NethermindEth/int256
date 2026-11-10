@@ -90,9 +90,6 @@ theorem scalar_first_carry (contract : CarryHelperContract Extracted.program Ext
   · intro after _ call kept
     exact continuation after kept.formed kept.staticWorld call.framed call.post
 
-#print axioms scalar_carry_prefix
-#print axioms scalar_first_carry
-
 end UInt256Proof.Safety
 
 namespace UInt256Proof.Safety
@@ -150,8 +147,6 @@ theorem scalar_carry_segment (segment : Fin 3) (left right output : Reference) (
               pureArity, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
           first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
 
-#print axioms scalar_carry_segment
-
 /-- Every discovered scalar carry call uses the checked arithmetic contract. -/
 theorem scalar_indexed_carry (contract : CarryHelperContract Extracted.program Extracted.addWithCarryIndex) (index : Fin 4) (args : List Value) (frame : Frame) (memory : Memory)
     (a b c : BitVec 64) (carryHome resultHome : Reference)
@@ -190,8 +185,6 @@ theorem scalar_indexed_carry (contract : CarryHelperContract Extracted.program E
   · intro after _ call kept
     exact continuation after kept.formed kept.staticWorld call.framed call.post
 
-#print axioms scalar_indexed_carry
-
 open UInt256Model.Safety
 
 /-- Valid caller views discharge both field loads for each remaining limb;
@@ -225,7 +218,5 @@ theorem scalar_carry_segment_checked (contract : CarryHelperContract Extracted.p
     (access_reference_valid _ _ _ _ _ carryWrite) (access_reference_valid _ _ _ _ _ resultWrite) post
   exact scalar_indexed_carry contract ⟨segment.val + 1, by omega⟩ (binaryArguments left right output ++ extra)
     frame memory _ _ c carryHome resultHome call.1.1 incoming carryRead carryWrite resultWrite disjoint post continuation
-
-#print axioms scalar_carry_segment_checked
 
 end UInt256Proof.Safety

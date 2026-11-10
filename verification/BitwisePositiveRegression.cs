@@ -47,7 +47,6 @@ foreach (bool returned in new[] { false, true })
         open UInt256Proof.Bitwise UInt256Model.Safety UInt256Model.Bitwise
         theorem correct : {{contract}} {{operationTerm}} Extracted.program 0 :=
           {{term}}
-        #print axioms correct
         end HelperFixture
         """;
     string proofPath = Path.Combine(consumer, "proofs", "Helper" + id + profile.Replace('-', '_') + ".lean");

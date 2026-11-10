@@ -27,7 +27,7 @@ void Require(bool condition, string message)
     string text = string.Concat(sources.OrderBy(pair => pair.Key, StringComparer.Ordinal)
         .Select(pair => pair.Key + "\n" + pair.Value));
     Require(Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text))) ==
-        "C4087B52643B59C1E8E4913674EB2DFB44455E995FC7A078DE11DB9B46172226",
+        "34D06DB8FD95D2F955EBF169C7EFF2E52DAE65F6424676E36FD2E8D2D28469F8",
         "Generated bindings must retain the reviewed contracts, body checks and profile theorems");
     Require(sources.SequenceEqual(ProofBindings.Sources([.. gates.Reverse()])),
         "Binding generation must not depend on registry ordering");

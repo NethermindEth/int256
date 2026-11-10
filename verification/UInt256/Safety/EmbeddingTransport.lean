@@ -47,9 +47,4 @@ theorem OrderedScalarContract.of_embeds {α : Type} {scalarFirst : Bool} {encode
   obtain ⟨fuel, final, certificate, rest⟩ := contract memory input scalar (call.of_embeds bound)
   exact ⟨fuel, final, bound.certificate certificate, rest⟩
 
-#print axioms CallingConditions.of_embeds
-#print axioms WrappingBinaryContract.of_embeds
-#print axioms AggregateReturn.BinaryContract.of_embeds
-#print axioms OrderedScalarContract.of_embeds
-
 end UInt256Model.Safety

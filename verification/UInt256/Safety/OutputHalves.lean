@@ -85,7 +85,4 @@ theorem output_halves_update (program : CIL.Program) (original entered current :
     have kept := firstPrivate reference width alignment bytes bound loaded
     exact ⟨kept, secondPrivate reference width alignment bytes bound kept⟩
 
-#print axioms output_halves_update
-#print axioms CallingConditions.output_half_address
-#print axioms output_half_update
 end UInt256Model.Safety

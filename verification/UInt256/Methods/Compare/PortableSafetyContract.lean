@@ -69,7 +69,6 @@ theorem portable_run (profile : CIL.FeatureProfile) (program : CIL.Program) (ind
     intrinsic_portable_mask]
   exact tail
 
-#print axioms portable_run
 end UInt256Proof.Compare.Safety
 
 namespace UInt256Proof.Compare.Safety
@@ -110,6 +109,4 @@ theorem portable_checked (profile : CIL.FeatureProfile) (program : CIL.Program) 
   exact (after.cells id bound offset).trans
     ((preserved.cells id bound offset).trans (before.cells id bound offset))
 
-#print axioms portable_result_math
-#print axioms portable_checked
 end UInt256Proof.Compare.Safety

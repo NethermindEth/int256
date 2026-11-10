@@ -51,8 +51,6 @@ theorem store_limbs_safe (profile : CIL.FeatureProfile) (program : CIL.Program) 
     c2.output_limb_formed member 2, c3.output_limb_formed member 3,
     storeValue, referenceAt, ordinaryAccessAlignment]
 
-#print axioms store_limbs_safe
-
 theorem store_limbs_readable_contract (profile : CIL.FeatureProfile)
     (program : CIL.Program) (index : Nat)
     (found : program[index]? = some (body profile))
@@ -80,5 +78,4 @@ theorem store_limbs_readable_contract (profile : CIL.FeatureProfile)
   · exact ⟨_, r2⟩
   · exact ⟨_, r3⟩
 
-#print axioms store_limbs_readable_contract
 end UInt256Proof.Multiply.LimbStorage

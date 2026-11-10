@@ -286,8 +286,6 @@ theorem full_inputs (profile : CIL.FeatureProfile) (program : CIL.Program) (meth
     (by rfl) (by rfl) found (by rfl) post
   exact continuation
 
-#print axioms full_frame_setup
-#print axioms full_inputs
 end UInt256Proof.Multiply.Full
 namespace UInt256Proof.Multiply.Full
 variable {alternative : Bool}
@@ -381,7 +379,6 @@ theorem full_scalar_top (profile : CIL.FeatureProfile) (program : CIL.Program) (
   exact rfl
   exact run_next_exists post found (by rfl) stored (continuation after next)
 
-#print axioms full_scalar_top
 end UInt256Proof.Multiply.Full
 namespace UInt256Proof.Multiply.Full
 variable {alternative : Bool}
@@ -508,7 +505,6 @@ theorem full_second_column (profile : CIL.FeatureProfile) (program : CIL.Program
       rw [second_column_order] at stateAfter
       exact stateAfter
 
-#print axioms full_second_column
 end UInt256Proof.Multiply.Full
 
 namespace UInt256Proof.Multiply.Full
@@ -566,7 +562,6 @@ theorem full_middle_column (profile : CIL.FeatureProfile) (program : CIL.Program
     (counting_local_effect profile program countIndex countFound state1.snapshots state1.call.1.1 13 _ _ (localWord k1 13) (by rfl)) post
   exact continuation
 
-#print axioms full_middle_column
 end UInt256Proof.Multiply.Full
 namespace UInt256Proof.Multiply.Full
 variable {alternative : Bool}
@@ -644,8 +639,6 @@ theorem full_first_upper (profile : CIL.FeatureProfile) (program : CIL.Program) 
     (localWord k2 6 + localWord k2 16) 152 (productArgs left right output) [] (body := (fullBody profile wordIndex countIndex storageIndex alternative))
   exact run_next_exists post found (by rfl) stored (continuation after next)
 
-#print axioms full_first_upper
-
 def fullUpperWords (original : Memory) (left right : Reference) :=
   let known := countWords (widenWords (fullFirstUpperWords original left right) 2 3 19 18) 15 19 13 15
   rememberWord known 6 (localWord known 6 + localWord known 18)
@@ -693,8 +686,6 @@ theorem full_upper (profile : CIL.FeatureProfile) (program : CIL.Program) (metho
   obtain ⟨after, stored, next⟩ := state2.store enteredWF homes 6 (by rfl)
     (localWord k2 6 + localWord k2 18) 166 (productArgs left right output) [] (body := (fullBody profile wordIndex countIndex storageIndex alternative))
   exact run_next_exists post found (by rfl) stored (continuation after next)
-
-#print axioms full_upper
 
 end UInt256Proof.Multiply.Full
 
@@ -750,7 +741,6 @@ theorem full_final (profile : CIL.FeatureProfile) (program : CIL.Program) (metho
     (localWord k2 6 + (localWord k2 20 + localWord k2 13)) 182 (productArgs left right output) [] (body := (fullBody profile wordIndex countIndex storageIndex alternative))
   exact run_next_exists post found (by rfl) stored (continuation after next)
 
-#print axioms full_final
 end UInt256Proof.Multiply.Full
 
 namespace UInt256Proof.Multiply.Full
@@ -786,7 +776,6 @@ theorem full_words_correct (original : Memory) (left right : Reference) :
         (congrArg _ (BitVec.add_zero _).symm))))))
   rw [words, product_limbs_correct, input_limbs_value, input_limbs_value]
 
-#print axioms full_words_correct
 end UInt256Proof.Multiply.Full
 
 namespace UInt256Proof.Multiply.Full
@@ -852,7 +841,6 @@ theorem full_output (profile : CIL.FeatureProfile) (program : CIL.Program) (meth
       run program fuel methodIndex 183 (productArgs left right output) frame [] current =
         .ok (final, returned) ∧ ProductResult original final left right output returned :=
   full_output_with_storage profile program methodIndex wordIndex countIndex storageIndex (ProductStorage.scalar_contract profile scalar program storageIndex limbIndex storageFound limbsFound) found _countFound original entered current left right output frame originalCall owned state
-#print axioms full_output
 end UInt256Proof.Multiply.Full
 
 namespace UInt256Proof.Multiply.Full
@@ -912,7 +900,6 @@ theorem full_invoke (profile : CIL.FeatureProfile) (program : CIL.Program) (meth
       invoke program fuel methodIndex (productArgs left right output) memory = .ok (final, []) ∧
       ProductResult memory final left right output [] :=
   full_invoke_with_storage profile program methodIndex wordIndex countIndex storageIndex (ProductStorage.scalar_contract profile scalar program storageIndex limbIndex storageFound limbsFound) found countFound contract top memory left right output call
-#print axioms full_invoke
 end UInt256Proof.Multiply.Full
 namespace UInt256Proof.Multiply.Full
 variable {alternative : Bool}
@@ -922,7 +909,6 @@ variable {alternative : Bool}
     (noAvx512 : profile.avx512DQVL = false) (noAvx2 : profile.avx2 = false) :
     FullTopContract profile program methodIndex wordIndex countIndex storageIndex :=
   full_scalar_top (alternative := alternative) profile program methodIndex wordIndex countIndex storageIndex found noAvx512 noAvx2
-#print axioms scalar_top_contract_order
 end UInt256Proof.Multiply.Full
 namespace UInt256Proof.Multiply.Full
 theorem scalar_top_contract (profile : CIL.FeatureProfile) (program : CIL.Program)

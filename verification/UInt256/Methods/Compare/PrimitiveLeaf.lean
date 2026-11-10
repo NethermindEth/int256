@@ -243,5 +243,4 @@ theorem run_template (leafSigned leafScalarFirst : Bool) (program : CIL.Program)
         · leaf_finish with h1, h2, negative
       · leaf_finish with h1, negative
 
-#print axioms run_template
 end UInt256Proof.Compare.PrimitiveLeaf

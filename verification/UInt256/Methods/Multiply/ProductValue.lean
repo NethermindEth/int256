@@ -20,4 +20,3 @@ theorem productLimbs_comm (a b : Limbs) : productLimbs a b = productLimbs b a :=
   rw [product_limbs_correct, product_limbs_correct, BitVec.mul_comm]
 
 end UInt256Proof.Multiply
-#print axioms UInt256Proof.Multiply.product_limbs_correct

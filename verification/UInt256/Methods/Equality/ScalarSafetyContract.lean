@@ -61,7 +61,6 @@ theorem scalar_run (memory : Memory) (left right : Reference) (frame : Frame)
   simp [run, cil_code, step, cil_guard, observerCount, checkedValue, numericValue, scalarDifference, CIL.NarrowKind.extend,
     Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   split <;> rfl
-#print axioms scalar_run
 
 end UInt256Proof.Equality.Safety
 
@@ -89,9 +88,6 @@ theorem scalar_run_value (memory : Memory) (left right : Reference) (frame : Fra
         [.scalar (.i32 (if inputValue memory left = inputValue memory right then 1 else 0))]) := by
   simpa only [scalar_difference_zero] using scalar_run memory left right frame call
 
-#print axioms scalar_difference_zero
-#print axioms scalar_run_value
-
 end UInt256Proof.Equality.Safety
 
 namespace UInt256Proof.Equality.Safety
@@ -117,6 +113,5 @@ theorem scalar_checked (memory : Memory) (left right : Reference)
   certify_readOnly_binary Extracted.program scalarIndex scalarBody
     (fun left right => .i32 (if left = right then 1 else 0))
     scalar_body_found scalar_frame_fits scalar_run_value memory left right call
-#print axioms scalar_checked
 
 end UInt256Proof.Equality.Safety

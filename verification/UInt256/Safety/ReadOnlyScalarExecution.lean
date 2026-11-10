@@ -29,6 +29,4 @@ theorem certify_readOnly_scalar {α : Type} (program : CIL.Program) (method : Na
     certify_invocation _ _ _ _ _ _ _ _ _ _ lookup checked setup live finished, ?_⟩
   exact (MemoryBelow.frame_round_trip setup (.refl _ _)).cells
 
-#print axioms certify_readOnly_scalar
-
 end UInt256Model.Safety

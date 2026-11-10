@@ -53,5 +53,4 @@ theorem arm_scalar_retire {program : CIL.Program} (original current final : Memo
       ((footprint id (Nat.lt_of_lt_of_le old next) offset untouched).trans (preserved.cells id old offset))
 
 
-#print axioms arm_scalar_retire
 end UInt256Proof.Add.Safety

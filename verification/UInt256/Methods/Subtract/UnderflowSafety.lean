@@ -8,5 +8,4 @@ theorem checked_underflow_contract (contract : BorrowHelperContract Extracted.pr
     (fun a b => decide (a.toNat < b.toNat)) Extracted.program Extracted.entryIndex :=
   underflow_contract_of_reporting (checked_dispatch_contract contract)
 
-#print axioms checked_underflow_contract
 end UInt256Proof.Subtract.Safety

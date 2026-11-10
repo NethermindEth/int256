@@ -59,7 +59,4 @@ theorem certify_readOnly_binary (program : CIL.Program) (method : Nat) (body : C
     (fun _ _ _ _ _ _ => True.intro)
     (fun memory left right frame _ => executes memory left right frame) memory left right call
 
-#print axioms certify_readOnly_binary_frame
-#print axioms certify_readOnly_binary
-
 end UInt256Model.Safety

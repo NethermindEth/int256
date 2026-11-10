@@ -14,5 +14,4 @@ theorem binary_correctness (operation : Binary) (profile : CIL.FeatureProfile)
   binary_checked (applyBinary operation) profile program index callee found
     (scalar_result operation profile scalar program callee constructor childFound constructorFound)
 
-#print axioms binary_correctness
 end UInt256Proof.Bitwise.ReturnSafety

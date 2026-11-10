@@ -32,8 +32,6 @@ theorem cast_input (memory : Memory) (input : Reference) :
   rw [byteNumber_snapshot (fun offset => (memory.cells input.allocation offset).bits) input.offset 32]
   rfl
 
-#print axioms cast_input
-
 def body (narrow : Bool) (profile : CIL.FeatureProfile) : CIL.Method :=
   { profile := profile, returnsValue := true, locals := [], code := [
     .arg 1, .intrinsic (.vector (if narrow then .createScalar32 256 else .createScalar64 256)) 1,
@@ -72,7 +70,6 @@ theorem run64 (profile : CIL.FeatureProfile) (program : CIL.Program) (index : Na
   split <;> rename_i h <;> simp [h, eq_comm]
   exact Ne.symm h
 
-#print axioms run64
 theorem run32 (profile : CIL.FeatureProfile) (program : CIL.Program) (index : Nat)
     (found : program[index]? = some (body true profile))
     (memory : Memory) (left : Reference) (right : BitVec 32) (frame : Frame)
@@ -92,8 +89,6 @@ theorem run32 (profile : CIL.FeatureProfile) (program : CIL.Program) (index : Na
   split <;> rename_i h <;> simp [h, eq_comm]
   exact Ne.symm h
 
-
-#print axioms run32
 
 
 
@@ -115,7 +110,6 @@ theorem checked32 (profile : CIL.FeatureProfile) (program : CIL.Program) (index 
     (by intro left right; simp [body, FrameSetupFits, InitializersFit, InitializerFits, AggregateArgumentsFit, ParameterArgumentsFit])
     (run32 profile program index found)
 
-#print axioms checked32
 theorem checked64 (profile : CIL.FeatureProfile) (program : CIL.Program) (index : Nat)
     (found : program[index]? = some (body false profile)) :
     ReadOnlyScalarContract CIL.Value.i64
@@ -124,7 +118,6 @@ theorem checked64 (profile : CIL.FeatureProfile) (program : CIL.Program) (index 
     (by intro left right; simp [body, FrameSetupFits, InitializersFit, InitializerFits, AggregateArgumentsFit, ParameterArgumentsFit])
     (run64 profile program index found)
 
-#print axioms checked64
 end EqualityFixture.LeafVectorPrimitive
 
 
@@ -245,9 +238,6 @@ theorem checked {α : Type} (encode : α → CIL.Value) (equal : BitVec 256 → 
   simpa only [ScalarOperatorContract, ReadOnlyScalarContract, scalarOperatorArguments,
     Bool.false_eq_true, ite_false, Bool.bne_false] using result
 
-#print axioms executed
-#print axioms checked
-
 
 
 
@@ -266,7 +256,6 @@ theorem checked32 (profile : CIL.FeatureProfile) (program : CIL.Program) (index 
   intro memory left right frame call
   simpa only [decide_eq_true_eq, widen] using EqualityFixture.LeafVectorPrimitive.run32 profile program callee leafFound memory left right frame call
 
-#print axioms checked32
 theorem checked64 (profile : CIL.FeatureProfile) (program : CIL.Program) (index callee : Nat)
     (vector : profile.vector256Accelerated = true)
     (found : program[index]? = some (body false profile callee))
@@ -280,5 +269,4 @@ theorem checked64 (profile : CIL.FeatureProfile) (program : CIL.Program) (index 
   intro memory left right frame call
   simpa only [decide_eq_true_eq, widen] using EqualityFixture.LeafVectorPrimitive.run64 profile program callee leafFound memory left right frame call
 
-#print axioms checked64
 end EqualityFixture.LeafPrimitiveWrapper

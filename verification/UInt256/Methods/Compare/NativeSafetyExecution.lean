@@ -221,5 +221,4 @@ theorem native_run (profile : CIL.FeatureProfile) (usesLess inclusive : Bool) (p
     refine (run_return found rfl rfl rfl).trans ?_
     simp only [nativeResult, nativeEqual, nativeComparison, Bool.false_eq_true, ite_true, ite_false]
     split <;> split <;> first | rfl | (rename_i a b; exact absurd a b) | (rename_i a b; exact absurd b a)
-#print axioms native_run
 end UInt256Proof.Compare.Safety

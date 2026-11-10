@@ -16,6 +16,4 @@ theorem scalar_family_correctness (profile : CIL.FeatureProfile)
       (storage := 2) (by rfl) (UInt256Proof.StorageScalar.store_limbs_readable_contract profile storageProfile _ _ (by rfl)))
 
 
-#print axioms scalar_correctness
-#print axioms scalar_family_correctness
 end UInt256Proof.LeftShift

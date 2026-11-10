@@ -72,7 +72,6 @@ theorem run64 (profile : CIL.FeatureProfile) (program : CIL.Program) (index : Na
   simp only [Function.comp_def, List.map_id', ← input_value]
   split <;> split <;> simp_all
 
-#print axioms run64
 theorem run32 (profile : CIL.FeatureProfile) (program : CIL.Program) (index : Nat)
     (found : program[index]? = some (body true profile))
     (memory : Memory) (left : Reference) (right : BitVec 32) (frame : Frame)
@@ -87,8 +86,6 @@ theorem run32 (profile : CIL.FeatureProfile) (program : CIL.Program) (index : Na
   simp only [Function.comp_def, List.map_id', ← input_value]
   split <;> split <;> simp_all
 
-
-#print axioms run32
 
 
 
@@ -110,7 +107,6 @@ theorem checked32 (profile : CIL.FeatureProfile) (program : CIL.Program) (index 
     (by intro left right; simp [body, FrameSetupFits, InitializersFit, InitializerFits, AggregateArgumentsFit, ParameterArgumentsFit, SelectedKindsFit])
     (run32 profile program index found)
 
-#print axioms checked32
 theorem checked64 (profile : CIL.FeatureProfile) (program : CIL.Program) (index : Nat)
     (found : program[index]? = some (body false profile)) :
     ReadOnlyScalarContract CIL.Value.i64
@@ -119,5 +115,4 @@ theorem checked64 (profile : CIL.FeatureProfile) (program : CIL.Program) (index 
     (by intro left right; simp [body, FrameSetupFits, InitializersFit, InitializerFits, AggregateArgumentsFit, ParameterArgumentsFit, SelectedKindsFit])
     (run64 profile program index found)
 
-#print axioms checked64
 end UInt256Proof.Equality.VectorPrimitive

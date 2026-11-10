@@ -10,5 +10,4 @@ theorem correctness :
   UInt256Proof.Add.Vector256.Masked.add_overflow_contract Extracted.program Extracted.profile
     rfl rfl rfl rfl ⟨rfl, rfl, rfl, rfl⟩
 
-#print axioms correctness
 end UInt256Proof.Fixture.Reporting.AddOverflow_x64_v3_EquivalentMask

@@ -53,7 +53,6 @@ theorem subtract_repair_start (program : CIL.Program) (body : CIL.Method) (metho
   cil_contract_steps 2 [found, code]
   exact run_next_exists post found (by cil_lookup [code]) (stored _ _ _) done
 
-#print axioms subtract_repair_start
 end UInt256Proof.Subtract.Profile
 
 namespace UInt256Proof.Subtract.Profile
@@ -92,7 +91,6 @@ theorem subtract_repair_segment (program : CIL.Program) (body : CIL.Method) (met
     cil_contract_steps [found, code, leftArg, rightArg, leftFormed, rightFormed,
       borrowFormed, resultFormed, borrowSlot, resultSlot, localAddress, leftRead, rightRead] until continuation
 
-#print axioms subtract_repair_segment
 end UInt256Proof.Subtract.Profile
 
 namespace UInt256Proof.Subtract.Profile
@@ -142,8 +140,6 @@ theorem subtract_repair_indexed_borrow (program : CIL.Program) (body : CIL.Metho
   simpa only [show 86 + 7 * index.val + 1 = 87 + 7 * index.val by omega, borrowContract, List.append_nil] using
     continuation after kept.formed kept.staticWorld call.framed call.post
 
-#print axioms subtract_repair_indexed_borrow
-
 /-- Caller views discharge both limb loads; checked homes discharge the borrow call. -/
 theorem subtract_repair_segment_checked (program : CIL.Program) (body : CIL.Method) (method : Nat)
     (found : program[method]? = some body)
@@ -183,7 +179,6 @@ theorem subtract_repair_segment_checked (program : CIL.Program) (body : CIL.Meth
     segment args frame memory _ _ c borrowHome resultHome call.1.1 incoming borrowRead borrowWrite resultWrite disjoint
     post continuation
 
-#print axioms subtract_repair_segment_checked
 end UInt256Proof.Subtract.Profile
 
 namespace UInt256Proof.Subtract.Profile
@@ -249,8 +244,6 @@ theorem subtract_repair_all (program : CIL.Program) (body : CIL.Method) (method 
   exact subtract_repair_next program body method found borrow storage code borrowFound
     3 third args leftArg rightArg post continuation
 
-#print axioms subtract_repair_next
-#print axioms subtract_repair_all
 end UInt256Proof.Subtract.Profile
 
 namespace UInt256Proof.Subtract.Profile
@@ -330,8 +323,6 @@ theorem subtract_repair_ready (program : CIL.Program) (specs : List NumericLocal
   · intro i impossible
     omega
 
-#print axioms subtract_repair_word_home
-#print axioms subtract_repair_ready
 end UInt256Proof.Subtract.Profile
 
 namespace UInt256Proof.Subtract.Profile
@@ -371,7 +362,6 @@ theorem subtract_repair_borrow (program : CIL.Program) (body : CIL.Method) (meth
   exact subtract_repair_all program body method found borrow storage code borrowFound
     ready args leftArg rightArg post (continuation borrowHome results)
 
-#print axioms subtract_repair_borrow
 end UInt256Proof.Subtract.Profile
 
 namespace UInt256Proof.Subtract.Profile
@@ -433,8 +423,6 @@ theorem subtract_repair_return (program : CIL.Program) (body : CIL.Method) (meth
   all_goals simp [run, found, fetched, returns, step, cil_guard, observerCount, checkedValue, numericValue, CIL.NarrowKind.extend,
     scalarUnderflowFlag, positive, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
-#print axioms subtract_repair_store_prefix
-#print axioms subtract_repair_return
 end UInt256Proof.Subtract.Profile
 
 namespace UInt256Proof.Subtract.Profile
@@ -500,5 +488,4 @@ theorem subtract_repair_finish (program : CIL.Program) (body : CIL.Method) (meth
   · intro id old offset untouched
     exact (retained.cells id old offset).trans ((outside id offset untouched).trans (state.callerCells id old offset))
 
-#print axioms subtract_repair_finish
 end UInt256Proof.Subtract.Profile

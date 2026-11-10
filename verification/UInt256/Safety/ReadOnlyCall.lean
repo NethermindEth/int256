@@ -30,6 +30,4 @@ theorem CallingConditions.input_value_of_caller_eq {program : CIL.Program}
     rw [preserved input.allocation (call.1.1.1 _ _ present).1 offset]
   simp only [inputValue, bytes]
 
-#print axioms CallingConditions.after_readonly_call
-#print axioms CallingConditions.input_value_of_caller_eq
 end UInt256Model.Safety

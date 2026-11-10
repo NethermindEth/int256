@@ -11,7 +11,6 @@ import UInt256.Methods.ValueForwarder32
   · intro left right _; split <;> simp
   · rfl
   · exact UInt256Proof.Equality.ReferenceVectorWrapper.checked Extracted.profile Extracted.program 1 2 rfl rfl rfl
-#print axioms UInt256Proof.Equality.EqualsUInt256Value.vector_correctness
 
 theorem UInt256Proof.Equality.EqualsUInt256Value.vector_family (profile : CIL.FeatureProfile)
     (vector : Extracted.profile.vector256Accelerated = profile.vector256Accelerated)
@@ -21,4 +20,3 @@ theorem UInt256Proof.Equality.EqualsUInt256Value.vector_family (profile : CIL.Fe
   UInt256Model.Safety.ReadOnlyScalarContract.reprofile UInt256Proof.Equality.ProfileBindings.uniform
     (UInt256Proof.Equality.ProfileBindings.reference_agreement profile vector sse) UInt256Proof.Equality.EqualsUInt256Value.vector_correctness
 
-#print axioms UInt256Proof.Equality.EqualsUInt256Value.vector_family

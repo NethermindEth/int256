@@ -69,5 +69,4 @@ theorem scalar_run (memory : Memory) (left right : Reference) (frame : Frame)
     simp [run, cil_code, step, cil_guard, observerCount, checkedValue, numericValue, scalarResult, CIL.NarrowKind.extend, h3,
       BitVec.lt_def, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure] <;> try (split <;> rfl)
 
-#print axioms scalar_run
 end UInt256Proof.Compare.Safety

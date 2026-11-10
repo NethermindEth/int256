@@ -59,7 +59,4 @@ theorem private_calling_conditions {program : CIL.Program} {first second : Refer
     obtain ⟨allocation, present, _, _⟩ := access_within_allocation _ _ _ _ _ writable
     exact (framed.access_write _ (call.1.1.1 _ _ present).1 _ _).trans writable
 
-#print axioms CallingConditions.after_preserving_inputs
-#print axioms private_input_bytes
-#print axioms private_calling_conditions
 end UInt256Model.Safety

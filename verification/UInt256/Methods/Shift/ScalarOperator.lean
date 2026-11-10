@@ -80,6 +80,4 @@ theorem operator_correctness (profile : CIL.FeatureProfile) (direction : Directi
     exact (after.cells id bound offset).trans ((outside id (Nat.lt_of_lt_of_le bound growth) offset
       (Or.inl (by rw [fresh]; exact Nat.ne_of_lt bound))).trans (before.cells id bound offset))
 
-#print axioms operator_correctness
-#print axioms operator_prefix
 end UInt256Proof.Shift.Safety

@@ -55,6 +55,4 @@ theorem storage_contract : LimbStorageContract Extracted.program storageIndex st
     exact UInt256Proof.Add.SSEShapes.ReversedStorage.store_limbs_readable_contract Extracted.profile _ _ found
       memory inputs output w0 w1 w2 w3 call
 
-#print axioms storage_contract
-
 end UInt256Proof.Safety

@@ -13,5 +13,4 @@ theorem helper_run :
 theorem correctness : UInt256Model.Safety.WrappingBinaryContract (· - ·) Extracted.program 0 :=
   checked_wrapping_contract (borrow_contract_of_run borrowWord rfl ⟨rfl, rfl, rfl, rfl⟩ helper_run borrowWord_correct)
 
-#print axioms correctness
 end UInt256Proof.Subtract.FixtureExtractedHelper

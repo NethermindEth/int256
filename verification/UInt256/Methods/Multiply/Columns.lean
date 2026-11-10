@@ -40,4 +40,3 @@ theorem column_correct (start : W64) (words : List W64) (bound : words.length < 
   simpa [column] using column_fold words start 0 (by simpa using bound)
 
 end UInt256Proof.Multiply
-#print axioms UInt256Proof.Multiply.column_correct

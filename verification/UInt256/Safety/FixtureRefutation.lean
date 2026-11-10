@@ -51,7 +51,4 @@ theorem checked_reporting_byte_refuted (program : CIL.Program) (entry observedFu
   rw [result] at observation
   exact different observation.symm
 
-#print axioms checked_binary_fault_refuted
-#print axioms checked_reporting_flag_refuted
-#print axioms checked_reporting_byte_refuted
 end UInt256Model.Safety.ContractRefutation

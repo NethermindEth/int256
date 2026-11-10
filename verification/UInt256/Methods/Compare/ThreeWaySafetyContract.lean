@@ -42,7 +42,4 @@ theorem threeWay_checked (memory : Memory) (left right : Reference)
   · intro memory left right frame call
     simpa only [threeWay_result_math] using threeWay_run memory left right frame call
 
-#print axioms threeWay_checked
-
-#print axioms threeWay_result_math
 end UInt256Proof.Compare.Safety

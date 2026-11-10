@@ -39,6 +39,4 @@ theorem checked_sse_add_overflow_contract (program : CIL.Program) (entry scalar 
     checked_sse_scalar_contract program scalar vector small carry storage profile scalarFound vectorFound smallFound carryFound storageFound
       disabled sse2 ssse3 sse42 memory left right output 1 rfl call
 
-#print axioms checked_sse_add_contract
-#print axioms checked_sse_add_overflow_contract
 end UInt256Proof.Add.Safety

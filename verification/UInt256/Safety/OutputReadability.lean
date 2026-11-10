@@ -28,6 +28,4 @@ theorem output_snapshot_value (memory : Memory) (output : Reference) (bytes : Li
     byteNumber_snapshot (fun offset => (memory.cells output.allocation offset).bits) output.offset 32]
   rfl
 
-#print axioms output_readable_of_limbs
-#print axioms output_snapshot_value
 end UInt256Model.Safety

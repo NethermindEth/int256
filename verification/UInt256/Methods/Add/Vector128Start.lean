@@ -99,7 +99,6 @@ theorem vector128_sum_checked (program : CIL.Program) (body : CIL.Method) (metho
              Bind.bind, Except.bind, Pure.pure, Except.pure]
           first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
 
-#print axioms vector128_sum_checked
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -167,7 +166,6 @@ theorem vector128_carry_checked (program : CIL.Program) (body : CIL.Method) (met
                Bind.bind, Except.bind, Pure.pure, Except.pure]
             first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
 
-#print axioms vector128_carry_checked
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -249,7 +247,6 @@ theorem vector128_prepare_checked (program : CIL.Program) (body : CIL.Method) (m
       (Nat.le_trans (write_extends_allocations _ _ _ _ _ w1).next
         (write_extends_allocations _ _ _ _ _ w2).next))
 
-#print axioms vector128_prepare_checked
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -323,5 +320,4 @@ theorem vector128_start_checked (program : CIL.Program) (body : CIL.Method) (met
   exact continuation locations sum lowMask highMask after located sumSlot lowSlot highSlot
     sumRead lowRead highRead reads (preserved.trans kept) afterCall afterAuthority (Nat.le_trans next advanced)
 
-#print axioms vector128_start_checked
 end UInt256Proof.Add.Safety

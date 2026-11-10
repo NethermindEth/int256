@@ -73,7 +73,6 @@ theorem full_avx2_inputs (profile : CIL.FeatureProfile) (program : CIL.Program)
   exact run_next_exists post found (by change some _ = _; first | (simp only [noAvx512, avx2, Bool.false_eq_true, ↓reduceIte] <;> rfl) | rfl) storedRight
     (continuation after afterState ⟨leftHome, rightHome, leftSlot, rightSlot, preservedLeft, rightRead⟩)
 
-#print axioms full_avx2_inputs
 end UInt256Proof.Multiply.Full
 
 namespace UInt256Proof.Multiply.Full
@@ -166,7 +165,6 @@ theorem full_avx2_cross (profile : CIL.FeatureProfile) (program : CIL.Program)
       ⟨⟨operands.leftHome, operands.rightHome, operands.leftSlot, operands.rightSlot, leftRead, rightRead⟩,
         crossHome, crossSlot, crossRead⟩)
 
-#print axioms full_avx2_cross
 end UInt256Proof.Multiply.Full
 
 namespace UInt256Proof.Multiply.Full
@@ -245,6 +243,4 @@ theorem full_avx2_top (profile : CIL.FeatureProfile) (program : CIL.Program)
   intro cross crossState vectors
   exact full_avx2_finish profile program methodIndex wordIndex countIndex storageIndex found noAvx512 avx2 original entered cross left right output frame enteredWF homes crossState vectors post continuation
 
-#print axioms full_avx2_finish
-#print axioms full_avx2_top
 end UInt256Proof.Multiply.Full

@@ -96,7 +96,4 @@ theorem not_correctness (profile : CIL.FeatureProfile)
   simpa only [show (256 : Nat)^32 = 2^256 from rfl, Nat.mod_eq_of_lt (BitVec.isLt _),
     BitVec.ofNat_toNat, BitVec.setWidth_eq] using decoded.symm
 
-#print axioms not_result
-#print axioms not_prefix
-#print axioms not_correctness
 end UInt256Proof.Bitwise

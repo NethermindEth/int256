@@ -89,7 +89,4 @@ theorem PrivateWords.after_word_call {program : CIL.Program} {original entered c
     state.authority.trans (authority.weaken state.next),
     state.snapshots.after_effect homes.writable state.call.1.1 index reference value slot loaded authority outside, caller⟩
 
-#print axioms PrivateWords.initial
-#print axioms PrivateWords.store
-#print axioms PrivateWords.after_word_call
 end UInt256Model.Safety

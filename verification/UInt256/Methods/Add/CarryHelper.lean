@@ -67,8 +67,6 @@ theorem carry_run_of_memory_steps (found : program[index]? = some (carryBody pro
   rw [run]
   simp [found, carryBody, step, cil_guard, observerCount, leaveFrame, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
-#print axioms carry_run_of_memory_steps
-
 end UInt256Proof.Add.CarrySafety
 
 namespace UInt256Proof.Add.CarrySafety
@@ -95,9 +93,6 @@ theorem carryWord_arithmetic (a b c : BitVec 64) (incoming : c.toNat ≤ 1) :
       (carryWord a b c).toNat ≤ 1 := by
   rw [carryWord_correct a b c incoming]
   exact ⟨UInt256Proof.carry_word_nat a b c incoming, UInt256Proof.carry_bound a b c incoming⟩
-
-#print axioms carryWord_correct
-#print axioms carryWord_arithmetic
 
 end UInt256Proof.Add.CarrySafety
 
@@ -199,8 +194,6 @@ theorem ScalarCarryState.advance {original before after : CIL.Safety.Memory} {fr
       exact framed.read_apart state.call.1.1 (state.completed i earlier)
         (by simp [Apart, state.carrySeparate i, state.resultSeparate i index same])
 
-#print axioms ScalarCarryState.advance
-
 end UInt256Proof.Add.CarrySafety
 
 namespace UInt256Proof.Add.CarrySafety
@@ -248,7 +241,4 @@ theorem scalar_flag_overflow (memory : CIL.Safety.Memory) (left right : Referenc
   simp only [scalarOverflowFlag, same, UInt256Proof.Reporting.word_positive,
     overflow, addOverflow, BitVec.ofNat_eq_ofNat]
 
-#print axioms scalar_sum_words
-#print axioms scalar_sum_value
-#print axioms scalar_flag_overflow
 end UInt256Proof.Add.CarrySafety

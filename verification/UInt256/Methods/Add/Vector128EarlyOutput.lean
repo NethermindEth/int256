@@ -62,7 +62,6 @@ theorem vector128_output_dispatch (program : CIL.Program) (body : CIL.Method) (m
            numericValue, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
        first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)
 
-#print axioms vector128_output_dispatch
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -128,7 +127,6 @@ theorem vector128_early_output (program : CIL.Program) (body : CIL.Method) (meth
     all_goals cil_contract_steps [found, code, loadLow, loadHigh, argument, formed,
       firstWrite, secondWrite, address, storeValue, referenceAt, ordinaryAccessAlignment] until done
 
-#print axioms vector128_early_output
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -204,5 +202,4 @@ theorem vector128_output_prefix (program : CIL.Program) (body : CIL.Method) (met
     (Nat.le_trans advanced next)
     (fun disabled => by rw [unchanged disabled]; exact preserved)
 
-#print axioms vector128_output_prefix
 end UInt256Proof.Add.Safety

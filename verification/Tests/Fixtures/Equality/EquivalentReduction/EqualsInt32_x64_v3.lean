@@ -9,4 +9,3 @@ theorem EqualityFixture.correct :
   UInt256Proof.Equality.SignedPrimitive.checked32 Extracted.profile Extracted.program 0 1 rfl
     (EqualityFixture.LeafPrimitiveWrapper.checked32 Extracted.profile Extracted.program 1 2 rfl rfl rfl)
 
-#print axioms EqualityFixture.correct

@@ -70,7 +70,6 @@ theorem shift_operand_save (original entered current : Memory)
     first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
   apply run_next_exists post found fetchedStore (stored _ _ _)
   simpa only [show ((27 + 3 * index.val) + 1) + 1 + 1 = 30 + 3 * index.val by omega] using done
-#print axioms shift_operand_save
 
 
 omit bodyFound in
@@ -163,8 +162,6 @@ theorem shift_operand_snapshots (original entered current : Memory)
         (Nat.le_trans (write_extends_allocations _ _ _ _ _ w2).next
           (write_extends_allocations _ _ _ _ _ w3).next)))
 
-#print axioms shift_operand_snapshots
-
 /-- Prepare private count and operand snapshots without changing any caller bytes. -/
 theorem shift_prepared (original entered current : Memory)
     (inputs outputs : List Reference) (input : Reference) (frame : Frame) (args : List Value)
@@ -210,5 +207,4 @@ theorem shift_prepared (original entered current : Memory)
     (keep 2 (by decide) complementHome _ complementSlot complementRead)
     snapshots (p.trans q) d b (Nat.le_trans n m)
 
-#print axioms shift_prepared
 end UInt256Proof.Shift.Safety

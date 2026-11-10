@@ -31,5 +31,4 @@ theorem PrivateWords.finish_output {program : CIL.Program} {original entered cur
       ((result.footprint id (Nat.lt_of_lt_of_le bound (Nat.le_trans state.enteredBound state.next)) offset outside).trans
         (state.caller id bound offset))
 
-#print axioms PrivateWords.finish_output
 end UInt256Model.Safety

@@ -25,7 +25,4 @@ theorem checked_greater_equal_binding :
       (fun values => .i32 (if (values[1]?.getD 0).toNat ≤ (values[0]?.getD 0).toNat then 1 else 0))
       Extracted.program Extracted.entryIndex 2 := checked_greater_equal_contract
 
-#print axioms checked_greater_equal_contract
-#print axioms checked_greater_equal_binding
-
 end UInt256Proof.Compare.Safety

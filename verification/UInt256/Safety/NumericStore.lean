@@ -75,6 +75,4 @@ theorem checked_numeric_store (program : CIL.Program) (body : CIL.Method)
     inputs outputs frame currentCall enteredWF authority index spec reference slot bound writable value number fits
   exact ⟨reference, after, slot, result⟩
 
-#print axioms checked_numeric_home_store
-#print axioms checked_numeric_store
 end UInt256Model.Safety

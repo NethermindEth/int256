@@ -42,5 +42,4 @@ theorem output_result_of_storage {program : CIL.Program} (original current resul
   · intro id old offset untouched
     exact (retained.cells id old offset).trans ((outside id offset untouched).trans (caller id old offset))
 
-#print axioms output_result_of_storage
 end UInt256Model.Safety

@@ -13,5 +13,4 @@ theorem profile_correctness : UInt256Model.Safety.AggregateReturn.BinaryContract
   UInt256Model.Safety.AggregateReturn.BinaryContract.of_embeds fullEmbeds <|
   UInt256Model.Safety.AggregateReturn.binary_checked (· * ·) Extracted.profile embedded 0 1 rfl
     (initialized_result context (profile_word_contract context rfl) (profile_top_contract context rfl))
-#print axioms profile_correctness
 end UInt256Proof.OperatorMultiplyUInt256UInt256

@@ -82,7 +82,6 @@ theorem hardware_word_tail (program : CIL.Program) (index start : Nat) (body : C
   · intro id offset outside
     apply write_outside _ _ _ _ _ _ _ written
     simpa only [length] using outside
-#print axioms hardware_word_tail
 end UInt256Proof.Multiply
 namespace UInt256Proof.Multiply
 def bmiWordBody (profile : CIL.FeatureProfile) : CIL.Method := { profile := profile, returnsValue := true, locals := [], localKinds := [], parameterHomes := [], staticSites := [], code := [
@@ -226,7 +225,6 @@ theorem hardware_word_invoke (arm : Bool) (profile : CIL.FeatureProfile)
       · apply run_next (target := 13) (values := []) (nextFrame := frame) (updated := memory) found (by rfl)
         rfl
       exact executed
-#print axioms hardware_word_invoke
 end UInt256Proof.Multiply
 namespace UInt256Proof.Multiply
 open CIL.Safety
@@ -239,5 +237,4 @@ theorem hardware_word_contract (arm : Bool) (profile : CIL.FeatureProfile)
   obtain ⟨fuel, final, execution, valid, loaded, authority, outside⟩ :=
     hardware_word_invoke arm profile bmi armEnabled program index found memory a b output wf writable
   exact ⟨fuel, final, execution, valid, loaded, authority, fun id _ offset bound => outside id offset bound⟩
-#print axioms hardware_word_contract
 end UInt256Proof.Multiply

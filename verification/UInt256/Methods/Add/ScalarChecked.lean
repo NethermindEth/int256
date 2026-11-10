@@ -88,9 +88,6 @@ theorem scalar_return (args : List Value) (frame : Frame) (memory : Memory)
     CIL.NarrowKind.extend, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   split <;> rfl
 
-#print axioms scalar_store_prefix
-#print axioms scalar_return
-
 end UInt256Proof.Safety
 
 namespace UInt256Proof.Safety
@@ -160,8 +157,6 @@ theorem scalar_finish (original entered current : CIL.Safety.Memory) (frame : Fr
     · intro id old offset untouched
       exact (retained.cells id old offset).trans ((outside id offset untouched).trans (state.callerCells id old offset))
 
-#print axioms scalar_finish
-
 theorem ScalarResult.modular_sum {original final : CIL.Safety.Memory} {values : List Value}
     {left right output : Reference} (result : ScalarResult original final values left right output) :
     inputValue final output = inputValue original left + inputValue original right :=
@@ -182,9 +177,6 @@ theorem scalar_general_checked (contract : CarryHelperContract Extracted.program
     (fun final values => ScalarResult memory final values left right output)
   intro frame entered carryHome results after setup state
   exact scalar_finish memory entered after frame left right output carryHome results call setup state
-
-#print axioms ScalarResult.modular_sum
-#print axioms scalar_general_checked
 
 end UInt256Proof.Safety
 
@@ -244,9 +236,6 @@ theorem scalar_left_small_checked (memory : CIL.Safety.Memory) (left right outpu
   exact scalar_small_finish true memory entered current frame left right output (inputLimb memory left 0)
     call setup ready.call ready.preserved next math.1 math.2
 
-#print axioms scalar_right_small_checked
-#print axioms scalar_left_small_checked
-
 end UInt256Proof.Safety
 
 namespace UInt256Proof.Safety
@@ -275,8 +264,5 @@ theorem scalar_checked (contract : CarryHelperContract Extracted.program Extract
     · obtain ⟨fuel, final, values, invoked, result⟩ :=
         scalar_general_checked contract memory left right output call rightSmall leftSmall
       exact ⟨fuel, final, values, invoked, result.as_add⟩
-
-#print axioms ScalarResult.as_add
-#print axioms scalar_checked
 
 end UInt256Proof.Safety

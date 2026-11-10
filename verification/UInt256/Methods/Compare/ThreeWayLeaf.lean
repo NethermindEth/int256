@@ -208,5 +208,4 @@ theorem threeWay_run (profile : CIL.FeatureProfile) (program : CIL.Program) (ind
     · threeway_finish with ite_eq_right h3, ite_eq_left lt
     · threeway_finish with ite_eq_right h3, ite_eq_right lt
 
-#print axioms threeWay_run
 end UInt256Proof.Compare.ThreeWayLeaf
