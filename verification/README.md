@@ -1,7 +1,6 @@
 # UInt256 verification with LeanCIL
 
-This directory consumes LeanCIL at
-`eee140277e3bed6708b2f5ea759d38bf7519fb9a` through the pinned Lake dependency.
+This directory consumes LeanCIL through the [pinned Lake dependency](lakefile.toml).
 CIL semantics, extraction, and verification infrastructure belong to LeanCIL;
 this directory contains only UInt256 specifications and proofs.
 
@@ -9,7 +8,7 @@ Proofs establish arithmetic results, finite return, permitted overlap and preser
 caller memory. Frame setup supplies typed storage evidence for numeric locals; initialized
 values and later writes require their own checked facts. Profile-parametric comparison proofs
 use `ProfileAgreement.of_flags` and a kernel-checked empty feature-read list for scalar programs.
-See LeanCIL's [proof guide](https://github.com/NethermindEth/LeanCIL/blob/eee140277e3bed6708b2f5ea759d38bf7519fb9a/docs/PROOFS.md)
+See LeanCIL's [proof guide](https://github.com/NethermindEth/LeanCIL/blob/8e44f531ef893fd4b253c24a6d95fb4cd15ffbbd/docs/PROOFS.md)
 for the checked execution and contract APIs.
 
 The Add/Subtract Vector128 helpers use `CodeAt` placements instead of carrying
