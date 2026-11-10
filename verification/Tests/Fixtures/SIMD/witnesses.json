@@ -18,5 +18,6 @@
   { "case": "WrongTop", "method": "Add", "left": ["18446744073709551615", "18446744073709551615", "18446744073709551615", "0"], "right": ["1", "0", "0", "1"], "outputBase": 128, "address": 152, "actualByte": 1 },
   { "case": "WrongTop", "method": "Subtract", "left": ["0", "0", "0", "2"], "right": ["1", "0", "0", "1"], "outputBase": 128, "address": 152, "actualByte": 1 },
   { "case": "WrongFlag", "method": "Add", "left": ["0", "0", "0", "0"], "right": ["0", "0", "0", "0"], "outputBase": 128, "flag": 1 },
+  { "case": "WrongArgumentOrder", "method": "Subtract", "left": ["0", "0", "0", "0"], "right": ["1", "0", "0", "0"], "outputBase": 128, "flag": 0 },
   { "case": "WrongFlag", "method": "Subtract", "left": ["0", "0", "0", "0"], "right": ["0", "0", "0", "0"], "outputBase": 128, "flag": 1 }
 ]

@@ -398,6 +398,8 @@ sumHi -= extra;
         return !DifferenceDispatcher(a, b, out res);
 #elif RENAMED
         return DifferenceDispatcher(a, b, out res);
+#elif WRONG_ARGUMENT_ORDER
+        return SubtractImpl(b, a, out res);
 #elif WRONG_REPORTING_FLAG
         return !SubtractImpl(a, b, out res);
 #else

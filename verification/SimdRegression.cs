@@ -53,6 +53,7 @@ static bool Positive(string name, string profile) => name switch
 };
 static bool Negative(string name, string method, string profile) => name switch
 {
+    "WrongArgumentOrder" => method == "Subtract",
     "WrongAlignment" => profile is "arm64-advsimd" or "x64-sse42",
     "WrongTop" => profile == "arm64-advsimd" || method == "Subtract" && profile == "x64-sse42",
     "WrongBlend" => profile == "x64-v3",
