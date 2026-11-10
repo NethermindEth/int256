@@ -44,12 +44,7 @@ theorem run_local_word_call {program : CIL.Program} {method pc callee : Nat} {bo
   obtain ⟨reference, slot, ready, formed⟩ := state.home enteredWF homes target targetKind
   apply run_next_exists post found code0 (state.snapshots.load a leftKnown)
   apply run_next_exists post found code1 (state.snapshots.load b rightKnown)
-  have addressRest : step body (.localAddr target) (pc + 2) args frame
-      (.scalar (.i64 b) :: .scalar (.i64 a) :: rest) current =
-      .ok (.next (pc + 3) (.reference (.address reference) :: .scalar (.i64 b) :: .scalar (.i64 a) :: rest) frame current) := by
-    simp [step, cil_guard, observerCount, localAddress, slot, formValue, formed, checkedAt,
-      Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-  apply run_next_exists post found code2 addressRest
+  apply run_next_exists post found code2 (by cil_checked_step [slot, formed, localAddress])
   obtain ⟨childFuel, after, invoked, wf, loaded, authority, outside⟩ := effect reference slot ready
   have updated := state.after_word_call originalCall homes childFuel callee _ _ invoked
     target reference stored slot wf loaded authority outside
@@ -57,12 +52,7 @@ theorem run_local_word_call {program : CIL.Program} {method pc callee : Nat} {bo
     (pc + 4) args rest (body := body)
   have tail := run_next_exists post found code4 written (by
     simpa only [WP, Nat.add_assoc] using continuation prepared preparedState)
-  have stepped : step body (.call callee 3) (pc + 3) args frame
-      (.reference (.address reference) :: .scalar (.i64 b) :: .scalar (.i64 a) :: rest) current =
-      .ok (.call callee [.scalar (.i64 a), .scalar (.i64 b), .reference (.address reference)] rest current) := by
-    simp [step, cil_guard, observerCount, checkedValue, numericValue, formValue, formed, checkedAt,
-      Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-  exact run_call_post found code3 stepped ⟨childFuel, invoked⟩ (by
+  exact run_call_post found code3 (by cil_checked_step [formed]) ⟨childFuel, invoked⟩ (by
     simpa only [Nat.add_assoc, Nat.reduceAdd, List.cons_append, List.nil_append] using tail)
 
 #print axioms run_local_word_call
