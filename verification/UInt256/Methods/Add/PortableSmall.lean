@@ -63,10 +63,10 @@ theorem portable_small_input_prefix (program : CIL.Program) (method storage : Na
         frame (.scalar (.i64 (words i)) :: rest) (states i.val) =
           .ok (.next (pc + 1) rest frame (states (i.val + 1))))
     (post : Memory → List Value → Prop)
-    (continuation : WP (fun fuel => run program fuel method 55
-        (armSmallArguments input output word) frame [] (states 4)) post) :
-    WP (fun fuel => run program fuel method 0
-        (armSmallArguments input output word) frame [] (states 0)) post := by
+    (continuation : WP (Execution (fun fuel => run program fuel method 55
+        (armSmallArguments input output word) frame [] (states 4))) (Function.uncurry post)) :
+    WP (Execution (fun fuel => run program fuel method 0
+        (armSmallArguments input output word) frame [] (states 0))) (Function.uncurry post) := by
     have f0 := formed 0
     have f1 := formed 1
     have f2 := formed 2
@@ -122,10 +122,10 @@ theorem portable_small_input_prefix_checked (program : CIL.Program) (method stor
     (homes : NumericHomes entered original.nextIdentity armSmallSpecs frame.locals)
     (post : CIL.Safety.Memory → List Value → Prop)
     (continuation : ∀ after, ARMSmallSaved program original entered after input output frame 4 →
-      WP (fun fuel => run program fuel method 55
-          (armSmallArguments input output word) frame [] after) post) :
-    WP (fun fuel => run program fuel method 0
-        (armSmallArguments input output word) frame [] entered) post := by
+      WP (Execution (fun fuel => run program fuel method 55
+          (armSmallArguments input output word) frame [] after)) (Function.uncurry post)) :
+    WP (Execution (fun fuel => run program fuel method 0
+        (armSmallArguments input output word) frame [] entered)) (Function.uncurry post) := by
   have enteredCall := call.after_frame_setup setup
   have initial : ARMSmallSaved program original entered entered input output frame 0 :=
     ⟨enteredCall, enterFrame_preserves_caller_memory _ _ _ _ _ setup,
@@ -188,10 +188,10 @@ theorem portable_small_prepare (program : CIL.Program) (method storage : Nat) (p
     (post : Memory → List Value → Prop)
     (continuation : ∀ after, PortableSmallState program original entered after input output frame
       (inputLimb original input) (inputLimb original input 0 + word) →
-      WP (fun fuel => run program fuel method 59
-          (armSmallArguments input output word) frame [] after) post) :
-    WP (fun fuel => run program fuel method 55
-        (armSmallArguments input output word) frame [] current) post := by
+      WP (Execution (fun fuel => run program fuel method 59
+          (armSmallArguments input output word) frame [] after)) (Function.uncurry post)) :
+    WP (Execution (fun fuel => run program fuel method 55
+        (armSmallArguments input output word) frame [] current)) (Function.uncurry post) := by
   obtain ⟨lowHome, lowSlot, lowRead⟩ := saved.completed 0 (by decide)
   obtain ⟨sumHome, after, sumSlot, sumRead, sumPreserved, _, _, sumWritten, sumStep⟩ :=
     portable_small_private_store program profile storage original.nextIdentity entered current [input] [output] frame
@@ -206,14 +206,14 @@ theorem portable_small_prepare (program : CIL.Program) (method storage : Nat) (p
     (args := armSmallArguments input output word) (stack := []) lowSlot lowRead
   have stored := sumStep 58 (armSmallArguments input output word) []
   have done := continuation after state
-  refine run_next_exists post found rfl load ?_
+  refine WP.step (post := Function.uncurry post) found rfl load ?_
   iterate 2
-    apply run_next_exists post found (by rfl)
+    apply WP.step (post := Function.uncurry post) found (by rfl)
     simp (config := { implicitDefEqProofs := false })
       [step, cil_guard, observerCount, armSmallArguments, checkedValue, numericValue, pureArity, scalars, CIL.step.eq_def, localResult, CIL.binary,
         Bind.bind, Except.bind, Pure.pure, Except.pure]
     try (first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)
-  refine run_next_exists post found rfl stored ?_
+  refine WP.step (post := Function.uncurry post) found rfl stored ?_
   exact done
 
 /-- Compare the stored low sum with the saved low limb: carry at70, no-carry output at62. -/
@@ -225,9 +225,9 @@ theorem portable_small_low_decision (program : CIL.Program) (method storage : Na
     (lowRead : read memory lowHome 8 1 = .ok (numberBytes low.toNat 8))
     (sumRead : read memory sumHome 8 1 = .ok (numberBytes sum.toNat 8))
     (post : Memory → List Value → Prop)
-    (continuation : WP (fun fuel => run program fuel method (if sum < low then 70 else 62)
-        args frame [] memory) post) :
-    WP (fun fuel => run program fuel method 59 args frame [] memory) post := by
+    (continuation : WP (Execution (fun fuel => run program fuel method (if sum < low then 70 else 62)
+        args frame [] memory)) (Function.uncurry post)) :
+    WP (Execution (fun fuel => run program fuel method 59 args frame [] memory)) (Function.uncurry post) := by
   have loadSum := load_numeric_local .word64 (.i64 sum) sum.toNat rfl sumRead
   have loadLow := load_numeric_local .word64 (.i64 low) low.toNat rfl lowRead
   by_cases carry : sum < low
@@ -251,11 +251,11 @@ theorem portable_small_increment (program : CIL.Program) (method storage : Nat) 
       args frame (.scalar (.i64 (word + 1)) :: rest) before =
         .ok (.next (pc + 1) rest frame after))
     (post : Memory → List Value → Prop)
-    (continuation : WP (fun fuel => run program fuel method
+    (continuation : WP (Execution (fun fuel => run program fuel method
         (if word + 1 = BitVec.ofNat 64 0 then portableIncrementZero segment else portableIncrementStart segment + 7)
-        args frame [] after) post) :
-    WP (fun fuel => run program fuel method (portableIncrementStart segment)
-        args frame [] before) post := by
+        args frame [] after)) (Function.uncurry post)) :
+    WP (Execution (fun fuel => run program fuel method (portableIncrementStart segment)
+        args frame [] before)) (Function.uncurry post) := by
   obtain ⟨segment, bound⟩ := segment
   have cases : segment = 0 ∨ segment = 1 ∨ segment = 2 := by omega
   have load := fun (pc : Nat) => step_load_word64 (body := portableSmallBody profile storage) (pc := pc)
@@ -269,7 +269,7 @@ theorem portable_small_increment (program : CIL.Program) (method storage : Nat) 
       have zero' := zero
       try simp only [BitVec.ofNat_eq_ofNat] at zero'
       iterate 6
-        apply run_next_exists post found (by rfl)
+        apply WP.step (post := Function.uncurry post) found (by rfl)
         first
         | exact load _
         | exact stored _ _
@@ -277,7 +277,7 @@ theorem portable_small_increment (program : CIL.Program) (method storage : Nat) 
             [step, cil_guard, observerCount, instruction, checkedValue, numericValue, pureArity, scalars, CIL.step.eq_def, localResult, CIL.binary,
               CIL.unary, Bind.bind, Except.bind, Pure.pure, Except.pure]
            try (first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
-      apply run_next_exists post found (by rfl) _ continuation
+      apply WP.step (post := Function.uncurry post) found (by rfl) _ continuation
       simp [step, cil_guard, observerCount, checkedValue, numericValue, pureArity, scalars, CIL.step.eq_def, CIL.truth,
         BitVec.ofNat_eq_ofNat, zero', Bind.bind, Except.bind, Pure.pure, Except.pure]
 
@@ -326,12 +326,12 @@ theorem PortableSmallState.increment (program : CIL.Program) (method storage : N
     (continuation : ∀ after,
       PortableSmallState program original entered after input output frame
         (armIncrementWord words ⟨segment.val + 1, by omega⟩) sum →
-      WP (fun fuel => run program fuel method
+      WP (Execution (fun fuel => run program fuel method
           (if words ⟨segment.val + 1, by omega⟩ + 1 = BitVec.ofNat 64 0
             then portableIncrementZero segment else portableIncrementStart segment + 7)
-          args frame [] after) post) :
-    WP (fun fuel => run program fuel method (portableIncrementStart segment)
-      args frame [] current) post := by
+          args frame [] after)) (Function.uncurry post)) :
+    WP (Execution (fun fuel => run program fuel method (portableIncrementStart segment)
+      args frame [] current)) (Function.uncurry post) := by
   let index : Fin 4 := ⟨segment.val + 1, by omega⟩
   obtain ⟨home, slot, loaded⟩ := state.limbs index
   obtain ⟨after, updated, stored⟩ := state.store_limb (profile := profile) (storage := storage) index (words index + 1) enteredWF homes
@@ -354,9 +354,9 @@ theorem portable_small_store_return (program : CIL.Program) (method storage : Na
       AccessBelow memory.nextIdentity memory stored →
       inputValue stored output = UInt256Model.value words →
       post (leaveFrame frame stored) [.scalar (.i32 flag)]) :
-    WP (fun fuel => run program fuel method callPc args frame
+    WP (Execution (fun fuel => run program fuel method callPc args frame
         [.scalar (.i64 (words 3)), .scalar (.i64 (words 2)), .scalar (.i64 (words 1)),
-          .scalar (.i64 (words 0)), .reference (.address output)] memory) post := by
+          .scalar (.i64 (words 0)), .reference (.address output)] memory)) (Function.uncurry post) := by
   obtain ⟨childFuel, stored, invoked, valid, outside, authority, value, readable⟩ :=
     UInt256Proof.Multiply.LimbStorage.store_limbs_readable_contract profile program storage storageFound
       memory inputs output (words 0) (words 1) (words 2) (words 3) call
@@ -376,6 +376,7 @@ theorem portable_small_store_return (program : CIL.Program) (method storage : Na
     have returns : (portableSmallBody profile storage).returnsValue = true := by rfl
     simp [run, found, retAt, returns, step, cil_guard, observerCount, checkedValue, numericValue, flagFit, List.mapM, List.mapM.loop, Option.bind,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
+  apply WP.adequate.mpr
   apply run_call_post found callAt stepped ⟨childFuel, invoked⟩
   refine ⟨2, leaveFrame frame stored, [.scalar (.i32 flag)], returned, ?_⟩
   apply continuation stored valid outside authority
@@ -418,8 +419,8 @@ theorem PortableSmallState.finish (program : CIL.Program) (method storage : Nat)
       AccessBelow current.nextIdentity current stored →
       inputValue stored output = UInt256Model.value (portableSiteWords site words sum) →
       post (leaveFrame frame stored) [.scalar (.i32 (portableSiteFlag site))]) :
-    WP (fun fuel => run program fuel method (portableSiteStart site)
-      args frame [] current) post := by
+    WP (Execution (fun fuel => run program fuel method (portableSiteStart site)
+      args frame [] current)) (Function.uncurry post) := by
   obtain ⟨h1, s1, r1⟩ := state.limbs 1
   obtain ⟨h2, s2, r2⟩ := state.limbs 2
   obtain ⟨h3, s3, r3⟩ := state.limbs 3
@@ -527,6 +528,7 @@ theorem PortableSmallState.exit (program : CIL.Program) (method storage : Nat) (
       run program fuel method (portableSiteStart site)
         (armSmallArguments input output word) frame [] current = .ok (final, returned) ∧
       ARMSmallPost original final returned input output word := by
+  apply WP.exists_execution
   apply state.finish program method storage profile found storageFound site (armSmallArguments input output word) (by rfl)
     (fun final returned => ARMSmallPost original final returned input output word)
   intro stored valid outside _ value
@@ -569,6 +571,7 @@ theorem portable_small_entry (program : CIL.Program) (method storage : Nat) (pro
   let post := fun final returned => ARMSmallPost original final returned input output word
   let args := armSmallArguments input output word
   have enteredWF := enterFrame_preserves_wellFormed _ _ _ _ _ call.1.1 setup
+  apply WP.exists_execution
   apply portable_small_input_prefix_checked program method storage profile found disabled original entered input output word frame call setup homes post
   intro current saved
   apply portable_small_prepare program method storage profile found original entered current input output word frame enteredWF homes saved post
@@ -591,21 +594,26 @@ theorem portable_small_entry (program : CIL.Program) (method storage : Nat) (pro
         intro after3 state3
         split
         · rename_i third
+          apply WP.adequate.mpr
           exact state3.exit program method storage profile found storageFound 4
             (portable_site_overflow _ word carry (by simpa [armIncrementWord] using first)
               (by simpa [armIncrementWord] using second) (by simpa [armIncrementWord] using third)) call setup
         · rename_i third
+          apply WP.adequate.mpr
           exact state3.exit program method storage profile found storageFound 3
             (portable_site_third _ word carry (by simpa [armIncrementWord] using first)
               (by simpa [armIncrementWord] using second) (by simpa [armIncrementWord] using third)) call setup
       · rename_i second
+        apply WP.adequate.mpr
         exact state2.exit program method storage profile found storageFound 2
           (portable_site_second _ word carry (by simpa [armIncrementWord] using first)
             (by simpa [armIncrementWord] using second)) call setup
     · rename_i first
+      apply WP.adequate.mpr
       exact state1.exit program method storage profile found storageFound 1
         (portable_site_first _ word carry (by simpa [armIncrementWord] using first)) call setup
   · rename_i carry
+    apply WP.adequate.mpr
     exact state.exit program method storage profile found storageFound 0
       (portable_site_no_carry _ word carry) call setup
 

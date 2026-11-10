@@ -159,7 +159,7 @@ theorem vector128_operand_checked (program : CIL.Program) (body : CIL.Method) (m
     simp only [vector128OperandLoad, vector128OperandLocal, Bool.false_eq_true, ite_false, ite_true,
       Fin.val_zero, Fin.val_one] at stored reading done ⊢
   all_goals
-    simp only [Nat.mul_zero, Nat.mul_one, Nat.add_zero] at reading
+    simp only [Nat.mul_zero, Nat.mul_one, Nat.add_zero] at reading ⊢
     cil_contract_steps [found, code, reading, stored] until done
 
 #print axioms vector128_operand_checked
@@ -204,10 +204,11 @@ theorem vector128_reference_prefix (program : CIL.Program) (body : CIL.Method) (
         [.reference (.address left), .reference (.address left)], memory⟩) := by
     unfold vector128SavedFrame
     cil_segment 2 [found, saved, layout, rightFormed, storeLocal]
+  apply WP.exists_execution
   apply (formed.trans rooted).run_exists args ⟨frame, [], memory⟩ ⟨rfl, rfl⟩ post
   intro after valid
   rcases valid with ⟨_, rfl⟩
-  exact continuation
+  exact WP.adequate.mpr continuation
 
 /-- The extracted signed offset computes the upper half within the live input allocation and its permitted view, before any load is attempted. -/
 theorem vector128_left_upper (program : CIL.Program) (body : CIL.Method) (method : Nat)

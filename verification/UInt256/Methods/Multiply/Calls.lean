@@ -43,16 +43,39 @@ theorem run_word_call {program : CIL.Program} {wordIndex method pc : Nat} {body 
     (continuation : ∀ after,
       PrivateWords program original entered after inputs outputs frame
         (rememberWord known index (lowProduct a b)) →
-      WP (fun fuel => run program fuel method (pc + 1) args frame
-        (.scalar (.i64 (highProduct a b)) :: rest) after) post) :
-    WP (fun fuel => run program fuel method pc args frame stack current) post := by
-  obtain ⟨childFuel, after, invoked, wf, loaded, authority, outside⟩ :=
-    contract current a b reference state.call.1.1 ready
-  have updated := state.after_word_call originalCall homes childFuel wordIndex
-    [.scalar (.i64 a), .scalar (.i64 b), .reference (.address reference)] [.scalar (.i64 (highProduct a b))]
-    invoked index reference (lowProduct a b) slot wf loaded authority
+      WP (Execution (fun fuel => run program fuel method (pc + 1) args frame
+        (.scalar (.i64 (highProduct a b)) :: rest) after)) (Function.uncurry post)) :
+    WP (Execution (fun fuel => run program fuel method pc args frame stack current))
+      (Function.uncurry post) := by
+  have helper : WP (Execution (fun fuel => invoke program fuel wordIndex
+      [.scalar (.i64 a), .scalar (.i64 b), .reference (.address reference)] current))
+      (fun (after, values) => values = [.scalar (.i64 (highProduct a b))] ∧
+        after.WellFormed ∧
+        read after reference 8 1 = .ok (numberBytes (lowProduct a b).toNat 8) ∧
+        AccessBelow current.nextIdentity current after ∧
+        (∀ id, id < current.nextIdentity → ∀ offset,
+          id ≠ reference.allocation ∨ offset < reference.offset ∨
+            reference.offset + 8 ≤ offset →
+          after.cells id offset = current.cells id offset)) := by
+    obtain ⟨fuel, after, invoked, result⟩ :=
+      contract current a b reference state.call.1.1 ready
+    exact ⟨fuel, (after, [.scalar (.i64 (highProduct a b))]), invoked, rfl, result⟩
+  have framed := helper.frame (initial := (current, []))
+    (assertion := fun result => FrameInvariants program current result.1 ∧
+      current.nextIdentity ≤ result.1.nextIdentity)
+    ⟨FrameInvariants.refl program state.call.1.1, Nat.le_refl _⟩
+    (by
+      rintro fuel ⟨after, values⟩ invoked _
+      exact ⟨call_frame_invariants found fetched stepped state.call.1.1 invoked,
+        (invoke_preserves_caller_allocations program fuel wordIndex _ values
+          current after invoked).next⟩)
+  apply WP.call found fetched stepped framed
+  intro after values callResult
+  obtain ⟨⟨rfl, _, loaded, authority, outside⟩, invariants, grows⟩ := callResult
+  have updated := state.after_word_call originalCall homes invariants grows
+    index reference (lowProduct a b) slot loaded authority
     (fun id old different offset => outside id old offset (Or.inl different))
-  exact run_call_post found fetched stepped ⟨childFuel, invoked⟩ (continuation after updated)
+  simpa only [List.cons_append, List.nil_append] using continuation after updated
 
 #print axioms run_word_call
 end UInt256Proof.Multiply.Calls

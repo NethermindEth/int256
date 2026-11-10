@@ -229,12 +229,14 @@ theorem scalar_first_product (profile : CIL.FeatureProfile) (program : CIL.Progr
     (body := (scalarBody profile wordIndex storageIndex)) (args := scalarArgs input word output) (pc := pc) (stack := stack)
     (index := 0) (inputLimb original input 0) (by simp [scalarInputs, rememberWord])
   cil_contract_steps 5 [found, scalarArgs, inputFormed, slot, referenceFormed, localAddress, reading, load0]
+  apply WP.exists_execution
   apply run_word_call contract state originalCall homes 4 reference word (inputLimb original input 0)
     slot writable post found (by rfl)
   · simp [step, cil_guard, observerCount, checkedValue, numericValue, formValue, referenceFormed,
       checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     first | rfl | exact ⟨rfl, rfl⟩
   intro middle middleState
+  apply WP.adequate.mpr
   obtain ⟨after, stored, finalState⟩ := middleState.store enteredWF homes 3 (by rfl)
     (highProduct word (inputLimb original input 0)) 37 (scalarArgs input word output)
     [.scalar (.i64 (inputLimb original input 3))] (body := (scalarBody profile wordIndex storageIndex))
@@ -280,11 +282,12 @@ theorem scalar_next_product (profile : CIL.FeatureProfile) (program : CIL.Progra
   all_goals
     dsimp [ladderStart, ladderInput] at load continuation ⊢
     cil_contract_steps 3 [found, scalarArgs, slot, formed, localAddress, load]
+    apply WP.exists_execution
     apply run_word_call contract state originalCall homes 5 reference word limb slot writable post found (by rfl)
     · simp [step, cil_guard, observerCount, checkedValue, numericValue, formValue, formed,
         checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
       first | rfl | exact ⟨rfl, rfl⟩
-    exact continuation
+    exact fun after valid => WP.adequate.mpr (continuation after valid)
 
 /-- Add a saved low product to the incoming carry, initialize the next result
     limb, and replace the carry by the high word plus the exact overflow bit. -/

@@ -268,12 +268,14 @@ theorem left_two_first_products (profile : CIL.FeatureProfile) (program : CIL.Pr
     | simp [step, cil_guard, observerCount, pureArity, instruction, localAddress, slot0, formValue, formed0, checkedAt,
         Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
       first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
+  apply WP.exists_execution
   apply run_word_call contract state originalCall homes 6 low0
     (inputLimb original left 0) (inputLimb original right 0) slot0 ready0 post found (by rfl)
   · simp [step, cil_guard, observerCount, checkedValue, numericValue, formValue, formed0, checkedAt,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     first | rfl | exact ⟨rfl, rfl⟩
   intro m0 state0
+  apply WP.adequate.mpr
   obtain ⟨m1, stored0, state1⟩ := state0.store enteredWF homes 5 (by rfl)
     (highProduct (inputLimb original left 0) (inputLimb original right 0))
     27 (productArgs left right output) [.scalar (.i64 (inputLimb original left 0))] (body := (leftTwoBody profile wordIndex countIndex storageIndex))
@@ -289,12 +291,14 @@ theorem left_two_first_products (profile : CIL.FeatureProfile) (program : CIL.Pr
     | simp [step, cil_guard, observerCount, pureArity, instruction, localAddress, slot1, formValue, formed1, checkedAt,
         Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
       first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
+  apply WP.exists_execution
   apply run_word_call contract state1 originalCall homes 8 low1
     (inputLimb original left 0) (inputLimb original right 1) slot1 ready1 post found (by rfl)
   · simp [step, cil_guard, observerCount, checkedValue, numericValue, formValue, formed1, checkedAt,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     first | rfl | exact ⟨rfl, rfl⟩
   intro m2 state2
+  apply WP.adequate.mpr
   obtain ⟨m3, stored1, state3⟩ := state2.store enteredWF homes 7 (by rfl)
     (highProduct (inputLimb original left 0) (inputLimb original right 1))
     32 (productArgs left right output) [.scalar (.i64 (inputLimb original left 0))] (body := (leftTwoBody profile wordIndex countIndex storageIndex))
@@ -357,26 +361,31 @@ theorem left_two_second_column (profile : CIL.FeatureProfile) (program : CIL.Pro
     35 (productArgs left right output) [.scalar (.i64 (inputLimb original left 0))] (body := (leftTwoBody profile wordIndex countIndex storageIndex))
   apply run_next_exists post found (by rfl) stored
   let k0 := rememberWord (leftTwoFirstProducts original left right) 9 0
+  apply WP.exists_execution
   apply run_local_word_call state0 originalCall enteredWF homes 5 8 9 10
     (localWord k0 5) (localWord k0 8) (countCarry (localWord k0 5) (localWord k0 8) 0)
     (localWord k0 5 + localWord k0 8) (by rfl) (by rfl) (by rfl) (by rfl)
     found (by rfl) (by rfl) (by rfl) (by rfl) (by rfl)
     (counting_local_effect profile program countIndex countFound state0.snapshots state0.call.1.1 9 _ _ 0 (by rfl)) post
   intro m1 state1
+  apply WP.adequate.mpr
   let k1 := countWords k0 5 8 9 10
+  apply WP.exists_execution
   apply run_local_word_call state1 originalCall enteredWF homes 0 1 12 11
     (localWord k1 0) (localWord k1 1) (lowProduct (localWord k1 0) (localWord k1 1))
     (highProduct (localWord k1 0) (localWord k1 1)) (by rfl) (by rfl) (by rfl) (by rfl)
     found (by rfl) (by rfl) (by rfl) (by rfl) (by rfl)
     (fun reference _ ready => widening_local_effect contract m1 _ _ state1.call.1.1 reference ready) post
   intro m2 state2
+  apply WP.adequate.mpr
   let k2 := widenWords k1 0 1 12 11
+  apply WP.exists_execution
   apply run_local_word_call state2 originalCall enteredWF homes 10 12 9 10
     (localWord k2 10) (localWord k2 12) (countCarry (localWord k2 10) (localWord k2 12) (localWord k2 9))
     (localWord k2 10 + localWord k2 12) (by rfl) (by rfl) (by rfl) (by rfl)
     found (by rfl) (by rfl) (by rfl) (by rfl) (by rfl)
     (counting_local_effect profile program countIndex countFound state2.snapshots state2.call.1.1 9 _ _ (localWord k2 9) (by rfl)) post
-  exact continuation
+  exact fun after valid => WP.adequate.mpr (continuation after valid)
 
 #print axioms left_two_second_column
 end UInt256Proof.Multiply.LeftTwo
@@ -424,19 +433,22 @@ theorem left_two_middle_column (profile : CIL.FeatureProfile) (program : CIL.Pro
     55 (productArgs left right output) [.scalar (.i64 (inputLimb original left 0))] (body := (leftTwoBody profile wordIndex countIndex storageIndex))
   apply run_next_exists post found (by rfl) resetStep
   let k0 := rememberWord (rememberWord known 13 (localWord known 9)) 9 0
+  apply WP.exists_execution
   apply run_local_word_call state0 originalCall enteredWF homes 13 7 9 13
     (localWord k0 13) (localWord k0 7) (countCarry (localWord k0 13) (localWord k0 7) 0)
     (localWord k0 13 + localWord k0 7) (by rfl) (by rfl) (by rfl) (by rfl)
     found (by rfl) (by rfl) (by rfl) (by rfl) (by rfl)
     (counting_local_effect profile program countIndex countFound state0.snapshots state0.call.1.1 9 _ _ 0 (by rfl)) post
   intro m1 state1
+  apply WP.adequate.mpr
   let k1 := countWords k0 13 7 9 13
+  apply WP.exists_execution
   apply run_local_word_call state1 originalCall enteredWF homes 13 11 9 13
     (localWord k1 13) (localWord k1 11) (countCarry (localWord k1 13) (localWord k1 11) (localWord k1 9))
     (localWord k1 13 + localWord k1 11) (by rfl) (by rfl) (by rfl) (by rfl)
     found (by rfl) (by rfl) (by rfl) (by rfl) (by rfl)
     (counting_local_effect profile program countIndex countFound state1.snapshots state1.call.1.1 9 _ _ (localWord k1 9) (by rfl)) post
-  exact continuation
+  exact fun after valid => WP.adequate.mpr (continuation after valid)
 
 #print axioms left_two_middle_column
 end UInt256Proof.Multiply.LeftTwo
@@ -476,12 +488,14 @@ theorem left_two_upper_product (profile : CIL.FeatureProfile) (program : CIL.Pro
   · simp [step, cil_guard, observerCount, localAddress, slot, formValue, formed, checkedAt,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     exact ⟨rfl, rfl, rfl, rfl⟩
+  apply WP.exists_execution
   apply run_word_call contract state originalCall homes 15 reference
     (inputLimb original left 0) (inputLimb original right 2) slot ready post found (by rfl)
   · simp [step, cil_guard, observerCount, checkedValue, numericValue, formValue, formed, checkedAt,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     first | rfl | exact ⟨rfl, rfl⟩
   intro middle middleState
+  apply WP.adequate.mpr
   obtain ⟨after, stored, next⟩ := middleState.store enteredWF homes 14 (by rfl)
     (highProduct (inputLimb original left 0) (inputLimb original right 2))
     69 (productArgs left right output) [] (body := (leftTwoBody profile wordIndex countIndex storageIndex))
@@ -511,12 +525,14 @@ theorem left_two_upper_accumulate (profile : CIL.FeatureProfile) (program : CIL.
       run program fuel index 70 (productArgs left right output) frame [] current =
         .ok (final, returned) ∧ post final returned := by
   let k0 := leftTwoUpperProduct original left right
+  apply WP.exists_execution
   apply run_local_word_call state originalCall enteredWF homes 13 15 9 13
     (localWord k0 13) (localWord k0 15) (countCarry (localWord k0 13) (localWord k0 15) (localWord k0 9))
     (localWord k0 13 + localWord k0 15) (by rfl) (by rfl) (by rfl) (by rfl)
     found (by rfl) (by rfl) (by rfl) (by rfl) (by rfl)
     (counting_local_effect profile program countIndex countFound state.snapshots state.call.1.1 9 _ _ (localWord k0 9) (by rfl)) post
   intro middle middleState
+  apply WP.adequate.mpr
   let k1 := countWords k0 13 15 9 13
   apply run_next_exists post found (by rfl) (middleState.snapshots.load (localWord k1 4) (by rfl))
   apply run_next_exists post found (by rfl) (middleState.snapshots.load (localWord k1 14) (by rfl))
@@ -560,19 +576,23 @@ theorem left_two_final (profile : CIL.FeatureProfile) (program : CIL.Program) (i
       run program fuel index 79 (productArgs left right output) frame [] current =
         .ok (final, returned) ∧ post final returned := by
   let k0 := leftTwoUpperWords original left right
+  apply WP.exists_execution
   apply run_local_word_call state originalCall enteredWF homes 0 2 17 16
     (localWord k0 0) (localWord k0 2) (lowProduct (localWord k0 0) (localWord k0 2))
     (highProduct (localWord k0 0) (localWord k0 2)) (by rfl) (by rfl) (by rfl) (by rfl)
     found (by rfl) (by rfl) (by rfl) (by rfl) (by rfl)
     (fun reference _ ready => widening_local_effect contract current _ _ state.call.1.1 reference ready) post
   intro m1 state1
+  apply WP.adequate.mpr
   let k1 := widenWords k0 0 2 17 16
+  apply WP.exists_execution
   apply run_local_word_call state1 originalCall enteredWF homes 13 17 9 13
     (localWord k1 13) (localWord k1 17) (countCarry (localWord k1 13) (localWord k1 17) (localWord k1 9))
     (localWord k1 13 + localWord k1 17) (by rfl) (by rfl) (by rfl) (by rfl)
     found (by rfl) (by rfl) (by rfl) (by rfl) (by rfl)
     (counting_local_effect profile program countIndex countFound state1.snapshots state1.call.1.1 9 _ _ (localWord k1 9) (by rfl)) post
   intro m2 state2
+  apply WP.adequate.mpr
   let k2 := countWords k1 13 17 9 13
   apply run_next_exists post found (by rfl) (state2.snapshots.load (localWord k2 4) (by rfl))
   apply run_next_exists post found (by rfl) (state2.snapshots.load (localWord k2 16) (by rfl))

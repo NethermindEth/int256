@@ -27,11 +27,13 @@ theorem multiply_small_branch (ctx : Context alternative) (word : WordContract c
   let b := inputLimb original right 0
   let post := fun final returned => ProductResult original final left right output returned
   have found : ctx.program[ctx.indices.entry]? = some (multiplyBody ctx.profile ctx.indices) := ctx.entry
+  apply WP.exists_execution
   apply run_local_word_call state originalCall enteredWF homes 0 1 7 6
     a b (lowProduct a b) (highProduct a b) (by rfl) (by rfl) (by rfl) (by rfl)
     found (by rfl) (by rfl) (by rfl) (by rfl) (by rfl)
     (fun reference _ ready => widening_local_effect word current a b state.call.1.1 reference ready) post
   intro after next
+  apply WP.adequate.mpr
   have formed := next.call.output_formed (by simp : output ∈ [output])
   have loadLow := fun (pc : Nat) (stack : List Value) => next.snapshots.load
     (body := (multiplyBody ctx.profile ctx.indices)) (args := productArgs left right output) (pc := pc) (stack := stack)

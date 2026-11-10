@@ -39,21 +39,46 @@ theorem run_local_word_call {program : CIL.Program} {method pc callee : Nat} {bo
     (continuation : ∀ after,
       PrivateWords program original entered after inputs outputs frame
         (rememberWord (rememberWord known target stored) result returned) →
-      WP (fun fuel => run program fuel method (pc + 5) args frame rest after) post) :
-    WP (fun fuel => run program fuel method pc args frame rest current) post := by
+      WP (Execution (fun fuel => run program fuel method (pc + 5) args frame rest after))
+        (Function.uncurry post)) :
+    WP (Execution (fun fuel => run program fuel method pc args frame rest current))
+      (Function.uncurry post) := by
   obtain ⟨reference, slot, ready, formed⟩ := state.home enteredWF homes target targetKind
-  apply run_next_exists post found code0 (state.snapshots.load a leftKnown)
-  apply run_next_exists post found code1 (state.snapshots.load b rightKnown)
-  apply run_next_exists post found code2 (by cil_checked_step [slot, formed, localAddress])
-  obtain ⟨childFuel, after, invoked, wf, loaded, authority, outside⟩ := effect reference slot ready
-  have updated := state.after_word_call originalCall homes childFuel callee _ _ invoked
-    target reference stored slot wf loaded authority outside
+  apply WP.step found code0 (state.snapshots.load a leftKnown)
+  apply WP.step found code1 (state.snapshots.load b rightKnown)
+  apply WP.step found code2 (by cil_checked_step [slot, formed, localAddress])
+  have called : step body (.call callee 3) (pc + 3) args frame
+      (.reference (.address reference) :: .scalar (.i64 b) :: .scalar (.i64 a) :: rest)
+      current = .ok (.call callee
+        [.scalar (.i64 a), .scalar (.i64 b), .reference (.address reference)] rest current) := by
+    cil_checked_step [formed]
+  have helper : WP (Execution (fun fuel => invoke program fuel callee
+      [.scalar (.i64 a), .scalar (.i64 b), .reference (.address reference)] current))
+      (fun (after, values) => values = [.scalar (.i64 returned)] ∧
+        after.WellFormed ∧ read after reference 8 1 = .ok (numberBytes stored.toNat 8) ∧
+        AccessBelow current.nextIdentity current after ∧
+        (∀ id, id < current.nextIdentity → id ≠ reference.allocation → ∀ offset,
+          after.cells id offset = current.cells id offset)) := by
+    obtain ⟨fuel, after, invoked, result⟩ := effect reference slot ready
+    exact ⟨fuel, (after, [.scalar (.i64 returned)]), invoked, rfl, result⟩
+  have framed := helper.frame (initial := (current, []))
+    (assertion := fun result => FrameInvariants program current result.1 ∧
+      current.nextIdentity ≤ result.1.nextIdentity)
+    ⟨FrameInvariants.refl program state.call.1.1, Nat.le_refl _⟩
+    (by
+      rintro fuel ⟨after, values⟩ invoked _
+      exact ⟨call_frame_invariants found code3 called state.call.1.1 invoked,
+        (invoke_preserves_caller_allocations program fuel callee _ values
+          current after invoked).next⟩)
+  apply WP.call found code3 called framed
+  intro after values callResult
+  obtain ⟨⟨rfl, _, loaded, authority, outside⟩, invariants, grows⟩ := callResult
+  have updated := state.after_word_call originalCall homes invariants grows
+    target reference stored slot loaded authority outside
   obtain ⟨prepared, written, preparedState⟩ := updated.store enteredWF homes result resultKind returned
     (pc + 4) args rest (body := body)
-  have tail := run_next_exists post found code4 written (by
-    simpa only [WP, Nat.add_assoc] using continuation prepared preparedState)
-  exact run_call_post found code3 (by cil_checked_step [formed]) ⟨childFuel, invoked⟩ (by
-    simpa only [Nat.add_assoc, Nat.reduceAdd, List.cons_append, List.nil_append] using tail)
+  simpa only [Nat.add_assoc, Nat.reduceAdd, List.cons_append, List.nil_append] using
+    WP.step found code4 written (continuation prepared preparedState)
 
 #print axioms run_local_word_call
 end UInt256Model.Safety

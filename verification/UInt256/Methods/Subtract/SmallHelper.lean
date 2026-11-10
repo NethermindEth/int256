@@ -237,10 +237,10 @@ theorem small_input_prefix_checked (program : CIL.Program) (method storage : Nat
     (homes : WordHomes entered original.nextIdentity smallWordSpecs frame.locals)
     (post : Memory → List Value → Prop)
     (continuation : ∀ after, SmallSaved program original entered after input output word frame.locals 4 →
-      WP (fun fuel => run program fuel method 16 (smallArguments input output word) frame
-          [.scalar (.i64 word), .scalar (.i64 (inputLimb original input 0))] after) post) :
-    WP (fun fuel => run program fuel method 0
-      (smallArguments input output word) frame [] entered) post := by
+      WP (Execution (fun fuel => run program fuel method 16 (smallArguments input output word) frame
+          [.scalar (.i64 word), .scalar (.i64 (inputLimb original input 0))] after)) (Function.uncurry post)) :
+    WP (Execution (fun fuel => run program fuel method 0
+      (smallArguments input output word) frame [] entered)) (Function.uncurry post) := by
   have enteredCall := call.after_frame_setup setup
   have initial : SmallSaved program original entered entered input output word frame.locals 0 :=
     ⟨enteredCall, enterFrame_preserves_caller_memory _ _ _ _ _ setup,
@@ -271,22 +271,22 @@ theorem small_input_prefix_checked (program : CIL.Program) (method storage : Nat
   simp only [smallSavedWord, Fin.val_zero, Fin.val_one, Fin.val_two, CIL.fin_val_three,
     Nat.reduceLT, ↓reduceDIte, Nat.reduceAdd] at step0 step1 step2 step3
   have a0 : (smallArguments input output word)[0]? = some (.reference (.address input)) := rfl
-  refine run_next_exists post found rfl (step_reference_arg a0 f0) ?_
-  refine run_next_exists post found rfl (step_field (r0 _)) ?_
-  refine run_next_exists post found rfl (step_reference_arg a0 f0) ?_
-  refine run_next_exists post found rfl (step_field (r1 _)) ?_
-  refine run_next_exists post found rfl (step0 _ _) ?_
-  refine run_next_exists post found rfl (step_reference_arg a0 f1) ?_
-  refine run_next_exists post found rfl (step_field (r2 _)) ?_
-  refine run_next_exists post found rfl (step1 _ _) ?_
-  refine run_next_exists post found rfl (step_reference_arg a0 f2) ?_
-  refine run_next_exists post found rfl (step_field (r3 _)) ?_
-  refine run_next_exists post found rfl (step2 _ _) ?_
-  refine run_next_exists post found rfl rfl ?_
-  refine run_next_exists post found rfl rfl ?_
-  refine run_next_exists post found rfl rfl ?_
-  refine run_next_exists post found rfl (step3 _ _) ?_
-  refine run_next_exists post found rfl rfl ?_
+  refine WP.step (post := Function.uncurry post) found rfl (step_reference_arg a0 f0) ?_
+  refine WP.step (post := Function.uncurry post) found rfl (step_field (r0 _)) ?_
+  refine WP.step (post := Function.uncurry post) found rfl (step_reference_arg a0 f0) ?_
+  refine WP.step (post := Function.uncurry post) found rfl (step_field (r1 _)) ?_
+  refine WP.step (post := Function.uncurry post) found rfl (step0 _ _) ?_
+  refine WP.step (post := Function.uncurry post) found rfl (step_reference_arg a0 f1) ?_
+  refine WP.step (post := Function.uncurry post) found rfl (step_field (r2 _)) ?_
+  refine WP.step (post := Function.uncurry post) found rfl (step1 _ _) ?_
+  refine WP.step (post := Function.uncurry post) found rfl (step_reference_arg a0 f2) ?_
+  refine WP.step (post := Function.uncurry post) found rfl (step_field (r3 _)) ?_
+  refine WP.step (post := Function.uncurry post) found rfl (step2 _ _) ?_
+  refine WP.step (post := Function.uncurry post) found rfl rfl ?_
+  refine WP.step (post := Function.uncurry post) found rfl rfl ?_
+  refine WP.step (post := Function.uncurry post) found rfl rfl ?_
+  refine WP.step (post := Function.uncurry post) found rfl (step3 _ _) ?_
+  refine WP.step (post := Function.uncurry post) found rfl rfl ?_
   exact done
 
 #print axioms small_frame_setup
@@ -358,14 +358,14 @@ theorem small_branch_prefix (program : CIL.Program) (method storage : Nat) (prof
     (reads : ∀ i, read memory (homes i) 8 1 = .ok (numberBytes
       (if h : i.val < 3 then words ⟨i.val + 1, by omega⟩ else words 0 - word).toNat 8))
     (post : Memory → List Value → Prop)
-    (continuation : WP (fun fuel => run program fuel method
+    (continuation : WP (Execution (fun fuel => run program fuel method
         (smallStoreCall (smallSelectedBranch words word).val) (smallArguments input output word) frame
         [.scalar (.i64 (smallDifference words word 3)), .scalar (.i64 (smallDifference words word 2)),
          .scalar (.i64 (smallDifference words word 1)), .scalar (.i64 (smallDifference words word 0)),
-         .reference (.address output)] memory) post) :
-    WP (fun fuel => run program fuel method 16
+         .reference (.address output)] memory)) (Function.uncurry post)) :
+    WP (Execution (fun fuel => run program fuel method 16
         (smallArguments input output word) frame [.scalar (.i64 word), .scalar (.i64 (words 0))]
-        memory) post := by
+        memory)) (Function.uncurry post) := by
   have s0 := slots 0
   have s1 := slots 1
   have s2 := slots 2
@@ -378,64 +378,64 @@ theorem small_branch_prefix (program : CIL.Program) (method storage : Nat) (prof
     Nat.reduceLT, ↓reduceDIte, Nat.reduceAdd] at s0 s1 s2 s3 r0 r1 r2 r3
   have a2 : (smallArguments input output word)[2]? = some (.reference (.address output)) := rfl
   by_cases h0 : words 0 < word
-  · refine run_next_exists post found rfl (step_bltu_word (ite_eq_left_of_eq_true _ _ (eq_true h0))) ?_
-    refine run_next_exists post found rfl (step_local_loaded s0 r0) ?_
+  · refine WP.step (post := Function.uncurry post) found rfl (step_bltu_word (ite_eq_left_of_eq_true _ _ (eq_true h0))) ?_
+    refine WP.step (post := Function.uncurry post) found rfl (step_local_loaded s0 r0) ?_
     by_cases h1 : words 1 = 0
-    · refine run_next_exists post found rfl (step_brzero_word (ite_eq_left_of_eq_true _ _ (eq_true h1))) ?_
-      refine run_next_exists post found rfl (step_local_loaded s1 r1) ?_
+    · refine WP.step (post := Function.uncurry post) found rfl (step_brzero_word (ite_eq_left_of_eq_true _ _ (eq_true h1))) ?_
+      refine WP.step (post := Function.uncurry post) found rfl (step_local_loaded s1 r1) ?_
       by_cases h2 : words 2 = 0
-      · refine run_next_exists post found rfl (step_brzero_word (ite_eq_left_of_eq_true _ _ (eq_true h2))) ?_
-        refine run_next_exists post found rfl (step_local_loaded s2 r2) ?_
+      · refine WP.step (post := Function.uncurry post) found rfl (step_brzero_word (ite_eq_left_of_eq_true _ _ (eq_true h2))) ?_
+        refine WP.step (post := Function.uncurry post) found rfl (step_local_loaded s2 r2) ?_
         by_cases h3 : words 3 = 0
-        · refine run_next_exists post found rfl (step_brzero_word (ite_eq_left_of_eq_true _ _ (eq_true h3))) ?_
+        · refine WP.step (post := Function.uncurry post) found rfl (step_brzero_word (ite_eq_left_of_eq_true _ _ (eq_true h3))) ?_
           repeat' first
-            | refine run_next_exists (op := .arg 2) post found rfl (step_reference_arg a2 formed) ?_
-            | refine run_next_exists (op := .local 3) post found rfl (step_local_loaded s3 r3) ?_
-            | refine run_next_exists post found rfl rfl ?_
+            | refine WP.step (operation := .arg 2) (post := Function.uncurry post) found rfl (step_reference_arg a2 formed) ?_
+            | refine WP.step (operation := .local 3) (post := Function.uncurry post) found rfl (step_local_loaded s3 r3) ?_
+            | refine WP.step (post := Function.uncurry post) found rfl rfl ?_
           simp only [smallSelectedBranch, smallDifference, smallStoreCall, Fin.val_zero, Fin.val_one, Fin.val_two,
               CIL.fin_val_three, Nat.reduceEqDiff, ne_eq, h0, h1, h2, h3, not_true_eq_false, and_true,
               ↓reduceIte] at continuation
           exact continuation
-        · refine run_next_exists post found rfl (step_brzero_word (ite_eq_right_of_eq_false _ _ (eq_false h3))) ?_
+        · refine WP.step (post := Function.uncurry post) found rfl (step_brzero_word (ite_eq_right_of_eq_false _ _ (eq_false h3))) ?_
           repeat' first
-            | refine run_next_exists (op := .arg 2) post found rfl (step_reference_arg a2 formed) ?_
-            | refine run_next_exists (op := .local 2) post found rfl (step_local_loaded s2 r2) ?_
-            | refine run_next_exists (op := .local 3) post found rfl (step_local_loaded s3 r3) ?_
-            | refine run_next_exists post found rfl rfl ?_
+            | refine WP.step (operation := .arg 2) (post := Function.uncurry post) found rfl (step_reference_arg a2 formed) ?_
+            | refine WP.step (operation := .local 2) (post := Function.uncurry post) found rfl (step_local_loaded s2 r2) ?_
+            | refine WP.step (operation := .local 3) (post := Function.uncurry post) found rfl (step_local_loaded s3 r3) ?_
+            | refine WP.step (post := Function.uncurry post) found rfl rfl ?_
           simp only [smallSelectedBranch, smallDifference, smallStoreCall, Fin.val_zero, Fin.val_one, Fin.val_two,
               CIL.fin_val_three, Nat.reduceEqDiff, ne_eq, h0, h1, h2, h3, not_false_eq_true, not_true_eq_false, and_true,
               ↓reduceIte] at continuation
           exact continuation
-      · refine run_next_exists post found rfl (step_brzero_word (ite_eq_right_of_eq_false _ _ (eq_false h2))) ?_
+      · refine WP.step (post := Function.uncurry post) found rfl (step_brzero_word (ite_eq_right_of_eq_false _ _ (eq_false h2))) ?_
         repeat' first
-          | refine run_next_exists (op := .arg 2) post found rfl (step_reference_arg a2 formed) ?_
-          | refine run_next_exists (op := .local 1) post found rfl (step_local_loaded s1 r1) ?_
-          | refine run_next_exists (op := .local 2) post found rfl (step_local_loaded s2 r2) ?_
-          | refine run_next_exists (op := .local 3) post found rfl (step_local_loaded s3 r3) ?_
-          | refine run_next_exists post found rfl rfl ?_
+          | refine WP.step (operation := .arg 2) (post := Function.uncurry post) found rfl (step_reference_arg a2 formed) ?_
+          | refine WP.step (operation := .local 1) (post := Function.uncurry post) found rfl (step_local_loaded s1 r1) ?_
+          | refine WP.step (operation := .local 2) (post := Function.uncurry post) found rfl (step_local_loaded s2 r2) ?_
+          | refine WP.step (operation := .local 3) (post := Function.uncurry post) found rfl (step_local_loaded s3 r3) ?_
+          | refine WP.step (post := Function.uncurry post) found rfl rfl ?_
         simp only [smallSelectedBranch, smallDifference, smallStoreCall, Fin.val_zero, Fin.val_one, Fin.val_two,
             CIL.fin_val_three, Nat.reduceEqDiff, ne_eq, h0, h1, h2, not_false_eq_true, not_true_eq_false, and_true,
             and_false, ↓reduceIte] at continuation
         exact continuation
-    · refine run_next_exists post found rfl (step_brzero_word (ite_eq_right_of_eq_false _ _ (eq_false h1))) ?_
+    · refine WP.step (post := Function.uncurry post) found rfl (step_brzero_word (ite_eq_right_of_eq_false _ _ (eq_false h1))) ?_
       repeat' first
-        | refine run_next_exists (op := .arg 2) post found rfl (step_reference_arg a2 formed) ?_
-        | refine run_next_exists (op := .local 0) post found rfl (step_local_loaded s0 r0) ?_
-        | refine run_next_exists (op := .local 1) post found rfl (step_local_loaded s1 r1) ?_
-        | refine run_next_exists (op := .local 2) post found rfl (step_local_loaded s2 r2) ?_
-        | refine run_next_exists (op := .local 3) post found rfl (step_local_loaded s3 r3) ?_
-        | refine run_next_exists post found rfl rfl ?_
+        | refine WP.step (operation := .arg 2) (post := Function.uncurry post) found rfl (step_reference_arg a2 formed) ?_
+        | refine WP.step (operation := .local 0) (post := Function.uncurry post) found rfl (step_local_loaded s0 r0) ?_
+        | refine WP.step (operation := .local 1) (post := Function.uncurry post) found rfl (step_local_loaded s1 r1) ?_
+        | refine WP.step (operation := .local 2) (post := Function.uncurry post) found rfl (step_local_loaded s2 r2) ?_
+        | refine WP.step (operation := .local 3) (post := Function.uncurry post) found rfl (step_local_loaded s3 r3) ?_
+        | refine WP.step (post := Function.uncurry post) found rfl rfl ?_
       simp only [smallSelectedBranch, smallDifference, smallStoreCall, Fin.val_zero, Fin.val_one, Fin.val_two,
           CIL.fin_val_three, Nat.reduceEqDiff, ne_eq, h0, h1, not_false_eq_true, not_true_eq_false,
           and_false, ↓reduceIte] at continuation
       exact continuation
-  · refine run_next_exists post found rfl (step_bltu_word (ite_eq_right_of_eq_false _ _ (eq_false h0))) ?_
+  · refine WP.step (post := Function.uncurry post) found rfl (step_bltu_word (ite_eq_right_of_eq_false _ _ (eq_false h0))) ?_
     repeat' first
-      | refine run_next_exists (op := .arg 2) post found rfl (step_reference_arg a2 formed) ?_
-      | refine run_next_exists (op := .local 0) post found rfl (step_local_loaded s0 r0) ?_
-      | refine run_next_exists (op := .local 1) post found rfl (step_local_loaded s1 r1) ?_
-      | refine run_next_exists (op := .local 2) post found rfl (step_local_loaded s2 r2) ?_
-      | refine run_next_exists (op := .local 3) post found rfl (step_local_loaded s3 r3) ?_
+      | refine WP.step (operation := .arg 2) (post := Function.uncurry post) found rfl (step_reference_arg a2 formed) ?_
+      | refine WP.step (operation := .local 0) (post := Function.uncurry post) found rfl (step_local_loaded s0 r0) ?_
+      | refine WP.step (operation := .local 1) (post := Function.uncurry post) found rfl (step_local_loaded s1 r1) ?_
+      | refine WP.step (operation := .local 2) (post := Function.uncurry post) found rfl (step_local_loaded s2 r2) ?_
+      | refine WP.step (operation := .local 3) (post := Function.uncurry post) found rfl (step_local_loaded s3 r3) ?_
     simp only [smallSelectedBranch, smallDifference, smallStoreCall, Fin.val_zero, Fin.val_one, Fin.val_two,
         CIL.fin_val_three, Nat.reduceEqDiff, h0, not_false_eq_true,
         ↓reduceIte] at continuation
@@ -487,6 +487,7 @@ theorem small_finish (program : CIL.Program) (method storage : Nat) (profile : C
   let homes : Fin 4 → Reference := fun i => Classical.choose (candidates i)
   have facts := fun i => Classical.choose_spec (candidates i)
   have formed := state.call.output_formed (by simp : output ∈ [output])
+  apply WP.exists_execution
   apply small_branch_prefix program method storage profile found input output word frame current homes
     (inputLimb original input) formed (fun i => (facts i).1) (fun i => (facts i).2.2) post
   obtain ⟨childFuel, stored, invoked, valid, outside, authority, value, _⟩ :=
@@ -503,6 +504,7 @@ theorem small_finish (program : CIL.Program) (method storage : Nat) (profile : C
       .ok (.call storage (UInt256Proof.Multiply.LimbStorage.arguments output (words 0) (words 1) (words 2) (words 3)) [] current) := by
     cil_checked_step [UInt256Proof.Multiply.LimbStorage.arguments, formed]
   have returned := small_return program method storage profile found branch (smallArguments input output word) frame stored
+  apply WP.adequate.mpr
   apply run_call_post found fetched stepped ⟨childFuel, invoked⟩
   refine ⟨2, leaveFrame frame stored, _, returned, ?_⟩
   obtain ⟨allocation, present, _, _⟩ := formed_reference_live _ _ _
@@ -532,10 +534,10 @@ theorem small_checked (program : CIL.Program) (method storage : Nat) (profile : 
       SmallResult memory final values input output word := by
   obtain ⟨frame, entered, setup, homes, _, _⟩ :=
     small_frame_setup profile storage memory (smallArguments input output word) call.1.1
-  obtain ⟨fuel, final, values, finished, satisfied⟩ := small_input_prefix_checked program method storage profile found
+  obtain ⟨fuel, final, values, finished, satisfied⟩ := WP.exists_execution (small_input_prefix_checked program method storage profile found
     memory entered input output word frame call setup homes (fun final values => SmallResult memory final values input output word)
-    (fun current state => small_finish program method storage profile found storageFound memory entered current frame
-      input output word call setup state)
+    (fun current state => WP.adequate.mpr (small_finish program method storage profile found storageFound memory entered current frame
+      input output word call setup state)))
   have checked : (smallArguments input output word).mapM (checkedValue memory) =
       .ok (smallArguments input output word) := by
     have fi := call.input_formed (reference := input) (by simp)

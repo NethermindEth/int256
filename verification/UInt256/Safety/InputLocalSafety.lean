@@ -39,11 +39,12 @@ theorem run_input_to_local {program : CIL.Program} {method pc argument target : 
         ⟨frame, .scalar (.i64 (inputLimb original input limb)) :: rest, current⟩)
       (SegmentState.exact args ⟨frame, rest, after⟩) := by
     cil_segment 1 [found, code, stored]
+  apply WP.exists_execution
   apply (readingSegment.trans storingSegment).run_exists args ⟨frame, rest, current⟩
     ⟨rfl, rfl⟩ post
   intro final valid
   rcases valid with ⟨_, rfl⟩
-  exact continuation after next
+  exact WP.adequate.mpr (continuation after next)
 
 #print axioms run_input_to_local
 end UInt256Model.Safety

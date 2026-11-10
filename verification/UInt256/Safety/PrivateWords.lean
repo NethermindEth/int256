@@ -4,6 +4,8 @@ import CIL.Safety.ExecutionStaticWorld
 import UInt256.Safety.PrivateCalls
 import UInt256.Safety.OutputAccess
 
+/-! Private word snapshots retain caller bytes and access across checked stores and helper calls. -/
+
 namespace UInt256Model.Safety
 open CIL.Safety
 
@@ -53,20 +55,18 @@ theorem PrivateWords.store {program : CIL.Program} {original entered current : M
   intro id old offset
   exact (preserved.cells id old offset).trans (state.caller id old offset)
 
-/-- Import a proved helper's one-word effect. The helper's actual invocation
-    supplies lifetime/static-world preservation; its contract supplies readback,
-    authority and unchanged caller bytes. -/
+/-- A helper's named frame invariants and allocation growth transport its exact one-word
+    effect. Readback, access authority and unchanged caller bytes remain separate premises. -/
 theorem PrivateWords.after_word_call {program : CIL.Program} {original entered current after : Memory}
     {inputs outputs : List Reference} {frame : Frame} {known : Nat → Option (BitVec 64)}
     {kinds : List CIL.LocalKind}
     (state : PrivateWords program original entered current inputs outputs frame known)
     (originalCall : CallingConditions program original inputs outputs)
     (homes : CompleteWritableHomes entered original.nextIdentity kinds frame.locals)
-    (fuel method : Nat) (args returned : List Value)
-    (invoked : invoke program fuel method args current = .ok (after, returned))
+    (invariants : FrameInvariants program current after)
+    (grows : current.nextIdentity ≤ after.nextIdentity)
     (index : Nat) (reference : Reference) (value : BitVec 64)
     (slot : frame.locals[index]? = some (.bytes .word64 reference))
-    (wf : after.WellFormed)
     (loaded : read after reference 8 1 = .ok (numberBytes value.toNat 8))
     (authority : AccessBelow current.nextIdentity current after)
     (outside : ∀ id, id < current.nextIdentity → id ≠ reference.allocation → ∀ offset,
@@ -77,15 +77,15 @@ theorem PrivateWords.after_word_call {program : CIL.Program} {original entered c
       after.cells id offset = original.cells id offset :=
     (outside id (Nat.lt_of_lt_of_le old (Nat.le_trans state.enteredBound state.next))
       (Nat.ne_of_lt (Nat.lt_of_lt_of_le old homeBound)) offset).trans (state.caller id old offset)
-  have world := invoke_preserves_static_world program fuel method args returned current after
-    state.call.1.1 state.call.2 invoked
-  have call := state.call.after_preserving_inputs wf authority world (by
-    intro input member offset limit
-    obtain ⟨allocation, present, _, _⟩ := formed_reference_live _ _ _ (originalCall.input_formed member)
-    have old := (originalCall.1.1.1 _ _ present).1
-    exact (caller input.allocation old _).trans (state.caller input.allocation old _).symm)
+  have call := state.call.after_preserving_inputs invariants.formed authority
+    (invariants.staticWorld state.call.2) (by
+      intro input member offset limit
+      obtain ⟨allocation, present, _, _⟩ :=
+        formed_reference_live _ _ _ (originalCall.input_formed member)
+      have old := (originalCall.1.1.1 _ _ present).1
+      exact (caller input.allocation old _).trans (state.caller input.allocation old _).symm)
   exact ⟨call, state.enteredBound,
-    Nat.le_trans state.next (invoke_preserves_caller_allocations program fuel method args returned current after invoked).next,
+    Nat.le_trans state.next grows,
     state.authority.trans (authority.weaken state.next),
     state.snapshots.after_effect homes.writable state.call.1.1 index reference value slot loaded authority outside, caller⟩
 

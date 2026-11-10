@@ -198,12 +198,14 @@ theorem both_two_first_products (profile : CIL.FeatureProfile) (program : CIL.Pr
     | simp [step, cil_guard, observerCount, pureArity, instruction, localAddress, slot0, formValue, formed0, checkedAt,
         Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
       first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
+  apply WP.exists_execution
   apply run_word_call contract state originalCall homes 4 low0
     (inputLimb original left 0) (inputLimb original right 0) slot0 ready0 post found (by rfl)
   · simp [step, cil_guard, observerCount, checkedValue, numericValue, formValue, formed0, checkedAt,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     first | rfl | exact ⟨rfl, rfl⟩
   intro m0 state0
+  apply WP.adequate.mpr
   obtain ⟨m1, stored0, state1⟩ := state0.store enteredWF homes 3 (by rfl)
     (highProduct (inputLimb original left 0) (inputLimb original right 0))
     15 (productArgs left right output) [.scalar (.i64 (inputLimb original left 0))] (body := (bothTwoBody profile wordIndex countIndex storageIndex))
@@ -219,12 +221,14 @@ theorem both_two_first_products (profile : CIL.FeatureProfile) (program : CIL.Pr
     | simp [step, cil_guard, observerCount, localAddress, slot1, formValue, formed1, checkedAt,
         Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
       first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
+  apply WP.exists_execution
   apply run_word_call contract state1 originalCall homes 6 low1
     (inputLimb original left 0) (inputLimb original right 1) slot1 ready1 post found (by rfl)
   · simp [step, cil_guard, observerCount, checkedValue, numericValue, formValue, formed1, checkedAt,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     first | rfl | exact ⟨rfl, rfl⟩
   intro m2 state2
+  apply WP.adequate.mpr
   obtain ⟨m3, stored1, state3⟩ := state2.store enteredWF homes 5 (by rfl)
     (highProduct (inputLimb original left 0) (inputLimb original right 1))
     19 (productArgs left right output) [] (body := (bothTwoBody profile wordIndex countIndex storageIndex))
@@ -264,26 +268,31 @@ theorem both_two_second_column (profile : CIL.FeatureProfile) (program : CIL.Pro
     22 (productArgs left right output) [] (body := (bothTwoBody profile wordIndex countIndex storageIndex))
   apply run_next_exists post found (by rfl) stored
   let k0 := rememberWord (bothTwoFirstProducts original left right) 7 0
+  apply WP.exists_execution
   apply run_local_word_call state0 originalCall enteredWF homes 3 6 7 8
     (localWord k0 3) (localWord k0 6) (countCarry (localWord k0 3) (localWord k0 6) 0)
     (localWord k0 3 + localWord k0 6) (by rfl) (by rfl) (by rfl) (by rfl)
     found (by rfl) (by rfl) (by rfl) (by rfl) (by rfl)
     (counting_local_effect profile program countIndex countFound state0.snapshots state0.call.1.1 7 _ _ 0 (by rfl)) post
   intro m1 state1
+  apply WP.adequate.mpr
   let k1 := countWords k0 3 6 7 8
+  apply WP.exists_execution
   apply run_local_word_call state1 originalCall enteredWF homes 1 0 10 9
     (localWord k1 1) (localWord k1 0) (lowProduct (localWord k1 1) (localWord k1 0))
     (highProduct (localWord k1 1) (localWord k1 0)) (by rfl) (by rfl) (by rfl) (by rfl)
     found (by rfl) (by rfl) (by rfl) (by rfl) (by rfl)
     (fun reference _ ready => widening_local_effect contract m1 _ _ state1.call.1.1 reference ready) post
   intro m2 state2
+  apply WP.adequate.mpr
   let k2 := widenWords k1 1 0 10 9
+  apply WP.exists_execution
   apply run_local_word_call state2 originalCall enteredWF homes 8 10 7 8
     (localWord k2 8) (localWord k2 10) (countCarry (localWord k2 8) (localWord k2 10) (localWord k2 7))
     (localWord k2 8 + localWord k2 10) (by rfl) (by rfl) (by rfl) (by rfl)
     found (by rfl) (by rfl) (by rfl) (by rfl) (by rfl)
     (counting_local_effect profile program countIndex countFound state2.snapshots state2.call.1.1 7 _ _ (localWord k2 7) (by rfl)) post
-  exact continuation
+  exact fun after valid => WP.adequate.mpr (continuation after valid)
 
 #print axioms both_two_second_column
 end UInt256Proof.Multiply.BothTwo
@@ -327,33 +336,40 @@ theorem both_two_final_column (profile : CIL.FeatureProfile) (program : CIL.Prog
     42 (productArgs left right output) [] (body := (bothTwoBody profile wordIndex countIndex storageIndex))
   apply run_next_exists post found (by rfl) resetStep
   let k0 := rememberWord (rememberWord known 11 (localWord known 7)) 7 0
+  apply WP.exists_execution
   apply run_local_word_call state0 originalCall enteredWF homes 11 5 7 11
     (localWord k0 11) (localWord k0 5) (countCarry (localWord k0 11) (localWord k0 5) 0)
     (localWord k0 11 + localWord k0 5) (by rfl) (by rfl) (by rfl) (by rfl)
     found (by rfl) (by rfl) (by rfl) (by rfl) (by rfl)
     (counting_local_effect profile program countIndex countFound state0.snapshots state0.call.1.1 7 _ _ 0 (by rfl)) post
   intro m1 state1
+  apply WP.adequate.mpr
   let k1 := countWords k0 11 5 7 11
+  apply WP.exists_execution
   apply run_local_word_call state1 originalCall enteredWF homes 11 9 7 11
     (localWord k1 11) (localWord k1 9) (countCarry (localWord k1 11) (localWord k1 9) (localWord k1 7))
     (localWord k1 11 + localWord k1 9) (by rfl) (by rfl) (by rfl) (by rfl)
     found (by rfl) (by rfl) (by rfl) (by rfl) (by rfl)
     (counting_local_effect profile program countIndex countFound state1.snapshots state1.call.1.1 7 _ _ (localWord k1 7) (by rfl)) post
   intro m2 state2
+  apply WP.adequate.mpr
   let k2 := countWords k1 11 9 7 11
+  apply WP.exists_execution
   apply run_local_word_call state2 originalCall enteredWF homes 1 2 13 12
     (localWord k2 1) (localWord k2 2) (lowProduct (localWord k2 1) (localWord k2 2))
     (highProduct (localWord k2 1) (localWord k2 2)) (by rfl) (by rfl) (by rfl) (by rfl)
     found (by rfl) (by rfl) (by rfl) (by rfl) (by rfl)
     (fun reference _ ready => widening_local_effect contract m2 _ _ state2.call.1.1 reference ready) post
   intro m3 state3
+  apply WP.adequate.mpr
   let k3 := widenWords k2 1 2 13 12
+  apply WP.exists_execution
   apply run_local_word_call state3 originalCall enteredWF homes 11 13 7 11
     (localWord k3 11) (localWord k3 13) (countCarry (localWord k3 11) (localWord k3 13) (localWord k3 7))
     (localWord k3 11 + localWord k3 13) (by rfl) (by rfl) (by rfl) (by rfl)
     found (by rfl) (by rfl) (by rfl) (by rfl) (by rfl)
     (counting_local_effect profile program countIndex countFound state3.snapshots state3.call.1.1 7 _ _ (localWord k3 7) (by rfl)) post
-  exact continuation
+  exact fun after valid => WP.adequate.mpr (continuation after valid)
 
 #print axioms both_two_final_column
 end UInt256Proof.Multiply.BothTwo
