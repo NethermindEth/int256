@@ -2,6 +2,8 @@ import UInt256.Safety.LocalCallSafety
 import UInt256.Methods.Multiply.WordScalarSafety
 import UInt256.Methods.Multiply.CountSafety
 
+/-! Checked multiplication helper calls preserve private snapshots and return both product words. -/
+
 namespace UInt256Proof.Multiply.Calls
 open CIL.Safety UInt256Model.Safety
 
@@ -41,20 +43,16 @@ theorem run_word_call {program : CIL.Program} {wordIndex method pc : Nat} {body 
     (continuation : ∀ after,
       PrivateWords program original entered after inputs outputs frame
         (rememberWord known index (lowProduct a b)) →
-      ∃ fuel final returned,
-        run program fuel method (pc + 1) args frame (.scalar (.i64 (highProduct a b)) :: rest) after =
-          .ok (final, returned) ∧ post final returned) :
-    ∃ fuel final returned,
-      run program fuel method pc args frame stack current = .ok (final, returned) ∧ post final returned := by
+      WP (fun fuel => run program fuel method (pc + 1) args frame
+        (.scalar (.i64 (highProduct a b)) :: rest) after) post) :
+    WP (fun fuel => run program fuel method pc args frame stack current) post := by
   obtain ⟨childFuel, after, invoked, wf, loaded, authority, outside⟩ :=
     contract current a b reference state.call.1.1 ready
   have updated := state.after_word_call originalCall homes childFuel wordIndex
     [.scalar (.i64 a), .scalar (.i64 b), .reference (.address reference)] [.scalar (.i64 (highProduct a b))]
     invoked index reference (lowProduct a b) slot wf loaded authority
     (fun id old different offset => outside id old offset (Or.inl different))
-  obtain ⟨parentFuel, final, returned, resumed, satisfied⟩ := continuation after updated
-  obtain ⟨fuel, finished⟩ := run_call_exists found fetched stepped ⟨childFuel, invoked⟩ ⟨parentFuel, resumed⟩
-  exact ⟨fuel, final, returned, finished, satisfied⟩
+  exact run_call_post found fetched stepped ⟨childFuel, invoked⟩ (continuation after updated)
 
 #print axioms run_word_call
 end UInt256Proof.Multiply.Calls

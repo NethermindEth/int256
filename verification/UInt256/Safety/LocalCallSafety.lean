@@ -1,6 +1,7 @@
 import UInt256.Safety.PrivateWordAccess
-import CIL.Safety.CallComposition
-import CIL.Safety.StepComposition
+import CIL.Safety.WeakestPrecondition
+
+/-! Checked local-writing calls carry the helper's low word and returned high word into a suffix. -/
 
 namespace UInt256Model.Safety
 open CIL.Safety
@@ -38,10 +39,8 @@ theorem run_local_word_call {program : CIL.Program} {method pc callee : Nat} {bo
     (continuation : ∀ after,
       PrivateWords program original entered after inputs outputs frame
         (rememberWord (rememberWord known target stored) result returned) →
-      ∃ fuel final values, run program fuel method (pc + 5) args frame rest after =
-        .ok (final, values) ∧ post final values) :
-    ∃ fuel final values, run program fuel method pc args frame rest current =
-      .ok (final, values) ∧ post final values := by
+      WP (fun fuel => run program fuel method (pc + 5) args frame rest after) post) :
+    WP (fun fuel => run program fuel method pc args frame rest current) post := by
   obtain ⟨reference, slot, ready, formed⟩ := state.home enteredWF homes target targetKind
   apply run_next_exists post found code0 (state.snapshots.load a leftKnown)
   apply run_next_exists post found code1 (state.snapshots.load b rightKnown)
@@ -57,16 +56,14 @@ theorem run_local_word_call {program : CIL.Program} {method pc callee : Nat} {bo
   obtain ⟨prepared, written, preparedState⟩ := updated.store enteredWF homes result resultKind returned
     (pc + 4) args rest (body := body)
   have tail := run_next_exists post found code4 written (by
-    simpa only [Nat.add_assoc] using continuation prepared preparedState)
-  obtain ⟨tailFuel, final, values, resumed, satisfied⟩ := tail
+    simpa only [WP, Nat.add_assoc] using continuation prepared preparedState)
   have stepped : step body (.call callee 3) (pc + 3) args frame
       (.reference (.address reference) :: .scalar (.i64 b) :: .scalar (.i64 a) :: rest) current =
       .ok (.call callee [.scalar (.i64 a), .scalar (.i64 b), .reference (.address reference)] rest current) := by
     simp [step, cil_guard, observerCount, checkedValue, numericValue, formValue, formed, checkedAt,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-  obtain ⟨fuel, ran⟩ := run_call_exists found code3 stepped ⟨childFuel, invoked⟩
-    ⟨tailFuel, by simpa only [Nat.add_assoc, Nat.reduceAdd, List.cons_append, List.nil_append] using resumed⟩
-  exact ⟨fuel, final, values, ran, satisfied⟩
+  exact run_call_post found code3 stepped ⟨childFuel, invoked⟩ (by
+    simpa only [Nat.add_assoc, Nat.reduceAdd, List.cons_append, List.nil_append] using tail)
 
 #print axioms run_local_word_call
 end UInt256Model.Safety
