@@ -1,4 +1,7 @@
 import UInt256.Methods.Compare.NativeSafetyContract
+
+/-! Native comparison wrappers forward reversed arguments through checked shared loading rules. -/
+
 namespace UInt256Proof.Compare.Safety
 open CIL.Safety UInt256Model.Safety
 
@@ -29,17 +32,15 @@ theorem native_entry_checked (profile : CIL.FeatureProfile) (usesLess inclusive 
   · intro memory left right call
     exact native_checked profile usesLess inclusive program callee childFound native nativeF avx2 avx memory right left call.swap_binary_inputs
   · intro memory left right frame call post continuation
-    have fl := call.input_formed (reference := left) (by simp)
-    have fr := call.input_formed (reference := right) (by simp)
-    simp only [readOnlyArguments, List.map_cons, List.map_nil, List.reverse_cons,
-      List.reverse_nil, List.nil_append, List.cons_append] at continuation
-    repeat' first
-      | exact continuation
-      | (apply run_next_exists post found
-         · simp only [nativeEntryBody]; rfl
-         · simp (config := { implicitDefEqProofs := false })
-             [readOnlyArguments, step, cil_guard, observerCount, checkedValue, formValue,
-               fl, fr, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-           try (exact ⟨rfl, rfl, rfl, rfl⟩))
+    apply run_load_arguments found call.readOnly_arguments_valid (plainLoads [1, 0]) 0 []
+      (readOnlyArguments [right, left])
+    · intro position load selected
+      match position with
+      | 0 => cases selected; rfl
+      | 1 => cases selected; rfl
+      | _ + 2 => simp [plainLoads] at selected
+    · rfl
+    · exact plainLoads_unchanged _ _
+    · exact continuation
 #print axioms native_entry_checked
 end UInt256Proof.Compare.Safety

@@ -4,6 +4,8 @@ import UInt256.Safety.ReadOnlyExecution
 import CIL.Safety.CallComposition
 import CIL.Safety.GuardNormalization
 
+/-! Read-only UInt256 wrappers compose checked prefixes, child invocations and suffixes. -/
+
 namespace UInt256Model.Safety
 open CIL.Safety
 
@@ -107,12 +109,7 @@ theorem compose_readOnly_binary (program : CIL.Program) (method pc callee : Nat)
     simp only [value, call.input_value_after_setup setup (by simp : left ∈ [left, right]),
       call.input_value_after_setup setup (by simp : right ∈ [left, right])]
   rw [initialValue] at finished
-  have checked : (readOnlyArguments [left, right]).mapM (checkedValue memory) =
-      .ok (readOnlyArguments [left, right]) := by
-    have fl := call.input_formed (reference := left) (by simp)
-    have fr := call.input_formed (reference := right) (by simp)
-    simp [readOnlyArguments, checkedValue, formValue, fl, fr, checkedAt,
-      Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
+  have checked := checkedValues_of_valid call.readOnly_arguments_valid
   refine ⟨fuel, _, certify_invocation _ _ _ _ _ _ _ _ _ _ lookup checked setup live finished, ?_⟩
   have before := enterFrame_preserves_caller_memory _ _ _ _ _ setup
   have fresh := enterFrame_fresh _ _ _ _ _ setup

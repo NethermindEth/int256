@@ -1,6 +1,8 @@
 import CIL.Safety.WriteEffects
 import UInt256.Safety.Calling
 
+/-! Checked UInt256 output access retains overlapping calling views through writes. -/
+
 namespace UInt256Model.Safety
 
 open CIL.Safety
@@ -16,15 +18,8 @@ theorem CallingConditions.after_write {program : CIL.Program}
     {reference : Reference} {bytes : List (BitVec 8)} {alignment : Nat}
     (call : CallingConditions program memory inputs outputs)
     (written : write memory reference bytes alignment = .ok result) :
-    CallingConditions program result inputs outputs := by
-  refine ⟨⟨write_preserves_wellFormed _ _ _ _ _ call.1.1 written, ?_, ?_⟩,
-    write_preserves_static_world _ _ _ _ _ _ call.2 written⟩
-  · intro input member
-    obtain ⟨old, readable⟩ := call.1.readable input member
-    exact write_preserves_readability written readable
-  · intro output member
-    obtain ⟨allocation, ready⟩ := access_requirements (call.1.writable output member)
-    exact (ready.after_write written).access
+    CallingConditions program result inputs outputs :=
+  ⟨call.1.after_write written, write_preserves_static_world _ _ _ _ _ _ call.2 written⟩
 
 theorem CallingConditions.output_limb_address {program : CIL.Program}
     {memory : CIL.Safety.Memory} {inputs outputs : List Reference}

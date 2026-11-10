@@ -2,6 +2,8 @@ import UInt256.Safety.CallerSetup
 import CIL.Safety.AccessBelow
 import CIL.Safety.MethodContract
 
+/-! Private word helpers transport UInt256 calling views with explicit authority and confinement. -/
+
 namespace UInt256Model.Safety
 open CIL.Safety
 
@@ -49,15 +51,11 @@ theorem private_calling_conditions {program : CIL.Program} {first second : Refer
     (separate : ∀ reference ∈ inputs,
       reference.allocation ≠ first.allocation ∧ reference.allocation ≠ second.allocation) :
     CallingConditions program after inputs outputs := by
-  refine ⟨⟨formed, ?_, ?_⟩, world call.2⟩
-  · intro view member
-    obtain ⟨reference, inputMember, rfl⟩ := List.mem_map.mp member
-    obtain ⟨notFirst, notSecond⟩ := separate reference inputMember
-    exact ⟨_, framed.read_apart call.1.1 (call.input_snapshot inputMember) (by simp [Apart, wordView, notFirst, notSecond])⟩
-  · intro view member
-    have writable := call.1.writable view member
-    obtain ⟨allocation, present, _, _⟩ := access_within_allocation _ _ _ _ _ writable
-    exact (framed.access_write _ (call.1.1.1 _ _ present).1 _ _).trans writable
+  refine ⟨call.1.after_confined framed formed ?_, world call.2⟩
+  intro view member
+  obtain ⟨reference, inputMember, rfl⟩ := List.mem_map.mp member
+  obtain ⟨notFirst, notSecond⟩ := separate reference inputMember
+  simp [Apart, wordView, notFirst, notSecond]
 
 #print axioms CallingConditions.after_preserving_inputs
 #print axioms private_input_bytes

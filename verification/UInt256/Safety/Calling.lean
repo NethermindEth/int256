@@ -1,8 +1,11 @@
 import CIL.Safety.AccessRequirements
+import CIL.Safety.CallingFields
 import CIL.Safety.StaticReferences
 import CIL.Safety.LiveState
 import CIL.Safety.FrameProgress
 import UInt256.Representation
+
+/-! UInt256 arguments specialize LeanCIL's checked calling views to four 64-bit limbs. -/
 
 namespace UInt256Model.Safety
 
@@ -68,11 +71,8 @@ theorem CallingConditions.input_snapshot {program : CIL.Program}
     (call : CallingConditions program memory inputs outputs)
     {reference : Reference} (member : reference ∈ inputs) :
     read memory reference 32 1 =
-      .ok ((List.range 32).map fun i => (memory.cells reference.allocation (reference.offset + i)).bits) := by
-  obtain ⟨bytes, loaded⟩ := call.1.readable (wordView reference) (List.mem_map.mpr ⟨reference, member, rfl⟩)
-  have same := read_result_snapshot loaded
-  rw [same] at loaded
-  exact loaded
+      .ok ((List.range 32).map fun i => (memory.cells reference.allocation (reference.offset + i)).bits) :=
+  call.1.input_snapshot (wordView reference) (List.mem_map.mpr ⟨reference, member, rfl⟩)
 
 theorem CallingConditions.input_load {program : CIL.Program}
     {memory : CIL.Safety.Memory} {inputs outputs : List Reference}
@@ -89,14 +89,13 @@ theorem CallingConditions.input_formed {program : CIL.Program}
     {memory : CIL.Safety.Memory} {inputs outputs : List Reference}
     (call : CallingConditions program memory inputs outputs)
     {reference : Reference} (member : reference ∈ inputs) : form memory reference = .ok reference :=
-  read_reference_valid _ _ _ _ _ (call.input_snapshot member)
+  call.1.input_formed (wordView reference) (List.mem_map.mpr ⟨reference, member, rfl⟩)
 
 theorem CallingConditions.output_formed {program : CIL.Program}
     {memory : CIL.Safety.Memory} {inputs outputs : List Reference}
     (call : CallingConditions program memory inputs outputs)
     {reference : Reference} (member : reference ∈ outputs) : form memory reference = .ok reference :=
-  access_reference_valid _ _ _ _ _
-    (call.1.writable (wordView reference) (List.mem_map.mpr ⟨reference, member, rfl⟩))
+  call.1.output_formed (wordView reference) (List.mem_map.mpr ⟨reference, member, rfl⟩)
 
 theorem CallingConditions.binary_arguments_valid {program : CIL.Program}
     {memory : CIL.Safety.Memory} {left right output : Reference}
