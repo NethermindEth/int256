@@ -17,18 +17,11 @@ theorem forward_wrapping_binary (program : CIL.Program) (wrapperIndex childIndex
   obtain ⟨childFuel, final, certificate, value, writable, footprint⟩ :=
     child memory left right output call
   have fetch : wrapperBody.code[4]? = some .ret := by simp [code]
-  have tail : run program 2 wrapperIndex 4 (binaryArguments left right output)
-      {
-        activation := memory.nextIdentity
-        locals := []
-        owned := []
-        arguments := []
-        stackBytes := 0 } [] final = .ok (final, []) := by
-    simp [run, found, fetch, returns, step, cil_guard, observerCount, leaveFrame,
-      Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   obtain ⟨fuel, certified⟩ := forward_binary_call program wrapperIndex childIndex wrapperBody found
     (by simp [code]) (by simp [code]) (by simp [code]) (by simp [code])
-    kinds locals parameters vectors memory left right output call final [] [] childFuel certificate.1 tail
+    kinds locals parameters vectors memory left right output call final [] [] childFuel certificate.1 (by
+      simp [run, found, fetch, returns, step, cil_guard, observerCount, leaveFrame,
+        Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure])
   exact ⟨fuel, final, certified, value, writable, footprint⟩
 
 #print axioms forward_wrapping_binary

@@ -80,7 +80,7 @@ theorem compose_readOnly_binary (program : CIL.Program) (method pc callee : Nat)
           .ok (final, values) ∧ post final values) :
     BinaryReadOnlyInvocation operation program method := by
   intro memory left right call
-  obtain ⟨frame, entered, setup, live⟩ := call.readOnly_setup_succeeds (fits left right)
+  obtain ⟨frame, entered, setup, _⟩ := call.readOnly_setup_succeeds (fits left right)
   have enteredCall := call.after_frame_setup setup
   obtain ⟨childFuel, childFinal, childCertificate, childCells⟩ := child entered left right enteredCall
   have checkedChild : (childArguments left right).mapM (checkedValue entered) =
@@ -95,22 +95,27 @@ theorem compose_readOnly_binary (program : CIL.Program) (method pc callee : Nat)
       (callee := callee) (pc := pc) (args := readOnlyArguments [left, right])
       (frame := frame) valid (known left right)
   let value := operation (inputValue entered left) (inputValue entered right)
-  obtain ⟨suffixFuel, tail⟩ := suffixProof childFinal left right frame
-    (inputValue entered left) (inputValue entered right)
-  obtain ⟨tailFuel, tail⟩ := run_call_exists lookup fetched stepped
-    ⟨childFuel, childCertificate.1⟩ ⟨suffixFuel, tail⟩
-  let post : Memory → List Value → Prop :=
-    fun final values => final = leaveFrame frame childFinal ∧ values = [.scalar value]
-  obtain ⟨fuel, final, values, finished, sameFinal, sameValues⟩ :=
-    prefixProof entered left right frame enteredCall post ⟨tailFuel, _, _, tail, rfl, rfl⟩
-  subst final
-  subst values
+  have finished : WP (Execution (fun fuel =>
+      invoke program fuel method (readOnlyArguments [left, right]) memory))
+      (fun result => result = (leaveFrame frame childFinal, [.scalar value])) := by
+    apply WP.enter lookup (checkedValues_of_valid call.readOnly_arguments_valid) setup
+    apply WP.adequate.mpr
+    apply prefixProof entered left right frame enteredCall
+    apply WP.exists_execution
+    apply WP.call lookup fetched stepped
+      (helperPost := fun result => result =
+        (childFinal, [.scalar (childOperation (inputValue entered left) (inputValue entered right))]))
+      (WP.exact_iff.mpr ⟨childFuel, childCertificate.1⟩)
+    intro final values same
+    obtain ⟨rfl, rfl⟩ := Prod.mk.inj same
+    exact WP.exact_iff.mpr (suffixProof final left right frame
+      (inputValue entered left) (inputValue entered right))
+  obtain ⟨fuel, invoked⟩ := WP.exact_iff.mp finished
   have initialValue : value = operation (inputValue memory left) (inputValue memory right) := by
     simp only [value, call.input_value_after_setup setup (by simp : left ∈ [left, right]),
       call.input_value_after_setup setup (by simp : right ∈ [left, right])]
-  rw [initialValue] at finished
-  have checked := checkedValues_of_valid call.readOnly_arguments_valid
-  refine ⟨fuel, _, certify_invocation _ _ _ _ _ _ _ _ _ _ lookup checked setup live finished, ?_⟩
+  rw [initialValue] at invoked
+  refine ⟨fuel, _, InvocationCertificate.of_invoke call.1.1 call.2 invoked, ?_⟩
   have before := enterFrame_preserves_caller_memory _ _ _ _ _ setup
   have fresh := enterFrame_fresh _ _ _ _ _ setup
   have after := leaveFrame_preserves_memory_below frame childFinal memory.nextIdentity
@@ -153,15 +158,16 @@ theorem forward_readOnly_binary (program : CIL.Program) (method pc callee : Nat)
   apply compose_readOnly_binary program method pc callee body operation operation childArguments
     lookup fetched fits length known child
   · intro memory left right frame x y
-    refine ⟨1, ?_⟩
+    apply (WP.exact_iff (execution := Execution _)).mp
     obtain ⟨flag, result, normalizedFlag⟩ := normalized x y
     rw [result]
-    apply run_return lookup forwarding
+    apply WP.returned lookup forwarding
     · apply step_return_unchanged
       · simp [returns]
       · rfl
       · rfl
       · exact ⟨flag, rfl, normalizedFlag⟩
+    · rfl
     · rfl
   · exact prefixProof
 

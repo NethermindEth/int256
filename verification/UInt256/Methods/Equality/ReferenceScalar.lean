@@ -54,10 +54,8 @@ theorem checked (profile : CIL.FeatureProfile) (program : CIL.Program) (index ca
       have fr := currentCall.input_formed (reference := second) (by simp)
       have vectorOff : profile.evaluate .vector256Accelerated = false := vector
       have sseOff : profile.evaluate .sse41 = false := sse
-      obtain ⟨fuel, final, values, tail, satisfied⟩ := continuation
-      refine ⟨fuel + 6, final, values, ?_, satisfied⟩
-      cil_checked_steps 6 [body, readOnlyArguments, fl, fr, vectorOff, sseOff]
-      exact tail
+      cil_contract_steps 6 [readOnlyArguments, fl, fr, vectorOff, sseOff]
+      exact continuation
   exact forwarded memory left right call
 
 #print axioms checked
