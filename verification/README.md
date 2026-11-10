@@ -16,13 +16,13 @@ The Add/Subtract Vector128 helpers use `CodeAt` placements instead of carrying
 prefixes, suffixes and their length equations through every execution lemma.
 Input setup composes LeanCIL `Segment` proofs: multiplication joins the input
 read and private store, while vector setup joins reference formation and root
-storage. The continuations retain their original frame, stack, memory and
-caller-footprint obligations; the registered contracts and profiles are unchanged.
+storage. The continuations retain frame, stack, memory and
+caller-footprint obligations.
 
 ## Verification scope
 
 The 188 registered method/profile gates in `manifests/gates.json` include all
-87 scalar migration targets: addition/subtraction and their reporting variants,
+87 scalar targets: addition/subtraction and their reporting variants,
 multiplication, bitwise operations, shifts, equality, and ordering. Accelerated
 gates currently cover vector bitwise operations and shifts, vector/SSE equality,
 AVX2/AVX512 ordering, all seven multiplication entries on `arm64-advsimd`, `x64-v3`,
@@ -60,8 +60,8 @@ preservation of caller memory.
 Each gate applies to its registered LeanCIL feature profile and a successfully
 initialized `Nethermind.Int256.UInt256` type; it does not prove the static
 constructor. All 87 signatures in `manifests/targets.json` have scalar gates,
-but the original accelerated profile and regression-fixture scope is still
-being migrated. Supporting arithmetic and profile-transport lemmas do not
+but some accelerated profile and regression-fixture cases still require
+proofs. Supporting arithmetic and profile-transport lemmas do not
 replace a certificate for the extracted compiled implementation. Changes to
 shared proofs require recertification against the final source snapshot.
 
@@ -186,64 +186,6 @@ covered, including private module parts. Original compiled artifacts retain
 their raw-byte stability checks. Older manifests fall back to normal replay;
 the next successful main run exports manifests for the new verifier and pin.
 
-The wrapper refactor removes the extraction-dependent `PrimitiveSafetyLeaf` and
-`PrimitiveSafetyContract` adapter modules. The supporting audit then checked 505
-theorems; it now checks 3699. Binding checks distinguish reversed operands, signed versus unsigned
-widening, and negation, so the reusable wrapper cannot silently accept those
-instruction changes. A serial per-module profile of `LtUInt256UInt64` fell from
-86.5 to 58.3 seconds with shared wrappers. These diagnostic timings include
-repeated import loading and do not predict parallel end-to-end verification.
-
-Earlier helper-only Windows measurements used LeanCIL `0eba3c5` on the same compiled assembly, with
-`LEAN_NUM_THREADS=2` and a pre-certified CIL library:
-
-| Consumer verification | Before | Shared helper proofs |
-| --- | ---: | ---: |
-| First `LtUInt256UInt64` certificate | 298.5 s | 144.8 s |
-| Consumer proof build within that check | 115.3 s | 35.7 s |
-| Kernel replay within that check | 165.7 s | 91.9 s |
-| Subsequent, different `LtInt64UInt256` certificate | - | 65.3 s |
-
-These are single local samples, not CI timing guarantees; short development
-checks overlapped the baseline. Both first-gate runs built and kernel-checked
-consumer proofs without consumer cache reuse. The subsequent gate reused the
-authenticated shared modules, but freshly checked its extraction and public
-proof (`consumer-certified-artifact`, not `consumer-proof-cache`). Its kernel
-replay took 33.5 seconds and excluded the shared helper modules.
-To reproduce, extract the methods once, prepare the certified CIL library with
-upstream `scripts/PrepareLibrary.cs`, and set `LEANCIL_CERTIFIED_LIBRARY` and
-`LEANCIL_CERTIFIED_LIBRARY_SHA256` to its directory and printed manifest digest.
-Set `LEANCIL_CACHE_DIR` to a new directory and `LEAN_NUM_THREADS=2`, then keep
-the environment fixed while running these commands from `verification/`:
-
-```text
-dotnet .lake/packages/leancil/Extractor/bin/Nethermind.LeanCIL.dll verify artifacts/LtUInt256UInt64/scalar --proof proofs/LtUInt256UInt64Scalar.lean --theorem UInt256Proof.Compare.LtUInt256UInt64.scalar_correctness --proof-root .
-dotnet .lake/packages/leancil/Extractor/bin/Nethermind.LeanCIL.dll verify artifacts/LtInt64UInt256/scalar --proof proofs/LtInt64UInt256Scalar.lean --theorem UInt256Proof.Compare.LtInt64UInt256.scalar_correctness --proof-root .
-```
-
-The measurements exclude production/extractor builds and CIL library preparation.
-The complete 31-gate comparison validation took 20 minutes 51 seconds: the first
-two gates ran sequentially to measure reuse, followed by the other 29 at
-concurrency four. All 31 full certificates passed, and their 631 distinct
-source/settings hashes, assembly/extraction identities and allowed axioms were
-audited. The expanded supporting-library audit passed 496 theorems. A direct
-binding negative check rejected replacing the unsigned helper's `ltu` instruction
-with `gtu`; the unchanged instruction passed. Gate selection and runner regression
-checks also passed.
-
-For the same scalar subtraction proof and assembly, local Windows monitoring
-observed about 51 GB peak kernel-replay working set without a thread limit and
-4.7 GB with `LEAN_NUM_THREADS=2`; both full certificates passed. The runs had
-different concurrent load, so their elapsed times are not a speed comparison.
-Two unchanged repeats of the bounded subtraction certificate returned
-`consumer-proof-cache` in 3.6 and 3.9 seconds. This measures warm reuse, not the
-cost of proving a changed extraction or changed consumer sources.
-
-At the initial pin update, local validation passed all 43 full method certificates against the pinned
-revision, checked their 641 distinct source/settings hashes, and audited 409
-supporting theorems. The C# selector and batch-runner regression tests,
-analyzer-enabled builds (including IDE0005), and workflow actionlint also passed.
-
 To verify several methods with one build locally, invoke the single-file C# app:
 
 ```powershell
@@ -276,19 +218,12 @@ gate must be reviewed to ensure its selected theorem states the full contract.
 
 ## Upstream status and remaining work
 
-The pinned revision contains the fixes for
-[initialization assumptions (#25)](https://github.com/NethermindEth/LeanCIL/issues/25),
-[consumer proof packages (#26)](https://github.com/NethermindEth/LeanCIL/issues/26),
-and [`Unsafe.SkipInit<T>` (#34)](https://github.com/NethermindEth/LeanCIL/issues/34).
-Scalar Add now extracts its real `StoreLimbs` helper without changing production
-code. SkipInit preserves memory; the proof establishes initialization through
-the subsequent writes.
-
-The scalar execution proofs were ported from the original branch to fresh
-extraction, including byte-offset field operations, parameter-home setup and
-Boolean return normalization. Extraction output remains ignored; the expected
-UInt256 helper bodies in `PrimitiveLeaf` are checked against that output by each
-gate. The extractor and CIL semantics remain upstream.
+The pinned extractor handles initialization assumptions, consumer proof packages and
+`Unsafe.SkipInit<T>`. Scalar Add extracts its actual `StoreLimbs` helper.
+SkipInit preserves memory; the proof establishes initialization through subsequent writes.
+Extraction output is ignored. Each gate checks its expected UInt256 helper bodies against
+that output, including byte-offset fields, parameter homes and Boolean return normalization.
+The extractor and CIL semantics remain upstream.
 
 `manifests/gates.json` registers 188 method/profile pairs covering all 87 scalar targets
 and distinct accelerated implementations. Extraction admission is separate from certification:
@@ -300,7 +235,7 @@ so a complete run also passes `x64-v3`.
 
 ## Regression fixtures
 
-The original fixture cases run through `BitwiseRegression.cs`,
+The fixture cases run through `BitwiseRegression.cs`,
 `BitwisePositiveRegression.cs`, `ShiftRegression.cs`, `ShiftPositiveRegression.cs`,
 `MultiplyRegression.cs` and `AddSubtractRegression.cs` (`dotnet run --file verification/<runner>`).
 Each runner freezes a consumer snapshot, certifies positive fixtures, and for
@@ -352,7 +287,7 @@ production proof. Helper mutations run at direct `Equals` entries; wrapper-local
 and snapshot mutations retain their own cases. Polarity counterexamples compose a checked
 child observation through the exact extracted wrapper instead of unfolding its execution again.
 The [coverage map](Tests/Fixtures/Equality/README.md) explains the representatives and limits.
-The equality matrix now issues 124 verification requests instead of 288, a 57% reduction:
+The equality matrix issues 124 verification requests:
 scalar 48, x64-v3 57, SSE 19. These are request counts, not measured wall-time savings.
 
 `CompareRegression.cs [dir] [all|<profile>]` covers `op<` on scalar,
@@ -362,7 +297,7 @@ ComparisonAlternative is proved per profile under
 ComparisonSigned and ThreeWayAlternative are refuted. The alternative proofs reuse checked stepping
 with the complementary order facts required by the compiled branches, at the default proof limit. ComparisonWrongLane mutates the
 Vector256-only path, which no .NET 10 profile reaches; the runner only checks that it leaves every gated extraction unchanged.
-Differences from the original group: ThreeWayAlternative (returns -7/9) is a
+ThreeWayAlternative (returns -7/9) is a
 refutation because the CompareTo contract is the exact -1/0/1 result; the
 vector mutations use `Vector256.LessThan` on sign-flipped lanes and
 `GetElement` because the extractor rejects `Vector256.LessThan<long>` and
@@ -374,9 +309,6 @@ Each public gate must retain independent arithmetic and safety contracts,
 including initial operands under valid overlap, normal finite return,
 caller-byte preservation, and its claimed feature coverage. Re-run the original
 mutation/refutation cases before claiming equivalent verification scope.
-The previous pin's negative check replaced the first `add` in the compiled
-`AddWithCarry` helper with `sub`: the unchanged proof failed in `CarryMemory`
-(now the gate's `carryBody` binding) and emitted no certificate. That check was not the full mutation suite.
 Further extraction or proof-composition gaps should be reproduced upstream
 rather than hidden behind consumer copies of CIL infrastructure.
 
@@ -402,15 +334,12 @@ The generator uses independently rechecked extractions of `AddScalar` on `scalar
 the generated Lean namespace and omits unused per-PC equations with checked schema/name guards.
 The original command output, including those equations, remains in `artifacts/generated-templates`.
 Only the shared bodies are committed and included in the compiled-library audit. Specialization wrappers
-retain their previous total definitions, including exact profile metadata and callee parameters.
+retain their total definitions, including exact profile metadata and callee parameters.
 The alternative masked-prepare regression body remains handwritten because it deliberately
 describes different code. Existing regression witnesses and gate registrations are retained.
 
 Fixed-flag wrappers use Lean's built-in elaboration and reduction once to materialize their
 specialized definitions; the kernel still checks the resulting ordinary terms. The `PrepareAdd`
 flag remains a parameter. This removes handwritten instruction lists, not proof obligations.
-The fixed selected-module kernel workload, including generated declarations, changes from
-17,491,210 to 17,677,369 raw heartbeats (+1.06%); this migration is a maintenance improvement,
-not a proof-speed claim. Direct template aliases without once-only specialization cost 18,564,057.
 Whole-entry Add generation is currently blocked by the reachable `get_BroadcastLookup` static-site
-metadata; the migrated helpers avoid that unsupported input without removing metadata or checks.
+metadata; the generated helpers avoid that unsupported input without removing metadata or checks.
