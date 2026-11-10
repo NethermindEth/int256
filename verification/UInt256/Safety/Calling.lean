@@ -69,7 +69,7 @@ theorem CallingConditions.input_snapshot {program : CIL.Program}
     {reference : Reference} (member : reference ∈ inputs) :
     read memory reference 32 1 =
       .ok ((List.range 32).map fun i => (memory.cells reference.allocation (reference.offset + i)).bits) := by
-  obtain ⟨bytes, loaded⟩ := call.1.2.1 (wordView reference) (List.mem_map.mpr ⟨reference, member, rfl⟩)
+  obtain ⟨bytes, loaded⟩ := call.1.readable (wordView reference) (List.mem_map.mpr ⟨reference, member, rfl⟩)
   have same := read_result_snapshot loaded
   rw [same] at loaded
   exact loaded
@@ -96,7 +96,7 @@ theorem CallingConditions.output_formed {program : CIL.Program}
     (call : CallingConditions program memory inputs outputs)
     {reference : Reference} (member : reference ∈ outputs) : form memory reference = .ok reference :=
   access_reference_valid _ _ _ _ _
-    (call.1.2.2 (wordView reference) (List.mem_map.mpr ⟨reference, member, rfl⟩))
+    (call.1.writable (wordView reference) (List.mem_map.mpr ⟨reference, member, rfl⟩))
 
 theorem CallingConditions.binary_arguments_valid {program : CIL.Program}
     {memory : CIL.Safety.Memory} {left right output : Reference}

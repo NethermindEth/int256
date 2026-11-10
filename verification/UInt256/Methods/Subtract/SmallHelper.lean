@@ -521,7 +521,7 @@ theorem small_finish (program : CIL.Program) (method storage : Nat) (profile : C
     rw [retained.cells output.allocation old offset]
   refine ⟨leaveFrame_preserves_wellFormed _ _ valid.1.1, ?_, rfl, ?_, ?_⟩
   · simpa only [inputValue, bytes, UInt256Model.value] using value
-  · exact (retained.access output old 32 1 true).trans (valid.1.2.2 (wordView output) (by simp))
+  · exact (retained.access output old 32 1 true).trans (valid.1.writable (wordView output) (by simp))
   · intro id earlier offset untouched
     exact (retained.cells id earlier offset).trans
       ((outside id offset untouched).trans (state.preserved.cells id earlier offset))

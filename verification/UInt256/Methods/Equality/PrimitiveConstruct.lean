@@ -50,7 +50,7 @@ theorem primitive_construct (memory : Memory) (left home : Reference) (argument 
     constructor_contract profile program constructorIndex constructorFound updated [left] temporary right 0 0 0 updatedCall
   have constructedWritable := authority.access updatedWritable (Nat.lt_of_lt_of_le homeBound growth.next)
   have readOnlyCall : CallingConditions program constructed [left] [] :=
-    ⟨⟨constructedCall.1.1, constructedCall.1.2.1, by simp⟩, constructedCall.2⟩
+    ⟨⟨constructedCall.1.1, constructedCall.1.readable, by simp⟩, constructedCall.2⟩
   have owned : nextFrame.OwnedAbove watermark := by
     intro id member
     change id ∈ temporary.allocation :: frame.owned at member

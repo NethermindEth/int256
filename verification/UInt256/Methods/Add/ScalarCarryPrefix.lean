@@ -87,8 +87,9 @@ theorem scalar_first_carry (contract : CarryHelperContract Extracted.program Ext
       checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     exact ⟨rfl, rfl, rfl⟩
   · exact ⟨wellFormed, by simp, carryRead, carryWrite, resultWrite, disjoint⟩
-  · rintro after _ - formed world _ framed ⟨_, rfl, math⟩
-    exact continuation after formed world framed math
+  · intro after output call invariants
+    simpa only [carryContract, List.append_nil] using
+      continuation after invariants.formed invariants.staticWorld call.framed call.post
 
 #print axioms scalar_carry_prefix
 #print axioms scalar_first_carry
@@ -187,8 +188,9 @@ theorem scalar_indexed_carry (contract : CarryHelperContract Extracted.program E
       checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
     exact ⟨rfl, rfl, rfl⟩
   · exact ⟨wellFormed, incoming, carryRead, carryWrite, resultWrite, disjoint⟩
-  · rintro after _ - formed world _ framed ⟨_, rfl, math⟩
-    exact continuation after formed world framed math
+  · intro after output call invariants
+    simpa only [carryContract, List.append_nil] using
+      continuation after invariants.formed invariants.staticWorld call.framed call.post
 
 #print axioms scalar_indexed_carry
 

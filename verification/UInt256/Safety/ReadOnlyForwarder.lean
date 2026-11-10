@@ -41,9 +41,9 @@ theorem CallingConditions.swap_binary_inputs {program : CIL.Program}
     {memory : Memory} {left right : Reference} {outputs : List Reference}
     (call : CallingConditions program memory [left, right] outputs) :
     CallingConditions program memory [right, left] outputs := by
-  refine ⟨⟨call.1.1, ?_, call.1.2.2⟩, call.2⟩
+  refine ⟨⟨call.1.1, ?_, call.1.writable⟩, call.2⟩
   intro view member
-  apply call.1.2.1 view
+  apply call.1.readable view
   simpa [or_comm] using member
 
 #print axioms CallingConditions.swap_binary_inputs

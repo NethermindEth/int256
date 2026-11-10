@@ -50,7 +50,7 @@ theorem multiply_small_branch (ctx : Context alternative) (word : WordContract c
   obtain ⟨childFuel, childFinal, invoked, valid, outside, _, value, readable⟩ :=
     ctx.storage after [left, right] output (lowProduct a b) (highProduct a b) 0 0 next.call
   have expected : OutputResult after childFinal output (inputValue original left * inputValue original right) [] := by
-    refine ⟨rfl, valid.1.1, ?_, valid.1.2.2 (wordView output) (by simp), readable, ?_⟩
+    refine ⟨rfl, valid.1.1, ?_, valid.1.writable (wordView output) (by simp), readable, ?_⟩
     · exact value.trans ((product_padding _ _).trans
         (small_product_value original left right leftSmall rightSmall))
     · exact fun id _ offset beyond => outside id offset beyond
@@ -86,9 +86,9 @@ theorem multiply_left_two_branch (ctx : Context alternative) (word : WordContrac
   have call : CallingConditions ctx.program current [firstInput, secondInput] [output] := by
     cases swapped
     · exact state.call
-    · refine ⟨⟨state.call.1.1, ?_, state.call.1.2.2⟩, state.call.2⟩
+    · refine ⟨⟨state.call.1.1, ?_, state.call.1.writable⟩, state.call.2⟩
       intro view member
-      apply state.call.1.2.1 view
+      apply state.call.1.readable view
       simpa [firstInput, secondInput, or_comm] using member
   have zero : inputLimb current firstInput 2 = 0 ∧ inputLimb current firstInput 3 = 0 := by
     simpa only [state.input_limb originalCall firstInput firstMember] using
@@ -284,9 +284,9 @@ theorem multiply_scalar_branch (ctx : Context alternative) (word : WordContract 
   have secondMember : secondInput ∈ [left, right] := by cases swapped <;> simp [secondInput]
   let smallWord := inputLimb original secondInput 0
   have call : CallingConditions ctx.program current [firstInput] [output] := by
-    refine ⟨⟨state.call.1.1, ?_, state.call.1.2.2⟩, state.call.2⟩
+    refine ⟨⟨state.call.1.1, ?_, state.call.1.writable⟩, state.call.2⟩
     intro view member
-    apply state.call.1.2.1 view
+    apply state.call.1.readable view
     simp only [List.map_cons, List.map_nil, List.mem_singleton] at member
     subst view
     exact List.mem_map.mpr ⟨firstInput, firstMember, rfl⟩

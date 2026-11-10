@@ -31,12 +31,12 @@ theorem CallingConditions.with_readable_input {program : CIL.Program}
     (call : CallingConditions program memory inputs outputs)
     {bytes : List (BitVec 8)} (loaded : read memory reference 32 1 = .ok bytes) :
     CallingConditions program memory (inputs ++ [reference]) outputs := by
-  refine ⟨⟨call.1.1, ?_, call.1.2.2⟩, call.2⟩
+  refine ⟨⟨call.1.1, ?_, call.1.writable⟩, call.2⟩
   intro view member
   simp only [List.map_append, List.map_cons, List.map_nil, List.mem_append,
     List.mem_singleton] at member
   rcases member with member | rfl
-  · exact call.1.2.1 view member
+  · exact call.1.readable view member
   · exact ⟨bytes, loaded⟩
 
 #print axioms CallingConditions.with_readable_input

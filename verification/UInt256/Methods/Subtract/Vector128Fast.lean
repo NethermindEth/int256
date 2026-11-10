@@ -117,7 +117,7 @@ theorem subtract_fast_checked (program : CIL.Program) (body : CIL.Method) (metho
     (teardown.read output old 16 1).trans firstRead,
     (teardown.read { output with offset := output.offset + 16 } old 16 1).trans secondRead,
     (teardown.access output old 32 1 true).trans
-      (afterCall.1.2.2 (wordView output) (List.mem_map.mpr ⟨output, member, rfl⟩)), ?_⟩
+      (afterCall.1.writable (wordView output) (List.mem_map.mpr ⟨output, member, rfl⟩)), ?_⟩
   intro id offset earlier untouched
   exact (teardown.cells id earlier offset).trans ((outside id offset untouched).trans
     (state.preserved.cells id earlier offset))

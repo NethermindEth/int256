@@ -35,7 +35,7 @@ private theorem limb_address {program : CIL.Program} {memory : Memory}
     (call : CallingConditions program memory inputs [output]) (index : Fin 4) :
     add memory output 8 (BitVec.ofNat 64 index.val) =
       .ok { output with offset := output.offset + 8 * index.val } := by
-  obtain ⟨allocation, ready⟩ := access_requirements (call.1.2.2 (wordView output) (by simp))
+  obtain ⟨allocation, ready⟩ := access_requirements (call.1.writable (wordView output) (by simp))
   exact ready.add_slice call.1.1 8 index.val 8 (by omega) (by dsimp [wordView] at ready ⊢; omega)
 
 /-- The complete constructor body is checked once, independently of extraction.
@@ -96,7 +96,7 @@ theorem store_limbs_contract (profile : CIL.FeatureProfile) (scalar : profile.ve
     store_limbs_safe profile scalar program index found memory inputs output w0 w1 w2 w3 call
   have value := output_value_of_limb_reads result output w0 w1 w2 w3 r0 r1 r2 r3
   obtain ⟨bytes, loaded⟩ := output_readable_of_limbs result output
-    (valid.1.2.2 (wordView output) (by simp)) (by
+    (valid.1.writable (wordView output) (by simp)) (by
       intro i
       have cases : i.val = 0 ∨ i.val = 1 ∨ i.val = 2 ∨ i.val = 3 := by omega
       rcases cases with h | h | h | h <;> simp only [h, Nat.reduceMul, Nat.add_zero]
@@ -135,7 +135,7 @@ theorem store_limbs_readable_contract (profile : CIL.FeatureProfile)
     store_limbs_safe profile scalar program index found memory inputs output w0 w1 w2 w3 call
   refine ⟨24, result, executed, valid, outside, authority,
     output_value_of_limb_reads result output w0 w1 w2 w3 r0 r1 r2 r3, ?_⟩
-  apply output_readable_of_limbs result output (valid.1.2.2 (wordView output) (by simp))
+  apply output_readable_of_limbs result output (valid.1.writable (wordView output) (by simp))
   intro i
   have cases : i = 0 ∨ i = 1 ∨ i = 2 ∨ i = 3 := by omega
   rcases cases with rfl | rfl | rfl | rfl

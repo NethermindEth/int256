@@ -34,7 +34,7 @@ theorem run_leaf (profile : CIL.FeatureProfile)
     (by simp : output ∈ [output]) 0 (numberBytes bits.toNat 32)
     (by rw [length]; decide) (by rw [length]; decide)
   simp only [Nat.add_zero, length] at written readback
-  refine ⟨final, ?_, readback, retained.1.2.2 (wordView output) (by simp), outside⟩
+  refine ⟨final, ?_, readback, retained.1.writable (wordView output) (by simp), outside⟩
   simp only [bits, BitVec.toNat_not] at written length
   have fl := call.input_formed (reference := input) (by simp)
   have fo := call.output_formed (reference := output) (by simp)

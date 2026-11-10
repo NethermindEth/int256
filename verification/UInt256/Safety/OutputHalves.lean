@@ -13,7 +13,7 @@ theorem CallingConditions.output_half_address {program : CIL.Program}
     add memory output 16 (BitVec.ofNat 64 index.val) =
       .ok { output with offset := output.offset + 16 * index.val } := by
   obtain ⟨allocation, ready⟩ := access_requirements
-    (call.1.2.2 (wordView output) (List.mem_map.mpr ⟨output, member, rfl⟩))
+    (call.1.writable (wordView output) (List.mem_map.mpr ⟨output, member, rfl⟩))
   dsimp only [wordView] at ready
   exact ready.add_slice call.1.1 16 index.val 16 (by decide) (by omega)
 

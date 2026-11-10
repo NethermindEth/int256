@@ -70,7 +70,7 @@ theorem store_limbs_readable_contract (profile : CIL.FeatureProfile)
     store_limbs_safe profile program index found memory inputs output w0 w1 w2 w3 call
   refine ⟨23, result, executed, valid, outside, authority,
     output_value_of_limb_reads result output w0 w1 w2 w3 r0 r1 r2 r3, ?_⟩
-  apply output_readable_of_limbs result output (valid.1.2.2 (wordView output) (by simp))
+  apply output_readable_of_limbs result output (valid.1.writable (wordView output) (by simp))
   intro i
   have cases : i = 0 ∨ i = 1 ∨ i = 2 ∨ i = 3 := by omega
   rcases cases with rfl | rfl | rfl | rfl

@@ -170,9 +170,9 @@ theorem vector128_sse_indexed_carry (program : CIL.Program) (body : CIL.Method) 
     try exact ⟨rfl, rfl⟩
   apply run_call_of_contract_formed (carry_helper_contract carryFound) ⟨a, b, c, carryHome, resultHome⟩ found fetched stepped rfl
     ⟨wellFormed, incoming, carryRead, carryWrite, resultWrite, disjoint⟩ wellFormed
-  rintro after _ - formed world _ framed ⟨_, rfl, math⟩
+  intro after output call invariants
   simpa only [show 171 + 7 * index.val + 1 = 172 + 7 * index.val by omega, carryContract, List.append_nil] using
-    continuation after formed world framed math
+    continuation after invariants.formed invariants.staticWorld call.framed call.post
 
 #print axioms vector128_sse_indexed_carry
 
@@ -527,7 +527,7 @@ theorem vector128_sse_finish (program : CIL.Program) (body : CIL.Method) (method
     exact computed.trans (scalar_sum_value original left right)
   · rw [scalar_flag_overflow]
   · exact (retained.access output outputOld 32 1 true).trans
-      (valid.1.2.2 (wordView output) (by simp))
+      (valid.1.writable (wordView output) (by simp))
   · intro id old offset untouched
     exact (retained.cells id old offset).trans ((outside id offset untouched).trans (state.callerCells id old offset))
 

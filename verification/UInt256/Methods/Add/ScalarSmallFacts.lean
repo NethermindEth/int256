@@ -102,11 +102,11 @@ theorem scalar_small_finish (swapped : Bool) (original entered current : CIL.Saf
   have member : scalarSmallSource swapped left right ∈ [left, right] := by
     cases swapped <;> simp [scalarSmallSource]
   have selected : CallingConditions Extracted.program current [scalarSmallSource swapped left right] [output] := by
-    refine ⟨⟨currentCall.1.1, ?_, currentCall.1.2.2⟩, currentCall.2⟩
+    refine ⟨⟨currentCall.1.1, ?_, currentCall.1.writable⟩, currentCall.2⟩
     intro view included
     have same : view = wordView (scalarSmallSource swapped left right) := by simpa using included
     subst view
-    exact currentCall.1.2.1 _ (List.mem_map.mpr ⟨_, member, rfl⟩)
+    exact currentCall.1.readable _ (List.mem_map.mpr ⟨_, member, rfl⟩)
   have inputFormed := currentCall.input_formed member
   have outputFormed := currentCall.output_formed (by simp : output ∈ [output])
   obtain ⟨childFuel, after, values, invoked, result⟩ :=

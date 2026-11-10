@@ -57,7 +57,7 @@ theorem shift_store_return (whole : Fin 4) (memory : Memory) (inputs : List Refe
   refine ⟨fuel, leaveFrame frame stored, [], finished, rfl,
     leaveFrame_preserves_wellFormed _ _ valid.1.1, ?_,
     (retained.access output outputOld 32 1 true).trans
-      (valid.1.2.2 (wordView output) (by simp)), ?_, ?_⟩
+      (valid.1.writable (wordView output) (by simp)), ?_, ?_⟩
   · simpa only [inputValue, bytes] using value
   · obtain ⟨snapshot, loaded⟩ := readable
     exact ⟨snapshot, (retained.read output outputOld 32 1).trans loaded⟩

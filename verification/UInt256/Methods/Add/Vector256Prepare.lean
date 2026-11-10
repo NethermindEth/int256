@@ -165,7 +165,7 @@ theorem prepare_masks (program : CIL.Program) (method : Nat) (profile : CIL.Feat
     prep_pure
     prep_pure
     prep_pure
-    rw [show (63#32).toNat % 64 = 63 from rfl, ternary_carry_lanes]
+    rw [ternary_carry_lanes]
     apply VectorFrame.run_cell_store post state scratch originalCall homes layout 1 rfl found (by rfl)
     intro current state scratch
     prep_pure
@@ -174,7 +174,7 @@ theorem prepare_masks (program : CIL.Program) (method : Nat) (profile : CIL.Feat
     prep_pure
     prep_pure
     prep_pure
-    rw [show ((3#32).setWidth 8).toNat = 3 from rfl, align_carry]
+    rw [align_carry]
     apply VectorFrame.run_cell_store post state scratch originalCall homes layout 2 rfl found (by rfl)
     intro current state scratch
     prep_pure

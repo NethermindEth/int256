@@ -35,7 +35,7 @@ theorem output_result_of_storage {program : CIL.Program} (original current resul
     funext offset
     rw [retained.cells output.allocation old offset]
   refine ⟨rfl, leaveFrame_preserves_wellFormed _ _ valid.1.1, ?_,
-    (retained.access output old 32 1 true).trans (valid.1.2.2 (wordView output) (by simp)), ?_, ?_⟩
+    (retained.access output old 32 1 true).trans (valid.1.writable (wordView output) (by simp)), ?_, ?_⟩
   · simpa only [inputValue, bytes] using value
   · obtain ⟨snapshot, loaded⟩ := readable
     exact ⟨snapshot, (retained.read output old 32 1).trans loaded⟩

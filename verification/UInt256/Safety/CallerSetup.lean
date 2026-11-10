@@ -16,12 +16,12 @@ theorem CallingConditions.after_memory_below {program : CIL.Program}
     CallingConditions program updated inputs outputs := by
   refine ⟨⟨wellFormed, ?_, ?_⟩, world⟩
   · intro input member
-    obtain ⟨bytes, loaded⟩ := call.1.2.1 input member
+    obtain ⟨bytes, loaded⟩ := call.1.readable input member
     obtain ⟨allocation, present, _, _⟩ := formed_reference_live _ _ _
       (read_reference_valid _ _ _ _ _ loaded)
     exact ⟨bytes, (preserved.read input.reference (call.1.1.1 _ _ present).1 _ _).trans loaded⟩
   · intro output member
-    have writable := call.1.2.2 output member
+    have writable := call.1.writable output member
     obtain ⟨allocation, present, _, _⟩ := access_within_allocation _ _ _ _ _ writable
     exact (preserved.access output.reference (call.1.1.1 _ _ present).1 _ _ _).trans writable
 
@@ -49,12 +49,12 @@ theorem CallingConditions.after_frame_setup {program : CIL.Program}
   refine ⟨⟨enterFrame_preserves_wellFormed _ _ _ _ _ call.1.1 setup, ?_, ?_⟩,
     enterFrame_preserves_static_world _ _ _ _ _ _ call.1.1 call.2 setup⟩
   · intro input member
-    obtain ⟨bytes, loaded⟩ := call.1.2.1 input member
+    obtain ⟨bytes, loaded⟩ := call.1.readable input member
     obtain ⟨allocation, present, _, _⟩ := formed_reference_live _ _ _
       (read_reference_valid _ _ _ _ _ loaded)
     exact ⟨bytes, (preserved.read input.reference (call.1.1.1 _ _ present).1 _ _).trans loaded⟩
   · intro output member
-    have writable := call.1.2.2 output member
+    have writable := call.1.writable output member
     obtain ⟨allocation, present, _, _⟩ := access_within_allocation _ _ _ _ _ writable
     exact (preserved.access output.reference (call.1.1.1 _ _ present).1 _ _ _).trans writable
 

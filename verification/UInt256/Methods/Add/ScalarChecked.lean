@@ -156,7 +156,7 @@ theorem scalar_finish (original entered current : CIL.Safety.Memory) (frame : Fr
     refine ⟨leaveFrame_preserves_wellFormed _ _ valid.1.1, ?_, rfl, ?_, ?_⟩
     · simpa only [inputValue, bytes, scalarSumValue] using value
     · exact (retained.access output outputOld 32 1 true).trans
-        (valid.1.2.2 (wordView output) (by simp))
+        (valid.1.writable (wordView output) (by simp))
     · intro id old offset untouched
       exact (retained.cells id old offset).trans ((outside id offset untouched).trans (state.callerCells id old offset))
 

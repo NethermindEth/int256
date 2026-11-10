@@ -95,7 +95,7 @@ theorem ScratchCells.known_locals {memory : Memory} {cells : List Reference}
 theorem CallingConditions.without_inputs {program : CIL.Program} {memory : Memory}
     {inputs outputs : List Reference} (call : CallingConditions program memory inputs outputs) :
     CallingConditions program memory [] outputs :=
-  ⟨⟨call.1.1, fun _ member => by simp at member, call.1.2.2⟩, call.2⟩
+  ⟨⟨call.1.1, fun _ member => by simp at member, call.1.writable⟩, call.2⟩
 
 /-- Views valid at an older boundary survive any change that keeps the bytes below it. -/
 theorem CallingConditions.retained {program : CIL.Program} {original memory updated : Memory}
@@ -107,14 +107,14 @@ theorem CallingConditions.retained {program : CIL.Program} {original memory upda
     CallingConditions program updated inputs outputs := by
   refine ⟨⟨wellFormed, ?_, ?_⟩, world⟩
   · intro input member
-    obtain ⟨bytes, loaded⟩ := call.1.2.1 input member
-    obtain ⟨old, oldLoaded⟩ := origin.1.2.1 input member
+    obtain ⟨bytes, loaded⟩ := call.1.readable input member
+    obtain ⟨old, oldLoaded⟩ := origin.1.readable input member
     obtain ⟨allocation, present, _, _⟩ := formed_reference_live _ _ _
       (read_reference_valid _ _ _ _ _ oldLoaded)
     exact ⟨bytes, (preserved.read input.reference (origin.1.1.1 _ _ present).1 _ _).trans loaded⟩
   · intro output member
-    obtain ⟨allocation, present, _, _⟩ := access_within_allocation _ _ _ _ _ (origin.1.2.2 output member)
-    exact (preserved.access output.reference (origin.1.1.1 _ _ present).1 _ _ _).trans (call.1.2.2 output member)
+    obtain ⟨allocation, present, _, _⟩ := access_within_allocation _ _ _ _ _ (origin.1.writable output member)
+    exact (preserved.access output.reference (origin.1.1.1 _ _ present).1 _ _ _).trans (call.1.writable output member)
 
 /-- A frame entered from a caller memory that still agrees with an older original memory. -/
 theorem VectorFrame.initial_from {program : CIL.Program} {original memory entered : Memory}

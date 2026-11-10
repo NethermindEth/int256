@@ -20,10 +20,10 @@ theorem CallingConditions.after_write {program : CIL.Program}
   refine ⟨⟨write_preserves_wellFormed _ _ _ _ _ call.1.1 written, ?_, ?_⟩,
     write_preserves_static_world _ _ _ _ _ _ call.2 written⟩
   · intro input member
-    obtain ⟨old, readable⟩ := call.1.2.1 input member
+    obtain ⟨old, readable⟩ := call.1.readable input member
     exact write_preserves_readability written readable
   · intro output member
-    obtain ⟨allocation, ready⟩ := access_requirements (call.1.2.2 output member)
+    obtain ⟨allocation, ready⟩ := access_requirements (call.1.writable output member)
     exact (ready.after_write written).access
 
 theorem CallingConditions.output_limb_address {program : CIL.Program}
@@ -33,7 +33,7 @@ theorem CallingConditions.output_limb_address {program : CIL.Program}
     add memory output 1 (BitVec.ofNat 64 (8 * index.val)) =
       .ok { output with offset := output.offset + 8 * index.val } := by
   obtain ⟨allocation, ready⟩ := access_requirements
-    (call.1.2.2 (wordView output) (List.mem_map.mpr ⟨output, member, rfl⟩))
+    (call.1.writable (wordView output) (List.mem_map.mpr ⟨output, member, rfl⟩))
   dsimp only [wordView] at ready
   simpa only [Nat.one_mul] using
     ready.add_slice call.1.1 1 (8 * index.val) 8 (by decide) (by omega)
@@ -45,7 +45,7 @@ theorem CallingConditions.output_limb_formed {program : CIL.Program}
     form memory { output with offset := output.offset + 8 * index.val } =
       .ok { output with offset := output.offset + 8 * index.val } := by
   obtain ⟨allocation, ready⟩ := access_requirements
-    (call.1.2.2 (wordView output) (List.mem_map.mpr ⟨output, member, rfl⟩))
+    (call.1.writable (wordView output) (List.mem_map.mpr ⟨output, member, rfl⟩))
   dsimp only [wordView] at ready
   exact access_reference_valid _ _ _ _ _
     (ready.slice call.1.1 (8 * index.val) 8 (by decide) (by omega)).access
@@ -61,7 +61,7 @@ theorem CallingConditions.write_output_slice {program : CIL.Program}
       (∀ id offset, OutsideOutput output id offset → result.cells id offset = memory.cells id offset) ∧
       read result { output with offset := output.offset + start } bytes.length 1 = .ok bytes := by
   obtain ⟨allocation, ready⟩ := access_requirements
-    (call.1.2.2 (wordView output) (List.mem_map.mpr ⟨output, member, rfl⟩))
+    (call.1.writable (wordView output) (List.mem_map.mpr ⟨output, member, rfl⟩))
   dsimp only [wordView] at ready
   obtain ⟨result, written⟩ := write_succeeds (ready.slice call.1.1 start bytes.length nonempty within).access
   refine ⟨result, written, call.after_write written, ?_, write_readback _ _ _ _ _ written⟩
@@ -88,7 +88,7 @@ theorem CallingConditions.output_field_instruction {program : CIL.Program}
       (by rw [length]; decide) (by rw [length]; omega)
   refine ⟨result, ?_, retained, outside, ?_⟩
   · obtain ⟨allocation, ready⟩ := access_requirements
-      (call.1.2.2 (wordView output) (List.mem_map.mpr ⟨output, member, rfl⟩))
+      (call.1.writable (wordView output) (List.mem_map.mpr ⟨output, member, rfl⟩))
     have address := ready.add_slice call.1.1 1 (8 * index.val) 8 (by decide)
       (by dsimp [wordView] at ready ⊢; omega)
     simp only [Nat.one_mul, wordView] at address

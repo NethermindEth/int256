@@ -226,11 +226,11 @@ theorem subtract_scalar_small_route (program : CIL.Program) (method vectorIndex 
   let post := fun final returned => SubtractResult original final returned left right output
   have member : left ∈ [left, right] := by simp
   have selected : CallingConditions program current [left] [output] := by
-    refine ⟨⟨currentCall.1.1, ?_, currentCall.1.2.2⟩, currentCall.2⟩
+    refine ⟨⟨currentCall.1.1, ?_, currentCall.1.writable⟩, currentCall.2⟩
     intro view included
     have same : view = wordView left := by simpa using included
     subst view
-    exact currentCall.1.2.1 _ (List.mem_map.mpr ⟨_, member, rfl⟩)
+    exact currentCall.1.readable _ (List.mem_map.mpr ⟨_, member, rfl⟩)
   have fl := currentCall.input_formed member
   have fo := currentCall.output_formed (by simp : output ∈ [output])
   obtain ⟨childFuel, after, values, certified, result⟩ :=

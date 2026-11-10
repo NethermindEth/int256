@@ -160,7 +160,7 @@ theorem small_store_finish (branch : Fin 5) (original entered current : CIL.Safe
         simpa only [inputValue, bytes, UInt256Model.value] using value
       exact packed.trans math
     · exact (retained.access output outputOld 32 1 true).trans
-        (valid.1.2.2 (wordView output) (by simp))
+        (valid.1.writable (wordView output) (by simp))
     · intro id old offset untouched
       exact (retained.cells id old offset).trans ((outside id offset untouched).trans (preserved id old offset))
 

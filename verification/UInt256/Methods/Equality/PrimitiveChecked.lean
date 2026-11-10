@@ -32,7 +32,7 @@ theorem primitive_setup (primitiveBody : CIL.Method)
   obtain ⟨home, entered, setup, writableCall, before, fresh⟩ :=
     Bitwise.ReturnSafety.setup primitiveBody (primitiveArguments left right)
       kinds initializers vectorArgs parameters opaqueLocals program memory [left] call
-  exact ⟨_, entered, home, setup, rfl, writableCall.1.2.2 (wordView home) (by simp), fresh,
+  exact ⟨_, entered, home, setup, rfl, writableCall.1.writable (wordView home) (by simp), fresh,
     call.after_frame_setup setup, call.input_value_after_setup setup (by simp)⟩
 
 variable (program : CIL.Program) (primitiveIndex primitiveConstructorCall scalarIndex constructorIndex : Nat)

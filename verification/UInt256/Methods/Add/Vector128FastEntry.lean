@@ -182,7 +182,7 @@ theorem vector128_fast_result (program : CIL.Program) (body : CIL.Method) (metho
   · rw [output_value_of_packed_halves _ _ _ lo hi, UInt256Proof.sumWords_sum,
       input_limbs_value, input_limbs_value]
   · exact (teardown.access output old 32 1 true).trans
-      (afterCall.1.2.2 (wordView output) (List.mem_map.mpr ⟨output, member, rfl⟩))
+      (afterCall.1.writable (wordView output) (List.mem_map.mpr ⟨output, member, rfl⟩))
   · intro id offset earlier untouched
     exact (teardown.cells id earlier offset).trans (outside id offset untouched)
 

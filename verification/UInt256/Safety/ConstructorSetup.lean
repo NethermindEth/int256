@@ -10,12 +10,12 @@ theorem CallingConditions.with_writable_output {program : CIL.Program}
     (call : CallingConditions program memory inputs outputs)
     (writable : access memory reference 32 1 true = .ok ()) :
     CallingConditions program memory inputs (outputs ++ [reference]) := by
-  refine ⟨⟨call.1.1, call.1.2.1, ?_⟩, call.2⟩
+  refine ⟨⟨call.1.1, call.1.readable, ?_⟩, call.2⟩
   intro view member
   simp only [List.map_append, List.map_cons, List.map_nil, List.mem_append,
     List.mem_singleton] at member
   rcases member with member | rfl
-  · exact call.1.2.2 view member
+  · exact call.1.writable view member
   · exact writable
 
 /-- Transfer ordinary call permissions through the actual constructor-allocation

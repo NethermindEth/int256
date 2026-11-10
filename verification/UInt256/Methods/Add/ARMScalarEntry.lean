@@ -86,11 +86,11 @@ theorem arm_scalar_small_values (program : CIL.Program) (swapped : Bool) (origin
 theorem arm_scalar_select_input (program : CIL.Program) (memory : Memory) (inputs : List Reference) (input output : Reference)
     (call : CallingConditions program memory inputs [output]) (member : input ∈ inputs) :
     CallingConditions program memory [input] [output] := by
-  refine ⟨⟨call.1.1, ?_, call.1.2.2⟩, call.2⟩
+  refine ⟨⟨call.1.1, ?_, call.1.writable⟩, call.2⟩
   intro view selected
   have same : view = wordView input := by simpa using selected
   subst view
-  exact call.1.2.1 _ (List.mem_map.mpr ⟨input, member, rfl⟩)
+  exact call.1.readable _ (List.mem_map.mpr ⟨input, member, rfl⟩)
 
 /-- Original frame-home authority bounds the current allocation watermark. -/
 theorem arm_scalar_watermark (original entered current : Memory) (frame : Frame)

@@ -1,7 +1,7 @@
 # UInt256 verification with LeanCIL
 
 This directory consumes LeanCIL at
-`469ea3415338a1e7d6588fd0a90873f5442091af` through the pinned Lake dependency.
+`9a084079686ba4c5cb012a6c8f219ddc818cd70d` through the pinned Lake dependency.
 CIL semantics, extraction, and verification infrastructure belong to LeanCIL;
 this directory contains only UInt256 specifications and proofs.
 
@@ -9,7 +9,7 @@ Proofs establish arithmetic results, finite return, permitted overlap and preser
 caller memory. Frame setup supplies typed storage evidence for numeric locals; initialized
 values and later writes require their own checked facts. Profile-parametric comparison proofs
 use `ProfileAgreement.of_flags` and a kernel-checked empty feature-read list for scalar programs.
-See LeanCIL's [proof guide](https://github.com/NethermindEth/LeanCIL/blob/469ea3415338a1e7d6588fd0a90873f5442091af/docs/PROOFS.md)
+See LeanCIL's [proof guide](https://github.com/NethermindEth/LeanCIL/blob/9a084079686ba4c5cb012a6c8f219ddc818cd70d/docs/PROOFS.md)
 for the checked execution and contract APIs.
 
 The Add/Subtract Vector128 helpers use `CodeAt` placements instead of carrying
@@ -144,6 +144,11 @@ The independent arithmetic, checked finite return and caller-memory guarantees
 remain part of each public certificate.
 
 Bitwise scalar prefixes and limb helpers use LeanCIL's checked stepping tactics.
+Reporting wrappers reuse LeanCIL's checked argument loading, call and return proofs.
+Helper continuations select `CallResult.framed` and `CallResult.post`, with
+`FrameInvariants.formed` and `FrameInvariants.staticWorld`, by name. Calling views
+select `ValidCall.readable` and `ValidCall.writable` by name. A caller-byte footprint
+does not establish the permission and reference-slot preservation required by `Confined`.
 Equality and comparison wrappers share the same read-only forwarder composition;
 its call and return steps use LeanCIL's checked forwarder lemmas. Vector frames
 use `LocalSnapshots` to retain exact loaded values across local stores, disjoint

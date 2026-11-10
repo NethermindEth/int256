@@ -49,14 +49,14 @@ theorem construct_prefix (program : CIL.Program) (index pc constructor : Nat)
         arguments := []
         stackBytes := 0 }
   have readonly : CallingConditions program memory inputs [] :=
-    ⟨⟨call.1.1, call.1.2.1, by simp⟩, call.2⟩
+    ⟨⟨call.1.1, call.1.readable, by simp⟩, call.2⟩
   have checked : (words w0 w1 w2 w3).mapM (checkedValue memory) = .ok (words w0 w1 w2 w3) := by
     simp [words, checkedValue, numericValue, Bind.bind, Except.bind, Pure.pure, Except.pure]
   obtain ⟨temporary, updated, stepped, updatedCall, _, before, fresh⟩ :=
     readonly.new_aggregate256 (pc := pc) (callee := constructor)
       args (words w0 w1 w2 w3) [.reference (.address output)] frame memory found checked (by rfl)
   let nextFrame := { frame with owned := temporary.allocation :: frame.owned }
-  have writable := call.1.2.2 (wordView output) (by simp)
+  have writable := call.1.writable (wordView output) (by simp)
   obtain ⟨allocation, present, _, _⟩ := access_within_allocation _ _ _ _ _ writable
   have old : output.allocation < memory.nextIdentity := (call.1.1.1 _ _ present).1
   have growth := step_extends_allocations _ _ _ _ _ _ _ _ stepped
@@ -65,7 +65,7 @@ theorem construct_prefix (program : CIL.Program) (index pc constructor : Nat)
     constructor_contract profile program constructor constructorFound updated inputs temporary w0 w1 w2 w3 updatedCall
   have constructedWritable := authority.access updatedWritable (Nat.lt_of_lt_of_le old growth.next)
   have outputCall : CallingConditions program constructed inputs [output] :=
-    ⟨⟨childCall.1.1, childCall.1.2.1, by simpa [wordView] using constructedWritable⟩, childCall.2⟩
+    ⟨⟨childCall.1.1, childCall.1.readable, by simpa [wordView] using constructedWritable⟩, childCall.2⟩
   let bits := packed w0 w1 w2 w3
   have length : (numberBytes bits.toNat 32).length = 32 := by simp [numberBytes]
   obtain ⟨stored, written, storedCall, storedOutside, readback⟩ := outputCall.write_output_slice
@@ -133,11 +133,11 @@ theorem construct_result (program : CIL.Program) (scalarIndex constructPC constr
   have after := leaveFrame_preserves_memory_below nextFrame stored memory.nextIdentity
     (by intro id member; simp only [nextFrame, List.mem_cons, List.not_mem_nil, or_false] at member
         rw [member, fresh]; exact Nat.le_refl _)
-  have writable := call.1.2.2 (wordView output) (by simp)
+  have writable := call.1.writable (wordView output) (by simp)
   obtain ⟨allocation, present, _, _⟩ := access_within_allocation _ _ _ _ _ writable
   have old : output.allocation < memory.nextIdentity := (call.1.1.1 _ _ present).1
   refine ⟨fuel, _, finished, (after.read output old 32 1).trans readback,
-    (after.access output old 32 1 true).trans (storedCall.1.2.2 (wordView output) (by simp)), ?_⟩
+    (after.access output old 32 1 true).trans (storedCall.1.writable (wordView output) (by simp)), ?_⟩
   intro id bound offset beyond
   exact (after.cells id bound offset).trans (outside id bound offset beyond)
 #print axioms construct_result

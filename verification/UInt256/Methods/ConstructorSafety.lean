@@ -79,7 +79,7 @@ theorem constructor_contract (profile : CIL.FeatureProfile) (program : CIL.Progr
     constructor_safe profile program index found memory inputs output w0 w1 w2 w3 call
   have value := output_value_of_limb_reads result output w0 w1 w2 w3 r0 r1 r2 r3
   obtain ⟨bytes, loaded⟩ := output_readable_of_limbs result output
-    (valid.1.2.2 (wordView output) (by simp)) (by
+    (valid.1.writable (wordView output) (by simp)) (by
       intro i
       have cases : i.val = 0 ∨ i.val = 1 ∨ i.val = 2 ∨ i.val = 3 := by omega
       rcases cases with h | h | h | h <;> simp only [h, Nat.reduceMul, Nat.add_zero]

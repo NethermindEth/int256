@@ -138,9 +138,9 @@ theorem subtract_repair_indexed_borrow (program : CIL.Program) (body : CIL.Metho
     try exact ⟨rfl, rfl⟩
   apply run_call_of_contract_formed (borrow_helper_contract borrowFound) ⟨a, b, c, borrowHome, resultHome⟩ found fetched stepped rfl
     ⟨wellFormed, incoming, borrowRead, borrowWrite, resultWrite, disjoint⟩ wellFormed
-  rintro after _ - formed world _ framed ⟨_, rfl, math⟩
+  intro after output call invariants
   simpa only [show 86 + 7 * index.val + 1 = 87 + 7 * index.val by omega, borrowContract, List.append_nil] using
-    continuation after formed world framed math
+    continuation after invariants.formed invariants.staticWorld call.framed call.post
 
 #print axioms subtract_repair_indexed_borrow
 
@@ -496,7 +496,7 @@ theorem subtract_repair_finish (program : CIL.Program) (body : CIL.Method) (meth
   · rw [scalar_flag_underflow]
     rfl
   · exact (retained.access output outputOld 32 1 true).trans
-      (valid.1.2.2 (wordView output) (by simp))
+      (valid.1.writable (wordView output) (by simp))
   · intro id old offset untouched
     exact (retained.cells id old offset).trans ((outside id offset untouched).trans (state.callerCells id old offset))
 

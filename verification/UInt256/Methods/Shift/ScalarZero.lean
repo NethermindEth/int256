@@ -57,7 +57,7 @@ theorem shift_zero_finish (memory : Memory) (inputs outputs : List Reference)
     leaveFrame_preserves_wellFormed frame after afterCall.1.1,
     (retired.read output outputOld 32 1).trans loaded,
     (retired.access output outputOld 32 1 true).trans
-      (afterCall.1.2.2 (wordView output) (List.mem_map.mpr ⟨output, member, rfl⟩)), ?_⟩
+      (afterCall.1.writable (wordView output) (List.mem_map.mpr ⟨output, member, rfl⟩)), ?_⟩
   · have found := bodyFound
     have fetched : (scalarBody profile direction storage).code[16]? = some .ret := by rfl
     have returns : (scalarBody profile direction storage).returnsValue = false := by rfl

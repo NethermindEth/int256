@@ -228,7 +228,7 @@ theorem arm_small_entry (program : CIL.Program) (method storage : Nat) (profile 
     rw [initial] at exactFlag
     simp only [exactFlag]
   · exact (retired.access output outputOld 32 1 true).trans
-      (valid.1.2.2 (wordView output) (by simp))
+      (valid.1.writable (wordView output) (by simp))
   · intro id old offset untouched
     exact (retired.cells id old offset).trans
       ((outside id offset untouched).trans (state.preserved.cells id old offset))

@@ -225,7 +225,7 @@ theorem VectorFrame.finish {program : CIL.Program} {original entered current : M
   have old := state.output_old originalCall
   have loaded := state.result value rfl
   refine ⟨?_, (retained.access output old 32 1 true).trans
-    (state.call.1.2.2 (wordView output) (by simp)), ?_⟩
+    (state.call.1.writable (wordView output) (by simp)), ?_⟩
   · exact inputValue_of_encoded_read ((retained.read output old 32 1).trans loaded)
   · intro id bound offset away
     exact (retained.cells id bound offset).trans (state.caller id bound offset (Or.inr away))

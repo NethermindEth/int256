@@ -25,9 +25,9 @@ theorem primitive_multiply_finish (ctx : PrimitiveContext) (word : Calls.WordCon
   have childCall : CallingConditions ctx.program memory [left, right] [output] := by
     cases firstScalar
     · exact call
-    · refine ⟨⟨call.1.1, ?_, call.1.2.2⟩, call.2⟩
+    · refine ⟨⟨call.1.1, ?_, call.1.writable⟩, call.2⟩
       intro view member
-      apply call.1.2.1 view
+      apply call.1.readable view
       simpa [left, right, or_comm] using member
   obtain ⟨childFuel, result, certificate, loaded, _, outside⟩ :=
     initialized_result ctx.toContext word top memory left right output childCall

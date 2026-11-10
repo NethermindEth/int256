@@ -86,11 +86,11 @@ theorem scalar_small_finish (original entered current : CIL.Safety.Memory)
   have member : left ∈ [left, right] := by
     simp
   have selected : CallingConditions Extracted.program current [left] [output] := by
-    refine ⟨⟨currentCall.1.1, ?_, currentCall.1.2.2⟩, currentCall.2⟩
+    refine ⟨⟨currentCall.1.1, ?_, currentCall.1.writable⟩, currentCall.2⟩
     intro view included
     have same : view = wordView (left) := by simpa using included
     subst view
-    exact currentCall.1.2.1 _ (List.mem_map.mpr ⟨_, member, rfl⟩)
+    exact currentCall.1.readable _ (List.mem_map.mpr ⟨_, member, rfl⟩)
   have inputFormed := currentCall.input_formed member
   have outputFormed := currentCall.output_formed (by simp : output ∈ [output])
   obtain ⟨childFuel, after, values, certified, result⟩ :=

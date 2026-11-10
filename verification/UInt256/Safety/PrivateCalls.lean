@@ -23,7 +23,7 @@ theorem CallingConditions.after_preserving_inputs {program : CIL.Program}
     exact ⟨_, authority.read_eq (call.input_snapshot inputMember) (call.1.1.1 _ _ present).1
       (bytes reference inputMember)⟩
   · intro view member
-    have writable := call.1.2.2 view member
+    have writable := call.1.writable view member
     obtain ⟨allocation, present, _, _⟩ := access_within_allocation _ _ _ _ _ writable
     exact authority.access writable (call.1.1.1 _ _ present).1
 
@@ -55,7 +55,7 @@ theorem private_calling_conditions {program : CIL.Program} {first second : Refer
     obtain ⟨notFirst, notSecond⟩ := separate reference inputMember
     exact ⟨_, framed.read_apart call.1.1 (call.input_snapshot inputMember) (by simp [Apart, wordView, notFirst, notSecond])⟩
   · intro view member
-    have writable := call.1.2.2 view member
+    have writable := call.1.writable view member
     obtain ⟨allocation, present, _, _⟩ := access_within_allocation _ _ _ _ _ writable
     exact (framed.access_write _ (call.1.1.1 _ _ present).1 _ _).trans writable
 
