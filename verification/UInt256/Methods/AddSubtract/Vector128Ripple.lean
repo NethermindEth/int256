@@ -1,10 +1,11 @@
-import CIL.Safety.SymbolicExecution
+import CIL.Safety.LocalSnapshotSteps
 import CIL.StepEquations
 import CIL.Safety.Equations
 import CIL.Safety.MethodContract
 import CIL.Safety.CallComposition
 import UInt256.Methods.AddSubtract.Vector128Inputs
 import UInt256.Methods.AddSubtract.RippleState
+import UInt256.Methods.Multiply.LimbStorage
 
 /-!
 The scalar ripple that Add and Subtract share after their vector paths: zero a private flag
@@ -25,9 +26,6 @@ def rippleCode (helper storage home : Nat) : List CIL.Op := [
   .arg 0, .fieldAt 24 8, .arg 1, .fieldAt 24 8, .localAddr (home + 1), .localAddr (home + 5), .call helper 4,
   .arg 2, .local (home + 2), .local (home + 3), .local (home + 4), .local (home + 5), .call storage 5,
   .local (home + 1), .const32 0, .convI8, .gtu, .ret (some .unsigned8)]
-
-/-- The numeric local every ripple word occupies. -/
-def rippleWordSpec : NumericLocalSpec := ⟨.word64, .i64 0, 0, rfl⟩
 
 /-- The flag a ripple returns: one when its final flag word is positive. -/
 def rippleFlag (word : BitVec 64) : BitVec 32 :=
@@ -190,55 +188,58 @@ theorem ripple_limb {Input : Type} (contract : MethodContract Input Unit)
     segment args frame memory _ _ flagHome resultHome encoded returnsNothing call.1.1 permitted
     flagWrite resultWrite post continuation
 
-/-- Push the output reference and the four completed result words for the storage call. -/
-theorem ripple_store_prefix (program : CIL.Program) (body : CIL.Method) (method : Nat)
+/-- Store completed ripple words and return the preserved private flag through checked calls. -/
+theorem ripple_finish (program : CIL.Program) (body : CIL.Method) (method : Nat)
     (found : program[method]? = some body)
     (helper storage base home : Nat) (code : CodeAt body base (rippleCode helper storage home))
-    (output : Reference) (args : List Value)
+    (storageFound : program[storage]? = some (UInt256Proof.Multiply.LimbStorage.body body.profile))
+    (returns : body.returnsValue = true) (original memory : Memory) (frame : Frame)
+    (left right output flagHome : Reference) (results : Fin 4 → Reference)
+    (flags : Nat → BitVec 64) (words : Fin 4 → BitVec 64) (args : List Value)
     (outputArg : args[2]? = some (.reference (.address output)))
-    (frame : Frame) (memory : Memory) (words : Fin 4 → BitVec 64)
-    (outputFormed : form memory output = .ok output)
-    (snapshots : LocalSnapshots memory frame.locals (completedLocals words (home + 2) 4))
+    (call : CallingConditions program original [left, right] [output])
+    (state : RippleState program original memory frame left right output flagHome results
+      flags words 4 (home + 1) (home + 2))
     (post : Memory → List Value → Prop)
-    (continuation : ∃ fuel result returned,
-      run program fuel method (base + 36) args frame
-        [.scalar (.i64 (words 3)), .scalar (.i64 (words 2)), .scalar (.i64 (words 1)),
-          .scalar (.i64 (words 0)), .reference (.address output)] memory = .ok (result, returned) ∧
-        post result returned) :
-    ∃ fuel result returned,
-      run program fuel method (base + 31) args frame [] memory = .ok (result, returned) ∧
-        post result returned := by
-  have loading (i : Fin 4) (pc : Nat) (stack : List Value) := snapshots.load
-    (body := body) (args := args) (pc := pc) (stack := stack) (index := home + 2 + i.val)
-    (.i64 (words i)) (by simp [completedLocals, i.isLt])
-  cil_contract_steps [found, code, outputArg, outputFormed,
-    loading 0, loading 1, loading 2, loading 3] until continuation
-
-/-- Return the final flag word as an unsigned flag and retire the frame. -/
-theorem ripple_return (program : CIL.Program) (body : CIL.Method) (method : Nat)
-    (found : program[method]? = some body)
-    (helper storage base home : Nat) (code : CodeAt body base (rippleCode helper storage home))
-    (returns : body.returnsValue = true)
-    (args : List Value) (frame : Frame) (memory : Memory)
-    (flagHome : Reference) (flagWord : BitVec 64)
-    (slot : frame.locals[home + 1]? = some (.bytes .word64 flagHome))
-    (loaded : read memory flagHome 8 1 = .ok (numberBytes flagWord.toNat 8)) :
-    run program 5 method (base + 37) args frame [] memory =
-      .ok (leaveFrame frame memory, [.scalar (.i32 (rippleFlag flagWord))]) := by
-  have reading := load_local_word64_of_read loaded
-  iterate 4
-    apply Eq.trans
-    · apply run_next found (by cil_lookup [code])
-      simp (config := { implicitDefEqProofs := false })
-        [step, cil_guard, observerCount, slot, reading, checkedValue, numericValue, pureArity,
-          scalars, CIL.step.eq_def, CIL.binary, CIL.unary, instruction, Bind.bind, Except.bind,
-          Pure.pure, Except.pure]
-      first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
-  have fetched : body.code[base + 41]? = some (.ret (some .unsigned8)) := by
-    cil_lookup [code]
-  by_cases positive : BitVec.ofNat 64 0 < flagWord
-  all_goals simp [run, found, fetched, returns, step, cil_guard, observerCount, checkedValue,
-    numericValue, CIL.NarrowKind.extend, rippleFlag, positive, Except.mapError, Bind.bind,
-    Except.bind, Pure.pure, Except.pure]
+    (continuation : ∀ stored, CallingConditions program stored [left, right] [output] →
+      (∀ id offset, OutsideOutput output id offset →
+        stored.cells id offset = memory.cells id offset) →
+      inputValue stored output = UInt256Model.value words →
+      post (leaveFrame frame stored) [.scalar (.i32 (rippleFlag (flags 4)))]) :
+    WP (Execution (fun fuel => run program fuel method (base + 31) args frame [] memory))
+      (Function.uncurry post) := by
+  have formed := state.call.output_formed (by simp : output ∈ [output])
+  obtain ⟨childFuel, stored, invoked, valid, outside, authority, value, _⟩ :=
+    UInt256Proof.Multiply.LimbStorage.store_limbs_readable_contract body.profile program storage
+      storageFound memory [left, right] output (words 0) (words 1) (words 2) (words 3) state.call
+  have stepped : step body (.call storage 5) (base + 36) args frame
+      [.scalar (.i64 (words 3)), .scalar (.i64 (words 2)), .scalar (.i64 (words 1)),
+        .scalar (.i64 (words 0)), .reference (.address output)] memory =
+      .ok (.call storage (UInt256Proof.Multiply.LimbStorage.arguments output
+        (words 0) (words 1) (words 2) (words 3)) [] memory) := by
+    cil_checked_step [UInt256Proof.Multiply.LimbStorage.arguments, formed]
+  obtain ⟨_, outputPresent, _, _⟩ := formed_reference_live _ _ _
+    (call.output_formed (by simp : output ∈ [output]))
+  have outputOld := (call.1.1.1 _ _ outputPresent).1
+  have distinct : flagHome.allocation ≠ output.allocation :=
+    Ne.symm (Nat.ne_of_lt (Nat.lt_of_lt_of_le outputOld state.flagFresh))
+  have flagRead := authority.read_eq state.flagRead (state.call.1.1.access_bound state.flagWrite)
+    (fun i _ => outside _ _ (Or.inl distinct))
+  have loaded := load_local_word64_of_read flagRead
+  have suffix : WP (Execution (fun fuel =>
+      run program fuel method (base + 37) args frame [] stored)) (Function.uncurry post) := by
+    cil_contract_steps [found, code, state.flagSlot, loaded, returns]
+    simpa only [Function.uncurry, CIL.NarrowKind.extend_ite_ofNat_one_zero, rippleFlag] using
+      continuation stored valid outside (by simpa only [UInt256Model.value] using value)
+  have called : WP (Execution (fun fuel => run program fuel method (base + 36) args frame
+      [.scalar (.i64 (words 3)), .scalar (.i64 (words 2)), .scalar (.i64 (words 1)),
+        .scalar (.i64 (words 0)), .reference (.address output)] memory))
+      (Function.uncurry post) := by
+    apply WP.call (helperPost := fun result => result.1 = stored ∧ result.2 = [])
+      found (by cil_lookup [code]) stepped ⟨childFuel, (stored, []), invoked, rfl, rfl⟩
+    rintro final values ⟨rfl, rfl⟩
+    exact suffix
+  cil_contract_steps (snapshots := state.snapshots)
+    [found, code, outputArg, formed, completedLocals] until called
 
 end UInt256Proof.AddSubtract.Safety

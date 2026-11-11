@@ -29,21 +29,7 @@ theorem run_input_to_local {program : CIL.Program} {method pc argument target : 
   have reading := state.input_field originalCall input member limb rest
   obtain ⟨after, stored, next⟩ := state.store enteredWF homes target kind (inputLimb original input limb)
     (pc + 2) args rest (body := body)
-  have readingSegment : Segment program method pc (pc + 2)
-      (SegmentState.exact args ⟨frame, rest, current⟩)
-      (SegmentState.exact args
-        ⟨frame, .scalar (.i64 (inputLimb original input limb)) :: rest, current⟩) := by
-    cil_segment 2 [found, code, arg, formed, reading]
-  have storingSegment : Segment program method (pc + 2) (pc + 3)
-      (SegmentState.exact args
-        ⟨frame, .scalar (.i64 (inputLimb original input limb)) :: rest, current⟩)
-      (SegmentState.exact args ⟨frame, rest, after⟩) := by
-    cil_segment 1 [found, code, stored]
-  apply WP.exists_execution
-  apply (readingSegment.trans storingSegment).run_exists args ⟨frame, rest, current⟩
-    ⟨rfl, rfl⟩ post
-  intro final valid
-  rcases valid with ⟨_, rfl⟩
-  exact WP.adequate.mpr (continuation after next)
+  have suffix := continuation after next
+  cil_contract_steps [found, code, arg, formed, reading, stored] until suffix
 
 end UInt256Model.Safety

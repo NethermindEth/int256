@@ -6,6 +6,9 @@ import CIL.Safety.LocalCalls
 namespace UInt256Proof.AddSubtract.Safety
 open CIL.Safety UInt256Model.Safety
 
+/-- Each private ripple home stores a complete 64-bit word. -/
+def rippleWordSpec : NumericLocalSpec := ⟨.word64, .i64 0, 0, rfl⟩
+
 /-- Exactly the completed result locals have known contents; unwritten results remain unknown. -/
 def completedLocals (words : Fin 4 → BitVec 64) (base done : Nat) : Nat → Option CIL.Value :=
   fun index => if known : base ≤ index ∧ index - base < 4 ∧ index - base < done then
@@ -52,6 +55,67 @@ structure RippleState (program : CIL.Program) (original current : Memory) (frame
   callerCells : ∀ id, id < original.nextIdentity → ∀ offset,
     current.cells id offset = original.cells id offset
   snapshots : LocalSnapshots current frame.locals (completedLocals words resultBase done)
+
+/-- Fresh numeric homes initialize either carry or borrow without assuming result contents. -/
+theorem RippleState.initial (program : CIL.Program) (specs : List NumericLocalSpec)
+    (base : Nat) (wordSpecs : ∀ i : Fin 5, specs[base + i.val]? = some rippleWordSpec)
+    (original entered current : Memory) (frame : Frame) (root : LocalSlot)
+    (slots : List LocalSlot) (layout : frame.locals = root :: slots)
+    (left right output flagHome : Reference) (flags : Nat → BitVec 64)
+    (words : Fin 4 → BitVec 64) (zero : flags 0 = 0)
+    (call : CallingConditions program original [left, right] [output])
+    (currentCall : CallingConditions program current [left, right] [output])
+    (preserved : MemoryBelow original.nextIdentity original current)
+    (homes : NumericHomes entered original.nextIdentity specs slots)
+    (enteredWF : entered.WellFormed)
+    (authority : AccessBelow entered.nextIdentity entered current)
+    (flagSlot : frame.locals[base + 1]? = some (.bytes .word64 flagHome))
+    (flagRead : read current flagHome 8 1 = .ok (numberBytes 0 8)) :
+    ∃ results, RippleState program original current frame left right output flagHome results
+      flags words 0 (base + 1) (base + 2) := by
+  classical
+  have allHomes (index : Fin 5) : ∃ reference,
+      slots[base + index.val]? = some (.bytes .word64 reference) ∧
+      frame.locals[base + 1 + index.val]? = some (.bytes .word64 reference) ∧
+      original.nextIdentity ≤ reference.allocation ∧
+      access current reference 8 1 true = .ok () := by
+    obtain ⟨reference, slot, fresh, _, writable⟩ := homes.home_at _ _ (wordSpecs index)
+    refine ⟨reference, slot, ?_, fresh, ?_⟩
+    · simpa only [layout, show base + 1 + index.val = (base + index.val) + 1 by omega,
+        List.getElem?_cons_succ, rippleWordSpec] using slot
+    · exact authority.access writable (enteredWF.access_bound writable)
+  obtain ⟨flagRef, flagLocal, actualFlag, flagFresh, flagWrite⟩ := allHomes 0
+  have same : flagRef = flagHome := by
+    simpa only [show (0 : Fin 5).val = 0 from rfl, Nat.add_zero, flagSlot,
+      Option.some.injEq, LocalSlot.bytes.injEq, true_and] using actualFlag.symm
+  subst flagRef
+  let results := fun i : Fin 4 => Classical.choose (allHomes ⟨i.val + 1, by omega⟩)
+  have facts (i : Fin 4) := Classical.choose_spec (allHomes ⟨i.val + 1, by omega⟩)
+  have resultSlots (i : Fin 4) : slots[base + 1 + i.val]? =
+      some (.bytes .word64 (results i)) := by
+    simpa [results, Nat.add_assoc, Nat.add_comm, Nat.add_left_comm] using (facts i).1
+  refine ⟨results, currentCall, ?_, flagSlot, ?_, flagWrite,
+    fun i => (facts i).2.2.2, ?_, by simp [zero], ?_, ?_, ?_, flagFresh,
+    fun i => (facts i).2.2.1, preserved.cells, ?_⟩
+  · exact fun reference member => call.input_bytes_of_memory_below preserved member
+  · intro i
+    simpa [results, Nat.add_assoc, Nat.add_comm, Nat.add_left_comm] using (facts i).2.1
+  · simpa [zero] using flagRead
+  · intro reference member
+    obtain ⟨allocation, present, _, _⟩ := formed_reference_live _ _ _ (call.input_formed member)
+    have old := (call.1.1.1 _ _ present).1
+    exact ⟨Nat.ne_of_lt (Nat.lt_of_lt_of_le old flagFresh),
+      fun i => Nat.ne_of_lt (Nat.lt_of_lt_of_le old (facts i).2.2.1)⟩
+  · intro i
+    exact homes.writable.distinct _ _ _ _ _ _ (by omega) (resultSlots i) flagLocal
+  · intro i j different
+    exact homes.writable.distinct _ _ _ _ _ _ (by
+      intro same
+      apply different
+      apply Fin.ext
+      omega) (resultSlots i) (resultSlots j)
+  · intro index value impossible
+    simp [completedLocals] at impossible
 
 /-- Both helper outputs replace their old contents; earlier results are apart from both writes. -/
 theorem RippleState.advance {program original before after frame left right output flagHome

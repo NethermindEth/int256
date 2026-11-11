@@ -2,9 +2,12 @@ import UInt256.Methods.Multiply.FullSafety
 import UInt256.Methods.Multiply.VectorInputs
 import UInt256.Methods.Multiply.VectorSteps
 
+/-! The checked AVX512 top product preserves the caller and initialized word homes. -/
+
 namespace UInt256Proof.Multiply.Full
 open CIL.Safety UInt256Model.Safety UInt256Proof.Multiply.BothTwo UInt256Proof.Multiply.VectorInputs
 
+/-- The enabled AVX512 path multiplies reversed lanes and stores their exact sum. -/
 theorem full_avx512_top (profile : CIL.FeatureProfile) (program : CIL.Program)
     (methodIndex wordIndex countIndex storageIndex : Nat)
     (found : program[methodIndex]? = some (fullBody profile wordIndex countIndex storageIndex))
@@ -25,24 +28,18 @@ theorem full_avx512_top (profile : CIL.FeatureProfile) (program : CIL.Program)
     profileEq, enabled, CIL.FeatureProfile.evaluate]
   obtain ⟨stored, reference, slot, stepped, storedState, readback, _⟩ := state.store_vector enteredWF homes
     22 (by rfl) rightBits 34 (productArgs left right output) [.scalar (.v256 leftBits)] (body := (fullBody profile wordIndex countIndex storageIndex))
-  apply run_next_exists post found (by change some _ = _; simp only [enabled, ↓reduceIte] <;> rfl) stepped
-  apply run_next_exists post found (by change some _ = _; simp only [enabled, ↓reduceIte] <;> rfl)
-    (step_load_numeric_local .vector256 (.v256 rightBits) rightBits.toNat rfl slot readback)
-  apply run_next_exists post found (by change some _ = _; simp only [enabled, ↓reduceIte] <;> rfl)
-  · rfl
-  apply run_next_exists post found (by change some _ = _; simp only [enabled, ↓reduceIte] <;> rfl)
-    (step_reverse256 _ _ _ _ _ _ _ _ _ _ (by simpa only [profileEq] using avx2))
-  apply run_next_exists post found (by change some _ = _; simp only [enabled, ↓reduceIte] <;> rfl)
-    (step_mul256 _ _ _ _ _ _ _ _ _ _ _ _ _ _
-      (by simp only [CIL.Intrinsic.available, profileEq, enabled, dq, foundation, vl, Bool.true_and]))
-  apply run_next_exists post found (by change some _ = _; simp only [enabled, ↓reduceIte] <;> rfl)
-    (step_sum256 _ _ _ _ _ _ _ _ _ _)
+  apply run_next_exists post found
+    (by change some _ = _; simp only [enabled, ↓reduceIte] <;> rfl) stepped
+  have loaded := step_load_numeric_local
+    (body := fullBody profile wordIndex countIndex storageIndex) (pc := 35)
+    (args := productArgs left right output) (stack := [.scalar (.v256 leftBits)])
+    .vector256 (.v256 rightBits)
+    rightBits.toNat rfl slot readback
+  cil_contract_steps 5 [found, enabled, avx2, dq, foundation, vl, profileEq,
+    CIL.Intrinsic.available, loaded, leftBits, rightBits, a, b,
+    step_reverse256, step_mul256, step_sum256]
   obtain ⟨after, storedTop, finalState⟩ := storedState.store enteredWF homes 6 (by rfl)
     (fullTop original left right) 40 (productArgs left right output) [] (body := (fullBody profile wordIndex countIndex storageIndex))
-  apply run_next_exists post found (by change some _ = _; simp only [enabled, ↓reduceIte] <;> rfl) storedTop
-  apply run_next_exists post found (by rfl)
-  · simp [enabled, step, cil_guard, observerCount, pureArity, scalars, CIL.step.eq_def, Bind.bind, Except.bind, Pure.pure, Except.pure]
-    exact ⟨rfl, rfl, rfl, rfl⟩
-  exact continuation after finalState
+  cil_contract_steps [found, enabled, storedTop, fullTop, a, b] until continuation after finalState
 
 end UInt256Proof.Multiply.Full

@@ -13,10 +13,12 @@ for the checked execution and contract APIs.
 
 The Add/Subtract Vector128 helpers use `CodeAt` placements instead of carrying
 prefixes, suffixes and their length equations through every execution lemma.
-Input setup composes LeanCIL `Segment` proofs: multiplication joins the input
-read and private store, while vector setup joins reference formation and root
-storage. The continuations retain frame, stack, memory and
-caller-footprint obligations.
+Whole-path ARM addition and multiplication proofs compose checked execution through `WP`.
+Local snapshots supply initialized loads and carry updated values across actual stores;
+writable unknown homes do not authorize reads. The ARM and portable paths share their state
+and save operations. Add/Subtract repair proofs share frame initialization and the checked
+storage-call/flag-return suffix. Mixed-vector multiplication uses the same snapshot rules for
+word and vector homes, retaining the helper's exact write footprint and caller-memory obligations.
 
 ## Verification scope
 
