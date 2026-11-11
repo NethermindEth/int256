@@ -2,6 +2,7 @@ import UInt256.Methods.Multiply.Calls
 import UInt256.Methods.Multiply.ProductValue
 import UInt256.Methods.Multiply.ProductStorageContract
 import UInt256.Safety.OutputCallReturn
+import CIL.Safety.WordSnapshotPreservation
 
 /-! Private-home transitions shared by the multiplication paths: local stores, widening and
     carry-counting helper calls over remembered words, and the final product storage call. -/
@@ -31,6 +32,44 @@ variable {program : CIL.Program} {method pc : Nat} {body : CIL.Method}
   {args rest : List Value} {frame : Frame} {original entered current : Memory}
   {inputs outputs : List Reference} {known : Nat → Option (BitVec 64)}
   {post : Memory → List Value → Prop}
+
+/-- A write of `value` to a private word home remembers it and keeps the caller's bytes. -/
+theorem _root_.UInt256Model.Safety.PrivateWords.after_word_write {program : CIL.Program}
+    {original entered current after : Memory} {inputs outputs : List Reference} {frame : Frame}
+    {known : Nat → Option (BitVec 64)} {kinds : List CIL.LocalKind} {index : Nat}
+    {home : Reference} {value : BitVec 64}
+    (state : PrivateWords program original entered current inputs outputs frame known)
+    (homes : CompleteWritableHomes entered original.nextIdentity kinds frame.locals)
+    (slot : frame.locals[index]? = some (.bytes .word64 home))
+    (written : write current home (numberBytes value.toNat 8) 1 = .ok after) :
+    PrivateWords program original entered after inputs outputs frame
+      (rememberWord known index value) :=
+  have preserved := write_preserves_memory_below _ _ _ _ _ _
+    (homes.writable.home_bound index .word64 home slot) written
+  ⟨state.call.after_write written, state.enteredBound,
+    Nat.le_trans state.next (write_extends_allocations _ _ _ _ _ written).next,
+    state.authority.trans ((write_preserves_access_below written _).weaken state.next),
+    state.snapshots.after_write homes.writable state.call.1.1 index home value slot written,
+    fun id old offset => (preserved.cells id old offset).trans (state.caller id old offset)⟩
+
+/-- A write to a private vector home keeps every remembered word and the caller's bytes. -/
+theorem _root_.UInt256Model.Safety.PrivateWords.after_vector_write {program : CIL.Program}
+    {original entered current after : Memory} {inputs outputs : List Reference} {frame : Frame}
+    {known : Nat → Option (BitVec 64)} {kinds : List CIL.LocalKind} {index : Nat}
+    {home : Reference} {bytes : List (BitVec 8)}
+    (state : PrivateWords program original entered current inputs outputs frame known)
+    (homes : CompleteWritableHomes entered original.nextIdentity kinds frame.locals)
+    (slot : frame.locals[index]? = some (.bytes .vector256 home))
+    (written : write current home bytes 1 = .ok after) :
+    PrivateWords program original entered after inputs outputs frame known :=
+  have preserved := write_preserves_memory_below _ _ _ _ _ _
+    (homes.writable.home_bound index .vector256 home slot) written
+  ⟨state.call.after_write written, state.enteredBound,
+    Nat.le_trans state.next (write_extends_allocations _ _ _ _ _ written).next,
+    state.authority.trans ((write_preserves_access_below written _).weaken state.next),
+    state.snapshots.after_other_kind_write homes.writable index .vector256 home (by decide) slot
+      written,
+    fun id old offset => (preserved.cells id old offset).trans (state.caller id old offset)⟩
 
 /-- Store the top word in a private home, remembering it for the continuation. -/
 theorem run_store_local {kinds : List CIL.LocalKind} {result : (Memory × List Value) → Prop}

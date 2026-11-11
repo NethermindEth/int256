@@ -102,7 +102,6 @@ theorem both_two_invoke_with_storage (profile : CIL.FeatureProfile) (program : C
         .ok (final, returned) ∧ post final returned := by
     have formedLeft := state.call.input_formed (by simp : left ∈ [left, right])
     have readLeft := state.input_field call left (by simp) 0
-    simp only [Fin.val_zero, Nat.mul_zero] at readLeft
     cil_contract_steps 2 [productArgs, formedLeft, readLeft]
     apply run_input_to_local (argument := 1) (target := 0) state call enteredWF homes right
       (by simp) 0 (by rfl) (by rfl) found (by rfl) post

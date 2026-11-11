@@ -40,43 +40,22 @@ theorem primitive_multiply_finish (ctx : PrimitiveContext) (word : Calls.WordCon
   have outputSlot : frame.locals[1]? = some (.bytes (.aggregate 32) output) := by simp [slots]
   have operandSlot : frame.locals[0]? = some (.bytes (.aggregate 32) operand) := by simp [slots]
   have found : ctx.program[ctx.wrapperIndex]? = some (primitiveBody ctx.profile ctx.firstScalar ctx.indices.entry ctx.conversionIndex) := ctx.wrapper
-  have tail : run ctx.program 2 ctx.wrapperIndex 7
-      (scalarOperatorArguments firstScalar input argument) frame [] result =
-      .ok (leaveFrame frame result, [.scalar (encoded value)]) := by
-    apply Eq.trans
-    · apply run_next found (by rfl)
-      exact step_load_aggregate (size := 32) (reference := output) outputSlot resultRead
-    · simp [run, found, primitiveBody, step, cil_guard, observerCount, checkedValue, numericValue, encoded,
-        Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   have fi := call.input_formed (reference := input) (by simp)
   have fa := call.input_formed (reference := operand) (by simp)
   have fo := call.output_formed (reference := output) (by simp)
-  have stepped : step (primitiveBody ctx.profile ctx.firstScalar ctx.indices.entry ctx.conversionIndex) (.call ctx.indices.entry 3) 6
-      (scalarOperatorArguments firstScalar input argument) frame
-      (binaryArguments left right output).reverse memory =
-      .ok (.call ctx.indices.entry (binaryArguments left right output) [] memory) := by
-    cases firstScalar <;> simp [step, cil_guard, observerCount, binaryArguments, left, right, checkedValue, formValue,
-      fi, fa, fo, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-  obtain ⟨tailFuel, called⟩ := run_call_exists found (by rfl) stepped ⟨childFuel, certificate.1⟩ ⟨2, tail⟩
-  let post : Memory → List Value → Prop := fun final returned => final = leaveFrame frame result ∧ returned = [.scalar (encoded value)]
+  have loading := fun pc args rest => step_load_aggregate (body := primitiveBody ctx.profile
+    ctx.firstScalar ctx.indices.entry ctx.conversionIndex) (pc := pc) (args := args)
+    (stack := rest) (size := 32) outputSlot resultRead
+  let post : Memory → List Value → Prop := fun final returned =>
+    final = leaveFrame frame result ∧ returned = [.scalar (encoded value)]
   have prefixRun : ∃ fuel final returned,
       run ctx.program fuel ctx.wrapperIndex 3 (scalarOperatorArguments firstScalar input argument)
         frame [] memory = .ok (final, returned) ∧ post final returned := by
-    cases firstScalar <;> dsimp [left, right] at code3 code4 called ⊢
+    cases firstScalar <;> dsimp [left, right] at code3 code4 certificate ⊢
     all_goals
-      apply run_next_exists post found code3
-      · simp [step, cil_guard, observerCount, scalarOperatorArguments, scalarArguments, localAddress, operandSlot, checkedValue,
-          formValue, fi, fa, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-        first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
-      apply run_next_exists post found code4
-      · simp [step, cil_guard, observerCount, scalarOperatorArguments, localAddress, operandSlot, checkedValue,
-          formValue, fi, fa, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-        first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
-      apply run_next_exists post found (by rfl)
-      · simp [step, cil_guard, observerCount, localAddress, outputSlot, formValue, fo, checkedAt,
-          Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-        first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
-      exact ⟨tailFuel, _, _, called, rfl, rfl⟩
+      cil_contract_steps [found, code3, code4, scalarOperatorArguments, scalarArguments,
+        binaryArguments, localAddress, operandSlot, outputSlot, fi, fa, fo, certificate, loading]
+      exact ⟨rfl, rfl⟩
   obtain ⟨fuel, final, returned, ran, rfl, rfl⟩ := prefixRun
   have retained := leaveFrame_preserves_memory_below frame result watermark owned
   refine ⟨fuel, _, ran, ?_⟩
@@ -138,31 +117,25 @@ theorem primitive_body (ctx : PrimitiveContext) (wordContract : Calls.WordContra
     simp only [step, cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, slots, List.getElem?_cons_zero, encoded, stored, Bind.bind, Except.bind, Pure.pure, Except.pure]
     cases frame
     simp_all
-  have afterConversion := run_next_exists post found (by rfl) storeStep ⟨tailFuel, final, _, tail, rfl, rfl⟩
-  obtain ⟨afterFuel, after, values, afterRun, afterEq, valuesEq⟩ := afterConversion
-  change after = final at afterEq
-  subst after
-  change values = [.scalar (encoded value)] at valuesEq
-  subst values
-  have callStep : step (primitiveBody ctx.profile ctx.firstScalar ctx.indices.entry ctx.conversionIndex) (.call ctx.conversionIndex 1) 1
+  have argStep : step (primitiveBody ctx.profile ctx.firstScalar ctx.indices.entry
+      ctx.conversionIndex) (.arg (if firstScalar then 0 else 1)) 0
+      (scalarOperatorArguments firstScalar input argument) frame [] memory =
+      .ok (.next 1 [.scalar argument] frame memory) := by
+    cases firstScalar <;> simp [step, cil_guard, observerCount, scalarOperatorArguments,
+      scalarArguments, checkedValue, numeric, Bind.bind, Except.bind, Pure.pure, Except.pure]
+  have callStep : step (primitiveBody ctx.profile ctx.firstScalar ctx.indices.entry
+      ctx.conversionIndex) (.call ctx.conversionIndex 1) 1
       (scalarOperatorArguments firstScalar input argument) frame [.scalar argument] memory =
       .ok (.call ctx.conversionIndex [.scalar argument] [] memory) := by
-    simp [step, cil_guard, observerCount, checkedValue, numeric, known, Bind.bind, Except.bind, Pure.pure, Except.pure]
-  obtain ⟨callFuel, called⟩ := run_call_exists found (by rfl) callStep ⟨conversionFuel, invoked⟩ ⟨afterFuel, afterRun⟩
+    simp [step, cil_guard, observerCount, checkedValue, numeric, known, Bind.bind, Except.bind,
+      Pure.pure, Except.pure]
   have started : ∃ fuel result returned,
       run ctx.program fuel ctx.wrapperIndex 0 (scalarOperatorArguments firstScalar input argument)
         frame [] memory = .ok (result, returned) ∧ post result returned := by
-    apply run_next_exists post found code0
-    · cases firstScalar <;> simp [step, cil_guard, observerCount, scalarOperatorArguments, scalarArguments, checkedValue, numeric,
-        Bind.bind, Except.bind, Pure.pure, Except.pure]
-      all_goals first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
-    exact ⟨callFuel, final, _, called, rfl, rfl⟩
-  obtain ⟨fuel, result, returned, ran, resultEq, returnedEq⟩ := started
-  change result = final at resultEq
-  subst result
-  change returned = [.scalar (encoded value)] at returnedEq
-  subst returned
-  refine ⟨fuel, final, ran, ?_⟩
+    cil_contract_steps [found, code0, argStep, callStep, invoked, storeStep]
+    exact ⟨tailFuel, final, _, tail, rfl, rfl⟩
+  obtain ⟨fuel, result, returned, ran, rfl, rfl⟩ := started
+  refine ⟨fuel, _, ran, ?_⟩
   intro id old offset
   have beforeOperand := Nat.lt_of_lt_of_le old privateOperand
   exact (outside id old offset).trans
@@ -265,25 +238,15 @@ theorem conversion_prefix64 (ctx : PrimitiveContext) (narrow : ctx.narrow = fals
     (word : BitVec 64) : ConversionPrefix ctx (.i64 word) word := by
   intro memory frame post continuation
   have found := ctx.conversion
-  simp only [narrow, Bool.false_eq_true, ↓reduceIte] at continuation
-  iterate 7
-    apply run_next_exists post found (by simp only [conversionBody, narrow]; rfl)
-    simp [step, cil_guard, observerCount, checkedValue, numericValue, pureArity, scalars, CIL.step.eq_def,
-      Bind.bind, Except.bind, Pure.pure, Except.pure]
-    first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
-  exact continuation
+  simp only [narrow, Bool.false_eq_true, ↓reduceIte] at continuation found
+  cil_contract_steps [found, conversionBody, conversionWords] until continuation
 
 theorem conversion_prefix32 (ctx : PrimitiveContext) (narrow : ctx.narrow = true)
     (word : BitVec 32) : ConversionPrefix ctx (.i32 word) (word.setWidth 64) := by
   intro memory frame post continuation
   have found := ctx.conversion
-  simp only [narrow, ↓reduceIte] at continuation
-  iterate 8
-    apply run_next_exists post found (by simp only [conversionBody, narrow]; rfl)
-    simp [step, cil_guard, observerCount, checkedValue, numericValue, pureArity, scalars, CIL.step.eq_def,
-      Bind.bind, Except.bind, Pure.pure, Except.pure]
-    first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
-  exact continuation
+  simp only [narrow, ↓reduceIte] at continuation found
+  cil_contract_steps [found, conversionBody, conversionWords] until continuation
 
 theorem primitive64_with_contracts (ctx : PrimitiveContext) (narrow : ctx.narrow = false)
     (wordContract : Calls.WordContract ctx.program ctx.indices.word)

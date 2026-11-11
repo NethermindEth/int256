@@ -100,14 +100,11 @@ theorem multiply_scalar_branch (ctx : Context alternative) (word : WordContract 
   have leftFormed := state.call.input_formed (by simp : left ∈ [left, right])
   have rightFormed := state.call.input_formed (by simp : right ∈ [left, right])
   have outputFormed := state.call.output_formed (by simp : output ∈ [output])
-  have loadWord := fun (pc : Nat) (stack : List Value) => state.snapshots.load
-    (body := multiplyBody ctx.profile ctx.indices) (args := productArgs left right output)
-    (pc := pc) (stack := stack) (index := if swapped then 0 else 1) smallWord
-    (by cases swapped <;> rfl)
   change ∃ fuel final returned, _ ∧ post final returned
-  cases swapped <;> dsimp [firstInput, secondInput, smallWord] at invoked loadWord ⊢
+  cases swapped <;> dsimp [firstInput, secondInput, smallWord] at invoked ⊢
   all_goals
-    cil_contract_steps 3 [productArgs, leftFormed, rightFormed, outputFormed, loadWord]
+    cil_contract_steps (snapshots := state.snapshots.toLocalSnapshots)
+      [productArgs, leftFormed, rightFormed, outputFormed, multiplyInputs]
     exact run_output_call (callee := ctx.indices.single) state originalCall owned _ found (by rfl)
       (by cil_checked_step [ScalarSafety.scalarArgs, leftFormed, rightFormed, outputFormed])
       (by rfl) (by rfl) ⟨childFuel, childFinal, invoked, expected⟩
@@ -139,15 +136,10 @@ theorem multiply_invoke (ctx : Context alternative) (word : WordContract ctx.pro
           (inputValue memory left * inputValue memory right) [] := by
       simpa only [BothTwo.ProductResult, state.input_value call left (by simp),
         state.input_value call right (by simp)] using result
-    apply run_next_exists post found (by rfl) (state.snapshots.load _ (by rfl))
-    apply run_next_exists post found (by rfl) (state.snapshots.load _ (by rfl))
-    apply run_next_exists post found (by rfl)
-    · simp [step, cil_guard, observerCount, pureArity, numericValue, scalars, CIL.step.eq_def,
-        CIL.binary, Bind.bind, Except.bind, Pure.pure, Except.pure]
-      first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
-    apply run_next_exists post found (by rfl) (step_word_nonzero _ _ _ _ _ _ _)
-    by_cases small : inputTail memory left ||| inputTail memory right = 0
-    · simp only [small, ite_true]
+    have words := state.snapshots.toLocalSnapshots
+    cil_contract_steps (snapshots := words) [multiplyInputs]
+    by_cases small : inputTail memory left ||| inputTail memory right = 0#64
+    · simp only [small]
       have halves := BitVec.or_eq_zero_iff.mp small
       apply WP.exists_execution
       apply run_widen_locals word state call enteredWF homes 0 1 7 6
@@ -163,30 +155,22 @@ theorem multiply_invoke (ctx : Context alternative) (word : WordContract ctx.pro
             (inputLimb memory right 0) else 0)
         ((product_padding _ _).trans (small_product_value memory left right halves.1 halves.2))
         found (by rfl) (by rfl)
-    simp only [small, ite_false]
-    apply run_next_exists post found (by rfl) (state.snapshots.load _ (by rfl))
-    apply run_next_exists post found (by rfl) (step_word_nonzero _ _ _ _ _ _ _)
-    by_cases rightSmall : inputTail memory right = 0
-    · simp only [rightSmall, ite_true]
+    simp only [small, not_false_eq_true, ↓reduceIte]
+    cil_contract_steps (snapshots := words) [multiplyInputs]
+    by_cases rightSmall : inputTail memory right = 0#64
+    · simp only [rightSmall]
       exact multiply_scalar_branch ctx word false memory entered current left right output frame
         call owned state rightSmall
-    simp only [rightSmall, ite_false]
-    apply run_next_exists post found (by rfl) (state.snapshots.load _ (by rfl))
-    apply run_next_exists post found (by rfl) (step_word_nonzero _ _ _ _ _ _ _)
-    by_cases leftSmall : inputTail memory left = 0
-    · simp only [leftSmall, ite_true]
+    simp only [rightSmall, not_false_eq_true, ↓reduceIte]
+    cil_contract_steps (snapshots := words) [multiplyInputs]
+    by_cases leftSmall : inputTail memory left = 0#64
+    · simp only [leftSmall]
       exact multiply_scalar_branch ctx word true memory entered current left right output frame
         call owned state leftSmall
-    simp only [leftSmall, ite_false]
-    apply run_next_exists post found (by rfl) (state.snapshots.load _ (by rfl))
-    apply run_next_exists post found (by rfl) (state.snapshots.load _ (by rfl))
-    apply run_next_exists post found (by rfl)
-    · simp [step, cil_guard, observerCount, pureArity, numericValue, scalars, CIL.step.eq_def,
-        CIL.binary, Bind.bind, Except.bind, Pure.pure, Except.pure]
-      first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
-    apply run_next_exists post found (by rfl) (step_word_nonzero _ _ _ _ _ _ _)
-    by_cases bothTwo : inputUpper memory left ||| inputUpper memory right = 0
-    · simp only [bothTwo, ite_true]
+    simp only [leftSmall, not_false_eq_true, ↓reduceIte]
+    cil_contract_steps (snapshots := words) [multiplyInputs]
+    by_cases bothTwo : inputUpper memory left ||| inputUpper memory right = 0#64
+    · simp only [bothTwo]
       have halves := BitVec.or_eq_zero_iff.mp bothTwo
       cil_contract_steps 3 [productArgs, leftFormed, rightFormed, outputFormed]
       obtain ⟨childFuel, childFinal, invoked, result⟩ := BothTwo.both_two_invoke_with_storage
@@ -200,21 +184,19 @@ theorem multiply_invoke (ctx : Context alternative) (word : WordContract ctx.pro
       exact run_output_call (callee := ctx.indices.bothTwo) state call owned _ found (by rfl)
         (by cil_checked_step [productArgs, leftFormed, rightFormed, outputFormed])
         (by rfl) (by rfl) ⟨childFuel, childFinal, invoked, expected result⟩
-    simp only [bothTwo, ite_false]
-    apply run_next_exists post found (by rfl) (state.snapshots.load _ (by rfl))
-    apply run_next_exists post found (by rfl) (step_word_nonzero _ _ _ _ _ _ _)
-    by_cases leftTwo : inputUpper memory left = 0
-    · simp only [leftTwo, ite_true]
+    simp only [bothTwo, not_false_eq_true, ↓reduceIte]
+    cil_contract_steps (snapshots := words) [multiplyInputs]
+    by_cases leftTwo : inputUpper memory left = 0#64
+    · simp only [leftTwo]
       exact multiply_left_two_branch ctx word false memory entered current left right output
         frame call owned state leftTwo
-    simp only [leftTwo, ite_false]
-    apply run_next_exists post found (by rfl) (state.snapshots.load _ (by rfl))
-    apply run_next_exists post found (by rfl) (step_word_nonzero _ _ _ _ _ _ _)
-    by_cases rightTwo : inputUpper memory right = 0
-    · simp only [rightTwo, ite_true]
+    simp only [leftTwo, not_false_eq_true, ↓reduceIte]
+    cil_contract_steps (snapshots := words) [multiplyInputs]
+    by_cases rightTwo : inputUpper memory right = 0#64
+    · simp only [rightTwo]
       exact multiply_left_two_branch ctx word true memory entered current left right output
         frame call owned state rightTwo
-    simp only [rightTwo, ite_false]
+    simp only [rightTwo, not_false_eq_true, ↓reduceIte]
     cil_contract_steps 3 [productArgs, leftFormed, rightFormed, outputFormed]
     obtain ⟨childFuel, childFinal, invoked, result⟩ := Full.full_invoke_with_storage ctx.profile
       ctx.program ctx.indices.full ctx.indices.word ctx.indices.count ctx.indices.storage

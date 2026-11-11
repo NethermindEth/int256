@@ -58,7 +58,6 @@ end UInt256Proof.Multiply.Entry
 namespace UInt256Proof.Multiply.Entry
 variable {alternative : Bool}
 open CIL.Safety UInt256Model.Safety
-open UInt256Proof.Multiply.BothTwo (run_store_local)
 theorem multiply_frame_setup (ctx : Context alternative) (memory : Memory) (left right output : Reference)
     (call : CallingConditions ctx.program memory [left, right] [output]) :
     ∃ frame entered,
@@ -106,40 +105,27 @@ theorem multiply_prepare (ctx : Context alternative) (original entered current :
   apply run_input_to_local (argument := 1) (target := 1) low0 originalCall enteredWF homes right
     (by simp) 0 (by rfl) (by rfl) found (by rfl) post
   intro _ low1
+  have formed := low1.call.1.1
+  have retained := low1.authority
   have formedLeft := low1.call.input_formed (by simp : left ∈ [left, right])
   have upperLeft := low1.input_field originalCall left (by simp) 2
   have topLeft := low1.input_field originalCall left (by simp) 3
-  simp only [CIL.fin_val_three, Nat.reduceMul] at upperLeft topLeft
-  cil_contract_steps 5 [productArgs, formedLeft, upperLeft, topLeft]
-  apply WP.exists_execution
-  apply run_store_local low1 enteredWF homes 2 (by rfl) (inputUpper original left) found (by rfl)
-  intro _ upper0
+  cil_contract_steps (snapshots := low1.snapshots.toLocalSnapshots)
+    [productArgs, formedLeft, upperLeft, topLeft]
+  have upper0 := low1.after_word_write homes (by assumption) localWrite
   have formedRight := upper0.call.input_formed (by simp : right ∈ [left, right])
   have upperRight := upper0.input_field originalCall right (by simp) 2
   have topRight := upper0.input_field originalCall right (by simp) 3
-  simp only [CIL.fin_val_three, Nat.reduceMul] at upperRight topRight
-  cil_contract_steps 5 [productArgs, formedRight, upperRight, topRight]
-  apply WP.exists_execution
-  apply run_store_local upper0 enteredWF homes 3 (by rfl) (inputUpper original right) found
-    (by rfl)
-  intro _ upper1
+  cil_contract_steps (snapshots := localSnapshots) [productArgs, formedRight, upperRight, topRight]
+  have upper1 := upper0.after_word_write homes (by assumption) localWrite_1
   have formedLeft := upper1.call.input_formed (by simp : left ∈ [left, right])
   have secondLeft := upper1.input_field originalCall left (by simp) 1
-  simp only [Fin.val_one, Nat.mul_one] at secondLeft
-  cil_contract_steps (snapshots := upper1.snapshots.toLocalSnapshots)
-    [productArgs, formedLeft, secondLeft]
-  apply WP.exists_execution
-  apply run_store_local upper1 enteredWF homes 4 (by rfl) (inputTail original left) found (by rfl)
-  intro _ tail0
+  cil_contract_steps (snapshots := localSnapshots_1) [productArgs, formedLeft, secondLeft]
+  have tail0 := upper1.after_word_write homes (by assumption) localWrite_2
   have formedRight := tail0.call.input_formed (by simp : right ∈ [left, right])
   have secondRight := tail0.input_field originalCall right (by simp) 1
-  simp only [Fin.val_one, Nat.mul_one] at secondRight
-  cil_contract_steps (snapshots := tail0.snapshots.toLocalSnapshots)
-    [productArgs, formedRight, secondRight]
-  apply WP.exists_execution
-  apply run_store_local tail0 enteredWF homes 5 (by rfl) (inputTail original right) found (by rfl)
-  intro _ tail1
-  exact WP.adequate.mpr (continuation _ tail1)
+  cil_contract_steps (snapshots := localSnapshots_2) [productArgs, formedRight, secondRight]
+    until continuation _ (tail0.after_word_write homes (by assumption) localWrite_3)
 
 theorem input_upper_zero (memory : Memory) (input : Reference)
     (zero : inputUpper memory input = 0) :

@@ -117,7 +117,6 @@ theorem left_two_invoke_with_storage (profile : CIL.FeatureProfile) (program : C
         .ok (final, returned) ∧ post final returned := by
     have formedLeft := state.call.input_formed (by simp : left ∈ [left, right])
     have readLeft := state.input_field call left (by simp) 0
-    simp only [Fin.val_zero, Nat.mul_zero] at readLeft
     cil_contract_steps 2 [productArgs, formedLeft, readLeft]
     apply run_input_to_local (argument := 0) (target := 0) state call enteredWF homes left
       (by simp) 1 (by rfl) (by rfl) found (by rfl) post
@@ -133,7 +132,6 @@ theorem left_two_invoke_with_storage (profile : CIL.FeatureProfile) (program : C
     intro m3 state3
     have formedRight := state3.call.input_formed (by simp : right ∈ [left, right])
     have readRight := state3.input_field call right (by simp) 3
-    simp only [CIL.fin_val_three, Nat.reduceMul] at readRight
     cil_contract_steps (snapshots := state3.snapshots.toLocalSnapshots)
       [productArgs, formedRight, readRight]
     apply WP.exists_execution

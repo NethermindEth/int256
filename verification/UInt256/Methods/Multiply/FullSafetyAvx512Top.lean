@@ -14,32 +14,20 @@ theorem full_avx512_top (profile : CIL.FeatureProfile) (program : CIL.Program)
     (enabled : profile.avx512DQVL = true) (avx2 : profile.avx2 = true)
     (dq : profile.avx512DQ = true) (foundation : profile.avx512F = true) (vl : profile.avx512FVL = true) :
     FullTopContract profile program methodIndex wordIndex countIndex storageIndex := by
-  intro original entered current left right output frame originalCall enteredWF homes state post continuation
-  let a := inputLimb original left
-  let b := inputLimb original right
-  let leftBits := CIL.Vector.pack256 (a 0) (a 1) (a 2) (a 3)
-  let rightBits := CIL.Vector.pack256 (b 0) (b 1) (b 2) (b 3)
+  intro original entered current left right output frame originalCall enteredWF homes state
+    post continuation
   have profileEq : (fullBody profile wordIndex countIndex storageIndex).profile = profile := rfl
   have formedLeft := state.call.input_formed (by simp : left ∈ [left, right])
   have formedRight := state.call.input_formed (by simp : right ∈ [left, right])
   have loadedLeft := input_vector_snapshot state originalCall left (by simp)
   have loadedRight := input_vector_snapshot state originalCall right (by simp)
-  cil_contract_steps 16 [found, productArgs, formedLeft, formedRight, loadedLeft, loadedRight,
-    profileEq, enabled, CIL.FeatureProfile.evaluate]
-  obtain ⟨stored, reference, slot, stepped, storedState, readback, _⟩ := state.store_vector enteredWF homes
-    22 (by rfl) rightBits 34 (productArgs left right output) [.scalar (.v256 leftBits)] (body := (fullBody profile wordIndex countIndex storageIndex))
-  apply run_next_exists post found
-    (by change some _ = _; simp only [enabled, ↓reduceIte] <;> rfl) stepped
-  have loaded := step_load_numeric_local
-    (body := fullBody profile wordIndex countIndex storageIndex) (pc := 35)
-    (args := productArgs left right output) (stack := [.scalar (.v256 leftBits)])
-    .vector256 (.v256 rightBits)
-    rightBits.toNat rfl slot readback
-  cil_contract_steps 5 [found, enabled, avx2, dq, foundation, vl, profileEq,
-    CIL.Intrinsic.available, loaded, leftBits, rightBits, a, b,
-    step_reverse256, step_mul256, step_sum256]
-  obtain ⟨after, storedTop, finalState⟩ := storedState.store enteredWF homes 6 (by rfl)
-    (fullTop original left right) 40 (productArgs left right output) [] (body := (fullBody profile wordIndex countIndex storageIndex))
-  cil_contract_steps [found, enabled, storedTop, fullTop, a, b] until continuation after finalState
+  have formed := state.call.1.1
+  have retained := state.authority
+  cil_contract_steps (snapshots := state.snapshots.toLocalSnapshots) [found, productArgs,
+    formedLeft, formedRight, loadedLeft, loadedRight, profileEq, enabled, avx2, dq, foundation,
+    vl, CIL.FeatureProfile.evaluate, CIL.Intrinsic.available, step_reverse256, step_mul256,
+    step_sum256] until continuation _ (by
+      simpa only [fullTop] using (state.after_vector_write homes (by assumption)
+        localWrite).after_word_write homes (by assumption) localWrite_1)
 
 end UInt256Proof.Multiply.Full

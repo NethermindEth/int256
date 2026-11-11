@@ -248,7 +248,6 @@ theorem full_scalar_top (profile : CIL.FeatureProfile) (program : CIL.Program) (
   have formedRight := state.call.input_formed (by simp : right ∈ [left, right])
   have readingLeft := state.input_field originalCall left (by simp) 3
   have readingRight := state.input_field originalCall right (by simp) 3
-  simp only [CIL.fin_val_three, Nat.reduceMul] at readingLeft readingRight
   obtain ⟨after, stored, next⟩ := state.store enteredWF homes 6 (by rfl)
     (fullTop original left right) 95 (productArgs left right output) []
     (body := fullBody profile wordIndex countIndex storageIndex alternative)

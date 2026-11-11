@@ -13,7 +13,7 @@ import UInt256.Safety.ArgumentValues
 
 namespace UInt256Proof.Multiply.ScalarSafety
 open CIL.Safety UInt256Model.Safety UInt256Proof.Multiply.Calls
-open UInt256Proof.Multiply.BothTwo (run_store_local run_widen_operand run_product_storage)
+open UInt256Proof.Multiply.BothTwo (run_widen_operand run_product_storage)
 
 def scalarBody (profile : CIL.FeatureProfile) (wordIndex storageIndex : Nat) : CIL.Method := by_elab
   let body ← Lean.Elab.Term.elabTermAndSynthesize
@@ -78,7 +78,6 @@ theorem scalar_invoke_with_storage (profile : CIL.FeatureProfile) (program : CIL
         (by simp) 2 (by rfl) (by rfl) found (by rfl) post
       intro _ saved2
       have reading := saved2.input_field call input (by simp) 3
-      simp only [CIL.fin_val_three, Nat.reduceMul] at reading
       cil_contract_steps 3
         [scalarArgs, saved2.call.input_formed (by simp : input ∈ [input]), reading]
       apply WP.exists_execution
@@ -92,38 +91,26 @@ theorem scalar_invoke_with_storage (profile : CIL.FeatureProfile) (program : CIL
       apply run_word_call contract carried0 call homes 5 low1 word (inputLimb memory input 1)
         slot1 ready1 _ found (by rfl) (by cil_checked_step [formed1])
       intro _ product1
-      cil_contract_steps (snapshots := product1.snapshots.toLocalSnapshots) []
-      apply WP.exists_execution
-      apply run_store_local product1 enteredWF homes 6 (by rfl) _ found (by rfl)
-      intro _ summed1
-      cil_contract_steps (snapshots := summed1.snapshots.toLocalSnapshots) []
-      simp only [flag]
-      apply WP.exists_execution
-      apply run_store_local summed1 enteredWF homes 3 (by rfl) _ found (by rfl)
-      intro _ carried1
+      have formed := product1.call.1.1
+      have retained := product1.authority
+      cil_contract_steps (snapshots := product1.snapshots.toLocalSnapshots) [scalarArgs]
+      have carried1 := (product1.after_word_write homes (by assumption)
+        localWrite).after_word_write homes (by assumption) localWrite_1
       obtain ⟨low2, slot2, ready2, formed2⟩ := carried1.home enteredWF homes 5 (by rfl)
-      cil_contract_steps (snapshots := carried1.snapshots.toLocalSnapshots)
-        [scalarArgs, slot2, formed2, localAddress]
+      cil_contract_steps (snapshots := localSnapshots_1) [scalarArgs, slot2, formed2, localAddress]
       apply WP.exists_execution
       apply run_word_call contract carried1 call homes 5 low2 word (inputLimb memory input 2)
         slot2 ready2 _ found (by rfl) (by cil_checked_step [formed2])
       intro _ product2
-      cil_contract_steps (snapshots := product2.snapshots.toLocalSnapshots) []
-      apply WP.exists_execution
-      apply run_store_local product2 enteredWF homes 7 (by rfl) _ found (by rfl)
-      intro _ summed2
-      cil_contract_steps (snapshots := summed2.snapshots.toLocalSnapshots) []
-      simp only [flag]
-      apply WP.exists_execution
-      apply run_store_local summed2 enteredWF homes 3 (by rfl) _ found (by rfl)
-      intro _ carried2
-      cil_contract_steps (snapshots := carried2.snapshots.toLocalSnapshots) [scalarArgs]
-      simp only [BitVec.mul_comm (inputLimb memory input 3) word]
-      apply WP.exists_execution
-      apply run_store_local carried2 enteredWF homes 8 (by rfl) _ found (by rfl)
-      intro _ finished
-      cil_contract_steps (snapshots := finished.snapshots.toLocalSnapshots)
+      have formed := product2.call.1.1
+      have retained := product2.authority
+      cil_contract_steps (snapshots := product2.snapshots.toLocalSnapshots) [scalarArgs]
+      have finished := ((product2.after_word_write homes (by assumption)
+        localWrite_2).after_word_write homes (by assumption)
+        localWrite_3).after_word_write homes (by assumption) localWrite_4
+      cil_contract_steps (snapshots := localSnapshots_4)
         [scalarArgs, finished.call.output_formed (by simp : output ∈ [output])]
+      simp only [flag, BitVec.mul_comm (inputLimb memory input 3) word]
       apply WP.exists_execution
       exact run_product_storage storage finished call owned
         (scalarLimbs (inputLimb memory input) word)
@@ -139,8 +126,7 @@ theorem scalar_invoke_with_storage (profile : CIL.FeatureProfile) (program : CIL
         apply WP.exists_execution
         exact run_product_storage storage state call owned (fun _ => 0)
           (by simp [UInt256Model.value]) found (by rfl) (by rfl)
-      · cil_contract_steps 3 [scalarArgs]
-        let bits := inputValue entered input
+      · let bits := inputValue entered input
         have length : (numberBytes bits.toNat 32).length = 32 := by simp [numberBytes]
         obtain ⟨result, written, valid, outside, readback⟩ := state.call.write_output_slice
           (by simp : output ∈ [output]) 0 (numberBytes bits.toNat 32)
@@ -149,16 +135,9 @@ theorem scalar_invoke_with_storage (profile : CIL.FeatureProfile) (program : CIL
         change write entered output (numberBytes bits.toNat 32) 1 = .ok result at written
         simp only [bits] at written length
         have loaded := input_encoded program entered [input] [output] state.call input (by simp)
-        iterate 4
-          apply run_next_exists post found (by rfl)
-          · simp [step, cil_guard, observerCount, scalarArgs, checkedValue, formValue, inputFormed,
-              outputFormed, checkedAt, pureArity, instruction, dereference,
-              ordinaryAccessAlignment, loaded, referenceAt, written, length,
-              Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-            try (first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)
-            done
-        apply WP.exists_execution
-        apply WP.returned found (by rfl) (by rfl) (by rfl)
+        cil_contract_steps [scalarArgs, inputFormed, outputFormed]
+        apply run_next_exists post found (by rfl) (by cil_checked_step [loaded])
+        cil_contract_steps [written]
         refine output_result_of_storage memory entered result [input] output _ frame call valid
           owned state.caller ?_ ⟨_, readback⟩ outside
         simpa using (inputValue_of_encoded_read readback).trans
