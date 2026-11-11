@@ -207,6 +207,62 @@ theorem VectorFrame.after_call {program : CIL.Program} {original entered current
     obtain ⟨allocation, requirements⟩ := access_requirements ready
     exact (preserved.read output (state.call.1.1.1 _ _ requirements.present).1 _ _).trans loaded
 
+/-- `after` is reached from `before` by checked writes alone. -/
+inductive WrittenFrom (before : Memory) : Memory → Prop
+  | same : WrittenFrom before before
+  | write {middle after : Memory} {reference : Reference} {bytes : List (BitVec 8)}
+      {alignment : Nat} (earlier : WrittenFrom before middle)
+      (written : write middle reference bytes alignment = .ok after) : WrittenFrom before after
+
+/-- Checked writes allocate nothing and keep the static world. -/
+theorem WrittenFrom.kept {before after : Memory} (chain : WrittenFrom before after)
+    {descriptors : List CIL.StaticDescriptor} (world : StaticWorldValid descriptors before) :
+    after.nextIdentity = before.nextIdentity ∧ StaticWorldValid descriptors after := by
+  induction chain with
+  | same => exact ⟨rfl, world⟩
+  | write _ written kept =>
+    exact ⟨(write_nextIdentity written).trans kept.1,
+      write_preserves_static_world _ _ _ _ _ _ kept.2 written⟩
+
+/-- Proves `WrittenFrom` from the `write` facts a snapshot walk leaves in the context. -/
+syntax "written_from_context" : tactic
+macro_rules
+  | `(tactic| written_from_context) => `(tactic| first
+    | exact WrittenFrom.same
+    | (refine WrittenFrom.write ?_ (by assumption); written_from_context))
+
+/-- The facts a snapshot walk reads from the context and restates after each local store. -/
+theorem VectorFrame.walk_facts {program : CIL.Program} {original entered current : Memory}
+    {inputs : List Reference} {output : Reference} {frame : Frame}
+    {known : Nat → Option CIL.Value} {stored : Option (BitVec 256)}
+    (state : VectorFrame program original entered current inputs output frame known stored)
+    (boundary : Nat) :
+    entered.WellFormed ∧ current.WellFormed ∧ AccessBelow entered.nextIdentity entered current ∧
+      ValidCall current (inputs.map wordView) ([output].map wordView) ∧
+      MemoryBelow boundary current current :=
+  ⟨state.enteredWF, state.call.1.1, state.authority, state.call.1, .refl _ _⟩
+
+/-- Local stores that keep every byte below `boundary` leave the frame with their snapshots. -/
+theorem VectorFrame.after_stores {program : CIL.Program} {original entered current after : Memory}
+    {inputs : List Reference} {output : Reference} {frame : Frame}
+    {known remembered : Nat → Option CIL.Value} {stored : Option (BitVec 256)} {boundary : Nat}
+    (state : VectorFrame program original entered current inputs output frame known stored)
+    (originalCall : CallingConditions program original inputs [output])
+    (locals : LocalSnapshots after frame.locals remembered)
+    (valid : ValidCall after (inputs.map wordView) ([output].map wordView) := by assumption)
+    (authority : AccessBelow entered.nextIdentity entered after := by assumption)
+    (preserved : MemoryBelow boundary current after := by assumption)
+    (bound : original.nextIdentity ≤ boundary := by first | exact Nat.le_refl _ | assumption)
+    (chain : WrittenFrom current after := by written_from_context) :
+    VectorFrame program original entered after inputs output frame remembered stored := by
+  obtain ⟨next, world⟩ := chain.kept state.call.2
+  have below := preserved.weaken bound
+  refine ⟨⟨valid, world⟩, state.enteredWF, state.enteredBound, next ▸ state.next, authority,
+    locals, fun id old offset away => (below.cells id old offset).trans
+      (state.caller id old offset away), fun value specified => ?_⟩
+  exact (below.read output (state.output_old originalCall) 32 1).trans
+    (state.result value specified)
+
 /-- Leaving the frame exposes the stored output, its authority and the other original caller bytes. -/
 theorem VectorFrame.finish {program : CIL.Program} {original entered current : Memory}
     {inputs : List Reference} {output : Reference} {frame : Frame}

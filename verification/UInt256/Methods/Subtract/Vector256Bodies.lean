@@ -42,4 +42,26 @@ def subtractUnderflowEntryBody (profile : CIL.FeatureProfile) (impl : Nat) : CIL
   .call impl 3,
   .ret (some .unsigned8)] }
 
+/-- AVX2 `SubtractImpl` that forms the incoming borrows with a permute and a zero blend. -/
+def Blended.subtractBlendImplBody (profile : CIL.FeatureProfile) (bmi1 : Bool) (lookup : Nat) :
+    CIL.Method := by_elab
+  let body ← Lean.Elab.Term.elabTermAndSynthesize (← `(
+    let template := subtractImplBody $(Lean.mkIdent `profile) false
+      $(Lean.mkIdent `bmi1) $(Lean.mkIdent `lookup)
+    let incoming : List CIL.Op := [.intrinsic (.vector (.reinterpret 256)) 1,
+      .intrinsic (.vector (.zero 256)) 0, .const32 3,
+      .intrinsic (.avx2 .blend32) 3, .intrinsic (.vector (.reinterpret 256)) 1]
+    { template with code := ((template.code.take 39 ++ incoming ++ template.code.drop 49)
+        |>.set 1 (.brzero 120) |>.set 60 (.brnonzero 112) |>.set 98 (.brnonzero 105)) })) none
+  let names := #[``subtractImplBody, ``List.take, ``List.drop, ``List.set,
+    ``List.append, ``HAppend.hAppend, ``Append.append]
+  let rules ← names.foldlM (fun rules name => rules.addDeclToUnfold name)
+    ({} : Lean.Meta.SimpTheorems)
+  let context ← Lean.Meta.Simp.mkContext (simpTheorems := #[rules])
+  let normalized := (← Lean.Meta.dsimp body context).1
+  let rules ← #[``eq_self, ``ite_true, ``ite_false].foldlM
+    (fun rules name => rules.addConst name) ({} : Lean.Meta.SimpTheorems)
+  let context ← Lean.Meta.Simp.mkContext (simpTheorems := #[rules])
+  return (← Lean.Meta.simp normalized context).1.expr
+
 end UInt256Proof.Subtract.Vector256

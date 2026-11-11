@@ -100,7 +100,7 @@ theorem entry_prepare (program : CIL.Program) (method prepare : Nat) (body : CIL
     (ScratchCells.known_locals cells slots defined)
   cil_contract_steps [found, f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, profileEq, features.avx2,
     CIL.FeatureProfile.evaluate, binaryArguments, prepareArguments, slot0, slot1, slot2, slot3,
-    localAddress, formed0, formed1, formed2, formed3, invoked, (by decide : ¬(1#32 = 0#32)),
+    localAddress, formed0, formed1, formed2, formed3, invoked,
     state.call.input_formed (reference := left) (by simp),
     state.call.input_formed (reference := right) (by simp),
     state.call.output_formed (reference := output) (by simp)] until continuation after next

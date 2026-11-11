@@ -33,14 +33,6 @@ def finishSum (sum carry propagation : BitVec 256) : BitVec 256 :=
 def finishFlag (carry propagation : BitVec 256) : BitVec 32 :=
   if 0#32 < (CIL.Vector.moveMask64 propagation + 2 * CIL.Vector.moveMask64 carry) &&& 16#32 then 1#32 else 0#32
 
-/-- Locals after the two lane masks, the cascade sum and the table index. -/
-def finishLocals (carry propagation : BitVec 256) : Nat → Option CIL.Value :=
-  let g := CIL.Vector.moveMask64 carry
-  let p := CIL.Vector.moveMask64 propagation
-  rememberLocal (rememberLocal (rememberLocal (rememberLocal (rememberLocal (fun _ => none)
-    0 (.i32 g)) 1 (.i32 p)) 0 (.i32 (p + 2 * g))) 1 (.i32 (p ^^^ (p + 2 * g)))) 1
-    (.i32 (UInt256Proof.SIMD.cascadeIndex g p))
-
 /-- `FinishAdd`: the table-corrected lane sum, the top carry bit, and no other caller byte changed. -/
 theorem finish_invoke (program : CIL.Program) (method lookup : Nat) (profile : CIL.FeatureProfile)
     (avx512 : Bool) (found : program[method]? = some (finishAddBody profile lookup))
@@ -58,9 +50,6 @@ theorem finish_invoke (program : CIL.Program) (method lookup : Nat) (profile : C
   obtain ⟨frame, entered, setup, numeric, _, _⟩ := numeric_frame_setup
     (finishAddBody profile lookup) finishSpecs rfl rfl rfl rfl rfl memory
     (finishArguments sum carry propagation output) originalCall.1.1
-  have homes : CompleteWritableHomes entered memory.nextIdentity
-      (finishAddBody profile lookup).localKinds frame.locals :=
-    CIL.Safety.NumericHomes.complete numeric
   have owned : ∀ id ∈ frame.owned, memory.nextIdentity ≤ id := fun id member =>
     ((enterFrame_fresh _ _ _ _ _ setup).2 id member).1
   let post : Memory → List Value → Prop := fun final returned =>
@@ -77,35 +66,26 @@ theorem finish_invoke (program : CIL.Program) (method lookup : Nat) (profile : C
         form current output = .ok output ∧ profile.avx = true ∧ profile.avx2 = true ∧
           (finishAddBody profile lookup).profile = profile :=
       ⟨state.call.output_formed (by simp), features.avx, features.avx2, rfl⟩
-    suffices index : ∀ current,
-        VectorFrame program memory entered current [] output frame (fun _ => none) none →
-        ∃ fuel final returned,
-          run program fuel method 0 (finishArguments sum carry propagation output) frame []
-            current = .ok (final, returned) ∧ post final returned from
-      index entered (.initial originalCall setup)
-    intro current state
-    iterate 5
-      cil_contract_steps (snapshots := state.locals) [found, finishArguments, facts state,
-        CIL.FeatureProfile.evaluate]
-      refine state.run_store post originalCall homes found fun current state => ?_
-    replace state : VectorFrame program memory entered current [] output frame
-      (finishLocals carry propagation) none := state
+    have state := VectorFrame.initial originalCall setup
+    obtain ⟨enteredFormed, formed, authority, valid, preserved⟩ :=
+      state.walk_facts memory.nextIdentity
+    cil_contract_steps (snapshots := state.locals) [found, finishArguments, facts state,
+      CIL.FeatureProfile.evaluate]
+    replace state := state.after_stores originalCall localSnapshots_4 (remembered :=
+      rememberLocal _ 1 (.i32 (UInt256Proof.SIMD.cascadeIndex (CIL.Vector.moveMask64 carry) _)))
     apply UInt256Proof.AddSubtract.Vector256.run_lookup post state found (by rfl) lookupFound
     intro current reference state loaded formed
     obtain ⟨added, row⟩ := UInt256Proof.AddSubtract.Vector256.table_row current reference
-      state.call.1.1 loaded (UInt256Proof.SIMD.cascadeIndex (CIL.Vector.moveMask64 carry)
-        (CIL.Vector.moveMask64 propagation))
-      (UInt256Proof.SIMD.cascade_index_bound _ _)
+      state.call.1.1 loaded _ (UInt256Proof.SIMD.cascade_index_bound
+        (CIL.Vector.moveMask64 carry) (CIL.Vector.moveMask64 propagation))
     cil_contract_steps (snapshots := state.locals) [found, finishArguments, facts state,
-      CIL.FeatureProfile.evaluate, formed, added, row, finishLocals]
-    refine state.run_store post originalCall homes found fun current state => ?_
+      CIL.FeatureProfile.evaluate, formed, added, row]
+    refine state.run_store post originalCall numeric.complete found fun current state => ?_
     cil_contract_steps (snapshots := state.locals) [found, finishArguments, facts state,
       CIL.FeatureProfile.evaluate]
-    refine state.run_output post originalCall homes found fun current state => ?_
-    replace state : VectorFrame program memory entered current [] output frame _
-      (some (finishSum sum carry propagation)) := state
+    refine state.run_output post originalCall numeric.complete found fun current state => ?_
     cil_contract_steps (snapshots := state.locals) [found, finishArguments, facts state,
-      CIL.FeatureProfile.evaluate, finishLocals, CIL.NarrowKind.extend_ite_ofNat_one_zero]
+      CIL.FeatureProfile.evaluate, CIL.NarrowKind.extend_ite_ofNat_one_zero]
     obtain ⟨_, access, footprint⟩ := state.finish originalCall owned
     exact ⟨rfl, state.finish_read originalCall owned, access, footprint⟩
   obtain ⟨fuel, final, returned, ran, flag, value, access, footprint⟩ := finished

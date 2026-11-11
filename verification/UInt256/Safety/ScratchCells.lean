@@ -130,49 +130,6 @@ theorem VectorFrame.initial_from {program : CIL.Program} {original memory entere
   · intro value impossible
     cases impossible
 
-/-- A typed local store keeps the frame facts and every scratch cell below the private homes. -/
-theorem VectorFrame.run_store_scratch {program : CIL.Program} {original entered current : Memory}
-    {inputs : List Reference} {output : Reference} {frame : Frame}
-    {known : Nat → Option CIL.Value} {stored : Option (BitVec 256)}
-    {kinds : List CIL.LocalKind} {body : CIL.Method} {method pc index number upper : Nat}
-    {args stack : List Value} {kind : CIL.LocalKind} {value : CIL.Value}
-    {cells : List Reference} {cellValues : Nat → Option (BitVec 256)}
-    (post : Memory → List Value → Prop)
-    (state : VectorFrame program original entered current inputs output frame known stored)
-    (scratch : ScratchCells current cells cellValues)
-    (originalCall : CallingConditions program original inputs [output])
-    (homes : CompleteWritableHomes entered upper kinds frame.locals) (bound : original.nextIdentity ≤ upper)
-    (layout : ScratchLayout original.nextIdentity upper cells)
-    (found : program[method]? = some body)
-    (continuation : ∀ after,
-      VectorFrame program original entered after inputs output frame (rememberLocal known index value) stored →
-      ScratchCells after cells cellValues →
-      ∃ fuel result returned,
-        run program fuel method (pc + 1) args frame stack after = .ok (result, returned) ∧ post result returned)
-    (fetched : body.code[pc]? = some (.setLocal index) := by rfl)
-    (specified : kinds[index]? = some kind := by rfl)
-    (fits : localNumber kind value = .ok number := by rfl)
-    (result : localResult kind value = value := by rfl) :
-    ∃ fuel result returned,
-      run program fuel method pc args frame (.scalar value :: stack) current = .ok (result, returned) ∧
-        post result returned := by
-  obtain ⟨after, stepped, next⟩ := state.store originalCall (homes.weaken bound) (body := body) (pc := pc)
-    (args := args) (stack := stack) kind value number specified fits result
-  obtain ⟨reference, slot, homeBound, ready⟩ := homes.home_at index kind specified
-  obtain ⟨allocation, requirements⟩ := access_requirements ready
-  have privateOld := (state.enteredWF.1 _ _ requirements.present).1
-  have writable := state.authority.access ready privateOld
-  obtain ⟨written, stepWritten, write, _⟩ := step_store_numeric_local
-    (body := body) (pc := pc) (args := args) (rest := stack) kind value number fits slot writable
-  rw [stepped] at stepWritten
-  have same : after = written := by
-    injection stepWritten with action
-    injection action
-  subst same
-  exact run_next_exists post found fetched stepped (continuation after next
-    (ScratchCells.after_write scratch write (fun i cell cellFound =>
-      Nat.ne_of_lt (Nat.lt_of_lt_of_le (layout.bounds i cell cellFound).2 homeBound))))
-
 /-- A 256-bit output store keeps every scratch cell above the caller boundary. -/
 theorem VectorFrame.output_store_scratch {program : CIL.Program} {original entered current : Memory}
     {inputs : List Reference} {output : Reference} {frame : Frame}

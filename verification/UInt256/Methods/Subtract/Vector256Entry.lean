@@ -13,7 +13,8 @@ theorem subtract_contract (program : CIL.Program) (profile : CIL.FeatureProfile)
     (features : ImplProfile profile avx512 bmi1) :
     WrappingBinaryContract (· - ·) program 0 :=
   forward_reporting_pop program 0 1 _ _ _ entryFound rfl rfl rfl rfl rfl rfl
-    (impl_contract program 1 2 profile avx512 bmi1 implFound lookupFound features)
+    (impl_contract program 1 2 profile avx512 bmi1 _ 5 (.inl ⟨rfl, rfl⟩) implFound lookupFound
+      features)
 
 /-- Public AVX2 `SubtractUnderflow`: wrapped difference and the exact initial-operand borrow. -/
 theorem subtract_underflow_contract (program : CIL.Program) (profile : CIL.FeatureProfile) (avx512 bmi1 : Bool)
@@ -23,6 +24,7 @@ theorem subtract_underflow_contract (program : CIL.Program) (profile : CIL.Featu
     (features : ImplProfile profile avx512 bmi1) :
     ReportingBinaryContract (· - ·) (fun left right => decide (left.toNat < right.toNat)) program 0 :=
   forward_reporting_byte program 0 1 _ _ _ entryFound rfl rfl rfl rfl rfl rfl
-    (impl_contract program 1 2 profile avx512 bmi1 implFound lookupFound features)
+    (impl_contract program 1 2 profile avx512 bmi1 _ 5 (.inl ⟨rfl, rfl⟩) implFound lookupFound
+      features)
 
 end UInt256Proof.Subtract.Vector256

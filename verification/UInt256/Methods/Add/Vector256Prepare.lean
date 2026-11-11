@@ -128,21 +128,23 @@ theorem prepare_invoke (program : CIL.Program) (method : Nat) (profile : CIL.Fea
       (by simp : left ∈ [left, right])
     have castLeft := UInt256Proof.Equality.VectorPrimitive.cast_input current left
     rw [state.input_value originalCall (by simp : left ∈ [left, right])] at castLeft
+    obtain ⟨enteredFormed, formed, authority, valid, preserved⟩ :=
+      state.walk_facts memory.nextIdentity
     -- The extracted body steps under either AVX-512 choice; the masked body has none.
     cases avx512 <;> rcases variant with rfl | ⟨⟨⟩, rfl⟩
     all_goals
       cil_contract_steps (snapshots := state.locals) [found, args, prepareArguments, profileEq,
         facts state cells, CIL.FeatureProfile.evaluate, loadLeft, castLeft]
-      refine state.run_store_scratch post cells originalCall homes grown layout found
-        fun current state cells => ?_
+      replace cells := cells.after_below localBelow cellsOld
+      replace state := state.after_stores originalCall localSnapshots
       have loadRight := UInt256Proof.Equality.VectorPrimitive.load_input state.call
         (by simp : right ∈ [left, right])
-      have castRight := UInt256Proof.Equality.VectorPrimitive.cast_input current right
+      have castRight := UInt256Proof.Equality.VectorPrimitive.cast_input storedLocal right
       rw [state.input_value originalCall (by simp : right ∈ [left, right])] at castRight
       cil_contract_steps (snapshots := state.locals) [found, args, prepareArguments, profileEq,
         facts state cells, CIL.FeatureProfile.evaluate, loadRight, castRight]
-      refine state.run_store_scratch post cells originalCall homes grown layout found
-        fun current state cells => ?_
+      replace cells := cells.after_below localBelow_1 cellsOld
+      replace state := state.after_stores originalCall localSnapshots_1
       cil_contract_steps (snapshots := state.locals) [found, args, prepareArguments, profileEq,
         facts state cells, CIL.FeatureProfile.evaluate]
       refine state.run_cell_store post cells originalCall homes layout 0 found
