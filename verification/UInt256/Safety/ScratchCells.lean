@@ -72,11 +72,6 @@ theorem ScratchCells.write_cell {memory : Memory} {cells : List Reference}
     exact write_preserves_disjoint_read written (targetValues stored previous)
       (Or.inl (layout.distinct other index target cell same targetFound found))
 
-theorem scratch_load {memory : Memory} {cell : Reference} {value : BitVec 256}
-    (loaded : CIL.Safety.read memory cell 32 1 = .ok (numberBytes value.toNat 32)) :
-    loadValue memory (.address cell) 32 = .ok (.v256 value) := by
-  simpa [numericOfWidth] using load_scalar_of_read (by decide) loaded
-
 /-- Remembered cells that are typed vector homes of a frame give its remembered locals. -/
 theorem ScratchCells.known_locals {memory : Memory} {cells : List Reference}
     {known : Nat → Option (BitVec 256)} {slots : List LocalSlot}
@@ -148,14 +143,16 @@ theorem VectorFrame.run_store_scratch {program : CIL.Program} {original entered 
     (originalCall : CallingConditions program original inputs [output])
     (homes : CompleteWritableHomes entered upper kinds frame.locals) (bound : original.nextIdentity ≤ upper)
     (layout : ScratchLayout original.nextIdentity upper cells)
-    (found : program[method]? = some body) (fetched : body.code[pc]? = some (.setLocal index))
-    (specified : kinds[index]? = some kind) (fits : localNumber kind value = .ok number)
-    (result : localResult kind value = value)
+    (found : program[method]? = some body)
     (continuation : ∀ after,
       VectorFrame program original entered after inputs output frame (rememberLocal known index value) stored →
       ScratchCells after cells cellValues →
       ∃ fuel result returned,
-        run program fuel method (pc + 1) args frame stack after = .ok (result, returned) ∧ post result returned) :
+        run program fuel method (pc + 1) args frame stack after = .ok (result, returned) ∧ post result returned)
+    (fetched : body.code[pc]? = some (.setLocal index) := by rfl)
+    (specified : kinds[index]? = some kind := by rfl)
+    (fits : localNumber kind value = .ok number := by rfl)
+    (result : localResult kind value = value := by rfl) :
     ∃ fuel result returned,
       run program fuel method pc args frame (.scalar value :: stack) current = .ok (result, returned) ∧
         post result returned := by
@@ -305,22 +302,6 @@ theorem VectorFrame.after_child {program : CIL.Program} {original entered curren
     fun id old offset away => footprint id old offset (away.resolve_left (by simp)),
     fun x same => by cases same; exact result⟩
 
-/-- Loading a remembered cell pushes its value. -/
-theorem run_cell_load {program : CIL.Program} {body : CIL.Method} {method pc : Nat}
-    {args stack : List Value} {frame : Frame} {current : Memory} {cell : Reference} {value : BitVec 256}
-    (post : Memory → List Value → Prop)
-    (found : program[method]? = some body) (fetched : body.code[pc]? = some (.memory .load256))
-    (loaded : CIL.Safety.read current cell 32 1 = .ok (numberBytes value.toNat 32))
-    (continuation : ∃ fuel result returned,
-      run program fuel method (pc + 1) args frame (.scalar (.v256 value) :: stack) current =
-        .ok (result, returned) ∧ post result returned) :
-    ∃ fuel result returned,
-      run program fuel method pc args frame (.reference (.address cell) :: stack) current =
-        .ok (result, returned) ∧ post result returned := by
-  apply run_next_exists post found fetched _ continuation
-  simp [step, cil_guard, observerCount, staticInstruction, memoryInstruction, otherMemoryInstruction, scratch_load loaded,
-    Bind.bind, Except.bind, Pure.pure, Except.pure]
-
 /-- A 256-bit store to a scratch cell; the continuation receives the updated frame and cells. -/
 theorem VectorFrame.run_cell_store {program : CIL.Program} {original entered current : Memory}
     {inputs : List Reference} {output : Reference} {frame : Frame}
@@ -334,13 +315,14 @@ theorem VectorFrame.run_cell_store {program : CIL.Program} {original entered cur
     (originalCall : CallingConditions program original inputs [output])
     (homes : CompleteWritableHomes entered upper kinds frame.locals)
     (layout : ScratchLayout original.nextIdentity upper cells)
-    (index : Nat) {cell : Reference} (cellFound : cells[index]? = some cell)
-    (found : program[method]? = some body) (fetched : body.code[pc]? = some (.memory .store256))
+    (index : Nat) {cell : Reference} (found : program[method]? = some body)
     (continuation : ∀ after,
       VectorFrame program original entered after inputs output frame known stored →
       ScratchCells after cells (rememberCell cellValues index value) →
       ∃ fuel result returned,
-        run program fuel method (pc + 1) args frame rest after = .ok (result, returned) ∧ post result returned) :
+        run program fuel method (pc + 1) args frame rest after = .ok (result, returned) ∧ post result returned)
+    (cellFound : cells[index]? = some cell := by rfl)
+    (fetched : body.code[pc]? = some (.memory .store256) := by rfl) :
     ∃ fuel result returned,
       run program fuel method pc args frame (.scalar (.v256 value) :: .reference (.address cell) :: rest) current =
         .ok (result, returned) ∧ post result returned := by
@@ -361,12 +343,13 @@ theorem VectorFrame.run_output_store {program : CIL.Program} {original entered c
     (originalCall : CallingConditions program original inputs [output])
     (homes : CompleteWritableHomes entered original.nextIdentity kinds frame.locals)
     (layout : ScratchLayout original.nextIdentity upper cells)
-    (found : program[method]? = some body) (fetched : body.code[pc]? = some (.memory .store256))
+    (found : program[method]? = some body)
     (continuation : ∀ after,
       VectorFrame program original entered after inputs output frame known (some value) →
       ScratchCells after cells cellValues →
       ∃ fuel result returned,
-        run program fuel method (pc + 1) args frame rest after = .ok (result, returned) ∧ post result returned) :
+        run program fuel method (pc + 1) args frame rest after = .ok (result, returned) ∧ post result returned)
+    (fetched : body.code[pc]? = some (.memory .store256) := by rfl) :
     ∃ fuel result returned,
       run program fuel method pc args frame (.scalar (.v256 value) :: .reference (.address output) :: rest)
         current = .ok (result, returned) ∧ post result returned := by

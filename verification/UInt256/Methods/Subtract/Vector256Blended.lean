@@ -53,34 +53,24 @@ theorem impl_inputs (program : CIL.Program) (method lookup : Nat) (profile : CIL
       run program fuel method 0 (binaryArguments left right output) frame [] current =
         .ok (final, values) ∧ post final values := by
   have profileEq : (subtractBlendImplBody profile bmi1 lookup).profile = profile := rfl
-  have loadLeft := UInt256Proof.Equality.VectorPrimitive.load_input state.call (by simp : left ∈ [left, right])
+  have loadLeft := UInt256Proof.Equality.VectorPrimitive.load_input state.call
+    (by simp : left ∈ [left, right])
   have castLeft := UInt256Proof.Equality.VectorPrimitive.cast_input current left
-  have sameLeft := state.input_value originalCall (by simp : left ∈ [left, right])
-  rw [sameLeft] at castLeft
-  impl_pure
-  impl_pure
-  impl_pure
-  apply run_next_exists post found (by rfl)
-  · simp only [step, cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, pureArity, loadLeft]; rfl
-  apply run_next_exists post found (by rfl)
-  · simp only [step, cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, staticInstruction, castLeft]; rfl
-  impl_store
-  have loadRight := UInt256Proof.Equality.VectorPrimitive.load_input state.call (by simp : right ∈ [left, right])
+  rw [state.input_value originalCall (by simp : left ∈ [left, right])] at castLeft
+  cil_contract_steps (snapshots := state.locals) [found, binaryArguments, profileEq,
+    impl_facts features state, CIL.FeatureProfile.evaluate, loadLeft, castLeft]
+  refine state.run_store post originalCall homes found fun current state => ?_
+  have loadRight := UInt256Proof.Equality.VectorPrimitive.load_input state.call
+    (by simp : right ∈ [left, right])
   have castRight := UInt256Proof.Equality.VectorPrimitive.cast_input current right
-  have sameRight := state.input_value originalCall (by simp : right ∈ [left, right])
-  rw [sameRight] at castRight
-  impl_pure
-  apply run_next_exists post found (by rfl)
-  · simp only [step, cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, pureArity, loadRight]; rfl
-  apply run_next_exists post found (by rfl)
-  · simp only [step, cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, staticInstruction, castRight]; rfl
-  impl_store
-  impl_load
-  impl_load
-  impl_pure
-  impl_store
+  rw [state.input_value originalCall (by simp : right ∈ [left, right])] at castRight
+  cil_contract_steps (snapshots := state.locals) [found, binaryArguments, profileEq,
+    impl_facts features state, CIL.FeatureProfile.evaluate, loadRight, castRight]
+  refine state.run_store post originalCall homes found fun current state => ?_
+  cil_contract_steps (snapshots := state.locals) [found, binaryArguments, profileEq,
+    impl_facts features state, CIL.FeatureProfile.evaluate]
+  refine state.run_store post originalCall homes found fun current state => ?_
   exact continuation current state
-
 theorem impl_masks (program : CIL.Program) (method lookup : Nat) (profile : CIL.FeatureProfile)
     (bmi1 : Bool) (found : program[method]? = some (subtractBlendImplBody profile bmi1 lookup))
     (features : ImplProfile profile false bmi1)
@@ -100,25 +90,15 @@ theorem impl_masks (program : CIL.Program) (method lookup : Nat) (profile : CIL.
       run program fuel method 14 (binaryArguments left right output) frame [] current =
         .ok (final, values) ∧ post final values := by
   have profileEq : (subtractBlendImplBody profile bmi1 lookup).profile = profile := rfl
-  impl_pure
-  impl_pure
-  impl_load
-  impl_load
-  impl_pure
-  impl_store
-  impl_load
-  impl_pure
-  impl_pure
-  impl_pure
-  impl_pure
-  impl_pure
-  impl_pure
-  impl_pure
-  rw [show CIL.Vector.zip256 (fun x y => CIL.Vector.mask64 (BitVec.ult x y)) a b = borrowLanes a b from rfl,
-    blend_incoming]
-  impl_store
+  cil_contract_steps (snapshots := state.locals) [found, binaryArguments, profileEq,
+    impl_facts features state, CIL.FeatureProfile.evaluate, differenceLocals]
+  refine state.run_store post originalCall homes found fun current state => ?_
+  cil_contract_steps (snapshots := state.locals) [found, binaryArguments, profileEq,
+    impl_facts features state, CIL.FeatureProfile.evaluate, differenceLocals]
+  rw [show ∀ mask, CIL.Vector.blend32 (CIL.Vector.permute4x64 mask 144#8) 0 3#8 =
+    borrowIncoming mask from blend_incoming]
+  refine state.run_store post originalCall homes found fun current state => ?_
   exact continuation current state
-
 theorem impl_decision (program : CIL.Program) (method lookup : Nat) (profile : CIL.FeatureProfile)
     (bmi1 : Bool) (found : program[method]? = some (subtractBlendImplBody profile bmi1 lookup))
     (features : ImplProfile profile false bmi1)
@@ -145,48 +125,21 @@ theorem impl_decision (program : CIL.Program) (method lookup : Nat) (profile : C
       run program fuel method 45 (binaryArguments left right output) frame [] current =
         .ok (final, values) ∧ post final values := by
   have profileEq : (subtractBlendImplBody profile bmi1 lookup).profile = profile := rfl
-  impl_pure
-  impl_pure
-  impl_pure
-  impl_pure
-  impl_load
-  impl_load
-  impl_pure
-  obtain ⟨stored, storeStep, state⟩ := state.output_store originalCall homes
-    (subtractBlendImplBody profile bmi1 lookup) 52 (binaryArguments left right output) []
-    (speculative a b)
-  apply run_next_exists post found (by rfl) storeStep
-  impl_load
-  impl_load
-  impl_pure
-  impl_store
-  impl_load
-  impl_load
-  impl_pure
+  cil_contract_steps (snapshots := state.locals) [found, binaryArguments, profileEq,
+    impl_facts features state, CIL.FeatureProfile.evaluate, maskLocals, differenceLocals]
+  refine state.run_output post originalCall homes found fun current state => ?_
+  cil_contract_steps (snapshots := state.locals) [found, binaryArguments, profileEq,
+    impl_facts features state, CIL.FeatureProfile.evaluate, maskLocals, differenceLocals]
+  refine state.run_store post originalCall homes found fun current state => ?_
+  replace state : VectorFrame program original entered current [left, right] output frame
+    (equalLocals a b) (some (speculative a b)) := state
   by_cases decided : equalLanes a b &&& borrowIncoming (borrowLanes a b) = 0
-  · have selected : CIL.Vector.zip256 (fun x y => CIL.Vector.mask64 (x == y)) a b &&&
-        borrowIncoming (borrowLanes a b) = 0#256 := decided
-    simp only [selected, ite_true]
-    impl_pure
-    exact fast decided current state
-  · have selected : ¬ CIL.Vector.zip256 (fun x y => CIL.Vector.mask64 (x == y)) a b &&&
-        borrowIncoming (borrowLanes a b) = 0#256 := decided
-    simp only [selected, ite_false]
-    impl_pure
-    exact slow decided current state
-
-/-- The byte return keeps a 0/1 flag. -/
-theorem impl_return (program : CIL.Program) (method lookup : Nat) (profile : CIL.FeatureProfile)
-    (bmi1 : Bool) (found : program[method]? = some (subtractBlendImplBody profile bmi1 lookup))
-    (pc : Nat) (fetched : (subtractBlendImplBody profile bmi1 lookup).code[pc]? = some (.ret (some .unsigned8)))
-    (args : List Value) (frame : Frame) (memory : Memory) (flag : BitVec 32)
-    (normalized : CIL.NarrowKind.unsigned8.extend flag = flag) :
-    run program 1 method pc args frame [.scalar (.i32 flag)] memory =
-      .ok (leaveFrame frame memory, [.scalar (.i32 flag)]) := by
-  have returns : (subtractBlendImplBody profile bmi1 lookup).returnsValue = true := rfl
-  simp [run, found, fetched, returns, step, cil_guard, observerCount, normalized, checkedValue, numericValue,
-    Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-
+  · cil_contract_steps (snapshots := state.locals) [found, binaryArguments, profileEq,
+      impl_facts features state, CIL.FeatureProfile.evaluate, equalLocals, maskLocals,
+      differenceLocals, decided] until fast decided current state
+  · cil_contract_steps (snapshots := state.locals) [found, binaryArguments, profileEq,
+      impl_facts features state, CIL.FeatureProfile.evaluate, equalLocals, maskLocals,
+      differenceLocals, decided] until slow decided current state
 theorem impl_fast_return (program : CIL.Program) (method lookup : Nat) (profile : CIL.FeatureProfile)
     (bmi1 : Bool) (found : program[method]? = some (subtractBlendImplBody profile bmi1 lookup))
     (features : ImplProfile profile false bmi1)
@@ -200,16 +153,10 @@ theorem impl_fast_return (program : CIL.Program) (method lookup : Nat) (profile 
       run program fuel method 112 (binaryArguments left right output) frame [] current =
         .ok (final, values) ∧ post final values := by
   have profileEq : (subtractBlendImplBody profile bmi1 lookup).profile = profile := rfl
-  impl_load
-  impl_pure
-  impl_pure
-  impl_pure
-  impl_pure
-  impl_pure
-  impl_pure
-  exact ⟨1, _, _, impl_return program method lookup profile bmi1 found 119 rfl _ frame current _
-    (by split <;> rfl), continuation⟩
-
+  cil_contract_steps (snapshots := state.locals) [found, binaryArguments, profileEq,
+    impl_facts features state, CIL.FeatureProfile.evaluate, equalLocals, maskLocals,
+    differenceLocals, CIL.NarrowKind.extend_ite_ofNat_one_zero]
+  exact continuation
 theorem impl_index (program : CIL.Program) (method lookup : Nat) (profile : CIL.FeatureProfile)
     (bmi1 : Bool) (found : program[method]? = some (subtractBlendImplBody profile bmi1 lookup))
     (features : ImplProfile profile false bmi1)
@@ -229,30 +176,12 @@ theorem impl_index (program : CIL.Program) (method lookup : Nat) (profile : CIL.
       run program fuel method 61 (binaryArguments left right output) frame [] current =
         .ok (final, values) ∧ post final values := by
   have profileEq : (subtractBlendImplBody profile bmi1 lookup).profile = profile := rfl
-  impl_load
-  impl_pure
-  impl_pure
-  impl_store
-  impl_load
-  impl_pure
-  impl_pure
-  impl_store
-  impl_load
-  impl_pure
-  impl_load
-  impl_pure
-  impl_pure
-  impl_store
-  impl_load
-  impl_load
-  impl_pure
-  impl_store
-  impl_load
-  impl_pure
-  impl_pure
-  impl_store
+  iterate 5
+    cil_contract_steps (snapshots := state.locals) [found, binaryArguments, profileEq,
+      impl_facts features state, CIL.FeatureProfile.evaluate, equalLocals, maskLocals,
+      differenceLocals]
+    refine state.run_store post originalCall homes found fun current state => ?_
   exact continuation current state
-
 theorem impl_slow_tail (program : CIL.Program) (method lookup : Nat) (profile : CIL.FeatureProfile)
     (bmi1 : Bool) (found : program[method]? = some (subtractBlendImplBody profile bmi1 lookup))
     (lookupFound : program[lookup]? = some (UInt256Proof.AddSubtract.Vector256.lookupBody profile identity assembly))
@@ -277,48 +206,35 @@ theorem impl_slow_tail (program : CIL.Program) (method lookup : Nat) (profile : 
   have profileEq : (subtractBlendImplBody profile bmi1 lookup).profile = profile := rfl
   apply UInt256Proof.AddSubtract.Vector256.run_lookup post state found (by rfl) lookupFound
   intro current reference state loaded formed
-  obtain ⟨added, row⟩ := UInt256Proof.AddSubtract.Vector256.table_row current reference state.call.1.1 loaded
-    (UInt256Proof.SIMD.cascadeIndex (CIL.Vector.moveMask64 (borrowLanes a b)) (CIL.Vector.moveMask64 (equalLanes a b)))
+  obtain ⟨added, row⟩ := UInt256Proof.AddSubtract.Vector256.table_row current reference
+    state.call.1.1 loaded (UInt256Proof.SIMD.cascadeIndex
+      (CIL.Vector.moveMask64 (borrowLanes a b)) (CIL.Vector.moveMask64 (equalLanes a b)))
     (UInt256Proof.SIMD.cascade_index_bound _ _)
-  cil_contract_steps 2 [found, formed]
-  impl_load
-  impl_pure
-  cil_contract_steps 2 [found, added, row]
-  impl_store
-  impl_pure
-  impl_pure
-  impl_load
-  impl_load
-  impl_pure
-  obtain ⟨stored, storeStep, state⟩ := state.output_store originalCall homes
-    (subtractBlendImplBody profile bmi1 lookup) 96 (binaryArguments left right output) []
-    (corrected a b)
-  apply run_next_exists post found (by rfl) storeStep
+  cil_contract_steps (snapshots := state.locals) [found, binaryArguments, profileEq,
+    impl_facts features state, CIL.FeatureProfile.evaluate, slowLocals, equalLocals, maskLocals,
+    differenceLocals, formed, added, row, CIL.offsetValue]
+  refine state.run_store post originalCall homes found fun current state => ?_
+  cil_contract_steps (snapshots := state.locals) [found, binaryArguments, profileEq,
+    impl_facts features state, CIL.FeatureProfile.evaluate, slowLocals, equalLocals, maskLocals,
+    differenceLocals]
+  refine state.run_output post originalCall homes found fun stored state => ?_
+  replace state : VectorFrame program original entered stored [left, right] output frame _
+    (some (corrected a b)) := state
   cases bmi1
-  · impl_pure
-    impl_pure
-    impl_load
-    impl_pure
-    impl_pure
-    impl_pure
-    impl_pure
-    exact ⟨1, _, _, impl_return program method lookup profile false found 104 rfl _ frame stored _
-      (by split <;> rfl), continuation stored state⟩
-  · impl_pure
-    impl_pure
-    impl_load
-    impl_pure
-    impl_pure
-    impl_pure
-    impl_pure
-    have bit := bextr_bit (CIL.Vector.moveMask64 (equalLanes a b) + 2#32 * CIL.Vector.moveMask64 (borrowLanes a b))
-    simp only [BitVec.toNat_setWidth] at bit
-    apply run_next_exists post found (by rfl)
-    · simp [step, cil_guard, observerCount, staticInstruction, memoryInstruction, otherMemoryInstruction, bit,
-        Bind.bind, Except.bind, Pure.pure, Except.pure]
-      try exact ⟨rfl, rfl, rfl, rfl⟩
-    exact ⟨1, _, _, impl_return program method lookup profile true found 111 rfl _ frame stored _
-      (by simp [CIL.NarrowKind.extend]), continuation stored state⟩
+  · cil_contract_steps (snapshots := state.locals) [found, binaryArguments, profileEq,
+      impl_facts features state, CIL.FeatureProfile.evaluate, slowLocals, equalLocals,
+      maskLocals, differenceLocals, CIL.NarrowKind.extend_ite_ofNat_one_zero]
+    exact continuation stored state
+  · cil_contract_steps (snapshots := state.locals) [found, binaryArguments, profileEq,
+      impl_facts features state, CIL.FeatureProfile.evaluate, slowLocals, equalLocals,
+      maskLocals, differenceLocals]
+    apply run_next_exists post found (op := .memory .bitcastByteBool) (by rfl)
+    · cil_stack_cleanup
+      rw [step_memory_bitcastByteBool_i32_eq, if_pos (bextr_bit _)]
+    cil_contract_steps [found]
+    rw [show ∀ flag : BitVec 8, CIL.NarrowKind.unsigned8.extend (flag.setWidth 32) =
+      flag.setWidth 32 from fun flag => by simp [CIL.NarrowKind.extend]]
+    exact continuation stored state
 
 /-- Blended AVX2 `SubtractImpl`: the exact initial-operand borrow, the wrapped difference, a writable output and
     unchanged caller bytes outside it, for either borrow-mask form and either flag extraction. -/

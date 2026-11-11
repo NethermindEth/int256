@@ -19,27 +19,14 @@ theorem four_cells {h0 h1 h2 h3 : Reference} {P : Nat → Reference → Prop}
   intro index cell found
   rcases index with _ | _ | _ | _ | index <;> simp at found <;> subst found <;> assumption
 
-set_option hygiene false in
-/-- One pure entry instruction; expects `post found features profileEq state left right output`. -/
-macro "entry_pure" : tactic => `(tactic|
-  (have formedLeft := state.call.input_formed (reference := left) (by simp)
-   have formedRight := state.call.input_formed (reference := right) (by simp)
-   have formedOutput := state.call.output_formed (reference := output) (by simp)
-   apply run_next_exists post found (by first | assumption | rfl)
-   · simp (config := { implicitDefEqProofs := false })
-       [step, cil_guard, observerCount, pureArity.eq_def, binaryArguments, checkedValue, numericValue, formValue, formedLeft, formedRight,
-         formedOutput, staticInstruction, memoryInstruction, checkedAt, profileEq, features.avx, features.avx2,
-         CIL.FeatureProfile.evaluate, scalars, checkedIntrinsic, CIL.Intrinsic.available, CIL.step.eq_def,
-         CIL.binary.eq_def, CIL.unary.eq_def, CIL.truth, instruction.eq_def, Except.mapError, Bind.bind, Except.bind, Pure.pure,
-         Except.pure]
-     try (first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)))
-
-set_option hygiene false in
-macro "entry_address" : tactic => `(tactic|
-  (apply run_next_exists post found (by first | assumption | rfl)
-   · simp [step, cil_guard, observerCount, slot0, slot1, slot2, slot3, localAddress, formValue, formed0, formed1, formed2, formed3,
-       checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-     try (first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)))
+/-- The four remembered entry locals, by index. -/
+theorem entryLocals_known (left right : BitVec 256) :
+    entryLocals left right 0 = some (.v256 (CIL.Vector.zip256 (· + ·) left right)) ∧
+      entryLocals left right 1 = some (.v256 (generatedCarry left right)) ∧
+      entryLocals left right 2 = some (.v256 (incomingCarry (generatedCarry left right))) ∧
+      entryLocals left right 3 =
+        some (.v256 (propagationMask (CIL.Vector.zip256 (· + ·) left right))) :=
+  ⟨rfl, rfl, rfl, rfl⟩
 
 /-- Both entries up to `PrepareAdd`: the speculative sum is stored and the four lane vectors are locals. -/
 theorem entry_prepare (program : CIL.Program) (method prepare : Nat) (body : CIL.Method)
@@ -111,32 +98,12 @@ theorem entry_prepare (program : CIL.Program) (method prepare : Nat) (body : CIL
     · simp [preparedCells, maskCells, inputCells, rememberCell] at specified
   have next := VectorFrame.after_child state conditions grown authority footprint result
     (ScratchCells.known_locals cells slots defined)
-  obtain ⟨fuel, final, values, ran, satisfied⟩ := continuation after next
-  entry_pure
-  entry_pure
-  entry_pure
-  entry_pure
-  entry_pure
-  entry_address
-  entry_address
-  entry_address
-  entry_address
-  have formedLeft := state.call.input_formed (reference := left) (by simp)
-  have formedRight := state.call.input_formed (reference := right) (by simp)
-  have formedOutput := state.call.output_formed (reference := output) (by simp)
-  have stepped : step body (.call prepare 7) 9 (binaryArguments left right output) frame
-      [.reference (.address h3), .reference (.address h2), .reference (.address h1), .reference (.address h0),
-       .reference (.address output), .reference (.address right), .reference (.address left)] entered =
-      .ok (.call prepare (prepareArguments left right output h0 h1 h2 h3) [] entered) := by
-    simp [step, cil_guard, observerCount, prepareArguments, checkedValue, formValue, formedLeft, formedRight, formedOutput,
-      formed0, formed1, formed2, formed3, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure,
-      Except.pure]
-  obtain ⟨total, composed⟩ := run_call_exists found f9 stepped ⟨childFuel, invoked⟩ ⟨fuel, by simpa using ran⟩
-  exact ⟨total, final, values, composed, satisfied⟩
-
-set_option hygiene false in
-macro "entry_load" : tactic => `(tactic|
-  apply VectorFrame.run_load post state found (by rfl) (by rfl))
+  cil_contract_steps [found, f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, profileEq, features.avx2,
+    CIL.FeatureProfile.evaluate, binaryArguments, prepareArguments, slot0, slot1, slot2, slot3,
+    localAddress, formed0, formed1, formed2, formed3, invoked, (by decide : ¬(1#32 = 0#32)),
+    state.call.input_formed (reference := left) (by simp),
+    state.call.input_formed (reference := right) (by simp),
+    state.call.output_formed (reference := output) (by simp)] until continuation after next
 
 theorem entry_setup (program : CIL.Program) (body : CIL.Method) (memory : Memory)
     (left right output : Reference) (call : CallingConditions program memory [left, right] [output])
@@ -154,12 +121,6 @@ theorem entry_setup (program : CIL.Program) (body : CIL.Method) (memory : Memory
   exact ⟨frame, entered, setup, call.binary_entry_live setup, CIL.Safety.NumericHomes.complete numeric,
     fun id member => ((enterFrame_fresh _ _ _ _ _ setup).2 id member).1⟩
 
-set_option hygiene false in
-/-- A branch step that also rewrites with the decided guard `selected`. -/
-macro "entry_branch" : tactic => `(tactic|
-  (apply run_next_exists post found (by rfl)
-   · first | (simp only [selected]; rfl) | rfl))
-
 /-- Caller guarantees of the Add entry: wrapped sum, writable output, other caller bytes kept. -/
 def AddPost (memory : Memory) (left right output : Reference) (final : Memory) : Prop :=
   inputValue final output = inputValue memory left + inputValue memory right ∧
@@ -167,144 +128,9 @@ def AddPost (memory : Memory) (left right output : Reference) (final : Memory) :
     ∀ id, id < memory.nextIdentity → ∀ offset, OutsideOutput output id offset →
       final.cells id offset = memory.cells id offset
 
-/-- The `Add` entry after `PrepareAdd`: the fast return or the `FinishAdd` correction. -/
-theorem add_tail (program : CIL.Program) (profile : CIL.FeatureProfile) (avx512 : Bool) (finish prepare : Nat)
-    (found : program[0]? = some (addEntryBody profile finish prepare))
-    (finishContract : FinishContract program finish)
-    (features : AddProfile profile avx512)
-    (memory entered after : Memory) (left right output : Reference) (frame : Frame)
-    (call : CallingConditions program memory [left, right] [output])
-    (owned : ∀ id ∈ frame.owned, memory.nextIdentity ≤ id)
-    (state : VectorFrame program memory entered after [left, right] output frame
-      (entryLocals (inputValue memory left) (inputValue memory right))
-      (some (fastSum (inputValue memory left) (inputValue memory right)))) :
-    ∃ fuel final values,
-      run program fuel 0 10 (binaryArguments left right output) frame [] after = .ok (final, values) ∧
-        values = [] ∧ AddPost memory left right output final := by
-  have profileEq : (addEntryBody profile finish prepare).profile = profile := rfl
-  let post : Memory → List Value → Prop := fun final values => values = [] ∧ AddPost memory left right output final
-  have returns : (addEntryBody profile finish prepare).returnsValue = false := rfl
-  have retFetch : (addEntryBody profile finish prepare).code[24]? = some .ret := rfl
-  generalize ha : inputValue memory left = a at state
-  generalize hb : inputValue memory right = b at state
-  entry_load
-  entry_load
-  entry_pure
-  entry_pure
-  entry_pure
-  entry_pure
-  entry_pure
-  by_cases guard : parentPropagationBits (propagationMask (CIL.Vector.zip256 (· + ·) a b))
-      (incomingCarry (generatedCarry a b)) = BitVec.ofNat 32 0
-  · have selected : CIL.Vector.moveMask64 (propagationMask (CIL.Vector.zip256 (· + ·) a b) &&&
-        incomingCarry (generatedCarry a b)) &&& 6#32 = 0#32 := guard
-    entry_branch
-    obtain ⟨value, access, footprint⟩ := state.finish call owned
-    refine ⟨1, _, _, ?_, rfl, by rw [ha, hb]; exact value.trans (fast_sum_value a b guard), access, footprint⟩
-    exact run_return found retFetch rfl rfl
-  · have selected : (CIL.Vector.moveMask64 (propagationMask (CIL.Vector.zip256 (· + ·) a b) &&&
-        incomingCarry (generatedCarry a b)) &&& 6#32 != 0) = true := bne_iff_ne.mpr guard
-    entry_branch
-    simp only [selected, ↓reduceIte]
-    entry_load
-    entry_load
-    entry_load
-    entry_pure
-    let sum := CIL.Vector.zip256 (· + ·) a b
-    have formedOutput := state.call.output_formed (reference := output) (by simp)
-    have stepped : step (addEntryBody profile finish prepare) (.call finish 4) 22 (binaryArguments left right output) frame
-        [.reference (.address output), .scalar (.v256 (propagationMask sum)),
-         .scalar (.v256 (generatedCarry a b)), .scalar (.v256 sum)] after =
-        .ok (.call finish (finishArguments sum (generatedCarry a b) (propagationMask sum) output) [] after) := by
-      simp [step, cil_guard, observerCount, finishArguments, checkedValue, numericValue, formValue, formedOutput, checkedAt,
-        Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-    obtain ⟨childFuel, finished, invoked, result, writable, footprint⟩ :=
-      finishContract after output state.call.without_inputs sum (generatedCarry a b) (propagationMask sum)
-    obtain ⟨value, access, kept⟩ := state.finish_child call owned result writable footprint
-    have popFetch : (addEntryBody profile finish prepare).code[23]? = some .pop := rfl
-    have tail : run program 2 0 23 (binaryArguments left right output) frame
-        ([.scalar (.i32 (finishFlag (generatedCarry a b) (propagationMask sum)))] ++ []) finished =
-        .ok (leaveFrame frame finished, []) :=
-      (run_next found popFetch rfl).trans (run_return found retFetch rfl rfl)
-    obtain ⟨total, ran⟩ := run_call_exists found rfl stepped ⟨childFuel, invoked⟩ ⟨2, tail⟩
-    exact ⟨total, _, _, ran, rfl, by rw [ha, hb]; exact value.trans (cascade_sum_value a b), access, kept⟩
-
 /-- Caller guarantees of the AddOverflow entry: exact initial-operand carry and the Add guarantees. -/
 def overflowFlag (memory : Memory) (left right : Reference) : BitVec 32 :=
   if 2^256 ≤ (inputValue memory left).toNat + (inputValue memory right).toNat then 1 else 0
-
-theorem overflow_tail (program : CIL.Program) (profile : CIL.FeatureProfile) (avx512 : Bool) (finish prepare : Nat)
-    (found : program[0]? = some (addOverflowEntryBody profile finish prepare))
-    (finishContract : FinishContract program finish)
-    (features : AddProfile profile avx512)
-    (memory entered after : Memory) (left right output : Reference) (frame : Frame)
-    (call : CallingConditions program memory [left, right] [output])
-    (owned : ∀ id ∈ frame.owned, memory.nextIdentity ≤ id)
-    (state : VectorFrame program memory entered after [left, right] output frame
-      (entryLocals (inputValue memory left) (inputValue memory right))
-      (some (fastSum (inputValue memory left) (inputValue memory right)))) :
-    ∃ fuel final values,
-      run program fuel 0 10 (binaryArguments left right output) frame [] after = .ok (final, values) ∧
-        values = [.scalar (.i32 (overflowFlag memory left right))] ∧ AddPost memory left right output final := by
-  have profileEq : (addOverflowEntryBody profile finish prepare).profile = profile := rfl
-  let post : Memory → List Value → Prop := fun final values =>
-    values = [.scalar (.i32 (overflowFlag memory left right))] ∧ AddPost memory left right output final
-  have returns : (addOverflowEntryBody profile finish prepare).returnsValue = true := rfl
-  generalize ha : inputValue memory left = a at state
-  generalize hb : inputValue memory right = b at state
-  have retEq : ∀ (pc : Nat) (flag : BitVec 32),
-      (addOverflowEntryBody profile finish prepare).code[pc]? = some (.ret (some .unsigned8)) →
-      CIL.NarrowKind.unsigned8.extend flag = flag → ∀ m : Memory,
-      run program 1 0 pc (binaryArguments left right output) frame [.scalar (.i32 flag)] m =
-        .ok (leaveFrame frame m, [.scalar (.i32 flag)]) := by
-    intro pc flag fetched normalized m
-    simp [run, found, fetched, returns, step, cil_guard, observerCount, normalized, checkedValue, numericValue,
-      Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-  entry_load
-  entry_load
-  entry_pure
-  by_cases guard : propagationMask (CIL.Vector.zip256 (· + ·) a b) &&& incomingCarry (generatedCarry a b) =
-      BitVec.ofNat 256 0
-  · simp only [guard, ↓reduceIte]
-    entry_pure
-    entry_load
-    entry_pure
-    entry_pure
-    entry_pure
-    entry_pure
-    entry_pure
-    entry_pure
-    obtain ⟨value, access, footprint⟩ := state.finish call owned
-    refine ⟨1, _, _, retEq 27 _ rfl (by split <;> rfl) after, ?_,
-      by rw [ha, hb]; exact value.trans (fast_sum_value a b (parent_of_full _ _ guard)), access, footprint⟩
-    unfold overflowFlag
-    rw [ha, hb, ← fast_flag_value a b guard]
-    rfl
-  · simp only [guard, ↓reduceIte]
-    entry_pure
-    entry_load
-    entry_load
-    entry_load
-    entry_pure
-    let sum := CIL.Vector.zip256 (· + ·) a b
-    have formedOutput := state.call.output_formed (reference := output) (by simp)
-    have stepped : step (addOverflowEntryBody profile finish prepare) (.call finish 4) 18 (binaryArguments left right output) frame
-        [.reference (.address output), .scalar (.v256 (propagationMask sum)),
-         .scalar (.v256 (generatedCarry a b)), .scalar (.v256 sum)] after =
-        .ok (.call finish (finishArguments sum (generatedCarry a b) (propagationMask sum) output) [] after) := by
-      simp [step, cil_guard, observerCount, finishArguments, checkedValue, numericValue, formValue, formedOutput, checkedAt,
-        Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-    obtain ⟨childFuel, finished, invoked, result, writable, footprint⟩ :=
-      finishContract after output state.call.without_inputs sum (generatedCarry a b) (propagationMask sum)
-    obtain ⟨value, access, kept⟩ := state.finish_child call owned result writable footprint
-    have normalized : CIL.NarrowKind.unsigned8.extend (finishFlag (generatedCarry a b) (propagationMask sum)) =
-        finishFlag (generatedCarry a b) (propagationMask sum) := CIL.NarrowKind.extend_ite_ofNat_one_zero _ _
-    obtain ⟨total, ran⟩ := run_call_exists found rfl stepped ⟨childFuel, invoked⟩
-      ⟨1, by simpa using retEq 19 _ rfl normalized finished⟩
-    refine ⟨total, _, _, ran, ?_, by rw [ha, hb]; exact value.trans (cascade_sum_value a b), access, kept⟩
-    unfold overflowFlag
-    rw [ha, hb, ← cascade_flag_value a b]
-    rfl
 
 theorem binary_checked {program : CIL.Program} {memory : Memory} {left right output : Reference}
     (call : CallingConditions program memory [left, right] [output]) :
@@ -332,8 +158,28 @@ theorem add_contract_of_callees (program : CIL.Program) (profile : CIL.FeaturePr
       rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl prepareContract features memory entered left right output frame
       call setup homes
     intro after state
-    exact add_tail program profile avx512 finish prepare entryFound finishContract features memory entered after
-      left right output frame call owned state
+    have profileEq : (addEntryBody profile finish prepare).profile = profile := rfl
+    generalize ha : inputValue memory left = a at state
+    generalize hb : inputValue memory right = b at state
+    have formedOutput := state.call.output_formed (reference := output) (by simp)
+    by_cases guard : parentPropagationBits (propagationMask (CIL.Vector.zip256 (· + ·) a b))
+        (incomingCarry (generatedCarry a b)) = BitVec.ofNat 32 0
+    · have selected : CIL.Vector.moveMask64 (propagationMask (CIL.Vector.zip256 (· + ·) a b) &&&
+          incomingCarry (generatedCarry a b)) &&& 6#32 = 0#32 := guard
+      cil_contract_steps (snapshots := state.locals) [entryFound, binaryArguments, profileEq,
+        features.avx, features.avx2, CIL.FeatureProfile.evaluate, entryLocals_known a b, selected]
+      obtain ⟨value, access, footprint⟩ := state.finish call owned
+      exact ⟨rfl, by rw [ha, hb]; exact value.trans (fast_sum_value a b guard), access, footprint⟩
+    · have selected : ¬CIL.Vector.moveMask64 (propagationMask (CIL.Vector.zip256 (· + ·) a b) &&&
+          incomingCarry (generatedCarry a b)) &&& 6#32 = 0#32 := guard
+      let sum := CIL.Vector.zip256 (· + ·) a b
+      obtain ⟨childFuel, finished, invoked, result, writable, footprint⟩ := finishContract after
+        output state.call.without_inputs sum (generatedCarry a b) (propagationMask sum)
+      obtain ⟨value, access, kept⟩ := state.finish_child call owned result writable footprint
+      cil_contract_steps (snapshots := state.locals) [entryFound, binaryArguments, profileEq,
+        features.avx, features.avx2, CIL.FeatureProfile.evaluate, entryLocals_known a b, selected,
+        formedOutput, finishArguments, invoked]
+      exact ⟨rfl, by rw [ha, hb]; exact value.trans (cascade_sum_value a b), access, kept⟩
   obtain ⟨fuel, final, values, ran, empty, value, access, footprint⟩ := finished
   subst empty
   exact ⟨fuel, final, certify_invocation program 0 _ _ memory frame entered fuel final [] entryFound
@@ -356,8 +202,33 @@ theorem add_overflow_contract_of_callees (program : CIL.Program) (profile : CIL.
       entryFound rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl prepareContract features memory entered left right
       output frame call setup homes
     intro after state
-    exact overflow_tail program profile avx512 finish prepare entryFound finishContract features memory entered
-      after left right output frame call owned state
+    have profileEq : (addOverflowEntryBody profile finish prepare).profile = profile := rfl
+    generalize ha : inputValue memory left = a at state
+    generalize hb : inputValue memory right = b at state
+    have formedOutput := state.call.output_formed (reference := output) (by simp)
+    by_cases guard : propagationMask (CIL.Vector.zip256 (· + ·) a b) &&&
+        incomingCarry (generatedCarry a b) = BitVec.ofNat 256 0
+    · cil_contract_steps (snapshots := state.locals) [entryFound, binaryArguments, profileEq,
+        features.avx, features.avx2, CIL.FeatureProfile.evaluate, entryLocals_known a b, guard,
+        CIL.NarrowKind.extend_ite_ofNat_one_zero]
+      obtain ⟨value, access, footprint⟩ := state.finish call owned
+      refine ⟨?_, by rw [ha, hb]; exact value.trans (fast_sum_value a b (parent_of_full _ _ guard)),
+        access, footprint⟩
+      unfold overflowFlag
+      rw [ha, hb, ← fast_flag_value a b guard]
+      rfl
+    · let sum := CIL.Vector.zip256 (· + ·) a b
+      obtain ⟨childFuel, finished, invoked, result, writable, footprint⟩ := finishContract after
+        output state.call.without_inputs sum (generatedCarry a b) (propagationMask sum)
+      obtain ⟨value, access, kept⟩ := state.finish_child call owned result writable footprint
+      cil_contract_steps (snapshots := state.locals) [entryFound, binaryArguments, profileEq,
+        features.avx, features.avx2, CIL.FeatureProfile.evaluate, entryLocals_known a b, guard,
+        formedOutput, finishArguments, invoked, finishFlag,
+        CIL.NarrowKind.extend_ite_ofNat_one_zero]
+      refine ⟨?_, by rw [ha, hb]; exact value.trans (cascade_sum_value a b), access, kept⟩
+      unfold overflowFlag
+      rw [ha, hb, ← cascade_flag_value a b]
+      rfl
   obtain ⟨fuel, final, values, ran, flag, value, access, footprint⟩ := finished
   subst flag
   refine ⟨fuel, final, ?_, value, access, footprint⟩

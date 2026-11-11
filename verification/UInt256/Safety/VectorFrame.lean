@@ -54,16 +54,6 @@ theorem VectorFrame.initial {program : CIL.Program} {original entered : Memory}
   · intro value impossible
     cases impossible
 
-theorem VectorFrame.load {program : CIL.Program} {original entered current : Memory}
-    {inputs : List Reference} {output : Reference} {frame : Frame}
-    {known : Nat → Option CIL.Value} {stored : Option (BitVec 256)}
-    (state : VectorFrame program original entered current inputs output frame known stored)
-    {body : CIL.Method} {pc index : Nat} {args stack : List Value} {value : CIL.Value}
-    (specified : known index = some value) :
-    step body (.local index) pc args frame stack current =
-      .ok (.next (pc + 1) (.scalar value :: stack) frame current) := by
-  exact state.locals.load value specified
-
 /-- A typed local store remembers its value and changes only that private home. -/
 theorem VectorFrame.store {program : CIL.Program} {original entered current : Memory}
     {inputs : List Reference} {output : Reference} {frame : Frame}
@@ -109,22 +99,6 @@ theorem VectorFrame.store {program : CIL.Program} {original entered current : Me
         exact (state.call.1.1.1 _ _ req.present).1)
       (fun i _ => outside _ different _)
 
-/-- A typed local load pushes the remembered value. -/
-theorem VectorFrame.run_load {program : CIL.Program} {original entered current : Memory}
-    {inputs : List Reference} {output : Reference} {frame : Frame}
-    {known : Nat → Option CIL.Value} {stored : Option (BitVec 256)}
-    {body : CIL.Method} {method pc index : Nat} {args stack : List Value} {value : CIL.Value}
-    (post : Memory → List Value → Prop)
-    (state : VectorFrame program original entered current inputs output frame known stored)
-    (found : program[method]? = some body) (fetched : body.code[pc]? = some (.local index))
-    (specified : known index = some value)
-    (continuation : ∃ fuel result returned,
-      run program fuel method (pc + 1) args frame (.scalar value :: stack) current = .ok (result, returned) ∧
-        post result returned) :
-    ∃ fuel result returned,
-      run program fuel method pc args frame stack current = .ok (result, returned) ∧ post result returned :=
-  run_next_exists post found fetched (state.load specified) continuation
-
 /-- A typed local store remembers its value; the continuation receives the new state. -/
 theorem VectorFrame.run_store {program : CIL.Program} {original entered current : Memory}
     {inputs : List Reference} {output : Reference} {frame : Frame}
@@ -135,13 +109,15 @@ theorem VectorFrame.run_store {program : CIL.Program} {original entered current 
     (state : VectorFrame program original entered current inputs output frame known stored)
     (originalCall : CallingConditions program original inputs [output])
     (homes : CompleteWritableHomes entered original.nextIdentity kinds frame.locals)
-    (found : program[method]? = some body) (fetched : body.code[pc]? = some (.setLocal index))
-    (specified : kinds[index]? = some kind) (fits : localNumber kind value = .ok number)
-    (result : localResult kind value = value)
+    (found : program[method]? = some body)
     (continuation : ∀ after,
       VectorFrame program original entered after inputs output frame (rememberLocal known index value) stored →
       ∃ fuel result returned,
-        run program fuel method (pc + 1) args frame stack after = .ok (result, returned) ∧ post result returned) :
+        run program fuel method (pc + 1) args frame stack after = .ok (result, returned) ∧ post result returned)
+    (fetched : body.code[pc]? = some (.setLocal index) := by rfl)
+    (specified : kinds[index]? = some kind := by rfl)
+    (fits : localNumber kind value = .ok number := by rfl)
+    (result : localResult kind value = value := by rfl) :
     ∃ fuel result returned,
       run program fuel method pc args frame (.scalar value :: stack) current = .ok (result, returned) ∧
         post result returned := by
@@ -187,6 +163,27 @@ theorem VectorFrame.output_store {program : CIL.Program} {original entered curre
   · intro x same
     cases same
     exact readback
+
+/-- A 256-bit output store; the continuation receives the frame holding the stored value. -/
+theorem VectorFrame.run_output {program : CIL.Program} {original entered current : Memory}
+    {inputs : List Reference} {output : Reference} {frame : Frame}
+    {known : Nat → Option CIL.Value} {stored : Option (BitVec 256)}
+    {kinds : List CIL.LocalKind} {body : CIL.Method} {method pc : Nat}
+    {args rest : List Value} {value : BitVec 256} (post : Memory → List Value → Prop)
+    (state : VectorFrame program original entered current inputs output frame known stored)
+    (originalCall : CallingConditions program original inputs [output])
+    (homes : CompleteWritableHomes entered original.nextIdentity kinds frame.locals)
+    (found : program[method]? = some body)
+    (continuation : ∀ after,
+      VectorFrame program original entered after inputs output frame known (some value) →
+      ∃ fuel result returned, run program fuel method (pc + 1) args frame rest after =
+        .ok (result, returned) ∧ post result returned)
+    (fetched : body.code[pc]? = some (.memory .store256) := by rfl) :
+    ∃ fuel result returned, run program fuel method pc args frame
+      (.scalar (.v256 value) :: .reference (.address output) :: rest) current =
+        .ok (result, returned) ∧ post result returned := by
+  obtain ⟨after, stepped, next⟩ := state.output_store originalCall homes body pc args rest value
+  exact run_next_exists post found fetched stepped (continuation after next)
 
 /-- An invoked helper that keeps all bytes below the current boundary keeps every remembered fact. -/
 theorem VectorFrame.after_call {program : CIL.Program} {original entered current after : Memory}
