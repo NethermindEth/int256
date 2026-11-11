@@ -63,82 +63,41 @@ open CIL.Safety UInt256Model.Safety UInt256Proof.AddSubtract.Safety CIL.Vector
 def full128 (result : BitVec 128) : BitVec 128 :=
   CIL.Vector.zip128 (fun x y => CIL.Vector.mask64 (x == y)) result (~~~0)
 
-/-- Caller guarantees since `start` and the remembered private vectors behind the root slot. -/
-structure Vector128State (program : CIL.Program) (boundary : Nat) (entered start current : Memory)
-    (inputs outputs : List Reference) (slots : List LocalSlot)
-    (values : List (Option CIL.Value)) : Prop where
-  call : CallingConditions program current inputs outputs
-  preserved : MemoryBelow boundary start current
-  authority : AccessBelow entered.nextIdentity entered current
-  advanced : start.nextIdentity ≤ current.nextIdentity
-  snapshots : LocalSnapshots current slots (knownLocals values)
+def armWordSpec : NumericLocalSpec := ⟨.word64, .i64 0, 0, rfl⟩
 
-variable {program : CIL.Program} {boundary : Nat} {entered start current : Memory}
-  {inputs outputs : List Reference} {slots : List LocalSlot} {values : List (Option CIL.Value)}
+/-- Numeric locals of the ARM helper behind its root slot: fourteen saved vectors, five words
+    and the four repair vectors. -/
+def armSpecs : List NumericLocalSpec := List.replicate 14 vector128ZeroSpec ++
+  List.replicate 5 armWordSpec ++ List.replicate 4 vector128ZeroSpec
 
-/-- Saved vector reads start a state that remembers them and nothing in the `spare` locals. -/
-theorem Vector128State.initial {count : Nat} (saved : Fin count → BitVec 128) (spare : Nat)
-    (call : CallingConditions program current inputs outputs)
-    (authority : AccessBelow entered.nextIdentity entered current)
+theorem armSpecs_first : ∀ i : Fin 14, armSpecs[i.val]? = some vector128ZeroSpec := by
+  intro i
+  have cases : i = 0 ∨ i = 1 ∨ i = 2 ∨ i = 3 ∨ i = 4 ∨ i = 5 ∨ i = 6 ∨ i = 7 ∨ i = 8 ∨ i = 9 ∨
+      i = 10 ∨ i = 11 ∨ i = 12 ∨ i = 13 := by omega
+  rcases cases with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl |
+    rfl <;> rfl
+
+/-- What a frame's locals remember when the first `count` vectors behind its root slot hold
+    `saved`. -/
+def savedVectors {count : Nat} (saved : Fin count → BitVec 128) : Nat → Option CIL.Value :=
+  fun index => if ready : 1 ≤ index ∧ index - 1 < count then
+    some (.v128 (saved ⟨index - 1, ready.2⟩)) else none
+
+/-- Saved vector reads behind the root slot are snapshots of the frame's locals. -/
+theorem savedVectors_snapshots {count : Nat} {saved : Fin count → BitVec 128}
+    {current : Memory} {frame : Frame} {root : LocalSlot} {slots : List LocalSlot}
+    (layout : frame.locals = root :: slots)
     (reads : ∀ i : Fin count, ∃ reference, slots[i.val]? = some (.bytes .vector128 reference) ∧
       read current reference 16 1 = .ok (numberBytes (saved i).toNat 16)) :
-    Vector128State program boundary entered current current inputs outputs slots
-      (List.ofFn (fun i => some (.v128 (saved i))) ++ List.replicate spare none) := by
-  refine ⟨call, MemoryBelow.refl _ _, authority, Nat.le_refl _, ?_⟩
+    LocalSnapshots current frame.locals (savedVectors saved) := by
   intro index value specified
-  by_cases bound : index < count
-  · obtain ⟨reference, slot, loaded⟩ := reads ⟨index, bound⟩
-    exact ⟨.vector128, reference, .v128 (saved ⟨index, bound⟩), _, slot, rfl,
-      by simpa [knownLocals, List.getElem?_append, bound, localResult] using specified, loaded⟩
-  · simp only [knownLocals, List.getElem?_append, List.length_ofFn, bound, ite_false,
-      List.getElem?_replicate] at specified
-    split at specified <;> cases specified
-
-/-- The frame's locals remember the same vectors one slot after the root. -/
-theorem Vector128State.locals
-    (state : Vector128State program boundary entered start current inputs outputs slots values)
-    {frame : Frame} {root : LocalSlot} (layout : frame.locals = root :: slots) :
-    LocalSnapshots current frame.locals (knownLocals (none :: values)) := by
-  rw [layout]
-  exact state.snapshots.skip
-
-/-- A remembered vector is an initialized sixteen-byte home holding exactly its bits. -/
-theorem Vector128State.read
-    (state : Vector128State program boundary entered start current inputs outputs slots values)
-    {index : Nat} {value : BitVec 128} (known : knownLocals values index = some (.v128 value)) :
-    ∃ reference, slots[index]? = some (.bytes .vector128 reference) ∧
-      read current reference 16 1 = .ok (numberBytes value.toNat 16) := by
-  obtain ⟨kind, home, stored, number, slot, fits, result, loaded⟩ := state.snapshots index _ known
-  have vector : kind = .vector128 ∧ number = value.toNat := by
-    cases kind <;> cases stored <;>
-      simp_all [localResult, localNumber, CIL.Value.hasUnspecified] <;>
-      (split at fits <;> simp_all)
-  obtain ⟨rfl, rfl⟩ := vector
-  exact ⟨home, slot, loaded⟩
-
-/-- A checked private vector store remembers the value and keeps the caller guarantees. -/
-theorem Vector128State.store
-    (state : Vector128State program boundary entered start current inputs outputs slots values)
-    (body : CIL.Method) {specs : List NumericLocalSpec} {frame : Frame} {root : LocalSlot}
-    (layout : frame.locals = root :: slots) (enteredWF : entered.WellFormed)
-    (homes : NumericHomes entered boundary specs slots) (index : Nat) (behindRoot : 0 < index)
-    (specified : specs[index - 1]? = some vector128ZeroSpec)
-    (present : index - 1 < values.length) (value : BitVec 128) :
-    ∃ after, Vector128State program boundary entered start after inputs outputs slots
-        (values.set (index - 1) (some (.v128 value))) ∧
-      ∀ pc args rest, step body (.setLocal index) pc args frame
-        (.scalar (.v128 value) :: rest) current = .ok (.next (pc + 1) rest frame after) := by
-  obtain ⟨home, after, slot, _, kept, call, authority, written, stepped⟩ :=
-    vector128_local_store program body specs boundary entered current inputs outputs frame root
-      slots layout state.call enteredWF homes state.authority (index - 1) vector128ZeroSpec
-      specified (.v128 value) value.toNat rfl
-  rw [Nat.sub_add_cancel behindRoot] at slot stepped
-  refine ⟨after, ⟨call, state.preserved.trans kept, authority,
-    Nat.le_trans state.advanced (write_extends_allocations _ _ _ _ _ written).next, ?_⟩, stepped⟩
-  rw [← rememberLocal_knownLocals present]
-  refine state.snapshots.after_write homes.writable (index - 1) .vector128 home (.v128 value)
-    value.toNat rfl ?_ written
-  obtain ⟨tail, rfl⟩ : ∃ tail, index = tail + 1 := ⟨index - 1, by omega⟩
-  simpa [layout, vector128ZeroSpec] using slot
+  unfold savedVectors at specified
+  split at specified
+  next ready =>
+    obtain ⟨reference, slot, loaded⟩ := reads ⟨index - 1, ready.2⟩
+    obtain ⟨inner, rfl⟩ : ∃ inner, index = inner + 1 := ⟨index - 1, by omega⟩
+    cases specified
+    exact ⟨.vector128, reference, .v128 _, _, by simpa [layout] using slot, rfl, rfl, loaded⟩
+  next => cases specified
 
 end UInt256Proof.Add.Safety

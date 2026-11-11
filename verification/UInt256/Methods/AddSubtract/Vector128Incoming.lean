@@ -153,10 +153,8 @@ theorem vector128_incoming_checked (program : CIL.Program) (body : CIL.Method) (
       intrinsic_sse_align, intrinsic_reinterpret128] until done
   · rw [← incoming128_arm_low] at storeLow
     rw [← incoming128_arm_high] at storeHigh
-    cil_contract_steps 2 [found, code, show body.profile.evaluate .advSimd = true from selected]
-    -- The taken feature branch leaves its target as an undecided literal comparison.
-    simp only [BitVec.reduceEq, not_false_eq_true, ↓reduceIte]
     cil_contract_steps [found, code, selected, loadLow, reloadLow, loadHigh, storeLow, storeHigh,
+      show body.profile.evaluate .advSimd = true from selected,
       intrinsic_zero128, intrinsic_adv_extract] until done
 
 end UInt256Proof.AddSubtract.Safety

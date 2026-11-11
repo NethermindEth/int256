@@ -71,10 +71,7 @@ theorem vector128_decision_checked (program : CIL.Program) (body : CIL.Method) (
     by_cases zero : value 13 = BitVec.ofNat 128 0
     all_goals
       simp only [beq_iff_eq, zero, ↓reduceIte] at done ⊢
-      cil_contract_steps 1 [found, tail]
-      -- A taken branch leaves its target as an undecided literal comparison.
-      try simp only [BitVec.reduceEq, not_false_eq_true, ↓reduceIte]
-      exact done
+      cil_contract_steps [found, tail] until done
   have loadLow := state.snapshots.load frame root layout 11 (by decide) body
   have loadHigh := state.snapshots.load frame root layout 12 (by decide) body
   cases selected : body.profile.advSimd <;> simp only [selected] at code condition
@@ -82,21 +79,18 @@ theorem vector128_decision_checked (program : CIL.Program) (body : CIL.Method) (
       slotSpec (value 11 ||| value 12) (by simp [condition, selectedPropagation128])
     cil_contract_steps [found, code, loadLow, loadHigh, stored, intrinsic_or128,
       show body.profile.evaluate .advSimd = false from selected] until branch after saved
-  · cil_contract_steps 2 [found, code, show body.profile.evaluate .advSimd = true from selected]
-    simp only [BitVec.reduceEq, not_false_eq_true, ↓reduceIte]
+  · have feature : body.profile.evaluate .advSimd = true := selected
     by_cases reporting : flag = BitVec.ofNat 32 0
     · subst reporting
       obtain ⟨after, saved, stored⟩ := state.store body specs frame root layout enteredWF homes
         slotSpec (advExtract64 (value 11) (value 12) 1)
         (by simp [condition, selectedPropagation128, incoming128_arm_high])
-      cil_contract_steps [found, code, selected, argument, flagFit, loadLow, loadHigh, stored,
-        intrinsic_adv_extract] until branch after saved
+      cil_contract_steps [found, code, feature, selected, argument, flagFit, loadLow, loadHigh,
+        stored, intrinsic_adv_extract] until branch after saved
     · obtain ⟨after, saved, stored⟩ := state.store body specs frame root layout enteredWF homes
         slotSpec (value 11 ||| value 12) (by simp [condition, selectedPropagation128, reporting])
-      cil_contract_steps 2 [found, code, argument, flagFit]
-      simp only [reporting, not_false_eq_true, ↓reduceIte]
-      cil_contract_steps [found, code, loadLow, loadHigh, stored, intrinsic_or128]
-        until branch after saved
+      cil_contract_steps [found, code, feature, argument, flagFit, reporting, loadLow, loadHigh,
+        stored, intrinsic_or128] until branch after saved
 
 /-- The fourteen private vectors saved by the decision: the thirteen before it and the
     condition it tests. -/

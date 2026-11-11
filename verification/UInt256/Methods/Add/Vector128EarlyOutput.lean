@@ -83,11 +83,8 @@ theorem vector128_early_output (program : CIL.Program) (body : CIL.Method) (meth
       (fun id offset old excluded =>
         (outside id offset excluded).trans (state.preserved.cells id old offset))
       (by simp [selected])
-    cil_contract_steps 4 [found, code, argument, formed,
-      show body.profile.evaluate .advSimd = true from selected]
-    -- The taken feature branch leaves its target as an undecided literal comparison.
-    simp only [BitVec.reduceEq, not_false_eq_true, ↓reduceIte]
     cil_contract_steps [found, code, loadLow, loadHigh, argument, formed, firstWrite,
-      secondWrite, address, storeValue, referenceAt, ordinaryAccessAlignment] until done
+      secondWrite, address, storeValue, referenceAt, ordinaryAccessAlignment,
+      show body.profile.evaluate .advSimd = true from selected] until done
 
 end UInt256Proof.Add.Safety

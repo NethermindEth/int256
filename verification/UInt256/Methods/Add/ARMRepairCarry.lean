@@ -55,16 +55,13 @@ def armRepairSnapshot (values : Fin 14 → BitVec 128) (i : Fin 14) : BitVec 128
 /-- Complete ARM private repair state from the selected propagation condition through both
     overwrites, retaining all unaffected original snapshots. -/
 theorem vector128_arm_repair_checked (program : CIL.Program) (body : CIL.Method) (method : Nat)
-    (specs : List NumericLocalSpec) (found : program[method]? = some body)
-    (code : CodeAt body 113 (armRepairCode))
-    (repairSpecs : ∀ i : Fin 4, specs[19 + i.val]? = some vector128ZeroSpec)
-    (baseSpecs : ∀ i : Fin 14, specs[i.val]? = some vector128ZeroSpec)
+    (found : program[method]? = some body) (code : CodeAt body 113 (armRepairCode))
     (enabled : body.profile.advSimd = true)
     (boundary : Nat) (entered current : Memory)
-    (inputs outputs : List Reference) (frame : Frame) (root : LocalSlot) (slots : List LocalSlot)
-    (layout : frame.locals = root :: slots) (args : List Value)
+    (inputs outputs : List Reference) (frame : Frame) (root : Option ManagedReference)
+    (slots : List LocalSlot) (layout : frame.locals = .root root :: slots) (args : List Value)
     (currentCall : CallingConditions program current inputs outputs)
-    (enteredWF : entered.WellFormed) (homes : NumericHomes entered boundary specs slots)
+    (enteredWF : entered.WellFormed) (homes : NumericHomes entered boundary armSpecs slots)
     (authority : AccessBelow entered.nextIdentity entered current)
     (flag : BitVec 32) (flagFit : CIL.NarrowKind.unsigned8.extend flag = flag)
     (argument : args[3]? = some (.scalar (.i32 flag)))
@@ -87,63 +84,42 @@ theorem vector128_arm_repair_checked (program : CIL.Program) (body : CIL.Method)
     ∃ fuel final returned,
       run program fuel method 113 args frame [] current = .ok (final, returned) ∧
         post final returned := by
-  have initial := Vector128State.initial (program := program) (boundary := boundary)
-    (entered := entered) values 9 currentCall authority snapshots
-  change Vector128State program boundary entered current current inputs outputs slots
-    [some (.v128 (values 0)), some (.v128 (values 1)), some (.v128 (values 2)),
-      some (.v128 (values 3)), some (.v128 (values 4)), some (.v128 (values 5)),
-      some (.v128 (values 6)), some (.v128 (values 7)), some (.v128 (values 8)),
-      some (.v128 (values 9)), some (.v128 (values 10)), some (.v128 (values 11)),
-      some (.v128 (values 12)), some (.v128 (values 13)),
-      none, none, none, none, none, none, none, none, none] at initial
-  obtain ⟨_, propagated, storePropagation⟩ := initial.store body layout enteredWF homes 20
-    (by decide) (repairSpecs 0) (by simp) (incoming128High (values 11) (values 12))
-  obtain ⟨_, filled, storeFull⟩ := propagated.store body layout enteredWF homes 21 (by decide)
-    (repairSpecs 1) (by simp) (full128 (values 10))
-  obtain ⟨_, extended, storeExtra⟩ := filled.store body layout enteredWF homes 22 (by decide)
-    (repairSpecs 2) (by simp)
-    (incoming128Low (full128 (values 10) &&& incoming128High (values 11) (values 12)))
-  rw [← incoming128_arm_low] at storeExtra
-  obtain ⟨_, masked, storeRepair⟩ := extended.store body layout enteredWF homes 23 (by decide)
-    (repairSpecs 3) (by simp) (repair128Mask (values 10) (values 11) (values 12))
-  obtain ⟨_, carried, storeCarry⟩ := masked.store body layout enteredWF homes 7 (by decide)
-    (baseSpecs 6) (by simp) (repaired128Carry (values 6) (values 12) (full128 (values 10))
-      (repair128Mask (values 10) (values 11) (values 12)))
-  obtain ⟨after, repaired, storeHigh⟩ := carried.store body layout enteredWF homes 11 (by decide)
-    (baseSpecs 10) (by simp)
-    (corrected128 (values 10) (repair128Mask (values 10) (values 11) (values 12)))
+  have known := savedVectors_snapshots layout snapshots
+  have formed := currentCall.1.wellFormed
+  have preserved := MemoryBelow.refl boundary current
   have suffix : ∃ fuel final returned, run program fuel method 121 args frame
       [.scalar (.v128 (incoming128High (values 11) (values 12)))] current =
         .ok (final, returned) ∧ post final returned := by
-    cil_contract_steps (snapshots := initial.locals layout)
-      [found, code, storePropagation]
-    cil_contract_steps (snapshots := propagated.locals layout)
-      [found, code, storeFull, full128]
-    cil_contract_steps (snapshots := filled.locals layout)
-      [found, code, enabled, storeExtra]
-    cil_contract_steps (snapshots := extended.locals layout)
-      [found, code, storeRepair, repair128Mask]
-    cil_contract_steps (snapshots := masked.locals layout)
-      [found, code, storeCarry, repaired128Carry]
-    cil_contract_steps (snapshots := carried.locals layout)
-      [found, code, storeHigh, corrected128]
-    refine continuation after (fun i => ?_) repaired.preserved repaired.call repaired.authority
-      repaired.advanced
-    obtain ⟨index, bound⟩ := i
-    have cases : index = 0 ∨ index = 1 ∨ index = 2 ∨ index = 3 ∨ index = 4 ∨ index = 5 ∨
-        index = 6 ∨ index = 7 ∨ index = 8 ∨ index = 9 ∨ index = 10 ∨ index = 11 ∨
-        index = 12 ∨ index = 13 := by omega
-    rcases cases with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl |
-      rfl | rfl <;> exact repaired.read rfl
+    cil_contract_steps (snapshots := known) [found, code, enabled, savedVectors]
+    refine continuation _ (fun i => ?_) preserved
+      ((((((currentCall.after_write localWrite).after_write localWrite_1).after_write
+        localWrite_2).after_write localWrite_3).after_write localWrite_4).after_write
+        localWrite_5) authority ?_
+    · obtain ⟨home, slot, _⟩ := snapshots i
+      refine ⟨home, slot, localSnapshots_5.read_vector128 (index := i.val + 1) ?_
+        (by simpa [layout] using slot)⟩
+      obtain ⟨index, bound⟩ := i
+      have cases : index = 0 ∨ index = 1 ∨ index = 2 ∨ index = 3 ∨ index = 4 ∨ index = 5 ∨
+          index = 6 ∨ index = 7 ∨ index = 8 ∨ index = 9 ∨ index = 10 ∨ index = 11 ∨
+          index = 12 ∨ index = 13 := by omega
+      rcases cases with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl |
+        rfl | rfl <;> simp [rememberLocal, savedVectors, armRepairSnapshot, repaired128Carry,
+          repair128Mask, corrected128, full128, ← incoming128_arm_low]
+    · have propagation := (write_extends_allocations _ _ _ _ _ localWrite).next
+      have full := (write_extends_allocations _ _ _ _ _ localWrite_1).next
+      have extra := (write_extends_allocations _ _ _ _ _ localWrite_2).next
+      have repair := (write_extends_allocations _ _ _ _ _ localWrite_3).next
+      have carry := (write_extends_allocations _ _ _ _ _ localWrite_4).next
+      have high := (write_extends_allocations _ _ _ _ _ localWrite_5).next
+      omega
   by_cases zero : flag = BitVec.ofNat 32 0
   · rw [← show values 13 = incoming128High (values 11) (values 12) by
       simpa [selectedPropagation128, enabled, zero] using condition] at suffix
-    cil_contract_steps (snapshots := initial.locals layout)
-      [found, code, argument, flagFit, zero] until suffix
+    cil_contract_steps (snapshots := known) [found, code, argument, flagFit, zero, savedVectors]
+      until suffix
   · rw [← incoming128_arm_high] at suffix
-    cil_contract_steps (snapshots := initial.locals layout)
-      [found, code, argument, flagFit, zero, enabled] until suffix
-
+    cil_contract_steps (snapshots := known) [found, code, argument, flagFit, zero, enabled,
+      savedVectors] until suffix
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety

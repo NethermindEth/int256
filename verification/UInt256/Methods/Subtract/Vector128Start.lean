@@ -114,9 +114,6 @@ theorem subtract_decision_checked (program : CIL.Program) (body : CIL.Method) (m
   by_cases zero : subtractPropagation values = BitVec.ofNat 128 0
   all_goals
     simp only [beq_iff_eq, zero, ↓reduceIte] at continuation ⊢
-    cil_contract_steps 1 [found, code]
-    -- A taken branch leaves its target as an undecided literal comparison.
-    try simp only [BitVec.reduceEq, not_false_eq_true, ↓reduceIte]
-    exact continuation
+    cil_contract_steps [found, code] until continuation
 
 end UInt256Proof.Subtract.Profile

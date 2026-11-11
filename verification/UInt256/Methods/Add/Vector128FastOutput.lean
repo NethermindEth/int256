@@ -82,10 +82,8 @@ theorem vector128_fast_suffix (program : CIL.Program) (body : CIL.Method) (metho
     rw [CIL.NarrowKind.extend_ite_ofNat_one_zero]
     exact continuation after firstRead secondRead afterCall outside
   · have loadCarry := snapshots.load frame root layout 6 (by decide) body
-    cil_contract_steps 2 [found, code, show body.profile.evaluate .advSimd = true from selected]
-    -- The taken feature branch leaves its target as an undecided literal comparison.
-    simp only [BitVec.reduceEq, not_false_eq_true, ↓reduceIte]
-    cil_contract_steps [found, code, returns, loadCarry, intrinsic_extract128]
+    cil_contract_steps [found, code, returns, loadCarry, intrinsic_extract128,
+      show body.profile.evaluate .advSimd = true from selected]
     rw [CIL.NarrowKind.extend_ite_ofNat_one_zero]
     exact continuation current (earlyRead selected).1 (earlyRead selected).2 currentCall
       (fun _ _ _ => rfl)

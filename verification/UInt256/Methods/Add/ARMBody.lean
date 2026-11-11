@@ -11,19 +11,6 @@ def armBody (profile : CIL.FeatureProfile) : CIL.Method := by_elab
   let some unfolded ← Lean.Meta.unfoldDefinition? body
     | throwError "Expected generated template application"
   return ← Lean.Meta.withTransparency .default (Lean.Meta.reduce unfolded)
-def armWordSpec : NumericLocalSpec := ⟨.word64, .i64 0, 0, rfl⟩
-def armSpecs : List NumericLocalSpec := List.replicate 14 vector128ZeroSpec ++ List.replicate 5 armWordSpec ++ List.replicate 4 vector128ZeroSpec
-
-theorem armSpecs_first : ∀ i : Fin 14, armSpecs[i.val]? = some vector128ZeroSpec := by
-  intro i
-  have cases : i = 0 ∨ i = 1 ∨ i = 2 ∨ i = 3 ∨ i = 4 ∨ i = 5 ∨ i = 6 ∨ i = 7 ∨ i = 8 ∨ i = 9 ∨ i = 10 ∨ i = 11 ∨ i = 12 ∨ i = 13 := by omega
-  rcases cases with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;> rfl
-
-theorem armSpecs_repair : ∀ i : Fin 4, armSpecs[19 + i.val]? = some vector128ZeroSpec := by
-  intro i
-  have cases : i = 0 ∨ i = 1 ∨ i = 2 ∨ i = 3 := by omega
-  rcases cases with rfl | rfl | rfl | rfl <;> rfl
-
 theorem arm_helper_checked (profile : CIL.FeatureProfile) (enabled : profile.advSimd = true)
     (program : CIL.Program) (method : Nat) (found : program[method]? = some (armBody profile))
     (memory : Memory) (left right output : Reference) (flag : BitVec 32)
@@ -43,13 +30,13 @@ theorem arm_helper_checked (profile : CIL.FeatureProfile) (enabled : profile.adv
     change profile.advSimd = false at disabled
     rw [enabled] at disabled
     contradiction
-  apply checked_vector128_arm_contract program b method armSpecs found
+  apply checked_vector128_arm_contract program b method found
     rfl (by simp only [b, armBody, incomingPrefix, enabled, ite_true]; rfl)
-    rfl armSpecs_first (fun disabled => (disabledFalse disabled).elim)
+    rfl (fun disabled => (disabledFalse disabled).elim)
     (fun disabled => (disabledFalse disabled).elim)
     (by simp only [b, armBody, earlyOutputCode, enabled, ite_true]; rfl)
     rfl (by simp only [b, armBody, decisionCode, enabled, ite_true]; rfl)
     (by simp only [b, armBody, fastOutputCode, enabled, ite_true]; rfl) rfl
-    rfl rfl armSpecs_repair ⟨rfl,rfl⟩ rfl rfl rfl enabled
+    rfl rfl ⟨rfl,rfl⟩ rfl rfl rfl enabled
     memory left right output flag flagFit call
 end UInt256Proof.Add.Safety
