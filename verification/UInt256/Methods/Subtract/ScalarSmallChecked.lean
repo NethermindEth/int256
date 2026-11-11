@@ -26,7 +26,7 @@ theorem scalar_right_small_checked (memory : CIL.Safety.Memory) (left right outp
     scalar_frame_setup memory (binaryArguments left right output) call.1.1
   obtain ⟨fuel, final, values, finished, result⟩ := scalar_right_prefix_checked memory entered
     left right output frame call setup homes post (by
-      intro home current slot loaded preserved currentCall authority next
+      intro current saved preserved currentCall authority next
       rw [small]
       obtain ⟨childFuel, after, values, certified, result⟩ :=
         Profile.small_checked Extracted.program Extracted.subtractScalarUInt64Index
@@ -55,8 +55,7 @@ theorem scalar_right_small_checked (memory : CIL.Safety.Memory) (left right outp
               (result.as_subtract keptRight small)))
       conv in scalarFirstDecision => cbv
       conv at finish in scalarSmallCall => cbv
-      cil_contract_steps [found, binaryArguments, fl, fo, slot,
-        load_local_word64_of_read loaded] until finish)
+      cil_contract_steps (snapshots := saved) [found, binaryArguments, fl, fo] until finish)
   exact ⟨fuel, final, values, invoke_of_run found
     (checkedValues_of_valid call.binary_arguments_valid) setup finished, result⟩
 

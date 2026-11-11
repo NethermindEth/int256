@@ -1,6 +1,9 @@
 import UInt256.Methods.Subtract.ScalarSmallChecked
 import UInt256.Safety.ReportingContract
 
+/-! The extracted SubtractImpl with AVX2 disabled skips its vector block and forwards the
+    scalar helper's difference and underflow flag. -/
+
 namespace UInt256Proof.Subtract.Safety
 open CIL.Safety UInt256Model.Safety
 
@@ -8,115 +11,60 @@ open CIL.Safety UInt256Model.Safety
     checked below against the independently discovered scalar helper. -/
 def dispatchCall : Nat := Extracted.subtractVector256Body.code.length - 2
 
-theorem dispatch_prefix (left right output : Reference) (frame : Frame) (memory : CIL.Safety.Memory)
-    (call : CallingConditions Extracted.program memory [left, right] [output])
-    (post : CIL.Safety.Memory → List Value → Prop)
-    (continuation : ∃ fuel final values,
-      run Extracted.program fuel Extracted.subtractVector256Index dispatchCall (binaryArguments left right output)
-        frame [.reference (.address output), .reference (.address right),
-          .reference (.address left)] memory = .ok (final, values) ∧ post final values) :
-    ∃ fuel final values,
-      run Extracted.program fuel Extracted.subtractVector256Index 0 (binaryArguments left right output)
-        frame [] memory = .ok (final, values) ∧ post final values := by
-  have fl := call.input_formed (reference := left) (by simp)
-  have fr := call.input_formed (reference := right) (by simp)
-  have fo := call.output_formed (reference := output) (by simp)
-  conv at continuation in dispatchCall => cbv
-  repeat' first
-    | exact continuation
-    | (simp (config := { failIfUnchanged := false })
-       apply run_next_exists post
-       · simp only [cil_code]; rfl
-       · simp only [cil_code]; rfl
-       · simp (config := { implicitDefEqProofs := false })
-           [cil_code, binaryArguments, step, cil_guard, observerCount, checkedValue, numericValue, formValue, fl, fr, fo,
-             pureArity, scalars, CIL.step, CIL.FeatureProfile.evaluate, checkedAt, Except.mapError,
-             Bind.bind, Except.bind, Pure.pure, Except.pure]
-         first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)
-
-theorem dispatch_return (args : List Value) (flag : BitVec 32) (frame : Frame) (memory : CIL.Safety.Memory)
-    (normalized : CIL.NarrowKind.unsigned8.extend flag = flag) :
-    run Extracted.program 1 Extracted.subtractVector256Index (dispatchCall + 1) args frame [.scalar (.i32 flag)] memory =
-      .ok (leaveFrame frame memory, [.scalar (.i32 flag)]) := by
-  have lookup : Extracted.program[Extracted.subtractVector256Index]? = some Extracted.subtractVector256Body := by simp only [cil_code]
-  have returned : Extracted.subtractVector256Body.code[dispatchCall + 1]? = some (.ret (some .unsigned8)) := by
-    conv in dispatchCall => cbv
-    simp only [Nat.reduceAdd, cil_code]
-  have returns : Extracted.subtractVector256Body.returnsValue = true := by rfl
-  simp [run, lookup, returned, returns, step, cil_guard, observerCount, checkedValue, numericValue, normalized,
-    Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-
 theorem dispatch_contract_of_scalar
     (scalarChecked : ∀ memory left right output,
       CallingConditions Extracted.program memory [left, right] [output] →
       ∃ fuel final values,
         invoke Extracted.program fuel scalarIndex (binaryArguments left right output) memory =
-          .ok (final, values) ∧ SubtractResult memory final values left right output) : ReportingBinaryContract (· - ·)
-    (fun left right => decide (left.toNat < right.toNat))
-    Extracted.program Extracted.subtractVector256Index := by
+          .ok (final, values) ∧ SubtractResult memory final values left right output) :
+    ReportingBinaryContract (· - ·) (fun left right => decide (left.toNat < right.toNat))
+      Extracted.program Extracted.subtractVector256Index := by
   intro memory left right output call
-  have fits : FrameSetupFits Extracted.subtractVector256Body (binaryArguments left right output) := by
-    simp [cil_code, FrameSetupFits, InitializersFit, InitializerFits, AggregateArgumentsFit, ParameterArgumentsFit, SelectedKindsFit]
-  obtain ⟨frame, entered, setup, live⟩ := call.binary_setup_succeeds fits
+  let post := fun final returned => SubtractResult memory final returned left right output
+  have found : Extracted.program[Extracted.subtractVector256Index]? =
+      some Extracted.subtractVector256Body := by rfl
+  have fits : FrameSetupFits Extracted.subtractVector256Body
+      (binaryArguments left right output) := by
+    simp [cil_code, FrameSetupFits, InitializersFit, InitializerFits, AggregateArgumentsFit,
+      ParameterArgumentsFit]
+  obtain ⟨frame, entered, setup, _⟩ := call.binary_setup_succeeds fits
   have enteredCall := call.after_frame_setup setup
-  obtain ⟨childFuel, after, values, invoked, result⟩ := scalarChecked entered left right output enteredCall
-  rw [result.flag] at invoked
-  have found : Extracted.program[Extracted.subtractVector256Index]? = some Extracted.subtractVector256Body := by simp only [cil_code]
-  have fetched : Extracted.subtractVector256Body.code[dispatchCall]? = some (.call scalarIndex 3) := by
+  obtain ⟨childFuel, after, values, invoked, result⟩ :=
+    scalarChecked entered left right output enteredCall
+  obtain rfl := result.flag
+  have fresh := enterFrame_fresh _ _ _ _ _ setup
+  have fetched : Extracted.subtractVector256Body.code[dispatchCall]? =
+      some (.call scalarIndex 3) := by
     conv in dispatchCall => cbv
     simp only [cil_code]
     rfl
-  have fl := enteredCall.input_formed (reference := left) (by simp)
-  have fr := enteredCall.input_formed (reference := right) (by simp)
-  have fo := enteredCall.output_formed (reference := output) (by simp)
-  have stepped : step Extracted.subtractVector256Body (.call scalarIndex 3) dispatchCall
-      (binaryArguments left right output) frame
-      [.reference (.address output), .reference (.address right), .reference (.address left)]
-      entered = .ok (.call scalarIndex (binaryArguments left right output) [] entered) := by
-    simp [step, cil_guard, observerCount, binaryArguments, binaryArguments, checkedValue, numericValue, formValue, fl, fr, fo,
-      checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-  obtain ⟨tailFuel, tail⟩ := run_call_exists found fetched stepped ⟨childFuel, invoked⟩
-    ⟨1, dispatch_return _ (subtractUnderflow entered left right) frame after
-      (by unfold subtractUnderflow; split <;> decide)⟩
-  let post : CIL.Safety.Memory → List Value → Prop := fun final values =>
-    final = leaveFrame frame after ∧ values = [.scalar (.i32 (subtractUnderflow entered left right))]
-  obtain ⟨fuel, final, values, finished, sameFinal, sameValues⟩ :=
-    dispatch_prefix left right output frame entered enteredCall post ⟨tailFuel, _, _, tail, rfl, rfl⟩
-  subst final
-  subst values
-  have inputSame : ∀ reference ∈ [left, right], inputValue entered reference = inputValue memory reference := by
-    intro reference member
-    exact call.input_value_after_setup setup member
-  have flagSame : subtractUnderflow entered left right = subtractUnderflow memory left right := by
-    simp only [subtractUnderflow, inputSame left (by simp), inputSame right (by simp)]
-  rw [flagSame] at finished
-  have checked : (binaryArguments left right output).mapM (checkedValue memory) =
-      .ok (binaryArguments left right output) := by
-    have fl := call.input_formed (reference := left) (by simp)
-    have fr := call.input_formed (reference := right) (by simp)
-    have fo := call.output_formed (reference := output) (by simp)
-    simp [binaryArguments, checkedValue, formValue, fl, fr, fo, checkedAt,
-      Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-  refine ⟨fuel, leaveFrame frame after, ?_, ?_, ?_, ?_⟩
-  · simpa only [subtractUnderflow, decide_eq_true_eq] using
-      certify_invocation _ _ _ _ _ _ _ _ _ _ found checked setup live finished
-  all_goals
-    have fresh := enterFrame_fresh _ _ _ _ _ setup
-    have retained := leaveFrame_preserves_memory_below frame after memory.nextIdentity
-      (fun id member => (fresh.2 id member).1)
-    have before := enterFrame_preserves_caller_memory _ _ _ _ _ setup
-    obtain ⟨allocation, present, _, _⟩ := formed_reference_live _ _ _ (call.output_formed (by simp : output ∈ [output]))
-    have old := (call.1.1.1 _ _ present).1
-  · have bytes : (fun offset => ((leaveFrame frame after).cells output.allocation offset).bits) =
-        (fun offset => (after.cells output.allocation offset).bits) := by
-      funext offset
-      rw [retained.cells output.allocation old offset]
-    have math := result.value
-    rw [inputSame left (by simp), inputSame right (by simp)] at math
-    simpa only [inputValue, bytes] using math
-  · exact (retained.access output old 32 1 true).trans result.writable
-  · intro id bound offset outside
-    exact (retained.cells id bound offset).trans
-      ((result.footprint id (Nat.lt_of_lt_of_le bound fresh.1.next) offset outside).trans (before.cells id bound offset))
+  have returned : Extracted.subtractVector256Body.code[dispatchCall + 1]? =
+      some (.ret (some .unsigned8)) := by
+    conv in dispatchCall => cbv
+    simp only [Nat.reduceAdd, cil_code]
+  have forwarded := run_call_post (post := post) found (pc := dispatchCall)
+    (args := binaryArguments left right output) fetched
+    (step_call_loaded enteredCall.binary_arguments_valid rfl) ⟨childFuel, invoked⟩
+    (run_return_exists found returned
+      (step_return_unchanged (narrow := some .unsigned8) rfl rfl rfl
+        ⟨_, rfl, CIL.NarrowKind.extend_ite_one_zero _ _⟩) rfl
+      (Profile.subtract_result_retire call
+        (enterFrame_preserves_caller_memory _ _ _ _ _ setup).cells
+        fresh.1.next (fun id member => (fresh.2 id member).1) result))
+  have executed : ∃ fuel final returned,
+      run Extracted.program fuel Extracted.subtractVector256Index 0
+        (binaryArguments left right output) frame [] entered = .ok (final, returned) ∧
+      post final returned := by
+    conv at forwarded in dispatchCall => cbv
+    cil_contract_steps [found, binaryArguments,
+      enteredCall.input_formed (reference := left) (by simp),
+      enteredCall.input_formed (reference := right) (by simp),
+      enteredCall.output_formed (reference := output) (by simp)] until forwarded
+  obtain ⟨fuel, final, returned, ran, retired⟩ := executed
+  obtain rfl := retired.flag
+  refine ⟨fuel, final, ?_, retired.value, retired.writable, retired.footprint⟩
+  simpa only [subtractUnderflow, decide_eq_true_eq] using
+    InvocationCertificate.of_invoke call.1.wellFormed call.2
+      (invoke_of_run found (checkedValues_of_valid call.binary_arguments_valid) setup ran)
 
 end UInt256Proof.Subtract.Safety

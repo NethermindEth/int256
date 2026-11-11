@@ -48,12 +48,7 @@ theorem scalar_general_checked (contract : BorrowHelperContract Extracted.progra
           (op := .call Extracted.storeLimbsIndex 5)
         · rfl
         · rfl
-        · unfold UInt256Proof.Safety.storageArguments
-          repeat' (conv in UInt256Proof.Safety.storageWordOrder => cbv)
-          simp [List.range_succ, List.findIdx, List.findIdx.go, step, cil_guard, observerCount,
-            checkedValue, numericValue, formValue, formed, checkedAt, Except.mapError,
-            Bind.bind, Except.bind, Pure.pure, Except.pure]
-          exact ⟨rfl, rfl, rfl⟩
+        · cil_checked_step [UInt256Proof.Safety.storageArguments, formed]
         · exact state.call
         · intro stored valid outside authority value
           obtain ⟨outputAllocation, outputPresent, _, _⟩ := formed_reference_live _ _ _

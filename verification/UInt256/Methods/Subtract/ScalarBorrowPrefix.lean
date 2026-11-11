@@ -57,9 +57,6 @@ theorem scalar_borrow_run_next (contract : BorrowHelperContract Extracted.progra
   have cases : segment = 0 ∨ segment = 1 ∨ segment = 2 := by omega
   rcases cases with rfl | rfl | rfl
   all_goals
-    dsimp at resultSlot leftRead rightRead tail
-    simp (config := { failIfUnchanged := false }) only [CIL.fin_val_three, Nat.reduceMul]
-      at leftRead rightRead tail
     conv in (scalarBorrowCall _) => cbv
     cil_contract_steps [found, binaryArguments, fl, fr, fb, fo, borrowSlot, resultSlot,
       leftRead, rightRead] until tail
@@ -83,19 +80,24 @@ theorem scalar_general_borrows (contract : BorrowHelperContract Extracted.progra
       run Extracted.program fuel scalarIndex 0 (binaryArguments left right output) frame [] entered =
         .ok (result, returned) ∧ post result returned := by
   apply scalar_right_prefix_checked original entered left right output frame call setup homes post
-  intro rightHome before rightSlot rightRead preserved beforeCall authority _
+  intro before saved preserved beforeCall authority _
   have enteredWF := enterFrame_preserves_wellFormed _ _ _ _ _ call.1.1 setup
-  have specified : scalarLocalSpecs[1]? = some (some 0) := by rfl
-  obtain ⟨borrowHome, borrowSlot, fresh, _, initialWrite⟩ := homes.word_at 1 0 specified
-  obtain ⟨allocation, present, _, _⟩ := access_within_allocation _ _ _ _ _ initialWrite
-  have writable := authority.access initialWrite (enteredWF.1 _ _ present).1
-  obtain ⟨prepared, written, _, loaded, _⟩ := store_local_word64 0 writable
-  have caller := preserved.trans (write_preserves_memory_below _ _ _ _ _ _ fresh written)
+  obtain ⟨borrowHome, borrowSlot, _, _, initialWrite⟩ := homes.word_at 1 0 (by rfl)
+  have writable := authority.access initialWrite (enteredWF.access_bound initialWrite)
+  have writableHomes := homes.writable
+  have beforeFormed := beforeCall.1.1
+  have found : Extracted.program[scalarIndex]? = some scalarBody := by rfl
+  have adv : scalarBody.profile.advSimd = false := by rfl
+  have sse : scalarBody.profile.sse42 = false := by rfl
+  conv in scalarFirstDecision => cbv
+  cil_contract_steps (snapshots := saved) [found, large, adv, sse]
+  have cleared : read storedLocal borrowHome 8 1 = .ok (numberBytes 0 8) := by
+    simpa [localWidth] using write_readback _ _ _ _ _ localWrite
   -- The chain invariant comes from the allocated homes; caller views need no separation.
   obtain ⟨results, state⟩ : ∃ results, ScalarBorrowState (program := Extracted.program) original
-      prepared frame left right output borrowHome results 0 :=
+      storedLocal frame left right output borrowHome results 0 :=
     UInt256Proof.AddSubtract.Safety.RippleState.initial
-      Extracted.program (wordKinds scalarLocalSpecs) 1 0 original entered prepared frame
+      Extracted.program (wordKinds scalarLocalSpecs) 1 0 original entered storedLocal frame
       frame.locals (by intro index; rfl) (fun i => by
         have specified : scalarLocalSpecs[1 + i.val]? = some (some 0) := by
           obtain ⟨i, bound⟩ := i
@@ -105,31 +107,18 @@ theorem scalar_general_borrows (contract : BorrowHelperContract Extracted.progra
         exact ⟨reference, slot⟩)
       left right output borrowHome (scalarBorrowValue original left right) _
       (by simp [scalarBorrowValue]) call
-      (call.after_memory_below caller (write_preserves_wellFormed _ _ _ _ _ beforeCall.1.1 written)
-        (write_preserves_static_world _ _ _ _ _ _ beforeCall.2 written))
-      caller homes.writable enteredWF (authority.trans (write_preserves_access_below written _))
-      borrowSlot loaded
-  have savedRight := ((write_preserves_memory_below _ _ _ _ _ borrowHome.allocation
-    (Nat.le_refl _) written).read rightHome (homes.ordered 0 1 rightHome borrowHome (by decide)
-      rightSlot borrowSlot) 8 1).trans rightRead
-  have stored (pc : Nat) (rest : List Value) :
-      step scalarBody (.setLocal 1) pc (binaryArguments left right output) frame
-        (.scalar (.i64 0) :: rest) before = .ok (.next (pc + 1) rest frame prepared) := by
-    obtain ⟨result, stepped, sameWrite, _⟩ := step_store_word64_same_frame
-      (body := scalarBody) (pc := pc) (args := binaryArguments left right output) (rest := rest)
-      0 borrowSlot writable
-    rw [written] at sameWrite
-    cases sameWrite
-    exact stepped
+      (call.after_memory_below preserved localFormed
+        (write_preserves_static_world _ _ _ _ _ _ beforeCall.2 localWrite))
+      preserved homes.writable enteredWF authority borrowSlot cleared
   have leftRead (rest : List Value) :
-      instruction (.fieldAt 0 8) (.reference (.address left) :: rest) prepared =
-        .ok (prepared, .scalar (.i64 (inputLimb original left 0)) :: rest) := by
+      instruction (.fieldAt 0 8) (.reference (.address left) :: rest) storedLocal =
+        .ok (storedLocal, .scalar (.i64 (inputLimb original left 0)) :: rest) := by
     have field := state.call.input_field_instruction (reference := left) (by simp) 0 rest
     simp only [Fin.val_zero, Nat.mul_zero] at field
     rw [field]
     simp only [inputLimb, state.inputBytes left (by simp)]
   have first := scalar_indexed_borrow contract 0 (binaryArguments left right output) frame
-    prepared (inputLimb original left 0) (inputLimb original right 0) _ borrowHome (results 0)
+    storedLocal (inputLimb original left 0) (inputLimb original right 0) _ borrowHome (results 0)
     state.call.1.1 state.flagBound state.flagRead state.flagWrite (state.resultWrites 0)
     (Or.inl (Ne.symm (state.flagSeparate 0))) post
     (fun after formed world framed math =>
@@ -137,13 +126,9 @@ theorem scalar_general_borrows (contract : BorrowHelperContract Extracted.progra
         fun _ second => scalar_borrow_run_next contract 1 second post
           fun _ third => scalar_borrow_run_next contract 2 third post
             (continuation borrowHome results))
-  have found : Extracted.program[scalarIndex]? = some scalarBody := by rfl
-  have adv : scalarBody.profile.advSimd = false := by rfl
-  have sse : scalarBody.profile.sse42 = false := by rfl
-  conv in scalarFirstDecision => cbv
   conv at first in (scalarBorrowCall _) => cbv
-  cil_contract_steps [found, binaryArguments, large, adv, sse, stored, leftRead, rightSlot,
-    state.flagSlot, state.resultSlots 0, load_local_word64_of_read savedRight, localAddress,
+  cil_contract_steps (snapshots := localSnapshots) [found, binaryArguments, leftRead,
+    state.flagSlot, state.resultSlots 0, localAddress,
     state.call.input_formed (reference := left) (by simp),
     access_reference_valid _ _ _ _ _ state.flagWrite,
     access_reference_valid _ _ _ _ _ (state.resultWrites 0)] until first
