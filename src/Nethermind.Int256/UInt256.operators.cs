@@ -302,10 +302,7 @@ public readonly partial struct UInt256
             c.LeftShift(shift, out c);
         }
 
-        if (negate)
-            Negate(in c);
-
-        return c;
+        return negate ? Negate(in c) : c;
     }
 
     public static explicit operator decimal(in UInt256 a) => (decimal)(BigInteger)a;

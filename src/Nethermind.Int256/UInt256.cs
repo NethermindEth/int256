@@ -38,14 +38,8 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
 
     public static UInt256 Negate(in UInt256 a)
     {
-        ulong cs0 = 0 - a.u0;
-        ulong cs1 = 0 - a.u1;
-        ulong cs2 = 0 - a.u2;
-        ulong cs3 = 0 - a.u3;
-        if (a.u0 > 0)
-            cs3--;
-
-        return new UInt256(cs0, cs1, cs2, cs3);
+        Subtract(in Zero, in a, out UInt256 res);
+        return res;
     }
 
     public (ulong value, bool overflow) UlongWithOverflow => (u0, (u1 | u2 | u3) != 0);
