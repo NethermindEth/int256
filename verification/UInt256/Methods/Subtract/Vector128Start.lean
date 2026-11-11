@@ -44,9 +44,6 @@ def subtractDecisionCode : List CIL.Op := [
   .intrinsic (.vector (.zero 128)) 0, .intrinsic (.vector (.equalsAll 128)) 2,
   .brnonzero 119]
 
-theorem subtract_incoming_length (adv : Bool) : (subtractIncomingCode adv).length = 25 := by
-  cases adv <;> rfl
-
 def subtractMask (a b : BitVec 128) : BitVec 128 := zip128 (fun x y => mask64 (x.ult y)) a b
 
 /-- Initial halves, lane differences, borrow masks and the two incoming-borrow vectors. -/
@@ -148,11 +145,6 @@ theorem SubtractVectorState.retain {program : CIL.Program} {original entered cur
     SubtractVectorState program original entered current inputs outputs slots values fewer :=
   ⟨state.call, state.preserved, state.authority, fun i lower => state.snapshots i (by omega)⟩
 
-end UInt256Proof.Subtract.Profile
-
-namespace UInt256Proof.Subtract.Profile
-open CIL.Safety UInt256Model.Safety UInt256Proof.AddSubtract.Safety CIL.Vector
-
 /-- Lane differences and borrow masks from the four saved halves. -/
 theorem subtract_start_checked (program : CIL.Program) (body : CIL.Method) (method : Nat) (specs : List NumericLocalSpec)
     (found : program[method]? = some body) (code : CodeAt body 22 (subtractStartCode))
@@ -181,51 +173,8 @@ theorem subtract_start_checked (program : CIL.Program) (body : CIL.Method) (meth
   have c2 := s6.load frame root layout 2 (by decide) body
   have d1 := s7.load frame root layout 1 (by decide) body
   have d3 := s7.load frame root layout 3 (by decide) body
-  have e0 : subtractSnapshot values 0 = values 0 := rfl
-  have e1 : subtractSnapshot values 1 = values 1 := rfl
-  have e2 : subtractSnapshot values 2 = values 2 := rfl
-  have e3 : subtractSnapshot values 3 = values 3 := rfl
-  have e4 : subtractSnapshot values ⟨4, by decide⟩ = zip128 (· - ·) (values 0) (values 2) := rfl
-  have e5 : subtractSnapshot values ⟨5, by decide⟩ = zip128 (· - ·) (values 1) (values 3) := rfl
-  have e6 : subtractSnapshot values ⟨6, by decide⟩ =
-      zip128 (fun x y => mask64 (x.ult y)) (values 0) (values 2) := rfl
-  have e7 : subtractSnapshot values ⟨7, by decide⟩ =
-      zip128 (fun x y => mask64 (x.ult y)) (values 1) (values 3) := rfl
-  rw [e0] at a0 c0
-  rw [e1] at b1 d1
-  rw [e2] at a2 c2
-  rw [e3] at b3 d3
-  rw [e4] at st4
-  rw [e5] at st5
-  rw [e6] at st6
-  rw [e7] at st7
-  repeat' first
-    | exact done
-    | (apply run_next_exists post found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
-       first
-       | ((with_reducible show step _ (.local 1) _ _ _ _ _ = _); exact a0 _ _ _)
-       | ((with_reducible show step _ (.local 3) _ _ _ _ _ = _); exact a2 _ _ _)
-       | ((with_reducible show step _ (.local 2) _ _ _ _ _ = _); exact b1 _ _ _)
-       | ((with_reducible show step _ (.local 4) _ _ _ _ _ = _); exact b3 _ _ _)
-       | ((with_reducible show step _ (.local 1) _ _ _ _ _ = _); exact c0 _ _ _)
-       | ((with_reducible show step _ (.local 3) _ _ _ _ _ = _); exact c2 _ _ _)
-       | ((with_reducible show step _ (.local 2) _ _ _ _ _ = _); exact d1 _ _ _)
-       | ((with_reducible show step _ (.local 4) _ _ _ _ _ = _); exact d3 _ _ _)
-       | ((with_reducible show step _ (.setLocal 5) _ _ _ _ _ = _); exact st4 _ _ _)
-       | ((with_reducible show step _ (.setLocal 6) _ _ _ _ _ = _); exact st5 _ _ _)
-       | ((with_reducible show step _ (.setLocal 7) _ _ _ _ _ = _); exact st6 _ _ _)
-       | ((with_reducible show step _ (.setLocal 8) _ _ _ _ _ = _); exact st7 _ _ _)
-       | (simp (config := { implicitDefEqProofs := false })
-           [step, cil_guard, observerCount, checkedIntrinsic, pureArity, scalars, CIL.step.eq_def, CIL.Intrinsic.available,
-             CIL.Vector.intrinsic_sub128, CIL.Vector.intrinsic_lt128, checkedValue, numericValue,
-             Bind.bind, Except.bind, Pure.pure, Except.pure]
-          first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
-
-end UInt256Proof.Subtract.Profile
-
-namespace UInt256Proof.Subtract.Profile
-open CIL.Safety UInt256Model.Safety UInt256Proof.AddSubtract.Safety CIL.Vector
-
+  cil_contract_steps [found, code, a0, a2, b1, b3, c0, c2, d1, d3, st4, st5, st6, st7,
+    subtractSnapshot, subtractMask, intrinsic_sub128, intrinsic_lt128] until done
 /-- The selected ISA's incoming-borrow instructions store both shifted masks. -/
 theorem subtract_incoming_checked (program : CIL.Program) (body : CIL.Method) (method : Nat) (specs : List NumericLocalSpec)
     (found : program[method]? = some body) (code : CodeAt body 38 (subtractIncomingCode body.profile.advSimd))
@@ -246,54 +195,32 @@ theorem subtract_incoming_checked (program : CIL.Program) (body : CIL.Method) (m
   obtain ⟨m8, s9, st8⟩ := state.store body specs frame root layout enteredWF homes (by decide) (vectorSpecs 8)
   obtain ⟨m9, s10, st9⟩ := s9.store body specs frame root layout enteredWF homes (by decide) (vectorSpecs 9)
   have done := continuation m9 s10
-  have a6 := state.load frame root layout 6 (by decide) body
-  have b6 := s9.load frame root layout 6 (by decide) body
-  have b7 := s9.load frame root layout 7 (by decide) body
-  have e6 : subtractSnapshot values 6 = subtractMask (values 0) (values 2) := rfl
-  have e7 : subtractSnapshot values 7 = subtractMask (values 1) (values 3) := rfl
-  have e8 : subtractSnapshot values ⟨8, by decide⟩ = incoming128Low (subtractMask (values 0) (values 2)) := rfl
-  have e9 : subtractSnapshot values ⟨9, by decide⟩ =
-      incoming128High (subtractMask (values 0) (values 2)) (subtractMask (values 1) (values 3)) := rfl
-  rw [e6] at a6 b6
-  rw [e7] at b7
-  rw [e8] at st8
-  rw [e9] at st9
+  have a6 := state.load frame root layout ⟨6, by decide⟩ (by decide) body
+  have b6 := s9.load frame root layout ⟨6, by decide⟩ (by decide) body
+  have b7 := s9.load frame root layout ⟨7, by decide⟩ (by decide) body
+  have low : subtractSnapshot values ⟨6, by decide⟩ = subtractMask (values 0) (values 2) := rfl
+  have high : subtractSnapshot values ⟨7, by decide⟩ = subtractMask (values 1) (values 3) := rfl
+  have incomingLow : subtractSnapshot values ⟨8, by decide⟩ =
+      incoming128Low (subtractMask (values 0) (values 2)) := rfl
+  have incomingHigh : subtractSnapshot values ⟨9, by decide⟩ = incoming128High
+      (subtractMask (values 0) (values 2)) (subtractMask (values 1) (values 3)) := rfl
+  rw [low] at a6 b6
+  rw [high] at b7
+  rw [incomingLow] at st8
+  rw [incomingHigh] at st9
   cases selected : body.profile.advSimd <;> simp only [selected] at code
   · rw [← incoming128_sse_low] at st8
     rw [← incoming128_sse_high] at st9
-    repeat' first
-      | exact done
-      | (apply run_next_exists post found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
-         first
-         | ((with_reducible show step _ (.local 7) _ _ _ _ _ = _); exact a6 _ _ _)
-         | ((with_reducible show step _ (.local 7) _ _ _ _ _ = _); exact b6 _ _ _)
-         | ((with_reducible show step _ (.local 8) _ _ _ _ _ = _); exact b7 _ _ _)
-         | ((with_reducible show step _ (.setLocal 9) _ _ _ _ _ = _); exact st8 _ _ _)
-         | ((with_reducible show step _ (.setLocal 10) _ _ _ _ _ = _); exact st9 _ _ _)
-         | (simp (config := { implicitDefEqProofs := false })
-             [show (BitVec.setWidth 8 (8 : BitVec 32)).toNat = 8 from rfl, step, cil_guard, observerCount, selected, sse, ssse, pureArity,
-               scalars, CIL.step.eq_def, CIL.Intrinsic.available, CIL.FeatureProfile.evaluate,
-               CIL.Vector.intrinsic_sse_shift, CIL.Vector.intrinsic_sse_align,
-               CIL.Vector.intrinsic_reinterpret128, checkedValue, numericValue,
-               Bind.bind, Except.bind, Pure.pure, Except.pure]
-            first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
+    cil_contract_steps [found, code, selected, sse selected, ssse selected, a6, b6, b7, st8, st9,
+      show body.profile.evaluate .advSimd = false from selected,
+      intrinsic_sse_shift, intrinsic_sse_align, intrinsic_reinterpret128] until done
   · rw [← incoming128_arm_low] at st8
     rw [← incoming128_arm_high] at st9
-    repeat' first
-      | exact done
-      | (apply run_next_exists post found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
-         first
-         | ((with_reducible show step _ (.local 7) _ _ _ _ _ = _); exact a6 _ _ _)
-         | ((with_reducible show step _ (.local 7) _ _ _ _ _ = _); exact b6 _ _ _)
-         | ((with_reducible show step _ (.local 8) _ _ _ _ _ = _); exact b7 _ _ _)
-         | ((with_reducible show step _ (.setLocal 9) _ _ _ _ _ = _); exact st8 _ _ _)
-         | ((with_reducible show step _ (.setLocal 10) _ _ _ _ _ = _); exact st9 _ _ _)
-         | (simp (config := { implicitDefEqProofs := false })
-             [step, cil_guard, observerCount, selected, pureArity, scalars, CIL.step.eq_def, CIL.Intrinsic.available, CIL.FeatureProfile.evaluate,
-               CIL.Vector.intrinsic_zero128, CIL.Vector.intrinsic_adv_extract, checkedValue, numericValue,
-               Bind.bind, Except.bind, Pure.pure, Except.pure]
-            first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
-
+    cil_contract_steps 2 [found, code, show body.profile.evaluate .advSimd = true from selected]
+    -- The taken feature branch leaves its target as an undecided literal comparison.
+    simp only [BitVec.reduceEq, not_false_eq_true, ↓reduceIte]
+    cil_contract_steps [found, code, selected, a6, b6, b7, st8, st9,
+      intrinsic_zero128, intrinsic_adv_extract] until done
 /-- Branch on the actual coalesced propagation test without writing memory. -/
 theorem subtract_decision_checked (program : CIL.Program) (body : CIL.Method) (method : Nat)
     (found : program[method]? = some body) (code : CodeAt body 63 (subtractDecisionCode))
@@ -307,33 +234,20 @@ theorem subtract_decision_checked (program : CIL.Program) (body : CIL.Method) (m
         current = .ok (result, returned) ∧ post result returned) :
     ∃ fuel result returned,
       run program fuel method 63 args frame [] current = .ok (result, returned) ∧ post result returned := by
-  have a4 := state.load frame root layout 4 (by decide) body
-  have a5 := state.load frame root layout 5 (by decide) body
-  have a8 := state.load frame root layout 8 (by decide) body
-  have a9 := state.load frame root layout 9 (by decide) body
+  have a4 := state.load frame root layout ⟨4, by decide⟩ (by decide) body
+  have a5 := state.load frame root layout ⟨5, by decide⟩ (by decide) body
+  have a8 := state.load frame root layout ⟨8, by decide⟩ (by decide) body
+  have a9 := state.load frame root layout ⟨9, by decide⟩ (by decide) body
+  cil_contract_steps 13 [found, code, a4, a5, a8, a9, intrinsic_zero128, intrinsic_eq128,
+    intrinsic_and128, intrinsic_or128, intrinsic_equal_all128]
+  change ∃ fuel result returned, run program fuel method 76 args frame [.scalar (.i32
+    (if subtractPropagation values == BitVec.ofNat 128 0 then 1 else 0))] current = _ ∧ _
   by_cases zero : subtractPropagation values = BitVec.ofNat 128 0
   all_goals
-    simp only [zero, ite_true, ite_false] at continuation
-    unfold subtractPropagation at zero
-    iterate 14
-      apply run_next_exists post found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
-      first
-      | exact a4 _ _ _
-      | exact a5 _ _ _
-      | exact a8 _ _ _
-      | exact a9 _ _ _
-      | (simp (config := { implicitDefEqProofs := false })
-           [CIL.truth, Option.bind, List.mapM, checkedIntrinsic, step, cil_guard, observerCount, pureArity, scalars, CIL.step.eq_def,
-             CIL.Intrinsic.available, CIL.Vector.intrinsic_zero128, CIL.Vector.intrinsic_eq128,
-             CIL.Vector.intrinsic_and128, CIL.Vector.intrinsic_or128, CIL.Vector.intrinsic_equal_all128,
-             show (0 : BitVec 128) = BitVec.ofNat 128 0 from rfl, zero,
-             checkedValue, numericValue, Bind.bind, Except.bind, Pure.pure, Except.pure]
-         try (first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
-    try simp only [List.reverse_nil]
-    -- The intrinsic simp set splits the or-test into two zero tests.
-    split
-    all_goals first
-      | exact continuation
-      | (exfalso; simp only [show (0 : BitVec 128) = BitVec.ofNat 128 0 from rfl] at *; simp_all)
+    simp only [beq_iff_eq, zero, ↓reduceIte] at continuation ⊢
+    cil_contract_steps 1 [found, code]
+    -- A taken branch leaves its target as an undecided literal comparison.
+    try simp only [BitVec.reduceEq, not_false_eq_true, ↓reduceIte]
+    exact continuation
 
 end UInt256Proof.Subtract.Profile
