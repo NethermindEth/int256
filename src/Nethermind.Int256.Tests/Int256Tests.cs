@@ -249,6 +249,19 @@ public class Int256Tests : UInt256TestsTemplate<Int256>
         Assert.That(((Int256)value), Is.EqualTo(new Int256((BigInteger)value)));
     }
 
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(-1)]
+    [TestCase(int.MaxValue)]
+    [TestCase(int.MinValue + 1)]
+    [TestCase(int.MinValue)]
+    public void Int_conversion_agrees_with_the_BigInteger_path(int value)
+    {
+        Assert.That(new Int256(value), Is.EqualTo(new Int256((BigInteger)value)));
+        Assert.That((Int256)value, Is.EqualTo(new Int256((BigInteger)value)));
+        Assert.That((BigInteger)new Int256(value), Is.EqualTo((BigInteger)value));
+    }
+
     [Test]
     public void Max_is_two_to_the_255_minus_one()
     {
