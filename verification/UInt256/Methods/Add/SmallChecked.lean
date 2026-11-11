@@ -1,5 +1,5 @@
 import UInt256.Methods.Add.SmallFinish
-import UInt256.Methods.Add.InputWords
+import UInt256.Safety.InputWords
 import UInt256.Methods.Reporting.Arithmetic
 import CIL.Safety.LocalSnapshotSteps
 

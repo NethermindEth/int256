@@ -1,5 +1,5 @@
 import UInt256.Methods.Subtract.ScalarSafetySetup
-import UInt256.Methods.Add.InputWords
+import UInt256.Safety.InputWords
 import CIL.Safety.AccessBelow
 import CIL.Safety.StepComposition
 import CIL.Safety.GuardNormalization

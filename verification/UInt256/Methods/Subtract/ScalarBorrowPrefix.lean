@@ -1,6 +1,6 @@
 import UInt256.Methods.Subtract.BorrowHelper
 import UInt256.Methods.Subtract.ScalarBorrowSegments
-import UInt256.Methods.Add.InputWords
+import UInt256.Safety.InputWords
 import UInt256.Methods.Subtract.ScalarSafetyPrefix
 
 /-! The large-operand route of the extracted scalar body: the private borrow word is cleared

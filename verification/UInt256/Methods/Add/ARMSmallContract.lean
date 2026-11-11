@@ -1,5 +1,5 @@
 import UInt256.Methods.Add.ARMSmallState
-import UInt256.Methods.Add.InputWords
+import UInt256.Safety.InputWords
 import CIL.Safety.LocalSnapshotSteps
 
 /-! Checked small-add execution, arithmetic, overflow and caller-memory contracts. -/

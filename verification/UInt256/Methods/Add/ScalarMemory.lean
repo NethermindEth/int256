@@ -3,7 +3,7 @@ import UInt256.Methods.Add.ScalarPrefix
 import UInt256.Safety.CallerSetup
 import CIL.Safety.AccessBelow
 import CIL.Safety.LocalSnapshotSteps
-import UInt256.Methods.Add.InputWords
+import UInt256.Safety.InputWords
 
 namespace UInt256Proof.Safety
 

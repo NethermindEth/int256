@@ -1,7 +1,7 @@
 import UInt256.Generated.MethodTemplates
 import CIL.Safety.Equations
 import UInt256.Methods.Add.ARMSmallContract
-import UInt256.Methods.Add.InputWords
+import UInt256.Safety.InputWords
 import CIL.Safety.MethodContract
 import CIL.Safety.WeakestPrecondition
 

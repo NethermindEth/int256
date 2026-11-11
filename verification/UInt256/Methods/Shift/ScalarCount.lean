@@ -1,7 +1,7 @@
 import UInt256.Methods.Shift.ScalarBody
 import UInt256.Safety.VectorFrame
 import UInt256.Safety.LimbAccess
-import UInt256.Methods.Add.InputWords
+import UInt256.Safety.InputWords
 import CIL.Safety.LocalSnapshotSteps
 
 /-!

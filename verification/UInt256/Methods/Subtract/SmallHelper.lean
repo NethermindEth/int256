@@ -7,7 +7,7 @@ import CIL.Safety.CallComposition
 import CIL.Safety.ReturnMemory
 import CIL.Safety.Certificate
 import CIL.Safety.LocalSnapshotSteps
-import UInt256.Methods.Add.InputWords
+import UInt256.Safety.InputWords
 import UInt256.Safety.OutputReturn
 import UInt256.Arithmetic.Borrow
 import UInt256.Methods.Reporting.Arithmetic
