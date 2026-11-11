@@ -1,3 +1,4 @@
+import UInt256.Generated.MethodTemplates
 import CIL.StepEquations
 import CIL.Safety.Equations
 import UInt256.Safety.PrivateInputValues
@@ -12,85 +13,12 @@ import CIL.Safety.MethodContract
 namespace UInt256Proof.Multiply.ScalarSafety
 open CIL.Safety UInt256Model.Safety UInt256Proof.Multiply.Calls
 
-def scalarBody (profile : CIL.FeatureProfile) (wordIndex storageIndex : Nat) : CIL.Method := { profile := profile, returnsValue := false, locals := [.unmodeled, .unmodeled, .unmodeled, .unmodeled, .unmodeled, .unmodeled, .unmodeled, .unmodeled, .unmodeled], localKinds := [.word64, .word64, .word64, .word64, .word64, .word64, .word64, .word64, .word64], parameterHomes := [], staticSites := [], code := [
-  .arg 1,
-  .const32 1,
-  .convI8,
-  .bgtu 22,
-  .arg 1,
-  .brnonzero 17,
-  .arg 2,
-  .const32 0,
-  .convI8,
-  .const32 0,
-  .convI8,
-  .const32 0,
-  .convI8,
-  .const32 0,
-  .convI8,
-  .call storageIndex 5,
-  .ret,
-  .arg 2,
-  .arg 0,
-  .loadAggregate 32,
-  .storeAggregate 32,
-  .ret,
-  .arg 0,
-  .fieldAt 0 8,
-  .setLocal 0,
-  .arg 0,
-  .fieldAt 8 8,
-  .setLocal 1,
-  .arg 0,
-  .fieldAt 16 8,
-  .setLocal 2,
-  .arg 0,
-  .fieldAt 24 8,
-  .arg 1,
-  .local 0,
-  .localAddr 4,
-  .call wordIndex 3,
-  .setLocal 3,
-  .arg 1,
-  .local 1,
-  .localAddr 5,
-  .call wordIndex 3,
-  .local 5,
-  .local 3,
-  .add,
-  .setLocal 6,
-  .local 6,
-  .local 5,
-  .ltu,
-  .convI8,
-  .add,
-  .setLocal 3,
-  .arg 1,
-  .local 2,
-  .localAddr 5,
-  .call wordIndex 3,
-  .local 5,
-  .local 3,
-  .add,
-  .setLocal 7,
-  .local 7,
-  .local 5,
-  .ltu,
-  .convI8,
-  .add,
-  .setLocal 3,
-  .arg 1,
-  .mul,
-  .local 3,
-  .add,
-  .setLocal 8,
-  .arg 2,
-  .local 4,
-  .local 6,
-  .local 7,
-  .local 8,
-  .call storageIndex 5,
-  .ret] }
+def scalarBody (profile : CIL.FeatureProfile) (wordIndex storageIndex : Nat) : CIL.Method := by_elab
+  let body ← Lean.Elab.Term.elabTermAndSynthesize
+    (← `(UInt256Proof.Generated.Method.method17 $(Lean.mkIdent `profile) $(Lean.mkIdent `wordIndex) $(Lean.mkIdent `storageIndex))) none
+  let some unfolded ← Lean.Meta.unfoldDefinition? body
+    | throwError "Expected generated template application"
+  return ← Lean.Meta.withTransparency .default (Lean.Meta.reduce unfolded)
 def scalarArgs (input : Reference) (word : BitVec 64) (output : Reference) : List Value :=
   [.reference (.address input), .scalar (.i64 word), .reference (.address output)]
 

@@ -23,25 +23,33 @@ void Require(bool condition, string message)
 {
     Gate[] gates = VerificationSupport.Gates(root);
     Dictionary<string, string> sources = ProofBindings.Sources(gates);
-    Require(sources.Count == 63, "Every templated primitive binding must be generated");
+    Require(sources.Count == 142, "Every catalogued binding must be generated");
     string text = string.Concat(sources.OrderBy(pair => pair.Key, StringComparer.Ordinal)
         .Select(pair => pair.Key + "\n" + pair.Value));
     Require(Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text))) ==
-        "34D06DB8FD95D2F955EBF169C7EFF2E52DAE65F6424676E36FD2E8D2D28469F8",
+        "A0CCD6B01999A31ACB88DC322E969FF3A0FE6A440FABD5A69221E8BCE815121C",
         "Generated bindings must retain the reviewed contracts, body checks and profile theorems");
     Require(sources.SequenceEqual(ProofBindings.Sources([.. gates.Reverse()])),
         "Binding generation must not depend on registry ordering");
-    Gate selected = gates.Single(gate => gate.Method == "EqUInt256UInt32" && gate.Profile == "scalar");
-    foreach (Gate[] invalid in new[]
-        {
-            gates.Where(gate => gate != selected).ToArray(), gates.Append(selected).ToArray(),
-            gates.Select(gate => gate == selected ? gate with { Profile = "x64-v4" } : gate).ToArray()
-        })
+    foreach (var (method, profile) in new[] { ("EqUInt256UInt32", "scalar"), ("OperatorNot", "x64-v3"),
+        ("OperatorRsh", "scalar"), ("EqualsInt32", "x64-v3"), ("GeUInt256UInt256", "x64-v4"),
+        ("AddOverflow", "arm64-advsimd"), ("OperatorMultiplyUInt32UInt256", "x64-v4-v128"),
+        ("NeUInt256UInt256", "x64-sse42") })
     {
-        bool rejected = false;
-        try { ProofBindings.Sources(invalid); }
-        catch (InvalidOperationException) { rejected = true; }
-        Require(rejected, "Missing, duplicate and unsupported-profile binding gates must be rejected");
+        Gate selected = gates.Single(gate => gate.Method == method && gate.Profile == profile);
+        foreach (Gate[] invalid in new[]
+            {
+                gates.Where(gate => gate != selected).ToArray(), gates.Append(selected).ToArray(),
+                gates.Select(gate => gate == selected ? gate with { Profile = "unreviewed" } : gate).ToArray(),
+                gates.Select(gate => gate == selected ? gate with { Proof = "wrong.lean" } : gate).ToArray(),
+                gates.Select(gate => gate == selected ? gate with { Theorem = "wrong" } : gate).ToArray()
+            })
+        {
+            bool rejected = false;
+            try { ProofBindings.Sources(invalid); }
+            catch (InvalidOperationException) { rejected = true; }
+            Require(rejected, "Missing, duplicate or altered binding gates must be rejected");
+        }
     }
 }
 void SelectionCheck(string[] paths, string[] expected, bool contracts, bool all = false)
@@ -250,7 +258,13 @@ try
             string head = (await VerificationSupport.RunChecked(source, "git", ["-C", package, "rev-parse", "HEAD"])).Trim();
             File.WriteAllText(Path.Combine(source, "lake-manifest.json"),
                 JsonSerializer.Serialize(new { packages = new[] { new { name = "sample", rev = head } } }));
-            await VerificationSupport.PrepareConsumer(source, consumer);
+            await VerificationSupport.PrepareConsumer(source, consumer, () =>
+            {
+                File.WriteAllText(Path.Combine(source, "Templates.lean"), revision.ToString());
+                return Task.CompletedTask;
+            });
+            Require(File.ReadAllText(Path.Combine(consumer, "Templates.lean")) == revision.ToString(),
+                "Consumer snapshots must materialize current templates before copying sources");
             Require(File.ReadAllText(Path.Combine(consumer, "Proof.lean")) == File.ReadAllText(Path.Combine(source, "Proof.lean")),
                 "Consumer snapshots must retain proof sources");
             Require(!File.Exists(Path.Combine(consumer, "Ignored.cs")) && !Directory.Exists(Path.Combine(consumer, "artifacts")),
@@ -258,7 +272,7 @@ try
             Require((await VerificationSupport.RunChecked(source, "git", ["-C", cloned, "rev-parse", "HEAD"])).Trim() == head,
                 "Consumer dependencies must follow the pinned revision, including a revision absent from the previous clone");
         }
-        await VerificationSupport.PrepareConsumer(source, consumer);
+        await VerificationSupport.PrepareConsumer(source, consumer, () => Task.CompletedTask);
         Console.WriteLine("Regression snapshot and dependency refresh checks passed.");
     }
     File.WriteAllText(Path.Combine(temporary, "manifests/targets.json"), """
@@ -313,7 +327,9 @@ try
         Require(failure != "crash" || (message!.Contains("First/scalar") && message.Contains("Second/scalar")),
             "Requests without results must fail");
         Require(!File.Exists(stale), "A stale certificate survived fresh extraction");
-        Require(calls.Count(call => call[0] == "build") == 2, "Builds must run once per batch");
+        Require(calls.Count(call => call.Contains("--prepare")) == 1 && calls[0].SequenceEqual(
+            ["run", "--file", "GenerateTemplates.cs", "--", "--prepare"]),
+            "Each batch must prepare its templates and dependencies once before extraction");
         Require(calls.Count(call => call.Contains("verify-batch")) == 1, "Verification must share one batch session");
         string[][] expected = failure switch
         {
@@ -359,7 +375,9 @@ try
         Environment.SetEnvironmentVariable(export, exporting ? temporary : null);
         await VerificationRunner.Run(temporary, new("verify", [], "scalar",
             Groups: [new("scalar", ["First", "Second"]), new("x64-v3", ["Third"])]), Command);
-        Require(calls.Count(call => call[0] == "build") == 2, "A multi-profile job must build the tools once");
+        Require(calls.Count(call => call.Contains("--prepare")) == 1 && calls[0].SequenceEqual(
+            ["run", "--file", "GenerateTemplates.cs", "--", "--prepare"]),
+            "A multi-profile job must prepare templates and dependencies once before extraction");
         Require(sessions.SequenceEqual(["first,second,third"]), "All profiles must share one batch session");
         Require(!calls.Any(call => call.Contains("verify")), "Batch sessions export support themselves; no request is split out");
         Require(calls.Where(call => call.Contains("extract")).Select(call => call[4]).SequenceEqual(
@@ -421,9 +439,8 @@ try
             return Task.CompletedTask;
         });
         Require(contracts.SequenceEqual([
-            "lake update",
+            "dotnet run --file GenerateTemplates.cs -- --prepare",
             "lake build",
-            "dotnet build .lake/packages/leancil/Extractor -c Release",
             "dotnet .lake/packages/leancil/Extractor/bin/Nethermind.LeanCIL.dll audit-library --project . --module UInt256 " +
                 "--prefix UInt256Model --prefix UInt256Proof --axioms propext,Quot.sound,Classical.choice"]),
             "The contract audit must kernel-replay the whole UInt256 library under both namespaces with only the core axioms");    }

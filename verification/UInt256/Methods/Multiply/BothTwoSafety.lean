@@ -1,3 +1,4 @@
+import UInt256.Generated.MethodTemplates
 import CIL.Safety.Equations
 import UInt256.Methods.Multiply.LocalArithmeticSafety
 import UInt256.Methods.Multiply.ProductStorage
@@ -7,79 +8,12 @@ import UInt256.Safety.OutputReturn
 namespace UInt256Proof.Multiply.BothTwo
 open CIL.Safety UInt256Model.Safety
 
-def bothTwoBody (profile : CIL.FeatureProfile) (wordIndex countIndex storageIndex : Nat) : CIL.Method := { profile := profile, returnsValue := false, locals := [.unmodeled, .unmodeled, .unmodeled, .unmodeled, .unmodeled, .unmodeled, .unmodeled, .unmodeled, .unmodeled, .unmodeled, .unmodeled, .unmodeled, .unmodeled, .unmodeled], localKinds := [.word64, .word64, .word64, .word64, .word64, .word64, .word64, .word64, .word64, .word64, .word64, .word64, .word64, .word64], parameterHomes := [], staticSites := [], code := [
-  .arg 0,
-  .fieldAt 0 8,
-  .arg 1,
-  .fieldAt 0 8,
-  .setLocal 0,
-  .arg 0,
-  .fieldAt 8 8,
-  .setLocal 1,
-  .arg 1,
-  .fieldAt 8 8,
-  .setLocal 2,
-  .dup,
-  .local 0,
-  .localAddr 4,
-  .call wordIndex 3,
-  .setLocal 3,
-  .local 2,
-  .localAddr 6,
-  .call wordIndex 3,
-  .setLocal 5,
-  .const32 0,
-  .convI8,
-  .setLocal 7,
-  .local 3,
-  .local 6,
-  .localAddr 7,
-  .call countIndex 3,
-  .setLocal 8,
-  .local 1,
-  .local 0,
-  .localAddr 10,
-  .call wordIndex 3,
-  .setLocal 9,
-  .local 8,
-  .local 10,
-  .localAddr 7,
-  .call countIndex 3,
-  .setLocal 8,
-  .local 7,
-  .setLocal 11,
-  .const32 0,
-  .convI8,
-  .setLocal 7,
-  .local 11,
-  .local 5,
-  .localAddr 7,
-  .call countIndex 3,
-  .setLocal 11,
-  .local 11,
-  .local 9,
-  .localAddr 7,
-  .call countIndex 3,
-  .setLocal 11,
-  .local 1,
-  .local 2,
-  .localAddr 13,
-  .call wordIndex 3,
-  .setLocal 12,
-  .local 11,
-  .local 13,
-  .localAddr 7,
-  .call countIndex 3,
-  .setLocal 11,
-  .arg 2,
-  .local 4,
-  .local 8,
-  .local 11,
-  .local 12,
-  .local 7,
-  .add,
-  .call storageIndex 5,
-  .ret] }
+def bothTwoBody (profile : CIL.FeatureProfile) (wordIndex countIndex storageIndex : Nat) : CIL.Method := by_elab
+  let body ← Lean.Elab.Term.elabTermAndSynthesize
+    (← `(UInt256Proof.Generated.Method.method18 $(Lean.mkIdent `profile) $(Lean.mkIdent `countIndex) $(Lean.mkIdent `wordIndex) $(Lean.mkIdent `storageIndex))) none
+  let some unfolded ← Lean.Meta.unfoldDefinition? body
+    | throwError "Expected generated template application"
+  return ← Lean.Meta.withTransparency .default (Lean.Meta.reduce unfolded)
 def productArgs (left right output : Reference) : List Value :=
   [.reference (.address left), .reference (.address right), .reference (.address output)]
 

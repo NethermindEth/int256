@@ -15,13 +15,12 @@ internal static class VerificationRunner
     {
         if (options.Action is not ("contracts" or "verify" or "extract")) throw new ArgumentException("Expected contracts, extract or verify");
         ProofBindings.Prepare(root);
-        await command("lake", ["update"]);
+        await command("dotnet", ["run", "--file", "GenerateTemplates.cs", "--", "--prepare"]);
         const string tool = ".lake/packages/leancil/Extractor/bin/Nethermind.LeanCIL.dll";
         if (options.Action == "contracts")
         {
             // The streamed build surfaces sorry warnings; the audit then kernel-replays the oleans without running UInt256 code.
             await command("lake", ["build"]);
-            await command("dotnet", ["build", ".lake/packages/leancil/Extractor", "-c", "Release"]);
             await command("dotnet", [tool, "audit-library", "--project", ".", .. AuditArguments]);
             Console.WriteLine("UInt256 contracts and supporting lemmas checked. No compiled-method certificate was produced.");
             return;
@@ -35,10 +34,6 @@ internal static class VerificationRunner
             throw new ArgumentException("Each profile may appear in only one group");
         using JsonDocument inventory = JsonDocument.Parse(File.ReadAllText(Path.Combine(root, "manifests/targets.json")));
         Gate[] gates = VerificationSupport.Gates(root);
-        await command("dotnet", ["build", ".lake/packages/leancil/Extractor", "-c", "Release"]);
-        // Docs beside the dll and PDB, from the same compile; the assembly is byte-identical without them.
-        await command("dotnet", ["build", "../src/Nethermind.Int256/Nethermind.Int256.csproj", "-c", "Release",
-            "-p:GenerateDocumentationFile=true", "-p:WarningsNotAsErrors=CS1591", "-nowarn:CS1591"]);
         Stopwatch elapsed = Stopwatch.StartNew();
         List<string> failures = [];
         List<Request> ready = [];

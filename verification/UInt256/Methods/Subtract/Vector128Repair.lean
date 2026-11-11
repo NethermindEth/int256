@@ -121,10 +121,11 @@ theorem subtract_repair_borrow (program : CIL.Program) (body : CIL.Method) (meth
     (wordSpecs 0) original.nextIdentity entered current [left, right] [output]
     frame root slots layout args currentCall enteredWF homes authority post
   intro borrowHome after borrowSlot borrowRead retained afterCall afterAuthority _written
-  obtain ⟨results, ready⟩ := RippleState.initial program specs 10 wordSpecs
-    original entered after frame root slots layout left right output borrowHome
+  obtain ⟨results, ready⟩ := RippleState.initial program (numericKinds specs) 10 1
+    original entered after frame slots (by simp only [layout, List.getElem?_cons_succ, implies_true])
+    (fun i => (homes.home_at _ _ (wordSpecs i)).imp (fun _ facts => facts.1)) left right output borrowHome
     (scalarBorrowValue original left right) _ (by simp [scalarBorrowValue])
-    call afterCall (preserved.trans retained) homes enteredWF afterAuthority borrowSlot borrowRead
+    call afterCall (preserved.trans retained) homes.writable enteredWF afterAuthority borrowSlot borrowRead
   exact subtract_repair_all program body method found borrow storage code borrowFound
     ready args leftArg rightArg post (continuation borrowHome results)
 

@@ -1,3 +1,4 @@
+import UInt256.Generated.MethodTemplates
 import UInt256.Methods.AddSubtract.RippleState
 import UInt256.Arithmetic.Borrow
 import CIL.Safety.WordLocals
@@ -18,30 +19,12 @@ namespace UInt256Proof.Subtract.Profile
 open CIL.Safety
 
 -- SubtractWithBorrow: frameless; writes the difference, then the outgoing borrow.
-def borrowBody (profile : CIL.FeatureProfile) : CIL.Method := { profile := profile, returnsValue := false, locals := [], localKinds := [], parameterHomes := [], staticSites := [], code := [
-  .arg 3,
-  .arg 0,
-  .arg 1,
-  .sub,
-  .arg 2,
-  .load64,
-  .sub,
-  .store64,
-  .arg 2,
-  .arg 0,
-  .arg 1,
-  .ltu,
-  .convI8,
-  .arg 2,
-  .load64,
-  .arg 0,
-  .arg 1,
-  .eq,
-  .convI8,
-  .band,
-  .bor,
-  .store64,
-  .ret] }
+def borrowBody (profile : CIL.FeatureProfile) : CIL.Method := by_elab
+  let body ← Lean.Elab.Term.elabTermAndSynthesize
+    (← `(UInt256Proof.Generated.Method.method27 $(Lean.mkIdent `profile))) none
+  let some unfolded ← Lean.Meta.unfoldDefinition? body
+    | throwError "Expected generated template application"
+  return ← Lean.Meta.withTransparency .default (Lean.Meta.reduce unfolded)
 
 theorem borrowBody_shape {profile : CIL.FeatureProfile} : BorrowShape (borrowBody profile) := ⟨rfl, rfl, rfl, rfl⟩
 

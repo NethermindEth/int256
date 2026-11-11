@@ -34,6 +34,13 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
+      - name: Install Lean toolchain for template materialization
+        uses: leanprover/lean-action@24581d74d674803a25a81b10b059c5c0cdd344c6 # v1.6.2
+        with:
+          lake-package-directory: verification
+          auto-config: false
+          use-github-cache: false
+          use-mathlib-cache: false
       - id: gates
         shell: pwsh
         env:
@@ -41,10 +48,10 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          dotnet run --file verification/TestVerification.cs
-          if ($LASTEXITCODE -ne 0) { throw 'Verification runner regression checks failed' }
           dotnet run --file verification/SelectGates.cs -- --event "$env:EVENT_NAME" --base "$env:BASE_SHA" --head "$env:HEAD_SHA" --output "$env:GITHUB_OUTPUT"
           if ($LASTEXITCODE -ne 0) { throw 'Gate selection failed' }
+          dotnet run --file verification/TestVerification.cs
+          if ($LASTEXITCODE -ne 0) { throw 'Verification runner regression checks failed' }
       - name: Find certified support from a successful main run
         id: support
         if: steps.gates.outputs.count != '0'

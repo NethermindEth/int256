@@ -51,9 +51,11 @@ internal static class VerificationSupport
         return output;
     }
 
-    internal static async Task PrepareConsumer(string root, string consumer)
+    internal static async Task PrepareConsumer(string root, string consumer, Func<Task>? prepareTemplates = null)
     {
         ProofBindings.Prepare(root);
+        await (prepareTemplates?.Invoke() ?? RunChecked(root, "dotnet",
+            ["run", "--file", "GenerateTemplates.cs", "--", "--prepare"]));
         CopySources(root, consumer);
         JsonArray packages = JsonNode.Parse(File.ReadAllText(Path.Combine(root, "lake-manifest.json")))!["packages"]!.AsArray();
         string packageRoot = Path.GetFullPath(Path.Combine(consumer, ".lake/packages"));

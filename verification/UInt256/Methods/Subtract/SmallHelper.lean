@@ -1,3 +1,4 @@
+import UInt256.Generated.MethodTemplates
 import CIL.Safety.WordFrameSetup
 import CIL.Safety.WordFootprint
 import CIL.Safety.AccessBelow
@@ -16,85 +17,12 @@ import CIL.Safety.WeakestPrecondition
 namespace UInt256Proof.Subtract.Profile
 
 -- SubtractScalarUInt64: four saved limbs, then one store and constant flag per borrow exit.
-def subtractSmallBody (profile : CIL.FeatureProfile) (storage : Nat) : CIL.Method := { profile := profile, returnsValue := true, locals := [.i64 0, .i64 0, .i64 0, .i64 0], localKinds := [.word64, .word64, .word64, .word64], parameterHomes := [], staticSites := [], code := [
-  .arg 0,
-  .fieldAt 0 8,
-  .arg 0,
-  .fieldAt 8 8,
-  .setLocal 0,
-  .arg 0,
-  .fieldAt 16 8,
-  .setLocal 1,
-  .arg 0,
-  .fieldAt 24 8,
-  .setLocal 2,
-  .dup,
-  .arg 1,
-  .sub,
-  .setLocal 3,
-  .arg 1,
-  .bltu 25,
-  .arg 2,
-  .local 3,
-  .local 0,
-  .local 1,
-  .local 2,
-  .call storage 5,
-  .const32 0,
-  .ret (some .unsigned8),
-  .local 0,
-  .brzero 38,
-  .arg 2,
-  .local 3,
-  .local 0,
-  .const32 1,
-  .convI8,
-  .sub,
-  .local 1,
-  .local 2,
-  .call storage 5,
-  .const32 0,
-  .ret (some .unsigned8),
-  .local 1,
-  .brzero 52,
-  .arg 2,
-  .local 3,
-  .const32 (BitVec.ofInt 32 (-1)),
-  .convI8,
-  .local 1,
-  .const32 1,
-  .convI8,
-  .sub,
-  .local 2,
-  .call storage 5,
-  .const32 0,
-  .ret (some .unsigned8),
-  .local 2,
-  .brzero 67,
-  .arg 2,
-  .local 3,
-  .const32 (BitVec.ofInt 32 (-1)),
-  .convI8,
-  .const32 (BitVec.ofInt 32 (-1)),
-  .convI8,
-  .local 2,
-  .const32 1,
-  .convI8,
-  .sub,
-  .call storage 5,
-  .const32 0,
-  .ret (some .unsigned8),
-  .arg 2,
-  .local 3,
-  .const32 (BitVec.ofInt 32 (-1)),
-  .convI8,
-  .const32 (BitVec.ofInt 32 (-1)),
-  .convI8,
-  .const32 (BitVec.ofInt 32 (-1)),
-  .convI8,
-  .call storage 5,
-  .const32 1,
-  .ret (some .unsigned8)] }
+def subtractSmallBody (profile : CIL.FeatureProfile) (storage : Nat) : CIL.Method := by_elab
+  let body ← Lean.Elab.Term.elabTermAndSynthesize
+    (← `(UInt256Proof.Generated.Method.method7 $(Lean.mkIdent `profile) $(Lean.mkIdent `storage))) none
+  let some unfolded ← Lean.Meta.unfoldDefinition? body
+    | throwError "Expected generated template application"
+  return ← Lean.Meta.withTransparency .default (Lean.Meta.reduce unfolded)
 end UInt256Proof.Subtract.Profile
 
 namespace UInt256Proof.Subtract.Profile
@@ -211,22 +139,6 @@ theorem SmallSaved.save {program : CIL.Program} {profile : CIL.FeatureProfile} {
     intro offset _
     exact write_word_outside written _ _ (Or.inl different)
 
-private theorem step_reference_arg {body : CIL.Method} {pc index : Nat} {args stack : List Value}
-    {frame : Frame} {memory : Memory} {reference : Reference}
-    (found : args[index]? = some (.reference (.address reference)))
-    (formed : form memory reference = .ok reference) :
-    step body (.arg index) pc args frame stack memory =
-      .ok (.next (pc + 1) (.reference (.address reference) :: stack) frame memory) := by
-  simp only [step, cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, found, checkedValue, formValue, formed, checkedAt, Except.mapError,
-    Bind.bind, Except.bind, Pure.pure, Except.pure]
-
-private theorem step_field {body : CIL.Method} {pc offset width : Nat} {args stack values : List Value}
-    {frame : Frame} {memory after : Memory}
-    (loaded : instruction (.fieldAt offset width) stack memory = .ok (after, values)) :
-    step body (.fieldAt offset width) pc args frame stack memory =
-      .ok (.next (pc + 1) values frame after) := by
-  simp only [cil_step, instructionStep, loaded, Bind.bind, Except.bind, Pure.pure, Except.pure]
-
 /-- Save the upper limbs and the low difference, keeping the low limb for the first borrow test. -/
 theorem small_input_prefix_checked (program : CIL.Program) (method storage : Nat) (profile : CIL.FeatureProfile)
     (found : program[method]? = some (subtractSmallBody profile storage)) (original entered : Memory)
@@ -271,16 +183,24 @@ theorem small_input_prefix_checked (program : CIL.Program) (method storage : Nat
   simp only [smallSavedWord, Fin.val_zero, Fin.val_one, Fin.val_two, CIL.fin_val_three,
     Nat.reduceLT, ↓reduceDIte, Nat.reduceAdd] at step0 step1 step2 step3
   have a0 : (smallArguments input output word)[0]? = some (.reference (.address input)) := rfl
-  refine WP.step (post := Function.uncurry post) found rfl (step_reference_arg a0 f0) ?_
-  refine WP.step (post := Function.uncurry post) found rfl (step_field (r0 _)) ?_
-  refine WP.step (post := Function.uncurry post) found rfl (step_reference_arg a0 f0) ?_
-  refine WP.step (post := Function.uncurry post) found rfl (step_field (r1 _)) ?_
+  refine WP.step (post := Function.uncurry post) found rfl
+    (by simp only [step_argument_eq, a0, checkedValue_address _ _ f0]; rfl) ?_
+  refine WP.step (post := Function.uncurry post) found rfl
+    (by simp only [step_fieldAt_eq, instructionStep, r0]; rfl) ?_
+  refine WP.step (post := Function.uncurry post) found rfl
+    (by simp only [step_argument_eq, a0, checkedValue_address _ _ f0]; rfl) ?_
+  refine WP.step (post := Function.uncurry post) found rfl
+    (by simp only [step_fieldAt_eq, instructionStep, r1]; rfl) ?_
   refine WP.step (post := Function.uncurry post) found rfl (step0 _ _) ?_
-  refine WP.step (post := Function.uncurry post) found rfl (step_reference_arg a0 f1) ?_
-  refine WP.step (post := Function.uncurry post) found rfl (step_field (r2 _)) ?_
+  refine WP.step (post := Function.uncurry post) found rfl
+    (by simp only [step_argument_eq, a0, checkedValue_address _ _ f1]; rfl) ?_
+  refine WP.step (post := Function.uncurry post) found rfl
+    (by simp only [step_fieldAt_eq, instructionStep, r2]; rfl) ?_
   refine WP.step (post := Function.uncurry post) found rfl (step1 _ _) ?_
-  refine WP.step (post := Function.uncurry post) found rfl (step_reference_arg a0 f2) ?_
-  refine WP.step (post := Function.uncurry post) found rfl (step_field (r3 _)) ?_
+  refine WP.step (post := Function.uncurry post) found rfl
+    (by simp only [step_argument_eq, a0, checkedValue_address _ _ f2]; rfl) ?_
+  refine WP.step (post := Function.uncurry post) found rfl
+    (by simp only [step_fieldAt_eq, instructionStep, r3]; rfl) ?_
   refine WP.step (post := Function.uncurry post) found rfl (step2 _ _) ?_
   refine WP.step (post := Function.uncurry post) found rfl rfl ?_
   refine WP.step (post := Function.uncurry post) found rfl rfl ?_
@@ -316,30 +236,6 @@ theorem small_return (program : CIL.Program) (method storage : Nat) (profile : C
     refine (run_next found rfl rfl).trans ?_
     exact run_return found rfl rfl rfl
 
-private theorem step_local_loaded {body : CIL.Method} {pc index : Nat} {args stack : List Value}
-    {frame : Frame} {memory : Memory} {slot : LocalSlot} {value : Value}
-    (found : frame.locals[index]? = some slot) (loaded : loadLocal memory slot = .ok value) :
-    step body (.local index) pc args frame stack memory =
-      .ok (.next (pc + 1) (value :: stack) frame memory) := by
-  simp only [step, cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, found, loaded, Bind.bind, Except.bind, Pure.pure, Except.pure]
-
-private theorem step_bltu_word {body : CIL.Method} {pc target : Nat} {args rest : List Value}
-    {frame : Frame} {memory : Memory} {x y : BitVec 64} {next : Nat}
-    (chosen : (if x < y then target else pc + 1) = next) :
-    step body (.bltu target) pc args frame (.scalar (.i64 y) :: .scalar (.i64 x) :: rest) memory =
-      .ok (.next next rest frame memory) := by
-  subst chosen
-  rfl
-
-private theorem step_brzero_word {body : CIL.Method} {pc target : Nat} {args rest : List Value}
-    {frame : Frame} {memory : Memory} {value : BitVec 64} {next : Nat}
-    (chosen : (if value = 0 then target else pc + 1) = next) :
-    step body (.brzero target) pc args frame (.scalar (.i64 value) :: rest) memory =
-      .ok (.next next rest frame memory) := by
-  subst chosen
-  change Except.ok (FrameAction.next (if value != 0 then pc + 1 else target) rest frame memory) = _
-  by_cases h : value = 0 <;> simp [h]
-
 def smallSelectedBranch (words : Fin 4 → BitVec 64) (word : BitVec 64) : Fin 5 :=
   if ¬ words 0 < word then 0 else if words 1 ≠ 0 then 1 else
     if words 2 ≠ 0 then 2 else if words 3 ≠ 0 then 3 else 4
@@ -374,68 +270,48 @@ theorem small_branch_prefix (program : CIL.Program) (method storage : Nat) (prof
     Nat.reduceLT, ↓reduceDIte, Nat.reduceAdd] at s0 s1 s2 s3 r0 r1 r2 r3
   have a2 : (smallArguments input output word)[2]? = some (.reference (.address output)) := rfl
   by_cases h0 : words 0 < word
-  · refine WP.step (post := Function.uncurry post) found rfl (step_bltu_word (ite_eq_left_of_eq_true _ _ (eq_true h0))) ?_
-    refine WP.step (post := Function.uncurry post) found rfl (step_local_loaded s0 r0) ?_
+  · refine WP.step (post := Function.uncurry post) found rfl (by cil_checked_step [h0]) ?_
+    refine WP.step (post := Function.uncurry post) found rfl
+      (by simp only [step_local_eq, s0, r0]; rfl) ?_
     by_cases h1 : words 1 = 0
-    · refine WP.step (post := Function.uncurry post) found rfl (step_brzero_word (ite_eq_left_of_eq_true _ _ (eq_true h1))) ?_
-      refine WP.step (post := Function.uncurry post) found rfl (step_local_loaded s1 r1) ?_
+    · refine WP.step (post := Function.uncurry post) found rfl (by cil_checked_step [h1]) ?_
+      refine WP.step (post := Function.uncurry post) found rfl
+        (by simp only [step_local_eq, s1, r1]; rfl) ?_
       by_cases h2 : words 2 = 0
-      · refine WP.step (post := Function.uncurry post) found rfl (step_brzero_word (ite_eq_left_of_eq_true _ _ (eq_true h2))) ?_
-        refine WP.step (post := Function.uncurry post) found rfl (step_local_loaded s2 r2) ?_
+      · refine WP.step (post := Function.uncurry post) found rfl (by cil_checked_step [h2]) ?_
+        refine WP.step (post := Function.uncurry post) found rfl
+          (by simp only [step_local_eq, s2, r2]; rfl) ?_
         by_cases h3 : words 3 = 0
-        · refine WP.step (post := Function.uncurry post) found rfl (step_brzero_word (ite_eq_left_of_eq_true _ _ (eq_true h3))) ?_
-          repeat' first
-            | refine WP.step (operation := .arg 2) (post := Function.uncurry post) found rfl (step_reference_arg a2 formed) ?_
-            | refine WP.step (operation := .local 3) (post := Function.uncurry post) found rfl (step_local_loaded s3 r3) ?_
-            | refine WP.step (post := Function.uncurry post) found rfl rfl ?_
+        · refine WP.step (post := Function.uncurry post) found rfl (by cil_checked_step [h3]) ?_
+          cil_contract_steps [found, a2, formed, s0, s1, s2, s3, r0, r1, r2, r3]
           simp only [smallSelectedBranch, smallDifference, smallStoreCall, Fin.val_zero, Fin.val_one, Fin.val_two,
               CIL.fin_val_three, Nat.reduceEqDiff, ne_eq, h0, h1, h2, h3, not_true_eq_false, and_true,
               ↓reduceIte] at continuation
-          exact continuation
-        · refine WP.step (post := Function.uncurry post) found rfl (step_brzero_word (ite_eq_right_of_eq_false _ _ (eq_false h3))) ?_
-          repeat' first
-            | refine WP.step (operation := .arg 2) (post := Function.uncurry post) found rfl (step_reference_arg a2 formed) ?_
-            | refine WP.step (operation := .local 2) (post := Function.uncurry post) found rfl (step_local_loaded s2 r2) ?_
-            | refine WP.step (operation := .local 3) (post := Function.uncurry post) found rfl (step_local_loaded s3 r3) ?_
-            | refine WP.step (post := Function.uncurry post) found rfl rfl ?_
+          exact WP.adequate.mp continuation
+        · refine WP.step (post := Function.uncurry post) found rfl (by cil_checked_step [h3]) ?_
+          cil_contract_steps [found, a2, formed, s0, s1, s2, s3, r0, r1, r2, r3]
           simp only [smallSelectedBranch, smallDifference, smallStoreCall, Fin.val_zero, Fin.val_one, Fin.val_two,
               CIL.fin_val_three, Nat.reduceEqDiff, ne_eq, h0, h1, h2, h3, not_false_eq_true, not_true_eq_false, and_true,
               ↓reduceIte] at continuation
-          exact continuation
-      · refine WP.step (post := Function.uncurry post) found rfl (step_brzero_word (ite_eq_right_of_eq_false _ _ (eq_false h2))) ?_
-        repeat' first
-          | refine WP.step (operation := .arg 2) (post := Function.uncurry post) found rfl (step_reference_arg a2 formed) ?_
-          | refine WP.step (operation := .local 1) (post := Function.uncurry post) found rfl (step_local_loaded s1 r1) ?_
-          | refine WP.step (operation := .local 2) (post := Function.uncurry post) found rfl (step_local_loaded s2 r2) ?_
-          | refine WP.step (operation := .local 3) (post := Function.uncurry post) found rfl (step_local_loaded s3 r3) ?_
-          | refine WP.step (post := Function.uncurry post) found rfl rfl ?_
+          exact WP.adequate.mp continuation
+      · refine WP.step (post := Function.uncurry post) found rfl (by cil_checked_step [h2]) ?_
+        cil_contract_steps [found, a2, formed, s0, s1, s2, s3, r0, r1, r2, r3]
         simp only [smallSelectedBranch, smallDifference, smallStoreCall, Fin.val_zero, Fin.val_one, Fin.val_two,
             CIL.fin_val_three, Nat.reduceEqDiff, ne_eq, h0, h1, h2, not_false_eq_true, not_true_eq_false, and_true,
             and_false, ↓reduceIte] at continuation
-        exact continuation
-    · refine WP.step (post := Function.uncurry post) found rfl (step_brzero_word (ite_eq_right_of_eq_false _ _ (eq_false h1))) ?_
-      repeat' first
-        | refine WP.step (operation := .arg 2) (post := Function.uncurry post) found rfl (step_reference_arg a2 formed) ?_
-        | refine WP.step (operation := .local 0) (post := Function.uncurry post) found rfl (step_local_loaded s0 r0) ?_
-        | refine WP.step (operation := .local 1) (post := Function.uncurry post) found rfl (step_local_loaded s1 r1) ?_
-        | refine WP.step (operation := .local 2) (post := Function.uncurry post) found rfl (step_local_loaded s2 r2) ?_
-        | refine WP.step (operation := .local 3) (post := Function.uncurry post) found rfl (step_local_loaded s3 r3) ?_
-        | refine WP.step (post := Function.uncurry post) found rfl rfl ?_
+        exact WP.adequate.mp continuation
+    · refine WP.step (post := Function.uncurry post) found rfl (by cil_checked_step [h1]) ?_
+      cil_contract_steps [found, a2, formed, s0, s1, s2, s3, r0, r1, r2, r3]
       simp only [smallSelectedBranch, smallDifference, smallStoreCall, Fin.val_zero, Fin.val_one, Fin.val_two,
           CIL.fin_val_three, Nat.reduceEqDiff, ne_eq, h0, h1, not_false_eq_true, not_true_eq_false,
           and_false, ↓reduceIte] at continuation
-      exact continuation
-  · refine WP.step (post := Function.uncurry post) found rfl (step_bltu_word (ite_eq_right_of_eq_false _ _ (eq_false h0))) ?_
-    repeat' first
-      | refine WP.step (operation := .arg 2) (post := Function.uncurry post) found rfl (step_reference_arg a2 formed) ?_
-      | refine WP.step (operation := .local 0) (post := Function.uncurry post) found rfl (step_local_loaded s0 r0) ?_
-      | refine WP.step (operation := .local 1) (post := Function.uncurry post) found rfl (step_local_loaded s1 r1) ?_
-      | refine WP.step (operation := .local 2) (post := Function.uncurry post) found rfl (step_local_loaded s2 r2) ?_
-      | refine WP.step (operation := .local 3) (post := Function.uncurry post) found rfl (step_local_loaded s3 r3) ?_
+      exact WP.adequate.mp continuation
+  · refine WP.step (post := Function.uncurry post) found rfl (by cil_checked_step [h0]) ?_
+    cil_contract_steps [found, a2, formed, s0, s1, s2, s3, r0, r1, r2, r3]
     simp only [smallSelectedBranch, smallDifference, smallStoreCall, Fin.val_zero, Fin.val_one, Fin.val_two,
         CIL.fin_val_three, Nat.reduceEqDiff, h0, not_false_eq_true,
         ↓reduceIte] at continuation
-    exact continuation
+    exact WP.adequate.mp continuation
 
 theorem small_selected_flag (words : Fin 4 → BitVec 64) (word : BitVec 64) :
     smallBranchFlag (smallSelectedBranch words word) =

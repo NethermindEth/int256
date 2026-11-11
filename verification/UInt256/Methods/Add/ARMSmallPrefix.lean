@@ -1,4 +1,4 @@
-import UInt256.Generated.AddTemplates
+import UInt256.Generated.MethodTemplates
 import UInt256.Methods.Add.ARMBody
 import CIL.Safety.ReturnArity
 import UInt256.Methods.Reporting.Arithmetic
@@ -19,7 +19,7 @@ open CIL.Safety
 
 def armSmallBody (profile : CIL.FeatureProfile) (storage : Nat) : CIL.Method := by_elab
   let body ← Lean.Elab.Term.elabTermAndSynthesize
-    (← `(UInt256Proof.Generated.Add.method1
+    (← `(UInt256Proof.Generated.Method.method2
       $(Lean.mkIdent `profile) true $(Lean.mkIdent `storage))) none
   let some unfolded ← Lean.Meta.unfoldDefinition? body
     | throwError "Expected generated template application"

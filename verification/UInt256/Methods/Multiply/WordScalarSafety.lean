@@ -1,3 +1,4 @@
+import UInt256.Generated.MethodTemplates
 import CIL.Safety.Equations
 import UInt256.Methods.Multiply.Product
 import CIL.Safety.WordMemory
@@ -11,29 +12,12 @@ open CIL.Safety
 
 /-- Current scalar Multiply64 uses Math.BigMul; it no longer expands the old
     six-local software multiplication routine. -/
-def scalarWordBody (profile : CIL.FeatureProfile) : CIL.Method :=
-  { profile := profile, locals := [], returnsValue := true, code := [
-    .feature .bmi2, .brzero 11,
-    .unsupported "Unreachable under selected profile",
-    .unsupported "Unreachable under selected profile",
-    .unsupported "Unreachable under selected profile",
-    .unsupported "Unreachable under selected profile",
-    .unsupported "Unreachable under selected profile",
-    .unsupported "Unreachable under selected profile",
-    .unsupported "Unreachable under selected profile",
-    .unsupported "Unreachable under selected profile",
-    .unsupported "Unreachable under selected profile",
-    .feature .armBase64, .brzero 22,
-    .unsupported "Unreachable under selected profile",
-    .unsupported "Unreachable under selected profile",
-    .unsupported "Unreachable under selected profile",
-    .unsupported "Unreachable under selected profile",
-    .unsupported "Unreachable under selected profile",
-    .unsupported "Unreachable under selected profile",
-    .unsupported "Unreachable under selected profile",
-    .unsupported "Unreachable under selected profile",
-    .unsupported "Unreachable under selected profile",
-    .arg 0, .arg 1, .arg 2, .memory (.bigMul64 false), .ret] }
+def scalarWordBody (profile : CIL.FeatureProfile) : CIL.Method := by_elab
+  let body ← Lean.Elab.Term.elabTermAndSynthesize
+    (← `(UInt256Proof.Generated.Method.method11 $(Lean.mkIdent `profile) false false)) none
+  let some unfolded ← Lean.Meta.unfoldDefinition? body
+    | throwError "Expected generated template application"
+  return ← Lean.Meta.withTransparency .default (Lean.Meta.reduce unfolded)
 
 private theorem feature_step (body : CIL.Method) (feature : CIL.Feature) (pc : Nat)
     (args rest : List Value) (frame : Frame) (memory : Memory) :

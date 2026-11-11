@@ -1,4 +1,4 @@
-import UInt256.Generated.AddTemplates
+import UInt256.Generated.MethodTemplates
 import UInt256.Methods.Add.ARMSmallContract
 import UInt256.Methods.Add.ARMFlag
 import UInt256.Safety.Contract
@@ -13,7 +13,7 @@ namespace UInt256Proof.Add.Safety
 open CIL.Safety UInt256Model.Safety UInt256Proof.AddSubtract.Safety
 def armScalarBody (profile : CIL.FeatureProfile) (vectorIndex smallIndex : Nat) : CIL.Method := by_elab
   let body ← Lean.Elab.Term.elabTermAndSynthesize
-    (← `(UInt256Proof.Generated.Add.method0
+    (← `(UInt256Proof.Generated.Method.method1
       $(Lean.mkIdent `profile) true false $(Lean.mkIdent `smallIndex)
       $(Lean.mkIdent `vectorIndex) 0 0)) none
   let some unfolded ← Lean.Meta.unfoldDefinition? body

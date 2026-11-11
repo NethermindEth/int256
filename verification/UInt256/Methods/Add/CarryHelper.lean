@@ -1,5 +1,5 @@
 import UInt256.Methods.AddSubtract.RippleState
-import UInt256.Generated.AddTemplates
+import UInt256.Generated.MethodTemplates
 import UInt256.Arithmetic.Carry
 import CIL.Safety.WordLocals
 import CIL.Safety.StepComposition
@@ -17,7 +17,7 @@ import UInt256.Safety.PrivateCalls
 namespace UInt256Proof.Add.CarrySafety
 def carryBody (profile : CIL.FeatureProfile) : CIL.Method := by_elab
   let body ← Lean.Elab.Term.elabTermAndSynthesize
-    (← `(UInt256Proof.Generated.Add.method3
+    (← `(UInt256Proof.Generated.Method.method13
       $(Lean.mkIdent `profile))) none
   let some unfolded ← Lean.Meta.unfoldDefinition? body
     | throwError "Expected generated template application"

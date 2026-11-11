@@ -34,6 +34,8 @@ if (eventName == "pull_request")
     paths.AddRange(changed.Split('\0', StringSplitOptions.RemoveEmptyEntries));
 }
 else if (eventName is not null) all = true;
+await VerificationSupport.RunChecked(VerificationSupport.Root, "dotnet",
+    ["run", "--file", "GenerateTemplates.cs", "--", "--prepare"]);
 Selection selection = VerificationSelection.Select(VerificationSupport.Root, paths, all);
 Console.WriteLine(JsonSerializer.Serialize(selection, VerificationSupport.Json));
 if (output is not null)

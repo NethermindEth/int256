@@ -1,4 +1,4 @@
-import UInt256.Generated.AddTemplates
+import UInt256.Generated.MethodTemplates
 import UInt256.Methods.Add.SSEEntry
 import UInt256.Methods.Add.PortableSmall
 import UInt256.Methods.Add.ARMScalarEntry
@@ -10,7 +10,7 @@ open CIL.Safety UInt256Model.Safety
 -- AddScalar with AdvSimd disabled: right-small, left-small, then the SSE4.2 vector helper.
 def sseScalarBody (profile : CIL.FeatureProfile) (vectorIndex smallIndex : Nat) : CIL.Method := by_elab
   let body ← Lean.Elab.Term.elabTermAndSynthesize
-    (← `(UInt256Proof.Generated.Add.method0
+    (← `(UInt256Proof.Generated.Method.method1
       $(Lean.mkIdent `profile) false true $(Lean.mkIdent `smallIndex)
       $(Lean.mkIdent `vectorIndex) 0 0)) none
   let some unfolded ← Lean.Meta.unfoldDefinition? body

@@ -10,31 +10,63 @@ using System.Text.RegularExpressions;
 
 var root = Path.GetDirectoryName(Source())!;
 var check = args is ["--check"];
-if (args.Length != 0 && !check) throw new ArgumentException("Expected no arguments or --check");
+var prepare = args is ["--prepare"];
+if (args.Length != 0 && !check && !prepare)
+    throw new ArgumentException("Expected no arguments, --check or --prepare");
+if (prepare)
+{
+    Run("lake", "update");
+    Run("dotnet", "build", ".lake/packages/leancil/Extractor", "-c", "Release");
+    Run("dotnet", "build", "../src/Nethermind.Int256/Nethermind.Int256.csproj", "-c", "Release",
+        "-p:GenerateDocumentationFile=true", "-p:WarningsNotAsErrors=CS1591", "-nowarn:CS1591");
+}
 var tool = Path.Combine(root, ".lake/packages/leancil/Extractor/bin/Nethermind.LeanCIL.dll");
 var assembly = Path.GetFullPath(Path.Combine(root,
     "../src/artifacts/bin/Nethermind.Int256/release/Nethermind.Int256.dll"));
 var output = Path.Combine(root, "artifacts/generated-templates");
 Directory.CreateDirectory(output);
 var methods = Run("dotnet", tool, "list", assembly).Split('\n', StringSplitOptions.TrimEntries);
+List<string> extractions = [];
 Generate("Add", "AddScalar", ["scalar", "arm64-advsimd", "x64-sse42"]);
 Generate("PrepareAdd", "PrepareAdd", ["x64-v3", "x64-v4"]);
+Generate("Subtract", "SubtractScalar", ["scalar", "arm64-advsimd", "x64-sse42"]);
+Generate("Multiply", "Multiply", ["scalar", "arm64-advsimd", "x64-v3", "x64-v4"],
+    "System.Void Nethermind.Int256.UInt256::Multiply(Nethermind.Int256.UInt256&," +
+    "Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)");
+Generate("LeftShift", "LeftShift", ["scalar"],
+    "System.Void Nethermind.Int256.UInt256::LeftShift(System.Int32,Nethermind.Int256.UInt256&)");
+Generate("RightShift", "RightShift", ["scalar"],
+    "System.Void Nethermind.Int256.UInt256::RightShift(System.Int32,Nethermind.Int256.UInt256&)");
+Generate("AddWide", "Add", ["x64-v3", "x64-v4"],
+    "System.Void Nethermind.Int256.UInt256::Add(Nethermind.Int256.UInt256&," +
+    "Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)");
+Generate("AddOverflowWide", "AddOverflow", ["x64-v3", "x64-v4"],
+    "System.Boolean Nethermind.Int256.UInt256::AddOverflow(Nethermind.Int256.UInt256&," +
+    "Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)");
+Generate("SubtractWide", "SubtractImpl", ["x64-v3", "x64-v4"]);
+WriteTemplates();
 
-void Generate(string name, string method, string[] profiles)
+void Generate(string name, string method, string[] profiles, string? signature = null)
 {
-    var selector = methods.Single(line => line.Contains("::" + method + "(", StringComparison.Ordinal));
-    var extractions = profiles.Select(profile => Path.Combine(output, name + "-" + profile)).ToArray();
+    var selector = methods.Single(line => signature is null
+        ? line.Contains("::" + method + "(", StringComparison.Ordinal) : line == signature);
+    var selected = profiles.Select(profile => Path.Combine(output, name + "-" + profile)).ToArray();
     for (var index = 0; index < profiles.Length; index++)
-        Run("dotnet", tool, "extract", assembly, selector, extractions[index], profiles[index],
+        Run("dotnet", tool, "extract", assembly, selector, selected[index], profiles[index],
             "--assume-initialized", "Nethermind.Int256.UInt256");
-    var shared = Path.Combine(output, name);
+    extractions.AddRange(selected);
+}
+
+void WriteTemplates()
+{
+    var shared = Path.Combine(output, "Method");
     Run("dotnet", [tool, "templates", shared, .. extractions]);
     using var manifest = JsonDocument.Parse(File.ReadAllText(Path.Combine(shared, "templates.json")));
     if (manifest.RootElement.GetProperty("schema").GetInt32() != 1)
         throw new InvalidOperationException("Unsupported template schema");
     var source = File.ReadAllText(Path.Combine(shared, "Templates.lean"))
-        .Replace("namespace Templates\n", "namespace UInt256Proof.Generated." + name + "\n", StringComparison.Ordinal)
-        .Replace("\nend Templates", "\nend UInt256Proof.Generated." + name, StringComparison.Ordinal);
+        .Replace("namespace Templates\n", "namespace UInt256Proof.Generated.Method\n", StringComparison.Ordinal)
+        .Replace("\nend Templates", "\nend UInt256Proof.Generated.Method", StringComparison.Ordinal);
     var lines = source.Split('\n');
     var emittedMethods = Regex.Matches(source, @"(?m)^@\[cil_code\] def (method[0-9]+) ")
         .Select(match => match.Groups[1].Value).ToArray();
@@ -44,7 +76,7 @@ void Generate(string name, string method, string[] profiles)
         if (lines.Count(line => line.TrimEnd() == "cil_instruction_equations " + methodName) != 1 ||
             !lines.Any(line => line.StartsWith("#print axioms " + methodName + "_instruction", StringComparison.Ordinal)))
             throw new InvalidOperationException("Missing generated instruction equations: " + methodName);
-    Write(name + "Templates", string.Join('\n', lines.Where(line => !IsEquation(line))));
+    Write("MethodTemplates", string.Join('\n', lines.Where(line => !IsEquation(line))));
 }
 
 static bool IsEquation(string line)

@@ -1,3 +1,4 @@
+import UInt256.Generated.MethodTemplates
 import CIL.Safety.Equations
 import UInt256.Methods.Multiply.LimbStorage
 import UInt256.Methods.Multiply.ProductStorageContract
@@ -6,21 +7,12 @@ import CIL.Safety.CallComposition
 namespace UInt256Proof.Multiply.ProductStorage
 open CIL.Safety UInt256Model.Safety
 
-def body (profile : CIL.FeatureProfile) (callee : Nat) : CIL.Method :=
-  { profile := profile, returnsValue := false, locals := [], code := [
-    .feature .vector256Accelerated, .brzero 13,
-    .unsupported "Unreachable under selected profile",
-    .unsupported "Unreachable under selected profile",
-    .unsupported "Unreachable under selected profile",
-    .unsupported "Unreachable under selected profile",
-    .unsupported "Unreachable under selected profile",
-    .unsupported "Unreachable under selected profile",
-    .unsupported "Unreachable under selected profile",
-    .unsupported "Unreachable under selected profile",
-    .unsupported "Unreachable under selected profile",
-    .unsupported "Unreachable under selected profile",
-    .unsupported "Unreachable under selected profile",
-    .arg 0, .arg 1, .arg 2, .arg 3, .arg 4, .call callee 5, .ret] }
+def body (profile : CIL.FeatureProfile) (callee : Nat) : CIL.Method := by_elab
+  let body ← Lean.Elab.Term.elabTermAndSynthesize
+    (← `(UInt256Proof.Generated.Method.method26 $(Lean.mkIdent `profile) false $(Lean.mkIdent `callee))) none
+  let some unfolded ← Lean.Meta.unfoldDefinition? body
+    | throwError "Expected generated template application"
+  return ← Lean.Meta.withTransparency .default (Lean.Meta.reduce unfolded)
 
 /-- Scalar product storage reuses the checked four-limb writer. Its
   route also checks its feature branch, forwarding call and empty-frame return. -/

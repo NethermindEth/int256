@@ -1,3 +1,4 @@
+import UInt256.Generated.MethodTemplates
 import CIL.Safety.Equations
 import UInt256.Methods.Multiply.Calls
 namespace UInt256Proof.Multiply
@@ -84,64 +85,20 @@ theorem hardware_word_tail (program : CIL.Program) (index start : Nat) (body : C
     simpa only [length] using outside
 end UInt256Proof.Multiply
 namespace UInt256Proof.Multiply
-def bmiWordBody (profile : CIL.FeatureProfile) : CIL.Method := { profile := profile, returnsValue := true, locals := [], localKinds := [], parameterHomes := [], staticSites := [], code := [
-  .feature .bmi2,
-  .brzero 11,
-  .arg 2,
-  .arg 0,
-  .arg 1,
-  .mul,
-  .store64,
-  .arg 0,
-  .arg 1,
-  .intrinsic (.bmi2 .multiplyHigh64) 2,
-  .ret,
-  .unsupported "Unreachable under selected profile",
-  .unsupported "Unreachable under selected profile",
-  .unsupported "Unreachable under selected profile",
-  .unsupported "Unreachable under selected profile",
-  .unsupported "Unreachable under selected profile",
-  .unsupported "Unreachable under selected profile",
-  .unsupported "Unreachable under selected profile",
-  .unsupported "Unreachable under selected profile",
-  .unsupported "Unreachable under selected profile",
-  .unsupported "Unreachable under selected profile",
-  .unsupported "Unreachable under selected profile",
-  .unsupported "Unreachable under selected profile",
-  .unsupported "Unreachable under selected profile",
-  .unsupported "Unreachable under selected profile",
-  .unsupported "Unreachable under selected profile",
-  .unsupported "Unreachable under selected profile"] }
+def bmiWordBody (profile : CIL.FeatureProfile) : CIL.Method := by_elab
+  let body ← Lean.Elab.Term.elabTermAndSynthesize
+    (← `(UInt256Proof.Generated.Method.method11 $(Lean.mkIdent `profile) true false)) none
+  let some unfolded ← Lean.Meta.unfoldDefinition? body
+    | throwError "Expected generated template application"
+  return ← Lean.Meta.withTransparency .default (Lean.Meta.reduce unfolded)
 
 
-def armWordBody (profile : CIL.FeatureProfile) : CIL.Method := { profile := profile, returnsValue := true, locals := [], localKinds := [], parameterHomes := [], staticSites := [], code := [
-  .feature .bmi2,
-  .brzero 11,
-  .unsupported "Unreachable under selected profile",
-  .unsupported "Unreachable under selected profile",
-  .unsupported "Unreachable under selected profile",
-  .unsupported "Unreachable under selected profile",
-  .unsupported "Unreachable under selected profile",
-  .unsupported "Unreachable under selected profile",
-  .unsupported "Unreachable under selected profile",
-  .unsupported "Unreachable under selected profile",
-  .unsupported "Unreachable under selected profile",
-  .feature .armBase64,
-  .brzero 22,
-  .arg 2,
-  .arg 0,
-  .arg 1,
-  .mul,
-  .store64,
-  .arg 0,
-  .arg 1,
-  .intrinsic (.armBase64 .multiplyHigh64) 2,
-  .ret,
-  .unsupported "Unreachable under selected profile",
-  .unsupported "Unreachable under selected profile",
-  .unsupported "Unreachable under selected profile",
-  .unsupported "Unreachable under selected profile",
-  .unsupported "Unreachable under selected profile"] }
+def armWordBody (profile : CIL.FeatureProfile) : CIL.Method := by_elab
+  let body ← Lean.Elab.Term.elabTermAndSynthesize
+    (← `(UInt256Proof.Generated.Method.method11 $(Lean.mkIdent `profile) false true)) none
+  let some unfolded ← Lean.Meta.unfoldDefinition? body
+    | throwError "Expected generated template application"
+  return ← Lean.Meta.withTransparency .default (Lean.Meta.reduce unfolded)
 
 end UInt256Proof.Multiply
 namespace UInt256Proof.Multiply

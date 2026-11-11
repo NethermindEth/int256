@@ -1,3 +1,4 @@
+import UInt256.Generated.MethodTemplates
 import UInt256.Safety.FourLimbWrites
 import UInt256.Safety.OutputReadability
 import CIL.Safety.StepComposition
@@ -9,12 +10,12 @@ namespace UInt256Proof.Multiply.LimbStorage
 open CIL.Safety UInt256Model.Safety
 set_option maxRecDepth 4096
 
-def body (profile : CIL.FeatureProfile) : CIL.Method :=
-  { profile := profile, locals := [], returnsValue := false, code := [
-    .arg 0, .skipInit, .arg 0, .fieldAddress 0, .memory .asRef, .arg 1, .store64,
-    .arg 0, .fieldAddress 8, .memory .asRef, .arg 2, .store64,
-    .arg 0, .fieldAddress 16, .memory .asRef, .arg 3, .store64,
-    .arg 0, .fieldAddress 24, .memory .asRef, .arg 4, .store64, .ret] }
+def body (profile : CIL.FeatureProfile) : CIL.Method := by_elab
+  let body ← Lean.Elab.Term.elabTermAndSynthesize
+    (← `(UInt256Proof.Generated.Method.method25 $(Lean.mkIdent `profile))) none
+  let some unfolded ← Lean.Meta.unfoldDefinition? body
+    | throwError "Expected generated template application"
+  return ← Lean.Meta.withTransparency .default (Lean.Meta.reduce unfolded)
 
 def arguments (output : Reference) (w0 w1 w2 w3 : BitVec 64) : List Value :=
   [.reference (.address output), .scalar (.i64 w0), .scalar (.i64 w1),

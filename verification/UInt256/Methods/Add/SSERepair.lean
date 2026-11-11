@@ -118,10 +118,11 @@ theorem vector128_sse_repair_carry (program : CIL.Program) (body : CIL.Method) (
     (wordSpecs 0) original.nextIdentity entered current [left, right] [output]
     frame root slots layout args currentCall enteredWF homes authority post
   intro carryHome after carrySlot carryRead retained afterCall afterAuthority _written
-  obtain ⟨results, ready⟩ := RippleState.initial program specs 14 wordSpecs
-    original entered after frame root slots layout left right output carryHome
+  obtain ⟨results, ready⟩ := RippleState.initial program (numericKinds specs) 14 1
+    original entered after frame slots (by simp only [layout, List.getElem?_cons_succ, implies_true])
+    (fun i => (homes.home_at _ _ (wordSpecs i)).imp (fun _ facts => facts.1)) left right output carryHome
     (scalarCarryValue original left right) _ (by simp [scalarCarryValue])
-    call afterCall (preserved.trans retained) homes enteredWF afterAuthority carrySlot carryRead
+    call afterCall (preserved.trans retained) homes.writable enteredWF afterAuthority carrySlot carryRead
   exact vector128_sse_carry_all program body method found carry storage code carryFound
     ready args leftArg rightArg post (continuation carryHome results)
 

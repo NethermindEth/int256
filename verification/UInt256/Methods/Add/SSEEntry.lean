@@ -1,5 +1,5 @@
 import CIL.Safety.SymbolicExecution
-import UInt256.Generated.AddTemplates
+import UInt256.Generated.MethodTemplates
 import UInt256.Methods.Add.SSERepair
 set_option maxRecDepth 4096
 
@@ -7,7 +7,7 @@ namespace UInt256Proof.Add.Safety
 open CIL.Safety UInt256Model.Safety UInt256Proof.AddSubtract.Safety
 def sseBody (profile : CIL.FeatureProfile) (carry storage : Nat) : CIL.Method := by_elab
   let body ← Lean.Elab.Term.elabTermAndSynthesize
-    (← `(UInt256Proof.Generated.Add.method2
+    (← `(UInt256Proof.Generated.Method.method3
       $(Lean.mkIdent `profile) false $(Lean.mkIdent `carry) $(Lean.mkIdent `storage))) none
   let some unfolded ← Lean.Meta.unfoldDefinition? body
     | throwError "Expected generated template application"

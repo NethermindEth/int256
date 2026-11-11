@@ -1,4 +1,4 @@
-import UInt256.Generated.AddTemplates
+import UInt256.Generated.MethodTemplates
 import UInt256.Methods.Add.ARMEntry
 set_option maxRecDepth 4096
 
@@ -6,7 +6,7 @@ namespace UInt256Proof.Add.Safety
 open CIL.Safety UInt256Model.Safety UInt256Proof.AddSubtract.Safety
 def armBody (profile : CIL.FeatureProfile) : CIL.Method := by_elab
   let body ← Lean.Elab.Term.elabTermAndSynthesize
-    (← `(UInt256Proof.Generated.Add.method2
+    (← `(UInt256Proof.Generated.Method.method3
       $(Lean.mkIdent `profile) true 0 0)) none
   let some unfolded ← Lean.Meta.unfoldDefinition? body
     | throwError "Expected generated template application"

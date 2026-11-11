@@ -1,4 +1,4 @@
-import UInt256.Generated.AddTemplates
+import UInt256.Generated.MethodTemplates
 import CIL.Safety.Equations
 import UInt256.Methods.Add.ARMSmallContract
 import CIL.Safety.MethodContract
@@ -13,7 +13,7 @@ open CIL.Safety
 -- AddScalarUInt64 with the AdvSimd branch disabled: one store and constant flag per carry exit.
 def portableSmallBody (profile : CIL.FeatureProfile) (storage : Nat) : CIL.Method := by_elab
   let body ← Lean.Elab.Term.elabTermAndSynthesize
-    (← `(UInt256Proof.Generated.Add.method1
+    (← `(UInt256Proof.Generated.Method.method2
       $(Lean.mkIdent `profile) false $(Lean.mkIdent `storage))) none
   let some unfolded ← Lean.Meta.unfoldDefinition? body
     | throwError "Expected generated template application"

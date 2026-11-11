@@ -6,7 +6,7 @@ generated/
 **/bin/
 **/obj/
 __pycache__/
-# Primitive binding sources are materialized by ProofBindings before selection and verification.
+# Catalogued binding sources are materialized before selection and verification.
 /proofs/Eq*Int32*.lean
 /proofs/Eq*Int64*.lean
 /proofs/Ne*Int32*.lean
@@ -20,3 +20,21 @@ __pycache__/
 /proofs/Lt*Int32*Scalar.lean
 /proofs/Lt*Int64*Scalar.lean
 !/proofs/LeUInt64UInt256Scalar.lean
+/proofs/*And*.lean
+/proofs/*Or*.lean
+/proofs/*Xor*.lean
+/proofs/*Not*.lean
+/proofs/*Lsh*.lean
+/proofs/*Rsh*.lean
+/proofs/LeftShift*.lean
+/proofs/RightShift*.lean
+/proofs/GeUInt256UInt256*.lean
+/proofs/GtUInt256UInt256*.lean
+/proofs/LeUInt256UInt256*.lean
+/proofs/LtUInt256UInt256*.lean
+/proofs/Add*Profile_*.lean
+/proofs/Subtract*Profile_*.lean
+/proofs/*Multiply*Profile.lean
+/UInt256/Generated/*Templates.lean
+/proofs/*UInt256*Sse.lean
+/proofs/*UInt256*Vector.lean
