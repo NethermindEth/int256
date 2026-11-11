@@ -48,36 +48,12 @@ theorem store_product_contract (profile : CIL.FeatureProfile) (scalar : profile.
     simp [args, checkedValue, numericValue, formValue, formed, checkedAt,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
   have setup : enterFrame (body profile callee) args memory = .ok (frame, memory) := by rfl
-  have resume : run program 1 index 19 args frame [] stored = .ok (stored, []) := by
-    have fetched : (body profile callee).code[19]? = some .ret := by rfl
-    rw [run]
-    simp only [found, fetched]
-    rfl
-  have stepped : step (body profile callee) (.call callee 5) 18 args frame args.reverse memory =
-      .ok (.call callee args [] memory) := by
-    simp [step, cil_guard, observerCount, args, checkedValue, numericValue, formValue, formed, checkedAt,
-      Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-  obtain ⟨tailFuel, tail⟩ := run_call_exists found (by rfl) stepped ⟨childFuel, invoked⟩ ⟨1, resume⟩
-  have disabled (pc : Nat) (stack : List Value) :
-      step (body profile callee) (.feature .vector256Accelerated) pc args frame stack memory =
-        .ok (.next (pc + 1) (.scalar (.i32 0) :: stack) frame memory) := by
-    change Except.ok (FrameAction.next (pc + 1)
-      (.scalar (.i32 (if profile.vector256Accelerated then 1 else 0)) :: stack) frame memory) = _
-    rw [scalar]
-    rfl
+  have disabled : profile.evaluate .vector256Accelerated = false := scalar
   have started : ∃ fuel result returned,
       run program fuel index 0 args frame [] memory = .ok (result, returned) ∧
       result = stored ∧ returned = [] := by
-    iterate 7
-      apply run_next_exists (fun result returned => result = stored ∧ returned = []) found (by rfl)
-      first
-      | exact disabled _ _
-      | rfl
-      | simp only [step, cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, args, List.getElem?_cons_zero,
-          checkedValue, formValue, formed, checkedAt, Except.mapError,
-          Bind.bind, Except.bind, Pure.pure, Except.pure]
-        rfl
-    exact ⟨tailFuel, stored, [], tail, rfl, rfl⟩
+    cil_contract_steps [found, args, frame, formed, disabled, invoked]
+    exact ⟨rfl, rfl⟩
   obtain ⟨fuel, result, returned, ran, rfl, rfl⟩ := started
   refine ⟨fuel, result, ?_, valid, outside, authority, value, readable⟩
   change invoke program fuel index args memory = _

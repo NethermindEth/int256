@@ -1,4 +1,5 @@
 import CIL.Safety.WordSnapshots
+import CIL.Safety.WordSnapshotPreservation
 import CIL.Safety.ExecutionLifetime
 import CIL.Safety.ExecutionStaticWorld
 import UInt256.Safety.PrivateCalls
@@ -29,6 +30,44 @@ theorem PrivateWords.initial {program : CIL.Program} {original entered : Memory}
     (MemoryBelow.refl _ _).accessBelow, WordSnapshots.empty _ _,
     (enterFrame_preserves_caller_memory _ _ _ _ _ setup).cells⟩
 
+/-- A write of `value` to a private word home remembers it and keeps the caller's bytes. -/
+theorem PrivateWords.after_word_write {program : CIL.Program}
+    {original entered current after : Memory} {inputs outputs : List Reference} {frame : Frame}
+    {known : Nat → Option (BitVec 64)} {kinds : List CIL.LocalKind} {index : Nat}
+    {home : Reference} {value : BitVec 64}
+    (state : PrivateWords program original entered current inputs outputs frame known)
+    (homes : CompleteWritableHomes entered original.nextIdentity kinds frame.locals)
+    (slot : frame.locals[index]? = some (.bytes .word64 home))
+    (written : write current home (numberBytes value.toNat 8) 1 = .ok after) :
+    PrivateWords program original entered after inputs outputs frame
+      (rememberWord known index value) :=
+  have preserved := write_preserves_memory_below _ _ _ _ _ _
+    (homes.writable.home_bound index .word64 home slot) written
+  ⟨state.call.after_write written, state.enteredBound,
+    Nat.le_trans state.next (write_extends_allocations _ _ _ _ _ written).next,
+    state.authority.trans ((write_preserves_access_below written _).weaken state.next),
+    state.snapshots.after_write homes.writable state.call.1.1 index home value slot written,
+    fun id old offset => (preserved.cells id old offset).trans (state.caller id old offset)⟩
+
+/-- A write to a private vector home keeps every remembered word and the caller's bytes. -/
+theorem PrivateWords.after_vector_write {program : CIL.Program}
+    {original entered current after : Memory} {inputs outputs : List Reference} {frame : Frame}
+    {known : Nat → Option (BitVec 64)} {kinds : List CIL.LocalKind} {index : Nat}
+    {home : Reference} {bytes : List (BitVec 8)}
+    (state : PrivateWords program original entered current inputs outputs frame known)
+    (homes : CompleteWritableHomes entered original.nextIdentity kinds frame.locals)
+    (slot : frame.locals[index]? = some (.bytes .vector256 home))
+    (written : write current home bytes 1 = .ok after) :
+    PrivateWords program original entered after inputs outputs frame known :=
+  have preserved := write_preserves_memory_below _ _ _ _ _ _
+    (homes.writable.home_bound index .vector256 home slot) written
+  ⟨state.call.after_write written, state.enteredBound,
+    Nat.le_trans state.next (write_extends_allocations _ _ _ _ _ written).next,
+    state.authority.trans ((write_preserves_access_below written _).weaken state.next),
+    state.snapshots.after_other_kind_write homes.writable index .vector256 home (by decide) slot
+      written,
+    fun id old offset => (preserved.cells id old offset).trans (state.caller id old offset)⟩
+
 /-- A real local store adds one remembered value; unknown homes require no
     fabricated initializer or prior read permission. -/
 theorem PrivateWords.store {program : CIL.Program} {original entered current : Memory}
@@ -46,14 +85,10 @@ theorem PrivateWords.store {program : CIL.Program} {original entered current : M
   obtain ⟨reference, slot, bound, ready⟩ := homes.home_at index .word64 specified
   obtain ⟨allocation, requirements⟩ := access_requirements ready
   have writable := state.authority.access ready (enteredWF.1 _ _ requirements.present).1
-  obtain ⟨after, stepped, snapshots, wf, preserved, authority, written⟩ :=
+  obtain ⟨after, stepped, _, _, _, _, written⟩ :=
     state.snapshots.store homes.writable state.call.1.1 reference value slot writable
       (body := body) (pc := pc) (args := args) (stack := stack)
-  refine ⟨after, stepped, state.call.after_write written, state.enteredBound,
-    Nat.le_trans state.next (write_extends_allocations _ _ _ _ _ written).next,
-    state.authority.trans (authority.weaken state.next), snapshots, ?_⟩
-  intro id old offset
-  exact (preserved.cells id old offset).trans (state.caller id old offset)
+  exact ⟨after, stepped, state.after_word_write homes slot written⟩
 
 /-- A helper's named frame invariants and allocation growth transport its exact one-word
     effect. Readback, access authority and unchanged caller bytes remain separate premises. -/

@@ -135,9 +135,7 @@ theorem scalar_invoke_with_storage (profile : CIL.FeatureProfile) (program : CIL
         change write entered output (numberBytes bits.toNat 32) 1 = .ok result at written
         simp only [bits] at written length
         have loaded := input_encoded program entered [input] [output] state.call input (by simp)
-        cil_contract_steps [scalarArgs, inputFormed, outputFormed]
-        apply run_next_exists post found (by rfl) (by cil_checked_step [loaded])
-        cil_contract_steps [written]
+        cil_contract_steps [scalarArgs, inputFormed, outputFormed, loaded, written]
         refine output_result_of_storage memory entered result [input] output _ frame call valid
           owned state.caller ?_ ⟨_, readback⟩ outside
         simpa using (inputValue_of_encoded_read readback).trans

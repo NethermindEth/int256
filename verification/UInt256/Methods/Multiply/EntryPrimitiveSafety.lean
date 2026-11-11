@@ -117,23 +117,14 @@ theorem primitive_body (ctx : PrimitiveContext) (wordContract : Calls.WordContra
     simp only [step, cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, slots, List.getElem?_cons_zero, encoded, stored, Bind.bind, Except.bind, Pure.pure, Except.pure]
     cases frame
     simp_all
-  have argStep : step (primitiveBody ctx.profile ctx.firstScalar ctx.indices.entry
-      ctx.conversionIndex) (.arg (if firstScalar then 0 else 1)) 0
-      (scalarOperatorArguments firstScalar input argument) frame [] memory =
-      .ok (.next 1 [.scalar argument] frame memory) := by
-    cases firstScalar <;> simp [step, cil_guard, observerCount, scalarOperatorArguments,
-      scalarArguments, checkedValue, numeric, Bind.bind, Except.bind, Pure.pure, Except.pure]
-  have callStep : step (primitiveBody ctx.profile ctx.firstScalar ctx.indices.entry
-      ctx.conversionIndex) (.call ctx.conversionIndex 1) 1
-      (scalarOperatorArguments firstScalar input argument) frame [.scalar argument] memory =
-      .ok (.call ctx.conversionIndex [.scalar argument] [] memory) := by
-    simp [step, cil_guard, observerCount, checkedValue, numeric, known, Bind.bind, Except.bind,
-      Pure.pure, Except.pure]
   have started : ∃ fuel result returned,
       run ctx.program fuel ctx.wrapperIndex 0 (scalarOperatorArguments firstScalar input argument)
         frame [] memory = .ok (result, returned) ∧ post result returned := by
-    cil_contract_steps [found, code0, argStep, callStep, invoked, storeStep]
-    exact ⟨tailFuel, final, _, tail, rfl, rfl⟩
+    cases firstScalar
+    all_goals
+      cil_contract_steps [found, code0, numeric, known, scalarOperatorArguments,
+        scalarArguments, invoked, storeStep]
+      exact ⟨tailFuel, final, _, tail, rfl, rfl⟩
   obtain ⟨fuel, result, returned, ran, rfl, rfl⟩ := started
   refine ⟨fuel, _, ran, ?_⟩
   intro id old offset

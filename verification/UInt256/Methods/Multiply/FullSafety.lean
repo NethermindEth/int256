@@ -224,7 +224,6 @@ def fullTop (original : Memory) (left right : Reference) :=
   ((inputLimb original left 0 * inputLimb original right 3 + inputLimb original left 1 * inputLimb original right 2) +
     inputLimb original left 2 * inputLimb original right 1) + inputLimb original left 3 * inputLimb original right 0
 
-set_option maxRecDepth 4096 in
 theorem full_scalar_top (profile : CIL.FeatureProfile) (program : CIL.Program) (methodIndex wordIndex countIndex storageIndex : Nat)
     (found : program[methodIndex]? = some (fullBody profile wordIndex countIndex storageIndex alternative))
     (noAvx512 : profile.avx512DQVL = false) (noAvx2 : profile.avx2 = false)
@@ -248,26 +247,12 @@ theorem full_scalar_top (profile : CIL.FeatureProfile) (program : CIL.Program) (
   have formedRight := state.call.input_formed (by simp : right ∈ [left, right])
   have readingLeft := state.input_field originalCall left (by simp) 3
   have readingRight := state.input_field originalCall right (by simp) 3
-  obtain ⟨after, stored, next⟩ := state.store enteredWF homes 6 (by rfl)
-    (fullTop original left right) 95 (productArgs left right output) []
-    (body := fullBody profile wordIndex countIndex storageIndex alternative)
-  have suffix := continuation after next
-  let scalarBody := fullBody profile wordIndex countIndex storageIndex alternative
-  have noAvx512Feature : profile.evaluate .avx512DQVL = false := noAvx512
-  have noAvx2Feature : profile.evaluate .avx2 = false := noAvx2
-  obtain ⟨architecture, nativeWidth, littleEndian, advSimd, sse2, ssse3, sse42, avx, avx2,
-    avx512F, avx512FVL, bmi1, sse41, avx512DQ, avx512DQVL, bmi2, armBase64,
-    vector256Accelerated⟩ := profile
-  change avx512DQVL = false at noAvx512
-  change avx2 = false at noAvx2
-  subst noAvx512 noAvx2
-  have fetched91 : scalarBody.code[91]? = some (.fieldAt 24 8) := by rfl
-  have fetched95 : scalarBody.code[95]? = some (.setLocal 6) := by rfl
+  have formed := state.call.1.1
+  have retained := state.authority
   cil_contract_steps (snapshots := state.snapshots.toLocalSnapshots)
-    [productArgs, fullBody, fullInputs, wordLocals, rememberWord, fullTop, fetched91, fetched95,
-      formedLeft, formedRight, readingLeft, readingRight, stored,
-      noAvx512Feature, noAvx2Feature] until suffix
-  exact run_next_exists post found fetched95 stored suffix
+    [productArgs, fullBody, fullInputs, wordLocals, rememberWord, fullTop, formedLeft,
+      formedRight, readingLeft, readingRight, noAvx512, noAvx2, Bool.or_false]
+    until continuation _ (state.after_word_write homes (by assumption) localWrite)
 
 def fullPrepared (original : Memory) (left right : Reference) :=
   rememberWord (fullInputs original left right) 6 (fullTop original left right)
@@ -428,20 +413,14 @@ theorem full_invoke_with_storage (profile : CIL.FeatureProfile) (program : CIL.P
     apply run_count_locals countFound m8 call enteredWF homes 15 21 13 15
       (by rfl) (by rfl) (by rfl) (by rfl) (by rfl) found (by rfl)
     intro _ m9
-    apply WP.step found (by rfl) (m9.snapshots.load _ (localWord_remembered (by rfl)))
-    apply WP.step found (by rfl) (m9.snapshots.load _ (localWord_remembered (by rfl)))
-    apply WP.step found (by rfl) (m9.snapshots.load _ (localWord_remembered (by rfl)))
-    iterate 2 (apply WP.step found (by rfl); rfl)
-    apply run_store_local m9 enteredWF homes 6 (by rfl) _ found (by rfl)
-    intro _ finished
-    apply WP.step found (by rfl) (by cil_checked_step
-      [productArgs, finished.call.output_formed (by simp : output ∈ [output])])
-    apply WP.step found (by rfl) (finished.snapshots.load _ (localWord_remembered (by rfl)))
-    apply WP.step found (by rfl) (finished.snapshots.load _ (localWord_remembered (by rfl)))
-    apply WP.step found (by rfl) (finished.snapshots.load _ (localWord_remembered (by rfl)))
-    apply WP.step found (by rfl) (finished.snapshots.load _ (localWord_remembered (by rfl)))
-    exact run_product_storage storage finished call owned (fullResultWords memory left right)
-      (full_words_correct memory left right) found (by rfl) (by rfl)
+    have formed := m9.call.1.1
+    have retained := m9.authority
+    have valid := m9.call.1
+    cil_contract_steps (snapshots := m9.snapshots.toLocalSnapshots) [productArgs]
+    apply WP.exists_execution
+    exact run_product_storage storage (m9.after_word_write homes (by assumption) localWrite)
+      call owned (fullResultWords memory left right) (full_words_correct memory left right)
+      found (by rfl) (by rfl)
   have body : ∃ fuel final returned, run program fuel methodIndex 0
       (productArgs left right output) frame [] entered = .ok (final, returned) ∧
         post final returned := by

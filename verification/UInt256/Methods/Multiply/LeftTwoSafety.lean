@@ -130,15 +130,14 @@ theorem left_two_invoke_with_storage (profile : CIL.FeatureProfile) (program : C
     apply run_input_to_local (argument := 1) (target := 3) state2 call enteredWF homes right
       (by simp) 2 (by rfl) (by rfl) found (by rfl) post
     intro m3 state3
+    have formed := state3.call.1.1
+    have retained := state3.authority
     have formedRight := state3.call.input_formed (by simp : right ∈ [left, right])
     have readRight := state3.input_field call right (by simp) 3
-    cil_contract_steps (snapshots := state3.snapshots.toLocalSnapshots)
+    cil_contract_steps (snapshots := state3.snapshots.toLocalSnapshots) 10
       [productArgs, formedRight, readRight]
     apply WP.exists_execution
-    apply run_store_local state3 enteredWF homes 4 (by rfl) (leftTwoTop memory left right)
-      found (by rfl)
-    intro m4 state4
-    apply WP.step found (by rfl) (by rfl)
+    have state4 := state3.after_word_write homes (by assumption) localWrite
     apply run_widen_operand contract state4 call enteredWF homes 1 6 5 _
       (by rfl) (by rfl) (by rfl) found (by rfl)
     intro m5 state5
@@ -186,14 +185,13 @@ theorem left_two_invoke_with_storage (profile : CIL.FeatureProfile) (program : C
     apply run_count_locals countFound state18 call enteredWF homes 13 17 9 13
       (by rfl) (by rfl) (by rfl) (by rfl) (by rfl) found (by rfl)
     intro m19 state19
-    cil_contract_steps (snapshots := state19.snapshots.toLocalSnapshots) []
+    have formed := state19.call.1.1
+    have retained := state19.authority
+    have valid := state19.call.1
+    cil_contract_steps (snapshots := state19.snapshots.toLocalSnapshots) [productArgs]
     apply WP.exists_execution
-    apply run_store_local state19 enteredWF homes 4 (by rfl) _ found (by rfl)
-    intro m20 state20
-    have formed := state20.call.output_formed (by simp : output ∈ [output])
-    cil_contract_steps (snapshots := state20.snapshots.toLocalSnapshots) [productArgs, formed]
-    apply WP.exists_execution
-    exact run_product_storage storage state20 call owned (leftTwoResultWords memory left right)
+    exact run_product_storage storage (state19.after_word_write homes (by assumption) localWrite_1)
+      call owned (leftTwoResultWords memory left right)
       (left_two_words_correct memory left right leftUpper) found (by rfl) (by rfl)
   obtain ⟨fuel, final, returned, ran, result⟩ := body
   have returns := result.returns
