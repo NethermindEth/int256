@@ -8,7 +8,7 @@ Proofs establish arithmetic results, finite return, permitted overlap and preser
 caller memory. Frame setup supplies typed storage evidence for numeric locals; initialized
 values and later writes require their own checked facts. Profile-parametric comparison proofs
 use `ProfileAgreement.of_flags` and a kernel-checked empty feature-read list for scalar programs.
-See LeanCIL's [proof guide](https://github.com/NethermindEth/LeanCIL/blob/4a3d57fdae83bf2321195386135c8a4859378605/docs/PROOFS.md)
+See LeanCIL's [proof guide](https://github.com/NethermindEth/LeanCIL/blob/84eacc655a446be8766104afc812fb1b79a17bd4/docs/PROOFS.md)
 for the checked execution and contract APIs.
 
 The Add/Subtract Vector128 helpers use `CodeAt` placements instead of carrying
