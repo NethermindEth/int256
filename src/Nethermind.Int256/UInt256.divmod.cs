@@ -1581,20 +1581,21 @@ public readonly partial struct UInt256
     }
 
     // Hardware div needs no normalisation: the running remainder starts at zero and stays below the
-    // divisor, so it can go straight into rdx.
+    // divisor, so it can go straight into rdx. While it is still zero, a limb below the divisor is
+    // already the remainder, so the leading divide of a dividend whose top limb is below the divisor goes.
     [SkipLocalsInit]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static ulong RemainderBy64Hardware(in UInt256 x, ulong d)
     {
-        ulong r = 0;
         ulong u3 = x.u3;
-        if (u3 != 0) (_, r) = X86Base.X64.DivRem(u3, r, d);
+        ulong r = u3;
+        if (u3 >= d) (_, r) = X86Base.X64.DivRem(u3, 0, d);
         ulong u2 = x.u2;
-        if ((u2 | r) != 0) (_, r) = X86Base.X64.DivRem(u2, r, d);
+        if (r != 0 || u2 >= d) (_, r) = X86Base.X64.DivRem(u2, r, d); else r = u2;
         ulong u1 = x.u1;
-        if ((u1 | r) != 0) (_, r) = X86Base.X64.DivRem(u1, r, d);
+        if (r != 0 || u1 >= d) (_, r) = X86Base.X64.DivRem(u1, r, d); else r = u1;
         ulong u0 = x.u0;
-        if ((u0 | r) != 0) (_, r) = X86Base.X64.DivRem(u0, r, d);
+        if (r != 0 || u0 >= d) (_, r) = X86Base.X64.DivRem(u0, r, d); else r = u0;
         return r;
     }
 
@@ -3332,30 +3333,44 @@ public readonly partial struct UInt256
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void DivideBy64BitsX86Base(in UInt256 x, ulong divisor, out UInt256 q, out UInt256 remainder)
     {
-        ulong rem = 0;
-        ulong q3 = 0;
+        // While the running remainder is zero, a limb below the divisor is a zero digit and becomes the
+        // remainder as it is, so the leading divide of a dividend whose top limb is below the divisor goes.
         ulong u3 = x.u3;
-        if (u3 != 0)
+        ulong rem = u3;
+        ulong q3 = 0;
+        if (u3 >= divisor)
         {
-            (q3, rem) = X86Base.X64.DivRem(lower: u3, upper: rem, divisor);
+            (q3, rem) = X86Base.X64.DivRem(lower: u3, upper: 0, divisor);
         }
         ulong u2 = x.u2;
         ulong q2 = 0;
-        if ((u2 | rem) != 0)
+        if (rem != 0 || u2 >= divisor)
         {
             (q2, rem) = X86Base.X64.DivRem(lower: u2, upper: rem, divisor);
         }
+        else
+        {
+            rem = u2;
+        }
         ulong u1 = x.u1;
         ulong q1 = 0;
-        if ((u1 | rem) != 0)
+        if (rem != 0 || u1 >= divisor)
         {
             (q1, rem) = X86Base.X64.DivRem(lower: u1, upper: rem, divisor);
         }
+        else
+        {
+            rem = u1;
+        }
         ulong u0 = x.u0;
         ulong q0 = 0;
-        if ((u0 | rem) != 0)
+        if (rem != 0 || u0 >= divisor)
         {
             (q0, rem) = X86Base.X64.DivRem(lower: u0, upper: rem, divisor);
+        }
+        else
+        {
+            rem = u0;
         }
 
         q = Create(q0, q1, q2, q3);
