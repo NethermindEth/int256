@@ -10,6 +10,7 @@ import CIL.Safety.ExecutionStaticWorld
 import CIL.Safety.ReturnMemory
 import CIL.Safety.GuardNormalization
 import CIL.Safety.MethodContract
+import UInt256.Methods.Equality.VectorPrimitive
 
 namespace UInt256Model.Safety
 open CIL.Safety
@@ -229,7 +230,7 @@ syntax "written_from_context" : tactic
 macro_rules
   | `(tactic| written_from_context) => `(tactic| first
     | exact WrittenFrom.same
-    | (refine WrittenFrom.write ?_ (by assumption); written_from_context))
+    | (refine WrittenFrom.write ?_ (by with_reducible assumption); written_from_context))
 
 /-- The facts a snapshot walk reads from the context and restates after each local store. -/
 theorem VectorFrame.walk_facts {program : CIL.Program} {original entered current : Memory}
@@ -297,5 +298,21 @@ theorem VectorFrame.input_value {program : CIL.Program} {original entered curren
   congr 2
   funext offset
   rw [state.caller input.allocation old offset (Or.inl rfl)]
+
+/-- An unwritten frame's input predates `boundary`, and its bytes cast to its initial value. -/
+theorem VectorFrame.input_read {program : CIL.Program} {original entered current : Memory}
+    {inputs : List Reference} {output : Reference} {frame : Frame}
+    {known : Nat → Option CIL.Value} {boundary : Nat}
+    (state : VectorFrame program original entered current inputs output frame known none)
+    (originalCall : CallingConditions program original inputs [output]) (input : Reference)
+    (member : input ∈ inputs)
+    (bound : original.nextIdentity ≤ boundary := by first | exact Nat.le_refl _ | assumption) :
+    input.allocation < boundary ∧ ∃ bytes, read current input 32 1 = .ok bytes ∧
+      bitcastValue (.aggregate 32) .vector256 (.aggregate bytes) =
+        .ok (.v256 (inputValue original input)) := by
+  obtain ⟨_, present, _⟩ := formed_reference_live _ _ _ (originalCall.input_formed member)
+  exact ⟨Nat.lt_of_lt_of_le (originalCall.1.1.1 _ _ present).1 bound, _,
+    state.call.input_snapshot member, state.input_value originalCall member ▸
+      UInt256Proof.Equality.VectorPrimitive.bitcast_input current input⟩
 
 end UInt256Model.Safety

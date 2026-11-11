@@ -124,26 +124,17 @@ theorem prepare_invoke (program : CIL.Program) (method : Nat) (profile : CIL.Fea
           .ok (final, returned) ∧ post final returned from
       inputs entered (.initial_from call grown same setup) (scratch.after_below below cellsOld)
     intro current state cells
-    have loadLeft := UInt256Proof.Equality.VectorPrimitive.load_input state.call
-      (by simp : left ∈ [left, right])
-    have castLeft := UInt256Proof.Equality.VectorPrimitive.cast_input current left
-    rw [state.input_value originalCall (by simp : left ∈ [left, right])] at castLeft
+    obtain ⟨leftOld, _, readLeft, castLeft⟩ := state.input_read originalCall left (by simp) grown
+    obtain ⟨rightOld, _, readRight, castRight⟩ :=
+      state.input_read originalCall right (by simp) grown
     obtain ⟨enteredFormed, formed, authority, valid, preserved⟩ :=
       state.walk_facts memory.nextIdentity
     -- The extracted body steps under either AVX-512 choice; the masked body has none.
     cases avx512 <;> rcases variant with rfl | ⟨⟨⟩, rfl⟩
     all_goals
       cil_contract_steps (snapshots := state.locals) [found, args, prepareArguments, profileEq,
-        facts state cells, CIL.FeatureProfile.evaluate, loadLeft, castLeft]
-      replace cells := cells.after_below localBelow cellsOld
-      replace state := state.after_stores originalCall localSnapshots
-      have loadRight := UInt256Proof.Equality.VectorPrimitive.load_input state.call
-        (by simp : right ∈ [left, right])
-      have castRight := UInt256Proof.Equality.VectorPrimitive.cast_input storedLocal right
-      rw [state.input_value originalCall (by simp : right ∈ [left, right])] at castRight
-      cil_contract_steps (snapshots := state.locals) [found, args, prepareArguments, profileEq,
-        facts state cells, CIL.FeatureProfile.evaluate, loadRight, castRight]
-      replace cells := cells.after_below localBelow_1 cellsOld
+        facts state cells, CIL.FeatureProfile.evaluate, readLeft, castLeft, readRight, castRight]
+      replace cells := cells.after_below preserved cellsOld
       replace state := state.after_stores originalCall localSnapshots_1
       cil_contract_steps (snapshots := state.locals) [found, args, prepareArguments, profileEq,
         facts state cells, CIL.FeatureProfile.evaluate]

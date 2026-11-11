@@ -1,5 +1,6 @@
 import CIL.Safety.SymbolicExecution
 import UInt256.Methods.Add.ARMRepairMasks
+import UInt256.Safety.VectorFrame
 
 namespace UInt256Proof.Add.Safety
 open CIL.Safety UInt256Model.Safety UInt256Proof.AddSubtract.Safety CIL.Vector CIL.Vector
@@ -86,32 +87,25 @@ theorem vector128_arm_repair_checked (program : CIL.Program) (body : CIL.Method)
         post final returned := by
   have known := savedVectors_snapshots layout snapshots
   have formed := currentCall.1.wellFormed
+  have valid := currentCall.1
   have preserved := MemoryBelow.refl boundary current
   have suffix : ∃ fuel final returned, run program fuel method 121 args frame
       [.scalar (.v128 (incoming128High (values 11) (values 12)))] current =
         .ok (final, returned) ∧ post final returned := by
     cil_contract_steps (snapshots := known) [found, code, enabled, savedVectors]
-    refine continuation _ (fun i => ?_) preserved
-      ((((((currentCall.after_write localWrite).after_write localWrite_1).after_write
-        localWrite_2).after_write localWrite_3).after_write localWrite_4).after_write
-        localWrite_5) authority ?_
-    · obtain ⟨home, slot, _⟩ := snapshots i
-      refine ⟨home, slot, localSnapshots_5.read_vector128 (index := i.val + 1) ?_
-        (by simpa [layout] using slot)⟩
-      obtain ⟨index, bound⟩ := i
-      have cases : index = 0 ∨ index = 1 ∨ index = 2 ∨ index = 3 ∨ index = 4 ∨ index = 5 ∨
-          index = 6 ∨ index = 7 ∨ index = 8 ∨ index = 9 ∨ index = 10 ∨ index = 11 ∨
-          index = 12 ∨ index = 13 := by omega
-      rcases cases with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl |
-        rfl | rfl <;> simp [rememberLocal, savedVectors, armRepairSnapshot, repaired128Carry,
-          repair128Mask, corrected128, full128, ← incoming128_arm_low]
-    · have propagation := (write_extends_allocations _ _ _ _ _ localWrite).next
-      have full := (write_extends_allocations _ _ _ _ _ localWrite_1).next
-      have extra := (write_extends_allocations _ _ _ _ _ localWrite_2).next
-      have repair := (write_extends_allocations _ _ _ _ _ localWrite_3).next
-      have carry := (write_extends_allocations _ _ _ _ _ localWrite_4).next
-      have high := (write_extends_allocations _ _ _ _ _ localWrite_5).next
-      omega
+    obtain ⟨next, world⟩ :=
+      (by written_from_context : WrittenFrom current storedLocal_5).kept currentCall.2
+    refine continuation _ (fun i => ?_) preserved ⟨valid, world⟩ authority (Nat.le_of_eq next.symm)
+    obtain ⟨home, slot, _⟩ := snapshots i
+    refine ⟨home, slot, localSnapshots_5.read_vector128 (index := i.val + 1) ?_
+      (by simpa [layout] using slot)⟩
+    obtain ⟨index, bound⟩ := i
+    have cases : index = 0 ∨ index = 1 ∨ index = 2 ∨ index = 3 ∨ index = 4 ∨ index = 5 ∨
+        index = 6 ∨ index = 7 ∨ index = 8 ∨ index = 9 ∨ index = 10 ∨ index = 11 ∨
+        index = 12 ∨ index = 13 := by omega
+    rcases cases with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl |
+      rfl | rfl <;> simp [rememberLocal, savedVectors, armRepairSnapshot, repaired128Carry,
+        repair128Mask, corrected128, full128, ← incoming128_arm_low]
   by_cases zero : flag = BitVec.ofNat 32 0
   · rw [← show values 13 = incoming128High (values 11) (values 12) by
       simpa [selectedPropagation128, enabled, zero] using condition] at suffix

@@ -5,7 +5,6 @@ import UInt256.Methods.Subtract.Vector256Bodies
 import UInt256.Methods.Subtract.Vector256Math
 import UInt256.Methods.Add.VectorArithmeticDefinitions
 import UInt256.Safety.VectorFrame
-import UInt256.Methods.Equality.VectorPrimitive
 import CIL.Safety.StepComposition
 import UInt256.Methods.AddSubtract.BroadcastLookup
 
@@ -70,7 +69,22 @@ def maskLocals (left right : BitVec 256) : Nat → Option CIL.Value :=
     0 (.v256 left)) 1 (.v256 right)) 2 (.v256 (CIL.Vector.zip256 (· - ·) left right)))
     3 (.v256 (borrowLanes left right))) 4 (.v256 (borrowIncoming (borrowLanes left right)))
 
-/-- Both operands are loaded and the borrow masks formed, by either mask form or the blend. -/
+/-- The first output store writes the speculative difference. -/
+def speculative (left right : BitVec 256) : BitVec 256 :=
+  CIL.Vector.zip256 (· + ·) (CIL.Vector.zip256 (· - ·) left right)
+    (borrowIncoming (borrowLanes left right))
+
+/-- Locals after the equal lanes, the cascade sum and the table index of the two lane masks. -/
+def slowLocals (left right : BitVec 256) : Nat → Option CIL.Value :=
+  let g := CIL.Vector.moveMask64 (borrowLanes left right)
+  let p := CIL.Vector.moveMask64 (equalLanes left right)
+  rememberLocal (rememberLocal (rememberLocal (rememberLocal (rememberLocal (rememberLocal
+    (maskLocals left right) 5 (.v256 (equalLanes left right))) 6 (.i32 g)) 7 (.i32 p))
+    6 (.i32 (p + 2 * g))) 7 (.i32 (p ^^^ (p + 2 * g)))) 7
+    (.i32 (UInt256Proof.SIMD.cascadeIndex g p))
+
+/-- Both operands are loaded and the borrow masks formed, by either mask form or the blend,
+    up to the store of the speculative difference. -/
 theorem impl_masks (program : CIL.Program) (method lookup : Nat) (profile : CIL.FeatureProfile)
     (avx512 bmi1 : Bool) (body : CIL.Method) (shift : Nat)
     (variant : ImplVariant profile avx512 bmi1 lookup body shift)
@@ -85,48 +99,28 @@ theorem impl_masks (program : CIL.Program) (method lookup : Nat) (profile : CIL.
       VectorFrame program memory entered after [left, right] output frame
         (maskLocals (inputValue memory left) (inputValue memory right)) none →
       ∃ fuel final values,
-        run program fuel method (45 + shift) (binaryArguments left right output) frame [] after =
-          .ok (final, values) ∧ post final values) :
+        run program fuel method (52 + shift) (binaryArguments left right output) frame
+          [.scalar (.v256 (speculative (inputValue memory left) (inputValue memory right))),
+            .reference (.address output)] after = .ok (final, values) ∧ post final values) :
     ∃ fuel final values,
       run program fuel method 0 (binaryArguments left right output) frame [] entered =
         .ok (final, values) ∧ post final values := by
   have profileEq := variant.profile_eq
   have state := VectorFrame.initial call setup
-  have loadLeft := UInt256Proof.Equality.VectorPrimitive.load_input state.call
-    (by simp : left ∈ [left, right])
-  have castLeft := UInt256Proof.Equality.VectorPrimitive.cast_input entered left
-  rw [state.input_value call (by simp : left ∈ [left, right])] at castLeft
+  obtain ⟨leftOld, _, readLeft, castLeft⟩ := state.input_read call left (by simp)
+  obtain ⟨rightOld, _, readRight, castRight⟩ := state.input_read call right (by simp)
   obtain ⟨enteredFormed, formed, authority, valid, preserved⟩ :=
     state.walk_facts memory.nextIdentity
   rcases variant with ⟨rfl, rfl⟩ | ⟨rfl, rfl, rfl⟩
   case' inl => cases avx512
   all_goals
     cil_contract_steps (snapshots := state.locals) [found, binaryArguments, profileEq,
-      impl_facts features state, CIL.FeatureProfile.evaluate, loadLeft, castLeft]
-    replace state := state.after_stores call localSnapshots
-    have loadRight := UInt256Proof.Equality.VectorPrimitive.load_input state.call
-      (by simp : right ∈ [left, right])
-    have castRight := UInt256Proof.Equality.VectorPrimitive.cast_input storedLocal right
-    rw [state.input_value call (by simp : right ∈ [left, right])] at castRight
-    cil_contract_steps (snapshots := state.locals) [found, binaryArguments, profileEq,
-      impl_facts features state, CIL.FeatureProfile.evaluate, loadRight, castRight]
+      impl_facts features state, CIL.FeatureProfile.evaluate, readLeft, castLeft, readRight,
+      castRight]
     simp only [ternary_borrow_lanes, permute_incoming, blend_incoming, ← borrowLanes.eq_1,
       show ∀ mask, CIL.Vector.alignRight64 mask 0 3 = borrowIncoming mask from align_incoming]
-      at localSnapshots_4
+      at localSnapshots_4 ⊢
     exact continuation _ (state.after_stores call localSnapshots_4)
-
-/-- The first output store writes the speculative difference. -/
-def speculative (left right : BitVec 256) : BitVec 256 :=
-  CIL.Vector.zip256 (· + ·) (CIL.Vector.zip256 (· - ·) left right) (borrowIncoming (borrowLanes left right))
-
-/-- Locals after the equal lanes, the cascade sum and the table index of the two lane masks. -/
-def slowLocals (left right : BitVec 256) : Nat → Option CIL.Value :=
-  let g := CIL.Vector.moveMask64 (borrowLanes left right)
-  let p := CIL.Vector.moveMask64 (equalLanes left right)
-  rememberLocal (rememberLocal (rememberLocal (rememberLocal (rememberLocal (rememberLocal
-    (maskLocals left right) 5 (.v256 (equalLanes left right))) 6 (.i32 g)) 7 (.i32 p))
-    6 (.i32 (p + 2 * g))) 7 (.i32 (p ^^^ (p + 2 * g)))) 7
-    (.i32 (UInt256Proof.SIMD.cascadeIndex g p))
 
 /-- The speculative store and the borrow decision: the fast path returns the top borrow, the
     slow path reaches the table lookup with the cascade index. -/
@@ -154,13 +148,12 @@ theorem impl_decision (program : CIL.Program) (method lookup : Nat) (profile : C
         run program fuel method (83 + shift) (binaryArguments left right output) frame [] after =
           .ok (final, values) ∧ post final values) :
     ∃ fuel final values,
-      run program fuel method (45 + shift) (binaryArguments left right output) frame [] current =
+      run program fuel method (52 + shift) (binaryArguments left right output) frame
+        [.scalar (.v256 (speculative a b)), .reference (.address output)] current =
         .ok (final, values) ∧ post final values := by
   have profileEq := variant.profile_eq
   rcases variant with ⟨rfl, rfl⟩ | ⟨rfl, rfl, rfl⟩
   all_goals
-    cil_contract_steps (snapshots := state.locals) [found, binaryArguments, profileEq,
-      impl_facts features state, CIL.FeatureProfile.evaluate, maskLocals]
     refine state.run_output post call homes found fun current state => ?_
     obtain ⟨enteredFormed, formed, authority, valid, preserved⟩ :=
       state.walk_facts memory.nextIdentity
@@ -180,9 +173,9 @@ def corrected (left right : BitVec 256) : BitVec 256 :=
     (UInt256Proof.SIMD.cascadeVector (UInt256Proof.SIMD.cascadeIndex
       (CIL.Vector.moveMask64 (borrowLanes left right)) (CIL.Vector.moveMask64 (equalLanes left right))))
 
-/-- The BMI1 extraction of bit 4 is a byte holding zero or one. -/
+/-- The BMI1 extraction of bit 4 is zero or one. -/
 theorem bextr_bit (x : BitVec 32) :
-    (((CIL.Vector.bextr32 x 4 1).setWidth 8).setWidth 32).toNat ≤ 1 := by
+    (CIL.Vector.bextr32 x 4 1).toNat ≤ 1 := by
   simp [CIL.Vector.bextr32]
   exact Nat.le_of_lt_succ (Nat.mod_lt _ (by decide))
 
@@ -226,19 +219,12 @@ theorem impl_slow_tail (program : CIL.Program) (method lookup : Nat) (profile : 
     cil_contract_steps (snapshots := state.locals) [found, binaryArguments, profileEq,
       impl_facts features state, CIL.FeatureProfile.evaluate, slowLocals, maskLocals]
     refine state.run_output post call homes found fun stored state => ?_
-    cases bmi1
-    · cil_contract_steps (snapshots := state.locals) [found, binaryArguments, profileEq,
+    cases bmi1 <;>
+      cil_contract_steps (snapshots := state.locals) [found, binaryArguments, profileEq,
         impl_facts features state, CIL.FeatureProfile.evaluate, slowLocals, maskLocals,
-        CIL.NarrowKind.extend_ite_ofNat_one_zero]
-      exact continuation stored _ state
-    · cil_contract_steps (snapshots := state.locals) [found, binaryArguments, profileEq,
-        impl_facts features state, CIL.FeatureProfile.evaluate, slowLocals, maskLocals]
-      apply run_next_exists post found (op := .memory .bitcastByteBool) (by rfl)
-      · cil_stack_cleanup
-        rw [step_memory_bitcastByteBool_i32_eq, if_pos (bextr_bit _)]
-      cil_contract_steps [found]
-      rw [show ∀ flag : BitVec 8, CIL.NarrowKind.unsigned8.extend (flag.setWidth 32) =
-        flag.setWidth 32 from fun flag => by simp [CIL.NarrowKind.extend]]
+        CIL.NarrowKind.extend_ite_ofNat_one_zero, bextr_bit, fun flag : BitVec 8 =>
+          show CIL.NarrowKind.unsigned8.extend (flag.setWidth 32) = flag.setWidth 32 by
+            simp [CIL.NarrowKind.extend]] <;>
       exact continuation stored _ state
 
 end UInt256Proof.Subtract.Vector256

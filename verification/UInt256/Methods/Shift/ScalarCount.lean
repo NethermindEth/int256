@@ -1,6 +1,7 @@
 import UInt256.Methods.Shift.ScalarBody
 import UInt256.Safety.VectorFrame
 import UInt256.Safety.LimbAccess
+import UInt256.Methods.Add.InputWords
 import CIL.Safety.LocalSnapshotSteps
 
 /-!
@@ -104,30 +105,17 @@ theorem shift_prepared (original entered current : Memory) (input output : Refer
   obtain ⟨allocation, present, _, _⟩ :=
     formed_reference_live _ _ _ (originalCall.input_formed (by simp : input ∈ [input]))
   have old := (originalCall.1.1.1 _ _ present).1
-  have reading := fun current known
-      (state : VectorFrame program original entered current [input] output frame known none)
-      limb (bound : limb < 4) rest =>
-    show instruction (.fieldAt (8 * (⟨limb, bound⟩ : Fin 4).val) 8)
-        (.reference (.address input) :: rest) current =
-        .ok (current, .scalar (.i64 (inputLimb original input ⟨limb, bound⟩)) :: rest) by
-      rw [state.call.input_field_instruction (by simp) ⟨limb, bound⟩ rest]
-      simp only [inputLimb, fun offset => state.caller input.allocation old offset (Or.inl rfl)]
-  cil_contract_steps 3 [countArgument]
-  refine state.run_store (kind := .word32) post originalCall homes found fun current state => ?_
-  cil_contract_steps (snapshots := state.locals) []
-  refine state.run_store (kind := .word32) post originalCall homes found fun current state => ?_
-  cil_contract_steps 2 [inputArgument, state.call.input_formed (by simp : input ∈ [input]),
-    reading _ _ state 0 (by decide)]
-  refine state.run_store (kind := .word64) post originalCall homes found fun current state => ?_
-  cil_contract_steps 2 [inputArgument, state.call.input_formed (by simp : input ∈ [input]),
-    reading _ _ state 1 (by decide)]
-  refine state.run_store (kind := .word64) post originalCall homes found fun current state => ?_
-  cil_contract_steps 2 [inputArgument, state.call.input_formed (by simp : input ∈ [input]),
-    reading _ _ state 2 (by decide)]
-  refine state.run_store (kind := .word64) post originalCall homes found fun current state => ?_
-  cil_contract_steps 2 [inputArgument, state.call.input_formed (by simp : input ∈ [input]),
-    reading _ _ state 3 (by decide)]
-  refine state.run_store (kind := .word64) post originalCall homes found fun current state => ?_
-  exact continuation current state
+  have words := state.call.input_words_kept (.refl _ _) input (by simp)
+  simp only [inputLimb, fun offset => state.caller input.allocation old offset (Or.inl rfl)]
+    at words
+  have kept := fun after (below : MemoryBelow original.nextIdentity current after) =>
+    ArgumentView.word_below below ⟨input, 32⟩ old
+  obtain ⟨enteredFormed, formed, authority, valid, preserved⟩ :=
+    state.walk_facts original.nextIdentity
+  cil_contract_steps (snapshots := state.locals) [inputArgument, countArgument]
+  rw [kept storedLocal_1 (by assumption), kept storedLocal_2 (by assumption),
+    kept storedLocal_3 (by assumption), kept storedLocal_4 (by assumption), words.1,
+    words.2.1, words.2.2.1, words.2.2.2] at localSnapshots_5
+  exact continuation _ (state.after_stores originalCall localSnapshots_5)
 
 end UInt256Proof.Shift.Safety
