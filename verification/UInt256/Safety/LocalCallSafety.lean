@@ -61,19 +61,10 @@ theorem run_local_word_call {program : CIL.Program} {method pc callee : Nat} {bo
           after.cells id offset = current.cells id offset)) := by
     obtain ⟨fuel, after, invoked, result⟩ := effect reference slot ready
     exact ⟨fuel, (after, [.scalar (.i64 returned)]), invoked, rfl, result⟩
-  have framed := helper.frame (initial := (current, []))
-    (assertion := fun result => FrameInvariants program current result.1 ∧
-      current.nextIdentity ≤ result.1.nextIdentity)
-    ⟨FrameInvariants.refl program state.call.1.1, Nat.le_refl _⟩
-    (by
-      rintro fuel ⟨after, values⟩ invoked _
-      exact ⟨call_frame_invariants found code3 called state.call.1.1 invoked,
-        (invoke_preserves_caller_allocations program fuel callee _ values
-          current after invoked).next⟩)
-  apply WP.call found code3 called framed
-  intro after values callResult
-  obtain ⟨⟨rfl, _, loaded, authority, outside⟩, invariants, grows⟩ := callResult
-  have updated := state.after_word_call originalCall homes invariants grows
+  apply WP.call_framed found code3 called state.call.1.1 helper
+  intro after values callResult invariants allocations
+  obtain ⟨rfl, _, loaded, authority, outside⟩ := callResult
+  have updated := state.after_word_call originalCall homes invariants allocations.next
     target reference stored slot loaded authority outside
   obtain ⟨prepared, written, preparedState⟩ := updated.store enteredWF homes result resultKind returned
     (pc + 4) args rest (body := body)

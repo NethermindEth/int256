@@ -37,9 +37,7 @@ theorem scalar_indexed_borrow (contract : BorrowHelperContract Extracted.program
   · obtain ⟨index, bound⟩ := index
     have cases : index = 0 ∨ index = 1 ∨ index = 2 ∨ index = 3 := by omega
     rcases cases with rfl | rfl | rfl | rfl <;> rfl
-  · simp [step, cil_guard, observerCount, checkedValue, numericValue, formValue, fb, fr, checkedAt,
-      Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-    exact ⟨rfl, rfl, rfl⟩
+  · cil_checked_step [fb, fr]
   · exact ⟨wellFormed, incoming, borrowRead, borrowWrite, resultWrite, disjoint⟩
   · intro after output call invariants
     simpa only [borrowContract, List.append_nil] using
@@ -82,14 +80,7 @@ theorem scalar_borrow_segment_checked (contract : BorrowHelperContract Extracted
     dsimp at resultSlot leftRead rightRead tail
     simp (config := { failIfUnchanged := false }) only [CIL.fin_val_three, Nat.reduceMul] at leftRead rightRead tail
     conv in (scalarBorrowCall _) => cbv
-    repeat' first
-      | exact tail
-      | (simp (config := { failIfUnchanged := false })
-         apply run_next_exists post found (by rfl)
-         simp (config := { implicitDefEqProofs := false })
-           [step, cil_guard, observerCount, binaryArguments, checkedValue, formValue, fl, fr, fb, fo, borrowSlot, resultSlot,
-             localAddress, leftRead, rightRead, checkedAt, Except.mapError, Bind.bind, Except.bind,
-             Pure.pure, Except.pure]
-         first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)
+    cil_contract_steps [found, binaryArguments, fl, fr, fb, fo, borrowSlot, resultSlot,
+      leftRead, rightRead] until tail
 
 end UInt256Proof.Subtract.Safety

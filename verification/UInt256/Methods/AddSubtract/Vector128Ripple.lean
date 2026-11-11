@@ -141,9 +141,7 @@ theorem ripple_call {Input : Type} (contract : MethodContract Input Unit)
         .scalar (.i64 a)] memory =
       .ok (.call helper [.scalar (.i64 a), .scalar (.i64 b), .reference (.address flagHome),
         .reference (.address resultHome)] [] memory) := by
-    simp [step, cil_guard, observerCount, checkedValue, numericValue, formValue, flagFormed,
-      resultFormed, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-    try exact ⟨rfl, rfl⟩
+    cil_checked_step [flagFormed, resultFormed]
   apply run_call_of_contract_formed holds input found fetched stepped encoded.symm permitted
     wellFormed
   intro after output call kept

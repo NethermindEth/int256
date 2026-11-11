@@ -60,19 +60,10 @@ theorem run_word_call {program : CIL.Program} {wordIndex method pc : Nat} {body 
     obtain ⟨fuel, after, invoked, result⟩ :=
       contract current a b reference state.call.1.1 ready
     exact ⟨fuel, (after, [.scalar (.i64 (highProduct a b))]), invoked, rfl, result⟩
-  have framed := helper.frame (initial := (current, []))
-    (assertion := fun result => FrameInvariants program current result.1 ∧
-      current.nextIdentity ≤ result.1.nextIdentity)
-    ⟨FrameInvariants.refl program state.call.1.1, Nat.le_refl _⟩
-    (by
-      rintro fuel ⟨after, values⟩ invoked _
-      exact ⟨call_frame_invariants found fetched stepped state.call.1.1 invoked,
-        (invoke_preserves_caller_allocations program fuel wordIndex _ values
-          current after invoked).next⟩)
-  apply WP.call found fetched stepped framed
-  intro after values callResult
-  obtain ⟨⟨rfl, _, loaded, authority, outside⟩, invariants, grows⟩ := callResult
-  have updated := state.after_word_call originalCall homes invariants grows
+  apply WP.call_framed found fetched stepped state.call.1.1 helper
+  intro after values callResult invariants allocations
+  obtain ⟨rfl, _, loaded, authority, outside⟩ := callResult
+  have updated := state.after_word_call originalCall homes invariants allocations.next
     index reference (lowProduct a b) slot loaded authority
     (fun id old different offset => outside id old offset (Or.inl different))
   simpa only [List.cons_append, List.nil_append] using continuation after updated

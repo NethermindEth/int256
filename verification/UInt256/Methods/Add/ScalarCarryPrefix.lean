@@ -40,21 +40,10 @@ theorem scalar_carry_prefix (args : List Value) (frame : Frame) (before after : 
   conv in scalarSecondDecision => cbv
   have leftLoaded := load_local_word64_of_read leftRead
   have rightLoaded := load_local_word64_of_read rightRead
-  repeat'
-    first
-    | exact continuation
-    | simp (config := { failIfUnchanged := false }) [BitVec.ofNat_eq_ofNat, largeLeft]
-      apply run_next_exists post
-      · simp only [cil_code]; rfl
-      · simp only [cil_code]; rfl
-      · first
-        | ((with_reducible show step _ (.setLocal 2) _ _ _ _ _ = _); exact stored _ _)
-        | simp (config := { implicitDefEqProofs := false })
-            [cil_code, step, cil_guard, observerCount, checkedValue, numericValue, formValue, carryFormed, resultFormed,
-              leftSlot, rightSlot, carrySlot, resultSlot, leftLoaded, rightLoaded, localAddress,
-              pureArity, scalars, CIL.step, CIL.FeatureProfile.evaluate, instruction,
-              checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-          first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
+  have found : Extracted.program[Extracted.addScalarIndex]? = some Extracted.addScalarBody := by
+    simp only [cil_code]
+  cil_contract_steps [found, largeLeft, carryFormed, resultFormed, leftSlot, rightSlot,
+    carrySlot, resultSlot, leftLoaded, rightLoaded, stored, BitVec.ofNat_eq_ofNat] until continuation
 
 /-- Bind the first discovered parent call to the checked carry contract. -/
 theorem scalar_first_carry (contract : CarryHelperContract Extracted.program Extracted.addWithCarryIndex) (args : List Value) (frame : Frame) (memory : Memory)
@@ -83,9 +72,7 @@ theorem scalar_first_carry (contract : CarryHelperContract Extracted.program Ext
   · simp only [cil_code]
   · conv in scalarFirstCarryCall => cbv
     simp only [cil_code]
-  · simp [step, cil_guard, observerCount, checkedValue, numericValue, formValue, carryFormed, resultFormed,
-      checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-    exact ⟨rfl, rfl, rfl⟩
+  · cil_checked_step [carryFormed, resultFormed]
   · exact ⟨wellFormed, by simp, carryRead, carryWrite, resultWrite, disjoint⟩
   · intro after output call invariants
     simpa only [carryContract, List.append_nil] using
@@ -136,18 +123,10 @@ theorem scalar_carry_segment (segment : Fin 3) (left right output : Reference) (
   all_goals
     dsimp at leftRead rightRead resultSlot
     conv in (scalarCarryCall _) => cbv
-    repeat'
-      first
-      | exact continuation
-      | simp (config := { failIfUnchanged := false })
-        apply run_next_exists post
-        · simp only [cil_code]; rfl
-        · simp only [cil_code]; rfl
-        · simp (config := { implicitDefEqProofs := false })
-            [cil_code, step, cil_guard, observerCount, checkedValue, formValue, leftFormed, rightFormed,
-              carryFormed, resultFormed, carrySlot, resultSlot, localAddress, leftRead, rightRead,
-              pureArity, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-          first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
+    have found : Extracted.program[Extracted.addScalarIndex]? = some Extracted.addScalarBody := by
+      simp only [cil_code]
+    cil_contract_steps [found, leftFormed, rightFormed, carryFormed, resultFormed,
+      carrySlot, resultSlot, leftRead, rightRead] until continuation
 
 /-- Every discovered scalar carry call uses the checked arithmetic contract. -/
 theorem scalar_indexed_carry (contract : CarryHelperContract Extracted.program Extracted.addWithCarryIndex) (index : Fin 4) (args : List Value) (frame : Frame) (memory : Memory)
@@ -180,9 +159,7 @@ theorem scalar_indexed_carry (contract : CarryHelperContract Extracted.program E
     all_goals
       conv in (scalarCarryCall _) => cbv
       simp only [cil_code]
-  · simp [step, cil_guard, observerCount, checkedValue, numericValue, formValue, carryFormed, resultFormed,
-      checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-    exact ⟨rfl, rfl, rfl⟩
+  · cil_checked_step [carryFormed, resultFormed]
   · exact ⟨wellFormed, incoming, carryRead, carryWrite, resultWrite, disjoint⟩
   · intro after output call invariants
     simpa only [carryContract, List.append_nil] using
