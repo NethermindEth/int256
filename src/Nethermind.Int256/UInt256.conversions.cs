@@ -257,6 +257,11 @@ public readonly partial struct UInt256
             return TryParseHex(TrimWhiteSpace(value), out result);
         }
 
+        if (style == NumberStyles.None)
+        {
+            return TryParseDigits(value, out result, out _);
+        }
+
         NumberFormatInfo numberFormatInfo = NumberFormatInfo.GetInstance(provider);
         if (style == NumberStyles.Integer &&
             numberFormatInfo.PositiveSign == "+" &&
@@ -381,6 +386,25 @@ public readonly partial struct UInt256
 
         result = parsed;
         return true;
+    }
+
+    /// <summary>
+    /// Reads <see cref="NumberStyles.None"/> text from the limbs: only the digits 0-9, with trailing NUL characters
+    /// ignored as the framework parsers ignore them. Text of digits only that still fails to parse overflows 256 bits.
+    /// </summary>
+    /// <remarks>Keeps BigInteger, and its allocation, off the digits-only path.</remarks>
+    internal static bool TryParseDigits(ReadOnlySpan<char> value, out UInt256 result, out bool overflow)
+    {
+        value = value.TrimEnd('\0');
+        if (value.IsEmpty || value.ContainsAnyExceptInRange('0', '9'))
+        {
+            result = Zero;
+            overflow = false;
+            return false;
+        }
+
+        overflow = !TryParseDecimal(value, out result);
+        return !overflow;
     }
 
     private static bool TryParseHexChunk(ReadOnlySpan<char> value, ref int end, int start, out ulong chunk)
