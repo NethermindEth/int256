@@ -6,10 +6,14 @@ import CIL.Safety.StepComposition
 import CIL.Safety.CallComposition
 import CIL.Safety.ReturnMemory
 import CIL.Safety.Certificate
+import CIL.Safety.LocalSnapshotSteps
 import UInt256.Safety.CallerSetup
+import UInt256.Safety.PrivateWordAccess
+import UInt256.Safety.OutputReturn
 import UInt256.Arithmetic.Borrow
 import UInt256.Methods.Reporting.Arithmetic
 import UInt256.Methods.Multiply.LimbStorage
+import UInt256.Methods.Subtract.SafetyResult
 import CIL.Safety.WeakestPrecondition
 
 /-! Checked small-word subtraction retains saved inputs and returns the exact borrow flag. -/
@@ -31,190 +35,20 @@ open CIL.Safety UInt256Model.Safety
 def smallArguments (input output : Reference) (word : BitVec 64) : List Value :=
   [.reference (.address input), .scalar (.i64 word), .reference (.address output)]
 
-def smallWordSpecs : List (Option (BitVec 64)) := [some 0, some 0, some 0, some 0]
+/-- A value whose three upper limbs or to zero is its low limb. -/
+theorem input_small_value (memory : Memory) (reference : Reference)
+    (small : inputLimb memory reference 1 ||| inputLimb memory reference 2 |||
+      inputLimb memory reference 3 = 0) :
+    inputValue memory reference = BitVec.ofNat 256 (inputLimb memory reference 0).toNat := by
+  obtain ⟨h12, h3⟩ := BitVec.or_eq_zero_iff.mp small
+  obtain ⟨h1, h2⟩ := BitVec.or_eq_zero_iff.mp h12
+  have initial : UInt256Model.value (inputLimb memory reference) = inputValue memory reference :=
+    UInt256Proof.input_value (fun offset => (memory.cells reference.allocation offset).bits)
+      reference.offset
+  rw [← initial, ← UInt256Proof.singleLimb_eq (inputLimb memory reference) h1 h2 h3]
+  simp [UInt256Model.value, UInt256Proof.singleLimb]
 
-theorem small_frame_setup (profile : CIL.FeatureProfile) (storage : Nat) (memory : Memory) (args : List Value)
-    (wf : memory.WellFormed) :
-    ∃ frame result,
-      enterFrame (subtractSmallBody profile storage) args memory = .ok (frame, result) ∧
-      WordHomes result memory.nextIdentity smallWordSpecs frame.locals ∧
-      MemoryBelow memory.nextIdentity memory result ∧ result.WellFormed :=
-  word_frame_setup (subtractSmallBody profile storage) smallWordSpecs (by rfl) (by rfl)
-    (by rfl) (by rfl) (by rfl) memory args wf
-
-/-- A private word store retains the caller snapshot and all frame access authority. -/
-theorem small_private_store (program : CIL.Program) (profile : CIL.FeatureProfile) (storage : Nat)
-    (original entered current : CIL.Safety.Memory)
-    (input output : Reference) (word value : BitVec 64) (frame : Frame)
-    (call : CallingConditions program original [input] [output])
-    (currentCall : CallingConditions program current [input] [output])
-    (enteredWF : entered.WellFormed)
-    (homes : WordHomes entered original.nextIdentity smallWordSpecs frame.locals)
-    (preserved : MemoryBelow original.nextIdentity original current)
-    (authority : AccessBelow entered.nextIdentity entered current)
-    (index : Nat) (initial : BitVec 64)
-    (specified : smallWordSpecs[index]? = some (some initial)) :
-    ∃ reference after,
-      frame.locals[index]? = some (.bytes .word64 reference) ∧
-      read after reference 8 1 = .ok (numberBytes value.toNat 8) ∧
-      MemoryBelow original.nextIdentity original after ∧
-      CallingConditions program after [input] [output] ∧
-      AccessBelow entered.nextIdentity entered after ∧
-      write current reference (numberBytes value.toNat 8) 1 = .ok after ∧
-      ∀ pc rest, step (subtractSmallBody profile storage) (.setLocal index) pc
-        (smallArguments input output word) frame (.scalar (.i64 value) :: rest) current =
-          .ok (.next (pc + 1) rest frame after) := by
-  obtain ⟨reference, slot, bound, _, writable⟩ := homes.word_at index initial specified
-  obtain ⟨allocation, ready⟩ := access_requirements writable
-  have old := (enteredWF.1 reference.allocation allocation ready.present).1
-  have permitted := authority.access writable old
-  obtain ⟨after, written, _, loaded, _⟩ := store_local_word64 value permitted
-  have caller := preserved.trans (write_preserves_memory_below _ _ _ _ _ _ bound written)
-  have afterWF := write_preserves_wellFormed _ _ _ _ _ currentCall.1.1 written
-  have afterWorld := write_preserves_static_world _ _ _ _ _ _ currentCall.2 written
-  refine ⟨reference, after, slot, loaded, caller,
-    call.after_memory_below caller afterWF afterWorld,
-    authority.trans (write_preserves_access_below written _), written, ?_⟩
-  intro pc rest
-  obtain ⟨result, stepped, sameWrite, _⟩ := step_store_word64_same_frame
-    (body := subtractSmallBody profile storage) (pc := pc)
-    (args := smallArguments input output word) (rest := rest) value slot permitted
-  rw [written] at sameWrite
-  cases sameWrite
-  exact stepped
-
-theorem small_input_spec (i : Fin 4) : smallWordSpecs[i.val]? = some (some 0) := by
-  obtain ⟨i, bound⟩ := i
-  have cases : i = 0 ∨ i = 1 ∨ i = 2 ∨ i = 3 := by omega
-  rcases cases with rfl | rfl | rfl | rfl <;> rfl
-
-def smallSavedWord (original : Memory) (input : Reference) (word : BitVec 64) (i : Fin 4) : BitVec 64 :=
-  if h : i.val < 3 then inputLimb original input ⟨i.val + 1, by omega⟩ else inputLimb original input 0 - word
-
-structure SmallSaved (program : CIL.Program) (original entered current : CIL.Safety.Memory)
-    (input output : Reference) (word : BitVec 64) (slots : List LocalSlot) (done : Nat) : Prop where
-  call : CallingConditions program current [input] [output]
-  preserved : MemoryBelow original.nextIdentity original current
-  authority : AccessBelow entered.nextIdentity entered current
-  completed : ∀ i : Fin 4, i.val < done → ∃ reference,
-    slots[i.val]? = some (.bytes .word64 reference) ∧ reference.allocation < entered.nextIdentity ∧
-      read current reference 8 1 = .ok (numberBytes (smallSavedWord original input word i).toNat 8)
-
-theorem SmallSaved.save {program : CIL.Program} {profile : CIL.FeatureProfile} {storage : Nat}
-    {original entered current : CIL.Safety.Memory}
-    {input output : Reference} {word : BitVec 64} {frame : Frame}
-    (index : Fin 4)
-    (state : SmallSaved program original entered current input output word frame.locals index.val)
-    (call : CallingConditions program original [input] [output])
-    (enteredWF : entered.WellFormed)
-    (homes : WordHomes entered original.nextIdentity smallWordSpecs frame.locals) :
-    ∃ after, SmallSaved program original entered after input output word frame.locals (index.val + 1) ∧
-      ∀ pc rest, step (subtractSmallBody profile storage) (.setLocal index.val) pc
-        (smallArguments input output word) frame
-        (.scalar (.i64 (smallSavedWord original input word index)) :: rest) current =
-          .ok (.next (pc + 1) rest frame after) := by
-  obtain ⟨reference, after, fullSlot, loaded, preserved, afterCall, authority, written, stepped⟩ :=
-    small_private_store program profile storage original entered current input output word
-      (smallSavedWord original input word index)
-      frame call state.call enteredWF homes state.preserved state.authority
-      index.val 0 (small_input_spec index)
-  have slot := fullSlot
-  obtain ⟨home, homeSlot, _, _, writable⟩ := homes.word_at index.val 0 (small_input_spec index)
-  have same : home = reference := by rw [slot] at homeSlot; simpa using homeSlot.symm
-  subst home
-  obtain ⟨allocation, ready⟩ := access_requirements writable
-  have old := (enteredWF.1 _ _ ready.present).1
-  refine ⟨after, ⟨afterCall, preserved, authority, ?_⟩, stepped⟩
-  intro i saved
-  by_cases equal : i = index
-  · subst i
-    exact ⟨reference, slot, old, loaded⟩
-  · have earlier : i.val < index.val := by
-      have different : i.val ≠ index.val := fun h => equal (Fin.ext h)
-      omega
-    obtain ⟨previous, previousSlot, previousOld, previousRead⟩ := state.completed i earlier
-    have different := Nat.ne_of_lt (homes.ordered i.val index.val previous reference earlier previousSlot slot)
-    refine ⟨previous, previousSlot, previousOld,
-      (write_preserves_access_below written entered.nextIdentity).read_eq previousRead previousOld ?_⟩
-    intro offset _
-    exact write_word_outside written _ _ (Or.inl different)
-
-/-- Save the upper limbs and the low difference, keeping the low limb for the first borrow test. -/
-theorem small_input_prefix_checked (program : CIL.Program) (method storage : Nat) (profile : CIL.FeatureProfile)
-    (found : program[method]? = some (subtractSmallBody profile storage)) (original entered : Memory)
-    (input output : Reference) (word : BitVec 64) (frame : Frame)
-    (call : CallingConditions program original [input] [output])
-    (setup : enterFrame (subtractSmallBody profile storage) (smallArguments input output word) original =
-      .ok (frame, entered))
-    (homes : WordHomes entered original.nextIdentity smallWordSpecs frame.locals)
-    (post : Memory → List Value → Prop)
-    (continuation : ∀ after, SmallSaved program original entered after input output word frame.locals 4 →
-      WP (Execution (fun fuel => run program fuel method 16 (smallArguments input output word) frame
-          [.scalar (.i64 word), .scalar (.i64 (inputLimb original input 0))] after)) (Function.uncurry post)) :
-    WP (Execution (fun fuel => run program fuel method 0
-      (smallArguments input output word) frame [] entered)) (Function.uncurry post) := by
-  have enteredCall := call.after_frame_setup setup
-  have initial : SmallSaved program original entered entered input output word frame.locals 0 :=
-    ⟨enteredCall, enterFrame_preserves_caller_memory _ _ _ _ _ setup,
-      (MemoryBelow.refl entered.nextIdentity entered).accessBelow, by intro i impossible; omega⟩
-  obtain ⟨first, saved1, step0⟩ := initial.save (profile := profile) (storage := storage) 0 call enteredCall.1.1 homes
-  obtain ⟨second, saved2, step1⟩ := saved1.save (profile := profile) (storage := storage) 1 call enteredCall.1.1 homes
-  obtain ⟨third, saved3, step2⟩ := saved2.save (profile := profile) (storage := storage) 2 call enteredCall.1.1 homes
-  obtain ⟨fourth, saved4, step3⟩ := saved3.save (profile := profile) (storage := storage) 3 call enteredCall.1.1 homes
-  have done := continuation fourth saved4
-  have f0 := enteredCall.input_formed (reference := input) (by simp)
-  have f1 := saved1.call.input_formed (reference := input) (by simp)
-  have f2 := saved2.call.input_formed (reference := input) (by simp)
-  have r0 := call.input_field_after_setup setup (by simp : input ∈ [input]) 0
-  have r1 := call.input_field_after_setup setup (by simp : input ∈ [input]) 1
-  simp only [Fin.val_zero, Fin.val_one, Nat.reduceMul] at r0 r1
-  have r2 (rest : List Value) : instruction (.fieldAt 16 8) (.reference (.address input) :: rest) first =
-      .ok (first, .scalar (.i64 (inputLimb original input 2)) :: rest) := by
-    have field := saved1.call.input_field_instruction (reference := input) (by simp) 2 rest
-    simp only [Fin.val_two, CIL.fin_val_three, Nat.reduceMul] at field
-    rw [field]
-    simp only [inputLimb, call.input_bytes_of_memory_below saved1.preserved (reference := input) (by simp)]
-  have r3 (rest : List Value) : instruction (.fieldAt 24 8) (.reference (.address input) :: rest) second =
-      .ok (second, .scalar (.i64 (inputLimb original input 3)) :: rest) := by
-    have field := saved2.call.input_field_instruction (reference := input) (by simp) 3 rest
-    simp only [Fin.val_two, CIL.fin_val_three, Nat.reduceMul] at field
-    rw [field]
-    simp only [inputLimb, call.input_bytes_of_memory_below saved2.preserved (reference := input) (by simp)]
-  simp only [smallSavedWord, Fin.val_zero, Fin.val_one, Fin.val_two, CIL.fin_val_three,
-    Nat.reduceLT, ↓reduceDIte, Nat.reduceAdd] at step0 step1 step2 step3
-  have a0 : (smallArguments input output word)[0]? = some (.reference (.address input)) := rfl
-  refine WP.step (post := Function.uncurry post) found rfl
-    (by simp only [step_argument_eq, a0, checkedValue_address _ _ f0]; rfl) ?_
-  refine WP.step (post := Function.uncurry post) found rfl
-    (by simp only [step_fieldAt_eq, instructionStep, r0]; rfl) ?_
-  refine WP.step (post := Function.uncurry post) found rfl
-    (by simp only [step_argument_eq, a0, checkedValue_address _ _ f0]; rfl) ?_
-  refine WP.step (post := Function.uncurry post) found rfl
-    (by simp only [step_fieldAt_eq, instructionStep, r1]; rfl) ?_
-  refine WP.step (post := Function.uncurry post) found rfl (step0 _ _) ?_
-  refine WP.step (post := Function.uncurry post) found rfl
-    (by simp only [step_argument_eq, a0, checkedValue_address _ _ f1]; rfl) ?_
-  refine WP.step (post := Function.uncurry post) found rfl
-    (by simp only [step_fieldAt_eq, instructionStep, r2]; rfl) ?_
-  refine WP.step (post := Function.uncurry post) found rfl (step1 _ _) ?_
-  refine WP.step (post := Function.uncurry post) found rfl
-    (by simp only [step_argument_eq, a0, checkedValue_address _ _ f2]; rfl) ?_
-  refine WP.step (post := Function.uncurry post) found rfl
-    (by simp only [step_fieldAt_eq, instructionStep, r3]; rfl) ?_
-  refine WP.step (post := Function.uncurry post) found rfl (step2 _ _) ?_
-  refine WP.step (post := Function.uncurry post) found rfl rfl ?_
-  refine WP.step (post := Function.uncurry post) found rfl rfl ?_
-  refine WP.step (post := Function.uncurry post) found rfl rfl ?_
-  refine WP.step (post := Function.uncurry post) found rfl (step3 _ _) ?_
-  refine WP.step (post := Function.uncurry post) found rfl rfl ?_
-  exact done
-
-end UInt256Proof.Subtract.Profile
-
-
-namespace UInt256Proof.Subtract.Profile
-open CIL.Safety
-
+/-- The pc of the limb-store call that ends each borrow exit. -/
 def smallStoreCall : Nat → Nat
   | 0 => 22
   | 1 => 35
@@ -240,78 +74,14 @@ def smallSelectedBranch (words : Fin 4 → BitVec 64) (word : BitVec 64) : Fin 5
   if ¬ words 0 < word then 0 else if words 1 ≠ 0 then 1 else
     if words 2 ≠ 0 then 2 else if words 3 ≠ 0 then 3 else 4
 
-/-- Follow all five branch endings from the saved words to the store call with the specified limbs. -/
-theorem small_branch_prefix (program : CIL.Program) (method storage : Nat) (profile : CIL.FeatureProfile)
-    (found : program[method]? = some (subtractSmallBody profile storage))
-    (input output : Reference) (word : BitVec 64)
-    (frame : Frame) (memory : Memory) (homes : Fin 4 → Reference) (words : Fin 4 → BitVec 64)
-    (formed : form memory output = .ok output)
-    (slots : ∀ i : Fin 4, frame.locals[i.val]? = some (.bytes .word64 (homes i)))
-    (reads : ∀ i, read memory (homes i) 8 1 = .ok (numberBytes
-      (if h : i.val < 3 then words ⟨i.val + 1, by omega⟩ else words 0 - word).toNat 8))
-    (post : Memory → List Value → Prop)
-    (continuation : WP (Execution (fun fuel => run program fuel method
-        (smallStoreCall (smallSelectedBranch words word).val) (smallArguments input output word) frame
-        [.scalar (.i64 (smallDifference words word 3)), .scalar (.i64 (smallDifference words word 2)),
-         .scalar (.i64 (smallDifference words word 1)), .scalar (.i64 (smallDifference words word 0)),
-         .reference (.address output)] memory)) (Function.uncurry post)) :
-    WP (Execution (fun fuel => run program fuel method 16
-        (smallArguments input output word) frame [.scalar (.i64 word), .scalar (.i64 (words 0))]
-        memory)) (Function.uncurry post) := by
-  have s0 := slots 0
-  have s1 := slots 1
-  have s2 := slots 2
-  have s3 := slots 3
-  have r0 := load_local_word64_of_read (reads 0)
-  have r1 := load_local_word64_of_read (reads 1)
-  have r2 := load_local_word64_of_read (reads 2)
-  have r3 := load_local_word64_of_read (reads 3)
-  simp only [Fin.val_zero, Fin.val_one, Fin.val_two, CIL.fin_val_three,
-    Nat.reduceLT, ↓reduceDIte, Nat.reduceAdd] at s0 s1 s2 s3 r0 r1 r2 r3
-  have a2 : (smallArguments input output word)[2]? = some (.reference (.address output)) := rfl
-  by_cases h0 : words 0 < word
-  · refine WP.step (post := Function.uncurry post) found rfl (by cil_checked_step [h0]) ?_
-    refine WP.step (post := Function.uncurry post) found rfl
-      (by simp only [step_local_eq, s0, r0]; rfl) ?_
-    by_cases h1 : words 1 = 0
-    · refine WP.step (post := Function.uncurry post) found rfl (by cil_checked_step [h1]) ?_
-      refine WP.step (post := Function.uncurry post) found rfl
-        (by simp only [step_local_eq, s1, r1]; rfl) ?_
-      by_cases h2 : words 2 = 0
-      · refine WP.step (post := Function.uncurry post) found rfl (by cil_checked_step [h2]) ?_
-        refine WP.step (post := Function.uncurry post) found rfl
-          (by simp only [step_local_eq, s2, r2]; rfl) ?_
-        by_cases h3 : words 3 = 0
-        · refine WP.step (post := Function.uncurry post) found rfl (by cil_checked_step [h3]) ?_
-          cil_contract_steps [found, a2, formed, s0, s1, s2, s3, r0, r1, r2, r3]
-          simp only [smallSelectedBranch, smallDifference, smallStoreCall, Fin.val_zero, Fin.val_one, Fin.val_two,
-              CIL.fin_val_three, Nat.reduceEqDiff, ne_eq, h0, h1, h2, h3, not_true_eq_false, and_true,
-              ↓reduceIte] at continuation
-          exact WP.adequate.mp continuation
-        · refine WP.step (post := Function.uncurry post) found rfl (by cil_checked_step [h3]) ?_
-          cil_contract_steps [found, a2, formed, s0, s1, s2, s3, r0, r1, r2, r3]
-          simp only [smallSelectedBranch, smallDifference, smallStoreCall, Fin.val_zero, Fin.val_one, Fin.val_two,
-              CIL.fin_val_three, Nat.reduceEqDiff, ne_eq, h0, h1, h2, h3, not_false_eq_true, not_true_eq_false, and_true,
-              ↓reduceIte] at continuation
-          exact WP.adequate.mp continuation
-      · refine WP.step (post := Function.uncurry post) found rfl (by cil_checked_step [h2]) ?_
-        cil_contract_steps [found, a2, formed, s0, s1, s2, s3, r0, r1, r2, r3]
-        simp only [smallSelectedBranch, smallDifference, smallStoreCall, Fin.val_zero, Fin.val_one, Fin.val_two,
-            CIL.fin_val_three, Nat.reduceEqDiff, ne_eq, h0, h1, h2, not_false_eq_true, not_true_eq_false, and_true,
-            and_false, ↓reduceIte] at continuation
-        exact WP.adequate.mp continuation
-    · refine WP.step (post := Function.uncurry post) found rfl (by cil_checked_step [h1]) ?_
-      cil_contract_steps [found, a2, formed, s0, s1, s2, s3, r0, r1, r2, r3]
-      simp only [smallSelectedBranch, smallDifference, smallStoreCall, Fin.val_zero, Fin.val_one, Fin.val_two,
-          CIL.fin_val_three, Nat.reduceEqDiff, ne_eq, h0, h1, not_false_eq_true, not_true_eq_false,
-          and_false, ↓reduceIte] at continuation
-      exact WP.adequate.mp continuation
-  · refine WP.step (post := Function.uncurry post) found rfl (by cil_checked_step [h0]) ?_
-    cil_contract_steps [found, a2, formed, s0, s1, s2, s3, r0, r1, r2, r3]
-    simp only [smallSelectedBranch, smallDifference, smallStoreCall, Fin.val_zero, Fin.val_one, Fin.val_two,
-        CIL.fin_val_three, Nat.reduceEqDiff, h0, not_false_eq_true,
-        ↓reduceIte] at continuation
-    exact WP.adequate.mp continuation
+/-- The comparisons that select each of the five borrow exits, in exit order. -/
+theorem small_exit_cases (words : Fin 4 → BitVec 64) (word : BitVec 64) :
+    ¬ words 0 < word ∨ (words 0 < word ∧ ¬ words 1 = 0) ∨
+      (words 0 < word ∧ words 1 = 0 ∧ ¬ words 2 = 0) ∨
+      (words 0 < word ∧ words 1 = 0 ∧ words 2 = 0 ∧ ¬ words 3 = 0) ∨
+      (words 0 < word ∧ words 1 = 0 ∧ words 2 = 0 ∧ words 3 = 0) := by
+  by_cases h0 : words 0 < word <;> by_cases h1 : words 1 = 0 <;>
+    by_cases h2 : words 2 = 0 <;> by_cases h3 : words 3 = 0 <;> simp_all
 
 theorem small_selected_flag (words : Fin 4 → BitVec 64) (word : BitVec 64) :
     smallBranchFlag (smallSelectedBranch words word) =
@@ -320,11 +90,6 @@ theorem small_selected_flag (words : Fin 4 → BitVec 64) (word : BitVec 64) :
     by_cases h2 : words 2 = BitVec.ofNat 64 0 <;> by_cases h3 : words 3 = BitVec.ofNat 64 0 <;>
     simp [BitVec.ofNat_eq_ofNat, smallBranchFlag, smallSelectedBranch, h0, h1, h2, h3,
       show (3 : Fin 5).val = 3 from rfl, show (4 : Fin 5).val = 4 from rfl]
-
-end UInt256Proof.Subtract.Profile
-
-namespace UInt256Proof.Subtract.Profile
-open CIL.Safety UInt256Model.Safety
 
 structure SmallResult (original final : Memory) (values : List Value)
     (input output : Reference) (word : BitVec 64) : Prop where
@@ -335,64 +100,8 @@ structure SmallResult (original final : Memory) (values : List Value)
   footprint : ∀ id, id < original.nextIdentity → ∀ offset, OutsideOutput output id offset →
     final.cells id offset = original.cells id offset
 
-/-- Every small-operand branch stores through the checked limb helper and keeps caller bytes. -/
-theorem small_finish (program : CIL.Program) (method storage : Nat) (profile : CIL.FeatureProfile)
-    (found : program[method]? = some (subtractSmallBody profile storage))
-    (storageFound : program[storage]? = some (UInt256Proof.Multiply.LimbStorage.body profile))
-    (original entered current : Memory) (frame : Frame)
-    (input output : Reference) (word : BitVec 64)
-    (call : CallingConditions program original [input] [output])
-    (setup : enterFrame (subtractSmallBody profile storage) (smallArguments input output word) original =
-      .ok (frame, entered))
-    (state : SmallSaved program original entered current input output word frame.locals 4) :
-    ∃ fuel final values,
-      run program fuel method 16
-        (smallArguments input output word) frame [.scalar (.i64 word), .scalar (.i64 (inputLimb original input 0))]
-        current = .ok (final, values) ∧ SmallResult original final values input output word := by
-  let words := smallDifference (inputLimb original input) word
-  let branch := smallSelectedBranch (inputLimb original input) word
-  let post := fun final values => SmallResult original final values input output word
-  have candidates := fun i : Fin 4 => state.completed i i.isLt
-  let homes : Fin 4 → Reference := fun i => Classical.choose (candidates i)
-  have facts := fun i => Classical.choose_spec (candidates i)
-  have formed := state.call.output_formed (by simp : output ∈ [output])
-  apply WP.exists_execution
-  apply small_branch_prefix program method storage profile found input output word frame current homes
-    (inputLimb original input) formed (fun i => (facts i).1) (fun i => (facts i).2.2) post
-  obtain ⟨childFuel, stored, invoked, valid, outside, authority, value, _⟩ :=
-    UInt256Proof.Multiply.LimbStorage.store_limbs_readable_contract profile program storage storageFound
-      current [input] output (words 0) (words 1) (words 2) (words 3) state.call
-  have fetched : (subtractSmallBody profile storage).code[smallStoreCall branch.val]? = some (.call storage 5) := by
-    obtain ⟨branch, bound⟩ := branch
-    have cases : branch = 0 ∨ branch = 1 ∨ branch = 2 ∨ branch = 3 ∨ branch = 4 := by omega
-    rcases cases with rfl | rfl | rfl | rfl | rfl <;> rfl
-  have stepped : step (subtractSmallBody profile storage) (.call storage 5) (smallStoreCall branch.val)
-      (smallArguments input output word) frame
-      [.scalar (.i64 (words 3)), .scalar (.i64 (words 2)), .scalar (.i64 (words 1)),
-        .scalar (.i64 (words 0)), .reference (.address output)] current =
-      .ok (.call storage (UInt256Proof.Multiply.LimbStorage.arguments output (words 0) (words 1) (words 2) (words 3)) [] current) := by
-    cil_checked_step [UInt256Proof.Multiply.LimbStorage.arguments, formed]
-  have returned := small_return program method storage profile found branch (smallArguments input output word) frame stored
-  apply WP.adequate.mpr
-  apply run_call_post found fetched stepped ⟨childFuel, invoked⟩
-  refine ⟨2, leaveFrame frame stored, _, returned, ?_⟩
-  obtain ⟨allocation, present, _, _⟩ := formed_reference_live _ _ _
-    (call.output_formed (by simp : output ∈ [output]))
-  have old := (call.1.1.1 _ _ present).1
-  have fresh := enterFrame_fresh _ _ _ _ _ setup
-  have retained := leaveFrame_preserves_memory_below frame stored original.nextIdentity
-    (fun id member => (fresh.2 id member).1)
-  have bytes : (fun offset => ((leaveFrame frame stored).cells output.allocation offset).bits) =
-      (fun offset => (stored.cells output.allocation offset).bits) := by
-    funext offset
-    rw [retained.cells output.allocation old offset]
-  refine ⟨leaveFrame_preserves_wellFormed _ _ valid.1.1, ?_, rfl, ?_, ?_⟩
-  · simpa only [inputValue, bytes, UInt256Model.value] using value
-  · exact (retained.access output old 32 1 true).trans (valid.1.writable (wordView output) (by simp))
-  · intro id earlier offset untouched
-    exact (retained.cells id earlier offset).trans
-      ((outside id offset untouched).trans (state.preserved.cells id earlier offset))
-
+/-- Save the upper limbs and the low difference, follow the selected borrow exit, and store
+    through the checked limb helper; the retired frame keeps every other caller byte. -/
 theorem small_checked (program : CIL.Program) (method storage : Nat) (profile : CIL.FeatureProfile)
     (found : program[method]? = some (subtractSmallBody profile storage))
     (storageFound : program[storage]? = some (UInt256Proof.Multiply.LimbStorage.body profile))
@@ -401,22 +110,83 @@ theorem small_checked (program : CIL.Program) (method storage : Nat) (profile : 
     ∃ fuel final values,
       InvocationCertificate program method (smallArguments input output word) memory fuel final values ∧
       SmallResult memory final values input output word := by
-  obtain ⟨frame, entered, setup, homes, _, _⟩ :=
-    small_frame_setup profile storage memory (smallArguments input output word) call.1.1
-  obtain ⟨fuel, final, values, finished, satisfied⟩ := WP.exists_execution (small_input_prefix_checked program method storage profile found
-    memory entered input output word frame call setup homes (fun final values => SmallResult memory final values input output word)
-    (fun current state => WP.adequate.mpr (small_finish program method storage profile found storageFound memory entered current frame
-      input output word call setup state)))
+  let post := fun final values => SmallResult memory final values input output word
+  obtain ⟨frame, entered, setup, numeric, _, enteredWF⟩ :=
+    numeric_frame_setup (subtractSmallBody profile storage)
+      (List.replicate 4 ⟨.word64, .i64 0, 0, rfl⟩) rfl rfl rfl rfl rfl memory
+      (smallArguments input output word) call.1.1
+  have homes := numeric.complete
+  have owned : ∀ id ∈ frame.owned, memory.nextIdentity ≤ id :=
+    fun id member => ((enterFrame_fresh _ _ _ _ _ setup).2 id member).1
+  have initial := PrivateWords.initial call setup
+  obtain ⟨_, store0, saved1⟩ := initial.store enteredWF homes 0 (by rfl)
+    (inputLimb memory input 1) 4 (smallArguments input output word)
+    [.scalar (.i64 (inputLimb memory input 0))] (body := subtractSmallBody profile storage)
+  obtain ⟨_, store1, saved2⟩ := saved1.store enteredWF homes 1 (by rfl)
+    (inputLimb memory input 2) 7 (smallArguments input output word)
+    [.scalar (.i64 (inputLimb memory input 0))] (body := subtractSmallBody profile storage)
+  obtain ⟨_, store2, saved3⟩ := saved2.store enteredWF homes 2 (by rfl)
+    (inputLimb memory input 3) 10 (smallArguments input output word)
+    [.scalar (.i64 (inputLimb memory input 0))] (body := subtractSmallBody profile storage)
+  obtain ⟨current, store3, state⟩ := saved3.store enteredWF homes 3 (by rfl)
+    (inputLimb memory input 0 - word) 14 (smallArguments input output word)
+    [.scalar (.i64 (inputLimb memory input 0))] (body := subtractSmallBody profile storage)
+  have formed := state.call.output_formed (by simp : output ∈ [output])
+  have exit : WP (Execution (fun fuel => run program fuel method
+      (smallStoreCall (smallSelectedBranch (inputLimb memory input) word).val)
+      (smallArguments input output word) frame
+      [.scalar (.i64 (smallDifference (inputLimb memory input) word 3)),
+        .scalar (.i64 (smallDifference (inputLimb memory input) word 2)),
+        .scalar (.i64 (smallDifference (inputLimb memory input) word 1)),
+        .scalar (.i64 (smallDifference (inputLimb memory input) word 0)),
+        .reference (.address output)] current)) (Function.uncurry post) := by
+    obtain ⟨childFuel, stored, invoked, valid, outside, _, value, readable⟩ :=
+      UInt256Proof.Multiply.LimbStorage.store_limbs_readable_contract profile program storage
+        storageFound current [input] output _ _ _ _ state.call
+    have fetched : ∀ branch : Fin 5, (subtractSmallBody profile storage).code[
+        smallStoreCall branch.val]? = some (.call storage 5) := by
+      rintro ⟨branch, bound⟩
+      have cases : branch = 0 ∨ branch = 1 ∨ branch = 2 ∨ branch = 3 ∨ branch = 4 := by omega
+      rcases cases with rfl | rfl | rfl | rfl | rfl <;> rfl
+    have retired := output_result_of_storage memory current stored [input] output _ frame call
+      valid owned state.caller value readable outside
+    exact WP.adequate.mpr (run_call_post found (fetched _)
+      (by cil_checked_step [UInt256Proof.Multiply.LimbStorage.arguments, formed])
+      ⟨childFuel, invoked⟩
+      ⟨2, _, _, small_return program method storage profile found _ _ frame stored,
+        retired.wellFormed, retired.value, rfl, retired.writable, retired.footprint⟩)
+  have branches : WP (Execution (fun fuel => run program fuel method 16
+      (smallArguments input output word) frame
+      [.scalar (.i64 word), .scalar (.i64 (inputLimb memory input 0))] current))
+      (Function.uncurry post) := by
+    have snapshots := state.snapshots.toLocalSnapshots
+    rcases small_exit_cases (inputLimb memory input) word with taken | taken | taken | taken | taken
+
+    all_goals
+      simp only [smallSelectedBranch, smallDifference, smallStoreCall, Fin.val_zero, Fin.val_one,
+        Fin.val_two, CIL.fin_val_three, Nat.reduceEqDiff, ne_eq, taken, not_true_eq_false,
+        not_false_eq_true, and_true, and_false, ↓reduceIte] at exit
+      cil_contract_steps (snapshots := snapshots) [smallArguments, formed, taken]
+      exact WP.adequate.mp exit
+  have started : ∃ fuel final values,
+      run program fuel method 0 (smallArguments input output word) frame [] entered =
+        .ok (final, values) ∧ post final values := by
+    cil_contract_steps [found, smallArguments,
+      initial.call.input_formed (reference := input) (by simp),
+      saved1.call.input_formed (reference := input) (by simp),
+      saved2.call.input_formed (reference := input) (by simp),
+      initial.input_field call input (by simp) 0, initial.input_field call input (by simp) 1,
+      saved1.input_field call input (by simp) 2, saved2.input_field call input (by simp) 3,
+      store0, store1, store2, store3] until branches
+  obtain ⟨fuel, final, values, finished, satisfied⟩ := started
   have checked : (smallArguments input output word).mapM (checkedValue memory) =
       .ok (smallArguments input output word) := by
     have fi := call.input_formed (reference := input) (by simp)
     have fo := call.output_formed (reference := output) (by simp)
     simp [smallArguments, checkedValue, numericValue, formValue, fi, fo, checkedAt,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-  have live := checked_entry_live_state _ _ _ _ _ _ _ call.1.1 call.2 checked setup
   exact ⟨fuel, final, values,
-    certify_invocation program method _ _ memory frame entered fuel final values found checked setup live finished,
-    satisfied⟩
+    .of_run call.1.wellFormed call.2 found checked setup finished, satisfied⟩
 
 /-- Arithmetic is stated over the initial input, independently of the extracted algorithm. -/
 theorem SmallResult.modular_difference {original final : Memory} {values : List Value}
@@ -442,5 +212,60 @@ theorem SmallResult.underflow {original final : Memory} {values : List Value}
   have flag := UInt256Proof.Reporting.small_underflow_iff (inputLimb original input) word
   rw [originalValue, scalarValue] at flag
   simpa only [small_selected_flag, flag] using result.flag
+
+end UInt256Proof.Subtract.Profile
+
+namespace UInt256Proof.Subtract.Profile
+open CIL.Safety UInt256Model.Safety UInt256Proof.Subtract.Safety
+
+/-- Subtracting a right operand of one limb through the small helper is the full subtraction. -/
+theorem SmallResult.as_subtract {original current final : Memory} {values : List Value}
+    {left right output : Reference}
+    (result : SmallResult current final values left output (inputLimb original right 0))
+    (keptRight : inputValue current right = inputValue original right)
+    (small : inputLimb original right 1 ||| inputLimb original right 2 |||
+      inputLimb original right 3 = 0) :
+    SubtractResult current final values left right output := by
+  have wide : (inputLimb original right 0).toNat < 2^256 :=
+    Nat.lt_trans (inputLimb original right 0).isLt (by decide)
+  refine ⟨result.wellFormed, ?_, ?_, result.writable, result.footprint⟩
+  · rw [result.modular_difference, keptRight, input_small_value original right small]
+  · rw [result.underflow]
+    simp only [subtractUnderflow, keptRight, input_small_value original right small,
+      BitVec.toNat_ofNat, Nat.mod_eq_of_lt wide]
+
+/-- A child result over current caller bytes is the parent result over the original bytes. -/
+theorem subtract_result_retire {program : CIL.Program} {original current final : Memory}
+    {frame : Frame} {left right output : Reference} {returned : List Value}
+    (call : CallingConditions program original [left, right] [output])
+    (caller : ∀ id, id < original.nextIdentity → ∀ offset,
+      current.cells id offset = original.cells id offset)
+    (next : original.nextIdentity ≤ current.nextIdentity)
+    (owned : ∀ id ∈ frame.owned, original.nextIdentity ≤ id)
+    (result : SubtractResult current final returned left right output) :
+    SubtractResult original (leaveFrame frame final) returned left right output := by
+  have kept : ∀ reference ∈ [left, right],
+      inputValue current reference = inputValue original reference := by
+    intro reference member
+    obtain ⟨allocation, present, _, _⟩ := formed_reference_live _ _ _ (call.input_formed member)
+    simp only [inputValue, caller reference.allocation (call.1.1.1 _ _ present).1]
+  have retained := leaveFrame_preserves_memory_below frame final original.nextIdentity owned
+  obtain ⟨allocation, present, _, _⟩ :=
+    formed_reference_live _ _ _ (call.output_formed (by simp : output ∈ [output]))
+  have old := (call.1.1.1 _ _ present).1
+  have bytes : (fun offset => ((leaveFrame frame final).cells output.allocation offset).bits) =
+      (fun offset => (final.cells output.allocation offset).bits) := by
+    funext offset
+    rw [retained.cells output.allocation old offset]
+  refine ⟨leaveFrame_preserves_wellFormed _ _ result.wellFormed, ?_, ?_,
+    (retained.access output old 32 1 true).trans result.writable, ?_⟩
+  · have math := result.value
+    rw [kept left (by simp), kept right (by simp)] at math
+    simpa only [inputValue, bytes] using math
+  · rw [result.flag]
+    simp only [subtractUnderflow, kept left (by simp), kept right (by simp)]
+  · intro id bound offset outside
+    exact (retained.cells id bound offset).trans ((result.footprint id
+      (Nat.lt_of_lt_of_le bound next) offset outside).trans (caller id bound offset))
 
 end UInt256Proof.Subtract.Profile

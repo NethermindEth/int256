@@ -1,6 +1,8 @@
 import UInt256.Methods.Subtract.BorrowContract
 import UInt256.Methods.Subtract.ScalarSafetySetup
 
+/-! The borrow-helper call sites of the extracted scalar body and their checked contract call. -/
+
 namespace UInt256Proof.Subtract.Safety
 open CIL.Safety UInt256Model.Safety UInt256Proof.Subtract.Profile
 
@@ -42,45 +44,5 @@ theorem scalar_indexed_borrow (contract : BorrowHelperContract Extracted.program
   · intro after output call invariants
     simpa only [borrowContract, List.append_nil] using
       continuation after invariants.formed invariants.staticWorld call.framed call.post
-
-theorem scalar_borrow_segment_checked (contract : BorrowHelperContract Extracted.program Extracted.subtractWithBorrowIndex) (segment : Fin 3) (left right output : Reference)
-    (frame : Frame) (memory : Memory) (c : BitVec 64) (borrowHome resultHome : Reference)
-    (call : CallingConditions Extracted.program memory [left, right] [output])
-    (borrowSlot : frame.locals[1]? = some (.bytes .word64 borrowHome))
-    (resultSlot : frame.locals[segment.val + 3]? = some (.bytes .word64 resultHome))
-    (incoming : c.toNat ≤ 1) (borrowRead : read memory borrowHome 8 1 = .ok (numberBytes c.toNat 8))
-    (borrowWrite : access memory borrowHome 8 1 true = .ok ())
-    (resultWrite : access memory resultHome 8 1 true = .ok ()) (disjoint : WordsDisjoint borrowHome resultHome)
-    (post : Memory → List Value → Prop)
-    (continuation : ∀ after, after.WellFormed →
-      (StaticWorldPreserved Extracted.program memory after) →
-      Confined [(borrowHome, 8), (resultHome, 8)] memory after →
-      BorrowPost (inputLimb memory left ⟨segment.val + 1, by omega⟩)
-        (inputLimb memory right ⟨segment.val + 1, by omega⟩) c borrowHome resultHome after →
-      ∃ fuel result returned,
-        run Extracted.program fuel scalarIndex (scalarBorrowCall (segment.val + 1) + 1)
-          (binaryArguments left right output) frame [] after = .ok (result, returned) ∧ post result returned) :
-    ∃ fuel result returned,
-      run Extracted.program fuel scalarIndex (scalarBorrowCall segment.val + 1)
-        (binaryArguments left right output) frame [] memory = .ok (result, returned) ∧ post result returned := by
-  have tail := scalar_indexed_borrow contract ⟨segment.val + 1, by omega⟩ (binaryArguments left right output) frame memory
-    (inputLimb memory left ⟨segment.val + 1, by omega⟩) (inputLimb memory right ⟨segment.val + 1, by omega⟩)
-    c borrowHome resultHome call.1.1 incoming borrowRead borrowWrite resultWrite disjoint post continuation
-  have fl := call.input_formed (reference := left) (by simp)
-  have fr := call.input_formed (reference := right) (by simp)
-  have fb := access_reference_valid _ _ _ _ _ borrowWrite
-  have fo := access_reference_valid _ _ _ _ _ resultWrite
-  have leftRead := call.input_field_instruction (by simp : left ∈ [left, right]) ⟨segment.val + 1, by omega⟩
-  have rightRead := call.input_field_instruction (by simp : right ∈ [left, right]) ⟨segment.val + 1, by omega⟩
-  have found : Extracted.program[scalarIndex]? = some scalarBody := by rfl
-  obtain ⟨segment, bound⟩ := segment
-  have cases : segment = 0 ∨ segment = 1 ∨ segment = 2 := by omega
-  rcases cases with rfl | rfl | rfl
-  all_goals
-    dsimp at resultSlot leftRead rightRead tail
-    simp (config := { failIfUnchanged := false }) only [CIL.fin_val_three, Nat.reduceMul] at leftRead rightRead tail
-    conv in (scalarBorrowCall _) => cbv
-    cil_contract_steps [found, binaryArguments, fl, fr, fb, fo, borrowSlot, resultSlot,
-      leftRead, rightRead] until tail
 
 end UInt256Proof.Subtract.Safety
