@@ -699,22 +699,45 @@ public readonly partial struct Int256 : IEquatable<Int256>, IComparable, ICompar
 
     public TypeCode GetTypeCode() => TypeCode.Object;
     public bool ToBoolean(IFormatProvider? provider) => !IsZero;
-    public byte ToByte(IFormatProvider? provider) => System.Convert.ToByte(ToDecimal(provider), provider);
-    public char ToChar(IFormatProvider? provider) => System.Convert.ToChar(ToDecimal(provider), provider);
-    public DateTime ToDateTime(IFormatProvider? provider) => System.Convert.ToDateTime(ToDecimal(provider), provider);
-    public decimal ToDecimal(IFormatProvider? provider) => (decimal)(BigInteger)this;
-    public double ToDouble(IFormatProvider? provider) => (double)(BigInteger)this;
-    public short ToInt16(IFormatProvider? provider) => System.Convert.ToInt16(ToDecimal(provider), provider);
-    public int ToInt32(IFormatProvider? provider) => System.Convert.ToInt32(ToDecimal(provider), provider);
-    public long ToInt64(IFormatProvider? provider) => System.Convert.ToInt64(ToDecimal(provider), provider);
-    public sbyte ToSByte(IFormatProvider? provider) => System.Convert.ToSByte(ToDecimal(provider), provider);
-    public float ToSingle(IFormatProvider? provider) => (float)(BigInteger)this;
+    public byte ToByte(IFormatProvider? provider) => System.Convert.ToByte(ToDecimal(provider));
+    public char ToChar(IFormatProvider? provider) => System.Convert.ToChar(ToDecimal(provider));
+    public DateTime ToDateTime(IFormatProvider? provider) => System.Convert.ToDateTime(ToDecimal(provider));
+    // The integral members narrow from here, so none of them build a BigInteger.
+    public decimal ToDecimal(IFormatProvider? provider) => UInt256.ToDecimal(Magnitude(in this), IsNegative, ConversionMode.Checked);
+    public double ToDouble(IFormatProvider? provider)
+    {
+        double magnitude = TruncateToDouble(Magnitude(in this));
+        return IsNegative ? -magnitude : magnitude;
+    }
+    public short ToInt16(IFormatProvider? provider) => System.Convert.ToInt16(ToDecimal(provider));
+    public int ToInt32(IFormatProvider? provider) => System.Convert.ToInt32(ToDecimal(provider));
+    public long ToInt64(IFormatProvider? provider) => System.Convert.ToInt64(ToDecimal(provider));
+    public sbyte ToSByte(IFormatProvider? provider) => System.Convert.ToSByte(ToDecimal(provider));
+    // Rounds through double, as the BigInteger conversion this replaces did.
+    public float ToSingle(IFormatProvider? provider) => (float)ToDouble(provider);
     public object ToType(Type conversionType, IFormatProvider? provider) => conversionType == typeof(BigInteger)
         ? (BigInteger)this
         : System.Convert.ChangeType(ToDecimal(provider), conversionType, provider);
-    public ushort ToUInt16(IFormatProvider? provider) => System.Convert.ToUInt16(ToDecimal(provider), provider);
-    public uint ToUInt32(IFormatProvider? provider) => System.Convert.ToUInt32(ToDecimal(provider), provider);
-    public ulong ToUInt64(IFormatProvider? provider) => System.Convert.ToUInt64(ToDecimal(provider), provider);
+    public ushort ToUInt16(IFormatProvider? provider) => System.Convert.ToUInt16(ToDecimal(provider));
+    public uint ToUInt32(IFormatProvider? provider) => System.Convert.ToUInt32(ToDecimal(provider));
+    public ulong ToUInt64(IFormatProvider? provider) => System.Convert.ToUInt64(ToDecimal(provider));
+
+    /// <summary>
+    /// Keeps the top 53 bits and drops the rest, as the <see cref="BigInteger"/> conversion that <see cref="ToDouble"/>
+    /// used before. <c>double.CreateChecked</c> rounds to nearest instead.
+    /// </summary>
+    private static double TruncateToDouble(in UInt256 magnitude)
+    {
+        int length = magnitude.BitLen;
+        if (length <= 53)
+        {
+            return magnitude.u0;
+        }
+
+        magnitude.RightShift(length - 53, out UInt256 top);
+        ulong exponent = (ulong)(length - 1 + 1023);
+        return BitConverter.UInt64BitsToDouble((exponent << 52) | (top.u0 & 0x000F_FFFF_FFFF_FFFF));
+    }
 
     // The sign has always been a literal '-' here and the digits are ASCII, so the provider changes nothing.
     public string ToString(IFormatProvider? provider) => ToString();
