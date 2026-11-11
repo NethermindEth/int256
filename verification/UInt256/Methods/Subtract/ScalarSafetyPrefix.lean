@@ -1,5 +1,5 @@
 import UInt256.Methods.Subtract.ScalarSafetySetup
-import UInt256.Safety.CallerSetup
+import UInt256.Methods.Add.InputWords
 import CIL.Safety.AccessBelow
 import CIL.Safety.StepComposition
 import CIL.Safety.GuardNormalization
@@ -39,24 +39,18 @@ theorem scalar_right_prefix_checked (memory entered : Memory) (left right output
   obtain ⟨reference, slot, _, _, writable⟩ := homes.word_at 0 0 (by rfl)
   have writableHomes := homes.writable
   have enteredCall := call.after_frame_setup setup
-  have enteredFormed := enteredCall.1.1
+  have valid := enteredCall.1
+  have enteredFormed := valid.1
   have preserved := enterFrame_preserves_caller_memory _ _ _ _ _ setup
   have found : Extracted.program[scalarIndex]? = some scalarBody := by rfl
-  cil_contract_steps (snapshots := LocalSnapshots.empty entered frame.locals)
-    [found, binaryArguments, enteredCall.input_formed (reference := right) (by simp),
-      call.input_field_after_setup setup (by simp : right ∈ [left, right]) 0]
-  have afterCall := call.after_memory_below preserved localFormed
-    (write_preserves_static_world _ _ _ _ _ _ enteredCall.2 localWrite)
-  have done := continuation storedLocal localSnapshots preserved afterCall localAccess
+  cil_contract_steps (snapshots := LocalSnapshots.empty entered frame.locals) 11
+    [found, binaryArguments, call.input_words_kept preserved right (by simp)]
+  have done := continuation storedLocal localSnapshots preserved
+    (call.after_memory_below preserved localFormed
+      (write_preserves_static_world _ _ _ _ _ _ enteredCall.2 localWrite)) localAccess
     (Nat.le_trans (enterFrame_fresh _ _ _ _ _ setup).1.next
       (write_extends_allocations _ _ _ _ _ localWrite).next)
   conv at done in scalarFirstDecision => cbv
-  have upperReads (index : Fin 4) (rest : List Value) :
-      instruction (.fieldAt (8 * index.val) 8) (.reference (.address right) :: rest) storedLocal =
-        .ok (storedLocal, .scalar (.i64 (inputLimb memory right index)) :: rest) := by
-    rw [afterCall.input_field_instruction (by simp) index rest]
-    simp only [inputLimb, call.input_bytes_of_memory_below preserved (reference := right) (by simp)]
-  cil_contract_steps [found, binaryArguments,
-    afterCall.input_formed (reference := right) (by simp), upperReads] until done
+  exact done
 
 end UInt256Proof.Subtract.Safety

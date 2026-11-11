@@ -7,8 +7,7 @@ import CIL.Safety.CallComposition
 import CIL.Safety.ReturnMemory
 import CIL.Safety.Certificate
 import CIL.Safety.LocalSnapshotSteps
-import UInt256.Safety.CallerSetup
-import UInt256.Safety.PrivateWordAccess
+import UInt256.Methods.Add.InputWords
 import UInt256.Safety.OutputReturn
 import UInt256.Arithmetic.Borrow
 import UInt256.Methods.Reporting.Arithmetic
@@ -111,27 +110,30 @@ theorem small_checked (program : CIL.Program) (method storage : Nat) (profile : 
       InvocationCertificate program method (smallArguments input output word) memory fuel final values ∧
       SmallResult memory final values input output word := by
   let post := fun final values => SmallResult memory final values input output word
-  obtain ⟨frame, entered, setup, numeric, _, enteredWF⟩ :=
+  obtain ⟨frame, entered, setup, numeric, _, enteredFormed⟩ :=
     numeric_frame_setup (subtractSmallBody profile storage)
       (List.replicate 4 ⟨.word64, .i64 0, 0, rfl⟩) rfl rfl rfl rfl rfl memory
       (smallArguments input output word) call.1.1
-  have homes := numeric.complete
   have owned : ∀ id ∈ frame.owned, memory.nextIdentity ≤ id :=
     fun id member => ((enterFrame_fresh _ _ _ _ _ setup).2 id member).1
-  have initial := PrivateWords.initial call setup
-  obtain ⟨_, store0, saved1⟩ := initial.store enteredWF homes 0 (by rfl)
-    (inputLimb memory input 1) 4 (smallArguments input output word)
-    [.scalar (.i64 (inputLimb memory input 0))] (body := subtractSmallBody profile storage)
-  obtain ⟨_, store1, saved2⟩ := saved1.store enteredWF homes 1 (by rfl)
-    (inputLimb memory input 2) 7 (smallArguments input output word)
-    [.scalar (.i64 (inputLimb memory input 0))] (body := subtractSmallBody profile storage)
-  obtain ⟨_, store2, saved3⟩ := saved2.store enteredWF homes 2 (by rfl)
-    (inputLimb memory input 3) 10 (smallArguments input output word)
-    [.scalar (.i64 (inputLimb memory input 0))] (body := subtractSmallBody profile storage)
-  obtain ⟨current, store3, state⟩ := saved3.store enteredWF homes 3 (by rfl)
-    (inputLimb memory input 0 - word) 14 (smallArguments input output word)
-    [.scalar (.i64 (inputLimb memory input 0))] (body := subtractSmallBody profile storage)
-  have formed := state.call.output_formed (by simp : output ∈ [output])
+  suffices started : ∃ fuel final values,
+      run program fuel method 0 (smallArguments input output word) frame [] entered =
+        .ok (final, values) ∧ post final values by
+    obtain ⟨fuel, final, values, finished, satisfied⟩ := started
+    exact ⟨fuel, final, values, .of_run call.1.wellFormed call.2 found (checkedValues_of_valid (by
+      simp [ValuesValid, smallArguments, Value.Valid, numericValue,
+        call.input_formed (reference := input), call.output_formed (reference := output)]))
+      setup finished, satisfied⟩
+  have enteredCall := call.after_frame_setup setup
+  have valid := enteredCall.1
+  have preserved := enterFrame_preserves_caller_memory _ _ _ _ _ setup
+  cil_contract_steps (snapshots := LocalSnapshots.empty entered frame.locals) 16
+    [found, smallArguments, call.input_words_kept preserved input (by simp)]
+  have currentCall : CallingConditions program storedLocal_3 [input] [output] :=
+    ⟨valid, write_preserves_static_world _ _ _ _ _ _ (write_preserves_static_world _ _ _ _ _ _
+      (write_preserves_static_world _ _ _ _ _ _ (write_preserves_static_world _ _ _ _ _ _
+        enteredCall.2 localWrite) localWrite_1) localWrite_2) localWrite_3⟩
+  have formed := currentCall.output_formed (by simp : output ∈ [output])
   have exit : WP (Execution (fun fuel => run program fuel method
       (smallStoreCall (smallSelectedBranch (inputLimb memory input) word).val)
       (smallArguments input output word) frame
@@ -139,54 +141,29 @@ theorem small_checked (program : CIL.Program) (method storage : Nat) (profile : 
         .scalar (.i64 (smallDifference (inputLimb memory input) word 2)),
         .scalar (.i64 (smallDifference (inputLimb memory input) word 1)),
         .scalar (.i64 (smallDifference (inputLimb memory input) word 0)),
-        .reference (.address output)] current)) (Function.uncurry post) := by
+        .reference (.address output)] storedLocal_3)) (Function.uncurry post) := by
     obtain ⟨childFuel, stored, invoked, valid, outside, _, value, readable⟩ :=
       UInt256Proof.Multiply.LimbStorage.store_limbs_readable_contract profile program storage
-        storageFound current [input] output _ _ _ _ state.call
+        storageFound storedLocal_3 [input] output _ _ _ _ currentCall
     have fetched : ∀ branch : Fin 5, (subtractSmallBody profile storage).code[
         smallStoreCall branch.val]? = some (.call storage 5) := by
       rintro ⟨branch, bound⟩
       have cases : branch = 0 ∨ branch = 1 ∨ branch = 2 ∨ branch = 3 ∨ branch = 4 := by omega
       rcases cases with rfl | rfl | rfl | rfl | rfl <;> rfl
-    have retired := output_result_of_storage memory current stored [input] output _ frame call
-      valid owned state.caller value readable outside
+    have retired := output_result_of_storage memory storedLocal_3 stored [input] output _ frame
+      call valid owned preserved.cells value readable outside
     exact WP.adequate.mpr (run_call_post found (fetched _)
       (by cil_checked_step [UInt256Proof.Multiply.LimbStorage.arguments, formed])
       ⟨childFuel, invoked⟩
       ⟨2, _, _, small_return program method storage profile found _ _ frame stored,
         retired.wellFormed, retired.value, rfl, retired.writable, retired.footprint⟩)
-  have branches : WP (Execution (fun fuel => run program fuel method 16
-      (smallArguments input output word) frame
-      [.scalar (.i64 word), .scalar (.i64 (inputLimb memory input 0))] current))
-      (Function.uncurry post) := by
-    have snapshots := state.snapshots.toLocalSnapshots
-    rcases small_exit_cases (inputLimb memory input) word with taken | taken | taken | taken | taken
-
-    all_goals
-      simp only [smallSelectedBranch, smallDifference, smallStoreCall, Fin.val_zero, Fin.val_one,
-        Fin.val_two, CIL.fin_val_three, Nat.reduceEqDiff, ne_eq, taken, not_true_eq_false,
-        not_false_eq_true, and_true, and_false, ↓reduceIte] at exit
-      cil_contract_steps (snapshots := snapshots) [smallArguments, formed, taken]
-      exact WP.adequate.mp exit
-  have started : ∃ fuel final values,
-      run program fuel method 0 (smallArguments input output word) frame [] entered =
-        .ok (final, values) ∧ post final values := by
-    cil_contract_steps [found, smallArguments,
-      initial.call.input_formed (reference := input) (by simp),
-      saved1.call.input_formed (reference := input) (by simp),
-      saved2.call.input_formed (reference := input) (by simp),
-      initial.input_field call input (by simp) 0, initial.input_field call input (by simp) 1,
-      saved1.input_field call input (by simp) 2, saved2.input_field call input (by simp) 3,
-      store0, store1, store2, store3] until branches
-  obtain ⟨fuel, final, values, finished, satisfied⟩ := started
-  have checked : (smallArguments input output word).mapM (checkedValue memory) =
-      .ok (smallArguments input output word) := by
-    have fi := call.input_formed (reference := input) (by simp)
-    have fo := call.output_formed (reference := output) (by simp)
-    simp [smallArguments, checkedValue, numericValue, formValue, fi, fo, checkedAt,
-      Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-  exact ⟨fuel, final, values,
-    .of_run call.1.wellFormed call.2 found checked setup finished, satisfied⟩
+  rcases small_exit_cases (inputLimb memory input) word with taken | taken | taken | taken | taken
+  all_goals
+    simp only [smallSelectedBranch, smallDifference, smallStoreCall, Fin.val_zero, Fin.val_one,
+      Fin.val_two, CIL.fin_val_three, Nat.reduceEqDiff, ne_eq, taken, not_true_eq_false,
+      not_false_eq_true, and_true, and_false, ↓reduceIte] at exit
+    cil_contract_steps (snapshots := localSnapshots_3) [smallArguments, formed, taken]
+    exact WP.adequate.mp exit
 
 /-- Arithmetic is stated over the initial input, independently of the extracted algorithm. -/
 theorem SmallResult.modular_difference {original final : Memory} {values : List Value}
