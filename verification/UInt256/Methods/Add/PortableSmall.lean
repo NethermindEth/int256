@@ -31,26 +31,6 @@ theorem portable_small_frame_setup (profile : CIL.FeatureProfile) (storage : Nat
       MemoryBelow memory.nextIdentity memory entered ∧ entered.WellFormed :=
   numeric_frame_setup (portableSmallBody profile storage) armSmallSpecs (by rfl) (by rfl) (by rfl) (by rfl) (by rfl) memory args wf
 
-theorem portable_small_private_store (program : CIL.Program) (profile : CIL.FeatureProfile) (storage : Nat) (boundary : Nat) (entered current : Memory)
-    (inputs outputs : List Reference) (frame : Frame)
-    (call : CallingConditions program current inputs outputs)
-    (enteredWF : entered.WellFormed)
-    (homes : NumericHomes entered boundary armSmallSpecs frame.locals)
-    (authority : AccessBelow entered.nextIdentity entered current)
-    (index : Nat) (spec : NumericLocalSpec) (specified : armSmallSpecs[index]? = some spec)
-    (value : CIL.Value) (number : Nat) (fits : localNumber spec.kind value = .ok number) :
-    ∃ reference after,
-      frame.locals[index]? = some (.bytes spec.kind reference) ∧
-      read after reference (localWidth spec.kind) 1 = .ok (numberBytes number (localWidth spec.kind)) ∧
-      MemoryBelow boundary current after ∧
-      CallingConditions program after inputs outputs ∧
-      AccessBelow entered.nextIdentity entered after ∧
-      write current reference (numberBytes number (localWidth spec.kind)) 1 = .ok after ∧
-      ∀ pc args rest, step (portableSmallBody profile storage) (.setLocal index) pc args frame
-        (.scalar value :: rest) current = .ok (.next (pc + 1) rest frame after) :=
-  checked_numeric_store program (portableSmallBody profile storage) armSmallSpecs boundary
-    entered current inputs outputs frame call enteredWF homes authority index spec specified value number fits
-
 /-- Check all four input snapshots, then take the disabled AdvSimd branch to the scalar sum. -/
 theorem portable_small_input_prefix (program : CIL.Program) (method storage : Nat) (profile : CIL.FeatureProfile) (found : program[method]? = some (portableSmallBody profile storage)) (disabled : profile.advSimd = false) (input output : Reference) (word : BitVec 64)
     (words : Fin 4 → BitVec 64) (frame : Frame) (states : Nat → Memory)
@@ -85,35 +65,6 @@ theorem portable_small_input_prefix (program : CIL.Program) (method storage : Na
       CIL.FeatureProfile.evaluate, f0, f1, f2, f3, l0, l1, l2, l3,
       s0, s1, s2, s3] until continuation
 
-theorem portable_small_save {program : CIL.Program} {profile : CIL.FeatureProfile} {storage : Nat} {original entered current : Memory}
-    {input output : Reference} {frame : Frame}
-    (index : Fin 4) (state : ARMSmallSaved program original entered current input output frame index.val)
-    (word : BitVec 64) (enteredWF : entered.WellFormed)
-    (homes : NumericHomes entered original.nextIdentity armSmallSpecs frame.locals) :
-    ∃ after, ARMSmallSaved program original entered after input output frame (index.val + 1) ∧
-      ∀ pc rest, step (portableSmallBody profile storage) (.setLocal index.val) pc
-        (armSmallArguments input output word) frame
-        (.scalar (.i64 (inputLimb original input index)) :: rest) current =
-          .ok (.next (pc + 1) rest frame after) := by
-  obtain ⟨reference, after, slot, loaded, preserved, afterCall, authority, written, stepped⟩ :=
-    portable_small_private_store program profile storage original.nextIdentity entered current [input] [output] frame
-      state.call enteredWF homes state.authority index.val armSmallWordSpec (arm_small_input_spec index)
-      (.i64 (inputLimb original input index)) (inputLimb original input index).toNat rfl
-  refine ⟨after, ⟨afterCall, state.preserved.trans preserved, authority, ?_⟩,
-    fun pc rest => stepped pc _ rest⟩
-  intro i saved
-  by_cases equal : i = index
-  · subst i
-    exact ⟨reference, slot, loaded⟩
-  · have earlier : i.val < index.val := by
-      have different : i.val ≠ index.val := fun h => equal (Fin.ext h)
-      omega
-    obtain ⟨previous, previousSlot, previousRead⟩ := state.completed i earlier
-    have different := Nat.ne_of_lt
-      (homes.ordered i.val index.val .word64 .word64 previous reference earlier previousSlot slot)
-    exact ⟨previous, previousSlot,
-      write_preserves_disjoint_read written previousRead (Or.inl different)⟩
-
 theorem portable_small_input_prefix_checked (program : CIL.Program) (method storage : Nat) (profile : CIL.FeatureProfile) (found : program[method]? = some (portableSmallBody profile storage)) (disabled : profile.advSimd = false) (original entered : CIL.Safety.Memory)
     (input output : Reference) (word : BitVec 64) (frame : Frame)
     (call : CallingConditions program original [input] [output])
@@ -129,11 +80,12 @@ theorem portable_small_input_prefix_checked (program : CIL.Program) (method stor
   have enteredCall := call.after_frame_setup setup
   have initial : ARMSmallSaved program original entered entered input output frame 0 :=
     ⟨enteredCall, enterFrame_preserves_caller_memory _ _ _ _ _ setup,
-      (MemoryBelow.refl entered.nextIdentity entered).accessBelow, by intro i impossible; omega⟩
-  obtain ⟨first, saved1, step0⟩ := portable_small_save (profile := profile) (storage := storage) 0 initial word enteredCall.1.1 homes
-  obtain ⟨second, saved2, step1⟩ := portable_small_save (profile := profile) (storage := storage) 1 saved1 word enteredCall.1.1 homes
-  obtain ⟨third, saved3, step2⟩ := portable_small_save (profile := profile) (storage := storage) 2 saved2 word enteredCall.1.1 homes
-  obtain ⟨fourth, saved4, step3⟩ := portable_small_save (profile := profile) (storage := storage) 3 saved3 word enteredCall.1.1 homes
+      (MemoryBelow.refl entered.nextIdentity entered).accessBelow,
+      by intro index value specified; simp [smallSaved] at specified⟩
+  obtain ⟨first, saved1, step0⟩ := SmallState.save 0 initial (portableSmallBody profile storage) enteredCall.1.1 homes
+  obtain ⟨second, saved2, step1⟩ := SmallState.save 1 saved1 (portableSmallBody profile storage) enteredCall.1.1 homes
+  obtain ⟨third, saved3, step2⟩ := SmallState.save 2 saved2 (portableSmallBody profile storage) enteredCall.1.1 homes
+  obtain ⟨fourth, saved4, step3⟩ := SmallState.save 3 saved3 (portableSmallBody profile storage) enteredCall.1.1 homes
   let states : Nat → CIL.Safety.Memory := fun n => match n with
     | 0 => entered | 1 => first | 2 => second | 3 => third | _ => fourth
   have saved : ∀ i : Fin 4, ARMSmallSaved program original entered (states i.val) input output frame i.val := by
@@ -154,25 +106,20 @@ theorem portable_small_input_prefix_checked (program : CIL.Program) (method stor
   · intro ⟨i, bound⟩ pc rest
     have cases : i = 0 ∨ i = 1 ∨ i = 2 ∨ i = 3 := by omega
     rcases cases with rfl | rfl | rfl | rfl
-    · exact step0 pc rest
-    · exact step1 pc rest
-    · exact step2 pc rest
-    · exact step3 pc rest
+    · exact step0 pc _ rest
+    · exact step1 pc _ rest
+    · exact step2 pc _ rest
+    · exact step3 pc _ rest
 
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
 open CIL.Safety UInt256Model.Safety
 
-structure PortableSmallState (program : CIL.Program) (original entered current : Memory) (input output : Reference)
-    (frame : Frame) (words : Fin 4 → BitVec 64) (sum : BitVec 64) : Prop where
-  call : CallingConditions program current [input] [output]
-  preserved : MemoryBelow original.nextIdentity original current
-  authority : AccessBelow entered.nextIdentity entered current
-  limbs : ∀ i : Fin 4, ∃ home, frame.locals[i.val]? = some (.bytes .word64 home) ∧
-    read current home 8 1 = .ok (numberBytes (words i).toNat 8)
-  sumRead : ∃ home, frame.locals[4]? = some (.bytes .word64 home) ∧
-    read current home 8 1 = .ok (numberBytes sum.toNat 8)
+/-- Portable addition shares the caller guarantees and local snapshot representation. -/
+abbrev PortableSmallState (program : CIL.Program) (original entered current : Memory)
+    (input output : Reference) (frame : Frame) (words : Fin 4 → BitVec 64) (sum : BitVec 64) :=
+  SmallState program original entered current input output frame (portableSmallKnown words sum)
 
 /-- Store the low sum in local4 without disturbing the four saved input limbs. -/
 theorem portable_small_prepare (program : CIL.Program) (method storage : Nat) (profile : CIL.FeatureProfile) (found : program[method]? = some (portableSmallBody profile storage))
@@ -187,48 +134,34 @@ theorem portable_small_prepare (program : CIL.Program) (method storage : Nat) (p
           (armSmallArguments input output word) frame [] after)) (Function.uncurry post)) :
     WP (Execution (fun fuel => run program fuel method 55
         (armSmallArguments input output word) frame [] current)) (Function.uncurry post) := by
-  obtain ⟨lowHome, lowSlot, lowRead⟩ := saved.completed 0 (by decide)
-  obtain ⟨sumHome, after, sumSlot, sumRead, sumPreserved, _, _, sumWritten, sumStep⟩ :=
-    portable_small_private_store program profile storage original.nextIdentity entered current [input] [output] frame
-      saved.call enteredWF homes saved.authority 4 armSmallWordSpec (by rfl)
-      (.i64 (inputLimb original input 0 + word)) (inputLimb original input 0 + word).toNat rfl
-  have afterSaved := saved.after_later_write homes (by decide : 4 ≤ 4) sumSlot sumWritten sumPreserved
-  have state : PortableSmallState program original entered after input output frame
-      (inputLimb original input) (inputLimb original input 0 + word) :=
-    ⟨afterSaved.call, afterSaved.preserved, afterSaved.authority,
-      fun i => afterSaved.completed i i.isLt, ⟨sumHome, sumSlot, sumRead⟩⟩
-  have load := step_load_word64 (body := portableSmallBody profile storage) (pc := 55)
-    (args := armSmallArguments input output word) (stack := []) lowSlot lowRead
+  have load := saved.snapshots.load (body := portableSmallBody profile storage)
+    (index := 0) (args := armSmallArguments input output word) (pc := 55) (stack := [])
+    (.i64 (inputLimb original input 0)) (by simp [smallSaved])
+  obtain ⟨after, state, sumStep⟩ := saved.store (portableSmallBody profile storage)
+    enteredWF homes 4 armWordSpec (by rfl)
+    (.i64 (inputLimb original input 0 + word)) (inputLimb original input 0 + word).toNat rfl
   have stored := sumStep 58 (armSmallArguments input output word) []
   have done := continuation after state
-  refine WP.step (post := Function.uncurry post) found rfl load ?_
-  iterate 2
-    apply WP.step (post := Function.uncurry post) found (by rfl)
-    simp (config := { implicitDefEqProofs := false })
-      [step, cil_guard, observerCount, armSmallArguments, checkedValue, numericValue, pureArity, scalars, CIL.step.eq_def, localResult, CIL.binary,
-        Bind.bind, Except.bind, Pure.pure, Except.pure]
-    try (first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)
-  refine WP.step (post := Function.uncurry post) found rfl stored ?_
-  exact done
+  cil_contract_steps [found, load, stored, armSmallArguments] until done
 
 /-- Compare the stored low sum with the saved low limb: carry at70, no-carry output at62. -/
 theorem portable_small_low_decision (program : CIL.Program) (method storage : Nat) (profile : CIL.FeatureProfile) (found : program[method]? = some (portableSmallBody profile storage))
-    (memory : Memory) (frame : Frame) (args : List Value) (lowHome sumHome : Reference)
+    (memory : Memory) (frame : Frame) (args : List Value)
     (low sum : BitVec 64)
-    (lowSlot : frame.locals[0]? = some (.bytes .word64 lowHome))
-    (sumSlot : frame.locals[4]? = some (.bytes .word64 sumHome))
-    (lowRead : read memory lowHome 8 1 = .ok (numberBytes low.toNat 8))
-    (sumRead : read memory sumHome 8 1 = .ok (numberBytes sum.toNat 8))
+    (loadLow : ∀ pc stack, step (portableSmallBody profile storage) (.local 0) pc args frame stack
+      memory = .ok (.next (pc + 1) (.scalar (.i64 low) :: stack) frame memory))
+    (loadSum : ∀ pc stack, step (portableSmallBody profile storage) (.local 4) pc args frame stack
+      memory = .ok (.next (pc + 1) (.scalar (.i64 sum) :: stack) frame memory))
+
     (post : Memory → List Value → Prop)
     (continuation : WP (Execution (fun fuel => run program fuel method (if sum < low then 70 else 62)
         args frame [] memory)) (Function.uncurry post)) :
     WP (Execution (fun fuel => run program fuel method 59 args frame [] memory)) (Function.uncurry post) := by
-  have loadSum := load_numeric_local .word64 (.i64 sum) sum.toNat rfl sumRead
-  have loadLow := load_numeric_local .word64 (.i64 low) low.toNat rfl lowRead
+
   by_cases carry : sum < low
   all_goals
     simp only [carry, ite_true, ite_false] at continuation
-    cil_contract_steps [sumSlot, lowSlot, loadSum, loadLow, carry] until continuation
+    cil_contract_steps [found, loadSum, loadLow, carry] until continuation
 
 def portableIncrementStart : Fin 3 → Nat
   | 0 => 70 | 1 => 85 | 2 => 101
@@ -239,9 +172,10 @@ def portableIncrementZero : Fin 3 → Nat
 /-- One carry increment: store the incremented limb and continue only while it wrapped to zero. -/
 theorem portable_small_increment (program : CIL.Program) (method storage : Nat) (profile : CIL.FeatureProfile) (found : program[method]? = some (portableSmallBody profile storage))
     (segment : Fin 3) (before after : Memory) (frame : Frame) (args : List Value)
-    (home : Reference) (word : BitVec 64)
-    (slot : frame.locals[segment.val + 1]? = some (.bytes .word64 home))
-    (loaded : read before home 8 1 = .ok (numberBytes word.toNat 8))
+    (word : BitVec 64)
+    (load : ∀ pc, step (portableSmallBody profile storage) (.local (segment.val + 1)) pc
+      args frame [] before = .ok (.next (pc + 1) [.scalar (.i64 word)] frame before))
+
     (stored : ∀ pc rest, step (portableSmallBody profile storage) (.setLocal (segment.val + 1)) pc
       args frame (.scalar (.i64 (word + 1)) :: rest) before =
         .ok (.next (pc + 1) rest frame after))
@@ -253,28 +187,17 @@ theorem portable_small_increment (program : CIL.Program) (method storage : Nat) 
         args frame [] before)) (Function.uncurry post) := by
   obtain ⟨segment, bound⟩ := segment
   have cases : segment = 0 ∨ segment = 1 ∨ segment = 2 := by omega
-  have load := fun (pc : Nat) => step_load_word64 (body := portableSmallBody profile storage) (pc := pc)
-    (args := args) (stack := []) slot loaded
+
   rcases cases with rfl | rfl | rfl
   all_goals
-    dsimp only [portableIncrementStart, portableIncrementZero, Nat.reduceAdd] at slot stored continuation load ⊢
+    dsimp only [portableIncrementStart, portableIncrementZero, Nat.reduceAdd] at stored continuation load ⊢
+    cil_contract_steps 6 [found, load, stored]
     by_cases zero : word + 1 = BitVec.ofNat 64 0
     all_goals
       simp only [zero, ite_true, ite_false] at continuation
       have zero' := zero
       try simp only [BitVec.ofNat_eq_ofNat] at zero'
-      iterate 6
-        apply WP.step (post := Function.uncurry post) found (by rfl)
-        first
-        | exact load _
-        | exact stored _ _
-        | (simp (config := { implicitDefEqProofs := false })
-            [step, cil_guard, observerCount, instruction, checkedValue, numericValue, pureArity, scalars, CIL.step.eq_def, localResult, CIL.binary,
-              CIL.unary, Bind.bind, Except.bind, Pure.pure, Except.pure]
-           try (first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
-      apply WP.step (post := Function.uncurry post) found (by rfl) _ continuation
-      simp [step, cil_guard, observerCount, checkedValue, numericValue, pureArity, scalars, CIL.step.eq_def, CIL.truth,
-        BitVec.ofNat_eq_ofNat, zero', Bind.bind, Except.bind, Pure.pure, Except.pure]
+      cil_contract_steps [found, zero', BitVec.ofNat_eq_ofNat] until continuation
 
 end UInt256Proof.Add.Safety
 
@@ -291,21 +214,26 @@ theorem PortableSmallState.store_limb {program : CIL.Program} {profile : CIL.Fea
         (fun i => if i = index then value else words i) sum ∧
       ∀ pc args rest, step (portableSmallBody profile storage) (.setLocal index.val) pc args frame
         (.scalar (.i64 value) :: rest) current = .ok (.next (pc + 1) rest frame after) := by
-  obtain ⟨home, after, slot, loaded, preserved, call, authority, written, stepped⟩ :=
-    portable_small_private_store program profile storage original.nextIdentity entered current [input] [output] frame
-      state.call enteredWF homes state.authority index.val armSmallWordSpec (arm_small_input_spec index)
-      (.i64 value) value.toNat rfl
-  refine ⟨after, ⟨call, state.preserved.trans preserved, authority, ?_, ?_⟩, stepped⟩
-  · intro i
-    by_cases same : i = index
-    · subst i
-      exact ⟨home, slot, by simpa [armSmallWordSpec, localWidth] using loaded⟩
-    · obtain ⟨other, otherSlot, otherRead⟩ := state.limbs i
-      refine ⟨other, otherSlot, ?_⟩
-      simp only [same, ite_false]
-      exact arm_small_other_read homes (fun h => same (Fin.ext h)) otherSlot slot written otherRead
-  · obtain ⟨other, otherSlot, otherRead⟩ := state.sumRead
-    exact ⟨other, otherSlot, arm_small_other_read homes (by omega) otherSlot slot written otherRead⟩
+  have specified : armSmallSpecs[index.val]? = some armWordSpec := by
+    obtain ⟨index, bound⟩ := index
+    have cases : index = 0 ∨ index = 1 ∨ index = 2 ∨ index = 3 := by omega
+    rcases cases with rfl | rfl | rfl | rfl <;> rfl
+  obtain ⟨after, updated, stepped⟩ := state.store (portableSmallBody profile storage)
+    enteredWF homes index.val armWordSpec specified (.i64 value) value.toNat rfl
+  have maps : rememberLocal (portableSmallKnown words sum) index.val (.i64 value) =
+      portableSmallKnown (fun i => if i = index then value else words i) sum := by
+    funext other
+    by_cases same : other = index.val
+    · subst other
+      simp [portableSmallKnown, rememberLocal, smallSaved, index.isLt,
+        show index.val ≠ 4 by omega]
+    · by_cases bound : other < 4
+      · have different : (⟨other, bound⟩ : Fin 4) ≠ index := fun equal => same (congrArg Fin.val equal)
+        simp [portableSmallKnown, rememberLocal, smallSaved, same, bound, different]
+      · simp [portableSmallKnown, rememberLocal, smallSaved, same, bound]
+  change SmallState _ _ _ _ _ _ _ (rememberLocal (portableSmallKnown words sum) index.val (.i64 value)) at updated
+  rw [maps] at updated
+  exact ⟨after, updated, stepped⟩
 
 /-- Execute one carry increment with every memory premise derived from the state. -/
 theorem PortableSmallState.increment (program : CIL.Program) (method storage : Nat) (profile : CIL.FeatureProfile) (found : program[method]? = some (portableSmallBody profile storage))
@@ -325,9 +253,17 @@ theorem PortableSmallState.increment (program : CIL.Program) (method storage : N
     WP (Execution (fun fuel => run program fuel method (portableIncrementStart segment)
       args frame [] current)) (Function.uncurry post) := by
   let index : Fin 4 := ⟨segment.val + 1, by omega⟩
-  obtain ⟨home, slot, loaded⟩ := state.limbs index
+  have load := fun pc => state.snapshots.load (body := portableSmallBody profile storage)
+    (index := index.val) (args := args) (stack := []) (pc := pc) (.i64 (words index))
+    (by simp [portableSmallKnown, rememberLocal, smallSaved, index.isLt,
+      show index.val ≠ 4 by omega])
   obtain ⟨after, updated, stored⟩ := state.store_limb (profile := profile) (storage := storage) index (words index + 1) enteredWF homes
-  exact portable_small_increment program method storage profile found segment current after frame args home (words index) slot loaded
+  have updatedWords : (fun i => if i = index then words index + 1 else words i) =
+      armIncrementWord words index := by
+    funext i
+    simp only [armIncrementWord, Fin.ext_iff]
+  rw [updatedWords] at updated
+  exact portable_small_increment program method storage profile found segment current after frame args (words index) load
     (fun pc rest => stored pc args rest) post (continuation after updated)
 
 /-- Store four words through StoreLimbs, then return the constant flag. -/
@@ -358,22 +294,15 @@ theorem portable_small_store_return (program : CIL.Program) (method storage : Na
         .scalar (.i64 (words 0)), .reference (.address output)] memory =
       .ok (.call storage (UInt256Proof.Multiply.LimbStorage.arguments output (words 0) (words 1) (words 2) (words 3)) [] memory) := by
     cil_checked_step [UInt256Proof.Multiply.LimbStorage.arguments, formed]
-  have returned : run program 2 method (callPc + 1) args frame [] stored =
-      .ok (leaveFrame frame stored, [.scalar (.i32 flag)]) := by
-    have constStep : step (portableSmallBody profile storage) (.const32 flag) (callPc + 1) args frame [] stored =
-        .ok (.next (callPc + 1 + 1) [.scalar (.i32 flag)] frame stored) := by
-      simp [step, cil_guard, observerCount, instruction, checkedValue, numericValue, pureArity, scalars, CIL.step.eq_def,
-        Bind.bind, Except.bind, Pure.pure, Except.pure]
-    rw [run_next found constAt constStep]
-    have returns : (portableSmallBody profile storage).returnsValue = true := by rfl
-    simp [run, found, retAt, returns, step, cil_guard, observerCount, checkedValue, numericValue, flagFit, List.mapM, List.mapM.loop, Option.bind,
-      Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-  apply WP.adequate.mpr
-  apply run_call_post found callAt stepped ⟨childFuel, invoked⟩
-  refine ⟨2, leaveFrame frame stored, [.scalar (.i32 flag)], returned, ?_⟩
-  apply continuation stored valid outside authority
-  simpa only [UInt256Model.value] using value
-
+  have suffix : WP (Execution (fun fuel =>
+      run program fuel method (callPc + 1) args frame [] stored)) (Function.uncurry post) := by
+    cil_contract_steps [found, constAt, retAt, flagFit]
+    apply continuation stored valid outside authority
+    simpa only [UInt256Model.value] using value
+  apply WP.call (helperPost := fun result => result.1 = stored ∧ result.2 = [])
+    found callAt stepped ⟨childFuel, (stored, []), invoked, rfl, rfl⟩
+  rintro final values ⟨rfl, rfl⟩
+  exact suffix
 end UInt256Proof.Add.Safety
 
 namespace UInt256Proof.Add.Safety
@@ -410,14 +339,18 @@ theorem PortableSmallState.finish (program : CIL.Program) (method storage : Nat)
       post (leaveFrame frame stored) [.scalar (.i32 (portableSiteFlag site))]) :
     WP (Execution (fun fuel => run program fuel method (portableSiteStart site)
       args frame [] current)) (Function.uncurry post) := by
-  obtain ⟨h1, s1, r1⟩ := state.limbs 1
-  obtain ⟨h2, s2, r2⟩ := state.limbs 2
-  obtain ⟨h3, s3, r3⟩ := state.limbs 3
-  obtain ⟨h4, s4, r4⟩ := state.sumRead
-  have l1 := fun pc stack => step_load_word64 (body := portableSmallBody profile storage) (pc := pc) (args := args) (stack := stack) s1 r1
-  have l2 := fun pc stack => step_load_word64 (body := portableSmallBody profile storage) (pc := pc) (args := args) (stack := stack) s2 r2
-  have l3 := fun pc stack => step_load_word64 (body := portableSmallBody profile storage) (pc := pc) (args := args) (stack := stack) s3 r3
-  have l4 := fun pc stack => step_load_word64 (body := portableSmallBody profile storage) (pc := pc) (args := args) (stack := stack) s4 r4
+  have loads := fun (index : Fin 4) (pc : Nat) (stack : List Value) =>
+    state.snapshots.load (body := portableSmallBody profile storage) (pc := pc)
+      (index := index.val) (args := args) (stack := stack) (.i64 (words index))
+      (by simp [portableSmallKnown, rememberLocal, smallSaved, index.isLt,
+        show index.val ≠ 4 by omega])
+  have l1 := loads 1
+  have l2 := loads 2
+  have l3 := loads 3
+  have l4 := fun pc stack => state.snapshots.load (body := portableSmallBody profile storage)
+    (index := 4) (pc := pc) (args := args) (stack := stack) (.i64 sum)
+    (by simp [portableSmallKnown, rememberLocal])
+
   have formed := state.call.output_formed (by simp : output ∈ [output])
   have finishing := fun (callPc : Nat) callAt constAt retAt flagFit =>
     portable_small_store_return program method storage profile found storageFound current frame args [input] output
@@ -457,7 +390,8 @@ theorem portable_site_first (words : Fin 4 → BitVec 64) (word : BitVec 64) (ca
   · funext ⟨i, hi⟩
     have cases : i = 0 ∨ i = 1 ∨ i = 2 ∨ i = 3 := by omega
     rcases cases with rfl | rfl | rfl | rfl <;>
-      simp [portableSiteWords, portableSiteZeros, armSmallOutputWords, armSmallResult, armCarryResult, armIncrementWord, carry, first]
+      simp [portableSiteWords, portableSiteZeros, armSmallOutputWords, armSmallResult,
+        armCarryResult, armIncrementWord, carry, first, show (3 : Fin 4).val = 3 from rfl]
   · simp [portableSiteFlag, armSmallResult, armCarryResult, armIncrementWord, carry, first]
 
 theorem portable_site_second (words : Fin 4 → BitVec 64) (word : BitVec 64) (carry : words 0 + word < words 0)
@@ -467,7 +401,9 @@ theorem portable_site_second (words : Fin 4 → BitVec 64) (word : BitVec 64) (c
   · funext ⟨i, hi⟩
     have cases : i = 0 ∨ i = 1 ∨ i = 2 ∨ i = 3 := by omega
     rcases cases with rfl | rfl | rfl | rfl <;>
-      simp [portableSiteWords, portableSiteZeros, armSmallOutputWords, armSmallResult, armCarryResult, armIncrementWord, carry, first, second]
+      simp [portableSiteWords, portableSiteZeros, armSmallOutputWords, armSmallResult,
+        armCarryResult, armIncrementWord, carry, first, second,
+        show (3 : Fin 4).val = 3 from rfl]
   · simp [portableSiteFlag, armSmallResult, armCarryResult, armIncrementWord, carry, first, second]
 
 theorem portable_site_third (words : Fin 4 → BitVec 64) (word : BitVec 64) (carry : words 0 + word < words 0)
@@ -477,9 +413,12 @@ theorem portable_site_third (words : Fin 4 → BitVec 64) (word : BitVec 64) (ca
   · funext ⟨i, hi⟩
     have cases : i = 0 ∨ i = 1 ∨ i = 2 ∨ i = 3 := by omega
     rcases cases with rfl | rfl | rfl | rfl <;>
-      simp [portableSiteWords, portableSiteZeros, armSmallOutputWords, armSmallResult, armCarryResult, armIncrementWord, carry, first, second, third]
-  · simp [portableSiteFlag, armSmallResult, armCarryResult, armIncrementWord, carry, first, second, third]
-    all_goals decide
+      simp [portableSiteWords, portableSiteZeros, armSmallOutputWords, armSmallResult,
+        armCarryResult, armIncrementWord, carry, first, second, third,
+        show (3 : Fin 4).val = 3 from rfl]
+  · simp [portableSiteFlag, armSmallResult, armCarryResult, armIncrementWord,
+      carry, first, second, third, show (3 : Fin 4).val = 3 from rfl,
+      show (3 : Fin 5).val = 3 from rfl]
 
 theorem portable_site_overflow (words : Fin 4 → BitVec 64) (word : BitVec 64) (carry : words 0 + word < words 0)
     (first : words 1 + BitVec.ofNat 64 1 = BitVec.ofNat 64 0) (second : words 2 + BitVec.ofNat 64 1 = BitVec.ofNat 64 0) (third : words 3 + BitVec.ofNat 64 1 = BitVec.ofNat 64 0) :
@@ -488,9 +427,12 @@ theorem portable_site_overflow (words : Fin 4 → BitVec 64) (word : BitVec 64) 
   · funext ⟨i, hi⟩
     have cases : i = 0 ∨ i = 1 ∨ i = 2 ∨ i = 3 := by omega
     rcases cases with rfl | rfl | rfl | rfl <;>
-      simp [portableSiteWords, portableSiteZeros, armSmallOutputWords, armSmallResult, armCarryResult, armIncrementWord, carry, first, second, third]
-  · simp [portableSiteFlag, armSmallResult, armCarryResult, armIncrementWord, carry, first, second, third]
-    all_goals decide
+      simp [portableSiteWords, portableSiteZeros, armSmallOutputWords, armSmallResult,
+        armCarryResult, armIncrementWord, carry, first, second, third,
+        show (3 : Fin 4).val = 3 from rfl]
+  · simp [portableSiteFlag, armSmallResult, armCarryResult, armIncrementWord,
+      carry, first, second, third, show (3 : Fin 4).val = 3 from rfl,
+      show (4 : Fin 5).val = 4 from rfl]
 
 end UInt256Proof.Add.Safety
 
@@ -507,11 +449,9 @@ theorem PortableSmallState.exit (program : CIL.Program) (method storage : Nat) (
     (call : CallingConditions program original [input] [output])
     (setup : enterFrame (portableSmallBody profile storage) (armSmallArguments input output word) original =
       .ok (frame, entered)) :
-    ∃ fuel final returned,
-      run program fuel method (portableSiteStart site)
-        (armSmallArguments input output word) frame [] current = .ok (final, returned) ∧
-      ARMSmallPost original final returned input output word := by
-  apply WP.exists_execution
+    WP (Execution (fun fuel => run program fuel method (portableSiteStart site)
+      (armSmallArguments input output word) frame [] current))
+      (fun result => ARMSmallPost original result.1 result.2 input output word) := by
   apply state.finish program method storage profile found storageFound site (armSmallArguments input output word) (by rfl)
     (fun final returned => ARMSmallPost original final returned input output word)
   intro stored valid outside _ value
@@ -559,10 +499,15 @@ theorem portable_small_entry (program : CIL.Program) (method storage : Nat) (pro
   intro current saved
   apply portable_small_prepare program method storage profile found original entered current input output word frame enteredWF homes saved post
   intro after state
-  obtain ⟨lowHome, lowSlot, lowRead⟩ := state.limbs 0
-  obtain ⟨sumHome, sumSlot, sumRead⟩ := state.sumRead
-  apply portable_small_low_decision program method storage profile found after frame args lowHome sumHome
-    (inputLimb original input 0) (inputLimb original input 0 + word) lowSlot sumSlot lowRead sumRead post
+  have loadLow := fun pc stack => state.snapshots.load (body := portableSmallBody profile storage)
+    (index := 0) (args := args) (pc := pc) (stack := stack) (.i64 (inputLimb original input 0))
+    (by simp [portableSmallKnown, rememberLocal, smallSaved])
+  have loadSum := fun pc stack => state.snapshots.load (body := portableSmallBody profile storage)
+    (index := 4) (args := args) (pc := pc) (stack := stack) (.i64 (inputLimb original input 0 + word))
+    (by simp [portableSmallKnown, rememberLocal])
+  apply portable_small_low_decision program method storage profile found after frame args
+    (inputLimb original input 0) (inputLimb original input 0 + word) loadLow loadSum post
+
   split
   · rename_i carry
     apply state.increment program method storage profile found 0 args enteredWF homes post
@@ -577,26 +522,21 @@ theorem portable_small_entry (program : CIL.Program) (method storage : Nat) (pro
         intro after3 state3
         split
         · rename_i third
-          apply WP.adequate.mpr
           exact state3.exit program method storage profile found storageFound 4
             (portable_site_overflow _ word carry (by simpa [armIncrementWord] using first)
               (by simpa [armIncrementWord] using second) (by simpa [armIncrementWord] using third)) call setup
         · rename_i third
-          apply WP.adequate.mpr
           exact state3.exit program method storage profile found storageFound 3
             (portable_site_third _ word carry (by simpa [armIncrementWord] using first)
               (by simpa [armIncrementWord] using second) (by simpa [armIncrementWord] using third)) call setup
       · rename_i second
-        apply WP.adequate.mpr
         exact state2.exit program method storage profile found storageFound 2
           (portable_site_second _ word carry (by simpa [armIncrementWord] using first)
             (by simpa [armIncrementWord] using second)) call setup
     · rename_i first
-      apply WP.adequate.mpr
       exact state1.exit program method storage profile found storageFound 1
         (portable_site_first _ word carry (by simpa [armIncrementWord] using first)) call setup
   · rename_i carry
-    apply WP.adequate.mpr
     exact state.exit program method storage profile found storageFound 0
       (portable_site_no_carry _ word carry) call setup
 
