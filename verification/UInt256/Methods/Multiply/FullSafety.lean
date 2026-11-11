@@ -270,10 +270,6 @@ theorem full_scalar_top (profile : CIL.FeatureProfile) (program : CIL.Program) (
       noAvx512Feature, noAvx2Feature] until suffix
   exact run_next_exists post found fetched95 stored suffix
 
-theorem localWord_known (known : Nat → Option (BitVec 64)) (index : Nat)
-    (present : (known index).isSome = true) : known index = some (localWord known index) := by
-  cases found : known index <;> simp_all [localWord]
-
 def fullPrepared (original : Memory) (left right : Reference) :=
   rememberWord (fullInputs original left right) 6 (fullTop original left right)
 
@@ -383,254 +379,128 @@ theorem full_invoke_with_storage (profile : CIL.FeatureProfile) (program : CIL.P
     ∃ fuel final,
       invoke program fuel methodIndex (productArgs left right output) memory = .ok (final, []) ∧
       ProductResult memory final left right output [] := by
-  obtain ⟨frame, entered, setup, homes, enteredWF, state⟩ := full_frame_setup profile program methodIndex wordIndex countIndex storageIndex found memory left right output call
-  have fresh := enterFrame_fresh _ _ _ _ _ setup
-  have owned : ∀ id ∈ frame.owned, memory.nextIdentity ≤ id := fun id member => (fresh.2 id member).1
+  obtain ⟨frame, entered, setup, homes, enteredWF, state⟩ := full_frame_setup profile program
+    methodIndex wordIndex countIndex storageIndex found memory left right output call
+  have owned : ∀ id ∈ frame.owned, memory.nextIdentity ≤ id :=
+    fun id member => ((enterFrame_fresh _ _ _ _ _ setup).2 id member).1
   let post := fun final returned => ProductResult memory final left right output returned
-  let execute (pc : Nat) (known : Nat → Option (BitVec 64)) :=
-    ∀ current, PrivateWords program memory entered current [left, right] [output] frame known →
-    WP (Execution (fun fuel => run program fuel methodIndex pc
-        (productArgs left right output) frame [] current)) (Function.uncurry post)
-  have finish : execute 183 (fullFinalWords memory left right) := by
-    intro current state
-    apply WP.adequate.mpr
-    let known := fullFinalWords memory left right
-    let words := fullResultWords memory left right
-    let post := fun final returned => ProductResult memory final left right output returned
-    have formed := state.call.output_formed (by simp : output ∈ [output])
-    have load (index : Nat) (value : BitVec 64) (present : known index = some value)
-        (pc : Nat) (stack : List Value) := state.snapshots.load
-      (body := fullBody profile wordIndex countIndex storageIndex alternative)
-      (args := productArgs left right output) (pc := pc) (stack := stack) value present
-    have saved0 := load 8 (words 0) (localWord_known _ _ (by rfl))
-    have saved1 := load 14 (words 1) (localWord_known _ _ (by rfl))
-    have saved2 := load 15 (words 2) (localWord_known _ _ (by rfl))
-    have saved3 := load 6 (words 3) (localWord_known _ _ (by rfl))
-    cil_contract_steps 5 [productArgs, formed, saved0, saved1, saved2, saved3]
-    obtain ⟨childFuel, result, invoked, valid, outside, _, value, readable⟩ :=
-      storage current [left, right] output (words 0) (words 1) (words 2) (words 3) state.call
-    have packed : inputValue result output = UInt256Model.value words := value
-    have stepped (w0 w1 w2 w3 : BitVec 64) : step (fullBody profile wordIndex countIndex storageIndex alternative)
-        (.call storageIndex 5) 188 (productArgs left right output) frame
-        [.scalar (.i64 w3), .scalar (.i64 w2), .scalar (.i64 w1),
-          .scalar (.i64 w0), .reference (.address output)] current =
-        .ok (.call storageIndex [.reference (.address output), .scalar (.i64 w0),
-          .scalar (.i64 w1), .scalar (.i64 w2), .scalar (.i64 w3)] [] current) := by
-      cil_checked_step [formed]
+  have upper : ∀ current, PrivateWords program memory entered current [left, right] [output]
+      frame (fullSecondColumn memory left right) →
+      WP (Execution (fun fuel => run program fuel methodIndex 124
+        (productArgs left right output) frame [] current)) (Function.uncurry post) := by
+    intro current middle
+    apply WP.step found (by rfl) (middle.snapshots.load _ (localWord_remembered (by rfl)))
+    apply run_store_local middle enteredWF homes 15 (by rfl) _ found (by rfl)
+    intro _ copied
+    iterate 2 (apply WP.step found (by rfl); rfl)
+    apply run_store_local copied enteredWF homes 13 (by rfl) 0 found (by rfl)
+    intro _ reset
+    apply run_count_locals countFound reset call enteredWF homes 15 9 13 15
+      (by rfl) (by rfl) (by rfl) (by rfl) (by rfl) found (by rfl)
+    intro _ m0
+    apply run_count_locals countFound m0 call enteredWF homes 15 11 13 15
+      (by rfl) (by rfl) (by rfl) (by rfl) (by rfl) found (by rfl)
+    intro _ m1
+    apply run_widen_locals contract m1 call enteredWF homes 0 5 17 16
+      (by rfl) (by rfl) (by rfl) (by rfl) found (by rfl)
+    intro _ m2
+    apply run_count_locals countFound m2 call enteredWF homes 15 17 13 15
+      (by rfl) (by rfl) (by rfl) (by rfl) (by rfl) found (by rfl)
+    intro _ m3
+    apply WP.step found (by rfl) (m3.snapshots.load _ (localWord_remembered (by rfl)))
+    apply WP.step found (by rfl) (m3.snapshots.load _ (localWord_remembered (by rfl)))
+    iterate 1 (apply WP.step found (by rfl); rfl)
+    apply run_store_local m3 enteredWF homes 6 (by rfl) _ found (by rfl)
+    intro _ m4
+    apply run_widen_locals contract m4 call enteredWF homes 2 3 19 18
+      (by rfl) (by rfl) (by rfl) (by rfl) found (by rfl)
+    intro _ m5
+    apply run_count_locals countFound m5 call enteredWF homes 15 19 13 15
+      (by rfl) (by rfl) (by rfl) (by rfl) (by rfl) found (by rfl)
+    intro _ m6
+    apply WP.step found (by rfl) (m6.snapshots.load _ (localWord_remembered (by rfl)))
+    apply WP.step found (by rfl) (m6.snapshots.load _ (localWord_remembered (by rfl)))
+    iterate 1 (apply WP.step found (by rfl); rfl)
+    apply run_store_local m6 enteredWF homes 6 (by rfl) _ found (by rfl)
+    intro _ m7
+    apply run_widen_locals contract m7 call enteredWF homes 4 1 21 20
+      (by rfl) (by rfl) (by rfl) (by rfl) found (by rfl)
+    intro _ m8
+    apply run_count_locals countFound m8 call enteredWF homes 15 21 13 15
+      (by rfl) (by rfl) (by rfl) (by rfl) (by rfl) found (by rfl)
+    intro _ m9
+    apply WP.step found (by rfl) (m9.snapshots.load _ (localWord_remembered (by rfl)))
+    apply WP.step found (by rfl) (m9.snapshots.load _ (localWord_remembered (by rfl)))
+    apply WP.step found (by rfl) (m9.snapshots.load _ (localWord_remembered (by rfl)))
+    iterate 2 (apply WP.step found (by rfl); rfl)
+    apply run_store_local m9 enteredWF homes 6 (by rfl) _ found (by rfl)
+    intro _ finished
+    apply WP.step found (by rfl) (by cil_checked_step
+      [productArgs, finished.call.output_formed (by simp : output ∈ [output])])
+    apply WP.step found (by rfl) (finished.snapshots.load _ (localWord_remembered (by rfl)))
+    apply WP.step found (by rfl) (finished.snapshots.load _ (localWord_remembered (by rfl)))
+    apply WP.step found (by rfl) (finished.snapshots.load _ (localWord_remembered (by rfl)))
+    apply WP.step found (by rfl) (finished.snapshots.load _ (localWord_remembered (by rfl)))
+    exact run_product_storage storage finished call owned (fullResultWords memory left right)
+      (full_words_correct memory left right) found (by rfl) (by rfl)
+  have body : ∃ fuel final returned, run program fuel methodIndex 0
+      (productArgs left right output) frame [] entered = .ok (final, returned) ∧
+        post final returned := by
+    apply run_input_to_local (argument := 0) (target := 0) state call enteredWF homes left
+      (by simp) 0 (by rfl) (by rfl) found (by rfl) post
+    intro _ saved0
+    apply run_input_to_local (argument := 1) (target := 1) saved0 call enteredWF homes right
+      (by simp) 0 (by rfl) (by rfl) found (by rfl) post
+    intro _ saved1
+    apply run_input_to_local (argument := 0) (target := 2) saved1 call enteredWF homes left
+      (by simp) 1 (by rfl) (by rfl) found (by rfl) post
+    intro _ saved2
+    apply run_input_to_local (argument := 1) (target := 3) saved2 call enteredWF homes right
+      (by simp) 1 (by rfl) (by rfl) found (by rfl) post
+    intro _ saved3
+    apply run_input_to_local (argument := 0) (target := 4) saved3 call enteredWF homes left
+      (by simp) 2 (by rfl) (by rfl) found (by rfl) post
+    intro _ saved4
+    apply run_input_to_local (argument := 1) (target := 5) saved4 call enteredWF homes right
+      (by simp) 2 (by rfl) (by rfl) found (by rfl) post
+    intro _ saved5
+    apply top memory entered _ left right output frame call enteredWF homes saved5 post
+    intro _ prepared
     apply WP.exists_execution
-    apply WP.call (helperPost := fun after => after.1 = result ∧ after.2 = [])
-      found (by rfl) (stepped (words 0) (words 1) (words 2) (words 3)) ⟨childFuel, (result, []), invoked, rfl, rfl⟩
-    rintro final returned ⟨same, rfl⟩
-    change final = result at same
-    subst final
-    apply WP.returned found (by rfl) (by rfl) (by rfl)
-    exact output_result_of_storage memory current result [left, right]
-      output _ frame call valid owned state.caller
-      (packed.trans (full_words_correct memory left right)) readable outside
-  have finalColumn : execute 167 (fullUpperWords memory left right) := by
-    intro current state
-    let continuation := finish
-    let k0 := fullUpperWords memory left right
-    apply run_local_word_call state call enteredWF homes 4 1 21 20
-      (localWord k0 4) (localWord k0 1) (lowProduct (localWord k0 4) (localWord k0 1))
-      (highProduct (localWord k0 4) (localWord k0 1)) (localWord_known _ _ (by rfl)) (localWord_known _ _ (by rfl)) (by rfl) (by rfl)
-      found (by rfl) (by rfl) (by rfl) (by rfl) (by rfl)
-      (fun reference _ ready => widening_local_effect contract current _ _ state.call.1.1 reference ready) post
-    intro m1 state1
-    let k1 := widenWords k0 4 1 21 20
-    apply run_local_word_call state1 call enteredWF homes 15 21 13 15
-      (localWord k1 15) (localWord k1 21) (countCarry (localWord k1 15) (localWord k1 21) (localWord k1 13))
-      (localWord k1 15 + localWord k1 21) (localWord_known _ _ (by rfl)) (localWord_known _ _ (by rfl)) (by rfl) (by rfl)
-      found (by rfl) (by rfl) (by rfl) (by rfl) (by rfl)
-      (counting_local_effect profile program countIndex countFound state1.snapshots state1.call.1.1 13 _ _ (localWord k1 13) (localWord_known _ _ (by rfl))) post
-    intro m2 state2
-    let k2 := countWords k1 15 21 13 15
-    apply WP.step found (by rfl) (state2.snapshots.load (localWord k2 6) (localWord_known _ _ (by rfl)))
-    apply WP.step found (by rfl) (state2.snapshots.load (localWord k2 20) (localWord_known _ _ (by rfl)))
-    apply WP.step found (by rfl) (state2.snapshots.load (localWord k2 13) (localWord_known _ _ (by rfl)))
-    iterate 2
-      apply WP.step found (by rfl)
-      rfl
-    obtain ⟨after, stored, next⟩ := state2.store enteredWF homes 6 (by rfl)
-      (localWord k2 6 + (localWord k2 20 + localWord k2 13)) 182 (productArgs left right output) [] (body := (fullBody profile wordIndex countIndex storageIndex alternative))
-    exact WP.step found (by rfl) stored (continuation after next)
-  have upperColumn : execute 153 (fullFirstUpperWords memory left right) := by
-    intro current state
-    let continuation := finalColumn
-    let k0 := fullFirstUpperWords memory left right
-    apply run_local_word_call state call enteredWF homes 2 3 19 18
-      (localWord k0 2) (localWord k0 3) (lowProduct (localWord k0 2) (localWord k0 3))
-      (highProduct (localWord k0 2) (localWord k0 3))
-      (localWord_known _ _ (by rfl)) (localWord_known _ _ (by rfl)) (by rfl) (by rfl)
-      found (by rfl) (by rfl) (by rfl) (by rfl) (by rfl)
-      (fun reference _ ready => widening_local_effect contract current _ _ state.call.1.1 reference ready) post
-    intro m1 state1
-    let k1 := widenWords k0 2 3 19 18
-    apply run_local_word_call state1 call enteredWF homes 15 19 13 15
-      (localWord k1 15) (localWord k1 19) (countCarry (localWord k1 15) (localWord k1 19) (localWord k1 13))
-      (localWord k1 15 + localWord k1 19)
-      (localWord_known _ _ (by rfl)) (localWord_known _ _ (by rfl)) (by rfl) (by rfl)
-      found (by rfl) (by rfl) (by rfl) (by rfl) (by rfl)
-      (counting_local_effect profile program countIndex countFound state1.snapshots state1.call.1.1 13 _ _ (localWord k1 13) (localWord_known _ _ (by rfl))) post
-    intro m2 state2
-    let k2 := countWords k1 15 19 13 15
-    apply WP.step found (by rfl) (state2.snapshots.load (localWord k2 6) (localWord_known _ _ (by rfl)))
-    apply WP.step found (by rfl) (state2.snapshots.load (localWord k2 18) (localWord_known _ _ (by rfl)))
-    apply WP.step found (by rfl)
-    · rfl
-    obtain ⟨after, stored, next⟩ := state2.store enteredWF homes 6 (by rfl)
-      (localWord k2 6 + localWord k2 18) 166 (productArgs left right output) [] (body := (fullBody profile wordIndex countIndex storageIndex alternative))
-    exact WP.step found (by rfl) stored (continuation after next)
-  have firstUpper : execute 139 (fullMiddleWords memory left right) := by
-    intro current state
-    let continuation := upperColumn
-    let k0 := fullMiddleWords memory left right
-    apply run_local_word_call state call enteredWF homes 0 5 17 16
-      (localWord k0 0) (localWord k0 5) (lowProduct (localWord k0 0) (localWord k0 5))
-      (highProduct (localWord k0 0) (localWord k0 5))
-      (localWord_known _ _ (by rfl)) (localWord_known _ _ (by rfl)) (by rfl) (by rfl)
-      found (by rfl) (by rfl) (by rfl) (by rfl) (by rfl)
-      (fun reference _ ready => widening_local_effect contract current _ _ state.call.1.1 reference ready) post
-    intro m1 state1
-    let k1 := widenWords k0 0 5 17 16
-    apply run_local_word_call state1 call enteredWF homes 15 17 13 15
-      (localWord k1 15) (localWord k1 17) (countCarry (localWord k1 15) (localWord k1 17) (localWord k1 13))
-      (localWord k1 15 + localWord k1 17)
-      (localWord_known _ _ (by rfl)) (localWord_known _ _ (by rfl)) (by rfl) (by rfl)
-      found (by rfl) (by rfl) (by rfl) (by rfl) (by rfl)
-      (counting_local_effect profile program countIndex countFound state1.snapshots state1.call.1.1 13 _ _ (localWord k1 13) (localWord_known _ _ (by rfl))) post
-    intro m2 state2
-    let k2 := countWords k1 15 17 13 15
-    apply WP.step found (by rfl) (state2.snapshots.load (localWord k2 6) (localWord_known _ _ (by rfl)))
-    apply WP.step found (by rfl) (state2.snapshots.load (localWord k2 16) (localWord_known _ _ (by rfl)))
-    apply WP.step found (by rfl)
-    · rfl
-    obtain ⟨after, stored, next⟩ := state2.store enteredWF homes 6 (by rfl)
-      (localWord k2 6 + localWord k2 16) 152 (productArgs left right output) [] (body := (fullBody profile wordIndex countIndex storageIndex alternative))
-    exact WP.step found (by rfl) stored (continuation after next)
-  have middleColumn : execute 124 (fullSecondColumn memory left right) := by
-    intro current state
-    let continuation := firstUpper
-    let known := fullSecondColumn memory left right
-    apply WP.step found (by rfl)
-      (state.snapshots.load (localWord known 13) (localWord_known _ _ (by rfl)))
-    obtain ⟨copied, copiedStep, copiedState⟩ := state.store enteredWF homes 15 (by rfl) (localWord known 13)
-      125 (productArgs left right output) [] (body := (fullBody profile wordIndex countIndex storageIndex alternative))
-    apply WP.step found (by rfl) copiedStep
-    iterate 2
-      apply WP.step found (by rfl)
-      rfl
-    obtain ⟨m0, resetStep, state0⟩ := copiedState.store enteredWF homes 13 (by rfl) 0
-      128 (productArgs left right output) [] (body := (fullBody profile wordIndex countIndex storageIndex alternative))
-    apply WP.step found (by rfl) resetStep
-    let k0 := rememberWord (rememberWord known 15 (localWord known 13)) 13 0
-    apply run_local_word_call state0 call enteredWF homes 15 9 13 15
-      (localWord k0 15) (localWord k0 9) (countCarry (localWord k0 15) (localWord k0 9) 0)
-      (localWord k0 15 + localWord k0 9) (localWord_known _ _ (by rfl)) (localWord_known _ _ (by rfl)) (by rfl) (by rfl)
-      found (by rfl) (by rfl) (by rfl) (by rfl) (by rfl)
-      (counting_local_effect profile program countIndex countFound state0.snapshots state0.call.1.1 13 _ _ 0 (by rfl)) post
-    intro m1 state1
-    let k1 := countWords k0 15 9 13 15
-    apply run_local_word_call state1 call enteredWF homes 15 11 13 15
-      (localWord k1 15) (localWord k1 11) (countCarry (localWord k1 15) (localWord k1 11) (localWord k1 13))
-      (localWord k1 15 + localWord k1 11) (localWord_known _ _ (by rfl)) (localWord_known _ _ (by rfl)) (by rfl) (by rfl)
-      found (by rfl) (by rfl) (by rfl) (by rfl) (by rfl)
-      (counting_local_effect profile program countIndex countFound state1.snapshots state1.call.1.1 13 _ _ (localWord k1 13) (by rfl)) post
-    exact continuation
-  have secondColumn : execute 96 (fullPrepared memory left right) := by
-    intro current state
-    let continuation := middleColumn
-    let k0 := fullPrepared memory left right
-    apply run_local_word_call state call enteredWF homes 0 1 8 7
-      (localWord k0 0) (localWord k0 1) (lowProduct (localWord k0 0) (localWord k0 1))
-      (highProduct (localWord k0 0) (localWord k0 1)) (by rfl) (by rfl) (by rfl) (by rfl)
-      found (by rfl) (by rfl) (by rfl) (by rfl) (by rfl)
-      (fun reference _ ready => widening_local_effect contract current _ _ state.call.1.1 reference ready) post
-    intro m1 state1
-    let k1 := widenWords k0 0 1 8 7
-    apply run_local_word_call state1 call enteredWF homes 0 3 10 9
-      (localWord k1 0) (localWord k1 3) (lowProduct (localWord k1 0) (localWord k1 3))
-      (highProduct (localWord k1 0) (localWord k1 3)) (by rfl) (by rfl) (by rfl) (by rfl)
-      found (by rfl) (by rfl) (by rfl) (by rfl) (by rfl)
-      (fun reference _ ready => widening_local_effect contract m1 _ _ state1.call.1.1 reference ready) post
-    intro m2 state2
-    let k2 := widenWords k1 0 3 10 9
-    apply run_local_word_call state2 call enteredWF homes 2 1 12 11
-      (localWord k2 2) (localWord k2 1) (lowProduct (localWord k2 2) (localWord k2 1))
-      (highProduct (localWord k2 2) (localWord k2 1)) (by rfl) (by rfl) (by rfl) (by rfl)
-      found (by rfl) (by rfl) (by rfl) (by rfl) (by rfl)
-      (fun reference _ ready => widening_local_effect contract m2 _ _ state2.call.1.1 reference ready) post
-    intro m3 state3
-    iterate 2
-      apply WP.step found (by rfl)
-      rfl
-    obtain ⟨m4, reset, state4⟩ := state3.store enteredWF homes 13 (by rfl) 0
-      113 (productArgs left right output) [] (body := (fullBody profile wordIndex countIndex storageIndex alternative))
-    apply WP.step found (by rfl) reset
+    apply run_widen_locals contract prepared call enteredWF homes 0 1 8 7
+      (by rfl) (by rfl) (by rfl) (by rfl) found (by rfl)
+    intro _ p0
+    apply run_widen_locals contract p0 call enteredWF homes 0 3 10 9
+      (by rfl) (by rfl) (by rfl) (by rfl) found (by rfl)
+    intro _ p1
+    apply run_widen_locals contract p1 call enteredWF homes 2 1 12 11
+      (by rfl) (by rfl) (by rfl) (by rfl) found (by rfl)
+    intro _ p2
+    iterate 2 (apply WP.step found (by rfl); rfl)
+    apply run_store_local p2 enteredWF homes 13 (by rfl) 0 found (by rfl)
+    intro _ p3
     cases alternative with
     | false =>
-        let k4 := rememberWord (fullFirstProducts memory left right) 13 0
-        apply run_local_word_call state4 call enteredWF homes 7 10 13 14
-          (localWord k4 7) (localWord k4 10) (countCarry (localWord k4 7) (localWord k4 10) 0)
-          (localWord k4 7 + localWord k4 10) (by rfl) (by rfl) (by rfl) (by rfl)
-          found (by rfl) (by rfl) (by rfl) (by rfl) (by rfl)
-          (counting_local_effect profile program countIndex countFound state4.snapshots state4.call.1.1 13 _ _ 0 (by rfl)) post
-        intro m5 state5
-        let k5 := countWords k4 7 10 13 14
-        apply run_local_word_call state5 call enteredWF homes 14 12 13 14
-          (localWord k5 14) (localWord k5 12) (countCarry (localWord k5 14) (localWord k5 12) (localWord k5 13))
-          (localWord k5 14 + localWord k5 12) (by rfl) (by rfl) (by rfl) (by rfl)
-          found (by rfl) (by rfl) (by rfl) (by rfl) (by rfl)
-          (counting_local_effect profile program countIndex countFound state5.snapshots state5.call.1.1 13 _ _ (localWord k5 13) (by rfl)) post
-        exact continuation
+      apply run_count_locals countFound p3 call enteredWF homes 7 10 13 14
+        (by rfl) (by rfl) (by rfl) (by rfl) (by rfl) found (by rfl)
+      intro _ p4
+      apply run_count_locals countFound p4 call enteredWF homes 14 12 13 14
+        (by rfl) (by rfl) (by rfl) (by rfl) (by rfl) found (by rfl)
+      intro _ p5
+      exact upper _ p5
     | true =>
-        let k4 := rememberWord (fullFirstProducts memory left right) 13 0
-        apply run_local_word_call state4 call enteredWF homes 7 12 13 14
-          (localWord k4 7) (localWord k4 12) (countCarry (localWord k4 7) (localWord k4 12) 0)
-          (localWord k4 7 + localWord k4 12) (by rfl) (by rfl) (by rfl) (by rfl)
-          found (by rfl) (by rfl) (by rfl) (by rfl) (by rfl)
-          (counting_local_effect profile program countIndex countFound state4.snapshots state4.call.1.1 13 _ _ 0 (by rfl)) post
-        intro m5 state5
-        let k5 := countWords k4 7 12 13 14
-        apply run_local_word_call state5 call enteredWF homes 14 10 13 14
-          (localWord k5 14) (localWord k5 10) (countCarry (localWord k5 14) (localWord k5 10) (localWord k5 13))
-          (localWord k5 14 + localWord k5 10) (by rfl) (by rfl) (by rfl) (by rfl)
-          found (by rfl) (by rfl) (by rfl) (by rfl) (by rfl)
-          (counting_local_effect profile program countIndex countFound state5.snapshots state5.call.1.1 13 _ _ (localWord k5 13) (by rfl)) post
-        intro after stateAfter
-        apply continuation after
-        change PrivateWords _ _ _ _ _ _ _ (countWords (countWords (rememberWord (fullFirstProducts memory left right) 13 0) 7 12 13 14) 14 10 13 14) at stateAfter
-        rw [second_column_order] at stateAfter
-        exact stateAfter
-  have prepared : execute 18 (fullInputs memory left right) := by
-    intro current saved
-    apply WP.adequate.mpr
-    apply top memory entered current left right output frame call enteredWF homes saved post
-    intro current ready
-    exact WP.adequate.mp (secondColumn current ready)
-  have body : WP (Execution (fun fuel => run program fuel methodIndex 0
-      (productArgs left right output) frame [] entered)) (Function.uncurry post) := by
-    apply WP.adequate.mpr
-    let continuation := fun current saved => WP.adequate.mp (prepared current saved)
-    apply run_input_to_local (argument := 0) (target := 0) state call enteredWF homes left (by simp) 0
-      (by rfl) (by rfl) found (by rfl) post
-    intro m0 state0
-    apply run_input_to_local (argument := 1) (target := 1) state0 call enteredWF homes right (by simp) 0
-      (by rfl) (by rfl) found (by rfl) post
-    intro m1 state1
-    apply run_input_to_local (argument := 0) (target := 2) state1 call enteredWF homes left (by simp) 1
-      (by rfl) (by rfl) found (by rfl) post
-    intro m2 state2
-    apply run_input_to_local (argument := 1) (target := 3) state2 call enteredWF homes right (by simp) 1
-      (by rfl) (by rfl) found (by rfl) post
-    intro m3 state3
-    apply run_input_to_local (argument := 0) (target := 4) state3 call enteredWF homes left (by simp) 2
-      (by rfl) (by rfl) found (by rfl) post
-    intro m4 state4
-    apply run_input_to_local (argument := 1) (target := 5) state4 call enteredWF homes right (by simp) 2
-      (by rfl) (by rfl) found (by rfl) post
-    exact continuation
-  obtain ⟨fuel, final, returned, ran, result⟩ := WP.adequate.mp body
+      apply run_count_locals countFound p3 call enteredWF homes 7 12 13 14
+        (by rfl) (by rfl) (by rfl) (by rfl) (by rfl) found (by rfl)
+      intro _ p4
+      apply run_count_locals countFound p4 call enteredWF homes 14 10 13 14
+        (by rfl) (by rfl) (by rfl) (by rfl) (by rfl) found (by rfl)
+      intro _ p5
+      apply upper
+      change PrivateWords _ _ _ _ _ _ _ (countWords (countWords (rememberWord
+        (fullFirstProducts memory left right) 13 0) 7 12 13 14) 14 10 13 14) at p5
+      rw [second_column_order] at p5
+      exact p5
+  obtain ⟨fuel, final, returned, ran, result⟩ := body
   have returns : returned = [] := result.returns
   subst returned
   have leftFormed := call.input_formed (by simp : left ∈ [left, right])

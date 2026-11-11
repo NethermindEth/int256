@@ -1,73 +1,19 @@
 import UInt256.Methods.Multiply.EntrySetup
 import UInt256.Safety.OutputCallReturn
 
+/-! The multiplication entry point dispatches on the saved zero masks to the single-word,
+    scalar, two-limb and full paths; every branch returns the checked product. -/
+
 namespace UInt256Proof.Multiply.Entry
 variable {alternative : Bool}
 open CIL.Safety UInt256Model.Safety UInt256Proof.Multiply.Calls
+open UInt256Proof.Multiply.BothTwo (run_widen_locals run_product_storage)
 
 private theorem product_padding (lo hi : BitVec 64) :
     BitVec.ofNat 256 (lo.toNat + hi.toNat * 2^64 + (0 : BitVec 64).toNat * 2^128 +
       (0 : BitVec 64).toNat * 2^192) = BitVec.ofNat 256 (lo.toNat + hi.toNat * 2^64) := by
   simp (config := { implicitDefEqProofs := false }) only
     [show (0 : BitVec 64).toNat = 0 from rfl, Nat.zero_mul, Nat.add_zero]
-
-theorem multiply_small_branch (ctx : Context alternative) (word : WordContract ctx.program ctx.indices.word)
-    (original entered current : Memory) (left right output : Reference) (frame : Frame)
-    (originalCall : CallingConditions ctx.program original [left, right] [output])
-    (enteredWF : entered.WellFormed)
-    (homes : CompleteWritableHomes entered original.nextIdentity (multiplyBody ctx.profile ctx.indices).localKinds frame.locals)
-    (owned : ∀ id ∈ frame.owned, original.nextIdentity ≤ id)
-    (state : PrivateWords ctx.program original entered current [left, right] [output] frame
-      (multiplyInputs original left right))
-    (leftSmall : inputTail original left = 0) (rightSmall : inputTail original right = 0) :
-    ∃ fuel final returned,
-      run ctx.program fuel ctx.indices.entry 32 (productArgs left right output) frame [] current =
-        .ok (final, returned) ∧ ProductResult original final left right output returned := by
-  let a := inputLimb original left 0
-  let b := inputLimb original right 0
-  let post := fun final returned => ProductResult original final left right output returned
-  have found : ctx.program[ctx.indices.entry]? = some (multiplyBody ctx.profile ctx.indices) := ctx.entry
-  apply WP.exists_execution
-  apply run_local_word_call state originalCall enteredWF homes 0 1 7 6
-    a b (lowProduct a b) (highProduct a b) (by rfl) (by rfl) (by rfl) (by rfl)
-    found (by rfl) (by rfl) (by rfl) (by rfl) (by rfl)
-    (fun reference _ ready => widening_local_effect word current a b state.call.1.1 reference ready) post
-  intro after next
-  apply WP.adequate.mpr
-  have formed := next.call.output_formed (by simp : output ∈ [output])
-  have loadLow := fun (pc : Nat) (stack : List Value) => next.snapshots.load
-    (body := (multiplyBody ctx.profile ctx.indices)) (args := productArgs left right output) (pc := pc) (stack := stack)
-    (index := 7) (lowProduct a b) (by rfl)
-  have loadHigh := fun (pc : Nat) (stack : List Value) => next.snapshots.load
-    (body := (multiplyBody ctx.profile ctx.indices)) (args := productArgs left right output) (pc := pc) (stack := stack)
-    (index := 6) (highProduct a b) (by rfl)
-  iterate 7
-    apply run_next_exists post found (by rfl)
-    first
-    | exact loadLow _ _
-    | exact loadHigh _ _
-    | simp [step, cil_guard, observerCount, productArgs, checkedValue, numericValue, pureArity, scalars, CIL.step.eq_def,
-        formValue, formed, checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-      first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
-  obtain ⟨childFuel, childFinal, invoked, valid, outside, _, value, readable⟩ :=
-    ctx.storage after [left, right] output (lowProduct a b) (highProduct a b) 0 0 next.call
-  have expected : OutputResult after childFinal output (inputValue original left * inputValue original right) [] := by
-    refine ⟨rfl, valid.1.1, ?_, valid.1.writable (wordView output) (by simp), readable, ?_⟩
-    · exact value.trans ((product_padding _ _).trans
-        (small_product_value original left right leftSmall rightSmall))
-    · exact fun id _ offset beyond => outside id offset beyond
-  apply run_output_call (callee := ctx.indices.storage)
-    next originalCall owned (inputValue original left * inputValue original right)
-    found (by rfl) _ (by rfl) (by rfl) ⟨childFuel, childFinal, invoked, expected⟩
-  simp [step, cil_guard, observerCount, checkedValue, numericValue, formValue, formed, checkedAt,
-    Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-  try rfl
-
-end UInt256Proof.Multiply.Entry
-
-namespace UInt256Proof.Multiply.Entry
-variable {alternative : Bool}
-open CIL.Safety UInt256Model.Safety UInt256Proof.Multiply.Calls
 
 theorem multiply_left_two_branch (ctx : Context alternative) (word : WordContract ctx.program ctx.indices.word) (swapped : Bool)
     (original entered current : Memory) (left right output : Reference) (frame : Frame)
@@ -112,157 +58,10 @@ theorem multiply_left_two_branch (ctx : Context alternative) (word : WordContrac
   change ∃ fuel final returned, _ ∧ post final returned
   cases swapped <;> dsimp [firstInput, secondInput] at invoked ⊢
   all_goals
-    iterate 3
-      apply run_next_exists post found (by rfl)
-      simp [step, cil_guard, observerCount, productArgs, checkedValue, formValue, leftFormed, rightFormed, outputFormed, checkedAt,
-        Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-      first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
-    apply run_output_call (callee := ctx.indices.leftTwo)
-      state originalCall owned (inputValue original left * inputValue original right)
-      found (by rfl) _ (by rfl) (by rfl) ⟨childFuel, childFinal, invoked, expected⟩
-    simp [step, cil_guard, observerCount, checkedValue, formValue, leftFormed, rightFormed, outputFormed, checkedAt,
-      Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-    rfl
-
-end UInt256Proof.Multiply.Entry
-
-namespace UInt256Proof.Multiply.Entry
-variable {alternative : Bool}
-open CIL.Safety UInt256Model.Safety UInt256Proof.Multiply.Calls
-
-theorem multiply_both_two_branch (ctx : Context alternative) (word : WordContract ctx.program ctx.indices.word)
-    (original entered current : Memory) (left right output : Reference) (frame : Frame)
-    (originalCall : CallingConditions ctx.program original [left, right] [output])
-    (owned : ∀ id ∈ frame.owned, original.nextIdentity ≤ id)
-    (state : PrivateWords ctx.program original entered current [left, right] [output] frame
-      (multiplyInputs original left right))
-    (leftUpper : inputUpper original left = 0) (rightUpper : inputUpper original right = 0) :
-    ∃ fuel final returned,
-      run ctx.program fuel ctx.indices.entry 64 (productArgs left right output) frame [] current =
-        .ok (final, returned) ∧ ProductResult original final left right output returned := by
-  let post := fun final returned => ProductResult original final left right output returned
-  have found : ctx.program[ctx.indices.entry]? = some (multiplyBody ctx.profile ctx.indices) := ctx.entry
-  have leftFormed := state.call.input_formed (by simp : left ∈ [left, right])
-  have rightFormed := state.call.input_formed (by simp : right ∈ [left, right])
-  have outputFormed := state.call.output_formed (by simp : output ∈ [output])
-  change ∃ fuel final returned, _ ∧ post final returned
-  iterate 3
-    apply run_next_exists post found (by rfl)
-    simp [step, cil_guard, observerCount, productArgs, checkedValue, formValue, leftFormed, rightFormed, outputFormed, checkedAt,
-      Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-    first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
-  have leftZero : inputLimb current left 2 = 0 ∧ inputLimb current left 3 = 0 := by
-    simpa only [state.input_limb originalCall left (by simp)] using input_upper_zero original left leftUpper
-  have rightZero : inputLimb current right 2 = 0 ∧ inputLimb current right 3 = 0 := by
-    simpa only [state.input_limb originalCall right (by simp)] using input_upper_zero original right rightUpper
-  obtain ⟨childFuel, childFinal, invoked, result⟩ := BothTwo.both_two_invoke_with_storage ctx.profile ctx.program ctx.indices.bothTwo ctx.indices.word ctx.indices.count ctx.indices.storage ctx.storage ctx.bothTwo ctx.count word current left right output state.call leftZero rightZero
-  have leftValue := state.input_value originalCall left (by simp)
-  have rightValue := state.input_value originalCall right (by simp)
-  have expected : OutputResult current childFinal output (inputValue original left * inputValue original right) [] := by
-    change OutputResult current childFinal output (inputValue current left * inputValue current right) [] at result
-    rw [leftValue, rightValue] at result
-    exact result
-  apply run_output_call (callee := ctx.indices.bothTwo) (callArgs := productArgs left right output)
-    state originalCall owned (inputValue original left * inputValue original right)
-    found (by rfl) _ (by rfl) (by rfl) ⟨childFuel, childFinal, invoked, expected⟩
-  simp [step, cil_guard, observerCount, productArgs, checkedValue, formValue, leftFormed, rightFormed, outputFormed, checkedAt,
-    Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-  try rfl
-
-end UInt256Proof.Multiply.Entry
-
-namespace UInt256Proof.Multiply.Entry
-variable {alternative : Bool}
-open CIL.Safety UInt256Model.Safety UInt256Proof.Multiply.Calls
-
-theorem multiply_full_branch (ctx : Context alternative) (word : WordContract ctx.program ctx.indices.word) (top : Full.FullTopContract ctx.profile ctx.program ctx.indices.full ctx.indices.word ctx.indices.count ctx.indices.storage)
-    (original entered current : Memory) (left right output : Reference) (frame : Frame)
-    (originalCall : CallingConditions ctx.program original [left, right] [output])
-    (owned : ∀ id ∈ frame.owned, original.nextIdentity ≤ id)
-    (state : PrivateWords ctx.program original entered current [left, right] [output] frame
-      (multiplyInputs original left right)) :
-    ∃ fuel final returned,
-      run ctx.program fuel ctx.indices.entry 83 (productArgs left right output) frame [] current =
-        .ok (final, returned) ∧ ProductResult original final left right output returned := by
-  let post := fun final returned => ProductResult original final left right output returned
-  have found : ctx.program[ctx.indices.entry]? = some (multiplyBody ctx.profile ctx.indices) := ctx.entry
-  have leftFormed := state.call.input_formed (by simp : left ∈ [left, right])
-  have rightFormed := state.call.input_formed (by simp : right ∈ [left, right])
-  have outputFormed := state.call.output_formed (by simp : output ∈ [output])
-  change ∃ fuel final returned, _ ∧ post final returned
-  iterate 3
-    apply run_next_exists post found (by rfl)
-    simp [step, cil_guard, observerCount, productArgs, checkedValue, formValue, leftFormed, rightFormed, outputFormed, checkedAt,
-      Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-    first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
-  obtain ⟨childFuel, childFinal, invoked, result⟩ := Full.full_invoke_with_storage ctx.profile ctx.program ctx.indices.full ctx.indices.word ctx.indices.count ctx.indices.storage ctx.storage ctx.full ctx.count word top current left right output state.call
-  have leftValue := state.input_value originalCall left (by simp)
-  have rightValue := state.input_value originalCall right (by simp)
-  have expected : OutputResult current childFinal output (inputValue original left * inputValue original right) [] := by
-    change OutputResult current childFinal output (inputValue current left * inputValue current right) [] at result
-    rw [leftValue, rightValue] at result
-    exact result
-  apply run_output_call (callee := ctx.indices.full) (callArgs := productArgs left right output)
-    state originalCall owned (inputValue original left * inputValue original right)
-    found (by rfl) _ (by rfl) (by rfl) ⟨childFuel, childFinal, invoked, expected⟩
-  simp [step, cil_guard, observerCount, productArgs, checkedValue, formValue, leftFormed, rightFormed, outputFormed, checkedAt,
-    Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-  try rfl
-
-end UInt256Proof.Multiply.Entry
-
-namespace UInt256Proof.Multiply.Entry
-variable {alternative : Bool}
-open CIL.Safety UInt256Model.Safety UInt256Proof.Multiply.Calls
-
-theorem multiply_large_dispatch (ctx : Context alternative) (word : WordContract ctx.program ctx.indices.word) (top : Full.FullTopContract ctx.profile ctx.program ctx.indices.full ctx.indices.word ctx.indices.count ctx.indices.storage)
-    (original entered current : Memory) (left right output : Reference) (frame : Frame)
-    (originalCall : CallingConditions ctx.program original [left, right] [output])
-    (owned : ∀ id ∈ frame.owned, original.nextIdentity ≤ id)
-    (state : PrivateWords ctx.program original entered current [left, right] [output] frame
-      (multiplyInputs original left right)) :
-    ∃ fuel final returned,
-      run ctx.program fuel ctx.indices.entry 60 (productArgs left right output) frame [] current =
-        .ok (final, returned) ∧ ProductResult original final left right output returned := by
-  let post := fun final returned => ProductResult original final left right output returned
-  have found : ctx.program[ctx.indices.entry]? = some (multiplyBody ctx.profile ctx.indices) := ctx.entry
-  have loadLeft := fun (pc : Nat) (stack : List Value) => state.snapshots.load
-    (body := (multiplyBody ctx.profile ctx.indices)) (args := productArgs left right output) (pc := pc) (stack := stack)
-    (index := 2) (inputUpper original left) (by rfl)
-  have loadRight := fun (pc : Nat) (stack : List Value) => state.snapshots.load
-    (body := (multiplyBody ctx.profile ctx.indices)) (args := productArgs left right output) (pc := pc) (stack := stack)
-    (index := 3) (inputUpper original right) (by rfl)
-  apply run_next_exists post found (by rfl) (loadLeft _ _)
-  apply run_next_exists post found (by rfl) (loadRight _ _)
-  apply run_next_exists post found (by rfl)
-  · simp [step, cil_guard, observerCount, pureArity, numericValue, scalars, CIL.step.eq_def, CIL.binary,
-      Bind.bind, Except.bind, Pure.pure, Except.pure]
-    first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
-  apply run_next_exists post found (by rfl) (step_word_nonzero _ _ _ _ _ _ _)
-  by_cases both : inputUpper original left ||| inputUpper original right = 0
-  · simp only [both, ite_true]
-    have halves := BitVec.or_eq_zero_iff.mp both
-    exact multiply_both_two_branch ctx word original entered current left right output frame originalCall owned state halves.1 halves.2
-  · simp only [both, ite_false]
-    apply run_next_exists post found (by rfl) (loadLeft _ _)
-    apply run_next_exists post found (by rfl) (step_word_nonzero _ _ _ _ _ _ _)
-    by_cases leftZero : inputUpper original left = 0
-    · simp only [leftZero, ite_true]
-      exact multiply_left_two_branch ctx word false original entered current left right output frame originalCall owned state leftZero
-    · simp only [leftZero, ite_false]
-      apply run_next_exists post found (by rfl) (loadRight _ _)
-      apply run_next_exists post found (by rfl) (step_word_nonzero _ _ _ _ _ _ _)
-      by_cases rightZero : inputUpper original right = 0
-      · simp only [rightZero, ite_true]
-        exact multiply_left_two_branch ctx word true original entered current left right output frame originalCall owned state rightZero
-      · simp only [rightZero, ite_false]
-        exact multiply_full_branch ctx word top original entered current left right output frame originalCall owned state
-
-end UInt256Proof.Multiply.Entry
-
-namespace UInt256Proof.Multiply.Entry
-variable {alternative : Bool}
-open CIL.Safety UInt256Model.Safety UInt256Proof.Multiply.Calls
+    cil_contract_steps 3 [productArgs, leftFormed, rightFormed, outputFormed]
+    exact run_output_call (callee := ctx.indices.leftTwo) state originalCall owned _ found (by rfl)
+      (by cil_checked_step [productArgs, leftFormed, rightFormed, outputFormed])
+      (by rfl) (by rfl) ⟨childFuel, childFinal, invoked, expected⟩
 
 theorem multiply_scalar_branch (ctx : Context alternative) (word : WordContract ctx.program ctx.indices.word) (swapped : Bool)
     (original entered current : Memory) (left right output : Reference) (frame : Frame)
@@ -296,107 +95,136 @@ theorem multiply_scalar_branch (ctx : Context alternative) (word : WordContract 
     cases swapped
     · rfl
     · exact BitVec.mul_comm _ _
-  have loadWord := fun (pc : Nat) (stack : List Value) => state.snapshots.load
-    (body := (multiplyBody ctx.profile ctx.indices)) (args := productArgs left right output) (pc := pc) (stack := stack)
-    (index := if swapped then 0 else 1) smallWord (by cases swapped <;> rfl)
   let post := fun final returned => ProductResult original final left right output returned
   have found : ctx.program[ctx.indices.entry]? = some (multiplyBody ctx.profile ctx.indices) := ctx.entry
   have leftFormed := state.call.input_formed (by simp : left ∈ [left, right])
   have rightFormed := state.call.input_formed (by simp : right ∈ [left, right])
   have outputFormed := state.call.output_formed (by simp : output ∈ [output])
+  have loadWord := fun (pc : Nat) (stack : List Value) => state.snapshots.load
+    (body := multiplyBody ctx.profile ctx.indices) (args := productArgs left right output)
+    (pc := pc) (stack := stack) (index := if swapped then 0 else 1) smallWord
+    (by cases swapped <;> rfl)
   change ∃ fuel final returned, _ ∧ post final returned
   cases swapped <;> dsimp [firstInput, secondInput, smallWord] at invoked loadWord ⊢
   all_goals
-    iterate 3
-      apply run_next_exists post found (by rfl)
-      first
-      | exact loadWord _ _
-      | simp [step, cil_guard, observerCount, productArgs, checkedValue, formValue, leftFormed, rightFormed, outputFormed, checkedAt,
-          Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-        first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
-    apply run_output_call (callee := ctx.indices.single)
-      state originalCall owned (inputValue original left * inputValue original right)
-      found (by rfl) _ (by rfl) (by rfl) ⟨childFuel, childFinal, invoked, expected⟩
-    simp [step, cil_guard, observerCount, ScalarSafety.scalarArgs, checkedValue, formValue, leftFormed, rightFormed, outputFormed, checkedAt,
-      Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-    rfl
-
-end UInt256Proof.Multiply.Entry
-
-namespace UInt256Proof.Multiply.Entry
-variable {alternative : Bool}
-open CIL.Safety UInt256Model.Safety UInt256Proof.Multiply.Calls
-
-theorem multiply_dispatch (ctx : Context alternative) (word : WordContract ctx.program ctx.indices.word) (top : Full.FullTopContract ctx.profile ctx.program ctx.indices.full ctx.indices.word ctx.indices.count ctx.indices.storage)
-    (original entered current : Memory) (left right output : Reference) (frame : Frame)
-    (originalCall : CallingConditions ctx.program original [left, right] [output])
-    (enteredWF : entered.WellFormed)
-    (homes : CompleteWritableHomes entered original.nextIdentity (multiplyBody ctx.profile ctx.indices).localKinds frame.locals)
-    (owned : ∀ id ∈ frame.owned, original.nextIdentity ≤ id)
-    (state : PrivateWords ctx.program original entered current [left, right] [output] frame
-      (multiplyInputs original left right)) :
-    ∃ fuel final returned,
-      run ctx.program fuel ctx.indices.entry 28 (productArgs left right output) frame [] current =
-        .ok (final, returned) ∧ ProductResult original final left right output returned := by
-  let post := fun final returned => ProductResult original final left right output returned
-  have found : ctx.program[ctx.indices.entry]? = some (multiplyBody ctx.profile ctx.indices) := ctx.entry
-  have loadLeft := fun (pc : Nat) (stack : List Value) => state.snapshots.load
-    (body := (multiplyBody ctx.profile ctx.indices)) (args := productArgs left right output) (pc := pc) (stack := stack)
-    (index := 4) (inputTail original left) (by rfl)
-  have loadRight := fun (pc : Nat) (stack : List Value) => state.snapshots.load
-    (body := (multiplyBody ctx.profile ctx.indices)) (args := productArgs left right output) (pc := pc) (stack := stack)
-    (index := 5) (inputTail original right) (by rfl)
-  apply run_next_exists post found (by rfl) (loadLeft _ _)
-  apply run_next_exists post found (by rfl) (loadRight _ _)
-  apply run_next_exists post found (by rfl)
-  · simp [step, cil_guard, observerCount, pureArity, numericValue, scalars, CIL.step.eq_def, CIL.binary,
-      Bind.bind, Except.bind, Pure.pure, Except.pure]
-    first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
-  apply run_next_exists post found (by rfl) (step_word_nonzero _ _ _ _ _ _ _)
-  by_cases both : inputTail original left ||| inputTail original right = 0
-  · simp only [both, ite_true]
-    have halves := BitVec.or_eq_zero_iff.mp both
-    exact multiply_small_branch ctx word original entered current left right output frame originalCall enteredWF homes owned state halves.1 halves.2
-  · simp only [both, ite_false]
-    apply run_next_exists post found (by rfl) (loadRight _ _)
-    apply run_next_exists post found (by rfl) (step_word_nonzero _ _ _ _ _ _ _)
-    by_cases rightZero : inputTail original right = 0
-    · simp only [rightZero, ite_true]
-      exact multiply_scalar_branch ctx word false original entered current left right output frame originalCall owned state rightZero
-    · simp only [rightZero, ite_false]
-      apply run_next_exists post found (by rfl) (loadLeft _ _)
-      apply run_next_exists post found (by rfl) (step_word_nonzero _ _ _ _ _ _ _)
-      by_cases leftZero : inputTail original left = 0
-      · simp only [leftZero, ite_true]
-        exact multiply_scalar_branch ctx word true original entered current left right output frame originalCall owned state leftZero
-      · simp only [leftZero, ite_false]
-        exact multiply_large_dispatch ctx word top original entered current left right output frame originalCall owned state
-
-end UInt256Proof.Multiply.Entry
-
-namespace UInt256Proof.Multiply.Entry
-variable {alternative : Bool}
-open CIL.Safety UInt256Model.Safety UInt256Proof.Multiply.Calls
+    cil_contract_steps 3 [productArgs, leftFormed, rightFormed, outputFormed, loadWord]
+    exact run_output_call (callee := ctx.indices.single) state originalCall owned _ found (by rfl)
+      (by cil_checked_step [ScalarSafety.scalarArgs, leftFormed, rightFormed, outputFormed])
+      (by rfl) (by rfl) ⟨childFuel, childFinal, invoked, expected⟩
 
 theorem multiply_invoke (ctx : Context alternative) (word : WordContract ctx.program ctx.indices.word) (top : Full.FullTopContract ctx.profile ctx.program ctx.indices.full ctx.indices.word ctx.indices.count ctx.indices.storage) (memory : Memory) (left right output : Reference)
     (call : CallingConditions ctx.program memory [left, right] [output]) :
     ∃ fuel final,
       invoke ctx.program fuel ctx.indices.entry (productArgs left right output) memory = .ok (final, []) ∧
       ProductResult memory final left right output [] := by
-  obtain ⟨frame, entered, setup, homes, enteredWF, state⟩ := multiply_frame_setup ctx memory left right output call
-  have fresh := enterFrame_fresh _ _ _ _ _ setup
-  have owned : ∀ id ∈ frame.owned, memory.nextIdentity ≤ id := fun id member => (fresh.2 id member).1
+  obtain ⟨frame, entered, setup, homes, enteredWF, initial⟩ :=
+    multiply_frame_setup ctx memory left right output call
+  have owned : ∀ id ∈ frame.owned, memory.nextIdentity ≤ id :=
+    fun id member => ((enterFrame_fresh _ _ _ _ _ setup).2 id member).1
   let post := fun final returned => ProductResult memory final left right output returned
+  have found : ctx.program[ctx.indices.entry]? = some (multiplyBody ctx.profile ctx.indices) :=
+    ctx.entry
   have body : ∃ fuel final returned,
       run ctx.program fuel ctx.indices.entry 0 (productArgs left right output) frame [] entered =
         .ok (final, returned) ∧ post final returned := by
-    apply multiply_prepare ctx memory entered entered left right output frame call enteredWF homes state post
-    intro current prepared
-    exact multiply_dispatch ctx word top memory entered current left right output frame call enteredWF homes owned prepared
+    apply multiply_prepare ctx memory entered entered left right output frame call enteredWF homes
+      initial post
+    intro current state
+    have leftFormed := state.call.input_formed (by simp : left ∈ [left, right])
+    have rightFormed := state.call.input_formed (by simp : right ∈ [left, right])
+    have outputFormed := state.call.output_formed (by simp : output ∈ [output])
+    have expected {childFinal : Memory}
+        (result : ProductResult current childFinal left right output []) :
+        OutputResult current childFinal output
+          (inputValue memory left * inputValue memory right) [] := by
+      simpa only [BothTwo.ProductResult, state.input_value call left (by simp),
+        state.input_value call right (by simp)] using result
+    apply run_next_exists post found (by rfl) (state.snapshots.load _ (by rfl))
+    apply run_next_exists post found (by rfl) (state.snapshots.load _ (by rfl))
+    apply run_next_exists post found (by rfl)
+    · simp [step, cil_guard, observerCount, pureArity, numericValue, scalars, CIL.step.eq_def,
+        CIL.binary, Bind.bind, Except.bind, Pure.pure, Except.pure]
+      first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
+    apply run_next_exists post found (by rfl) (step_word_nonzero _ _ _ _ _ _ _)
+    by_cases small : inputTail memory left ||| inputTail memory right = 0
+    · simp only [small, ite_true]
+      have halves := BitVec.or_eq_zero_iff.mp small
+      apply WP.exists_execution
+      apply run_widen_locals word state call enteredWF homes 0 1 7 6
+        (by rfl) (by rfl) (by rfl) (by rfl) found (by rfl)
+      intro _ next
+      cil_contract_steps (snapshots := next.snapshots.toLocalSnapshots)
+        [productArgs, next.call.output_formed (by simp : output ∈ [output])]
+      apply WP.exists_execution
+      exact run_product_storage ctx.storage next call owned
+        (fun index => if index.val = 0 then lowProduct (inputLimb memory left 0)
+            (inputLimb memory right 0)
+          else if index.val = 1 then highProduct (inputLimb memory left 0)
+            (inputLimb memory right 0) else 0)
+        ((product_padding _ _).trans (small_product_value memory left right halves.1 halves.2))
+        found (by rfl) (by rfl)
+    simp only [small, ite_false]
+    apply run_next_exists post found (by rfl) (state.snapshots.load _ (by rfl))
+    apply run_next_exists post found (by rfl) (step_word_nonzero _ _ _ _ _ _ _)
+    by_cases rightSmall : inputTail memory right = 0
+    · simp only [rightSmall, ite_true]
+      exact multiply_scalar_branch ctx word false memory entered current left right output frame
+        call owned state rightSmall
+    simp only [rightSmall, ite_false]
+    apply run_next_exists post found (by rfl) (state.snapshots.load _ (by rfl))
+    apply run_next_exists post found (by rfl) (step_word_nonzero _ _ _ _ _ _ _)
+    by_cases leftSmall : inputTail memory left = 0
+    · simp only [leftSmall, ite_true]
+      exact multiply_scalar_branch ctx word true memory entered current left right output frame
+        call owned state leftSmall
+    simp only [leftSmall, ite_false]
+    apply run_next_exists post found (by rfl) (state.snapshots.load _ (by rfl))
+    apply run_next_exists post found (by rfl) (state.snapshots.load _ (by rfl))
+    apply run_next_exists post found (by rfl)
+    · simp [step, cil_guard, observerCount, pureArity, numericValue, scalars, CIL.step.eq_def,
+        CIL.binary, Bind.bind, Except.bind, Pure.pure, Except.pure]
+      first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
+    apply run_next_exists post found (by rfl) (step_word_nonzero _ _ _ _ _ _ _)
+    by_cases bothTwo : inputUpper memory left ||| inputUpper memory right = 0
+    · simp only [bothTwo, ite_true]
+      have halves := BitVec.or_eq_zero_iff.mp bothTwo
+      cil_contract_steps 3 [productArgs, leftFormed, rightFormed, outputFormed]
+      obtain ⟨childFuel, childFinal, invoked, result⟩ := BothTwo.both_two_invoke_with_storage
+        ctx.profile ctx.program ctx.indices.bothTwo ctx.indices.word ctx.indices.count
+        ctx.indices.storage ctx.storage ctx.bothTwo ctx.count word current left right output
+        state.call
+        (by simpa only [state.input_limb call left (by simp)] using
+          input_upper_zero memory left halves.1)
+        (by simpa only [state.input_limb call right (by simp)] using
+          input_upper_zero memory right halves.2)
+      exact run_output_call (callee := ctx.indices.bothTwo) state call owned _ found (by rfl)
+        (by cil_checked_step [productArgs, leftFormed, rightFormed, outputFormed])
+        (by rfl) (by rfl) ⟨childFuel, childFinal, invoked, expected result⟩
+    simp only [bothTwo, ite_false]
+    apply run_next_exists post found (by rfl) (state.snapshots.load _ (by rfl))
+    apply run_next_exists post found (by rfl) (step_word_nonzero _ _ _ _ _ _ _)
+    by_cases leftTwo : inputUpper memory left = 0
+    · simp only [leftTwo, ite_true]
+      exact multiply_left_two_branch ctx word false memory entered current left right output
+        frame call owned state leftTwo
+    simp only [leftTwo, ite_false]
+    apply run_next_exists post found (by rfl) (state.snapshots.load _ (by rfl))
+    apply run_next_exists post found (by rfl) (step_word_nonzero _ _ _ _ _ _ _)
+    by_cases rightTwo : inputUpper memory right = 0
+    · simp only [rightTwo, ite_true]
+      exact multiply_left_two_branch ctx word true memory entered current left right output
+        frame call owned state rightTwo
+    simp only [rightTwo, ite_false]
+    cil_contract_steps 3 [productArgs, leftFormed, rightFormed, outputFormed]
+    obtain ⟨childFuel, childFinal, invoked, result⟩ := Full.full_invoke_with_storage ctx.profile
+      ctx.program ctx.indices.full ctx.indices.word ctx.indices.count ctx.indices.storage
+      ctx.storage ctx.full ctx.count word top current left right output state.call
+    exact run_output_call (callee := ctx.indices.full) state call owned _ found (by rfl)
+      (by cil_checked_step [productArgs, leftFormed, rightFormed, outputFormed])
+      (by rfl) (by rfl) ⟨childFuel, childFinal, invoked, expected result⟩
   obtain ⟨fuel, final, returned, ran, result⟩ := body
   have returns := result.returns
   subst returned
-  have found : ctx.program[ctx.indices.entry]? = some (multiplyBody ctx.profile ctx.indices) := ctx.entry
   have leftFormed := call.input_formed (by simp : left ∈ [left, right])
   have rightFormed := call.input_formed (by simp : right ∈ [left, right])
   have outputFormed := call.output_formed (by simp : output ∈ [output])
@@ -407,6 +235,3 @@ theorem multiply_invoke (ctx : Context alternative) (word : WordContract ctx.pro
   exact invoke_of_run found checked setup ran
 
 end UInt256Proof.Multiply.Entry
-
-
-
