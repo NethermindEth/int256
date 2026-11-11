@@ -3,7 +3,6 @@ import UInt256.Methods.Add.CarryContract
 import UInt256.Safety.LimbAccess
 
 set_option maxRecDepth 4096
-set_option maxHeartbeats 2000000
 
 namespace UInt256Proof.Safety
 

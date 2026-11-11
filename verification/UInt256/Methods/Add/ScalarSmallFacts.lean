@@ -44,19 +44,8 @@ theorem scalar_small_prefix (swapped : Bool) (left right output home : Reference
     conv at continuation in (scalarSmallCall _) => cbv
     dsimp [scalarSmallSource] at formed continuation
     dsimp at slot
-    repeat'
-      first
-      | exact continuation
-      | simp (config := { failIfUnchanged := false })
-        apply run_next_exists post
-        · simp only [cil_code]; rfl
-        · simp only [cil_code]; rfl
-        · simp (config := { implicitDefEqProofs := false })
-            [cil_code, scalarArguments, UInt256Model.Safety.binaryArguments, step, cil_guard, observerCount,
-              checkedValue, numericValue, formValue, formed, outputFormed, slot, reading,
-              pureArity, scalars, CIL.step, CIL.truth, checkedAt, Except.mapError,
-              Bind.bind, Except.bind, Pure.pure, Except.pure]
-          first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
+    cil_contract_steps [UInt256Model.Safety.binaryArguments, formed, outputFormed, slot, reading]
+      until continuation
 
 theorem scalar_small_return (swapped : Bool) (args : List Value) (flag : BitVec 32)
     (frame : Frame) (memory : Memory)

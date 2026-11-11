@@ -30,17 +30,7 @@ theorem overflow_prefix (left right output : Reference) (frame : Frame) (memory 
   have fr := call.input_formed (reference := right) (by simp)
   have fo := call.output_formed (reference := output) (by simp)
   conv at continuation in overflowCall => cbv
-  repeat' first
-    | exact continuation
-    | (simp (config := { failIfUnchanged := false })
-       apply run_next_exists post
-       · simp only [cil_code]; rfl
-       · simp only [cil_code]; rfl
-       · simp (config := { implicitDefEqProofs := false })
-           [cil_code, binaryArguments, step, cil_guard, observerCount, checkedValue, numericValue, formValue, fl, fr, fo,
-             pureArity, scalars, CIL.step, CIL.FeatureProfile.evaluate, checkedAt, Except.mapError,
-             Bind.bind, Except.bind, Pure.pure, Except.pure]
-         first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)
+  cil_contract_steps [binaryArguments, fl, fr, fo, CIL.FeatureProfile.evaluate] until continuation
 
 theorem overflow_return (args : List Value) (flag : BitVec 32) (frame : Frame) (memory : CIL.Safety.Memory)
     (normalized : CIL.NarrowKind.unsigned8.extend flag = flag) :

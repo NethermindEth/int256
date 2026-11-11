@@ -1,4 +1,6 @@
-import UInt256.Methods.Add.SmallSum
+import UInt256.Methods.Add.SmallMemory
+import UInt256.Safety.CallerSetup
+import CIL.Safety.StepComposition
 import UInt256.Safety.StorageSelection
 import UInt256.Arithmetic.Carry
 import CIL.Safety.ReturnMemory
@@ -113,65 +115,5 @@ theorem small_store_finish (branch : Fin 5) (original entered current : CIL.Safe
         (valid.1.writable (wordView output) (by simp))
     · intro id old offset untouched
       exact (retained.cells id old offset).trans ((outside id offset untouched).trans (preserved id old offset))
-
-theorem small_no_carry_value (memory : CIL.Safety.Memory) (input : Reference) (word : BitVec 64)
-    (noCarry : ¬ inputLimb memory input 0 + word < inputLimb memory input 0) :
-    UInt256Model.value (fun i : Fin 4 => if i.val = 0 then inputLimb memory input 0 + word else inputLimb memory input i) =
-      inputValue memory input + BitVec.ofNat 256 word.toNat := by
-  have sum := UInt256Proof.small_result_sum (inputLimb memory input) word
-  have initial : UInt256Model.value (inputLimb memory input) = inputValue memory input :=
-    UInt256Proof.input_value (fun offset => (memory.cells input.allocation offset).bits) input.offset
-  rw [initial] at sum
-  simpa [UInt256Model.value, UInt256Proof.smallResult, UInt256Proof.singleLimb,
-    show (3 : Fin 4).val = 3 from rfl, noCarry] using sum
-
-theorem small_no_carry_checked (memory : CIL.Safety.Memory)
-    (input output : Reference) (word : BitVec 64)
-    (call : CallingConditions Extracted.program memory [input] [output])
-    (noCarry : ¬ inputLimb memory input 0 + word < inputLimb memory input 0) :
-    ∃ fuel final values,
-      invoke Extracted.program fuel Extracted.addScalarUInt64Index (smallArguments input output word)
-        memory = .ok (final, values) ∧ SmallResult memory final values input output word 0 := by
-  let post := fun final values => SmallResult memory final values input output word 0
-  apply small_sum_invocation memory input output word call post
-  intro frame entered slots tailSlots sumHome after setup layout _ saved sumSlot sumRead
-  have candidates := fun i : Fin 4 => saved.completed i i.isLt
-  let homes : Fin 4 → Reference := fun i => Classical.choose (candidates i)
-  have facts := fun i : Fin 4 => Classical.choose_spec (candidates i)
-  have fullSlots : ∀ i : Fin 4, frame.locals[i.val]? = some (.bytes .word64 (homes i)) := by
-    intro i
-    have inside := (List.getElem?_eq_some_iff.mp (facts i).1).1
-    rw [layout, List.getElem?_append_left inside]
-    exact (facts i).1
-  have suffix : ∃ fuel result returned,
-      run Extracted.program fuel Extracted.addScalarUInt64Index (smallStoreCall 0)
-        (smallArguments input output word) frame
-        (storageArguments output (inputLimb memory input 0 + word) (inputLimb memory input 1)
-          (inputLimb memory input 2) (inputLimb memory input 3)).reverse after =
-          .ok (result, returned) ∧ post result returned :=
-    small_store_finish 0 memory entered after frame input output word
-      (fun i => if i.val = 0 then inputLimb memory input 0 + word else inputLimb memory input i)
-      call setup saved.call saved.preserved.cells (small_no_carry_value memory input word noCarry)
-  unfold storageArguments at suffix
-  rw [small_storage_word_order] at suffix
-  conv at suffix in (List.filterMap _ _) => cbv
-  simp [List.range_succ, List.findIdx] at suffix
-  conv in smallCarryDecision => cbv
-  conv at suffix in (smallStoreCall _) => cbv
-  have formed := saved.call.output_formed (by simp : output ∈ [output])
-  have s1 := fullSlots 1
-  have s2 := fullSlots 2
-  have s3 := fullSlots 3
-  dsimp at s1 s2 s3
-  simp only [show (3 : Fin 4).val = 3 from rfl] at s3
-  have reads : ∀ i, read after (homes i) 8 1 =
-      .ok (numberBytes (inputLimb memory input i).toNat 8) :=
-    fun i => (facts i).2.2
-  have r1 := load_local_word64_of_read (reads 1)
-  have r2 := load_local_word64_of_read (reads 2)
-  have r3 := load_local_word64_of_read (reads 3)
-  have r4 := load_local_word64_of_read sumRead
-  cil_contract_steps [smallArguments, noCarry, formed, s1, s2, s3, sumSlot, r1, r2, r3, r4]
-    until suffix
 
 end UInt256Proof.Safety

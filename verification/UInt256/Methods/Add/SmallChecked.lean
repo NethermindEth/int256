@@ -1,74 +1,28 @@
-import UInt256.Methods.Add.SmallCarryBranch
+import UInt256.Methods.Add.SmallFinish
+import UInt256.Methods.Add.InputWords
 import UInt256.Methods.Reporting.Arithmetic
+import CIL.Safety.LocalSnapshotSteps
+
+/-! Checked execution of the extracted small-addition helper on every carry path. -/
 
 namespace UInt256Proof.Safety
 
-open UInt256Model.Safety
+open CIL.Safety UInt256Model.Safety
 
-def incrementedWords (count : Nat) (words : Fin 4 → BitVec 64) : Fin 4 → BitVec 64 :=
-  fun i => if 0 < i.val ∧ i.val ≤ count then words i + 1 else words i
-
-theorem incrementedWords_next (segment : Fin 3) (words : Fin 4 → BitVec 64) :
-    (fun i => if i = (⟨segment.val + 1, by omega⟩ : Fin 4)
-      then incrementedWords segment.val words i + 1 else incrementedWords segment.val words i) =
-      incrementedWords (segment.val + 1) words := by
-  obtain ⟨n, bound⟩ := segment
-  have cases : n = 0 ∨ n = 1 ∨ n = 2 := by omega
-  rcases cases with rfl | rfl | rfl
-  all_goals
-    funext ⟨i, hi⟩
-    have cases : i = 0 ∨ i = 1 ∨ i = 2 ∨ i = 3 := by omega
-    rcases cases with rfl | rfl | rfl | rfl <;> simp [incrementedWords]
-
-theorem small_stopped_words (segment : Fin 3) (words : Fin 4 → BitVec 64) (word : BitVec 64)
-    (carry : words 0 + word < words 0)
-    (previous : ∀ i : Fin 4, 0 < i.val → i.val ≤ segment.val → words i + 1 = 0)
-    (stop : words ⟨segment.val + 1, by omega⟩ + 1 ≠ 0) :
-    smallCarryOutput segment.val (words 0 + word) (incrementedWords (segment.val + 1) words) =
-      UInt256Proof.smallResult words word := by
-  have p1 := previous 1
-  have p2 := previous 2
-  simp only [BitVec.ofNat_eq_ofNat] at p1 p2 stop
-  obtain ⟨n, bound⟩ := segment
-  have cases : n = 0 ∨ n = 1 ∨ n = 2 := by omega
-  rcases cases with rfl | rfl | rfl
-  all_goals
-    dsimp at p1 p2 stop
-    funext ⟨i, hi⟩
-    have cases : i = 0 ∨ i = 1 ∨ i = 2 ∨ i = 3 := by omega
-    rcases cases with rfl | rfl | rfl | rfl <;>
-      simp [smallCarryOutput, incrementedWords, UInt256Proof.smallResult, carry, p1, p2, stop]
-
-theorem small_overflow_words (words : Fin 4 → BitVec 64) (word : BitVec 64)
-    (carry : words 0 + word < words 0)
-    (first : words 1 + 1 = 0) (second : words 2 + 1 = 0) (third : words 3 + 1 = 0) :
-    (fun i : Fin 4 => if i.val = 0 then words 0 + word else 0) = UInt256Proof.smallResult words word := by
-  simp only [BitVec.ofNat_eq_ofNat] at first second third
-  funext ⟨i, hi⟩
-  have cases : i = 0 ∨ i = 1 ∨ i = 2 ∨ i = 3 := by omega
-  rcases cases with rfl | rfl | rfl | rfl <;>
-    simp [UInt256Proof.smallResult, carry, first, second, third]
-
-theorem small_result_value (memory : CIL.Safety.Memory) (input : CIL.Safety.Reference) (word : BitVec 64) :
-    UInt256Model.value (UInt256Proof.smallResult (inputLimb memory input) word) =
-      inputValue memory input + BitVec.ofNat 256 word.toNat := by
-  rw [UInt256Proof.small_result_sum]
-  have initial : UInt256Model.value (inputLimb memory input) = inputValue memory input :=
-    UInt256Proof.input_value (fun offset => (memory.cells input.allocation offset).bits) input.offset
-  rw [initial]
-  simp [UInt256Model.value, UInt256Proof.singleLimb]
-
-def smallOverflow (memory : CIL.Safety.Memory) (input : CIL.Safety.Reference) (word : BitVec 64) : BitVec 32 :=
+def smallOverflow (memory : CIL.Safety.Memory) (input : CIL.Safety.Reference)
+    (word : BitVec 64) : BitVec 32 :=
   if 2^256 ≤ (inputValue memory input).toNat + word.toNat then 1 else 0
 
-theorem smallOverflow_cases (memory : CIL.Safety.Memory) (input : CIL.Safety.Reference) (word : BitVec 64) :
+theorem smallOverflow_cases (memory : CIL.Safety.Memory) (input : CIL.Safety.Reference)
+    (word : BitVec 64) :
     smallOverflow memory input word =
       if inputLimb memory input 0 + word < inputLimb memory input 0 ∧
         inputLimb memory input 1 + 1 = 0 ∧ inputLimb memory input 2 + 1 = 0 ∧
         inputLimb memory input 3 + 1 = 0 then 1 else 0 := by
   have overflow := UInt256Proof.Reporting.small_overflow_iff (inputLimb memory input) word
   have initial : UInt256Model.value (inputLimb memory input) = inputValue memory input :=
-    UInt256Proof.input_value (fun offset => (memory.cells input.allocation offset).bits) input.offset
+    UInt256Proof.input_value (fun offset => (memory.cells input.allocation offset).bits)
+      input.offset
   have wideBound : word.toNat < 2^256 := Nat.lt_trans word.isLt (by decide)
   rw [initial] at overflow
   simp [UInt256Model.value, UInt256Proof.singleLimb, BitVec.toNat_ofNat,
@@ -76,168 +30,130 @@ theorem smallOverflow_cases (memory : CIL.Safety.Memory) (input : CIL.Safety.Ref
   unfold smallOverflow
   simp only [BitVec.ofNat_eq_ofNat, Nat.reducePow, ← overflow]
 
-end UInt256Proof.Safety
+theorem small_result_value (memory : CIL.Safety.Memory) (input : CIL.Safety.Reference)
+    (word : BitVec 64) :
+    UInt256Model.value (UInt256Proof.smallResult (inputLimb memory input) word) =
+      inputValue memory input + BitVec.ofNat 256 word.toNat := by
+  rw [UInt256Proof.small_result_sum]
+  have initial : UInt256Model.value (inputLimb memory input) = inputValue memory input :=
+    UInt256Proof.input_value (fun offset => (memory.cells input.allocation offset).bits)
+      input.offset
+  rw [initial]
+  simp [UInt256Model.value, UInt256Proof.singleLimb]
 
-namespace UInt256Proof.Safety
+/-- State an exit's store call at its numeral pc with its argument stack in call order. -/
+local macro "small_exit_stack" " at " done:ident : tactic => `(tactic| (
+  unfold storageArguments at $done:ident
+  rw [small_storage_word_order] at $done:ident
+  conv at $done:ident in (List.filterMap _ _) => cbv
+  simp [List.range_succ, List.findIdx] at $done:ident
+  conv at $done:ident in (smallStoreCall _) => cbv))
 
-open CIL.Safety UInt256Model.Safety
-
-theorem small_stopped_finish (segment : Fin 3) (original entered current : CIL.Safety.Memory)
-    (frame : Frame) (input output sumHome : Reference) (homes : Fin 4 → Reference) (word : BitVec 64)
-    (call : CallingConditions Extracted.program original [input] [output])
-    (setup : enterFrame Extracted.addScalarUInt64Body (smallArguments input output word) original =
-      .ok (frame, entered))
-    (state : SmallCarryState original current frame input output sumHome homes
-      (incrementedWords (segment.val + 1) (inputLimb original input)) (inputLimb original input 0 + word))
-    (carry : inputLimb original input 0 + word < inputLimb original input 0)
-    (previous : ∀ i : Fin 4, 0 < i.val → i.val ≤ segment.val → inputLimb original input i + 1 = 0)
-    (stop : inputLimb original input ⟨segment.val + 1, by omega⟩ + 1 ≠ 0) :
-    ∃ fuel final values,
-      run Extracted.program fuel Extracted.addScalarUInt64Index (smallIncrementDecision segment.val)
-        (smallArguments input output word) frame
-        [.scalar (.i64 (inputLimb original input ⟨segment.val + 1, by omega⟩ + 1))] current =
-          .ok (final, values) ∧ SmallResult original final values input output word (smallOverflow original input word) := by
-  let words := smallCarryOutput segment.val (inputLimb original input 0 + word)
-    (incrementedWords (segment.val + 1) (inputLimb original input))
-  have math : UInt256Model.value words = inputValue original input + BitVec.ofNat 256 word.toNat :=
-    (congrArg UInt256Model.value (small_stopped_words segment (inputLimb original input) word carry previous stop)).trans
-      (small_result_value original input word)
-  have atIndex : incrementedWords (segment.val + 1) (inputLimb original input)
-      ⟨segment.val + 1, by omega⟩ = inputLimb original input ⟨segment.val + 1, by omega⟩ + 1 := by
-    simp [incrementedWords]
-  have flag : smallOverflow original input word = 0 := by
-    rw [smallOverflow_cases]
-    simp only [BitVec.ofNat_eq_ofNat] at stop
-    obtain ⟨n, bound⟩ := segment
-    have cases : n = 0 ∨ n = 1 ∨ n = 2 := by omega
-    rcases cases with rfl | rfl | rfl
-    all_goals dsimp at stop
-    all_goals simp [stop]
-  let post := fun final values => SmallResult original final values input output word (smallOverflow original input word)
-  have execution := state.nonzero_prefix segment word (by rw [atIndex]; exact stop) post
-  rw [atIndex] at execution
-  apply execution
-  have finished := small_store_finish ⟨segment.val + 1, by omega⟩ original entered current frame
-    input output word words call setup state.call state.preserved.cells math
-  have notOverflow : segment.val + 1 ≠ 4 := by omega
-  simpa [post, words, smallCarryOutput, smallBranchFlag, notOverflow, flag] using finished
-
-theorem small_overflow_finish (original entered current : CIL.Safety.Memory)
-    (frame : Frame) (input output sumHome : Reference) (homes : Fin 4 → Reference) (word : BitVec 64)
-    (call : CallingConditions Extracted.program original [input] [output])
-    (setup : enterFrame Extracted.addScalarUInt64Body (smallArguments input output word) original =
-      .ok (frame, entered))
-    (state : SmallCarryState original current frame input output sumHome homes
-      (incrementedWords 3 (inputLimb original input)) (inputLimb original input 0 + word))
-    (carry : inputLimb original input 0 + word < inputLimb original input 0)
-    (first : inputLimb original input 1 + 1 = 0)
-    (second : inputLimb original input 2 + 1 = 0)
-    (third : inputLimb original input 3 + 1 = 0) :
-    ∃ fuel final values,
-      run Extracted.program fuel Extracted.addScalarUInt64Index (smallIncrementStart 3)
-        (smallArguments input output word) frame [] current = .ok (final, values) ∧
-      SmallResult original final values input output word (smallOverflow original input word) := by
-  let words := fun i : Fin 4 => if i.val = 0 then inputLimb original input 0 + word else 0
-  have math : UInt256Model.value words = inputValue original input + BitVec.ofNat 256 word.toNat :=
-    (congrArg UInt256Model.value (small_overflow_words (inputLimb original input) word carry first second third)).trans
-      (small_result_value original input word)
-  have flag : smallOverflow original input word = 1 := by
-    rw [smallOverflow_cases]
-    simp only [BitVec.ofNat_eq_ofNat] at first second third
-    simp [carry, first, second, third]
-  apply state.overflow_prefix word
-    (fun final values => SmallResult original final values input output word (smallOverflow original input word))
-  have finished := small_store_finish 4 original entered current frame input output word words
-    call setup state.call state.preserved.cells math
-  simpa [words, smallBranchFlag, show (3 : Fin 4).val = 3 from rfl,
-    show (4 : Fin 5).val = 4 from rfl, flag] using finished
-
-end UInt256Proof.Safety
-
-namespace UInt256Proof.Safety
-
-open CIL.Safety UInt256Model.Safety
-
-theorem SmallCarryState.increment_count {original current : CIL.Safety.Memory} {frame : Frame}
-    {input output sumHome : Reference} {homes : Fin 4 → Reference}
-    {words : Fin 4 → BitVec 64} {sum : BitVec 64} (segment : Fin 3)
-    (state : SmallCarryState original current frame input output sumHome homes
-      (incrementedWords segment.val words) sum)
-    (call : CallingConditions Extracted.program original [input] [output]) (word : BitVec 64)
-    (post : CIL.Safety.Memory → List Value → Prop)
-    (continuation : ∀ after,
-      SmallCarryState original after frame input output sumHome homes
-        (incrementedWords (segment.val + 1) words) sum →
-      ∃ fuel result returned,
-        run Extracted.program fuel Extracted.addScalarUInt64Index (smallIncrementDecision segment.val)
-          (smallArguments input output word) frame
-          [.scalar (.i64 (words ⟨segment.val + 1, by omega⟩ + 1))] after = .ok (result, returned) ∧
-        post result returned) :
-    ∃ fuel result returned,
-      run Extracted.program fuel Extracted.addScalarUInt64Index (smallIncrementStart segment.val)
-        (smallArguments input output word) frame [] current = .ok (result, returned) ∧ post result returned := by
-  apply state.increment call segment word post
-  intro after updated
-  rw [incrementedWords_next] at updated
-  have value : incrementedWords segment.val words ⟨segment.val + 1, by omega⟩ =
-      words ⟨segment.val + 1, by omega⟩ := by simp [incrementedWords]
-  rw [value]
-  exact continuation after updated
-
+/-- Checked small addition: input snapshots, low sum, every carry exit and the exact result. -/
 theorem small_checked (memory : CIL.Safety.Memory) (input output : Reference) (word : BitVec 64)
     (call : CallingConditions Extracted.program memory [input] [output]) :
     ∃ fuel final values,
-      invoke Extracted.program fuel Extracted.addScalarUInt64Index (smallArguments input output word)
-        memory = .ok (final, values) ∧
+      invoke Extracted.program fuel Extracted.addScalarUInt64Index
+        (smallArguments input output word) memory = .ok (final, values) ∧
       SmallResult memory final values input output word (smallOverflow memory input word) := by
-  by_cases carry : inputLimb memory input 0 + word < inputLimb memory input 0
-  · let post := fun final values => SmallResult memory final values input output word (smallOverflow memory input word)
-    apply small_sum_invocation memory input output word call post
-    intro frame entered slots tailSlots sumHome before setup layout homes saved sumSlot sumRead
-    have enteredWF := enterFrame_preserves_wellFormed _ _ _ _ _ call.1.1 setup
-    obtain ⟨references, initial⟩ := saved.carry_state (inputLimb memory input 0 + word)
-      enteredWF layout homes sumSlot sumRead
-    have zero : incrementedWords 0 (inputLimb memory input) = inputLimb memory input := by
-      funext i
-      simp [incrementedWords]
-      omega
-    have prepared : SmallCarryState memory before frame input output sumHome references
-        (incrementedWords 0 (inputLimb memory input)) (inputLimb memory input 0 + word) := by
-      rw [zero]
-      exact initial
-    apply small_carry_dispatch input output word (inputLimb memory input 0) frame before carry post
-    apply prepared.increment_count 0 call word post
-    intro first state1
-    by_cases h1 : inputLimb memory input 1 + 1 = 0
-    · apply small_zero_dispatch 0 input output word _ h1 frame first post
-      apply state1.increment_count 1 call word post
-      intro second state2
-      by_cases h2 : inputLimb memory input 2 + 1 = 0
-      · apply small_zero_dispatch 1 input output word _ h2 frame second post
-        apply state2.increment_count 2 call word post
-        intro third state3
-        by_cases h3 : inputLimb memory input 3 + 1 = 0
-        · apply small_zero_dispatch 2 input output word _ h3 frame third post
-          exact small_overflow_finish memory entered third frame input output sumHome references word
-            call setup state3 carry h1 h2 h3
-        · apply small_stopped_finish 2 memory entered third frame input output sumHome references word
-            call setup state3 carry ?_ h3
-          intro i positive bound
-          have cases : i.val = 1 ∨ i.val = 2 := by omega
-          rcases cases with one | two
-          · have same : i = 1 := Fin.ext one
-            simpa only [same] using h1
-          · have same : i = 2 := Fin.ext two
-            simpa only [same] using h2
-      · apply small_stopped_finish 1 memory entered second frame input output sumHome references word
-          call setup state2 carry ?_ h2
-        intro i positive bound
-        have same : i = 1 := Fin.ext (by omega)
-        simpa only [same] using h1
-    · exact small_stopped_finish 0 memory entered first frame input output sumHome references word
-        call setup state1 carry (by intro i positive bound; omega) h1
-  · have flag : smallOverflow memory input word = 0 := by simp [smallOverflow_cases, carry]
+  obtain ⟨frame, entered, setup, homes, _, _⟩ :=
+    small_frame_setup memory (smallArguments input output word) call.1.1
+  have checked : (smallArguments input output word).mapM (checkedValue memory) =
+      .ok (smallArguments input output word) := by
+    have fi := call.input_formed (reference := input) (by simp)
+    have fo := call.output_formed (reference := output) (by simp)
+    simp [smallArguments, checkedValue, numericValue, formValue, fi, fo,
+      checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
+  suffices executed : ∃ fuel final values,
+      run Extracted.program fuel Extracted.addScalarUInt64Index 0
+        (smallArguments input output word) frame [] entered = .ok (final, values) ∧
+      SmallResult memory final values input output word (smallOverflow memory input word) by
+    obtain ⟨fuel, final, values, finished, result⟩ := executed
+    refine ⟨fuel, final, values, ?_, result⟩
+    simpa only [invoke, cil_code, checked, setup, Except.mapError, Bind.bind, Except.bind]
+      using finished
+  have exit (branch : Fin 5) (current : Memory)
+      (currentCall : CallingConditions Extracted.program current [input] [output])
+      (preserved : MemoryBelow memory.nextIdentity memory current)
+      (flag : smallOverflow memory input word = smallBranchFlag branch) :
+      ∃ fuel final values,
+        run Extracted.program fuel Extracted.addScalarUInt64Index (smallStoreCall branch.val)
+          (smallArguments input output word) frame
+          (storageArguments output
+            (UInt256Proof.smallResult (inputLimb memory input) word 0)
+            (UInt256Proof.smallResult (inputLimb memory input) word 1)
+            (UInt256Proof.smallResult (inputLimb memory input) word 2)
+            (UInt256Proof.smallResult (inputLimb memory input) word 3)).reverse current =
+              .ok (final, values) ∧
+        SmallResult memory final values input output word (smallOverflow memory input word) := by
     rw [flag]
-    exact small_no_carry_checked memory input output word call carry
+    exact small_store_finish branch memory entered current frame input output word _ call setup
+      currentCall preserved.cells (small_result_value memory input word)
+  have enteredCall := call.after_frame_setup setup
+  have valid := enteredCall.1
+  have world := enteredCall.2
+  have enteredFormed := valid.1
+  have preserved := enterFrame_preserves_caller_memory _ _ _ _ _ setup
+  have limbs := fun current below =>
+    call.input_words_kept (current := current) below input (by simp)
+  cil_contract_steps (snapshots := LocalSnapshots.empty entered frame.locals)
+    [smallArguments, limbs _ preserved]
+  have world := write_preserves_static_world _ _ _ _ _ _ world localWrite
+  cil_contract_steps (snapshots := localSnapshots) [smallArguments, limbs _ preserved]
+  have world := write_preserves_static_world _ _ _ _ _ _ world localWrite_1
+  cil_contract_steps (snapshots := localSnapshots_1) [smallArguments, limbs _ preserved]
+  have world := write_preserves_static_world _ _ _ _ _ _ world localWrite_2
+  cil_contract_steps (snapshots := localSnapshots_2)
+    [smallArguments, limbs _ preserved, CIL.FeatureProfile.evaluate]
+  have world := write_preserves_static_world _ _ _ _ _ _ world localWrite_3
+  have world := write_preserves_static_world _ _ _ _ _ _ world localWrite_4
+  split
+  next carry =>
+    cil_contract_steps (snapshots := localSnapshots_4) [smallArguments]
+    have world := write_preserves_static_world _ _ _ _ _ _ world localWrite_5
+    split
+    next first =>
+      have done := exit 1 storedLocal_5 ⟨valid, world⟩ preserved
+        (by simp [smallOverflow_cases, smallBranchFlag, carry, first])
+      small_exit_stack at done
+      simp [UInt256Proof.smallResult, carry, first] at done
+      cil_contract_steps (snapshots := localSnapshots_5) [smallArguments] until done
+    next first =>
+      replace first := Decidable.not_not.mp first
+      cil_contract_steps (snapshots := localSnapshots_5) [smallArguments]
+      have world := write_preserves_static_world _ _ _ _ _ _ world localWrite_6
+      split
+      next second =>
+        have done := exit 2 storedLocal_6 ⟨valid, world⟩ preserved
+          (by simp [smallOverflow_cases, smallBranchFlag, carry, first, second])
+        small_exit_stack at done
+        simp [UInt256Proof.smallResult, carry, first, second] at done
+        cil_contract_steps (snapshots := localSnapshots_6) [smallArguments] until done
+      next second =>
+        replace second := Decidable.not_not.mp second
+        cil_contract_steps (snapshots := localSnapshots_6) [smallArguments]
+        have world := write_preserves_static_world _ _ _ _ _ _ world localWrite_7
+        split
+        next third =>
+          have done := exit 3 storedLocal_7 ⟨valid, world⟩ preserved (by
+            simp [smallOverflow_cases, smallBranchFlag, carry, first, second, third,
+              show (3 : Fin 5).val = 3 from rfl])
+          small_exit_stack at done
+          simp [UInt256Proof.smallResult, carry, first, second] at done
+          cil_contract_steps (snapshots := localSnapshots_7) [smallArguments] until done
+        next third =>
+          replace third := Decidable.not_not.mp third
+          have done := exit 4 storedLocal_7 ⟨valid, world⟩ preserved (by
+            simp [smallOverflow_cases, smallBranchFlag, carry, first, second, third,
+              show (4 : Fin 5).val = 4 from rfl])
+          small_exit_stack at done
+          simp [UInt256Proof.smallResult, carry, first, second, third] at done
+          cil_contract_steps (snapshots := localSnapshots_7) [smallArguments] until done
+  next carry =>
+    have done := exit 0 storedLocal_4 ⟨valid, world⟩ preserved
+      (by simp [smallOverflow_cases, smallBranchFlag, carry])
+    small_exit_stack at done
+    simp [UInt256Proof.smallResult, carry] at done
+    cil_contract_steps (snapshots := localSnapshots_4) [smallArguments] until done
 
 end UInt256Proof.Safety

@@ -1,5 +1,6 @@
 import UInt256.Methods.Multiply.VectorProducts
-import UInt256.Safety.PrivateVectorStore
+import CIL.Safety.WordSnapshotPreservation
+import UInt256.Safety.PrivateWords
 import UInt256.Safety.PrivateInputValues
 namespace UInt256Proof.Multiply.VectorInputs
 open CIL.Safety UInt256Model.Safety

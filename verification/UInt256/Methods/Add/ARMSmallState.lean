@@ -49,10 +49,6 @@ theorem armSmallKnown_store_flag (words : Fin 4 → BitVec 64) (sum : BitVec 64)
       armSmallKnown words sum value := by
   funext index
   by_cases same : index = 6 <;> simp [armSmallKnown, rememberLocal, same]
-/-- Portable execution uses local4 for the low sum. -/
-def portableSmallKnown (words : Fin 4 → BitVec 64) (sum : BitVec 64) :=
-  rememberLocal (smallSaved words 4) 4 (.i64 sum)
-
 /-- Caller guarantees and exact loaded values of private numeric locals. -/
 structure SmallState (program : CIL.Program) (original entered current : Memory)
     (input output : Reference) (frame : Frame) (known : Nat → Option CIL.Value) : Prop where

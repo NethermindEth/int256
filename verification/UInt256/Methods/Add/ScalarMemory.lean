@@ -2,47 +2,12 @@ import UInt256.Methods.Add.ScalarSetup
 import UInt256.Methods.Add.ScalarPrefix
 import UInt256.Safety.CallerSetup
 import CIL.Safety.AccessBelow
+import CIL.Safety.LocalSnapshotSteps
+import UInt256.Methods.Add.InputWords
 
 namespace UInt256Proof.Safety
 
 open CIL.Safety UInt256Model.Safety
-
-/-- The first local write is justified by fresh frame storage. All original
-    caller bytes and permissions survive, including arbitrarily aliased inputs. -/
-theorem scalar_right_store (memory entered : CIL.Safety.Memory)
-    (left right output : Reference) (args : List Value) (frame : Frame)
-    (call : CallingConditions Extracted.program memory [left, right] [output])
-    (setup : enterFrame Extracted.addScalarBody args memory = .ok (frame, entered))
-    (homes : WordHomes entered memory.nextIdentity scalarLocalSpecs frame.locals) :
-    ∃ reference after,
-      frame.locals[0]? = some (.bytes .word64 reference) ∧
-      read after reference 8 1 = .ok (numberBytes (inputLimb memory right 0).toNat 8) ∧
-      MemoryBelow memory.nextIdentity memory after ∧
-      CallingConditions Extracted.program after [left, right] [output] ∧
-      AccessBelow entered.nextIdentity entered after ∧
-      ∀ pc rest,
-        step Extracted.addScalarBody (.setLocal 0) pc args frame
-          (.scalar (.i64 (inputLimb memory right 0)) :: rest) entered =
-            .ok (.next (pc + 1) rest frame after) := by
-  have specified : scalarLocalSpecs[0]? = some (some 0) := by
-    simp [scalarLocalSpecs, cil_code]
-  obtain ⟨reference, slot, bound, _, writable⟩ := homes.word_at 0 0 specified
-  obtain ⟨after, written, stored, loaded, _⟩ := store_local_word64 (inputLimb memory right 0) writable
-  have caller := (enterFrame_preserves_caller_memory _ _ _ _ _ setup).trans
-    (write_preserves_memory_below _ _ _ _ _ _ bound written)
-  have enteredCall := call.after_frame_setup setup
-  have afterWF := write_preserves_wellFormed _ _ _ _ _ enteredCall.1.1 written
-  have afterWorld := write_preserves_static_world _ _ _ _ _ _ enteredCall.2 written
-  refine ⟨reference, after, slot, loaded, caller,
-    call.after_memory_below caller afterWF afterWorld,
-    write_preserves_access_below written _, ?_⟩
-  intro pc rest
-  obtain ⟨result, stepped, sameWrite, _⟩ := step_store_word64_same_frame
-    (body := Extracted.addScalarBody) (pc := pc) (args := args) (rest := rest)
-    (inputLimb memory right 0) slot writable
-  rw [written] at sameWrite
-  cases sameWrite
-  exact stepped
 
 /-- Discharge every prefix memory operation from ordinary calling conditions
     and actual frame setup. Only the branch continuation remains to be proved. -/
@@ -68,15 +33,25 @@ theorem scalar_right_prefix_checked (memory entered : CIL.Safety.Memory)
       run Extracted.program fuel Extracted.addScalarIndex 0
         (binaryArguments left right output ++ extra) frame [] entered = .ok (result, returned) ∧
       post result returned := by
-  obtain ⟨reference, after, slot, loaded, preserved, afterCall, authority, stored⟩ :=
-    scalar_right_store memory entered left right output _ frame call setup homes
-  apply scalar_right_prefix left right output extra (inputLimb memory right) frame entered after
-    ((call.after_frame_setup setup).input_formed (by simp)) (afterCall.input_formed (by simp))
-    (fun rest => call.input_field_after_setup setup (by simp) 0 rest) ?_ stored post
-    (continuation reference after slot loaded preserved afterCall authority)
-  intro index rest
-  rw [afterCall.input_field_instruction (by simp) index rest]
-  simp only [inputLimb, call.input_bytes_of_memory_below preserved (reference := right) (by simp)]
+  have enteredCall := call.after_frame_setup setup
+  have valid := enteredCall.1
+  have enteredFormed := valid.1
+  have preserved := enterFrame_preserves_caller_memory _ _ _ _ _ setup
+  have writable := homes.writable
+  obtain ⟨home, slot, _, _, ready⟩ := homes.word_at 0 0 (by simp [scalarLocalSpecs, cil_code])
+  have limbs := fun current below =>
+    call.input_words_kept (current := current) below right (by simp)
+  cil_contract_steps (snapshots := LocalSnapshots.empty entered frame.locals)
+    [binaryArguments, slot, ready, limbs _ preserved]
+  have loaded : read storedLocal home 8 1 =
+      .ok (numberBytes (inputLimb memory right 0).toNat 8) := by
+    simpa [numberBytes, localWidth] using write_readback _ _ _ _ _ localWrite
+  have done := continuation home storedLocal slot loaded preserved
+    ⟨valid, write_preserves_static_world _ _ _ _ _ _ enteredCall.2 localWrite⟩ localAccess
+  simp [scalarFirstDecision, cil_code] at done
+  cil_contract_steps (snapshots := localSnapshots)
+    [binaryArguments, limbs _ preserved, CIL.FeatureProfile.evaluate, BitVec.ofNat_eq_ofNat]
+    until done
 
 end UInt256Proof.Safety
 
@@ -95,45 +70,6 @@ structure ScalarLowWords (memory entered current : CIL.Safety.Memory) (frame : F
   leftSlot : frame.locals[1]? = some (.bytes .word64 leftHome)
   rightRead : read current rightHome 8 1 = .ok (numberBytes (inputLimb memory right 0).toNat 8)
   leftRead : read current leftHome 8 1 = .ok (numberBytes (inputLimb memory left 0).toNat 8)
-
-theorem scalar_left_store (memory entered before : CIL.Safety.Memory)
-    (left right output rightHome : Reference) (args : List Value) (frame : Frame)
-    (call : CallingConditions Extracted.program memory [left, right] [output])
-    (enteredWF : entered.WellFormed)
-    (homes : WordHomes entered memory.nextIdentity scalarLocalSpecs frame.locals)
-    (beforeCall : CallingConditions Extracted.program before [left, right] [output])
-    (preserved : MemoryBelow memory.nextIdentity memory before)
-    (authority : AccessBelow entered.nextIdentity entered before)
-    (rightSlot : frame.locals[0]? = some (.bytes .word64 rightHome))
-    (rightRead : read before rightHome 8 1 = .ok (numberBytes (inputLimb memory right 0).toNat 8)) :
-    ∃ leftHome after,
-      ScalarLowWords memory entered after frame left right output rightHome leftHome ∧
-      ∀ pc rest, step Extracted.addScalarBody (.setLocal 1) pc args frame
-        (.scalar (.i64 (inputLimb memory left 0)) :: rest) before =
-          .ok (.next (pc + 1) rest frame after) := by
-  have specified : scalarLocalSpecs[1]? = some (some 0) := by
-    simp [scalarLocalSpecs, cil_code]
-  obtain ⟨leftHome, leftSlot, fresh, _, initialAccess⟩ := homes.word_at 1 0 specified
-  obtain ⟨allocation, present, _, _⟩ := access_within_allocation _ _ _ _ _ initialAccess
-  have writable := authority.access initialAccess (enteredWF.1 _ _ present).1
-  obtain ⟨after, written, _, loaded, _⟩ := store_local_word64 (inputLimb memory left 0) writable
-  have caller := preserved.trans (write_preserves_memory_below _ _ _ _ _ _ fresh written)
-  have afterCall := call.after_memory_below caller
-    (write_preserves_wellFormed _ _ _ _ _ beforeCall.1.1 written)
-    (write_preserves_static_world _ _ _ _ _ _ beforeCall.2 written)
-  have ordered := homes.ordered 0 1 rightHome leftHome (by decide) rightSlot leftSlot
-  have earlier := write_preserves_memory_below _ _ _ _ _ leftHome.allocation (Nat.le_refl _) written
-  have rightRetained := (earlier.read rightHome ordered 8 1).trans rightRead
-  refine ⟨leftHome, after,
-    ⟨afterCall, caller, authority.trans (write_preserves_access_below written _),
-      rightSlot, leftSlot, rightRetained, loaded⟩, ?_⟩
-  intro pc rest
-  obtain ⟨result, stepped, sameWrite, _⟩ := step_store_word64_same_frame
-    (body := Extracted.addScalarBody) (pc := pc) (args := args) (rest := rest)
-    (inputLimb memory left 0) leftSlot writable
-  rw [written] at sameWrite
-  cases sameWrite
-  exact stepped
 
 theorem scalar_left_prefix_checked (memory entered before : CIL.Safety.Memory)
     (left right output rightHome : Reference) (extra : List Value) (frame : Frame)
@@ -160,20 +96,30 @@ theorem scalar_left_prefix_checked (memory entered before : CIL.Safety.Memory)
         (binaryArguments left right output ++ extra) frame
         [.scalar (.i64 (inputLimb memory right 1 ||| inputLimb memory right 2 |||
           inputLimb memory right 3))] before = .ok (result, returned) ∧ post result returned := by
-  obtain ⟨leftHome, after, ready, stored⟩ := scalar_left_store memory entered before left right output
-    rightHome _ frame call enteredWF homes beforeCall preserved authority rightSlot rightRead
-  apply scalar_left_prefix left right output extra _ largeRight (inputLimb memory left) frame before after
-    (beforeCall.input_formed (by simp)) (ready.call.input_formed (by simp)) ?_ ?_ stored post
-    (continuation leftHome after ready)
-  · intro rest
-    have field := beforeCall.input_field_instruction (reference := left) (by simp) 0 rest
-    simp only [Fin.val_zero, Nat.mul_zero] at field
-    rw [field]
-    simp only [inputLimb, call.input_bytes_of_memory_below preserved (reference := left) (by simp)]
-  · intro index rest
-    rw [ready.call.input_field_instruction (by simp) index rest]
-    simp only [inputLimb, call.input_bytes_of_memory_below ready.preserved (reference := left) (by simp)]
-
+  have valid := beforeCall.1
+  have beforeFormed := valid.1
+  have writable := homes.writable
+  obtain ⟨leftHome, leftSlot, _, _, initialAccess⟩ :=
+    homes.word_at 1 0 (by simp [scalarLocalSpecs, cil_code])
+  obtain ⟨allocation, present, _, _⟩ := access_within_allocation _ _ _ _ _ initialAccess
+  have ready := authority.access initialAccess (enteredWF.1 _ _ present).1
+  have limbs := fun current below =>
+    call.input_words_kept (current := current) below left (by simp)
+  conv in scalarFirstDecision => cbv
+  cil_contract_steps (snapshots := LocalSnapshots.empty before frame.locals)
+    [binaryArguments, largeRight, leftSlot, ready, limbs _ preserved, BitVec.ofNat_eq_ofNat]
+  have loaded : read storedLocal leftHome 8 1 =
+      .ok (numberBytes (inputLimb memory left 0).toNat 8) := by
+    simpa [numberBytes, localWidth] using write_readback _ _ _ _ _ localWrite
+  have ordered := homes.ordered 0 1 rightHome leftHome (by decide) rightSlot leftSlot
+  have earlier := write_preserves_memory_below _ _ _ _ _ leftHome.allocation (Nat.le_refl _)
+    localWrite
+  have done := continuation leftHome storedLocal
+    ⟨⟨valid, write_preserves_static_world _ _ _ _ _ _ beforeCall.2 localWrite⟩, preserved,
+      authority, rightSlot, leftSlot, (earlier.read rightHome ordered 8 1).trans rightRead, loaded⟩
+  simp [scalarSecondDecision, scalarFirstDecision, cil_code] at done
+  cil_contract_steps (snapshots := localSnapshots)
+    [binaryArguments, limbs _ preserved, BitVec.ofNat_eq_ofNat] until done
 /-- The scalar helper's actual invocation arguments on the public scalar path. -/
 def scalarArguments (left right output : Reference) : List Value :=
   binaryArguments left right output ++ [.scalar (.i32 0)]

@@ -34,22 +34,9 @@ theorem scalar_store_prefix (left right output : Reference) (extra : List Value)
   simp [List.range_succ, List.findIdx] at continuation
   conv in (scalarCarryCall _) => cbv
   simp only [Nat.reduceAdd]
-  have loading (i : Fin 4) (pc : Nat) (stack : List Value) := snapshots.load
-    (body := Extracted.addScalarBody) (args :=
-      [.reference (.address left), .reference (.address right), .reference (.address output)] ++ extra)
-    (pc := pc) (stack := stack) (index := i.val + 3) (.i64 (words i))
-    (by simp [UInt256Proof.AddSubtract.Safety.completedLocals, i.isLt])
-  iterate 5
-    apply run_next_exists post (body := Extracted.addScalarBody)
-    · rfl
-    · rfl
-    · first
-      | exact loading 0 _ _
-      | exact loading 1 _ _
-      | exact loading 2 _ _
-      | exact loading 3 _ _
-      | cil_checked_step [outputFormed]
-  exact continuation
+  cil_contract_steps (snapshots := snapshots)
+    [outputFormed, UInt256Proof.AddSubtract.Safety.completedLocals] until continuation
+
 theorem scalar_return (args : List Value) (frame : Frame) (memory : Memory)
     (carryHome : Reference) (carry : BitVec 64)
     (slot : frame.locals[2]? = some (.bytes .word64 carryHome))

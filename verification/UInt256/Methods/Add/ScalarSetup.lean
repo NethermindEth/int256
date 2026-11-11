@@ -27,24 +27,4 @@ theorem scalar_frame_setup (memory : Memory) (args : List Value) (wellFormed : m
   word_frame_setup Extracted.addScalarBody scalarLocalSpecs scalar_local_metadata.1
     scalar_local_metadata.2 (by simp only [cil_code]) (by simp only [cil_code]) (by rfl) memory args wellFormed
 
-/-- Any word selected by the extracted initializer metadata can be updated by
-    the actual local-store instruction, retaining its frame identity and exact
-    byte readback. Null reference-root slots cannot satisfy `specified`. -/
-theorem scalar_store_local {memory : Memory} {lower : Nat} {frame : Frame}
-    (homes : WordHomes memory lower scalarLocalSpecs frame.locals)
-    (index : Nat) (initial value : BitVec 64)
-    (specified : scalarLocalSpecs[index]? = some (some initial))
-    (pc : Nat) (args rest : List Value) :
-    ∃ reference result,
-      frame.locals[index]? = some (.bytes .word64 reference) ∧
-      lower ≤ reference.allocation ∧
-      step Extracted.addScalarBody (.setLocal index) pc args frame
-        (.scalar (.i64 value) :: rest) memory = .ok (.next (pc + 1) rest frame result) ∧
-      write memory reference (numberBytes value.toNat 8) 1 = .ok result ∧
-      read result reference 8 1 = .ok (numberBytes value.toNat 8) := by
-  obtain ⟨reference, slot, bound, _, writable⟩ := homes.word_at index initial specified
-  obtain ⟨result, stepped, written, loaded⟩ := step_store_word64_same_frame
-    (body := Extracted.addScalarBody) (pc := pc) (args := args) (rest := rest) value slot writable
-  exact ⟨reference, result, slot, bound, stepped, written, loaded⟩
-
 end UInt256Proof.Safety
