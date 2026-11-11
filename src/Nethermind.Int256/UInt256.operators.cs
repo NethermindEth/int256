@@ -306,11 +306,12 @@ public readonly partial struct UInt256
         return negate ? Negate(in c) : c;
     }
 
-    public static explicit operator decimal(in UInt256 a) => (decimal)(BigInteger)a;
+    public static explicit operator decimal(in UInt256 a) => ToDecimal(in a, negative: false, ConversionMode.Checked);
 
     public static explicit operator UInt256(decimal a)
     {
-        int[] bits = decimal.GetBits(decimal.Truncate(a));
+        Span<int> bits = stackalloc int[4];
+        decimal.GetBits(decimal.Truncate(a), bits);
         UInt256 c = new((uint)bits[0], (uint)bits[1], (uint)bits[2], 0, 0, 0, 0, 0);
         return a < 0 ? Negate(c) : c;
     }
