@@ -1231,7 +1231,7 @@ public readonly partial struct UInt256 : IBinaryInteger<UInt256>, IMinMaxValue<U
         return Math.ScaleB(reduced, exponent + 9);
     }
 
-    /// <inheritdoc cref="ToDouble"/>
+    /// <inheritdoc cref="ToDouble(in UInt256)"/>
     internal static float ToSingle(in UInt256 value)
     {
         if (!TopBits(in value, out ulong top, out int exponent)) return value.u0;
