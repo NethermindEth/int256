@@ -283,7 +283,8 @@ public readonly partial struct UInt256
             a = -a;
         }
 
-        if (a <= ulong.MaxValue)
+        // (double)ulong.MaxValue rounds up to 2^64, which does not fit in one limb.
+        if (a < 18446744073709551616.0)
         {
             ulong cu0 = (ulong)a;
             ulong cu1 = 0;
