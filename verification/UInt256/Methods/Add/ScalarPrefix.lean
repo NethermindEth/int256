@@ -1,7 +1,7 @@
 import UInt256.Methods.Add.Bindings
 import CIL.Safety.StepComposition
 import CIL.Safety.WordLocals
-import CIL.Safety.GuardNormalization
+import CIL.Safety.MethodContract
 
 namespace UInt256Proof.Safety
 
@@ -44,20 +44,8 @@ theorem scalar_right_prefix (left right output : Reference) (extra : List Value)
   have upper3 := upperReads 3
   simp only [Fin.val_one, Fin.val_two, CIL.fin_val_three, Nat.reduceMul] at upper1 upper2 upper3
   simp [scalarFirstDecision, cil_code] at continuation
-  repeat'
-    first
-    | exact continuation
-    | simp (config := { failIfUnchanged := false }) [BitVec.ofNat_eq_ofNat]
-      apply run_next_exists post
-      · simp only [cil_code]; rfl
-      · simp only [cil_code]; rfl
-      · first
-        | ((with_reducible show step _ (.setLocal 0) _ _ _ _ _ = _); exact stored _ _)
-        | simp (config := { implicitDefEqProofs := false })
-            [cil_code, step, cil_guard, observerCount, checkedValue, numericValue, formValue, rightBefore, rightAfter,
-              pureArity, scalars, CIL.step.eq_def, CIL.binary, CIL.unary, CIL.FeatureProfile.evaluate, firstRead, upper1, upper2, upper3,
-              checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-          first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
+  cil_contract_steps [rightBefore, rightAfter, firstRead, upper1, upper2, upper3, stored,
+    CIL.FeatureProfile.evaluate, BitVec.ofNat_eq_ofNat] until continuation
 
 end UInt256Proof.Safety
 
@@ -103,19 +91,7 @@ theorem scalar_left_prefix (left right output : Reference) (extra : List Value)
   simp only [Fin.val_one, Fin.val_two, CIL.fin_val_three, Nat.reduceMul] at upper1 upper2 upper3
   simp [scalarSecondDecision, scalarFirstDecision, cil_code] at continuation
   conv in scalarFirstDecision => cbv
-  repeat'
-    first
-    | exact continuation
-    | simp (config := { failIfUnchanged := false }) [BitVec.ofNat_eq_ofNat, largeRight]
-      apply run_next_exists post
-      · simp only [cil_code]; rfl
-      · simp only [cil_code]; rfl
-      · first
-        | ((with_reducible show step _ (.setLocal 1) _ _ _ _ _ = _); exact stored _ _)
-        | simp (config := { implicitDefEqProofs := false })
-            [cil_code, step, cil_guard, observerCount, checkedValue, numericValue, formValue, leftBefore, leftAfter,
-              pureArity, scalars, CIL.step.eq_def, CIL.binary, CIL.unary, firstRead, upper1, upper2, upper3,
-              checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-          first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
+  cil_contract_steps [largeRight, leftBefore, leftAfter, firstRead, upper1, upper2, upper3, stored,
+    BitVec.ofNat_eq_ofNat] until continuation
 
 end UInt256Proof.Safety

@@ -45,39 +45,6 @@ theorem scalar_carry_prefix (args : List Value) (frame : Frame) (before after : 
   cil_contract_steps [found, largeLeft, carryFormed, resultFormed, leftSlot, rightSlot,
     carrySlot, resultSlot, leftLoaded, rightLoaded, stored, BitVec.ofNat_eq_ofNat] until continuation
 
-/-- Bind the first discovered parent call to the checked carry contract. -/
-theorem scalar_first_carry (contract : CarryHelperContract Extracted.program Extracted.addWithCarryIndex) (args : List Value) (frame : Frame) (memory : Memory)
-    (a b : BitVec 64) (carryHome resultHome : Reference)
-    (wellFormed : memory.WellFormed)
-    (carryRead : read memory carryHome 8 1 = .ok (numberBytes 0 8))
-    (carryWrite : access memory carryHome 8 1 true = .ok ())
-    (resultWrite : access memory resultHome 8 1 true = .ok ())
-    (disjoint : WordsDisjoint carryHome resultHome)
-    (post : Memory → List Value → Prop)
-    (continuation : ∀ after, after.WellFormed →
-      (StaticWorldPreserved Extracted.program memory after) →
-      Confined [(carryHome, 8), (resultHome, 8)] memory after →
-      CarryPost a b 0 carryHome resultHome after →
-      ∃ fuel result returned,
-        run Extracted.program fuel Extracted.addScalarIndex (scalarFirstCarryCall + 1) args frame [] after =
-          .ok (result, returned) ∧ post result returned) :
-    ∃ fuel result returned,
-      run Extracted.program fuel Extracted.addScalarIndex scalarFirstCarryCall args frame
-        [.reference (.address resultHome), .reference (.address carryHome), .scalar (.i64 b), .scalar (.i64 a)]
-        memory = .ok (result, returned) ∧ post result returned := by
-  have carryFormed := access_reference_valid _ _ _ _ _ carryWrite
-  have resultFormed := access_reference_valid _ _ _ _ _ resultWrite
-  apply run_call_of_contract_formed contract ⟨a, b, 0, carryHome, resultHome⟩ (body := Extracted.addScalarBody)
-    (op := .call Extracted.addWithCarryIndex 4) (encoded := rfl) (formed := wellFormed)
-  · simp only [cil_code]
-  · conv in scalarFirstCarryCall => cbv
-    simp only [cil_code]
-  · cil_checked_step [carryFormed, resultFormed]
-  · exact ⟨wellFormed, by simp, carryRead, carryWrite, resultWrite, disjoint⟩
-  · intro after output call invariants
-    simpa only [carryContract, List.append_nil] using
-      continuation after invariants.formed invariants.staticWorld call.framed call.post
-
 
 end UInt256Proof.Safety
 
@@ -93,40 +60,6 @@ def scalarCarryCall : Nat → Nat
     start + (Extracted.addScalarBody.code.drop start).findIdx (fun op => match op with
       | .call callee _ => callee == Extracted.addWithCarryIndex
       | _ => false)
-
-/-- Each remaining limb follows its actual load/load/address/address sequence
-    between discovered calls. The indexed statement covers all three segments. -/
-theorem scalar_carry_segment (segment : Fin 3) (left right output : Reference) (extra : List Value)
-    (frame : Frame) (memory : Memory) (a b : BitVec 64) (carryHome resultHome : Reference)
-    (leftFormed : form memory left = .ok left) (rightFormed : form memory right = .ok right)
-    (leftRead : ∀ rest, instruction (.fieldAt (8 * (segment.val + 1)) 8)
-      (.reference (.address left) :: rest) memory = .ok (memory, .scalar (.i64 a) :: rest))
-    (rightRead : ∀ rest, instruction (.fieldAt (8 * (segment.val + 1)) 8)
-      (.reference (.address right) :: rest) memory = .ok (memory, .scalar (.i64 b) :: rest))
-    (carrySlot : frame.locals[2]? = some (.bytes .word64 carryHome))
-    (resultSlot : frame.locals[segment.val + 4]? = some (.bytes .word64 resultHome))
-    (carryFormed : form memory carryHome = .ok carryHome)
-    (resultFormed : form memory resultHome = .ok resultHome)
-    (post : Memory → List Value → Prop)
-    (continuation : ∃ fuel result returned,
-      run Extracted.program fuel Extracted.addScalarIndex (scalarCarryCall (segment.val + 1))
-        ([.reference (.address left), .reference (.address right), .reference (.address output)] ++ extra)
-        frame [.reference (.address resultHome), .reference (.address carryHome), .scalar (.i64 b), .scalar (.i64 a)]
-        memory = .ok (result, returned) ∧ post result returned) :
-    ∃ fuel result returned,
-      run Extracted.program fuel Extracted.addScalarIndex (scalarCarryCall segment.val + 1)
-        ([.reference (.address left), .reference (.address right), .reference (.address output)] ++ extra)
-        frame [] memory = .ok (result, returned) ∧ post result returned := by
-  obtain ⟨segment, bound⟩ := segment
-  have cases : segment = 0 ∨ segment = 1 ∨ segment = 2 := by omega
-  rcases cases with rfl | rfl | rfl
-  all_goals
-    dsimp at leftRead rightRead resultSlot
-    conv in (scalarCarryCall _) => cbv
-    have found : Extracted.program[Extracted.addScalarIndex]? = some Extracted.addScalarBody := by
-      simp only [cil_code]
-    cil_contract_steps [found, leftFormed, rightFormed, carryFormed, resultFormed,
-      carrySlot, resultSlot, leftRead, rightRead] until continuation
 
 /-- Every discovered scalar carry call uses the checked arithmetic contract. -/
 theorem scalar_indexed_carry (contract : CarryHelperContract Extracted.program Extracted.addWithCarryIndex) (index : Fin 4) (args : List Value) (frame : Frame) (memory : Memory)
@@ -192,12 +125,28 @@ theorem scalar_carry_segment_checked (contract : CarryHelperContract Extracted.p
     ∃ fuel result returned,
       run Extracted.program fuel Extracted.addScalarIndex (scalarCarryCall segment.val + 1)
         (binaryArguments left right output ++ extra) frame [] memory = .ok (result, returned) ∧ post result returned := by
-  apply scalar_carry_segment segment left right output extra frame memory _ _ carryHome resultHome
-    (call.input_formed (by simp)) (call.input_formed (by simp))
-    (fun rest => call.input_field_instruction (reference := left) (by simp) ⟨segment.val + 1, by omega⟩ rest)
-    (fun rest => call.input_field_instruction (reference := right) (by simp) ⟨segment.val + 1, by omega⟩ rest) carrySlot resultSlot
-    (access_reference_valid _ _ _ _ _ carryWrite) (access_reference_valid _ _ _ _ _ resultWrite) post
-  exact scalar_indexed_carry contract ⟨segment.val + 1, by omega⟩ (binaryArguments left right output ++ extra)
-    frame memory _ _ c carryHome resultHome call.1.1 incoming carryRead carryWrite resultWrite disjoint post continuation
+  have leftFormed := call.input_formed (reference := left) (by simp)
+  have rightFormed := call.input_formed (reference := right) (by simp)
+  have leftRead := fun rest => call.input_field_instruction (reference := left) (by simp)
+    ⟨segment.val + 1, by omega⟩ rest
+  have rightRead := fun rest => call.input_field_instruction (reference := right) (by simp)
+    ⟨segment.val + 1, by omega⟩ rest
+  have carryFormed := access_reference_valid _ _ _ _ _ carryWrite
+  have resultFormed := access_reference_valid _ _ _ _ _ resultWrite
+  have suffix := scalar_indexed_carry contract ⟨segment.val + 1, by omega⟩
+    (binaryArguments left right output ++ extra) frame memory
+    (inputLimb memory left ⟨segment.val + 1, by omega⟩)
+    (inputLimb memory right ⟨segment.val + 1, by omega⟩) c carryHome resultHome call.1.1
+    incoming carryRead carryWrite resultWrite disjoint post continuation
+  have found : Extracted.program[Extracted.addScalarIndex]? = some Extracted.addScalarBody := by
+    simp only [cil_code]
+  obtain ⟨segment, bound⟩ := segment
+  have cases : segment = 0 ∨ segment = 1 ∨ segment = 2 := by omega
+  rcases cases with rfl | rfl | rfl
+  all_goals
+    dsimp at leftRead rightRead resultSlot suffix
+    conv in (scalarCarryCall _) => cbv
+    cil_contract_steps [found, binaryArguments, leftFormed, rightFormed, carryFormed,
+      resultFormed, carrySlot, resultSlot, leftRead, rightRead] until suffix
 
 end UInt256Proof.Safety

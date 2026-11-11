@@ -92,9 +92,10 @@ theorem scalar_first_carry_checked (contract : CarryHelperContract Extracted.pro
     ready.lowWords.leftRead ready.lowWords.rightRead
     (access_reference_valid _ _ _ _ _ ready.carryWrite)
     (access_reference_valid _ _ _ _ _ ready.resultWrite) stored post
-  exact scalar_first_carry contract args frame prepared (inputLimb memory left 0) (inputLimb memory right 0)
-    carryHome resultHome ready.lowWords.call.1.1 ready.carryRead ready.carryWrite ready.resultWrite
-    ready.disjoint post (fun after formed world framed math =>
+  exact scalar_indexed_carry contract 0 args frame prepared (inputLimb memory left 0)
+    (inputLimb memory right 0) 0 carryHome resultHome ready.lowWords.call.1.1 (by decide)
+    ready.carryRead ready.carryWrite ready.resultWrite ready.disjoint post
+    (fun after formed world framed math =>
       continuation carryHome resultHome prepared after ready formed world framed math)
 
 end UInt256Proof.Safety

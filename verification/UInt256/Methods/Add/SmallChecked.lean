@@ -158,19 +158,6 @@ namespace UInt256Proof.Safety
 
 open CIL.Safety UInt256Model.Safety
 
-theorem small_zero_value (segment : Fin 3) (input output : Reference) (word value : BitVec 64)
-    (zero : value = 0) (frame : Frame) (memory : CIL.Safety.Memory)
-    (post : CIL.Safety.Memory → List Value → Prop)
-    (continuation : ∃ fuel result returned,
-      run Extracted.program fuel Extracted.addScalarUInt64Index (smallIncrementStart (segment.val + 1))
-        (smallArguments input output word) frame [] memory = .ok (result, returned) ∧ post result returned) :
-    ∃ fuel result returned,
-      run Extracted.program fuel Extracted.addScalarUInt64Index (smallIncrementDecision segment.val)
-        (smallArguments input output word) frame [.scalar (.i64 value)] memory = .ok (result, returned) ∧
-      post result returned := by
-  subst value
-  exact small_zero_dispatch segment input output word frame memory post continuation
-
 theorem SmallCarryState.increment_count {original current : CIL.Safety.Memory} {frame : Frame}
     {input output sumHome : Reference} {homes : Fin 4 → Reference}
     {words : Fin 4 → BitVec 64} {sum : BitVec 64} (segment : Fin 3)
@@ -222,15 +209,15 @@ theorem small_checked (memory : CIL.Safety.Memory) (input output : Reference) (w
     apply prepared.increment_count 0 call word post
     intro first state1
     by_cases h1 : inputLimb memory input 1 + 1 = 0
-    · apply small_zero_value 0 input output word _ h1 frame first post
+    · apply small_zero_dispatch 0 input output word _ h1 frame first post
       apply state1.increment_count 1 call word post
       intro second state2
       by_cases h2 : inputLimb memory input 2 + 1 = 0
-      · apply small_zero_value 1 input output word _ h2 frame second post
+      · apply small_zero_dispatch 1 input output word _ h2 frame second post
         apply state2.increment_count 2 call word post
         intro third state3
         by_cases h3 : inputLimb memory input 3 + 1 = 0
-        · apply small_zero_value 2 input output word _ h3 frame third post
+        · apply small_zero_dispatch 2 input output word _ h3 frame third post
           exact small_overflow_finish memory entered third frame input output sumHome references word
             call setup state3 carry h1 h2 h3
         · apply small_stopped_finish 2 memory entered third frame input output sumHome references word

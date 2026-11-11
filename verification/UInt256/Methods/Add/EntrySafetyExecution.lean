@@ -5,33 +5,6 @@ namespace UInt256Proof.Safety
 
 open CIL.Safety UInt256Model.Safety UInt256Proof.Add.CarrySafety
 
-theorem entry_scalar_prefix (left right output : Reference) (frame : Frame) (memory : CIL.Safety.Memory)
-    (call : CallingConditions Extracted.program memory [left, right] [output])
-    (post : CIL.Safety.Memory → List Value → Prop)
-    (continuation : ∃ fuel final values,
-      run Extracted.program fuel Extracted.entryIndex Extracted.entryScalarCall (binaryArguments left right output)
-        frame [.scalar (.i32 0), .reference (.address output), .reference (.address right),
-          .reference (.address left)] memory = .ok (final, values) ∧ post final values) :
-    ∃ fuel final values,
-      run Extracted.program fuel Extracted.entryIndex 0 (binaryArguments left right output)
-        frame [] memory = .ok (final, values) ∧ post final values := by
-  have fl := call.input_formed (reference := left) (by simp)
-  have fr := call.input_formed (reference := right) (by simp)
-  have fo := call.output_formed (reference := output) (by simp)
-  simp only [Extracted.entryScalarCall] at continuation
-  repeat'
-    first
-    | exact continuation
-    | simp (config := { failIfUnchanged := false })
-      apply run_next_exists post
-      · simp only [cil_code]; rfl
-      · simp only [cil_code]; rfl
-      · simp (config := { implicitDefEqProofs := false })
-          [cil_code, binaryArguments, step, cil_guard, observerCount, checkedValue, numericValue, formValue, fl, fr, fo,
-            pureArity, scalars, CIL.step, CIL.FeatureProfile.evaluate, checkedAt, Except.mapError,
-            Bind.bind, Except.bind, Pure.pure, Except.pure]
-        first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
-
 theorem entry_scalar_return (args : List Value) (flag : BitVec 32) (frame : Frame) (memory : CIL.Safety.Memory) :
     run Extracted.program 2 Extracted.entryIndex (Extracted.entryScalarCall + 1) args frame [.scalar (.i32 flag)] memory =
       .ok (leaveFrame frame memory, []) := by
@@ -65,44 +38,50 @@ theorem entry_run_checked (contract : CarryHelperContract Extracted.program Extr
   have executed : ∃ fuel final values,
       run Extracted.program fuel Extracted.entryIndex 0 (binaryArguments left right output) frame [] entered =
         .ok (final, values) ∧ post final values := by
-    apply entry_scalar_prefix left right output frame entered enteredCall post
-    obtain ⟨childFuel, after, values, invoked, result⟩ := scalar_checked contract entered left right output enteredCall
-    rw [result.flag] at invoked
-    have mf : Extracted.program[Extracted.entryIndex]? = some Extracted.entryBody := by simp only [cil_code]
-    have fetched : Extracted.entryBody.code[Extracted.entryScalarCall]? = some (.call Extracted.addScalarIndex 4) := by
-      simp only [cil_code]
-    have stepped : step Extracted.entryBody (.call Extracted.addScalarIndex 4) Extracted.entryScalarCall
-        (binaryArguments left right output) frame
-        [.scalar (.i32 0), .reference (.address output), .reference (.address right), .reference (.address left)]
-        entered = .ok (.call Extracted.addScalarIndex (scalarArguments left right output) [] entered) := by
-      have fl := enteredCall.input_formed (reference := left) (by simp)
-      have fr := enteredCall.input_formed (reference := right) (by simp)
-      have fo := enteredCall.output_formed (reference := output) (by simp)
-      simp [step, cil_guard, observerCount, scalarArguments, binaryArguments, checkedValue, numericValue, formValue, fl, fr, fo,
-        checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-    obtain ⟨fuel, finished⟩ := run_call_exists mf fetched stepped ⟨childFuel, invoked⟩
-      ⟨2, entry_scalar_return _ (addOverflow entered left right) frame after⟩
-    have retained := leaveFrame_preserves_memory_below frame after memory.nextIdentity
-      (fun id member => (fresh.2 id member).1)
-    obtain ⟨outputAllocation, outputPresent, _, _⟩ := formed_reference_live _ _ _
-      (call.output_formed (by simp : output ∈ [output]))
-    have outputOld := (call.1.1.1 _ _ outputPresent).1
-    have bytes : (fun offset => ((leaveFrame frame after).cells output.allocation offset).bits) =
-        (fun offset => (after.cells output.allocation offset).bits) := by
-      funext offset
-      rw [retained.cells output.allocation outputOld offset]
-    have inputSame : ∀ reference ∈ [left, right], inputValue entered reference = inputValue memory reference := by
-      intro reference member
-      simp only [inputValue, call.input_bytes_of_memory_below preserved member]
-    refine ⟨fuel, leaveFrame frame after, [], finished, rfl, ?_⟩
-    refine ⟨leaveFrame_preserves_wellFormed _ _ result.wellFormed, ?_, ?_, ?_⟩
-    · have math := result.value
-      rw [inputSame left (by simp), inputSame right (by simp)] at math
-      simpa only [inputValue, bytes] using math
-    · exact (retained.access output outputOld 32 1 true).trans result.writable
-    · intro id old offset outside
-      exact (retained.cells id old offset).trans
-        ((result.footprint id (Nat.lt_of_lt_of_le old fresh.1.next) offset outside).trans (preserved.cells id old offset))
+    have fl := enteredCall.input_formed (reference := left) (by simp)
+    have fr := enteredCall.input_formed (reference := right) (by simp)
+    have fo := enteredCall.output_formed (reference := output) (by simp)
+    have suffix : ∃ fuel final values,
+        run Extracted.program fuel Extracted.entryIndex Extracted.entryScalarCall
+          (binaryArguments left right output) frame
+          [.scalar (.i32 0), .reference (.address output), .reference (.address right),
+            .reference (.address left)] entered = .ok (final, values) ∧ post final values := by
+      obtain ⟨childFuel, after, values, invoked, result⟩ := scalar_checked contract entered left right output enteredCall
+      rw [result.flag] at invoked
+      have mf : Extracted.program[Extracted.entryIndex]? = some Extracted.entryBody := by simp only [cil_code]
+      have fetched : Extracted.entryBody.code[Extracted.entryScalarCall]? = some (.call Extracted.addScalarIndex 4) := by
+        simp only [cil_code]
+      have stepped : step Extracted.entryBody (.call Extracted.addScalarIndex 4) Extracted.entryScalarCall
+          (binaryArguments left right output) frame
+          [.scalar (.i32 0), .reference (.address output), .reference (.address right), .reference (.address left)]
+          entered = .ok (.call Extracted.addScalarIndex (scalarArguments left right output) [] entered) := by
+        simp [step, cil_guard, observerCount, scalarArguments, binaryArguments, checkedValue, numericValue, formValue, fl, fr, fo,
+          checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
+      obtain ⟨fuel, finished⟩ := run_call_exists mf fetched stepped ⟨childFuel, invoked⟩
+        ⟨2, entry_scalar_return _ (addOverflow entered left right) frame after⟩
+      have retained := leaveFrame_preserves_memory_below frame after memory.nextIdentity
+        (fun id member => (fresh.2 id member).1)
+      obtain ⟨outputAllocation, outputPresent, _, _⟩ := formed_reference_live _ _ _
+        (call.output_formed (by simp : output ∈ [output]))
+      have outputOld := (call.1.1.1 _ _ outputPresent).1
+      have bytes : (fun offset => ((leaveFrame frame after).cells output.allocation offset).bits) =
+          (fun offset => (after.cells output.allocation offset).bits) := by
+        funext offset
+        rw [retained.cells output.allocation outputOld offset]
+      have inputSame : ∀ reference ∈ [left, right], inputValue entered reference = inputValue memory reference := by
+        intro reference member
+        simp only [inputValue, call.input_bytes_of_memory_below preserved member]
+      refine ⟨fuel, leaveFrame frame after, [], finished, rfl, ?_⟩
+      refine ⟨leaveFrame_preserves_wellFormed _ _ result.wellFormed, ?_, ?_, ?_⟩
+      · have math := result.value
+        rw [inputSame left (by simp), inputSame right (by simp)] at math
+        simpa only [inputValue, bytes] using math
+      · exact (retained.access output outputOld 32 1 true).trans result.writable
+      · intro id old offset outside
+        exact (retained.cells id old offset).trans
+          ((result.footprint id (Nat.lt_of_lt_of_le old fresh.1.next) offset outside).trans (preserved.cells id old offset))
+    simp only [Extracted.entryScalarCall] at suffix
+    cil_contract_steps [binaryArguments, fl, fr, fo, CIL.FeatureProfile.evaluate] until suffix
   obtain ⟨fuel, final, values, finished, equal, result⟩ := executed
   subst values
   exact ⟨fuel, final, finished, result⟩

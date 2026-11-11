@@ -46,53 +46,6 @@ theorem small_return (branch : Fin 5) (args : List Value) (frame : Frame) (memor
     · simp [run, cil_code, step, cil_guard, observerCount, CIL.NarrowKind.extend, smallBranchFlag, checkedValue, numericValue,
         Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
-theorem small_no_carry_prefix (input output sumHome : Reference) (word : BitVec 64)
-    (frame : Frame) (memory : Memory) (homes : Fin 4 → Reference) (words : Fin 4 → BitVec 64)
-    (noCarry : ¬ words 0 + word < words 0)
-    (formed : form memory output = .ok output)
-    (slots : ∀ i : Fin 4, frame.locals[i.val]? = some (.bytes .word64 (homes i)))
-    (reads : ∀ i, read memory (homes i) 8 1 = .ok (numberBytes (words i).toNat 8))
-    (sumSlot : frame.locals[4]? = some (.bytes .word64 sumHome))
-    (sumRead : read memory sumHome 8 1 = .ok (numberBytes (words 0 + word).toNat 8))
-    (post : Memory → List Value → Prop)
-    (continuation : ∃ fuel result returned,
-      run Extracted.program fuel Extracted.addScalarUInt64Index (smallStoreCall 0)
-        (smallArguments input output word) frame
-        (storageArguments output (words 0 + word) (words 1) (words 2) (words 3)).reverse memory = .ok (result, returned) ∧
-      post result returned) :
-    ∃ fuel result returned,
-      run Extracted.program fuel Extracted.addScalarUInt64Index smallCarryDecision
-        (smallArguments input output word) frame
-        [.scalar (.i64 (words 0)), .scalar (.i64 (words 0 + word))] memory = .ok (result, returned) ∧
-      post result returned := by
-  unfold storageArguments at continuation
-  rw [small_storage_word_order] at continuation
-  conv at continuation in (List.filterMap _ _) => cbv
-  simp [List.range_succ, List.findIdx] at continuation
-  conv in smallCarryDecision => cbv
-  conv at continuation in (smallStoreCall _) => cbv
-  have s1 := slots 1
-  have s2 := slots 2
-  have s3 := slots 3
-  dsimp at s1 s2 s3
-  simp only [show (3 : Fin 4).val = 3 from rfl] at s3
-  have r1 := load_local_word64_of_read (reads 1)
-  have r2 := load_local_word64_of_read (reads 2)
-  have r3 := load_local_word64_of_read (reads 3)
-  have r4 := load_local_word64_of_read sumRead
-  repeat'
-    first
-    | exact continuation
-    | simp (config := { failIfUnchanged := false }) [noCarry]
-      apply run_next_exists post
-      · simp only [cil_code]; rfl
-      · simp only [cil_code]; rfl
-      · simp (config := { implicitDefEqProofs := false })
-          [cil_code, smallArguments, step, cil_guard, observerCount, checkedValue, numericValue, formValue, formed,
-            s1, s2, s3, sumSlot, r1, r2, r3, r4, pureArity, scalars, CIL.step,
-            checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-        first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
-
 end UInt256Proof.Safety
 
 namespace UInt256Proof.Safety
@@ -190,10 +143,35 @@ theorem small_no_carry_checked (memory : CIL.Safety.Memory)
     have inside := (List.getElem?_eq_some_iff.mp (facts i).1).1
     rw [layout, List.getElem?_append_left inside]
     exact (facts i).1
-  apply small_no_carry_prefix input output sumHome word frame after homes (inputLimb memory input)
-    noCarry (saved.call.output_formed (by simp)) fullSlots (fun i => (facts i).2.2) sumSlot sumRead post
-  let words := fun i : Fin 4 => if i.val = 0 then inputLimb memory input 0 + word else inputLimb memory input i
-  exact small_store_finish 0 memory entered after frame input output word words call setup saved.call
-    saved.preserved.cells (small_no_carry_value memory input word noCarry)
+  have suffix : ∃ fuel result returned,
+      run Extracted.program fuel Extracted.addScalarUInt64Index (smallStoreCall 0)
+        (smallArguments input output word) frame
+        (storageArguments output (inputLimb memory input 0 + word) (inputLimb memory input 1)
+          (inputLimb memory input 2) (inputLimb memory input 3)).reverse after =
+          .ok (result, returned) ∧ post result returned :=
+    small_store_finish 0 memory entered after frame input output word
+      (fun i => if i.val = 0 then inputLimb memory input 0 + word else inputLimb memory input i)
+      call setup saved.call saved.preserved.cells (small_no_carry_value memory input word noCarry)
+  unfold storageArguments at suffix
+  rw [small_storage_word_order] at suffix
+  conv at suffix in (List.filterMap _ _) => cbv
+  simp [List.range_succ, List.findIdx] at suffix
+  conv in smallCarryDecision => cbv
+  conv at suffix in (smallStoreCall _) => cbv
+  have formed := saved.call.output_formed (by simp : output ∈ [output])
+  have s1 := fullSlots 1
+  have s2 := fullSlots 2
+  have s3 := fullSlots 3
+  dsimp at s1 s2 s3
+  simp only [show (3 : Fin 4).val = 3 from rfl] at s3
+  have reads : ∀ i, read after (homes i) 8 1 =
+      .ok (numberBytes (inputLimb memory input i).toNat 8) :=
+    fun i => (facts i).2.2
+  have r1 := load_local_word64_of_read (reads 1)
+  have r2 := load_local_word64_of_read (reads 2)
+  have r3 := load_local_word64_of_read (reads 3)
+  have r4 := load_local_word64_of_read sumRead
+  cil_contract_steps [smallArguments, noCarry, formed, s1, s2, s3, sumSlot, r1, r2, r3, r4]
+    until suffix
 
 end UInt256Proof.Safety

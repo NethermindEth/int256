@@ -114,37 +114,6 @@ theorem small_input_prefix_checked (original entered : CIL.Safety.Memory)
     · exact step2 pc rest
     · exact step3 pc rest
 
-theorem small_saved_invocation (memory : CIL.Safety.Memory)
-    (input output : Reference) (word : BitVec 64)
-    (call : CallingConditions Extracted.program memory [input] [output])
-    (post : CIL.Safety.Memory → List Value → Prop)
-    (continuation : ∀ frame entered slots tailSlots after,
-      enterFrame Extracted.addScalarUInt64Body (smallArguments input output word) memory =
-        .ok (frame, entered) →
-      frame.locals = slots ++ tailSlots →
-      WordHomes entered memory.nextIdentity smallWordSpecs slots →
-      SmallSaved memory entered after input output slots 4 →
-      ∃ fuel result returned,
-        run Extracted.program fuel Extracted.addScalarUInt64Index smallScalarStart
-          (smallArguments input output word) frame [] after = .ok (result, returned) ∧
-        post result returned) :
-    ∃ fuel result returned,
-      invoke Extracted.program fuel Extracted.addScalarUInt64Index (smallArguments input output word)
-        memory = .ok (result, returned) ∧ post result returned := by
-  obtain ⟨frame, entered, slots, tailSlots, setup, layout, homes, _, _⟩ :=
-    small_frame_setup memory (smallArguments input output word) call.1.1
-  obtain ⟨fuel, result, returned, finished, satisfied⟩ := small_input_prefix_checked
-    memory entered input output word frame slots tailSlots call setup layout homes post
-      (fun after saved => continuation frame entered slots tailSlots after setup layout homes saved)
-  have checked : (smallArguments input output word).mapM (checkedValue memory) =
-      .ok (smallArguments input output word) := by
-    have fi := call.input_formed (reference := input) (by simp)
-    have fo := call.output_formed (reference := output) (by simp)
-    simp [smallArguments, checkedValue, numericValue, formValue, fi, fo,
-      checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-  refine ⟨fuel, result, returned, ?_, satisfied⟩
-  simpa only [invoke, cil_code, checked, setup, Except.mapError, Bind.bind, Except.bind] using finished
-
 end UInt256Proof.Safety
 
 namespace UInt256Proof.Safety
@@ -155,46 +124,6 @@ def smallCarryDecision : Nat :=
   Extracted.addScalarUInt64Body.code.findIdx fun op => match op with
     | .bltu _ => true
     | _ => false
-
-theorem small_sum_prefix (input output lowHome sumHome : Reference) (word low : BitVec 64)
-    (frame : Frame) (before after : CIL.Safety.Memory)
-    (lowSlot : frame.locals[0]? = some (.bytes .word64 lowHome))
-    (sumSlot : frame.locals[4]? = some (.bytes .word64 sumHome))
-    (lowBefore : read before lowHome 8 1 = .ok (numberBytes low.toNat 8))
-    (lowAfter : read after lowHome 8 1 = .ok (numberBytes low.toNat 8))
-    (sumAfter : read after sumHome 8 1 = .ok (numberBytes (low + word).toNat 8))
-    (stored : ∀ pc rest, step Extracted.addScalarUInt64Body (.setLocal 4) pc
-      (smallArguments input output word) frame (.scalar (.i64 (low + word)) :: rest) before =
-        .ok (.next (pc + 1) rest frame after))
-    (post : CIL.Safety.Memory → List Value → Prop)
-    (continuation : ∃ fuel result returned,
-      run Extracted.program fuel Extracted.addScalarUInt64Index smallCarryDecision
-        (smallArguments input output word) frame
-        [.scalar (.i64 low), .scalar (.i64 (low + word))] after = .ok (result, returned) ∧
-      post result returned) :
-    ∃ fuel result returned,
-      run Extracted.program fuel Extracted.addScalarUInt64Index smallScalarStart
-        (smallArguments input output word) frame [] before = .ok (result, returned) ∧
-      post result returned := by
-  conv in smallScalarStart => cbv
-  conv at continuation in smallCarryDecision => cbv
-  have r0 := load_local_word64_of_read lowBefore
-  have r1 := load_local_word64_of_read lowAfter
-  have r4 := load_local_word64_of_read sumAfter
-  repeat'
-    first
-    | exact continuation
-    | simp (config := { failIfUnchanged := false })
-      apply run_next_exists post
-      · simp only [cil_code]; rfl
-      · simp only [cil_code]; rfl
-      · first
-        | ((with_reducible show step _ (.setLocal 4) _ _ _ _ _ = _); exact stored _ _)
-        | simp (config := { implicitDefEqProofs := false })
-            [cil_code, smallArguments, step, cil_guard, observerCount, lowSlot, sumSlot, r0, r1, r4, checkedValue,
-              numericValue, pureArity, scalars, CIL.step, CIL.binary, CIL.unary,
-              Bind.bind, Except.bind, Pure.pure, Except.pure]
-          first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
 
 theorem SmallSaved.sum_store {original entered current : CIL.Safety.Memory}
     {input output : Reference} {slots tailSlots : List LocalSlot} {frame : Frame}
@@ -251,21 +180,38 @@ theorem small_sum_invocation (memory : CIL.Safety.Memory)
     ∃ fuel result returned,
       invoke Extracted.program fuel Extracted.addScalarUInt64Index (smallArguments input output word)
         memory = .ok (result, returned) ∧ post result returned := by
-  apply small_saved_invocation memory input output word call post
-  intro frame entered slots tailSlots before setup layout homes saved
+  obtain ⟨frame, entered, slots, tailSlots, setup, layout, homes, _, _⟩ :=
+    small_frame_setup memory (smallArguments input output word) call.1.1
   have enteredWF := enterFrame_preserves_wellFormed _ _ _ _ _ call.1.1 setup
-  obtain ⟨sumHome, after, updated, sumSlot, sumRead, stored⟩ :=
-    saved.sum_store word call enteredWF layout homes
-  obtain ⟨lowHome, lowSlot, _, lowBefore⟩ := saved.completed 0 (by decide)
-  obtain ⟨afterHome, afterSlot, _, lowAfter⟩ := updated.completed 0 (by decide)
-  have same : afterHome = lowHome := by rw [lowSlot] at afterSlot; simpa using afterSlot.symm
-  subst afterHome
-  have fullSlot : frame.locals[0]? = some (.bytes .word64 lowHome) := by
-    have inside : 0 < slots.length := (List.getElem?_eq_some_iff.mp lowSlot).1
-    rw [layout, List.getElem?_append_left inside]
-    exact lowSlot
-  exact small_sum_prefix input output lowHome sumHome word (inputLimb memory input 0)
-    frame before after fullSlot sumSlot lowBefore lowAfter sumRead stored post
-    (continuation frame entered slots tailSlots sumHome after setup layout homes updated sumSlot sumRead)
+  obtain ⟨fuel, result, returned, finished, satisfied⟩ := small_input_prefix_checked
+    memory entered input output word frame slots tailSlots call setup layout homes post (by
+      intro before saved
+      obtain ⟨sumHome, after, updated, sumSlot, sumRead, stored⟩ :=
+        saved.sum_store word call enteredWF layout homes
+      obtain ⟨lowHome, lowSlot, _, lowBefore⟩ := saved.completed 0 (by decide)
+      obtain ⟨afterHome, afterSlot, _, lowAfter⟩ := updated.completed 0 (by decide)
+      have same : afterHome = lowHome := by rw [lowSlot] at afterSlot; simpa using afterSlot.symm
+      subst afterHome
+      have fullSlot : frame.locals[0]? = some (.bytes .word64 lowHome) := by
+        have inside : 0 < slots.length := (List.getElem?_eq_some_iff.mp lowSlot).1
+        rw [layout, List.getElem?_append_left inside]
+        exact lowSlot
+      have suffix := continuation frame entered slots tailSlots sumHome after setup layout homes
+        updated sumSlot sumRead
+      conv in smallScalarStart => cbv
+      conv at suffix in smallCarryDecision => cbv
+      have r0 := load_local_word64_of_read lowBefore
+      have r1 := load_local_word64_of_read lowAfter
+      have r4 := load_local_word64_of_read sumRead
+      cil_contract_steps [smallArguments, fullSlot, sumSlot, r0, r1, r4, stored] until suffix)
+  have checked : (smallArguments input output word).mapM (checkedValue memory) =
+      .ok (smallArguments input output word) := by
+    have fi := call.input_formed (reference := input) (by simp)
+    have fo := call.output_formed (reference := output) (by simp)
+    simp [smallArguments, checkedValue, numericValue, formValue, fi, fo,
+      checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
+  refine ⟨fuel, result, returned, ?_, satisfied⟩
+  simpa only [invoke, cil_code, checked, setup, Except.mapError, Bind.bind, Except.bind]
+    using finished
 
 end UInt256Proof.Safety

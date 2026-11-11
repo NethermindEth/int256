@@ -20,37 +20,26 @@ theorem small_carry_dispatch (input output : Reference) (word low : BitVec 64)
         memory = .ok (result, returned) ∧ post result returned := by
   conv in smallCarryDecision => cbv
   conv at continuation in (smallIncrementStart _) => cbv
-  apply run_next_exists post
-  · simp only [cil_code]; rfl
-  · simp only [cil_code]; rfl
-  · simp [step, cil_guard, observerCount, numericValue, pureArity, scalars, CIL.step, carry,
-      Bind.bind, Except.bind, Pure.pure, Except.pure]
-    exact ⟨rfl, rfl, rfl, rfl⟩
-  · exact continuation
+  cil_contract_steps [carry] until continuation
 
-theorem small_zero_dispatch (segment : Fin 3) (input output : Reference) (word : BitVec 64)
-    (frame : Frame) (memory : CIL.Safety.Memory)
+theorem small_zero_dispatch (segment : Fin 3) (input output : Reference) (word value : BitVec 64)
+    (zero : value = 0) (frame : Frame) (memory : CIL.Safety.Memory)
     (post : CIL.Safety.Memory → List Value → Prop)
     (continuation : ∃ fuel result returned,
       run Extracted.program fuel Extracted.addScalarUInt64Index (smallIncrementStart (segment.val + 1))
         (smallArguments input output word) frame [] memory = .ok (result, returned) ∧ post result returned) :
     ∃ fuel result returned,
       run Extracted.program fuel Extracted.addScalarUInt64Index (smallIncrementDecision segment.val)
-        (smallArguments input output word) frame [.scalar (.i64 0)] memory = .ok (result, returned) ∧
-      post result returned := by
+        (smallArguments input output word) frame [.scalar (.i64 value)] memory =
+          .ok (result, returned) ∧ post result returned := by
+  subst value
   obtain ⟨segment, bound⟩ := segment
   have cases : segment = 0 ∨ segment = 1 ∨ segment = 2 := by omega
   rcases cases with rfl | rfl | rfl
   all_goals
     conv in (smallIncrementDecision _) => cbv
     conv at continuation in (smallIncrementStart _) => cbv
-    apply run_next_exists post
-    · simp only [cil_code]; rfl
-    · simp only [cil_code]; rfl
-    · simp [step, cil_guard, observerCount, numericValue, pureArity, scalars, CIL.step, CIL.truth,
-        Bind.bind, Except.bind, Pure.pure, Except.pure]
-      exact ⟨rfl, rfl, rfl, rfl⟩
-    · exact continuation
+    cil_contract_steps [] until continuation
 
 theorem SmallCarryState.nonzero_prefix {original current : CIL.Safety.Memory} {frame : Frame}
     {input output sumHome : Reference} {homes : Fin 4 → Reference}
@@ -91,18 +80,8 @@ theorem SmallCarryState.nonzero_prefix {original current : CIL.Safety.Memory} {f
     conv at continuation in (smallStoreCall _) => cbv
     simp [smallCarryOutput, show (3 : Fin 4).val = 3 from rfl] at continuation
     dsimp at nonzero
-    repeat'
-      first
-      | exact continuation
-      | simp (config := { failIfUnchanged := false })
-        apply run_next_exists post
-        · simp only [cil_code]; rfl
-        · simp only [cil_code]; rfl
-        · simp (config := { implicitDefEqProofs := false })
-            [cil_code, smallArguments, step, cil_guard, observerCount, checkedValue, numericValue, formValue, formed,
-              s1, s2, s3, s4, r1, r2, r3, r4, pureArity, scalars, CIL.step, CIL.truth, nonzero,
-              checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-          first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
+    cil_contract_steps [smallArguments, formed, s1, s2, s3, s4, r1, r2, r3, r4, nonzero]
+      until continuation
 
 theorem SmallCarryState.overflow_prefix {original current : CIL.Safety.Memory} {frame : Frame}
     {input output sumHome : Reference} {homes : Fin 4 → Reference}
@@ -125,17 +104,6 @@ theorem SmallCarryState.overflow_prefix {original current : CIL.Safety.Memory} {
   have reading := load_local_word64_of_read state.sumRead
   conv in (smallIncrementStart _) => cbv
   conv at continuation in (smallStoreCall _) => cbv
-  repeat'
-    first
-    | exact continuation
-    | simp (config := { failIfUnchanged := false })
-      apply run_next_exists post
-      · simp only [cil_code]; rfl
-      · simp only [cil_code]; rfl
-      · simp (config := { implicitDefEqProofs := false })
-          [cil_code, smallArguments, step, cil_guard, observerCount, checkedValue, numericValue, formValue, formed,
-            slot, reading, pureArity, scalars, CIL.step,
-            checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-        first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩
+  cil_contract_steps [smallArguments, formed, slot, reading] until continuation
 
 end UInt256Proof.Safety
