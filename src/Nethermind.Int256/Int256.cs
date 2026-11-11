@@ -53,18 +53,10 @@ public readonly partial struct Int256 : IEquatable<Int256>, IComparable, ICompar
         }
     }
 
-    public Int256(int n)
+    // Sign-extends like the long overload. Negating first went wrong for int.MinValue: -n wraps to itself, and the
+    // widened magnitude then negates to -(2^64 - 2^31).
+    public Int256(int n) : this((long)n)
     {
-        if (n < 0)
-        {
-            Int256 value = new(new UInt256((ulong)-n));
-            value.Neg(out Int256 res);
-            _value = res._value;
-        }
-        else
-        {
-            _value = new UInt256((ulong)n);
-        }
     }
 
     // Without this, the implicit long conversion binds to Int256(BigInteger), so every long turns
