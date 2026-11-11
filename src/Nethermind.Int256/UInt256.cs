@@ -842,15 +842,14 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         ulong c0 = s0 < a0 ? 1UL : 0UL;
         a0 = s0;
 
-        // a1 += hi + c0; c1 = carry out (0..2)
+        // The high half of a 64x64 product is at most 2^64 - 2, so hi + c0 cannot wrap and one carry test
+        // covers a1 + hi + c0 instead of two.
+        hi += c0;
         ulong s1 = a1 + hi;
-        ulong c1 = s1 < a1 ? 1UL : 0UL;
-        s1 += c0;
-        c1 += s1 < c0 ? 1UL : 0UL;
         a1 = s1;
 
-        // a2 += c1 (a2 stays small here)
-        a2 += c1;
+        // a2 stays small here
+        a2 += s1 < hi ? 1UL : 0UL;
     }
 
     public void Multiply(in UInt256 a, out UInt256 res) => Multiply(this, a, out res);
