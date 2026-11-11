@@ -608,7 +608,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     /// <param name="y">The second 256‑bit unsigned integer.</param>
     /// <param name="res">When this method returns, contains the 256‑bit product of x and y.</param>
     [SkipLocalsInit]
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(BigOpInlining)]
     public static void Multiply(in UInt256 x, in UInt256 y, out UInt256 res)
     {
         ulong x0 = x.u0;
@@ -666,7 +666,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     }
 
     [SkipLocalsInit]
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(BigOpInlining)]
     private static void MultiplyByUInt64(in UInt256 x, ulong y, out UInt256 res)
     {
         if (y <= 1)
@@ -730,7 +730,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
 
     // x fits in two limbs: five full products and two low halves instead of six and four.
     [SkipLocalsInit]
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(BigOpInlining)]
     private static void MultiplyLimbs2x4(in UInt256 x, in UInt256 y, out UInt256 res)
     {
         ulong x0 = x.u0;
@@ -770,7 +770,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     // ValueOperands takes the scalar top limb, so by-value operands are read as limbs only. A type argument rather than
     // a bool: without AVX2 the JIT keeps this kernel out of line, where a bool would cost the direct path an argument.
     [SkipLocalsInit]
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(BigOpInlining)]
     private static void MultiplyLimbs4x4<TOperands>(in UInt256 x, in UInt256 y, out UInt256 res) where TOperands : struct
     {
         ulong x0 = x.u0;
@@ -856,7 +856,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     public void Multiply(in UInt256 a, out UInt256 res) => Multiply(this, a, out res);
 
     [SkipLocalsInit]
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(BigOpInlining)]
     public static bool MultiplyOverflow(in UInt256 x, in UInt256 y, out UInt256 res)
     {
         ulong xTop = x.u2 | x.u3;
@@ -929,7 +929,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     }
 
     [SkipLocalsInit]
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(BigOpInlining)]
     private static bool MultiplyOverflow2x3(in UInt256 x, in UInt256 y, out UInt256 res)
     {
         ulong x0 = x.u0, x1 = x.u1;
@@ -975,7 +975,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
                     : 64 - BitOperations.LeadingZeroCount(u0);
 
     [SkipLocalsInit]
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(BigOpInlining)]
     private void Squared(out UInt256 result)
     {
         ulong x0 = u0;

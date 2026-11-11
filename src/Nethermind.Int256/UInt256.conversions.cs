@@ -419,7 +419,7 @@ public readonly partial struct UInt256
         return true;
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(BigOpInlining)]
     private static bool TryMultiplyByUInt64AndAdd(in UInt256 value, ulong multiplier, ulong addend, out UInt256 result)
     {
         ulong high = Multiply64(value.u0, multiplier, out ulong u0);

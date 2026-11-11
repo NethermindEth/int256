@@ -14,6 +14,10 @@ namespace Nethermind.Int256;
 
 public readonly partial struct UInt256
 {
+    // The large arithmetic primitives stay out of line: on RV32 a 256-bit product is a long run of 32-bit multiplies
+    // and carries, so a copy at every use costs the 4 MiB ROM of an Airbender guest hundreds of kilobytes, while a
+    // call costs a few instructions against hundreds.
+    private const MethodImplOptions BigOpInlining = MethodImplOptions.NoInlining;
     private const MethodImplOptions SubtractUnderflowInlining = MethodImplOptions.AggressiveInlining;
 
     [MethodImpl(MethodImplOptions.NoInlining)]
@@ -30,7 +34,7 @@ public readonly partial struct UInt256
     private const int ExpBinomialMinBits = 80;
 
     [SkipLocalsInit]
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(BigOpInlining)]
     private static void SquareExpLong(in UInt256 value, out UInt256 result)
     {
         ulong x0 = value.u0, x1 = value.u1, x2 = value.u2, x3 = value.u3;
