@@ -1590,9 +1590,34 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
 
     public int CompareTo(object? obj) => obj is not UInt256 int256 ? throw new InvalidOperationException() : CompareTo(int256);
 
+    /// <summary>
+    /// Formats the value as <see cref="BigInteger"/> formats it. <c>D</c>, <c>G</c> without a precision, <c>X</c> and
+    /// <c>B</c> are written from the limbs; any other format goes through <see cref="BigInteger"/>.
+    /// </summary>
     public string ToString(string format)
     {
-        return ((BigInteger)this).ToString(format);
+        if (!TryParseLimbFormat(format, out char kind, out int precision))
+        {
+            return ((BigInteger)this).ToString(format);
+        }
+
+        Span<char> buffer = stackalloc char[LimbFormatDigits + 1];
+        int start = WriteLimbDigits(in this, signed: false, kind, buffer, out _);
+        // BigInteger reads a leading hex digit above 7, or a leading binary 1, as a sign, so it writes a 0 before it.
+        if (kind != 'D' && !IsZero && (kind == 'B' || BitLen % 4 == 0))
+        {
+            buffer[--start] = '0';
+        }
+
+        ReadOnlySpan<char> digits = buffer[start..];
+        if (precision <= digits.Length)
+        {
+            return new string(digits);
+        }
+
+        Span<char> text = precision <= 512 ? stackalloc char[precision] : new char[precision];
+        Compose(text, default, digits);
+        return new string(text);
     }
 
     public bool IsUint64 => (u1 | u2 | u3) == 0;
