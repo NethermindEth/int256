@@ -19,15 +19,12 @@ theorem scalar_correctness (memory : Memory) (input : Reference) (count : BitVec
     have fo := call.output_formed (by simp : output ∈ [output])
     simp [shiftArguments, checkedValue, numericValue, formValue, checkedAt, fi, fo,
       Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-  obtain ⟨frame, entered, setup, homes, preserved, wf⟩ :=
+  obtain ⟨frame, entered, setup, homes, _, _⟩ :=
     scalar_frame_setup profile direction storage memory (shiftArguments input count output) call.1.1
   have live := checked_entry_live_state _ _ _ _ _ _ _ call.1.1 call.2 checked setup
-  have fresh := enterFrame_fresh _ _ _ _ _ setup
   obtain ⟨fuel, final, returned, executed, empty, finalWF, value, writable, readable, footprint⟩ :=
-    shift_body bodyFound store memory entered entered input output count frame (shiftArguments input count output)
-      rfl rfl rfl call (call.after_frame_setup setup) preserved wf homes
-      (MemoryBelow.refl entered.nextIdentity entered).accessBelow
-      (fun id member => (fresh.2 id member).1)
+    shift_body bodyFound store memory entered input output count frame
+      (shiftArguments input count output) rfl rfl rfl call setup homes
   subst returned
   exact ⟨fuel, final, certify_invocation _ _ _ _ _ _ _ _ _ _ bodyFound checked setup live executed,
     value, writable, readable, footprint⟩

@@ -1,6 +1,5 @@
 import UInt256.Methods.Shift.ScalarFinish
 import UInt256.Methods.Shift.ScalarZero
-import UInt256.Methods.Shift.ScalarDispatch
 import UInt256.Methods.Shift.SafetyCountMath
 
 namespace UInt256Proof.Shift.Safety
@@ -31,51 +30,43 @@ theorem zero_read_value (memory : Memory) (output : Reference)
 
 include bodyFound store
 
-/-- Execute the complete body from a valid private frame. The result is stated
-    on the initial caller operand, with the public full-signed-count semantics. -/
-theorem shift_body (original entered current : Memory) (input output : Reference)
+/-- Execute the complete body from its entered frame. The result is stated on the initial
+    caller operand, with the public full-signed-count semantics. -/
+theorem shift_body (original entered : Memory) (input output : Reference)
     (count : BitVec 32) (frame : Frame) (args : List Value)
     (inputArgument : args[0]? = some (.reference (.address input)))
     (countArgument : args[1]? = some (.scalar (.i32 count)))
     (outputArgument : args[2]? = some (.reference (.address output)))
     (call : CallingConditions program original [input] [output])
-    (currentCall : CallingConditions program current [input] [output])
-    (preserved : MemoryBelow original.nextIdentity original current)
-    (enteredWF : entered.WellFormed)
-    (homes : NumericHomes entered original.nextIdentity shiftSpecs frame.locals)
-    (authority : AccessBelow entered.nextIdentity entered current)
-    (owned : ∀ id ∈ frame.owned, original.nextIdentity ≤ id) :
+    (setup : enterFrame (scalarBody profile direction storage) args original = .ok (frame, entered))
+    (homes : NumericHomes entered original.nextIdentity shiftSpecs frame.locals) :
     ∃ fuel final returned,
-      run program fuel index 0 args frame [] current = .ok (final, returned) ∧
+      run program fuel index 0 args frame [] entered = .ok (final, returned) ∧
       ShiftResult (direction := direction) original final returned input output count := by
   obtain ⟨allocation, present, _, _⟩ := formed_reference_live _ _ _
     (call.output_formed (by simp : output ∈ [output]))
   have outputOld : output.allocation < original.nextIdentity := (call.1.1.1 _ _ present).1
-  apply shift_count_dispatch bodyFound original.nextIdentity entered current [input] [output] frame args count
-    countArgument currentCall enteredWF homes authority
-  · intro after large selected retained valid access next
+  have owned : ∀ id ∈ frame.owned, original.nextIdentity ≤ id :=
+    fun id member => ((enterFrame_fresh _ _ _ _ _ setup).2 id member).1
+  apply shift_count_dispatch bodyFound original entered entered input output frame args count
+    countArgument call homes.complete (VectorFrame.initial call setup)
+  · intro after known large selected state
     obtain ⟨fuel, final, returned, executed, empty, wf, loaded, writable, outside⟩ :=
-      shift_zero_finish bodyFound after [input] [output] frame args output original.nextIdentity valid
-        (by simp) outputArgument outputOld owned
+      shift_zero_finish bodyFound after [input] [output] frame args output original.nextIdentity
+        state.call (by simp) outputArgument outputOld owned
     refine ⟨fuel, final, returned, executed, empty, wf, ?_, writable, ⟨_, loaded⟩, ?_⟩
     · rw [zero_read_value final output loaded]
       simp only [result, shift_zero_count count large selected]
     · intro id old offset untouched
-      exact (outside id old offset untouched).trans
-        ((preserved.trans retained).cells id old offset)
-  · intro whole wholeHome after small selected wholeSlot wholeRead retained valid access next
-    apply shift_prepared bodyFound original entered after [input] [output] input frame args count whole wholeHome
-      inputArgument countArgument wholeSlot wholeRead call valid (by simp)
-      (preserved.trans retained) enteredWF homes access
-    intro maskHome complementHome ready maskSlot complementSlot wholeRead maskRead complementRead snapshots kept readyCall readyAccess readyNext
-    let bounded : Fin 4 := ⟨whole.toNat, small⟩
-    let references : Fin 4 → Reference := fun i => (snapshots i).choose
-    have slots := fun i => (snapshots i).choose_spec.1
-    have reads := fun i => (snapshots i).choose_spec.2
+      exact (outside id old offset untouched).trans (state.caller id old offset (Or.inl rfl))
+  · intro whole after known small selected state wholeKnown
+    apply shift_prepared bodyFound original entered after input output frame args count
+      inputArgument countArgument call homes.complete known state
+    intro ready state
     obtain ⟨fuel, final, returned, executed, empty, wf, calculated, writable, readable, outside⟩ :=
-      shift_nonzero_finish bodyFound store bounded ready frame [input] args output count wholeHome maskHome complementHome
-        references (inputLimb original input) original.nextIdentity outputArgument readyCall
-        wholeSlot maskSlot complementSlot wholeRead maskRead complementRead slots reads outputOld owned
+      shift_nonzero_finish bodyFound store ⟨whole.toNat, small⟩ original entered ready input
+        output frame args count (inputLimb original input) known original.nextIdentity
+        outputArgument state (by simpa using wholeKnown) outputOld owned
     refine ⟨fuel, final, returned, executed, empty, wf, ?_, writable, readable, ?_⟩
     · have model : UInt256Model.value (inputLimb original input) = inputValue original input :=
         UInt256Proof.input_value _ _
@@ -84,7 +75,6 @@ theorem shift_body (original entered current : Memory) (input output : Reference
       cases hdir : direction <;>
         simpa only [result, selectedCount, shiftValue, hdir] using calculated
     · intro id old offset untouched
-      exact (outside id old offset untouched).trans
-        ((kept.cells id old offset).trans ((preserved.trans retained).cells id old offset))
+      exact (outside id old offset untouched).trans (state.caller id old offset (Or.inl rfl))
 
 end UInt256Proof.Shift.Safety

@@ -1,6 +1,6 @@
 import CIL.StepEquations
 import CIL.Safety.Equations
-import UInt256.Methods.Shift.ScalarPrepared
+import UInt256.Methods.Shift.ScalarCount
 import UInt256.Methods.Shift.ValueOutputs
 import UInt256.Methods.Shift.Count
 import CIL.SymbolicExecution
@@ -33,9 +33,6 @@ def outputWords (direction : Direction) (whole : Fin 4) (words : Fin 4 → BitVe
     | 2 => [join 2 3, high, 0, 0]
     | _ => [high, 0, 0, 0]
 
-def outputStart (whole : Fin 4) : Nat :=
-  match whole.val with | 0 => 41 | 1 => 91 | 2 => 130 | _ => 155
-
 def outputCall (whole : Fin 4) : Nat :=
   match whole.val with | 0 => 86 | 1 => 125 | 2 => 153 | _ => 167
 
@@ -43,61 +40,33 @@ variable {profile : CIL.FeatureProfile} {direction : Direction} {storage : Nat}
   {program : CIL.Program} {index : Nat}
   (bodyFound : program[index]? = some (scalarBody profile direction storage))
 include bodyFound
-/-- Each nonzero-result route computes the actual store arguments from private
-    snapshots, without re-reading or changing any caller bytes. -/
-theorem shift_output_arguments (whole : Fin 4) (memory : Memory) (frame : Frame)
-    (args : List Value) (output : Reference) (mask complement : BitVec 32)
-    (maskHome complementHome : Reference) (homes : Fin 4 → Reference) (words : Fin 4 → BitVec 64)
+/-- Each nonzero-result route selected by the whole-limb count computes the actual store
+    arguments from the private snapshots, without re-reading or changing any caller byte. -/
+theorem shift_output_arguments (whole : Fin 4) (original entered memory : Memory)
+    (input output : Reference) (frame : Frame) (args : List Value) (count : BitVec 32)
+    (words : Fin 4 → BitVec 64) (known : Nat → Option CIL.Value)
     (argument : args[2]? = some (.reference (.address output)))
-    (formed : form memory output = .ok output)
-    (maskSlot : frame.locals[1]? = some (.bytes .word32 maskHome))
-    (complementSlot : frame.locals[2]? = some (.bytes .word32 complementHome))
-    (maskRead : read memory maskHome 4 1 = .ok (numberBytes mask.toNat 4))
-    (complementRead : read memory complementHome 4 1 = .ok (numberBytes complement.toNat 4))
-    (slots : ∀ i : Fin 4, frame.locals[3 + i.val]? = some (.bytes .word64 (homes i)))
-    (reads : ∀ i : Fin 4, read memory (homes i) 8 1 = .ok (numberBytes (words i).toNat 8))
+    (state : VectorFrame program original entered memory [input] output frame
+      (preparedLocals known count words) none)
+    (wholeKnown : known 0 = some (.i32 (BitVec.ofNat 32 whole.val)))
     (post : Memory → List Value → Prop)
     (continuation : ∃ fuel final returned,
       run program fuel index (outputCall whole) args frame
-        ((outputWords direction whole words mask complement).reverse.map (fun w => .scalar (.i64 w)) ++
-          [.reference (.address output)]) memory = .ok (final, returned) ∧ post final returned) :
+        ((outputWords direction whole words (count &&& 63) (63 - (count &&& 63))).reverse.map
+          (fun w => .scalar (.i64 w)) ++ [.reference (.address output)]) memory =
+        .ok (final, returned) ∧ post final returned) :
     ∃ fuel final returned,
-      run program fuel index (outputStart whole) args frame [] memory =
-        .ok (final, returned) ∧ post final returned := by
-  have loadMask := load_numeric_local .word32 (.i32 mask) mask.toNat rfl maskRead
-  have loadComplement := load_numeric_local .word32 (.i32 complement) complement.toNat rfl complementRead
-  have loadWord := fun i => load_numeric_local .word64 (.i64 (words i)) (words i).toNat rfl (reads i)
+      run program fuel index 39 args frame [] memory = .ok (final, returned) ∧
+        post final returned := by
+  have formed := state.call.output_formed (by simp : output ∈ [output])
   have found := bodyFound
   have cases : whole = 0 ∨ whole = 1 ∨ whole = 2 ∨ whole = 3 := by omega
   cases direction <;> rcases cases with rfl | rfl | rfl | rfl
   all_goals
-    simp only [outputStart, outputCall, outputWords, List.reverse_cons, List.reverse_nil,
-      List.nil_append, List.append_assoc, List.cons_append, List.map_cons, List.map_nil] at continuation ⊢
-    cil_contract_steps [argument, formed, maskSlot, complementSlot, slots, loadMask, loadComplement, loadWord]
-      until continuation
-
-/-- The bounded whole-limb count selects exactly its checked output route. -/
-theorem shift_output_dispatch (whole : Fin 4) (memory : Memory) (frame : Frame)
-    (args : List Value) (home : Reference)
-    (slot : frame.locals[0]? = some (.bytes .word32 home))
-    (loaded : read memory home 4 1 = .ok (numberBytes whole.val 4))
-    (post : Memory → List Value → Prop)
-    (continuation : ∃ fuel final returned,
-      run program fuel index (outputStart whole) args frame [] memory =
-        .ok (final, returned) ∧ post final returned) :
-    ∃ fuel final returned,
-      run program fuel index (39) args frame [] memory =
-        .ok (final, returned) ∧ post final returned := by
-  have fits : localNumber .word32 (.i32 (BitVec.ofNat 32 whole.val)) = .ok whole.val := by
-    simp [localNumber, CIL.Value.hasUnspecified, Nat.mod_eq_of_lt (show whole.val < 2^32 by omega)]
-  have load := load_numeric_local .word32 (.i32 (BitVec.ofNat 32 whole.val)) whole.val fits loaded
-  have cases : whole = 0 ∨ whole = 1 ∨ whole = 2 ∨ whole = 3 := by omega
-  cases direction <;> rcases cases with rfl | rfl | rfl | rfl
-  all_goals
-    have found := bodyFound
-    simp only [outputStart] at continuation
-    cil_contract_steps [slot, load] until continuation
-
+    simp only [outputCall, outputWords, List.reverse_cons, List.reverse_nil,
+      List.nil_append, List.cons_append, List.map_cons, List.map_nil] at continuation
+    cil_contract_steps (snapshots := state.locals) [argument, formed, preparedLocals,
+      wholeKnown] until continuation
 end UInt256Proof.Shift.Safety
 
 set_option maxHeartbeats 1000000

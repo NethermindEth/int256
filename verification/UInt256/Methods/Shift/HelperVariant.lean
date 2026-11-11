@@ -29,11 +29,8 @@ theorem count_invoke (profile : CIL.FeatureProfile) (program : CIL.Program) (ind
   have checked : ([.scalar (.i32 count)] : List Value).mapM (checkedValue memory) = .ok [.scalar (.i32 count)] := rfl
   have setup : enterFrame (countBody profile) [.scalar (.i32 count)] memory = .ok (frame, memory) := rfl
   apply invoke_of_run found checked setup
-  iterate 3
-    apply Eq.trans
-    · apply run_next found (by rfl)
-      shift_pure_step []
-  exact run_return found (by rfl) (by rfl) (by rfl)
+  cil_checked_steps [found]
+  rfl
 
 /-- A finished canonical run passes through PC 3 with exactly the whole-limb count on the stack. -/
 theorem canonical_prefix_strip (profile : CIL.FeatureProfile) (program : CIL.Program) (index storage fuel : Nat)
@@ -44,13 +41,12 @@ theorem canonical_prefix_strip (profile : CIL.FeatureProfile) (program : CIL.Pro
     ∃ remaining, run program remaining index 3 args frame [.scalar (.i32 (count.sshiftRight 6))] memory =
       .ok (final, returned) := by
   have firstStep : step (scalarBody profile .left storage) (.arg 1) 0 args frame [] memory =
-      .ok (.next 1 [.scalar (.i32 count)] frame memory) := by
-    simp [step, cil_guard, observerCount, argument, checkedValue, numericValue, Bind.bind, Except.bind, Pure.pure, Except.pure]
+      .ok (.next 1 [.scalar (.i32 count)] frame memory) := by cil_checked_step [argument]
   have secondStep : step (scalarBody profile .left storage) (.const32 6) 1 args frame [.scalar (.i32 count)] memory =
-      .ok (.next 2 [.scalar (.i32 6), .scalar (.i32 count)] frame memory) := by shift_pure_step []
+      .ok (.next 2 [.scalar (.i32 6), .scalar (.i32 count)] frame memory) := by cil_checked_step []
   have thirdStep : step (scalarBody profile .left storage) .shr 2 args frame
       [.scalar (.i32 6), .scalar (.i32 count)] memory =
-      .ok (.next 3 [.scalar (.i32 (count.sshiftRight 6))] frame memory) := by shift_pure_step []
+      .ok (.next 3 [.scalar (.i32 (count.sshiftRight 6))] frame memory) := by cil_checked_step []
   cases fuel with
   | zero => simp [run] at finished
   | succ fuel =>
@@ -74,8 +70,7 @@ theorem helper_prefix_prepend (profile : CIL.FeatureProfile) (program : CIL.Prog
       .ok (final, returned)) :
     ∃ fuel, run program fuel index 0 args frame [] memory = .ok (final, returned) := by
   have firstStep : step (helperBody profile storage helper) (.arg 1) 0 args frame [] memory =
-      .ok (.next 1 [.scalar (.i32 count)] frame memory) := by
-    simp [step, cil_guard, observerCount, argument, checkedValue, numericValue, Bind.bind, Except.bind, Pure.pure, Except.pure]
+      .ok (.next 1 [.scalar (.i32 count)] frame memory) := by cil_checked_step [argument]
   have callStep : step (helperBody profile storage helper) (.call helper 1) 1 args frame
       [.scalar (.i32 count)] memory = .ok (.call helper [.scalar (.i32 count)] [] memory) := rfl
   obtain ⟨fuel, finished⟩ := run_call_exists found (by rfl) callStep

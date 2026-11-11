@@ -1,8 +1,12 @@
 import UInt256.Methods.Shift.ScalarBody
-import CIL.Safety.StepComposition
-import UInt256.Safety.NumericStore
-import CIL.Safety.GuardNormalization
-import CIL.Safety.MethodContract
+import UInt256.Safety.VectorFrame
+import UInt256.Safety.LimbAccess
+import CIL.Safety.LocalSnapshotSteps
+
+/-!
+The scalar shift body up to its output routes: select the whole-limb count through the signed
+count branches, then save the bit counts and the four operand limbs in private locals.
+-/
 
 namespace UInt256Proof.Shift.Safety
 open CIL.Safety UInt256Model.Safety
@@ -11,127 +15,119 @@ variable {profile : CIL.FeatureProfile} {direction : Direction} {storage : Nat}
   (bodyFound : program[index]? = some (scalarBody profile direction storage))
 include bodyFound
 
-omit bodyFound in
-private theorem step_arg_scalar {body : CIL.Method} {pc index : Nat} {args stack : List Value}
-    {frame : Frame} {memory : Memory} {value : CIL.Value}
-    (found : args[index]? = some (.scalar value)) (numeric : numericValue value = true) :
-    step body (.arg index) pc args frame stack memory =
-      .ok (.next (pc + 1) (.scalar value :: stack) frame memory) := by
-  delta step
-  dsimp only
-  rw [found]
-  simp only [cil_guard, observerCount, Bool.or_false, Bool.false_eq_true, ite_false, checkedValue, numeric, ite_true, Bind.bind, Except.bind, Pure.pure, Except.pure]
-
-macro "shift_pure_step" "[" facts:term,* "]" : tactic =>
-  `(tactic| first
-    | rfl
-    $[| exact step_arg_scalar $facts:term rfl]*
-    | (simp (config := { implicitDefEqProofs := false })
-        [step, cil_guard, observerCount, checkedValue, numericValue, pureArity, scalars, CIL.step, CIL.binary,
-          Bind.bind, Except.bind, Pure.pure, Except.pure, $[$facts:term],*]
-       first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
-/-- Compute the signed whole-limb count from the actual Int32 argument and
-    initialize its private home before any count-dependent branch. -/
-theorem shift_count_start (boundary : Nat) (entered current : Memory)
-    (inputs outputs : List Reference) (frame : Frame) (args : List Value) (count : BitVec 32)
+/-- All signed count branches either reach the zero write or select a bounded whole-limb
+    count, which local 0 then holds. -/
+theorem shift_count_dispatch (original entered current : Memory) (input output : Reference)
+    (frame : Frame) (args : List Value) (count : BitVec 32)
     (argument : args[1]? = some (.scalar (.i32 count)))
-    (call : CallingConditions program current inputs outputs)
-    (enteredWF : entered.WellFormed)
-    (homes : NumericHomes entered boundary shiftSpecs frame.locals)
-    (authority : AccessBelow entered.nextIdentity entered current)
+    (originalCall : CallingConditions program original [input] [output])
+    (homes : CompleteWritableHomes entered original.nextIdentity (numericKinds shiftSpecs)
+      frame.locals)
+    (state : VectorFrame program original entered current [input] output frame (fun _ => none)
+      none)
     (post : Memory → List Value → Prop)
-    (continuation : ∀ reference after,
-      frame.locals[0]? = some (.bytes .word32 reference) →
-      read after reference 4 1 = .ok (numberBytes (count.sshiftRight 6).toNat 4) →
-      MemoryBelow boundary current after →
-      CallingConditions program after inputs outputs →
-      AccessBelow entered.nextIdentity entered after →
-      write current reference (numberBytes (count.sshiftRight 6).toNat 4) 1 = .ok after →
-      ∃ fuel final returned,
-        run program fuel index (4) args frame [] after =
-          .ok (final, returned) ∧ post final returned) :
-    ∃ fuel final returned,
-      run program fuel index 0 args frame [] current =
-        .ok (final, returned) ∧ post final returned := by
-  obtain ⟨reference, after, slot, loaded, preserved, afterCall, afterAuthority, written, stored⟩ :=
-    checked_numeric_store program (scalarBody profile direction storage) shiftSpecs boundary entered current inputs outputs
-      frame call enteredWF homes authority 0 ⟨.word32, .i32 0, 0, rfl⟩ (by rfl)
-      (.i32 (count.sshiftRight 6)) (count.sshiftRight 6).toNat rfl
-  have done := continuation reference after slot loaded preserved afterCall afterAuthority written
+    (zero : ∀ after known,
+      ¬ count.sshiftRight 6 < BitVec.ofNat 32 4 →
+      (0 ≤ (count.sshiftRight 6).toInt ∨ count &&& (63 : BitVec 32) = 0) →
+      VectorFrame program original entered after [input] output frame known none →
+      ∃ fuel final returned, run program fuel index 14 args frame [] after =
+        .ok (final, returned) ∧ post final returned)
+    (ready : ∀ whole after known,
+      whole < BitVec.ofNat 32 4 →
+      (whole = count.sshiftRight 6 ∨
+        (whole = 0 ∧ (count.sshiftRight 6).toInt < 0 ∧ count &&& (63 : BitVec 32) ≠ 0)) →
+      VectorFrame program original entered after [input] output frame known none →
+      known 0 = some (.i32 whole) →
+      ∃ fuel final returned, run program fuel index 19 args frame [] after =
+        .ok (final, returned) ∧ post final returned) :
+    ∃ fuel final returned, run program fuel index 0 args frame [] current =
+      .ok (final, returned) ∧ post final returned := by
   have found := bodyFound
   cil_contract_steps 3 [argument]
-  exact run_next_exists post found rfl (stored _ _ _) done
-/-- Both count comparisons read the initialized local and preserve memory.
-    The unsigned comparison precedes the signed negative-count test. -/
-theorem shift_count_guard (signed : Bool) (memory : Memory) (frame : Frame) (args : List Value)
-    (word : BitVec 32) (home : Reference)
-    (slot : frame.locals[0]? = some (.bytes .word32 home))
-    (loaded : read memory home 4 1 = .ok (numberBytes word.toNat 4))
-    (post : Memory → List Value → Prop)
-    (continuation : ∃ fuel final returned,
-      run program fuel index
-        (if signed then (if 0 ≤ word.toInt then 14 else 10)
-         else (if word < BitVec.ofNat 32 4 then 19 else 7))
-        args frame [] memory = .ok (final, returned) ∧ post final returned) :
-    ∃ fuel final returned,
-      run program fuel index (if signed then 7 else 4)
-        args frame [] memory = .ok (final, returned) ∧ post final returned := by
-  have load := fun (pc : Nat) (stack : List Value) => step_load_numeric_local
-    (body := (scalarBody profile direction storage)) (args := args) (pc := pc) (stack := stack)
-    .word32 (.i32 word) word.toNat rfl slot loaded
-  have found := bodyFound
-  cases signed <;> simp only [Bool.false_eq_true, ite_false, ite_true] at continuation ⊢
-  all_goals
-    apply run_next_exists post found (by rfl) (load _ _)
-    iterate 2
-      apply run_next_exists post found (by rfl)
-      shift_pure_step []
-    exact continuation
-
-/-- Negative counts use their masked low six bits to select zero output or
-    the existing historical intra-limb shift convention. -/
-theorem shift_negative_count_guard (memory : Memory) (frame : Frame) (args : List Value)
-    (count : BitVec 32) (argument : args[1]? = some (.scalar (.i32 count)))
-    (post : Memory → List Value → Prop)
-    (continuation : ∃ fuel final returned,
-      run program fuel index
-        (if count &&& (63 : BitVec 32) != 0 then 17 else 14)
-        args frame [] memory = .ok (final, returned) ∧ post final returned) :
-    ∃ fuel final returned,
-      run program fuel index (10) args frame [] memory =
+  refine state.run_store (kind := .word32) post originalCall homes found fun middle state => ?_
+  have unsigned : ∃ fuel final returned, run program fuel index
+      (if count.sshiftRight 6 < BitVec.ofNat 32 4 then 19 else 7) args frame [] middle =
         .ok (final, returned) ∧ post final returned := by
-  have found := bodyFound
-  cil_contract_steps 4 [argument]
-  simpa only [bne_iff_ne, BitVec.ofNat_eq_ofNat] using continuation
+    by_cases small : count.sshiftRight 6 < BitVec.ofNat 32 4
+    · simpa only [small, ↓reduceIte] using ready _ middle _ small (Or.inl rfl) state rfl
+    simp only [small, ↓reduceIte]
+    have signed : ∃ fuel final returned, run program fuel index
+        (if 0 ≤ (count.sshiftRight 6).toInt then 14 else 10) args frame [] middle =
+          .ok (final, returned) ∧ post final returned := by
+      by_cases nonnegative : 0 ≤ (count.sshiftRight 6).toInt
+      · simpa only [nonnegative, ↓reduceIte] using
+          zero middle _ small (Or.inl nonnegative) state
+      simp only [nonnegative, ↓reduceIte]
+      have masked : ∃ fuel final returned, run program fuel index
+          (if count &&& (63 : BitVec 32) != 0 then 17 else 14) args frame [] middle =
+            .ok (final, returned) ∧ post final returned := by
+        by_cases multiple : count &&& (63 : BitVec 32) = 0
+        · simpa only [multiple, bne_self_eq_false, Bool.false_eq_true, ↓reduceIte] using
+            zero middle _ small (Or.inr multiple) state
+        simp only [bne_iff_ne, ne_eq, multiple, not_false_eq_true, ↓reduceIte]
+        cil_contract_steps 1 []
+        refine state.run_store (kind := .word32) post originalCall homes found
+          fun after state => ?_
+        exact ready 0 after _ (by decide) (Or.inr ⟨rfl, by omega, multiple⟩) state rfl
+      cil_contract_steps 4 [argument]
+      simpa only [bne_iff_ne, BitVec.ofNat_eq_ofNat] using masked
+    cil_contract_steps (snapshots := state.locals) [] until signed
+  cil_contract_steps (snapshots := state.locals) [] until unsigned
 
-/-- Reset the whole-limb count only on the selected negative-count route. -/
-theorem shift_negative_count_reset (boundary : Nat) (entered current : Memory)
-    (inputs outputs : List Reference) (frame : Frame) (args : List Value)
-    (call : CallingConditions program current inputs outputs)
-    (enteredWF : entered.WellFormed)
-    (homes : NumericHomes entered boundary shiftSpecs frame.locals)
-    (authority : AccessBelow entered.nextIdentity entered current)
+/-- Locals 1-6 once the bit counts and the four operand limbs are saved. -/
+def preparedLocals (known : Nat → Option CIL.Value) (count : BitVec 32)
+    (words : Fin 4 → BitVec 64) : Nat → Option CIL.Value :=
+  rememberLocal (rememberLocal (rememberLocal (rememberLocal (rememberLocal (rememberLocal known
+    1 (.i32 (count &&& 63))) 2 (.i32 (63 - (count &&& 63)))) 3 (.i64 (words 0)))
+    4 (.i64 (words 1))) 5 (.i64 (words 2))) 6 (.i64 (words 3))
+
+/-- Save the masked bit count, its complement and all four initial operand limbs. No caller
+    byte changes, so the limbs read are the original ones even when the output overlaps. -/
+theorem shift_prepared (original entered current : Memory) (input output : Reference)
+    (frame : Frame) (args : List Value) (count : BitVec 32)
+    (inputArgument : args[0]? = some (.reference (.address input)))
+    (countArgument : args[1]? = some (.scalar (.i32 count)))
+    (originalCall : CallingConditions program original [input] [output])
+    (homes : CompleteWritableHomes entered original.nextIdentity (numericKinds shiftSpecs)
+      frame.locals)
+    (known : Nat → Option CIL.Value)
+    (state : VectorFrame program original entered current [input] output frame known none)
     (post : Memory → List Value → Prop)
-    (continuation : ∀ reference after,
-      frame.locals[0]? = some (.bytes .word32 reference) →
-      read after reference 4 1 = .ok (numberBytes 0 4) →
-      MemoryBelow boundary current after →
-      CallingConditions program after inputs outputs →
-      AccessBelow entered.nextIdentity entered after →
-      write current reference (numberBytes 0 4) 1 = .ok after →
-      ∃ fuel final returned,
-        run program fuel index (19) args frame [] after =
-          .ok (final, returned) ∧ post final returned) :
-    ∃ fuel final returned,
-      run program fuel index (17) args frame [] current =
-        .ok (final, returned) ∧ post final returned := by
-  obtain ⟨reference, after, slot, loaded, preserved, afterCall, afterAuthority, written, stored⟩ :=
-    checked_numeric_store program (scalarBody profile direction storage) shiftSpecs boundary entered current inputs outputs
-      frame call enteredWF homes authority 0 ⟨.word32, .i32 0, 0, rfl⟩ (by rfl)
-      (.i32 0) 0 rfl
-  have done := continuation reference after slot loaded preserved afterCall afterAuthority written
+    (continuation : ∀ after,
+      VectorFrame program original entered after [input] output frame
+        (preparedLocals known count (inputLimb original input)) none →
+      ∃ fuel final returned, run program fuel index 39 args frame [] after =
+        .ok (final, returned) ∧ post final returned) :
+    ∃ fuel final returned, run program fuel index 19 args frame [] current =
+      .ok (final, returned) ∧ post final returned := by
   have found := bodyFound
-  cil_contract_steps 1 []
-  exact run_next_exists post found rfl (stored _ _ _) done
+  obtain ⟨allocation, present, _, _⟩ :=
+    formed_reference_live _ _ _ (originalCall.input_formed (by simp : input ∈ [input]))
+  have old := (originalCall.1.1.1 _ _ present).1
+  have reading := fun current known
+      (state : VectorFrame program original entered current [input] output frame known none)
+      limb (bound : limb < 4) rest =>
+    show instruction (.fieldAt (8 * (⟨limb, bound⟩ : Fin 4).val) 8)
+        (.reference (.address input) :: rest) current =
+        .ok (current, .scalar (.i64 (inputLimb original input ⟨limb, bound⟩)) :: rest) by
+      rw [state.call.input_field_instruction (by simp) ⟨limb, bound⟩ rest]
+      simp only [inputLimb, fun offset => state.caller input.allocation old offset (Or.inl rfl)]
+  cil_contract_steps 3 [countArgument]
+  refine state.run_store (kind := .word32) post originalCall homes found fun current state => ?_
+  cil_contract_steps (snapshots := state.locals) []
+  refine state.run_store (kind := .word32) post originalCall homes found fun current state => ?_
+  cil_contract_steps 2 [inputArgument, state.call.input_formed (by simp : input ∈ [input]),
+    reading _ _ state 0 (by decide)]
+  refine state.run_store (kind := .word64) post originalCall homes found fun current state => ?_
+  cil_contract_steps 2 [inputArgument, state.call.input_formed (by simp : input ∈ [input]),
+    reading _ _ state 1 (by decide)]
+  refine state.run_store (kind := .word64) post originalCall homes found fun current state => ?_
+  cil_contract_steps 2 [inputArgument, state.call.input_formed (by simp : input ∈ [input]),
+    reading _ _ state 2 (by decide)]
+  refine state.run_store (kind := .word64) post originalCall homes found fun current state => ?_
+  cil_contract_steps 2 [inputArgument, state.call.input_formed (by simp : input ∈ [input]),
+    reading _ _ state 3 (by decide)]
+  refine state.run_store (kind := .word64) post originalCall homes found fun current state => ?_
+  exact continuation current state
 
 end UInt256Proof.Shift.Safety

@@ -1,5 +1,5 @@
 import CIL.Safety.Equations
-import UInt256.Methods.Shift.ScalarPrepared
+import UInt256.Methods.Shift.ScalarCount
 import CIL.Safety.ReturnMemory
 namespace UInt256Proof.Shift.Safety
 open CIL.Safety UInt256Model.Safety
