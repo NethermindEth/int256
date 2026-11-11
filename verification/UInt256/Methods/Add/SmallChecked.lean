@@ -97,23 +97,13 @@ theorem small_checked (memory : CIL.Safety.Memory) (input output : Reference) (w
   have limbs := fun current below =>
     call.input_words_kept (current := current) below input (by simp)
   cil_contract_steps (snapshots := LocalSnapshots.empty entered frame.locals)
-    [smallArguments, limbs _ preserved]
-  have world := write_preserves_static_world _ _ _ _ _ _ world localWrite
-  cil_contract_steps (snapshots := localSnapshots) [smallArguments, limbs _ preserved]
-  have world := write_preserves_static_world _ _ _ _ _ _ world localWrite_1
-  cil_contract_steps (snapshots := localSnapshots_1) [smallArguments, limbs _ preserved]
-  have world := write_preserves_static_world _ _ _ _ _ _ world localWrite_2
-  cil_contract_steps (snapshots := localSnapshots_2)
     [smallArguments, limbs _ preserved, CIL.FeatureProfile.evaluate]
-  have world := write_preserves_static_world _ _ _ _ _ _ world localWrite_3
-  have world := write_preserves_static_world _ _ _ _ _ _ world localWrite_4
   split
   next carry =>
     cil_contract_steps (snapshots := localSnapshots_4) [smallArguments]
-    have world := write_preserves_static_world _ _ _ _ _ _ world localWrite_5
     split
     next first =>
-      have done := exit 1 storedLocal_5 ⟨valid, world⟩ preserved
+      have done := exit 1 storedLocal_5 ⟨valid, by stored_world⟩ preserved
         (by simp [smallOverflow_cases, smallBranchFlag, carry, first])
       small_exit_stack at done
       simp [UInt256Proof.smallResult, carry, first] at done
@@ -121,10 +111,9 @@ theorem small_checked (memory : CIL.Safety.Memory) (input output : Reference) (w
     next first =>
       replace first := Decidable.not_not.mp first
       cil_contract_steps (snapshots := localSnapshots_5) [smallArguments]
-      have world := write_preserves_static_world _ _ _ _ _ _ world localWrite_6
       split
       next second =>
-        have done := exit 2 storedLocal_6 ⟨valid, world⟩ preserved
+        have done := exit 2 storedLocal_6 ⟨valid, by stored_world⟩ preserved
           (by simp [smallOverflow_cases, smallBranchFlag, carry, first, second])
         small_exit_stack at done
         simp [UInt256Proof.smallResult, carry, first, second] at done
@@ -132,10 +121,9 @@ theorem small_checked (memory : CIL.Safety.Memory) (input output : Reference) (w
       next second =>
         replace second := Decidable.not_not.mp second
         cil_contract_steps (snapshots := localSnapshots_6) [smallArguments]
-        have world := write_preserves_static_world _ _ _ _ _ _ world localWrite_7
         split
         next third =>
-          have done := exit 3 storedLocal_7 ⟨valid, world⟩ preserved (by
+          have done := exit 3 storedLocal_7 ⟨valid, by stored_world⟩ preserved (by
             simp [smallOverflow_cases, smallBranchFlag, carry, first, second, third,
               show (3 : Fin 5).val = 3 from rfl])
           small_exit_stack at done
@@ -143,14 +131,14 @@ theorem small_checked (memory : CIL.Safety.Memory) (input output : Reference) (w
           cil_contract_steps (snapshots := localSnapshots_7) [smallArguments] until done
         next third =>
           replace third := Decidable.not_not.mp third
-          have done := exit 4 storedLocal_7 ⟨valid, world⟩ preserved (by
+          have done := exit 4 storedLocal_7 ⟨valid, by stored_world⟩ preserved (by
             simp [smallOverflow_cases, smallBranchFlag, carry, first, second, third,
               show (4 : Fin 5).val = 4 from rfl])
           small_exit_stack at done
           simp [UInt256Proof.smallResult, carry, first, second, third] at done
           cil_contract_steps (snapshots := localSnapshots_7) [smallArguments] until done
   next carry =>
-    have done := exit 0 storedLocal_4 ⟨valid, world⟩ preserved
+    have done := exit 0 storedLocal_4 ⟨valid, by stored_world⟩ preserved
       (by simp [smallOverflow_cases, smallBranchFlag, carry])
     small_exit_stack at done
     simp [UInt256Proof.smallResult, carry] at done

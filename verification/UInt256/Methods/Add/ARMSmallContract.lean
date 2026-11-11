@@ -1,4 +1,5 @@
 import UInt256.Methods.Add.ARMSmallState
+import UInt256.Methods.Add.InputWords
 import CIL.Safety.LocalSnapshotSteps
 
 /-! Checked small-add execution, arithmetic, overflow and caller-memory contracts. -/
@@ -84,172 +85,160 @@ structure ARMSmallPost (original final : Memory) (returned : List Value)
   footprint : ∀ id, id < original.nextIdentity → ∀ offset, OutsideOutput output id offset →
     final.cells id offset = original.cells id offset
 
-/-- Full extracted ARM helper execution satisfies independent addition and exact overflow,
-    retiring private storage while preserving every other caller byte. -/
+/-- Limbs stored through StoreLimbs that are the small-sum result leave the exact sum, the
+    overflow bit and the caller footprint once the frame is retired. -/
+theorem ARMSmallPost.of_stored {program : CIL.Program} {original entered current stored : Memory}
+    {input output : Reference} {word second third fourth : BitVec 64} {flag : BitVec 32}
+    {frame : Frame} {body : CIL.Method} {args : List Value}
+    (call : CallingConditions program original [input] [output])
+    (setup : enterFrame body args original = .ok (frame, entered))
+    (preserved : MemoryBelow original.nextIdentity original current)
+    (valid : CallingConditions program stored [input] [output])
+    (outside : ∀ id offset, OutsideOutput output id offset →
+      stored.cells id offset = current.cells id offset)
+    (value : inputValue stored output = BitVec.ofNat 256
+      ((inputLimb original input 0 + word).toNat + second.toNat * 2^64 + third.toNat * 2^128 +
+        fourth.toNat * 2^192))
+    (agrees : (armSmallResult (inputLimb original input) word).1 1 = second ∧
+      (armSmallResult (inputLimb original input) word).1 2 = third ∧
+      (armSmallResult (inputLimb original input) word).1 3 = fourth ∧
+      (armSmallResult (inputLimb original input) word).2 = flag) :
+    ARMSmallPost original (leaveFrame frame stored) [.scalar (.i32 flag)] input output word := by
+  have fresh := enterFrame_fresh _ _ _ _ _ setup
+  have retired := leaveFrame_preserves_memory_below frame stored original.nextIdentity
+    (fun id member => (fresh.2 id member).1)
+  obtain ⟨allocation, present, _, _⟩ := formed_reference_live _ _ _
+    (call.output_formed (by simp : output ∈ [output]))
+  have outputOld : output.allocation < original.nextIdentity := (call.1.1.1 _ _ present).1
+  have bytes : (fun offset => ((leaveFrame frame stored).cells output.allocation offset).bits) =
+      (fun offset => (stored.cells output.allocation offset).bits) := by
+    funext offset
+    rw [retired.cells output.allocation outputOld offset]
+  refine ⟨leaveFrame_preserves_wellFormed _ _ valid.1.1, ?_, ?_, ?_, ?_⟩
+  · have mathematical := arm_small_result_value original input word
+    simp only [UInt256Model.value, armSmallOutputWords, agrees] at mathematical
+    simpa only [inputValue, bytes] using value.trans mathematical
+  · have initial : UInt256Model.value (inputLimb original input) = inputValue original input :=
+      UInt256Proof.input_value (fun offset => (original.cells input.allocation offset).bits)
+        input.offset
+    rw [← agrees.2.2.2, arm_small_result_flag, initial]
+  · exact (retired.access output outputOld 32 1 true).trans
+      (valid.1.writable (wordView output) (by simp))
+  · intro id old offset untouched
+    exact (retired.cells id old offset).trans
+      ((outside id offset untouched).trans (preserved.cells id old offset))
+
+/-- Store the output limbs through StoreLimbs and return the remembered byte flag: limbs and
+    flag that are the small-sum result give the exact sum, overflow bit and caller footprint. -/
+theorem arm_small_exit (program : CIL.Program) (method storage : Nat)
+    (profile : CIL.FeatureProfile) (found : program[method]? = some (armSmallBody profile storage))
+    (storageFound : program[storage]? = some (UInt256Proof.Multiply.LimbStorage.body profile))
+    (original entered current : Memory) (input output : Reference) (word : BitVec 64)
+    (frame : Frame) (call : CallingConditions program original [input] [output])
+    (setup : enterFrame (armSmallBody profile storage) (armSmallArguments input output word)
+      original = .ok (frame, entered))
+    (homes : NumericHomes entered original.nextIdentity armSmallSpecs frame.locals)
+    (currentCall : CallingConditions program current [input] [output])
+    (preserved : MemoryBelow original.nextIdentity original current)
+    (known : Nat → Option CIL.Value) (snapshots : LocalSnapshots current frame.locals known)
+    (second third fourth : BitVec 64) (flag : BitVec 32) (flagKnown : known 6 = some (.i32 flag))
+    (agrees : (armSmallResult (inputLimb original input) word).1 1 = second ∧
+      (armSmallResult (inputLimb original input) word).1 2 = third ∧
+      (armSmallResult (inputLimb original input) word).1 3 = fourth ∧
+      (armSmallResult (inputLimb original input) word).2 = flag) :
+    WP (Execution (fun fuel => run program fuel method 52
+        (armSmallArguments input output word) frame
+        [.scalar (.i64 fourth), .scalar (.i64 third), .scalar (.i64 second),
+          .scalar (.i64 (inputLimb original input 0 + word)), .reference (.address output)]
+        current))
+      (fun result => ARMSmallPost original result.1 result.2 input output word) := by
+  obtain ⟨childFuel, stored, invoked, valid, outside, authority, value, _⟩ :=
+    UInt256Proof.Multiply.LimbStorage.store_limbs_readable_contract profile program storage
+      storageFound current [input] output (inputLimb original input 0 + word) second third fourth
+      currentCall
+  have formed := currentCall.output_formed (by simp : output ∈ [output])
+  have stepped : step (armSmallBody profile storage) (.call storage 5) 52
+      (armSmallArguments input output word) frame
+      [.scalar (.i64 fourth), .scalar (.i64 third), .scalar (.i64 second),
+        .scalar (.i64 (inputLimb original input 0 + word)), .reference (.address output)]
+      current = .ok (.call storage (UInt256Proof.Multiply.LimbStorage.arguments output
+        (inputLimb original input 0 + word) second third fourth) [] current) := by
+    cil_checked_step [UInt256Proof.Multiply.LimbStorage.arguments, formed]
+  obtain ⟨allocation, present, _, _⟩ := formed_reference_live _ _ _
+    (call.output_formed (by simp : output ∈ [output]))
+  have retained := snapshots.after_unchanged currentCall.1.1 authority (by
+    intro index loaded kind home _ slot offset _
+    exact outside _ _ (Or.inl (Nat.ne_of_gt (Nat.lt_of_lt_of_le (call.1.1.1 _ _ present).1
+      (homes.home_bound index kind home slot)))))
+  have flagFit : CIL.NarrowKind.unsigned8.extend flag = flag := by
+    rw [← agrees.2.2.2, arm_small_result_flag]
+    split <;> rfl
+  apply WP.call (helperPost := fun result => result.1 = stored ∧ result.2 = [])
+    found (by rfl) stepped ⟨childFuel, (stored, []), invoked, rfl, rfl⟩
+  rintro final values ⟨rfl, rfl⟩
+  cil_contract_steps (snapshots := retained) [found, flagKnown, flagFit]
+  exact ARMSmallPost.of_stored call setup preserved valid outside value agrees
+
+/-- Full extracted ARM helper execution: input snapshots, low sum, every carry path and the
+    shared postcondition. -/
 theorem arm_small_entry (program : CIL.Program) (method storage : Nat)
     (profile : CIL.FeatureProfile) (found : program[method]? = some (armSmallBody profile storage))
     (enabled : profile.advSimd = true)
     (storageFound : program[storage]? = some (UInt256Proof.Multiply.LimbStorage.body profile))
     (original entered : Memory) (input output : Reference) (word : BitVec 64) (frame : Frame)
     (call : CallingConditions program original [input] [output])
-    (setup : enterFrame (armSmallBody profile storage) (armSmallArguments input output word) original =
-      .ok (frame, entered))
+    (setup : enterFrame (armSmallBody profile storage) (armSmallArguments input output word)
+      original = .ok (frame, entered))
     (homes : NumericHomes entered original.nextIdentity armSmallSpecs frame.locals) :
     WP (Execution (fun fuel => run program fuel method 0
       (armSmallArguments input output word) frame [] entered))
       (fun result => ARMSmallPost original result.1 result.2 input output word) := by
-  let post := fun final returned => ARMSmallPost original final returned input output word
-  let args := armSmallArguments input output word
-  let words := inputLimb original input
-  let sum := words 0 + word
-  let result := armSmallResult words word
-  let execute := fun pc stack memory => WP
-    (Execution (fun fuel => run program fuel method pc args frame stack memory))
-    (Function.uncurry post)
   have enteredCall := call.after_frame_setup setup
-  have initial : ARMSmallSaved program original entered entered input output frame 0 :=
-    ⟨enteredCall, enterFrame_preserves_caller_memory _ _ _ _ _ setup,
-      (MemoryBelow.refl entered.nextIdentity entered).accessBelow, by
-        intro index value impossible
-        simp [smallSaved] at impossible⟩
-  obtain ⟨allocation, present, _, _⟩ := formed_reference_live _ _ _
-    (call.output_formed (by simp : output ∈ [output]))
-  have outputOld : output.allocation < original.nextIdentity := (call.1.1.1 _ _ present).1
-  have finish (current : Memory)
-      (state : SmallState program original entered current input output frame
-        (armSmallKnown result.1 sum result.2)) : execute 47 [] current := by
-    generalize computed : result = calculated at state
-    have flagFit : CIL.NarrowKind.unsigned8.extend calculated.2 = calculated.2 := by
-      rw [← computed]
-      change CIL.NarrowKind.unsigned8.extend (armSmallResult words word).2 = _
-      rw [arm_small_result_flag]
-      split <;> rfl
-    have suffix : execute 52
-        [.scalar (.i64 (calculated.1 3)), .scalar (.i64 (calculated.1 2)),
-          .scalar (.i64 (calculated.1 1)), .scalar (.i64 sum), .reference (.address output)]
-        current := by
-      apply arm_small_store_return program method storage profile found storageFound current entered
-        original.nextIdentity frame args [input] output
-        (armSmallOutputWords calculated.1 sum) calculated.2
-        _ state.call homes state.snapshots (by rfl) flagFit outputOld post
-      intro stored valid outside _ value
-      have fresh := enterFrame_fresh _ _ _ _ _ setup
-      have retired := leaveFrame_preserves_memory_below frame stored original.nextIdentity
-        (fun id member => (fresh.2 id member).1)
-      have bytes : (fun offset => ((leaveFrame frame stored).cells output.allocation offset).bits) =
-          (fun offset => (stored.cells output.allocation offset).bits) := by
-        funext offset
-        rw [retired.cells output.allocation outputOld offset]
-      refine ⟨leaveFrame_preserves_wellFormed _ _ valid.1.1, ?_, ?_, ?_, ?_⟩
-      · have mathematical := value.trans (by
-          simpa only [← computed] using arm_small_result_value original input word)
-        simpa only [inputValue, bytes] using mathematical
-      · have initialValue : UInt256Model.value words = inputValue original input :=
-          UInt256Proof.input_value (fun offset => (original.cells input.allocation offset).bits)
-            input.offset
-        have exactFlag := arm_small_result_flag words word
-        rw [initialValue] at exactFlag
-        simp only [← computed, result, exactFlag]
-      · exact (retired.access output outputOld 32 1 true).trans
-          (valid.1.writable (wordView output) (by simp))
-      · intro id old offset untouched
-        exact (retired.cells id old offset).trans
-          ((outside id offset untouched).trans (state.preserved.cells id old offset))
-    cil_contract_steps (snapshots := state.snapshots)
-      [args, armSmallArguments, armSmallKnown, smallSaved,
-        state.call.output_formed (reference := output) (by simp)] until suffix
-  obtain ⟨first, saved1, store0⟩ := initial.save 0 (armSmallBody profile storage) enteredCall.1.1 homes
-  obtain ⟨second, saved2, store1⟩ := saved1.save 1 (armSmallBody profile storage) enteredCall.1.1 homes
-  obtain ⟨third, saved3, store2⟩ := saved2.save 2 (armSmallBody profile storage) enteredCall.1.1 homes
-  obtain ⟨fourth, saved4, store3⟩ := saved3.save 3 (armSmallBody profile storage) enteredCall.1.1 homes
-  obtain ⟨summed, sumState, storeSum⟩ := saved4.store (armSmallBody profile storage)
-    enteredCall.1.1 homes 5 armWordSpec (by rfl) (.i64 sum) sum.toNat rfl
-  obtain ⟨ready, state, storeFlag⟩ := sumState.store (armSmallBody profile storage)
-    enteredCall.1.1 homes 6 ⟨.narrow .unsigned8, .i32 0, 0, rfl⟩ (by rfl) (.i32 0) 0 rfl
-  change SmallState program original entered ready input output frame
-    (armSmallKnown words sum 0) at state
-  have arithmetic : execute 20 [] ready := by
-    have complementary : (words 0 ≤ sum) = (¬ sum < words 0) := by
-      apply propext
-      simp only [BitVec.le_def, BitVec.lt_def, Nat.not_lt]
-    by_cases carry : sum < words 0
-    · have carryPath : execute 23 [] ready := by
-        obtain ⟨after1, state1, increment1⟩ := state.store (armSmallBody profile storage)
-          enteredCall.1.1 homes 1 armWordSpec (by rfl) (.i64 (words 1 + 1)) _ rfl
-        simp only [armWordSpec, localResult] at state1
-        rw [armSmallKnown_store_word _ _ _ 1 (by decide)] at state1
-        have branch1 : execute 29 [.scalar (.i64 (words 1 + 1))] after1 := by
-          by_cases zero1 : words 1 + BitVec.ofNat 64 1 = BitVec.ofNat 64 0
-          · obtain ⟨after2, state2, increment2⟩ := state1.store (armSmallBody profile storage)
-              enteredCall.1.1 homes 2 armWordSpec (by rfl) (.i64 (words 2 + 1)) _ rfl
-            simp only [armWordSpec, localResult] at state2
-            rw [armSmallKnown_store_word _ _ _ 2 (by decide)] at state2
-            have branch2 : execute 36 [.scalar (.i64 (words 2 + 1))] after2 := by
-              by_cases zero2 : words 2 + BitVec.ofNat 64 1 = BitVec.ofNat 64 0
-              · obtain ⟨after3, state3, increment3⟩ := state2.store (armSmallBody profile storage)
-                  enteredCall.1.1 homes 3 armWordSpec (by rfl) (.i64 (words 3 + 1)) _ rfl
-                simp only [armWordSpec, localResult] at state3
-                rw [armSmallKnown_store_word _ _ _ 3 (by decide)] at state3
-                let flag : BitVec 32 := if words 3 + 1 = BitVec.ofNat 64 0 then 1 else 0
-                obtain ⟨afterFlag, finalState, flagStore⟩ := state3.store (armSmallBody profile storage)
-                  enteredCall.1.1 homes 6 ⟨.narrow .unsigned8, .i32 0, 0, rfl⟩ (by rfl)
-                  (.i32 flag) flag.toNat (by dsimp [flag]; split <;> rfl)
-                have flagFit : CIL.NarrowKind.unsigned8.extend flag = flag := by
-                  dsimp only [flag]; split <;> rfl
-                simp only [localResult, flagFit, armSmallKnown_store_flag] at finalState
-                have final : execute 47 [] afterFlag := by
-                  apply finish afterFlag
-                  dsimp only [result, armSmallResult, armCarryResult]
-                  unfold armIncrementWord
-                  simpa [show words 0 + word = sum from rfl, carry, zero1, zero2, flag,
-                    Fin.ext_iff, show (1 : Fin 4).val = 1 from rfl,
-                    show (2 : Fin 4).val = 2 from rfl, show (3 : Fin 4).val = 3 from rfl] using finalState
-                cil_contract_steps (snapshots := state2.snapshots)
-                  [zero2, increment3, flagStore, flag, armSmallKnown, smallSaved] until final
-              · have final : execute 47 [] after2 := by
-                  apply finish after2
-                  dsimp only [result, armSmallResult, armCarryResult]
-                  unfold armIncrementWord
-                  simpa [show words 0 + word = sum from rfl, carry, zero1, zero2,
-                    Fin.ext_iff, show (1 : Fin 4).val = 1 from rfl,
-                    show (2 : Fin 4).val = 2 from rfl, show (3 : Fin 4).val = 3 from rfl] using state2
-                cil_contract_steps [zero2] until final
-            cil_contract_steps (snapshots := state1.snapshots)
-              [zero1, increment2, armSmallKnown, smallSaved] until branch2
-          · have final : execute 47 [] after1 := by
-              apply finish after1
-              dsimp only [result, armSmallResult, armCarryResult]
-              unfold armIncrementWord
-              simpa [show words 0 + word = sum from rfl, carry, zero1,
-                Fin.ext_iff, show (1 : Fin 4).val = 1 from rfl,
-                show (2 : Fin 4).val = 2 from rfl, show (3 : Fin 4).val = 3 from rfl] using state1
-            cil_contract_steps [zero1] until final
-        cil_contract_steps (snapshots := state.snapshots)
-          [increment1, armSmallKnown, smallSaved] until branch1
-      cil_contract_steps (snapshots := state.snapshots)
-        [complementary, carry, armSmallKnown, smallSaved] until carryPath
-    · have final : execute 47 [] ready := by
-        apply finish ready
-        simpa only [result, armSmallResult, show words 0 + word = sum from rfl,
-          carry, ite_false] using state
-      cil_contract_steps (snapshots := state.snapshots)
-        [complementary, carry, armSmallKnown, smallSaved] until final
-  have inputLoad (current : Memory) (known : Nat → Option CIL.Value)
-      (saved : SmallState program original entered current input output frame known)
-      (index : Fin 4) (rest : List Value) :
-      instruction (.fieldAt (8 * index.val) 8) (.reference (.address input) :: rest) current =
-        .ok (current, .scalar (.i64 (words index)) :: rest) := by
-    rw [saved.call.input_field_instruction (by simp) index rest]
-    simp only [words, inputLimb,
-      call.input_bytes_of_memory_below saved.preserved (reference := input) (by simp)]
-  have loadLow := fun pc stack => saved4.snapshots.load (body := armSmallBody profile storage)
-    (pc := pc) (args := args) (stack := stack) (.i64 (words 0)) (index := 0) (by rfl)
-  cil_contract_steps [args, armSmallArguments, enabled,
-    initial.call.input_formed (reference := input) (by simp), saved1.call.input_formed (reference := input) (by simp),
-    saved2.call.input_formed (reference := input) (by simp), saved3.call.input_formed (reference := input) (by simp),
-    inputLoad _ _ initial 0, inputLoad _ _ saved1 1,
-    inputLoad _ _ saved2 2, inputLoad _ _ saved3 3,
-    store0, store1, store2, store3, storeSum, storeFlag, loadLow] until arithmetic
+  have valid := enteredCall.1
+  have world := enteredCall.2
+  have enteredFormed := valid.1
+  have preserved := enterFrame_preserves_caller_memory _ _ _ _ _ setup
+  have snapshots := LocalSnapshots.empty entered frame.locals
+  have limbs := fun current below =>
+    call.input_words_kept (current := current) below input (by simp)
+  have exit := fun current => arm_small_exit program method storage profile found storageFound
+    original entered current input output word frame call setup homes
+  cil_contract_steps (snapshots := snapshots)
+    [found, armSmallArguments, enabled, limbs _ preserved]
+  split
+  next low =>
+    have carry := BitVec.not_lt.mpr low
+    cil_contract_steps (snapshots := localSnapshots_5) [found, armSmallArguments]
+    exact WP.adequate.mp (exit storedLocal_5 ⟨valid, by stored_world⟩ preserved _
+      localSnapshots_5 _ _ _ _ (by rfl) (by simp [armSmallResult, carry]))
+  next carry =>
+    replace carry := BitVec.not_le.mp carry
+    cil_contract_steps (snapshots := localSnapshots_5) [found, armSmallArguments]
+    have lastIndex : (3 : Fin 4).val = 3 := rfl
+    split
+    next first =>
+      cil_contract_steps (snapshots := localSnapshots_6) [found, armSmallArguments]
+      exact WP.adequate.mp (exit storedLocal_6 ⟨valid, by stored_world⟩ preserved _
+        localSnapshots_6 _ _ _ _ (by rfl) (by
+          simp [armSmallResult, armCarryResult, armIncrementWord, carry, first, lastIndex]))
+    next first =>
+      replace first := Decidable.not_not.mp first
+      cil_contract_steps (snapshots := localSnapshots_6) [found, armSmallArguments]
+      split
+      next second =>
+        cil_contract_steps (snapshots := localSnapshots_7) [found, armSmallArguments]
+        exact WP.adequate.mp (exit storedLocal_7 ⟨valid, by stored_world⟩ preserved _
+          localSnapshots_7 _ _ _ _ (by rfl) (by
+            simp [armSmallResult, armCarryResult, armIncrementWord, carry, first, second,
+              lastIndex]))
+      next second =>
+        replace second := Decidable.not_not.mp second
+        cil_contract_steps (snapshots := localSnapshots_7) [found, armSmallArguments]
+        exact WP.adequate.mp (exit storedLocal_9 ⟨valid, by stored_world⟩ preserved _
+          localSnapshots_9 _ _ _ _ (by rfl) (by
+            simp [armSmallResult, armCarryResult, armIncrementWord, carry, first, second,
+              lastIndex]
+            split <;> rfl))
 
 end UInt256Proof.Add.Safety
 

@@ -5,66 +5,21 @@ namespace UInt256Proof.Safety
 
 open CIL.Safety UInt256Model.Safety UInt256Proof.Add.CarrySafety
 
+/-- The carry word is initialized in its private home while caller storage is unchanged and
+    every entered-frame home keeps its access. -/
 structure ScalarCarryReady (memory entered current : CIL.Safety.Memory) (frame : Frame)
-    (left right output rightHome leftHome carryHome resultHome : Reference) : Prop where
-  lowWords : ScalarLowWords memory entered current frame left right output rightHome leftHome
+    (left right output carryHome resultHome : Reference) : Prop where
+  call : CallingConditions Extracted.program current [left, right] [output]
+  preserved : MemoryBelow memory.nextIdentity memory current
+  authority : AccessBelow entered.nextIdentity entered current
   carrySlot : frame.locals[2]? = some (.bytes .word64 carryHome)
   resultSlot : frame.locals[3]? = some (.bytes .word64 resultHome)
   carryRead : read current carryHome 8 1 = .ok (numberBytes 0 8)
-  carryWrite : access current carryHome 8 1 true = .ok ()
-  resultWrite : access current resultHome 8 1 true = .ok ()
-  disjoint : WordsDisjoint carryHome resultHome
-
-/-- Initialize carry in its private word home without disturbing either saved
-    operand. All permissions come from actual frame setup and earlier writes. -/
-theorem scalar_carry_store (memory entered before : CIL.Safety.Memory)
-    (left right output rightHome leftHome : Reference) (args : List Value) (frame : Frame)
-    (call : CallingConditions Extracted.program memory [left, right] [output])
-    (enteredWF : entered.WellFormed)
-    (homes : WordHomes entered memory.nextIdentity scalarLocalSpecs frame.locals)
-    (lowWords : ScalarLowWords memory entered before frame left right output rightHome leftHome) :
-    ∃ carryHome resultHome after,
-      ScalarCarryReady memory entered after frame left right output rightHome leftHome carryHome resultHome ∧
-      ∀ pc rest, step Extracted.addScalarBody (.setLocal 2) pc args frame
-        (.scalar (.i64 0) :: rest) before = .ok (.next (pc + 1) rest frame after) := by
-  have carrySpec : scalarLocalSpecs[2]? = some (some 0) := by simp [scalarLocalSpecs, cil_code]
-  have resultSpec : scalarLocalSpecs[3]? = some (some 0) := by simp [scalarLocalSpecs, cil_code]
-  obtain ⟨carryHome, carrySlot, fresh, _, initialCarry⟩ := homes.word_at 2 0 carrySpec
-  obtain ⟨resultHome, resultSlot, _, _, initialResult⟩ := homes.word_at 3 0 resultSpec
-  obtain ⟨carryAllocation, carryPresent, _, _⟩ := access_within_allocation _ _ _ _ _ initialCarry
-  obtain ⟨resultAllocation, resultPresent, _, _⟩ := access_within_allocation _ _ _ _ _ initialResult
-  have carryOld := (enteredWF.1 _ _ carryPresent).1
-  have resultOld := (enteredWF.1 _ _ resultPresent).1
-  have writable := lowWords.authority.access initialCarry carryOld
-  obtain ⟨after, written, _, loaded, _⟩ := store_local_word64 0 writable
-  have authority := lowWords.authority.trans (write_preserves_access_below written _)
-  have caller := lowWords.preserved.trans (write_preserves_memory_below _ _ _ _ _ _ fresh written)
-  have afterCall := call.after_memory_below caller
-    (write_preserves_wellFormed _ _ _ _ _ lowWords.call.1.1 written)
-    (write_preserves_static_world _ _ _ _ _ _ lowWords.call.2 written)
-  have earlier := write_preserves_memory_below _ _ _ _ _ carryHome.allocation (Nat.le_refl _) written
-  have rightOrder := homes.ordered 0 2 rightHome carryHome (by decide) lowWords.rightSlot carrySlot
-  have leftOrder := homes.ordered 1 2 leftHome carryHome (by decide) lowWords.leftSlot carrySlot
-  have outputOrder := homes.ordered 2 3 carryHome resultHome (by decide) carrySlot resultSlot
-  refine ⟨carryHome, resultHome, after,
-    ⟨⟨afterCall, caller, authority, lowWords.rightSlot, lowWords.leftSlot,
-      (earlier.read rightHome rightOrder 8 1).trans lowWords.rightRead,
-      (earlier.read leftHome leftOrder 8 1).trans lowWords.leftRead⟩,
-      carrySlot, resultSlot, loaded, authority.access initialCarry carryOld,
-      authority.access initialResult resultOld, ?_⟩, ?_⟩
-  · exact Or.inl (Nat.ne_of_lt outputOrder)
-  · intro pc rest
-    obtain ⟨result, stepped, sameWrite, _⟩ := step_store_word64_same_frame
-      (body := Extracted.addScalarBody) (pc := pc) (args := args) (rest := rest) 0 carrySlot writable
-    rw [written] at sameWrite
-    cases sameWrite
-    exact stepped
 
 /-- Execute the both-large prefix and its first mathematical carry call from
     the state established by the two operand prefixes. -/
 theorem scalar_first_carry_checked (contract : CarryHelperContract Extracted.program Extracted.addWithCarryIndex) (memory entered before : CIL.Safety.Memory)
     (left right output rightHome leftHome : Reference) (args : List Value) (frame : Frame)
-    (call : CallingConditions Extracted.program memory [left, right] [output])
     (enteredWF : entered.WellFormed)
     (homes : WordHomes entered memory.nextIdentity scalarLocalSpecs frame.locals)
     (lowWords : ScalarLowWords memory entered before frame left right output rightHome leftHome)
@@ -72,7 +27,7 @@ theorem scalar_first_carry_checked (contract : CarryHelperContract Extracted.pro
       inputLimb memory left 3 ≠ BitVec.ofNat 64 0)
     (post : CIL.Safety.Memory → List Value → Prop)
     (continuation : ∀ carryHome resultHome prepared after,
-      ScalarCarryReady memory entered prepared frame left right output rightHome leftHome carryHome resultHome →
+      ScalarCarryReady memory entered prepared frame left right output carryHome resultHome →
       after.WellFormed →
       (StaticWorldPreserved Extracted.program prepared after) →
       Confined [(carryHome, 8), (resultHome, 8)] prepared after →
@@ -84,20 +39,39 @@ theorem scalar_first_carry_checked (contract : CarryHelperContract Extracted.pro
       run Extracted.program fuel Extracted.addScalarIndex scalarSecondDecision args frame
         [.scalar (.i64 (inputLimb memory left 1 ||| inputLimb memory left 2 |||
           inputLimb memory left 3))] before = .ok (result, returned) ∧ post result returned := by
-  obtain ⟨carryHome, resultHome, prepared, ready, stored⟩ := scalar_carry_store
-    memory entered before left right output rightHome leftHome args frame call enteredWF homes lowWords
-  apply scalar_carry_prefix args frame before prepared _ (inputLimb memory left 0)
-    (inputLimb memory right 0) largeLeft leftHome rightHome carryHome resultHome
-    ready.lowWords.leftSlot ready.lowWords.rightSlot ready.carrySlot ready.resultSlot
-    ready.lowWords.leftRead ready.lowWords.rightRead
-    (access_reference_valid _ _ _ _ _ ready.carryWrite)
-    (access_reference_valid _ _ _ _ _ ready.resultWrite) stored post
-  exact scalar_indexed_carry contract 0 args frame prepared (inputLimb memory left 0)
-    (inputLimb memory right 0) 0 carryHome resultHome ready.lowWords.call.1.1 (by decide)
-    ready.carryRead ready.carryWrite ready.resultWrite ready.disjoint post
-    (fun after formed world framed math =>
-      continuation carryHome resultHome prepared after ready formed world framed math)
-
+  obtain ⟨carryHome, carrySlot, _, _, initialCarry⟩ :=
+    homes.word_at 2 0 (by simp [scalarLocalSpecs, cil_code])
+  obtain ⟨resultHome, resultSlot, _, _, initialResult⟩ :=
+    homes.word_at 3 0 (by simp [scalarLocalSpecs, cil_code])
+  obtain ⟨_, carryPresent, _, _⟩ := access_within_allocation _ _ _ _ _ initialCarry
+  obtain ⟨_, resultPresent, _, _⟩ := access_within_allocation _ _ _ _ _ initialResult
+  have writable := homes.writable
+  have valid := lowWords.call.1
+  have beforeFormed := valid.1
+  have preserved := lowWords.preserved
+  have authority := lowWords.authority
+  have snapshots := ((LocalSnapshots.empty before frame.locals).after_effect 0 .word64 rightHome
+    (.i64 (inputLimb memory right 0)) _ lowWords.rightSlot rfl lowWords.rightRead
+    (fun _ _ _ _ _ _ _ _ loaded => loaded)).after_effect 1 .word64 leftHome
+    (.i64 (inputLimb memory left 0)) _ lowWords.leftSlot rfl lowWords.leftRead
+    (fun _ _ _ _ _ _ _ _ loaded => loaded)
+  conv in scalarSecondDecision => cbv
+  cil_contract_steps (snapshots := snapshots)
+    [largeLeft, authority.access initialCarry (enteredWF.1 _ _ carryPresent).1,
+      BitVec.ofNat_eq_ofNat]
+  have carryWrite := authority.access initialCarry (enteredWF.1 _ _ carryPresent).1
+  have resultWrite := authority.access initialResult (enteredWF.1 _ _ resultPresent).1
+  have carryRead : read storedLocal carryHome 8 1 = .ok (numberBytes 0 8) :=
+    write_readback _ _ _ _ _ localWrite
+  have done := scalar_indexed_carry contract 0 args frame storedLocal (inputLimb memory left 0)
+    (inputLimb memory right 0) 0 carryHome resultHome localFormed (by decide) carryRead
+    carryWrite resultWrite (Or.inl (Nat.ne_of_lt
+      (homes.ordered 2 3 carryHome resultHome (by decide) carrySlot resultSlot))) post
+    (continuation carryHome resultHome storedLocal ·
+      ⟨⟨valid, write_preserves_static_world _ _ _ _ _ _ lowWords.call.2 localWrite⟩, preserved,
+        authority, carrySlot, resultSlot, carryRead⟩)
+  cil_contract_steps [carrySlot, resultSlot, access_reference_valid _ _ _ _ _ carryWrite,
+    access_reference_valid _ _ _ _ _ resultWrite] until done
 end UInt256Proof.Safety
 
 namespace UInt256Proof.Safety
@@ -157,8 +131,8 @@ open CIL.Safety UInt256Model.Safety UInt256Proof.Add.CarrySafety
 /-- Derive all result homes, freshness and separation from actual frame setup;
     no new separation restrictions are imposed on caller views. -/
 theorem ScalarCarryReady.initial_state {original entered current : CIL.Safety.Memory} {frame : Frame}
-    {left right output rightHome leftHome carryHome resultHome : Reference}
-    (ready : ScalarCarryReady original entered current frame left right output rightHome leftHome carryHome resultHome)
+    {left right output carryHome resultHome : Reference}
+    (ready : ScalarCarryReady original entered current frame left right output carryHome resultHome)
     (call : CallingConditions Extracted.program original [left, right] [output])
     (enteredWF : entered.WellFormed)
     (homes : WordHomes entered original.nextIdentity scalarLocalSpecs frame.locals) :
@@ -174,8 +148,8 @@ theorem ScalarCarryReady.initial_state {original entered current : CIL.Safety.Me
       obtain ⟨reference, slot, _⟩ := homes.word_at _ _ specified
       exact ⟨reference, slot⟩)
     left right output carryHome (scalarCarryValue original left right) _
-    (by simp [scalarCarryValue]) call ready.lowWords.call ready.lowWords.preserved homes.writable
-    enteredWF ready.lowWords.authority ready.carrySlot ready.carryRead
+    (by simp [scalarCarryValue]) call ready.call ready.preserved homes.writable
+    enteredWF ready.authority ready.carrySlot ready.carryRead
   refine ⟨results, ?_, state⟩
   have first := state.resultSlots 0
   rw [show (0 : Fin 4).val + (2 + 0 + 1) = 3 from rfl, ready.resultSlot] at first
@@ -202,7 +176,7 @@ theorem scalar_general_carries (contract : CarryHelperContract Extracted.program
   intro frame entered rightHome leftHome before setup homes lowWords
   have enteredWF := enterFrame_preserves_wellFormed _ _ _ _ _ call.1.1 setup
   apply scalar_first_carry_checked contract memory entered before left right output rightHome leftHome
-    (scalarArguments left right output) frame call enteredWF homes lowWords largeLeft post
+    (scalarArguments left right output) frame enteredWF homes lowWords largeLeft post
   intro carryHome resultHome prepared after ready formed world framed math
   obtain ⟨results, first, initial⟩ := ready.initial_state call enteredWF homes
   subst first

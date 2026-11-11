@@ -41,17 +41,13 @@ theorem scalar_right_prefix_checked (memory entered : CIL.Safety.Memory)
   obtain ⟨home, slot, _, _, ready⟩ := homes.word_at 0 0 (by simp [scalarLocalSpecs, cil_code])
   have limbs := fun current below =>
     call.input_words_kept (current := current) below right (by simp)
+  have done := fun after (written : write entered home
+      (numberBytes (inputLimb memory right 0).toNat 8) 1 = .ok after) kept valid =>
+    continuation home after slot (write_readback _ _ _ _ _ written) kept
+      ⟨valid, write_preserves_static_world _ _ _ _ _ _ enteredCall.2 written⟩
   cil_contract_steps (snapshots := LocalSnapshots.empty entered frame.locals)
-    [binaryArguments, slot, ready, limbs _ preserved]
-  have loaded : read storedLocal home 8 1 =
-      .ok (numberBytes (inputLimb memory right 0).toNat 8) := by
-    simpa [numberBytes, localWidth] using write_readback _ _ _ _ _ localWrite
-  have done := continuation home storedLocal slot loaded preserved
-    ⟨valid, write_preserves_static_world _ _ _ _ _ _ enteredCall.2 localWrite⟩ localAccess
-  simp [scalarFirstDecision, cil_code] at done
-  cil_contract_steps (snapshots := localSnapshots)
-    [binaryArguments, limbs _ preserved, CIL.FeatureProfile.evaluate, BitVec.ofNat_eq_ofNat]
-    until done
+    [binaryArguments, slot, ready, limbs _ preserved, CIL.FeatureProfile.evaluate,
+      BitVec.ofNat_eq_ofNat] until done _ localWrite preserved valid localAccess
 
 end UInt256Proof.Safety
 
@@ -106,20 +102,17 @@ theorem scalar_left_prefix_checked (memory entered before : CIL.Safety.Memory)
   have limbs := fun current below =>
     call.input_words_kept (current := current) below left (by simp)
   conv in scalarFirstDecision => cbv
+  have ordered := homes.ordered 0 1 rightHome leftHome (by decide) rightSlot leftSlot
+  have done := fun after (written : write before leftHome
+      (numberBytes (inputLimb memory left 0).toNat 8) 1 = .ok after) kept access valid =>
+    continuation leftHome after
+      ⟨⟨valid, write_preserves_static_world _ _ _ _ _ _ beforeCall.2 written⟩, kept, access,
+        rightSlot, leftSlot, ((write_preserves_memory_below _ _ _ _ _ leftHome.allocation
+          (Nat.le_refl _) written).read rightHome ordered 8 1).trans rightRead,
+        write_readback _ _ _ _ _ written⟩
   cil_contract_steps (snapshots := LocalSnapshots.empty before frame.locals)
     [binaryArguments, largeRight, leftSlot, ready, limbs _ preserved, BitVec.ofNat_eq_ofNat]
-  have loaded : read storedLocal leftHome 8 1 =
-      .ok (numberBytes (inputLimb memory left 0).toNat 8) := by
-    simpa [numberBytes, localWidth] using write_readback _ _ _ _ _ localWrite
-  have ordered := homes.ordered 0 1 rightHome leftHome (by decide) rightSlot leftSlot
-  have earlier := write_preserves_memory_below _ _ _ _ _ leftHome.allocation (Nat.le_refl _)
-    localWrite
-  have done := continuation leftHome storedLocal
-    ⟨⟨valid, write_preserves_static_world _ _ _ _ _ _ beforeCall.2 localWrite⟩, preserved,
-      authority, rightSlot, leftSlot, (earlier.read rightHome ordered 8 1).trans rightRead, loaded⟩
-  simp [scalarSecondDecision, scalarFirstDecision, cil_code] at done
-  cil_contract_steps (snapshots := localSnapshots)
-    [binaryArguments, limbs _ preserved, BitVec.ofNat_eq_ofNat] until done
+    until done _ localWrite preserved authority valid
 /-- The scalar helper's actual invocation arguments on the public scalar path. -/
 def scalarArguments (left right output : Reference) : List Value :=
   binaryArguments left right output ++ [.scalar (.i32 0)]

@@ -78,29 +78,8 @@ theorem portable_small_exit (program : CIL.Program) (method storage : Nat)
     found callAt stepped ⟨childFuel, (stored, []), invoked, rfl, rfl⟩
   rintro final values ⟨rfl, rfl⟩
   cil_contract_steps [found, constAt, retAt, flagFit]
-  have fresh := enterFrame_fresh _ _ _ _ _ setup
-  have retired := leaveFrame_preserves_memory_below frame final original.nextIdentity
-    (fun id member => (fresh.2 id member).1)
-  obtain ⟨allocation, present, _, _⟩ := formed_reference_live _ _ _
-    (call.output_formed (by simp : output ∈ [output]))
-  have outputOld : output.allocation < original.nextIdentity := (call.1.1.1 _ _ present).1
-  have bytes : (fun offset => ((leaveFrame frame final).cells output.allocation offset).bits) =
-      (fun offset => (final.cells output.allocation offset).bits) := by
-    funext offset
-    rw [retired.cells output.allocation outputOld offset]
-  refine ⟨leaveFrame_preserves_wellFormed _ _ valid.1.1, ?_, ?_, ?_, ?_⟩
-  · have mathematical := arm_small_result_value original input word
-    simp only [UInt256Model.value, armSmallOutputWords, agrees] at mathematical
-    simpa only [inputValue, bytes] using value.trans mathematical
-  · have initial : UInt256Model.value (inputLimb original input) = inputValue original input :=
-      UInt256Proof.input_value (fun offset => (original.cells input.allocation offset).bits)
-        input.offset
-    rw [← agrees.2.2.2, arm_small_result_flag, initial]
-  · exact (retired.access output outputOld 32 1 true).trans
-      (valid.1.writable (wordView output) (by simp))
-  · intro id old offset untouched
-    exact (retired.cells id old offset).trans
-      ((outside id offset untouched).trans (preserved.cells id old offset))
+  exact ARMSmallPost.of_stored call setup preserved valid outside value agrees
+
 /-- Full portable helper execution: input snapshots, low sum, every carry exit, and the shared
     postcondition. -/
 theorem portable_small_entry (program : CIL.Program) (method storage : Nat)
@@ -126,61 +105,51 @@ theorem portable_small_entry (program : CIL.Program) (method storage : Nat)
     call.input_words_kept (current := current) below input (by simp)
   have exit := fun current => portable_small_exit program method storage profile found
     storageFound original entered current input output word frame call setup
-  cil_contract_steps (snapshots := snapshots) [found, armSmallArguments, limbs _ preserved]
-  have world := write_preserves_static_world _ _ _ _ _ _ world localWrite
-  cil_contract_steps (snapshots := localSnapshots) [found, armSmallArguments, limbs _ preserved]
-  have world := write_preserves_static_world _ _ _ _ _ _ world localWrite_1
-  cil_contract_steps (snapshots := localSnapshots_1) [found, armSmallArguments, limbs _ preserved]
-  have world := write_preserves_static_world _ _ _ _ _ _ world localWrite_2
-  cil_contract_steps (snapshots := localSnapshots_2)
+  cil_contract_steps (snapshots := snapshots)
     [found, armSmallArguments, disabled, limbs _ preserved]
-  have world := write_preserves_static_world _ _ _ _ _ _ world localWrite_3
-  have world := write_preserves_static_world _ _ _ _ _ _ world localWrite_4
   split
   next carry =>
     cil_contract_steps (snapshots := localSnapshots_4) [found, armSmallArguments]
-    have world := write_preserves_static_world _ _ _ _ _ _ world localWrite_5
     split
     next first =>
-      have done := exit storedLocal_5 ⟨valid, world⟩ preserved 82 _ _ _ 0 (by rfl) (by rfl) (by rfl)
-        (by simp [armSmallResult, armCarryResult, armIncrementWord, carry, first]
-            exact ⟨rfl, rfl, rfl⟩)
+      have done := exit storedLocal_5 ⟨valid, by stored_world⟩ preserved 82 _ _ _ 0
+        (by rfl) (by rfl) (by rfl) (by
+          simp [armSmallResult, armCarryResult, armIncrementWord, carry, first]
+          exact ⟨rfl, rfl, rfl⟩)
       cil_contract_steps (snapshots := localSnapshots_5) [found, armSmallArguments] until done
     next first =>
       replace first := Decidable.not_not.mp first
       cil_contract_steps (snapshots := localSnapshots_5) [found, armSmallArguments]
-      have world := write_preserves_static_world _ _ _ _ _ _ world localWrite_6
       split
       next second =>
-        have done := exit storedLocal_6 ⟨valid, world⟩ preserved 98 _ _ _ 0 (by rfl) (by rfl)
-          (by rfl) (by
+        have done := exit storedLocal_6 ⟨valid, by stored_world⟩ preserved 98 _ _ _ 0
+          (by rfl) (by rfl) (by rfl) (by
             simp [armSmallResult, armCarryResult, armIncrementWord, carry, first, second]
             exact ⟨rfl, rfl, rfl⟩)
         cil_contract_steps (snapshots := localSnapshots_6) [found, armSmallArguments] until done
       next second =>
         replace second := Decidable.not_not.mp second
         cil_contract_steps (snapshots := localSnapshots_6) [found, armSmallArguments]
-        have world := write_preserves_static_world _ _ _ _ _ _ world localWrite_7
         have lastIndex : (3 : Fin 4).val = 3 := rfl
         split
         next third =>
-          have done := exit storedLocal_7 ⟨valid, world⟩ preserved 115 _ _ _ 0 (by rfl) (by rfl)
-            (by rfl) (by
+          have done := exit storedLocal_7 ⟨valid, by stored_world⟩ preserved 115 _ _ _ 0
+            (by rfl) (by rfl) (by rfl) (by
               simp [armSmallResult, armCarryResult, armIncrementWord, carry, first, second,
                 third, lastIndex]
               exact ⟨rfl, rfl, rfl⟩)
           cil_contract_steps (snapshots := localSnapshots_7) [found, armSmallArguments] until done
         next third =>
           replace third := Decidable.not_not.mp third
-          have done := exit storedLocal_7 ⟨valid, world⟩ preserved 126 _ _ _ 1 (by rfl) (by rfl)
-            (by rfl) (by
+          have done := exit storedLocal_7 ⟨valid, by stored_world⟩ preserved 126 _ _ _ 1
+            (by rfl) (by rfl) (by rfl) (by
               simp [armSmallResult, armCarryResult, armIncrementWord, carry, first, second,
                 third, lastIndex]
               exact ⟨rfl, rfl, rfl⟩)
           cil_contract_steps (snapshots := localSnapshots_7) [found, armSmallArguments] until done
   next carry =>
-    have done := exit storedLocal_4 ⟨valid, world⟩ preserved 67 _ _ _ 0 (by rfl) (by rfl) (by rfl)
-      (by simp [armSmallResult, carry]; exact ⟨rfl, rfl, rfl⟩)
+    have done := exit storedLocal_4 ⟨valid, by stored_world⟩ preserved 67 _ _ _ 0
+      (by rfl) (by rfl) (by rfl) (by simp [armSmallResult, carry]; exact ⟨rfl, rfl, rfl⟩)
     cil_contract_steps (snapshots := localSnapshots_4) [found, armSmallArguments] until done
 /-- Ordinary valid caller views establish a checked invocation of the portable helper with exact sum and overflow. -/
 theorem checked_portable_small_contract (program : CIL.Program) (method storage : Nat) (profile : CIL.FeatureProfile) (found : program[method]? = some (portableSmallBody profile storage)) (storageFound : program[storage]? = some (UInt256Proof.Multiply.LimbStorage.body profile)) (disabled : profile.advSimd = false)

@@ -1,7 +1,13 @@
 import UInt256.Safety.CallerSetup
 import UInt256.Safety.LimbAccess
 
-/-! Input words that stepping reads through a caller view are the caller's original limbs. -/
+/-! Input words that stepping reads through a caller view are the caller's original limbs, and
+    private local stores keep the static world. -/
+
+/-- Close static-world validity at a memory reached from a valid one by private local stores. -/
+macro "stored_world" : tactic => `(tactic| repeat (first
+  | assumption
+  | refine CIL.Safety.write_preserves_static_world _ _ _ _ _ _ ?_ (by assumption)))
 
 namespace UInt256Model.Safety
 

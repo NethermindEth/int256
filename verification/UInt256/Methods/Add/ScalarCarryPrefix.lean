@@ -13,44 +13,6 @@ def scalarFirstCarryCall : Nat :=
     | .call callee _ => callee == Extracted.addWithCarryIndex
     | _ => false
 
-/-- Both operands have upper limbs. Follow the second decision, scalar ISA
-    guard, carry initialization and actual local loads/address formation. -/
-theorem scalar_carry_prefix (args : List Value) (frame : Frame) (before after : Memory)
-    (leftUpper a b : BitVec 64) (largeLeft : leftUpper ≠ BitVec.ofNat 64 0)
-    (leftHome rightHome carryHome resultHome : Reference)
-    (leftSlot : frame.locals[1]? = some (.bytes .word64 leftHome))
-    (rightSlot : frame.locals[0]? = some (.bytes .word64 rightHome))
-    (carrySlot : frame.locals[2]? = some (.bytes .word64 carryHome))
-    (resultSlot : frame.locals[3]? = some (.bytes .word64 resultHome))
-    (leftRead : read after leftHome 8 1 = .ok (numberBytes a.toNat 8))
-    (rightRead : read after rightHome 8 1 = .ok (numberBytes b.toNat 8))
-    (carryFormed : form after carryHome = .ok carryHome)
-    (resultFormed : form after resultHome = .ok resultHome)
-    (stored : ∀ pc rest, step Extracted.addScalarBody (.setLocal 2) pc args frame
-      (.scalar (.i64 0) :: rest) before = .ok (.next (pc + 1) rest frame after))
-    (post : Memory → List Value → Prop)
-    (continuation : ∃ fuel result returned,
-      run Extracted.program fuel Extracted.addScalarIndex scalarFirstCarryCall args frame
-        [.reference (.address resultHome), .reference (.address carryHome), .scalar (.i64 b), .scalar (.i64 a)]
-        after = .ok (result, returned) ∧ post result returned) :
-    ∃ fuel result returned,
-      run Extracted.program fuel Extracted.addScalarIndex scalarSecondDecision args frame
-        [.scalar (.i64 leftUpper)] before = .ok (result, returned) ∧ post result returned := by
-  conv in scalarSecondDecision => cbv
-  have leftLoaded := load_local_word64_of_read leftRead
-  have rightLoaded := load_local_word64_of_read rightRead
-  have found : Extracted.program[Extracted.addScalarIndex]? = some Extracted.addScalarBody := by
-    simp only [cil_code]
-  cil_contract_steps [found, largeLeft, carryFormed, resultFormed, leftSlot, rightSlot,
-    carrySlot, resultSlot, leftLoaded, rightLoaded, stored, BitVec.ofNat_eq_ofNat] until continuation
-
-
-end UInt256Proof.Safety
-
-namespace UInt256Proof.Safety
-
-open CIL.Safety UInt256Proof.Add.CarrySafety
-
 /-- Discover successive calls to the proved carry helper in extracted order. -/
 def scalarCarryCall : Nat → Nat
   | 0 => scalarFirstCarryCall
