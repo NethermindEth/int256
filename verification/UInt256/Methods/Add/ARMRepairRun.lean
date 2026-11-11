@@ -4,100 +4,6 @@ import UInt256.Methods.Add.ARMRepairCarry
 namespace UInt256Proof.Add.Safety
 open CIL.Safety UInt256Model.Safety UInt256Proof.AddSubtract.Safety
 
-/-- The ARM repair suffix returns the updated high-lane carry bit and retires its frame. -/
-theorem vector128_arm_repair_return (program : CIL.Program) (body : CIL.Method) (method : Nat)
-    (found : program[method]? = some body) (code : CodeAt body 113 (armRepairCode)) (returns : body.returnsValue = true) (enabled : body.profile.advSimd = true)
-    (memory : Memory) (frame : Frame) (args : List Value)
-    (home : Reference) (mask : BitVec 128)
-    (slot : frame.locals[7]? = some (.bytes .vector128 home))
-    (loaded : read memory home 16 1 = .ok (numberBytes mask.toNat 16)) :
-    run program 7 method 155 args frame [] memory =
-      .ok (leaveFrame frame memory,
-        [.scalar (.i32 (if CIL.Vector.lane64 mask 1 > BitVec.ofNat 64 0 then 1 else 0))]) := by
-  first
-  | solve | simp [body.profile] at enabled
-  |
-    have load := fun (pc : Nat) (stack : List Value) => step_load_numeric_local
-      (body := body) (args := args) (pc := pc) (stack := stack)
-      .vector128 (.v128 mask) mask.toNat rfl slot loaded
-    iterate 6
-      apply Eq.trans
-      · apply run_next found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
-        first
-        | exact load _ _
-        | (simp (config := { implicitDefEqProofs := false })
-            [localResult, checkedIntrinsic, step, cil_guard, observerCount, enabled, pureArity, scalars, CIL.step.eq_def, CIL.binary,
-              CIL.Intrinsic.available, CIL.Vector.intrinsic_extract128,
-              checkedValue, numericValue, Bind.bind, Except.bind, Pure.pure, Except.pure]
-           first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩)
-    have fetched : body.code[161]? = some (.ret (some .unsigned8)) := by (conv => lhs; arg 2; whnf); cil_lookup [code]
-    by_cases carry : CIL.Vector.lane64 mask 1 > BitVec.ofNat 64 0
-    all_goals simp [run, found, fetched, returns, step, cil_guard, observerCount, checkedValue, numericValue, CIL.NarrowKind.extend, carry,
-      Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-
-end UInt256Proof.Add.Safety
-
-namespace UInt256Proof.Add.Safety
-open CIL.Safety UInt256Model.Safety UInt256Proof.AddSubtract.Safety
-
-/-- Replace only the high output half, preserving the initialized low half and every private snapshot even when the original caller views overlap. -/
-theorem vector128_arm_repair_output (program : CIL.Program) (body : CIL.Method) (method : Nat)
-    (found : program[method]? = some body) (code : CodeAt body 113 (armRepairCode)) (returns : body.returnsValue = true) (enabled : body.profile.advSimd = true)
-    (original entered current : Memory) (inputs outputs : List Reference)
-    (output : Reference) (frame : Frame) (args : List Value)
-    (call : CallingConditions program original inputs outputs)
-    (currentCall : CallingConditions program current inputs outputs)
-    (member : output ∈ outputs) (authority : AccessBelow entered.nextIdentity entered current)
-    (argument : args[2]? = some (.reference (.address output)))
-    (low high : BitVec 128) (highHome : Reference)
-    (highSlot : frame.locals[11]? = some (.bytes .vector128 highHome))
-    (highRead : read current highHome 16 1 = .ok (numberBytes high.toNat 16))
-    (lowRead : read current output 16 1 = .ok (numberBytes low.toNat 16))
-    (post : Memory → List Value → Prop)
-    (continuation : ∀ after,
-      (read after output 16 1 = .ok (numberBytes low.toNat 16) ∧
-        read after { output with offset := output.offset + 16 } 16 1 = .ok (numberBytes high.toNat 16)) →
-      CallingConditions program after inputs outputs →
-      AccessBelow entered.nextIdentity entered after →
-      (∀ id offset, OutsideOutput output id offset → after.cells id offset = current.cells id offset) →
-      (∀ reference width alignment bytes, original.nextIdentity ≤ reference.allocation →
-        read current reference width alignment = .ok bytes → read after reference width alignment = .ok bytes) →
-      current.nextIdentity ≤ after.nextIdentity →
-      ∃ fuel final returned,
-        run program fuel method 155 args frame [] after = .ok (final, returned) ∧ post final returned) :
-    ∃ fuel final returned,
-      run program fuel method 149 args frame [] current = .ok (final, returned) ∧ post final returned := by
-  first
-  | solve | simp [body.profile] at enabled
-  |
-    obtain ⟨after, written, highOutput, afterCall, afterAuthority, outside, privateReads, advanced⟩ :=
-      output_half_update program original entered current inputs outputs output 1 high
-        call currentCall member authority
-    simp only [Fin.val_one, Nat.mul_one] at written highOutput
-    have lowOutput := write_preserves_disjoint_read written lowRead (Or.inr (Or.inl (by simp)))
-    have done := continuation after ⟨lowOutput, highOutput⟩ afterCall afterAuthority outside privateReads advanced
-    have loadHigh := fun (pc : Nat) (stack : List Value) => step_load_numeric_local
-      (body := body) (args := args) (pc := pc) (stack := stack)
-      .vector128 (.v128 high) high.toNat rfl highSlot highRead
-    have formed := currentCall.output_formed member
-    have address := currentCall.output_half_address member 1
-    simp only [Fin.val_one, Nat.mul_one] at address
-    repeat' first
-      | exact done
-      | (apply run_next_exists post found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
-         first
-         | exact loadHigh _ _
-         | (simp (config := { implicitDefEqProofs := false })
-             [localResult, step, cil_guard, observerCount, argument, checkedValue, formValue, formed, staticInstruction, memoryInstruction, otherMemoryInstruction, referenceAddInstruction, displaceReference,
-               storeValue, referenceAt, ordinaryAccessAlignment, written, address, CIL.offsetValue,
-               checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-            first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
-
-end UInt256Proof.Add.Safety
-
-namespace UInt256Proof.Add.Safety
-open CIL.Safety UInt256Model.Safety UInt256Proof.AddSubtract.Safety
-
 /-- Complete repaired output/return suffix. -/
 theorem vector128_arm_repair_suffix (program : CIL.Program) (body : CIL.Method) (method : Nat)
     (found : program[method]? = some body) (code : CodeAt body 113 (armRepairCode)) (returns : body.returnsValue = true) (enabled : body.profile.advSimd = true)
@@ -127,15 +33,26 @@ theorem vector128_arm_repair_suffix (program : CIL.Program) (body : CIL.Method) 
         [.scalar (.i32 (if CIL.Vector.lane64 carry 1 > BitVec.ofNat 64 0 then 1 else 0))]) :
     ∃ fuel final returned,
       run program fuel method 149 args frame [] current = .ok (final, returned) ∧ post final returned := by
-  apply vector128_arm_repair_output program body method found code returns enabled original entered current inputs outputs output frame args
-    call currentCall member authority argument low high highHome highSlot highRead lowRead post
-  intro after outputRead afterCall afterAuthority outside privateReads advanced
-  exact ⟨7, _, _, vector128_arm_repair_return program body method found code returns enabled after frame args carryHome carry carrySlot
-    (privateReads carryHome 16 1 _ carryBound carryRead),
-    continuation after outputRead afterCall afterAuthority outside advanced⟩
+  obtain ⟨after, written, highOutput, afterCall, afterAuthority, outside, privateReads,
+    advanced⟩ := output_half_update program original entered current inputs outputs output 1 high
+      call currentCall member authority
+  simp only [Fin.val_one, Nat.mul_one] at written highOutput
+  have lowOutput := write_preserves_disjoint_read written lowRead (Or.inr (Or.inl (by simp)))
+  have loadHigh : ∀ pc stack, step body (.local 11) pc args frame stack current =
+      .ok (.next (pc + 1) (.scalar (.v128 high) :: stack) frame current) := fun pc stack =>
+    step_load_numeric_local .vector128 (.v128 high) high.toNat rfl highSlot highRead
+  have loadCarry : ∀ pc stack, step body (.local 7) pc args frame stack after =
+      .ok (.next (pc + 1) (.scalar (.v128 carry) :: stack) frame after) := fun pc stack =>
+    step_load_numeric_local .vector128 (.v128 carry) carry.toNat rfl carrySlot
+      (privateReads carryHome 16 1 _ carryBound carryRead)
+  have address := currentCall.output_half_address member 1
+  simp only [Fin.val_one, Nat.mul_one] at address
+  cil_contract_steps [found, code, returns, enabled, argument, loadHigh, loadCarry,
+    currentCall.output_formed member, written, address]
+  simpa [CIL.NarrowKind.extend_ite_ofNat_one_zero, CIL.NarrowKind.extend_ite_one_zero] using
+    continuation after ⟨lowOutput, highOutput⟩ afterCall afterAuthority outside advanced
 
 end UInt256Proof.Add.Safety
-
 namespace UInt256Proof.Add.Safety
 open CIL.Safety UInt256Model.Safety UInt256Proof.AddSubtract.Safety
 

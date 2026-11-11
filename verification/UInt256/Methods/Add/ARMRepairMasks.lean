@@ -1,5 +1,6 @@
 import CIL.Safety.SymbolicExecution
 import CIL.Safety.ReturnArity
+import CIL.Safety.LocalSnapshotSteps
 import UInt256.Methods.Add.Vector128FastEntry
 
 namespace UInt256Proof.Add.Safety
@@ -56,321 +57,88 @@ def armRepairCode : List CIL.Op := [
 ]
 end UInt256Proof.Add.Safety
 namespace UInt256Proof.Add.Safety
-open CIL.Safety UInt256Model.Safety UInt256Proof.AddSubtract.Safety CIL.Vector CIL.Vector
+open CIL.Safety UInt256Model.Safety UInt256Proof.AddSubtract.Safety CIL.Vector
 
-/-- ARM reuses the saved sum-only condition or extracts the two propagation lanes, depending on the reporting flag, then initializes repair local20. -/
-theorem vector128_arm_repair_mask (program : CIL.Program) (body : CIL.Method) (method : Nat) (specs : List NumericLocalSpec)
-    (found : program[method]? = some body) (code : CodeAt body 113 (armRepairCode))
-    (repairSpecs : ∀ i : Fin 4, specs[19 + i.val]? = some vector128ZeroSpec) (enabled : body.profile.advSimd = true) (boundary : Nat) (entered current : Memory)
-    (inputs outputs : List Reference) (frame : Frame) (root : LocalSlot) (slots : List LocalSlot)
-    (layout : frame.locals = root :: slots) (args : List Value)
-    (currentCall : CallingConditions program current inputs outputs)
-    (enteredWF : entered.WellFormed) (homes : NumericHomes entered boundary specs slots)
-    (authority : AccessBelow entered.nextIdentity entered current)
-    (flag : BitVec 32) (flagFit : CIL.NarrowKind.unsigned8.extend flag = flag) (argument : args[3]? = some (.scalar (.i32 flag)))
-    (low high : BitVec 128) (lowHome highHome : Reference)
-    (lowSlot : frame.locals[12]? = some (.bytes .vector128 lowHome))
-    (highSlot : frame.locals[13]? = some (.bytes .vector128 highHome))
-    (lowRead : read current lowHome 16 1 = .ok (numberBytes low.toNat 16))
-    (highRead : read current highHome 16 1 = .ok (numberBytes high.toNat 16))
-    (conditionHome : Reference)
-    (conditionSlot : frame.locals[14]? = some (.bytes .vector128 conditionHome))
-    (conditionRead : read current conditionHome 16 1 = .ok
-      (numberBytes (selectedPropagation128 body.profile.advSimd flag low high).toNat 16))
-    (post : Memory → List Value → Prop)
-    (continuation : ∀ reference after,
-      frame.locals[20]? = some (.bytes .vector128 reference) →
-      read after reference 16 1 = .ok (numberBytes (incoming128High low high).toNat 16) →
-      MemoryBelow boundary current after →
-      CallingConditions program after inputs outputs →
-      AccessBelow entered.nextIdentity entered after →
-      write current reference (numberBytes (incoming128High low high).toNat 16) 1 = .ok after →
-      ∃ fuel result returned,
-        run program fuel method 122 args frame [] after =
-          .ok (result, returned) ∧ post result returned) :
-    ∃ fuel result returned,
-      run program fuel method 113 args frame [] current =
-        .ok (result, returned) ∧ post result returned := by
-  first
-  | solve | simp [body.profile] at enabled
-  |
-    obtain ⟨reference, after, slot, loaded, retained, afterCall, afterAuthority, written, stored⟩ :=
-      vector128_local_store program body specs boundary entered current inputs outputs frame root slots layout currentCall
-        enteredWF homes authority 19 vector128ZeroSpec (repairSpecs 0)
-        (.v128 (incoming128High low high)) (incoming128High low high).toNat rfl
-    have done := continuation reference after slot loaded retained afterCall afterAuthority written
-    have loadLow := fun (pc : Nat) (stack : List Value) => step_load_numeric_local
-      (body := body) (args := args) (pc := pc) (stack := stack)
-      .vector128 (.v128 low) low.toNat rfl lowSlot lowRead
-    have loadHigh := fun (pc : Nat) (stack : List Value) => step_load_numeric_local
-      (body := body) (args := args) (pc := pc) (stack := stack)
-      .vector128 (.v128 high) high.toNat rfl highSlot highRead
-    have loadCondition := fun (pc : Nat) (stack : List Value) => step_load_numeric_local
-      (body := body) (args := args) (pc := pc) (stack := stack)
-      .vector128 (.v128 (selectedPropagation128 body.profile.advSimd flag low high)) (selectedPropagation128 body.profile.advSimd flag low high).toNat
-      rfl conditionSlot conditionRead
-    by_cases zero : flag = BitVec.ofNat 32 0
-    all_goals
-      simp only [selectedPropagation128, enabled, zero, and_true, and_false, ite_true, ite_false,
-        true_and] at loadCondition
-      repeat' first
-        | exact done
-        | (simp (config := { failIfUnchanged := false })
-             [flagFit, show (0 : BitVec 32) = BitVec.ofNat 32 0 from rfl, zero]
-           apply run_next_exists post found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
-           first
-           | exact loadCondition _ _
-           | exact loadLow _ _
-           | exact loadHigh _ _
-           | exact stored _ _ _
-           | (simp (config := { implicitDefEqProofs := false })
-               [localResult, checkedIntrinsic, step, cil_guard, observerCount, enabled, flagFit, argument, pureArity, scalars, CIL.step.eq_def, CIL.FeatureProfile.evaluate,
-                 CIL.Intrinsic.available, CIL.Vector.intrinsic_or128, CIL.Vector.intrinsic_adv_extract,
-                 incoming128_arm_high, show (0 : BitVec 32) = BitVec.ofNat 32 0 from rfl, zero,
-                 checkedValue, numericValue, Bind.bind, Except.bind, Pure.pure, Except.pure]
-              first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
-
-end UInt256Proof.Add.Safety
-
-namespace UInt256Proof.Add.Safety
-open CIL.Safety UInt256Model.Safety UInt256Proof.AddSubtract.Safety CIL.Vector CIL.Vector
-
+/-- Lanes of the high result that are all ones, where an incoming carry propagates further. -/
 def full128 (result : BitVec 128) : BitVec 128 :=
   CIL.Vector.zip128 (fun x y => CIL.Vector.mask64 (x == y)) result (~~~0)
 
-theorem vector128_arm_full_mask (program : CIL.Program) (body : CIL.Method) (method : Nat) (specs : List NumericLocalSpec)
-    (found : program[method]? = some body) (code : CodeAt body 113 (armRepairCode))
-    (repairSpecs : ∀ i : Fin 4, specs[19 + i.val]? = some vector128ZeroSpec) (enabled : body.profile.advSimd = true)
-    (boundary : Nat) (entered current : Memory)
-    (inputs outputs : List Reference) (frame : Frame) (root : LocalSlot) (slots : List LocalSlot)
-    (layout : frame.locals = root :: slots) (args : List Value)
-    (currentCall : CallingConditions program current inputs outputs)
-    (enteredWF : entered.WellFormed) (homes : NumericHomes entered boundary specs slots)
+/-- Caller guarantees since `start` and the remembered private vectors behind the root slot. -/
+structure Vector128State (program : CIL.Program) (boundary : Nat) (entered start current : Memory)
+    (inputs outputs : List Reference) (slots : List LocalSlot)
+    (values : List (Option CIL.Value)) : Prop where
+  call : CallingConditions program current inputs outputs
+  preserved : MemoryBelow boundary start current
+  authority : AccessBelow entered.nextIdentity entered current
+  advanced : start.nextIdentity ≤ current.nextIdentity
+  snapshots : LocalSnapshots current slots (knownLocals values)
+
+variable {program : CIL.Program} {boundary : Nat} {entered start current : Memory}
+  {inputs outputs : List Reference} {slots : List LocalSlot} {values : List (Option CIL.Value)}
+
+/-- Saved vector reads start a state that remembers them and nothing in the `spare` locals. -/
+theorem Vector128State.initial {count : Nat} (saved : Fin count → BitVec 128) (spare : Nat)
+    (call : CallingConditions program current inputs outputs)
     (authority : AccessBelow entered.nextIdentity entered current)
-    (result : BitVec 128) (resultHome : Reference)
-    (resultSlot : frame.locals[11]? = some (.bytes .vector128 resultHome))
-    (resultRead : read current resultHome 16 1 = .ok (numberBytes result.toNat 16))
-    (post : Memory → List Value → Prop)
-    (continuation : ∀ reference after,
-      frame.locals[21]? = some (.bytes .vector128 reference) →
-      read after reference 16 1 = .ok (numberBytes (full128 result).toNat 16) →
-      MemoryBelow boundary current after →
-      CallingConditions program after inputs outputs →
-      AccessBelow entered.nextIdentity entered after →
-      write current reference (numberBytes (full128 result).toNat 16) 1 = .ok after →
-      ∃ fuel final returned,
-        run program fuel method 126 args frame [] after = .ok (final, returned) ∧ post final returned) :
-    ∃ fuel final returned,
-      run program fuel method 122 args frame [] current = .ok (final, returned) ∧ post final returned := by
-  first
-  | solve | simp [body.profile] at enabled
-  |
-    obtain ⟨reference, after, slot, loaded, retained, afterCall, afterAuthority, written, stored⟩ :=
-      vector128_local_store program body specs boundary entered current inputs outputs frame root slots layout currentCall
-        enteredWF homes authority 20 vector128ZeroSpec (repairSpecs 1)
-        (.v128 (full128 result)) (full128 result).toNat rfl
-    have done := continuation reference after slot loaded retained afterCall afterAuthority written
-    have load_result := fun (pc : Nat) (stack : List Value) => step_load_numeric_local
-      (body := body) (args := args) (pc := pc) (stack := stack)
-      .vector128 (.v128 result) result.toNat rfl resultSlot resultRead
-    have ones : CIL.evalIntrinsic (.vector (.ones 128)) [] = some (.v128 (~~~0)) := by rfl
-    repeat' first
-      | exact done
-      | (apply run_next_exists post found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
-         first
-         | exact load_result _ _
-         | exact stored _ _ _
-         | (simp (config := { implicitDefEqProofs := false })
-             [localResult, checkedIntrinsic, step, cil_guard, observerCount, enabled, pureArity, scalars, CIL.step.eq_def,
-               CIL.Intrinsic.available, ones, CIL.Vector.intrinsic_eq128, full128,
-               checkedValue, numericValue, Bind.bind, Except.bind, Pure.pure, Except.pure]
-            first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
+    (reads : ∀ i : Fin count, ∃ reference, slots[i.val]? = some (.bytes .vector128 reference) ∧
+      read current reference 16 1 = .ok (numberBytes (saved i).toNat 16)) :
+    Vector128State program boundary entered current current inputs outputs slots
+      (List.ofFn (fun i => some (.v128 (saved i))) ++ List.replicate spare none) := by
+  refine ⟨call, MemoryBelow.refl _ _, authority, Nat.le_refl _, ?_⟩
+  intro index value specified
+  by_cases bound : index < count
+  · obtain ⟨reference, slot, loaded⟩ := reads ⟨index, bound⟩
+    exact ⟨.vector128, reference, .v128 (saved ⟨index, bound⟩), _, slot, rfl,
+      by simpa [knownLocals, List.getElem?_append, bound, localResult] using specified, loaded⟩
+  · simp only [knownLocals, List.getElem?_append, List.length_ofFn, bound, ite_false,
+      List.getElem?_replicate] at specified
+    split at specified <;> cases specified
 
-theorem vector128_arm_extra_mask (program : CIL.Program) (body : CIL.Method) (method : Nat) (specs : List NumericLocalSpec)
-    (found : program[method]? = some body) (code : CodeAt body 113 (armRepairCode))
-    (repairSpecs : ∀ i : Fin 4, specs[19 + i.val]? = some vector128ZeroSpec) (enabled : body.profile.advSimd = true)
-    (boundary : Nat) (entered current : Memory)
-    (inputs outputs : List Reference) (frame : Frame) (root : LocalSlot) (slots : List LocalSlot)
-    (layout : frame.locals = root :: slots) (args : List Value)
-    (currentCall : CallingConditions program current inputs outputs)
-    (enteredWF : entered.WellFormed) (homes : NumericHomes entered boundary specs slots)
-    (authority : AccessBelow entered.nextIdentity entered current)
-    (full : BitVec 128) (fullHome : Reference)
-    (fullSlot : frame.locals[21]? = some (.bytes .vector128 fullHome))
-    (fullRead : read current fullHome 16 1 = .ok (numberBytes full.toNat 16))
-    (propagation : BitVec 128) (propagationHome : Reference)
-    (propagationSlot : frame.locals[20]? = some (.bytes .vector128 propagationHome))
-    (propagationRead : read current propagationHome 16 1 = .ok (numberBytes propagation.toNat 16))
-    (post : Memory → List Value → Prop)
-    (continuation : ∀ reference after,
-      frame.locals[22]? = some (.bytes .vector128 reference) →
-      read after reference 16 1 = .ok (numberBytes (incoming128Low (full &&& propagation)).toNat 16) →
-      MemoryBelow boundary current after →
-      CallingConditions program after inputs outputs →
-      AccessBelow entered.nextIdentity entered after →
-      write current reference (numberBytes (incoming128Low (full &&& propagation)).toNat 16) 1 = .ok after →
-      ∃ fuel final returned,
-        run program fuel method 133 args frame [] after = .ok (final, returned) ∧ post final returned) :
-    ∃ fuel final returned,
-      run program fuel method 126 args frame [] current = .ok (final, returned) ∧ post final returned := by
-  first
-  | solve | simp [body.profile] at enabled
-  |
-    obtain ⟨reference, after, slot, loaded, retained, afterCall, afterAuthority, written, stored⟩ :=
-      vector128_local_store program body specs boundary entered current inputs outputs frame root slots layout currentCall
-        enteredWF homes authority 21 vector128ZeroSpec (repairSpecs 2)
-        (.v128 (incoming128Low (full &&& propagation))) (incoming128Low (full &&& propagation)).toNat rfl
-    have done := continuation reference after slot loaded retained afterCall afterAuthority written
-    have load_full := fun (pc : Nat) (stack : List Value) => step_load_numeric_local
-      (body := body) (args := args) (pc := pc) (stack := stack)
-      .vector128 (.v128 full) full.toNat rfl fullSlot fullRead
-    have load_propagation := fun (pc : Nat) (stack : List Value) => step_load_numeric_local
-      (body := body) (args := args) (pc := pc) (stack := stack)
-      .vector128 (.v128 propagation) propagation.toNat rfl propagationSlot propagationRead
-    have ones : CIL.evalIntrinsic (.vector (.ones 128)) [] = some (.v128 (~~~0)) := by rfl
-    repeat' first
-      | exact done
-      | (apply run_next_exists post found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
-         first
-         | exact load_full _ _
-         | exact load_propagation _ _
-         | exact stored _ _ _
-         | (simp (config := { implicitDefEqProofs := false })
-             [localResult, checkedIntrinsic, step, cil_guard, observerCount, enabled, pureArity, scalars, CIL.step.eq_def,
-               CIL.Intrinsic.available, ones, CIL.Vector.intrinsic_zero128, CIL.Vector.intrinsic_and128, CIL.Vector.intrinsic_adv_extract, incoming128_arm_low,
-               checkedValue, numericValue, Bind.bind, Except.bind, Pure.pure, Except.pure]
-            first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
+/-- The frame's locals remember the same vectors one slot after the root. -/
+theorem Vector128State.locals
+    (state : Vector128State program boundary entered start current inputs outputs slots values)
+    {frame : Frame} {root : LocalSlot} (layout : frame.locals = root :: slots) :
+    LocalSnapshots current frame.locals (knownLocals (none :: values)) := by
+  rw [layout]
+  exact state.snapshots.skip
 
-end UInt256Proof.Add.Safety
+/-- A remembered vector is an initialized sixteen-byte home holding exactly its bits. -/
+theorem Vector128State.read
+    (state : Vector128State program boundary entered start current inputs outputs slots values)
+    {index : Nat} {value : BitVec 128} (known : knownLocals values index = some (.v128 value)) :
+    ∃ reference, slots[index]? = some (.bytes .vector128 reference) ∧
+      read current reference 16 1 = .ok (numberBytes value.toNat 16) := by
+  obtain ⟨kind, home, stored, number, slot, fits, result, loaded⟩ := state.snapshots index _ known
+  have vector : kind = .vector128 ∧ number = value.toNat := by
+    cases kind <;> cases stored <;>
+      simp_all [localResult, localNumber, CIL.Value.hasUnspecified] <;>
+      (split at fits <;> simp_all)
+  obtain ⟨rfl, rfl⟩ := vector
+  exact ⟨home, slot, loaded⟩
 
-namespace UInt256Proof.Add.Safety
-open CIL.Safety UInt256Model.Safety UInt256Proof.AddSubtract.Safety CIL.Vector CIL.Vector
-
-/-- Both extra-propagation stores, preserving all earlier private snapshots. -/
-theorem vector128_arm_extra_pair (program : CIL.Program) (body : CIL.Method) (method : Nat) (specs : List NumericLocalSpec)
-    (found : program[method]? = some body) (code : CodeAt body 113 (armRepairCode))
-    (repairSpecs : ∀ i : Fin 4, specs[19 + i.val]? = some vector128ZeroSpec)  (baseSpecs : ∀ i : Fin 14, specs[i.val]? = some vector128ZeroSpec)  (enabled : body.profile.advSimd = true)
-    (boundary : Nat) (entered current : Memory)
-    (inputs outputs : List Reference) (frame : Frame) (root : LocalSlot) (slots : List LocalSlot)
-    (layout : frame.locals = root :: slots) (args : List Value)
-    (currentCall : CallingConditions program current inputs outputs)
-    (enteredWF : entered.WellFormed) (homes : NumericHomes entered boundary specs slots)
-    (authority : AccessBelow entered.nextIdentity entered current)
-    (result propagation : BitVec 128) (resultHome propagationHome : Reference)
-    (resultSlot : slots[10]? = some (.bytes .vector128 resultHome))
-    (propagationSlot : slots[19]? = some (.bytes .vector128 propagationHome))
-    (resultRead : read current resultHome 16 1 = .ok (numberBytes result.toNat 16))
-    (propagationRead : read current propagationHome 16 1 = .ok (numberBytes propagation.toNat 16))
-    (post : Memory → List Value → Prop)
-    (continuation : ∀ fullHome extraHome after,
-      slots[20]? = some (.bytes .vector128 fullHome) →
-      slots[21]? = some (.bytes .vector128 extraHome) →
-      read after fullHome 16 1 = .ok (numberBytes (full128 result).toNat 16) →
-      read after extraHome 16 1 = .ok (numberBytes (incoming128Low (full128 result &&& propagation)).toNat 16) →
-      (∀ i, i < 20 → ∀ reference bytes, slots[i]? = some (.bytes .vector128 reference) →
-        read current reference 16 1 = .ok bytes → read after reference 16 1 = .ok bytes) →
-      MemoryBelow boundary current after →
-      CallingConditions program after inputs outputs →
-      AccessBelow entered.nextIdentity entered after →
-      current.nextIdentity ≤ after.nextIdentity →
-      ∃ fuel final returned,
-        run program fuel method 133 args frame [] after = .ok (final, returned) ∧ post final returned) :
-    ∃ fuel final returned,
-      run program fuel method 122 args frame [] current = .ok (final, returned) ∧ post final returned := by
-  have actualResult : frame.locals[11]? = some (.bytes .vector128 resultHome) := by simpa [layout] using resultSlot
-  have actualPropagation : frame.locals[20]? = some (.bytes .vector128 propagationHome) := by simpa [layout] using propagationSlot
-  apply vector128_arm_full_mask program body method specs found code repairSpecs enabled boundary entered current inputs outputs frame root slots layout args
-    currentCall enteredWF homes authority result resultHome actualResult resultRead post
-  intro fullHome middle fullSlot fullRead preserved middleCall middleAuthority firstWrite
-  have fullTail : slots[20]? = some (.bytes .vector128 fullHome) := by simpa [layout] using fullSlot
-  have savedPropagation := vector128_prior_read specs entered current middle boundary slots homes 19 20 (by decide)
-    propagationHome fullHome propagationSlot fullTail _ _ firstWrite propagationRead
-  apply vector128_arm_extra_mask program body method specs found code repairSpecs enabled boundary entered middle inputs outputs frame root slots layout args
-    middleCall enteredWF homes middleAuthority (full128 result) fullHome fullSlot fullRead
-    propagation propagationHome actualPropagation savedPropagation post
-  intro extraHome after extraSlot extraRead kept afterCall afterAuthority secondWrite
-  have extraTail : slots[21]? = some (.bytes .vector128 extraHome) := by simpa [layout] using extraSlot
-  have savedFull := vector128_prior_read specs entered middle after boundary slots homes 20 21 (by decide)
-    fullHome extraHome fullTail extraTail _ _ secondWrite fullRead
-  have earlier : ∀ i, i < 20 → ∀ reference bytes,
-      slots[i]? = some (.bytes .vector128 reference) →
-      read current reference 16 1 = .ok bytes → read after reference 16 1 = .ok bytes := by
-    intro i bound reference bytes slot loaded
-    exact vector128_prior_read specs entered middle after boundary slots homes i 21 (by omega)
-      reference extraHome slot extraTail _ _ secondWrite
-      (vector128_prior_read specs entered current middle boundary slots homes i 20 bound
-        reference fullHome slot fullTail _ _ firstWrite loaded)
-  exact continuation fullHome extraHome after fullTail extraTail savedFull extraRead earlier
-    (preserved.trans kept) afterCall afterAuthority
-    (Nat.le_trans (write_extends_allocations _ _ _ _ _ firstWrite).next
-      (write_extends_allocations _ _ _ _ _ secondWrite).next)
-
-end UInt256Proof.Add.Safety
-
-namespace UInt256Proof.Add.Safety
-open CIL.Safety UInt256Model.Safety UInt256Proof.AddSubtract.Safety CIL.Vector CIL.Vector
-
-/-- Check the repair OR or high-result subtraction, including an initialized readback when the subtraction overwrites its existing private home. -/
-theorem vector128_arm_repair_value (program : CIL.Program) (body : CIL.Method) (method : Nat) (specs : List NumericLocalSpec)
-    (found : program[method]? = some body) (code : CodeAt body 113 (armRepairCode))
-    (repairSpecs : ∀ i : Fin 4, specs[19 + i.val]? = some vector128ZeroSpec)  (baseSpecs : ∀ i : Fin 14, specs[i.val]? = some vector128ZeroSpec)  (enabled : body.profile.advSimd = true)
-    (boundary : Nat) (entered current : Memory)
-    (inputs outputs : List Reference) (frame : Frame) (root : LocalSlot) (slots : List LocalSlot)
-    (layout : frame.locals = root :: slots) (args : List Value)
-    (currentCall : CallingConditions program current inputs outputs)
-    (enteredWF : entered.WellFormed) (homes : NumericHomes entered boundary specs slots)
-    (authority : AccessBelow entered.nextIdentity entered current)
-    (subtract : Bool) (left right : BitVec 128) (leftHome rightHome : Reference)
-    (leftSlot : frame.locals[if subtract then 11 else 20]? = some (.bytes .vector128 leftHome))
-    (rightSlot : frame.locals[if subtract then 23 else 22]? = some (.bytes .vector128 rightHome))
-    (leftRead : read current leftHome 16 1 = .ok (numberBytes left.toNat 16))
-    (rightRead : read current rightHome 16 1 = .ok (numberBytes right.toNat 16))
-    (post : Memory → List Value → Prop)
-    (continuation : ∀ reference after,
-      frame.locals[if subtract then 11 else 23]? = some (.bytes .vector128 reference) →
-      read after reference 16 1 = .ok (numberBytes (if subtract then corrected128 left right else left ||| right).toNat 16) →
-      MemoryBelow boundary current after →
-      CallingConditions program after inputs outputs →
-      AccessBelow entered.nextIdentity entered after →
-      write current reference (numberBytes (if subtract then corrected128 left right else left ||| right).toNat 16) 1 = .ok after →
-      ∃ fuel final returned,
-        run program fuel method (if subtract then 149 else 137) args frame [] after =
-          .ok (final, returned) ∧ post final returned) :
-    ∃ fuel final returned,
-      run program fuel method (if subtract then 145 else 133) args frame [] current =
-        .ok (final, returned) ∧ post final returned := by
-  first
-  | solve | simp [body.profile] at enabled
-  |
-    have specified : specs[if subtract then 10 else 22]? = some vector128ZeroSpec := by
-      cases subtract <;> exact (by first | exact repairSpecs 3 | exact baseSpecs 10)
-    obtain ⟨reference, after, slot, loaded, retained, afterCall, afterAuthority, written, stored⟩ :=
-      vector128_local_store program body specs boundary entered current inputs outputs frame root slots layout currentCall
-        enteredWF homes authority _ vector128ZeroSpec specified
-        (.v128 (if subtract then corrected128 left right else left ||| right))
-        (if subtract then corrected128 left right else left ||| right).toNat rfl
-    have actual : frame.locals[if subtract then 11 else 23]? = some (.bytes .vector128 reference) := by
-      cases subtract <;> exact slot
-    have done := continuation reference after actual loaded retained afterCall afterAuthority written
-    have loadLeft := fun (pc : Nat) (stack : List Value) => step_load_numeric_local
-      (body := body) (args := args) (pc := pc) (stack := stack)
-      .vector128 (.v128 left) left.toNat rfl leftSlot leftRead
-    have loadRight := fun (pc : Nat) (stack : List Value) => step_load_numeric_local
-      (body := body) (args := args) (pc := pc) (stack := stack)
-      .vector128 (.v128 right) right.toNat rfl rightSlot rightRead
-    cases subtract <;> simp only [Bool.false_eq_true, ite_false, ite_true] at stored loadLeft loadRight done ⊢
-    all_goals
-      repeat' first
-        | exact done
-        | (apply run_next_exists post found (by (conv => lhs; arg 2; whnf); cil_lookup [code])
-           first
-           | exact loadLeft _ _
-           | exact loadRight _ _
-           | exact stored _ _ _
-           | (simp (config := { implicitDefEqProofs := false })
-               [localResult, checkedIntrinsic, step, cil_guard, observerCount, enabled, pureArity, scalars, CIL.step.eq_def, CIL.Intrinsic.available,
-                 CIL.Vector.intrinsic_sub128, CIL.Vector.intrinsic_or128, corrected128,
-                 checkedValue, numericValue, Bind.bind, Except.bind, Pure.pure, Except.pure]
-              first | rfl | exact ⟨rfl, rfl, rfl, rfl⟩))
+/-- A checked private vector store remembers the value and keeps the caller guarantees. -/
+theorem Vector128State.store
+    (state : Vector128State program boundary entered start current inputs outputs slots values)
+    (body : CIL.Method) {specs : List NumericLocalSpec} {frame : Frame} {root : LocalSlot}
+    (layout : frame.locals = root :: slots) (enteredWF : entered.WellFormed)
+    (homes : NumericHomes entered boundary specs slots) (index : Nat) (behindRoot : 0 < index)
+    (specified : specs[index - 1]? = some vector128ZeroSpec)
+    (present : index - 1 < values.length) (value : BitVec 128) :
+    ∃ after, Vector128State program boundary entered start after inputs outputs slots
+        (values.set (index - 1) (some (.v128 value))) ∧
+      ∀ pc args rest, step body (.setLocal index) pc args frame
+        (.scalar (.v128 value) :: rest) current = .ok (.next (pc + 1) rest frame after) := by
+  obtain ⟨home, after, slot, _, kept, call, authority, written, stepped⟩ :=
+    vector128_local_store program body specs boundary entered current inputs outputs frame root
+      slots layout state.call enteredWF homes state.authority (index - 1) vector128ZeroSpec
+      specified (.v128 value) value.toNat rfl
+  rw [Nat.sub_add_cancel behindRoot] at slot stepped
+  refine ⟨after, ⟨call, state.preserved.trans kept, authority,
+    Nat.le_trans state.advanced (write_extends_allocations _ _ _ _ _ written).next, ?_⟩, stepped⟩
+  rw [← rememberLocal_knownLocals present]
+  refine state.snapshots.after_write homes.writable (index - 1) .vector128 home (.v128 value)
+    value.toNat rfl ?_ written
+  obtain ⟨tail, rfl⟩ : ∃ tail, index = tail + 1 := ⟨index - 1, by omega⟩
+  simpa [layout, vector128ZeroSpec] using slot
 
 end UInt256Proof.Add.Safety

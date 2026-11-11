@@ -4,46 +4,6 @@ set_option maxRecDepth 4096
 namespace UInt256Proof.Add.Safety
 open CIL.Safety UInt256Model.Safety
 
-/-- The scalar dispatcher calls the certified small helper and forwards its proved scalar flag. -/
-theorem arm_small_parent_call (program : CIL.Program) (method vectorIndex smallIndex storage : Nat) (profile : CIL.FeatureProfile) (found : program[method]? = some (armScalarBody profile vectorIndex smallIndex)) (smallFound : program[smallIndex]? = some (armSmallBody profile storage)) (storageFound : program[storage]? = some (UInt256Proof.Multiply.LimbStorage.body profile)) (enabled : profile.advSimd = true)
-    (memory : Memory) (input output : Reference) (word : BitVec 64) (frame : Frame)
-    (args : List Value) (call : CallingConditions program memory [input] [output])
-    (post : Memory → List Value → Prop)
-    (continuation : ∀ childFuel final returned,
-      InvocationCertificate program smallIndex
-        (armSmallArguments input output word) memory childFuel final returned →
-      ARMSmallPost memory final returned input output word →
-      post (leaveFrame frame final) returned) :
-    ∃ fuel final returned,
-      run program fuel method 39 args frame
-        [.reference (.address output), .scalar (.i64 word), .reference (.address input)] memory =
-          .ok (final, returned) ∧ post final returned := by
-    obtain ⟨childFuel, final, returned, certified, result⟩ :=
-      checked_arm_small_contract program smallIndex storage profile smallFound storageFound enabled memory input output word call
-    have fi := call.input_formed (reference := input) (by simp)
-    have fo := call.output_formed (reference := output) (by simp)
-    have fetched : (armScalarBody profile vectorIndex smallIndex).code[39]? = some (.call smallIndex 3) := by rfl
-    have stepped : step (armScalarBody profile vectorIndex smallIndex) (.call smallIndex 3) 39 args frame
-        [.reference (.address output), .scalar (.i64 word), .reference (.address input)] memory =
-          .ok (.call smallIndex (armSmallArguments input output word) [] memory) := by
-      simp [step, cil_guard, observerCount, armSmallArguments, checkedValue, numericValue, formValue, fi, fo,
-        checkedAt, Except.mapError, Bind.bind, Except.bind, Pure.pure, Except.pure]
-    have returnedRun : run program 1 method 40 args frame (returned ++ []) final =
-        .ok (leaveFrame frame final, returned) := by
-      rw [result.flag]
-      split <;> simp [run, found, armScalarBody, step, cil_guard, observerCount, checkedValue, numericValue, List.mapM, Except.mapError,
-        Bind.bind, Except.bind, Pure.pure, Except.pure]
-      all_goals rfl
-    obtain ⟨fuel, executed⟩ := run_call_exists found fetched stepped
-      ⟨childFuel, certified.1⟩ ⟨1, returnedRun⟩
-    exact ⟨fuel, leaveFrame frame final, returned, executed,
-      continuation childFuel final returned certified result⟩
-
-end UInt256Proof.Add.Safety
-
-namespace UInt256Proof.Add.Safety
-open CIL.Safety UInt256Model.Safety
-
 theorem arm_scalar_small_value (memory : Memory) (input : Reference)
     (small : armScalarUpper memory input = BitVec.ofNat 64 0) :
     inputValue memory input = BitVec.ofNat 256 (inputLimb memory input 0).toNat := by
@@ -128,16 +88,33 @@ theorem arm_scalar_small_finish (program : CIL.Program) (method vectorIndex smal
     ∃ fuel final returned,
       run program fuel method 36 args frame [] current = .ok (final, returned) ∧
       ARMScalarReportingPost original final returned left right output flag := by
-  let post := fun final returned => ARMScalarReportingPost original final returned left right output flag
-  apply arm_scalar_small_arguments program method vectorIndex smallIndex profile found enabled current frame args source output home word root slot loaded
-    (currentCall.input_formed (by simp)) outputArg (currentCall.output_formed (by simp)) post
-  apply arm_small_parent_call program method vectorIndex smallIndex storage profile found smallFound storageFound enabled current source output word frame args currentCall post
-  intro childFuel final returned certified result
-  refine ⟨arm_scalar_retire original current final frame left right output returned call preserved next owned
-    result.wellFormed (result.value.trans sum) ⟨_, result.flag⟩ result.writable result.footprint, ?_⟩
-  intro _
-  simpa only [naturalSum] using result.flag
-
+  obtain ⟨childFuel, final, returned, certified, result⟩ := checked_arm_small_contract program
+    smallIndex storage profile smallFound storageFound enabled current source output word
+    currentCall
+  obtain ⟨carry, shaped⟩ : ∃ carry, returned = [.scalar (.i32 carry)] := ⟨_, result.flag⟩
+  subst shaped
+  have carryFit : CIL.NarrowKind.unsigned8.extend carry = carry := by
+    rw [CIL.Value.i32.inj (Value.scalar.inj (List.cons.inj result.flag).1)]
+    exact CIL.NarrowKind.extend_ite_one_zero _ _
+  have reported := result.flag
+  simp only [naturalSum] at reported
+  have sourceFormed := currentCall.input_formed (reference := source) (by simp)
+  have outputFormed := currentCall.output_formed (reference := output) (by simp)
+  have wordLoad := fun (pc : Nat) (stack : List Value) => step_load_word64
+    (body := armScalarBody profile vectorIndex smallIndex) (pc := pc) (args := args)
+    (stack := stack) slot loaded
+  apply WP.exists_execution
+  cil_contract_steps 3 [found, root, wordLoad, outputArg, sourceFormed, outputFormed]
+  apply WP.adequate.mp
+  apply WP.call (helperPost := fun reached =>
+      reached.1 = final ∧ reached.2 = [.scalar (.i32 carry)]) found (by rfl)
+    (by cil_checked_step [armSmallArguments, sourceFormed, outputFormed])
+    ⟨childFuel, _, certified.1, rfl, rfl⟩
+  rintro _ _ ⟨rfl, rfl⟩
+  cil_contract_steps [found, carryFit]
+  exact ⟨arm_scalar_retire original current _ frame left right output _ call preserved next
+    owned result.wellFormed (result.value.trans sum) ⟨_, rfl⟩ result.writable result.footprint,
+    fun _ => reported⟩
 /-- The vector route yields the same wrapping postcondition after parent retirement. -/
 theorem arm_scalar_vector_finish (program : CIL.Program) (method vectorIndex smallIndex storage : Nat) (profile : CIL.FeatureProfile) (found : program[method]? = some (armScalarBody profile vectorIndex smallIndex)) (vectorFound : program[vectorIndex]? = some (armBody profile)) (smallFound : program[smallIndex]? = some (armSmallBody profile storage)) (storageFound : program[storage]? = some (UInt256Proof.Multiply.LimbStorage.body profile)) (enabled : profile.advSimd = true)
     (original current : Memory) (frame : Frame) (left right output : Reference) (flag : BitVec 32) (flagFit : CIL.NarrowKind.unsigned8.extend flag = flag)
@@ -149,22 +126,34 @@ theorem arm_scalar_vector_finish (program : CIL.Program) (method vectorIndex sma
     ∃ fuel final returned,
       run program fuel method 25 (vector128Arguments left right output flag)
         frame [] current = .ok (final, returned) ∧ ARMScalarReportingPost original final returned left right output flag := by
-  let post := fun final returned => ARMScalarReportingPost original final returned left right output flag
-  apply vector128_arm_parent_call program method vectorIndex smallIndex profile found vectorFound enabled current left right output flag flagFit frame currentCall post
-  intro childFuel final returnedFlag certified result overflow writable footprint
-  have wellFormed := invoke_preserves_wellFormed _ _ _ _ _ _ _ currentCall.1.1 certified.1
-  have keptLeft : inputValue current left = inputValue original left := by
-    simp only [inputValue, call.input_bytes_of_memory_below preserved (reference := left) (by simp)]
-  have keptRight : inputValue current right = inputValue original right := by
-    simp only [inputValue, call.input_bytes_of_memory_below preserved (reference := right) (by simp)]
-  rw [keptLeft, keptRight] at result
-  refine ⟨arm_scalar_retire original current final frame left right output [.scalar (.i32 returnedFlag)]
-    call preserved next owned wellFormed result ⟨returnedFlag, rfl⟩ writable
-    (fun id old offset untouched => footprint id offset old untouched), ?_⟩
-  intro reporting
-  have exactFlag := overflow reporting
-  rw [keptLeft, keptRight] at exactFlag
-  rw [exactFlag]
+  obtain ⟨childFuel, final, returnedFlag, certified, result, returnedFit, overflow, writable,
+    footprint⟩ := arm_helper_checked_with_flag profile enabled program vectorIndex vectorFound
+      current left right output flag flagFit currentCall
+  have leftFormed := currentCall.input_formed (reference := left) (by simp)
+  have rightFormed := currentCall.input_formed (reference := right) (by simp)
+  have outputFormed := currentCall.output_formed (reference := output) (by simp)
+  have kept : ∀ reference ∈ [left, right],
+      inputValue current reference = inputValue original reference := fun reference member => by
+    simp only [inputValue, call.input_bytes_of_memory_below preserved member]
+  rw [kept left (by simp), kept right (by simp)] at result overflow
+  have called : WP (Execution (fun fuel => run program fuel method 29
+      (vector128Arguments left right output flag) frame
+      [.scalar (.i32 flag), .reference (.address output), .reference (.address right),
+        .reference (.address left)] current))
+      (fun reached => ARMScalarReportingPost original reached.1 reached.2 left right output
+        flag) := by
+    apply WP.call (helperPost := fun reached =>
+        reached.1 = final ∧ reached.2 = [.scalar (.i32 returnedFlag)]) found (by rfl)
+      (by cil_checked_step [vector128Arguments, flagFit, leftFormed, rightFormed, outputFormed])
+      ⟨childFuel, _, certified.1, rfl, rfl⟩
+    rintro _ _ ⟨rfl, rfl⟩
+    cil_contract_steps [found, returnedFit]
+    exact ⟨arm_scalar_retire original current _ frame left right output _ call preserved next
+      owned (invoke_preserves_wellFormed _ _ _ _ _ _ _ currentCall.1.1 certified.1) result
+      ⟨returnedFlag, rfl⟩ writable (fun id old offset untouched => footprint id offset old
+        untouched), fun reporting => by rw [overflow reporting]⟩
+  cil_contract_steps [found, vector128Arguments, flagFit, leftFormed, rightFormed, outputFormed]
+    until called
 
 end UInt256Proof.Add.Safety
 
