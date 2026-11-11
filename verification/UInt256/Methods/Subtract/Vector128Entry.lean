@@ -13,7 +13,7 @@ def subtractVectorBody (profile : CIL.FeatureProfile) (borrow storage : Nat) : C
     localKinds := [.reference, .vector128, .vector128, .vector128, .vector128, .vector128, .vector128, .vector128,
       .vector128, .vector128, .vector128, .word64, .word64, .word64, .word64, .word64],
     parameterHomes := [], staticSites := [],
-    code := vector128PrefixCode ++ subtractStartCode ++ subtractIncomingCode profile.advSimd ++
+    code := vector128PrefixCode ++ subtractStartCode ++ incomingCode profile.advSimd 38 6 ++
       subtractDecisionCode ++ subtractRepairCode borrow storage ++ subtractFastCode }
 
 def subtractVectorSpecs : List CIL.Safety.NumericLocalSpec :=
@@ -38,40 +38,6 @@ end UInt256Proof.Subtract.Profile
 
 namespace UInt256Proof.Subtract.Profile
 open CIL.Safety UInt256Model.Safety UInt256Proof.AddSubtract.Safety UInt256Proof.Subtract.Safety CIL.Vector UInt256Proof
-
-/-- Initial operand halves as the first four saved snapshots. -/
-theorem subtract_initial_state (program : CIL.Program) (original entered current : Memory)
-    (left right output : Reference) (slots : List LocalSlot) (l0 l1 r0 r1 : Reference)
-    (s0 : slots[0]? = some (.bytes .vector128 l0)) (s1 : slots[1]? = some (.bytes .vector128 l1))
-    (s2 : slots[2]? = some (.bytes .vector128 r0)) (s3 : slots[3]? = some (.bytes .vector128 r1))
-    (read0 : read current l0 16 1 = .ok (numberBytes (inputHalf original left 0).toNat 16))
-    (read1 : read current l1 16 1 = .ok (numberBytes (inputHalf original left 1).toNat 16))
-    (read2 : read current r0 16 1 = .ok (numberBytes (inputHalf original right 0).toNat 16))
-    (read3 : read current r1 16 1 = .ok (numberBytes (inputHalf original right 1).toNat 16))
-    (preserved : MemoryBelow original.nextIdentity original current)
-    (currentCall : CallingConditions program current [left, right] [output])
-    (authority : AccessBelow entered.nextIdentity entered current) :
-    SubtractVectorState program original entered current [left, right] [output] slots
-      (subtractInputValues original left right) 4 := by
-  obtain ⟨v0, v1, v2, v3⟩ := subtract_input_values original left right
-  refine ⟨currentCall, preserved, authority, ?_⟩
-  intro i lower
-  obtain ⟨i, bound⟩ := i
-  have small : i < 4 := lower
-  have cases : i = 0 ∨ i = 1 ∨ i = 2 ∨ i = 3 := by omega
-  rcases cases with rfl | rfl | rfl | rfl
-  · exact ⟨l0, s0, by
-      change read current l0 16 1 = .ok (numberBytes (subtractInputValues original left right 0).toNat 16)
-      rw [v0]; exact read0⟩
-  · exact ⟨l1, s1, by
-      change read current l1 16 1 = .ok (numberBytes (subtractInputValues original left right 1).toNat 16)
-      rw [v1]; exact read1⟩
-  · exact ⟨r0, s2, by
-      change read current r0 16 1 = .ok (numberBytes (subtractInputValues original left right 2).toNat 16)
-      rw [v2]; exact read2⟩
-  · exact ⟨r1, s3, by
-      change read current r1 16 1 = .ok (numberBytes (subtractInputValues original left right 3).toNat 16)
-      rw [v3]; exact read3⟩
 
 /-- Fast-path facts denote the independent difference and underflow of the initial operands. -/
 theorem subtract_fast_result (original final : Memory) (left right output : Reference) (returned : List Value)
@@ -141,28 +107,32 @@ theorem subtract_vector_entry (program : CIL.Program) (method borrow storage : N
   have fresh := enterFrame_fresh _ _ _ _ _ setup
   have owned : ∀ id ∈ saved.owned, original.nextIdentity ≤ id := fun id member => (fresh.2 id member).1
   let post := fun final returned => SubtractResult original final returned left right output
+  obtain ⟨leftLow, leftHigh, rightLow, rightHigh⟩ := subtract_input_values original left right
   apply vector128_inputs_checked program body method subtractVectorSpecs found
     (by cases selected : profile.advSimd <;> simp only [CodeAt, body, subtractVectorBody, selected] <;> rfl) subtract_vector_first_four
     original entered [left, right] [output] left right frame slots args call setup layout homes
-    (by simp) (by simp) leftArg rightArg post
-  intro l0 l1 r0 r1 current s0 s1 s2 s3 read0 read1 read2 read3 preserved currentCall authority _
-  have state := subtract_initial_state program original entered current left right output slots l0 l1 r0 r1
-    s0 s1 s2 s3 read0 read1 read2 read3 preserved currentCall authority
+    (by simp) (by simp) leftArg rightArg (subtractSnapshot values) leftLow leftHigh rightLow
+    rightHigh post
+  intro current state
   apply subtract_start_checked program body method subtractVectorSpecs found (by cases selected : profile.advSimd <;> simp only [CodeAt, body, subtractVectorBody, selected] <;> rfl) subtract_vector_specs
     original entered current [left, right] [output] saved _ slots savedLayout args enteredWF homes values state post
   intro m8 s8
-  apply subtract_incoming_checked program body method subtractVectorSpecs found
-    (by cases selected : profile.advSimd <;> simp only [CodeAt, body, subtractVectorBody, selected] <;> rfl) sse ssse subtract_vector_specs
-    original entered m8 [left, right] [output] saved _ slots savedLayout args enteredWF homes values s8 post
+  apply vector128_incoming_checked program body method subtractVectorSpecs found 38 6
+    (by cases selected : profile.advSimd <;>
+      simp only [CodeAt, body, subtractVectorBody, selected] <;> rfl) sse ssse
+    (subtract_vector_specs 8) (subtract_vector_specs 9) original.nextIdentity original entered m8
+    [left, right] [output] saved _ slots savedLayout args [] enteredWF homes
+    (subtractSnapshot values) rfl rfl s8 post
   intro m10 s10
   apply subtract_decision_checked program body method found
     (by cases selected : profile.advSimd <;> simp only [CodeAt, body, subtractVectorBody, selected] <;> rfl)
-    original entered m10 [left, right] [output] saved _ slots savedLayout args values s10 post
+    m10 saved _ slots savedLayout args values s10.snapshots post
   by_cases fast : subtractPropagation values = BitVec.ofNat 128 0
   · simp only [fast, ite_true]
     obtain ⟨fuel, final, returned, executed, wellFormed, flag, lowRead, highRead, writable, footprint⟩ :=
       subtract_fast_checked program body method subtractVectorSpecs found
-        (by cases selected : profile.advSimd <;> simp only [CodeAt, body, subtractVectorBody, selected] <;> rfl) rfl subtract_vector_specs
+        (by cases selected : profile.advSimd <;>
+          simp only [CodeAt, body, subtractVectorBody, selected] <;> rfl) rfl
         original entered m10 [left, right] [output] output saved _ slots savedLayout args call (by simp) outputArg
         homes values s10 owned
     exact ⟨fuel, final, returned, executed,

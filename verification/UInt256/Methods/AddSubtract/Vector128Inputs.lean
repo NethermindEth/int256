@@ -76,7 +76,6 @@ theorem vector128_prior_read (specs : List NumericLocalSpec) (entered before aft
   have ordered := homes.ordered i j .vector128 .vector128 source target earlier sourceSlot targetSlot
   exact write_preserves_disjoint_read written loaded (Or.inl (Nat.ne_of_lt ordered))
 
-
 def vector128PrefixCode : List CIL.Op := [
   .arg 0, .memory .asRef, .memory .asRef, .arg 1, .memory .asRef, .memory .asRef, .setLocal 0,
   .dup, .memory .load128, .setLocal 1,
@@ -89,12 +88,81 @@ def vector128ZeroSpec : NumericLocalSpec := ⟨.vector128, .v128 0, 0, rfl⟩
 def vector128SavedFrame (frame : Frame) (slots : List LocalSlot) (right : Reference) : Frame :=
   { frame with locals := .root (some (.address right)) :: slots }
 
+/-- The first `done` private vector homes hold the saved values `value`. -/
+abbrev VectorSnapshots (memory : Memory) (slots : List LocalSlot) (value : Nat → BitVec 128)
+    (done : Nat) : Prop :=
+  ∀ i, i < done → ∃ reference, slots[i]? = some (.bytes .vector128 reference) ∧
+    read memory reference 16 1 = .ok (numberBytes (value i).toNat 16)
+
+/-- Caller views and saved private vectors while a Vector128 helper runs. Storage of `base`
+    below `boundary` is intact, so facts about `base` survive every private store. -/
+structure VectorState (program : CIL.Program) (boundary : Nat) (base entered current : Memory)
+    (inputs outputs : List Reference) (slots : List LocalSlot) (value : Nat → BitVec 128)
+    (done : Nat) : Prop where
+  call : CallingConditions program current inputs outputs
+  preserved : MemoryBelow boundary base current
+  authority : AccessBelow entered.nextIdentity entered current
+  advanced : entered.nextIdentity ≤ current.nextIdentity
+  snapshots : VectorSnapshots current slots value done
+
+/-- Storing the next saved value keeps every earlier private snapshot and all caller facts. -/
+theorem VectorState.store {program : CIL.Program} {boundary : Nat} {base entered current : Memory}
+    {inputs outputs : List Reference} {slots : List LocalSlot} {value : Nat → BitVec 128}
+    {done : Nat}
+    (state : VectorState program boundary base entered current inputs outputs slots value done)
+    (body : CIL.Method) (specs : List NumericLocalSpec) (frame : Frame) (root : LocalSlot)
+    (layout : frame.locals = root :: slots) (enteredWF : entered.WellFormed)
+    (homes : NumericHomes entered boundary specs slots)
+    (specified : specs[done]? = some vector128ZeroSpec) (stored : BitVec 128)
+    (same : value done = stored) :
+    ∃ after,
+      VectorState program boundary base entered after inputs outputs slots value (done + 1) ∧
+      ∀ pc args rest, step body (.setLocal (done + 1)) pc args frame
+        (.scalar (.v128 stored) :: rest) current = .ok (.next (pc + 1) rest frame after) := by
+  obtain ⟨home, after, slot, loaded, retained, afterCall, afterAuthority, written, stepped⟩ :=
+    vector128_local_store program body specs boundary entered current inputs outputs frame root
+      slots layout state.call enteredWF homes state.authority done vector128ZeroSpec specified
+      (.v128 stored) stored.toNat rfl
+  have homeSlot : slots[done]? = some (.bytes .vector128 home) := by
+    simpa [layout, vector128ZeroSpec] using slot
+  refine ⟨after, ⟨afterCall, state.preserved.trans retained, afterAuthority,
+    Nat.le_trans state.advanced (write_extends_allocations _ _ _ _ _ written).next, ?_⟩, stepped⟩
+  intro i lower
+  by_cases last : i = done
+  · subst last
+    exact ⟨home, homeSlot, by rw [same]; exact loaded⟩
+  · obtain ⟨source, sourceSlot, sourceRead⟩ := state.snapshots i (by omega)
+    exact ⟨source, sourceSlot, vector128_prior_read specs entered current after boundary slots
+      homes i done (by omega) source home sourceSlot homeSlot _ _ written sourceRead⟩
+
+/-- A saved vector loads as its recorded value. -/
+theorem VectorSnapshots.load {memory : Memory} {slots : List LocalSlot}
+    {value : Nat → BitVec 128} {done : Nat} (snapshots : VectorSnapshots memory slots value done)
+    (frame : Frame) (root : LocalSlot) (layout : frame.locals = root :: slots)
+    (i : Nat) (lower : i < done) (body : CIL.Method) (pc : Nat) (args stack : List Value) :
+    step body (.local (i + 1)) pc args frame stack memory =
+      .ok (.next (pc + 1) (.scalar (.v128 (value i)) :: stack) frame memory) := by
+  obtain ⟨home, slot, loaded⟩ := snapshots i lower
+  exact step_load_numeric_local .vector128 (.v128 _) _ rfl (by simpa [layout] using slot) loaded
+
+/-- Fresh private homes keep their snapshots across writes that spare fresh allocations. -/
+theorem VectorSnapshots.transfer {entered before after : Memory} {boundary : Nat}
+    {specs : List NumericLocalSpec} {slots : List LocalSlot} {value : Nat → BitVec 128}
+    {done : Nat} (snapshots : VectorSnapshots before slots value done)
+    (homes : NumericHomes entered boundary specs slots)
+    (kept : ∀ reference, boundary ≤ reference.allocation → ∀ bytes,
+      read before reference 16 1 = .ok bytes → read after reference 16 1 = .ok bytes) :
+    VectorSnapshots after slots value done := by
+  intro i lower
+  obtain ⟨home, slot, loaded⟩ := snapshots i lower
+  exact ⟨home, slot, kept home (homes.home_bound i .vector128 home slot) _ loaded⟩
+
 /-- Save all four initial input halves before arithmetic or caller output writes. -/
-theorem vector128_inputs_checked (program : CIL.Program) (body : CIL.Method) (method : Nat) (specs : List NumericLocalSpec)
-    (found : program[method]? = some body) (code : CodeAt body 0 (vector128PrefixCode))
+theorem vector128_inputs_checked (program : CIL.Program) (body : CIL.Method) (method : Nat)
+    (specs : List NumericLocalSpec) (found : program[method]? = some body)
+    (code : CodeAt body 0 vector128PrefixCode)
     (firstFour : ∀ i : Fin 4, specs[i.val]? = some vector128ZeroSpec)
-    (original entered : Memory)
-    (inputs outputs : List Reference) (left right : Reference)
+    (original entered : Memory) (inputs outputs : List Reference) (left right : Reference)
     (frame : Frame) (slots : List LocalSlot) (args : List Value)
     (call : CallingConditions program original inputs outputs)
     (setup : enterFrame body args original = .ok (frame, entered))
@@ -103,20 +171,15 @@ theorem vector128_inputs_checked (program : CIL.Program) (body : CIL.Method) (me
     (leftMember : left ∈ inputs) (rightMember : right ∈ inputs)
     (leftArg : args[0]? = some (.reference (.address left)))
     (rightArg : args[1]? = some (.reference (.address right)))
+    (value : Nat → BitVec 128)
+    (leftLow : value 0 = inputHalf original left 0)
+    (leftHigh : value 1 = inputHalf original left 1)
+    (rightLow : value 2 = inputHalf original right 0)
+    (rightHigh : value 3 = inputHalf original right 1)
     (post : Memory → List Value → Prop)
-    (continuation : ∀ l0 l1 r0 r1 after,
-      slots[0]? = some (.bytes .vector128 l0) →
-      slots[1]? = some (.bytes .vector128 l1) →
-      slots[2]? = some (.bytes .vector128 r0) →
-      slots[3]? = some (.bytes .vector128 r1) →
-      read after l0 16 1 = .ok (numberBytes (inputHalf original left 0).toNat 16) →
-      read after l1 16 1 = .ok (numberBytes (inputHalf original left 1).toNat 16) →
-      read after r0 16 1 = .ok (numberBytes (inputHalf original right 0).toNat 16) →
-      read after r1 16 1 = .ok (numberBytes (inputHalf original right 1).toNat 16) →
-      MemoryBelow original.nextIdentity original after →
-      CallingConditions program after inputs outputs →
-      AccessBelow entered.nextIdentity entered after →
-      entered.nextIdentity ≤ after.nextIdentity →
+    (continuation : ∀ after,
+      VectorState program original.nextIdentity original entered after inputs outputs slots
+        value 4 →
       ∃ fuel result returned,
         run program fuel method 22 args (vector128SavedFrame frame slots right) [] after =
           .ok (result, returned) ∧ post result returned) :
@@ -124,53 +187,35 @@ theorem vector128_inputs_checked (program : CIL.Program) (body : CIL.Method) (me
       run program fuel method 0 args frame [] entered =
         .ok (result, returned) ∧ post result returned := by
   have enteredCall := call.after_frame_setup setup
-  have preserved := enterFrame_preserves_caller_memory _ _ _ _ _ setup
-  have store := fun current (currentCall : CallingConditions program current inputs outputs)
-      (authority : AccessBelow entered.nextIdentity entered current) (index : Fin 4)
-      (half : BitVec 128) =>
-    vector128_local_store program body specs original.nextIdentity entered current inputs outputs
-      (vector128SavedFrame frame slots right) _ slots rfl currentCall enteredCall.1.1 homes
-      authority index.val vector128ZeroSpec (firstFour index) (.v128 half) half.toNat rfl
-  obtain ⟨l0, m0, s0, read0, p0, c0, a0, w0, store0⟩ := store entered enteredCall
-    (MemoryBelow.refl _ _).accessBelow 0 (inputHalf original left 0)
-  obtain ⟨l1, m1, s1, read1, p1, c1, a1, w1, store1⟩ :=
-    store m0 c0 a0 1 (inputHalf original left 1)
-  obtain ⟨r0, m2, s2, read2, p2, c2, a2, w2, store2⟩ :=
-    store m1 c1 a1 2 (inputHalf original right 0)
-  obtain ⟨r1, m3, s3, read3, p3, c3, a3, w3, store3⟩ :=
-    store m2 c2 a2 3 (inputHalf original right 1)
-  have kept0 := preserved.trans p0
-  have kept1 := kept0.trans p1
-  have kept2 := kept1.trans p2
-  have load0 := vector128_input_load program original entered inputs outputs left 0 call
-    enteredCall leftMember preserved
-  have load1 := vector128_input_load program original m0 inputs outputs left 1 call c0
-    leftMember kept0
-  have load2 := vector128_input_load program original m1 inputs outputs right 0 call c1
-    rightMember kept1
-  have load3 := vector128_input_load program original m2 inputs outputs right 1 call c2
-    rightMember kept2
-  have upperLeft := c0.input_half_address leftMember 1
-  have upperRight := c2.input_half_address rightMember 1
+  have store := fun current done (state : VectorState program original.nextIdentity original
+      entered current inputs outputs slots value done) (declared : done < 4) stored same =>
+    state.store body specs (vector128SavedFrame frame slots right) _ rfl enteredCall.1.1 homes
+      (firstFour ⟨done, declared⟩) stored same
+  obtain ⟨m0, s0, store0⟩ := store entered 0 ⟨enteredCall,
+    enterFrame_preserves_caller_memory _ _ _ _ _ setup, (MemoryBelow.refl _ _).accessBelow,
+    Nat.le_refl _, fun _ lower => absurd lower (Nat.not_lt_zero _)⟩ (by decide) _ leftLow
+  obtain ⟨m1, s1, store1⟩ := store m0 1 s0 (by decide) _ leftHigh
+  obtain ⟨m2, s2, store2⟩ := store m1 2 s1 (by decide) _ rightLow
+  obtain ⟨m3, s3, store3⟩ := store m2 3 s2 (by decide) _ rightHigh
+  have load := fun current (currentCall : CallingConditions program current inputs outputs)
+      (kept : MemoryBelow original.nextIdentity original current) input member half =>
+    vector128_input_load program original current inputs outputs input half call currentCall
+      member kept
+  have load0 := load entered enteredCall (enterFrame_preserves_caller_memory _ _ _ _ _ setup)
+    left leftMember 0
+  have load1 := load m0 s0.call s0.preserved left leftMember 1
+  have load2 := load m1 s1.call s1.preserved right rightMember 0
+  have load3 := load m2 s2.call s2.preserved right rightMember 1
+  have upperLeft := s0.call.input_half_address leftMember 1
+  have upperRight := s2.call.input_half_address rightMember 1
   have rightRoot : (vector128SavedFrame frame slots right).locals[0]? =
       some (.root (some (.address right))) := rfl
-  have earlier := fun before after i j (lower : i < j) source target sourceSlot targetSlot =>
-    vector128_prior_read specs entered before after _ slots homes i j lower source target
-      sourceSlot targetSlot
-  have done := continuation l0 l1 r0 r1 m3 s0 s1 s2 s3
-    (earlier _ _ 0 3 (by decide) _ _ s0 s3 _ _ w3 (earlier _ _ 0 2 (by decide) _ _ s0 s2 _ _ w2
-      (earlier _ _ 0 1 (by decide) _ _ s0 s1 _ _ w1 read0)))
-    (earlier _ _ 1 3 (by decide) _ _ s1 s3 _ _ w3
-      (earlier _ _ 1 2 (by decide) _ _ s1 s2 _ _ w2 read1))
-    (earlier _ _ 2 3 (by decide) _ _ s2 s3 _ _ w3 read2) read3 (kept2.trans p3) c3 a3
-    (Nat.le_trans (write_extends_allocations _ _ _ _ _ w0).next
-      (Nat.le_trans (write_extends_allocations _ _ _ _ _ w1).next
-        (Nat.le_trans (write_extends_allocations _ _ _ _ _ w2).next
-          (write_extends_allocations _ _ _ _ _ w3).next)))
   cil_contract_steps [found, code, layout, leftArg, rightArg, vector128SavedFrame,
     enteredCall.input_formed leftMember, enteredCall.input_formed rightMember,
-    c1.input_formed rightMember, c2.input_formed rightMember, rightRoot,
-    load0, load1, load2, load3, upperLeft, upperRight, store0, store1, store2, store3] until done
+    s1.call.input_formed rightMember, s2.call.input_formed rightMember, rightRoot,
+    load0, load1, load2, load3, upperLeft, upperRight, store0, store1, store2,
+    store3] until continuation m3 s3
+
 /-- Overwriting any private vector home preserves every other vector home. -/
 theorem vector128_other_read (specs : List NumericLocalSpec) (entered before after : Memory) (boundary : Nat)
     (slots : List LocalSlot) (homes : NumericHomes entered boundary specs slots)
