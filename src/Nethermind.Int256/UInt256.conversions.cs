@@ -32,7 +32,8 @@ public readonly partial struct UInt256
     public long ToInt64(IFormatProvider? provider) => checked((long)ToUInt64(provider));
     public sbyte ToSByte(IFormatProvider? provider) => checked((sbyte)ToUInt64(provider));
     public float ToSingle(IFormatProvider? provider) => System.Convert.ToSingle(ToDouble(provider), provider);
-    public string ToString(IFormatProvider? provider) => ((BigInteger)this).ToString(provider);
+    // Digits are ASCII under every culture, so the provider changes nothing.
+    public string ToString(IFormatProvider? provider) => ToString();
     public object ToType(Type conversionType, IFormatProvider? provider) =>
         conversionType == typeof(BigInteger)
             ? (BigInteger)this

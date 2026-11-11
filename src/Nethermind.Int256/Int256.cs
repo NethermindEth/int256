@@ -716,15 +716,8 @@ public readonly partial struct Int256 : IEquatable<Int256>, IComparable, ICompar
     public uint ToUInt32(IFormatProvider? provider) => System.Convert.ToUInt32(ToDecimal(provider), provider);
     public ulong ToUInt64(IFormatProvider? provider) => System.Convert.ToUInt64(ToDecimal(provider), provider);
 
-    public string ToString(IFormatProvider? provider)
-    {
-        if (IsNegative)
-        {
-            Neg(out Int256 res);
-            return "-" + res._value.ToString(provider);
-        }
-        return _value.ToString(provider);
-    }
+    // The sign has always been a literal '-' here and the digits are ASCII, so the provider changes nothing.
+    public string ToString(IFormatProvider? provider) => ToString();
 
     public static void And(in Int256 a, in Int256 b, out Int256 res)
     {
