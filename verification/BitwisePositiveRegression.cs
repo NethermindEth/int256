@@ -3,35 +3,19 @@
 #:include RegressionBatch.cs
 #:include VerificationSupport.cs
 #:include ProofBindings.cs
-using System.Text.Json.Nodes;
 
 string root = Path.GetFullPath(args.Length > 0 ? args[0] : "verification");
 if (args.Length > 1) throw new ArgumentException("Usage: BitwisePositiveRegression.cs [verification-directory]");
 const string fixture = "BitwiseHelper";
-string work = Path.Combine(root, "artifacts/bitwise-positive-regressions", fixture);
-string consumer = Path.Combine(work, "consumer");
-string tool = Path.Combine(root, ".lake/packages/leancil/Extractor/bin/Nethermind.LeanCIL.dll");
-string fixtures = Path.Combine(root, "Tests/Fixtures/Bitwise");
-Task<string> Run(string executable, IEnumerable<string> arguments, bool disableIntrinsics = false) =>
-    VerificationSupport.RunChecked(root, executable, arguments, disableIntrinsics);
-await VerificationSupport.PrepareConsumer(root, consumer);
-string build = Path.Combine(work, "build");
-await Run("dotnet", ["build", Path.Combine(fixtures, "Nethermind.Int256.csproj"), "-c", "Release",
-    "-p:FixtureCase=" + fixture, "-p:BaseOutputPath=" + Path.Combine(build, "bin") + Path.DirectorySeparatorChar,
-    "-p:BaseIntermediateOutputPath=" + Path.Combine(build, "obj") + Path.DirectorySeparatorChar,
-    "-p:EnforceCodeStyleInBuild=true", "-p:GenerateDocumentationFile=true", "-v:q"]);
-JsonArray targets = JsonNode.Parse(File.ReadAllText(Path.Combine(root, "manifests/targets.json")))!["methods"]!.AsArray();
-List<(string Directory, string Proof, string Id, string Profile)> jobs = [];
+RegressionBatch batch = await RegressionBatch.Start(root, "bitwise-positive-regressions/" + fixture);
+string assembly = await batch.Build("Bitwise", fixture);
 foreach (string profile in new[] { "scalar", "x64-v3" })
 foreach (string operation in new[] { "And", "Or", "Xor", "Not" })
 foreach (bool returned in new[] { false, true })
 {
     bool unary = operation == "Not";
     string id = (returned ? "Operator" : "") + operation;
-    string extraction = Path.Combine(work, id, profile);
-    string signature = targets.Single(target => target!["id"]!.GetValue<string>() == id)!["signature"]!.GetValue<string>();
-    await Run("dotnet", [tool, "extract", Path.Combine(build, "bin/Release/net10.0/Nethermind.Int256.dll"), signature,
-        extraction, File.Exists(Path.Combine(root, "manifests/profiles", profile + ".json")) ? "@" + Path.Combine(root, "manifests/profiles", profile + ".json") : profile]);
+    string extraction = await batch.Extract(assembly, id, profile, Path.Combine(id, profile));
     string operationTerm = unary ? "(~~~·)" : "(applyBinary ." + operation.ToLowerInvariant() + ")";
     string arguments = unary ? "" : "." + operation.ToLowerInvariant() + " ";
     string kind = unary ? "unary" : "binary";
@@ -49,11 +33,9 @@ foreach (bool returned in new[] { false, true })
           {{term}}
         end HelperFixture
         """;
-    string proofPath = Path.Combine(consumer, "proofs", "Helper" + id + profile.Replace('-', '_') + ".lean");
-    File.WriteAllText(proofPath, proof);
-    jobs.Add((extraction, proofPath, id, profile));
+    batch.Checks.Add(new($"{id}/{profile}/{fixture}", extraction,
+        batch.Proof("Helper" + id + profile.Replace('-', '_'), proof), "HelperFixture.correct",
+        "full-contract certificate"));
 }
-Console.WriteLine($"Prepared {jobs.Count} positive {fixture} checks with a stable consumer snapshot.");
-List<string> failed = await RegressionBatch.Verify(root, tool, work, consumer, [.. jobs.Select(job => new RegressionCheck($"{job.Id}/{job.Profile}/{fixture}",
-    job.Directory, job.Proof, "HelperFixture.correct", "full-contract certificate"))]);
-if (failed.Count != 0) throw new InvalidOperationException("FAILED: " + string.Join(", ", failed));
+Console.WriteLine($"Prepared {batch.Checks.Count} positive {fixture} checks with a stable consumer snapshot.");
+await batch.FinishOrThrow();

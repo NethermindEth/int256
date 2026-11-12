@@ -16,12 +16,11 @@ internal static class VerificationRunner
         if (options.Action is not ("contracts" or "verify" or "extract")) throw new ArgumentException("Expected contracts, extract or verify");
         ProofBindings.Prepare(root);
         await command("dotnet", ["run", "--file", "GenerateTemplates.cs", "--", "--prepare"]);
-        const string tool = ".lake/packages/leancil/Extractor/bin/Nethermind.LeanCIL.dll";
         if (options.Action == "contracts")
         {
             // The streamed build surfaces sorry warnings; the audit then kernel-replays the oleans without running UInt256 code.
             await command("lake", ["build"]);
-            await command("dotnet", [tool, "audit-library", "--project", ".", .. AuditArguments]);
+            await command("dotnet", [VerificationSupport.Tool, "audit-library", "--project", ".", .. AuditArguments]);
             Console.WriteLine("UInt256 contracts and supporting lemmas checked. No compiled-method certificate was produced.");
             return;
         }
@@ -32,16 +31,15 @@ internal static class VerificationRunner
         if (groups.Any(group => !Regex.IsMatch(group.Profile, @"\A[a-zA-Z0-9-]+\z"))) throw new ArgumentException("Expected a profile name");
         if (groups.Select(group => group.Profile).Distinct(StringComparer.Ordinal).Count() != groups.Length)
             throw new ArgumentException("Each profile may appear in only one group");
-        using JsonDocument inventory = JsonDocument.Parse(File.ReadAllText(Path.Combine(root, "manifests/targets.json")));
         Gate[] gates = VerificationSupport.Gates(root);
         Stopwatch elapsed = Stopwatch.StartNew();
         List<string> failures = [];
         List<Request> ready = [];
         foreach (var group in groups)
             await ExtractGroup(root, options with { Profile = group.Profile, Methods = group.Methods },
-                inventory, gates, ready, failures, command, tool);
+                gates, ready, failures, command);
         // The verifier builds the union of all selected proof support once, across profiles too.
-        if (ready.Count > 0) await VerifyBatch(root, options, ready, failures, command, tool);
+        if (ready.Count > 0) await VerifyBatch(root, options, ready, failures, command);
         int total = groups.Sum(group => group.Methods.Length);
         Console.WriteLine($"{options.Action} finished in {elapsed.Elapsed.TotalSeconds:F1}s: {total - failures.Count} passed, {failures.Count} failed");
         if (failures.Count > 0) throw new InvalidOperationException(string.Join(Environment.NewLine, failures));
@@ -51,17 +49,15 @@ internal static class VerificationRunner
     internal static readonly string[] AuditArguments =
         ["--module", "UInt256", "--prefix", "UInt256Model", "--prefix", "UInt256Proof", "--axioms", "propext,Quot.sound,Classical.choice"];
 
-    static async Task ExtractGroup(string root, VerificationOptions options, JsonDocument inventory, Gate[] gates,
-        List<Request> ready, List<string> failures, Func<string, string[], Task> command, string tool)
+    static async Task ExtractGroup(string root, VerificationOptions options, Gate[] gates,
+        List<Request> ready, List<string> failures, Func<string, string[], Task> command)
     {
         foreach (string method in options.Methods)
         {
             Console.WriteLine($"START extract {method}/{options.Profile}");
             try
             {
-                JsonElement[] targets = inventory.RootElement.GetProperty("methods").EnumerateArray()
-                    .Where(target => target.GetProperty("id").GetString() == method).ToArray();
-                if (targets.Length != 1) throw new ArgumentException($"Unknown or ambiguous method ID: {method}");
+                string signature = VerificationSupport.Signature(root, method);
                 string profile = options.Profile;
                 string output = $"artifacts/{method}/{profile}";
                 string certificate = Path.Combine(root, output, "verified.json");
@@ -80,8 +76,9 @@ internal static class VerificationRunner
                     if (!File.Exists(Path.GetFullPath(proof, root))) throw new FileNotFoundException("Proof file not found", proof);
                 }
                 string profileArgument = File.Exists(Path.Combine(root, $"manifests/profiles/{profile}.json")) ? $"@manifests/profiles/{profile}.json" : profile;
-                await command("dotnet", [tool, "extract", "../src/artifacts/bin/Nethermind.Int256/release/Nethermind.Int256.dll",
-                    targets[0].GetProperty("signature").GetString()!, output, profileArgument, "--assume-initialized", "Nethermind.Int256.UInt256"]);
+                await command("dotnet", [VerificationSupport.Tool, "extract",
+                    "../src/artifacts/bin/Nethermind.Int256/release/Nethermind.Int256.dll",
+                    signature, output, profileArgument, "--assume-initialized", "Nethermind.Int256.UInt256"]);
                 if (options.Action == "verify") ready.Add(new(method, profile, output, proof!, theorem!));
                 else Console.WriteLine($"PASS extract {method}/{profile}");
             }
@@ -97,25 +94,20 @@ internal static class VerificationRunner
 
     // One LeanCIL session shares the source snapshot, support build and kernel replay across requests.
     static async Task VerifyBatch(string root, VerificationOptions options, List<Request> batch, List<string> failures,
-        Func<string, string[], Task> command, string tool)
+        Func<string, string[], Task> command)
     {
         var batchName = options.Groups is { Length: > 1 } ? "profiles" : options.Groups?[0].Profile ?? options.Profile;
         string manifest = Path.Combine(root, $"artifacts/verify-batch-{batchName}.json");
         string results = Path.Combine(root, $"artifacts/verify-batch-{batchName}-results.json");
         Directory.CreateDirectory(Path.GetDirectoryName(manifest)!);
         File.Delete(results);
-        File.WriteAllText(manifest, JsonSerializer.Serialize(new
+        VerificationSupport.WriteBatch(manifest, Path.GetFullPath(root), batch.Select(request => new
         {
-            schema = 1,
-            proofRoot = Path.GetFullPath(root),
-            requests = batch.Select(request => new
-            {
-                output = Path.GetFullPath(request.Output, root),
-                proof = Path.GetFullPath(request.Proof, root),
-                theorem = request.Theorem,
-            }),
+            output = Path.GetFullPath(request.Output, root),
+            proof = Path.GetFullPath(request.Proof, root),
+            theorem = request.Theorem,
         }));
-        List<string> arguments = [tool, "verify-batch", manifest, "--results", results];
+        List<string> arguments = [VerificationSupport.Tool, "verify-batch", manifest, "--results", results];
         if (options.Parallel is int parallel) arguments.AddRange(["--parallel", parallel.ToString(CultureInfo.InvariantCulture)]);
         string? error = null;
         try
@@ -123,12 +115,7 @@ internal static class VerificationRunner
             await command("dotnet", [.. arguments]);
         }
         catch (Exception exception) { error = exception.Message; }
-        JsonElement[] outcomes = [];
-        if (File.Exists(results))
-        {
-            using JsonDocument document = JsonDocument.Parse(File.ReadAllText(results));
-            outcomes = [.. document.RootElement.EnumerateArray().Select(outcome => outcome.Clone())];
-        }
+        JsonElement[] outcomes = VerificationSupport.BatchOutcomes(results);
         // Results follow request order; a request without a verified result fails, including when the tool wrote none.
         for (int index = 0; index < batch.Count; index++)
         {

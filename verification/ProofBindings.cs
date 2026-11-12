@@ -29,12 +29,8 @@ internal static class ProofBindings
             string method = (negate ? "Ne" : "Eq") + (scalarFirst ? primitive + "UInt256" : "UInt256" + primitive);
             string family = vector ? "vector" : "scalar";
             string theorem = "UInt256Proof.Equality." + method + "." + family;
-            string path = "proofs/" + method + (vector ? "Vector" : "Scalar") + ".lean";
-            Gate gate = new(method, vector ? "x64-v3" : "scalar", path, theorem + "_correctness");
-            if (gates.Count(candidate => candidate == gate) != 1)
-                throw new InvalidOperationException($"Expected exactly one generated binding gate: {method}/{gate.Profile}");
-            expected.Add(gate);
-            sources.Add(path, Equality(width, signed, scalarFirst, negate, vector, theorem));
+            Add(method, vector ? "x64-v3" : "scalar", method + (vector ? "Vector" : "Scalar"), theorem + "_correctness",
+                Equality(width, signed, scalarFirst, negate, vector, theorem));
         }
         foreach (int width in new[] { 32, 64 })
         foreach (bool signed in new[] { false, true })
@@ -45,12 +41,8 @@ internal static class ProofBindings
             string method = name + (scalarFirst ? primitive + "UInt256" : "UInt256" + primitive);
             // This overload takes UInt256 by value and has its own aggregate contract.
             if (method == "LeUInt64UInt256") continue;
-            string path = "proofs/" + method + "Scalar.lean";
-            Gate gate = new(method, "scalar", path, "UInt256Proof.Compare." + method + ".scalar_correctness");
-            if (gates.Count(candidate => candidate == gate) != 1)
-                throw new InvalidOperationException($"Expected exactly one generated binding gate: {method}/scalar");
-            expected.Add(gate);
-            sources.Add(path, Comparison(method, width, signed, scalarFirst, name, operation));
+            Add(method, "scalar", method + "Scalar", "UInt256Proof.Compare." + method + ".scalar_correctness",
+                Comparison(method, width, signed, scalarFirst, name, operation));
         }
         foreach (bool vector in new[] { false, true })
         {

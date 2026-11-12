@@ -9,11 +9,9 @@ internal sealed record RegressionShard(string Id, string[][] Runs);
 // CI runs exactly the runs this manifest lists, so a runner and its CI shards share one profile list.
 internal static class RegressionManifest
 {
-    static readonly JsonSerializerOptions Json = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
-
     internal static RegressionRunner[] Runners(string root) =>
         JsonSerializer.Deserialize<JsonElement>(File.ReadAllText(Path.Combine(root, "manifests/regressions.json")))
-            .GetProperty("runners").Deserialize<RegressionRunner[]>(Json)!;
+            .GetProperty("runners").Deserialize<RegressionRunner[]>(VerificationSupport.Json)!;
 
     // Each run is a runner file followed by its arguments after the verification directory.
     internal static RegressionShard[] Shards(string root)

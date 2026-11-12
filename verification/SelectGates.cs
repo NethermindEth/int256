@@ -15,11 +15,9 @@ string? eventName = null, first = null, last = null, output = null;
 for (int index = 0; index < args.Length; index++)
 {
     string option = args[index];
-    if (option == "--all") { all = true; continue; }
     if (++index == args.Length) throw new ArgumentException($"Missing value for {option}");
     switch (option)
     {
-        case "--changed-path": paths.Add(args[index]); break;
         case "--event": eventName = args[index]; break;
         case "--base": first = args[index]; break;
         case "--head": last = args[index]; break;

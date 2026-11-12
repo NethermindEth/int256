@@ -5,7 +5,6 @@
 #:include RegressionBatch.cs
 #:include VerificationSupport.cs
 #:include ProofBindings.cs
-using System.Text.Json.Nodes;
 using System.Xml.Linq;
 
 const string usage = "Usage: SafetyRegression.cs [verification-directory] [--case C]";
@@ -17,24 +16,12 @@ for (int i = 0; i < args.Length; i++)
     else throw new ArgumentException(usage);
 }
 string root = Path.GetFullPath(directory ?? "verification");
-string work = Path.Combine(root, "artifacts/safety-regressions");
-string consumer = Path.Combine(work, "consumer");
-string tool = Path.Combine(root, ".lake/packages/leancil/Extractor/bin/Nethermind.LeanCIL.dll");
 string fixtures = Path.Combine(root, "Tests/Fixtures/Safety");
-string signature = JsonNode.Parse(File.ReadAllText(Path.Combine(root, "manifests/targets.json")))!["methods"]!.AsArray()
-    .Single(target => target!["id"]!.GetValue<string>() == "Add")!["signature"]!.GetValue<string>();
-string productionProof = Path.Combine(consumer, "proofs/AddScalar.lean");
 const string productionTheorem = "UInt256Proof.Add.scalar_correctness";
 XElement[] registry = XDocument.Load(Path.Combine(fixtures, "Cases.props")).Descendants("SafetyCase").ToArray();
 if (selected is not null && registry.All(entry => (string)entry.Attribute("Include")! != selected)) throw new ArgumentException("Unknown safety case: " + selected);
-List<string> failed = [];
-
-Task<string> Run(string executable, IEnumerable<string> arguments, bool disableIntrinsics = false) =>
-    VerificationSupport.RunChecked(root, executable, arguments, disableIntrinsics);
-
-await VerificationSupport.PrepareConsumer(root, consumer);
-
-List<(string Name, string Extraction, string Proof, string Theorem, bool Negative)> jobs = [];
+RegressionBatch batch = await RegressionBatch.Start(root, "safety-regressions");
+string productionProof = Path.Combine(batch.Consumer, "proofs/AddScalar.lean");
 foreach (XElement entry in registry)
 {
     string name = (string)entry.Attribute("Include")!, suite = (string)entry.Attribute("Suite")!;
@@ -44,15 +31,7 @@ foreach (XElement entry in registry)
         Console.WriteLine($"UPSTREAM {name}: extractor behaviour belongs to LeanCIL; see Tests/Fixtures/Safety/README.md");
         continue;
     }
-    string build = Path.Combine(work, "build", name);
-    string intermediate = Path.Combine(build, "obj") + Path.DirectorySeparatorChar;
-    await Run("dotnet", ["build", Path.Combine(fixtures, "Nethermind.Int256.csproj"), "-c", "Release", "-p:FixtureCase=" + name,
-        "-p:BaseOutputPath=" + Path.Combine(build, "bin") + Path.DirectorySeparatorChar,
-        "-p:BaseIntermediateOutputPath=" + intermediate, "-p:MSBuildProjectExtensionsPath=" + intermediate,
-        "-p:EnforceCodeStyleInBuild=true", "-p:GenerateDocumentationFile=true", "-v:q"]);
-    string extraction = Path.Combine(work, name);
-    if (Directory.Exists(extraction)) Directory.Delete(extraction, true);
-    await Run("dotnet", [tool, "extract", Path.Combine(build, "bin/Release/net10.0/Nethermind.Int256.dll"), signature, extraction, "scalar"]);
+    string extraction = await batch.Extract(await batch.Build("Safety", name), "Add", "scalar", name, fresh: true);
     string inputBase = (string?)entry.Attribute("InputBase") ?? "0", input = $"⟨0, {inputBase}⟩", arguments = $"{input} {input} ⟨1, 0⟩";
     bool negative = suite == "negative";
     string theorem;
@@ -85,13 +64,10 @@ foreach (XElement entry in registry)
     }
     string source = File.ReadAllText(Path.Combine(fixtures, "WitnessTemplate.lean.in"))
         .Replace("@INPUT_SIZE@", (string?)entry.Attribute("InputSize") ?? "32").Replace("@INPUT_BASE@", inputBase).Replace("@THEOREM@", theorem);
-    string proof = Path.Combine(consumer, "proofs", "SafetyFixture" + name + ".lean");
-    File.WriteAllText(proof, source);
-    jobs.Add((name, extraction, proof, negative ? "SafetyWitness.refuted" : "SafetyWitness.accepted", negative));
+    batch.Checks.Add(new("Safety/" + name, extraction, batch.Proof("SafetyFixture" + name, source),
+        negative ? "SafetyWitness.refuted" : "SafetyWitness.accepted",
+        negative ? "checked fault refutation and production proof rejection"
+            : "checked valid call returns the initial-input sum",
+        negative ? productionProof : null, negative ? productionTheorem : null));
 }
-// The consumer snapshot is complete before any certificate is issued.
-failed.AddRange(await RegressionBatch.Verify(root, tool, work, consumer, [.. jobs.Select(job => new RegressionCheck("Safety/" + job.Name, job.Extraction, job.Proof, job.Theorem,
-    job.Negative ? "checked fault refutation and production proof rejection" : "checked valid call returns the initial-input sum",
-    job.Negative ? productionProof : null, job.Negative ? productionTheorem : null))]));
-if (failed.Count != 0) Console.WriteLine("FAILED: " + string.Join(", ", failed));
-Environment.ExitCode = failed.Count == 0 ? 0 : 1;
+await batch.Finish();

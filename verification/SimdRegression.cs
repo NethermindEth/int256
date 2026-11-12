@@ -21,11 +21,6 @@ for (int i = 0; i < args.Length; i++)
     else throw new ArgumentException(usage);
 }
 string root = Path.GetFullPath(directory ?? "verification");
-string work = Path.Combine(root, "artifacts/simd-regressions");
-string consumer = Path.Combine(work, "consumer");
-string tool = Path.Combine(root, ".lake/packages/leancil/Extractor/bin/Nethermind.LeanCIL.dll");
-JsonArray targets = JsonNode.Parse(File.ReadAllText(Path.Combine(root, "manifests/targets.json")))!["methods"]!.AsArray();
-JsonArray gates = JsonNode.Parse(File.ReadAllText(Path.Combine(root, "manifests/gates.json")))!["gates"]!.AsArray();
 JsonArray witnesses = JsonNode.Parse(File.ReadAllText(Path.Combine(root, "Tests/Fixtures/SIMD/witnesses.json")))!.AsArray();
 string[] simdProfiles = ["arm64-advsimd", "x64-sse42", "x64-v3", "x64-v4"];
 // Only these positives keep every production method body; other refactors need their own fixture proof.
@@ -42,7 +37,6 @@ HashSet<string> productionShaped = ["Baseline", "Renamed"];
 string[] supported = RegressionManifest.RequireProfiles(root, "SimdRegression.cs", groups.SelectMany(group => group.Profiles));
 if (filters.TryGetValue("profile", out string? filtered) && !supported.Contains(filtered))
     throw new ArgumentException($"Unknown profile {filtered}; expected one of {string.Join(", ", supported)}");
-List<string> incomplete = [], failed = [];
 
 // Applicability is the original suite's: features each mutation can reach on a profile.
 static bool Positive(string name, string profile) => name switch
@@ -62,31 +56,14 @@ static bool Negative(string name, string method, string profile) => name switch
 };
 bool Selected(string key, string value) => !filters.TryGetValue(key, out string? wanted) || wanted == value;
 
-Task<string> Run(string executable, IEnumerable<string> arguments, bool disableIntrinsics = false) =>
-    VerificationSupport.RunChecked(root, executable, arguments, disableIntrinsics);
-
-await VerificationSupport.PrepareConsumer(root, consumer);
-
+RegressionBatch batch = await RegressionBatch.Start(root, "simd-regressions");
+Gate[] gates = VerificationSupport.Gates(root);
 Dictionary<string, string> builds = [];
-async Task<string> Build(string group, string fixture)
-{
-    string key = group + "/" + fixture;
-    if (builds.TryGetValue(key, out string? built)) return built;
-    string build = Path.Combine(work, "build", group + fixture);
-    string intermediate = Path.Combine(build, "obj") + Path.DirectorySeparatorChar;
-    await Run("dotnet", ["build", Path.Combine(root, "Tests/Fixtures", group, "Nethermind.Int256.csproj"), "-c", "Release", "-p:FixtureCase=" + fixture,
-        "-p:BaseOutputPath=" + Path.Combine(build, "bin") + Path.DirectorySeparatorChar,
-        "-p:BaseIntermediateOutputPath=" + intermediate, "-p:MSBuildProjectExtensionsPath=" + intermediate,
-        "-p:EnforceCodeStyleInBuild=true", "-p:GenerateDocumentationFile=true", "-v:q"]);
-    return builds[key] = Path.Combine(build, "bin/Release/net10.0/Nethermind.Int256.dll");
-}
 async Task<string> Extract(string group, string fixture, string method, string profile)
 {
-    string signature = targets.Single(target => target!["id"]!.GetValue<string>() == method)!["signature"]!.GetValue<string>();
-    string extraction = Path.Combine(work, group, method, profile, fixture);
-    if (Directory.Exists(extraction)) Directory.Delete(extraction, true);
-    await Run("dotnet", [tool, "extract", await Build(group, fixture), signature, extraction, profile]);
-    return extraction;
+    if (!builds.TryGetValue(group + "/" + fixture, out string? assembly))
+        builds[group + "/" + fixture] = assembly = await batch.Build(group, fixture, group + fixture);
+    return await batch.Extract(assembly, method, profile, Path.Combine(group, method, profile, fixture), fresh: true);
 }
 // The `methodN : Method` bodies are what gate proofs bind; signatures carry the method names.
 static (string Code, string Names) ProgramText(string extraction)
@@ -107,8 +84,7 @@ static string Bytes(ulong[] left, ulong[] right)
 {
     IEnumerable<(int Offset, int Value)> Cells(ulong[] words, int origin) =>
         words.SelectMany((word, limb) => Enumerable.Range(0, 8).Select(i => (origin + 8 * limb + i, (int)((word >> (8 * i)) & 255))));
-    return string.Concat(Cells(left, 0).Concat(Cells(right, 64)).Where(cell => cell.Value != 0)
-        .Select(cell => $"offset = {cell.Offset} then {cell.Value} else if id = 0 ∧ ")) + "False then 0 else 0";
+    return RegressionBatch.InitialBytes(Cells(left, 0).Concat(Cells(right, 64)).Where(cell => cell.Value != 0));
 }
 static BigInteger Number(ulong[] words) => words.Select((word, i) => (BigInteger)word << (64 * i)).Aggregate(BigInteger.Zero, (a, b) => a + b);
 static ulong[] Words(JsonNode node) => node.AsArray().Select(word => ulong.Parse(word!.GetValue<string>(), CultureInfo.InvariantCulture)).ToArray();
@@ -139,7 +115,6 @@ string Refutation(string group, string method, string legacy, string operation, 
         .Replace("@WITNESS@", $"{index} {actual}");
 }
 
-List<(string Name, string Extraction, string Proof, string Theorem, Gate? Production)> jobs = [];
 foreach (var (group, item, methods, profiles) in groups)
 {
     if (!Selected("group", group)) continue;
@@ -160,53 +135,50 @@ foreach (var (group, item, methods, profiles) in groups)
         }
         if (cases.Count == 0) continue;
         string prefix = $"{group}/{method}/{profile}";
-        Gate? gate = gates.Where(node => node!["method"]!.GetValue<string>() == method && node["profile"]!.GetValue<string>() == profile)
-            .Select(node => new Gate(method, profile, Path.Combine(consumer, node!["proof"]!.GetValue<string>()), node["theorem"]!.GetValue<string>())).SingleOrDefault();
+        Gate? gate = gates.SingleOrDefault(gate => gate.Method == method && gate.Profile == profile);
         if (gate is null)
         {
-            foreach (var (name, _) in cases) incomplete.Add($"{prefix}/{name}");
+            foreach (var (name, _) in cases) batch.Incomplete.Add($"{prefix}/{name}");
             Console.WriteLine($"PENDING {prefix}: no production gate yet ({string.Join(", ", cases.Select(entry => entry.Case))})");
             continue;
         }
+        string production = Path.Combine(batch.Consumer, gate.Proof), profileName = profile.Replace('-', '_');
         var baseline = ProgramText(await Extract(group, "Baseline", method, profile));
         foreach (var (name, negative) in cases)
         {
             string label = $"{prefix}/{name}";
-            string fixtureProof = Path.Combine(consumer, "Tests/Fixtures", group, $"{method}_{profile.Replace('-', '_')}_{name}.lean");
+            string fixtureProof = Path.Combine(batch.Consumer, "Tests/Fixtures", group,
+                $"{method}_{profileName}_{name}.lean");
             JsonNode? witness = witnesses.SingleOrDefault(value => value!["case"]!.GetValue<string>() == name && value["method"]!.GetValue<string>() == legacy);
             if (negative ? witness is null : !productionShaped.Contains(name) && !File.Exists(fixtureProof))
             {
-                Console.WriteLine($"PENDING {label}: " + (negative ? "no checked witness yet" : "structurally different; no fixture proof yet"));
-                incomplete.Add(label);
+                batch.Pending(label,
+                    negative ? "no checked witness yet" : "structurally different; no fixture proof yet");
                 continue;
             }
-            string extraction = name == "Baseline" ? Path.Combine(work, group, method, profile, "Baseline") : await Extract(group, name, method, profile);
+            string extraction = name == "Baseline" ? Path.Combine(batch.Work, group, method, profile, "Baseline")
+                : await Extract(group, name, method, profile);
             var program = ProgramText(extraction);
             // A fixture that leaves the extracted program unchanged would certify nothing new.
             bool changed = name == "Renamed" ? program.Names != baseline.Names && program.Code == baseline.Code : program.Code != baseline.Code;
             if (name != "Baseline" && !changed)
             {
-                Console.WriteLine($"FAIL {label}: the fixture did not make its targeted change to the extracted program");
-                failed.Add(label);
+                batch.Fail(label, "the fixture did not make its targeted change to the extracted program");
                 continue;
             }
-            if (!negative)
-            {
-                jobs.Add(productionShaped.Contains(name) ? (label, extraction, gate.Proof, gate.Theorem, null)
-                    : (label, extraction, fixtureProof, $"UInt256Proof.Fixture.{group}.{method}_{profile.Replace('-', '_')}_{name}.correctness", null));
-                continue;
-            }
-            string proofPath = Path.Combine(consumer, "proofs", $"{group}Fixture_{method}_{profile.Replace('-', '_')}_{name}.lean");
-            File.WriteAllText(proofPath, Refutation(group, method, legacy, operation, flag, witness!));
-            jobs.Add((label, extraction, proofPath, "FixtureWitness.refuted", gate));
+            if (negative)
+                batch.Checks.Add(new(label, extraction, batch.Proof($"{group}Fixture_{method}_{profileName}_{name}",
+                    Refutation(group, method, legacy, operation, flag, witness!)), "FixtureWitness.refuted",
+                    "checked contract refutation and production proof rejection", production, gate.Theorem));
+            else if (productionShaped.Contains(name))
+                batch.Checks.Add(new(label, extraction, production, gate.Theorem, "checked production contract"));
+            else
+                batch.Checks.Add(new(label, extraction, fixtureProof,
+                    $"UInt256Proof.Fixture.{group}.{method}_{profileName}_{name}.correctness",
+                    "checked production contract"));
         }
     }
 }
 // A mistyped CI shard filter must not pass by checking nothing.
-if (jobs.Count == 0) throw new ArgumentException("No regression check matches the filters. " + usage);
-// The consumer snapshot is complete before any certificate is issued.
-failed.AddRange(await RegressionBatch.Verify(root, tool, work, consumer, [.. jobs.Select(job => new RegressionCheck(job.Name, job.Extraction, job.Proof, job.Theorem,
-    job.Production is null ? "checked production contract" : "checked contract refutation and production proof rejection", job.Production?.Proof, job.Production?.Theorem))]));
-if (incomplete.Count != 0) Console.WriteLine("INCOMPLETE: " + string.Join(", ", incomplete));
-if (failed.Count != 0) Console.WriteLine("FAILED: " + string.Join(", ", failed));
-Environment.ExitCode = incomplete.Count == 0 && failed.Count == 0 ? 0 : 1;
+if (batch.Checks.Count == 0) throw new ArgumentException("No regression check matches the filters. " + usage);
+await batch.Finish();

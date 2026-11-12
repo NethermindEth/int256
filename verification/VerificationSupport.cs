@@ -12,8 +12,33 @@ internal static class VerificationSupport
     private static string Source([CallerFilePath] string path = "") => path;
     internal static readonly JsonSerializerOptions Json = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
+    internal const string Tool = ".lake/packages/leancil/Extractor/bin/Nethermind.LeanCIL.dll";
+
     internal static Gate[] Gates(string root) =>
         JsonSerializer.Deserialize<Registry>(File.ReadAllText(Path.Combine(root, "manifests/gates.json")), Json)!.Gates;
+
+    // A method ID that names no signature, or several, has no single extraction target.
+    internal static string Signature(string root, string method)
+    {
+        string targets = File.ReadAllText(Path.Combine(root, "manifests/targets.json"));
+        using JsonDocument inventory = JsonDocument.Parse(targets);
+        string[] signatures = [.. inventory.RootElement.GetProperty("methods").EnumerateArray()
+            .Where(target => target.GetProperty("id").GetString() == method)
+            .Select(target => target.GetProperty("signature").GetString()!)];
+        return signatures is [string signature] ? signature
+            : throw new ArgumentException($"Unknown or ambiguous method ID: {method}");
+    }
+
+    internal static void WriteBatch(string manifest, string proofRoot, IEnumerable<object> requests) =>
+        File.WriteAllText(manifest, JsonSerializer.Serialize(new { schema = 1, proofRoot, requests }));
+
+    // Outcomes follow request order; a batch that wrote no results yields none, so every request then fails.
+    internal static JsonElement[] BatchOutcomes(string results)
+    {
+        if (!File.Exists(results)) return [];
+        using JsonDocument document = JsonDocument.Parse(File.ReadAllText(results));
+        return [.. document.RootElement.EnumerateArray().Select(outcome => outcome.Clone())];
+    }
 
     internal static async Task<string> Run(string root, string command, string[] arguments, bool capture = false,
         bool combineOutput = false, bool disableIntrinsics = false)

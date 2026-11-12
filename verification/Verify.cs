@@ -25,7 +25,6 @@ for (int index = 0; index < args.Length; index++)
     {
         case "--action": action = args[index].ToLowerInvariant(); break;
         case "--method": methodsSpecified = true; methods.Add(args[index]); break;
-        case "--methods-json": methodsSpecified = true; methods.AddRange(JsonSerializer.Deserialize<string[]>(args[index])!); break;
         case "--groups-json": groups = JsonSerializer.Deserialize<BatchGroup[]>(args[index], VerificationSupport.Json)!; break;
         case "--profile": profile = args[index]; break;
         case "--proof": proof = args[index]; break;

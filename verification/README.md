@@ -202,8 +202,10 @@ count / 8). With `--groups-json`, all profiles share that same session and works
 there is no separate group-concurrency setting. Each method/profile still receives its own
 certificate, and failures name the affected profile. `LEANCIL_EXPORT_CONSUMER_SUPPORT`
 exports the complete session's shared support without splitting out a request. The regression runners
-likewise submit each refutation and its `expect: rejected` production proof
-through one batch (`RegressionBatch.cs`). CI runs every regression runner,
+share one loop in `RegressionBatch.cs`: it prepares the consumer snapshot, builds each fixture case
+into its own output tree, extracts it, writes the generated proofs into the snapshot, and submits
+every check, including each refutation and its `expect: rejected` production proof, through one batch.
+Each runner file holds its case table and the proof text specific to its family. CI runs every regression runner,
 sharded by profile, whenever it runs the contract audit: on changes to any
 verification source, the LeanCIL pin or production code. `SelectGates.cs`
 generates that matrix from `manifests/regressions.json`; each sharded runner
