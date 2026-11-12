@@ -3,7 +3,8 @@
   <!-- zkEVM is a build feature, not a runtime identifier, so select by EnableZkEvm. -->
 
   <PropertyGroup>
-    <_Int256Variant Condition="'$(EnableZkEvm)' == 'true'">zkevm</_Int256Variant>
+    <_Int256Variant Condition="'$(EnableZkEvm)' == 'true' and '$(Int256ZkEvmCompact)' == 'true'">zkevm-compact</_Int256Variant>
+    <_Int256Variant Condition="'$(EnableZkEvm)' == 'true' and '$(_Int256Variant)' == ''">zkevm</_Int256Variant>
     <_Int256Variant Condition="'$(_Int256Variant)' == ''">std</_Int256Variant>
     <_Int256Assembly>$([MSBuild]::NormalizePath('$(MSBuildThisFileDirectory)', '..', 'impl', '$(_Int256Variant)', 'net10.0', 'Nethermind.Int256.dll'))</_Int256Assembly>
   </PropertyGroup>

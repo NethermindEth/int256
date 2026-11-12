@@ -14,10 +14,14 @@ namespace Nethermind.Int256;
 
 public readonly partial struct UInt256
 {
-    // The large arithmetic primitives stay out of line: on RV32 a 256-bit product is a long run of 32-bit multiplies
-    // and carries, so a copy at every use costs the 4 MiB ROM of an Airbender guest hundreds of kilobytes, while a
-    // call costs a few instructions against hundreds.
+#if ZKEVM_COMPACT
+    // The compact variant keeps the large arithmetic primitives out of line: on RV32 a 256-bit product is a long run
+    // of 32-bit multiplies and carries, so a copy at every use costs the 4 MiB ROM of an Airbender guest hundreds of
+    // kilobytes, while a call costs a few instructions against hundreds.
     private const MethodImplOptions BigOpInlining = MethodImplOptions.NoInlining;
+#else
+    private const MethodImplOptions BigOpInlining = MethodImplOptions.AggressiveInlining;
+#endif
     private const MethodImplOptions SubtractUnderflowInlining = MethodImplOptions.AggressiveInlining;
 
     [MethodImpl(MethodImplOptions.NoInlining)]

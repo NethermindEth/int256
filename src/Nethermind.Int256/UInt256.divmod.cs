@@ -2859,7 +2859,8 @@ public readonly partial struct UInt256
     // Dispatch on the narrower operand alone: an n x 4 product still needs only n*4
     // multiplies, so requiring both operands to be narrow leaves the common n x 4 shapes
     // on the full-width path. Every helper takes four arguments so none of them spills an
-    // operand to the stack on win-x64, and inlining keeps the 64x64 case in the caller.
+    // operand to the stack on win-x64, and inlining keeps the 64x64 case in the caller (except in
+    // the compact zkEVM variant, which keeps this method out of line).
     [SkipLocalsInit]
     [MethodImpl(BigOpInlining)]
     private static void Multiply256To512Bit(in UInt256 x, in UInt256 y, out UInt256 low, out UInt256 high)

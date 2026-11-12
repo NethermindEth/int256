@@ -17,7 +17,8 @@ namespace Nethermind.Int256;
 
 public readonly partial struct UInt256
 {
-    // The large arithmetic primitives are inlined wherever they are used (see UInt256.zkevm.cs).
+    // The large arithmetic primitives are inlined wherever they are used; only the compact zkEVM variant keeps them
+    // out of line (see UInt256.zkevm.cs).
     private const MethodImplOptions BigOpInlining = MethodImplOptions.AggressiveInlining;
     private const MethodImplOptions SubtractUnderflowInlining = (MethodImplOptions)0;
 

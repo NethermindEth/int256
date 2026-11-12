@@ -98,6 +98,15 @@ The NuGet package includes standard and RISC-V zkVM implementations with the sam
 </PropertyGroup>
 ```
 
+A guest that is short of code space, such as an RV32 guest with a small ROM, can also set `Int256ZkEvmCompact`. The compact variant keeps the large arithmetic primitives (multiplication, modular reduction, exponentiation steps) out of line: the image is smaller, at a cost of a few calls per operation.
+
+```xml
+<PropertyGroup>
+  <EnableZkEvm>true</EnableZkEvm>
+  <Int256ZkEvmCompact>true</Int256ZkEvmCompact>
+</PropertyGroup>
+```
+
 A guest whose zkVM has Zbb's `rev8` and performs misaligned word accesses natively can switch big-endian conversion to a word load plus `rev8` by stubbing `UInt256.get_HasByteReverse` to `true` in its ILC substitutions:
 
 ```xml
