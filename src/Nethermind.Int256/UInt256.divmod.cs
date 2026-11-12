@@ -3659,7 +3659,7 @@ public readonly partial struct UInt256
 
         ulong q0 = qhat1;
 
-        q = Create(q0, q1, 0, 0);
+        StoreProduct(out q, q0, q1, 0, 0);
 
         // Remainder is u0..u2
         UInt256 remN = Create(u0n2, u1d, u2d, 0);
@@ -3742,7 +3742,7 @@ public readonly partial struct UInt256
 
         ulong q0 = qhat;
 
-        q = Create(q0, 0, 0, 0);
+        StoreLowLimb(out q, q0);
 
         // Remainder is u0..u3
         remainder = ShiftRightSmall(rem, shift);
@@ -3903,8 +3903,8 @@ public readonly partial struct UInt256
             u4 = 0;
         }
 
-        Unsafe.SkipInit(out q);
-        ref ulong qRef = ref Unsafe.As<UInt256, ulong>(ref q);
+        // Digits stay in registers and go out as one 32-byte store, which a caller copying the word can forward.
+        ulong digit0 = 0, digit1 = 0, digit2 = 0;
 
         // Fast path: if the normalised low limb is 0 then V = v1n*B.
         // That turns the whole thing into a plain 256/64 division on (u4..u1),
@@ -3922,10 +3922,7 @@ public readonly partial struct UInt256
             (ulong q0, ulong r0) = X86Base.X64.DivRem(u1, r, v1n);
             r = r0;
 
-            Unsafe.Add(ref qRef, 0) = q0;
-            Unsafe.Add(ref qRef, 1) = q1;
-            Unsafe.Add(ref qRef, 2) = q2;
-            Unsafe.Add(ref qRef, 3) = 0;
+            StoreProduct(out q, q0, q1, q2, 0);
 
             Unsafe.SkipInit(out remainder);
             ref ulong rRef = ref Unsafe.As<UInt256, ulong>(ref remainder);
@@ -3961,7 +3958,7 @@ public readonly partial struct UInt256
         // x.u3 skips the divide, the correction and the subtract.
         if (u4 == 0 && u3 < v1n)
         {
-            Unsafe.Add(ref qRef, 2) = 0;
+            digit2 = 0;
         }
         else
         {
@@ -3999,13 +3996,13 @@ public readonly partial struct UInt256
             u2 -= lo;
             u3 = rhat - hi - borrow;
 
-            Unsafe.Add(ref qRef, 2) = qhat;
+            digit2 = qhat;
         }
 
         // Step j=1: q1 from (u3:u2:u1)
         if (u3 == 0 && u2 < v1n)
         {
-            Unsafe.Add(ref qRef, 1) = 0;
+            digit1 = 0;
         }
         else
         {
@@ -4053,7 +4050,7 @@ public readonly partial struct UInt256
             u1 -= lo;
             u2 = rhat - hi - borrow;
 
-            Unsafe.Add(ref qRef, 1) = qhat;
+            digit1 = qhat;
         }
 
         // Step j=0: q0 from (u2:u1:u0)
@@ -4102,11 +4099,11 @@ public readonly partial struct UInt256
             u0 -= lo;
             u1 = rhat - hi - borrow;
 
-            Unsafe.Add(ref qRef, 0) = qhat;
+            digit0 = qhat;
         }
 
         // q3 is always 0 for 256/128 here.
-        Unsafe.Add(ref qRef, 3) = 0;
+        StoreProduct(out q, digit0, digit1, digit2, 0);
 
         // Remainder (u0..u1 in normalised space) - unnormalise.
         Unsafe.SkipInit(out remainder);
