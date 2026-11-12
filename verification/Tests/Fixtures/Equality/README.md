@@ -4,10 +4,10 @@ Every production equality method/profile still has its own compiled certificate:
 24 x64-v3 and four SSE entries. Regression fixtures test implementation changes and rejection
 behaviour, rather than repeating every helper mutation through every public wrapper.
 
-`EqualityCoverage.cs` maps each overload explicitly to its direct `Equals` implementation.
-Unknown overloads and fixtures fail selection. `TestVerification.cs` checks that the selected
-representative exists and is applicable on the same profile, that positive proof files exist,
-and that all wrapper-local polarity mutations and the snapshot mutation remain selected.
+Each case is a variant of the gate it exercises in `verification/gates.json`, on that gate's
+profile, so a representative is listed only where it applies. The fixture project rejects an
+unknown `FixtureCase` at build time. A new equality gate gets no variants until they are added
+to it explicitly.
 
 | Fixture | Retained coverage |
 | --- | --- |

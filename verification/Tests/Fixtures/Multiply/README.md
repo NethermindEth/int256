@@ -3,8 +3,8 @@
 These preserve the original multiplication regression cases from
 `verification/uint256-memory-safety`: one of the two positive variants and the five mutations.
 Each negative proves that the compiled method cannot satisfy the complete
-checked wrapping multiplication contract; the regression runner also rejects
-the unmodified production proof and checks that no stale certificate remains.
+checked wrapping multiplication contract, and the unmodified production proof
+must be rejected without leaving a certificate.
 
 The fixture-only software Multiply64 fallback now uses Math.BigMul, matching
 the current production implementation. The previous fallback was checked
@@ -17,6 +17,7 @@ production execution proof and establishes equality of the resulting local
 word snapshots. It is the one positive refactor fixture kept for this family;
 the original ExtractedHelper positive was dropped.
 
-Run from the repository root:
+The cases are variants of the scalar `Multiply` gate (`WrongBmiHigh` on `x64-v3`) in
+`verification/gates.json`. Run them from `verification/`:
 
-    dotnet run --file verification/MultiplyRegression.cs
+    dotnet .lake/packages/leancil/Extractor/bin/Nethermind.LeanCIL.dll gates gates.json --only Multiply

@@ -3,20 +3,21 @@
 `Common/` holds the production-shaped Add/Subtract algorithms, scalar dispatch and
 lookup table (a copy of production `UInt256.Lookups.cs` with the `WRONG_TABLE`
 mutation), shared with the Reporting group. `Cases.props` registers each case and its
-compiler symbol. Run `dotnet run --file verification/SimdRegression.cs -- --group SIMD`
-(`--method`, `--profile` and `--case` narrow the run). The runner exits nonzero
-while any case is PENDING.
+compiler symbol. Each case is a variant of the Add or Subtract gate for its profile in
+`verification/gates.json`; from `verification/`, `leancil gates gates.json --only
+<gate>/<profile>/<Case>` runs one.
 
-Applicability per profile is the original suite's (`Positive`/`Negative` in the
-runner). Each positive must change its targeted extracted program (Renamed: method
-names only, identical bodies) and pass the registered production gate (EquivalentMask: its fixture proof). Each negative
-needs a kernel-checked refutation of `WrappingBinaryContract` from the concrete
-byte witness in `witnesses.json` (`CheckedRefutationTemplate.lean.in`, via
+Applicability per profile is the original suite's: a case is listed on the gates its
+mutation reaches. Each positive must change its targeted extracted program relative to
+Baseline (Renamed: method names only, identical bodies) and pass the production gate
+proof (EquivalentMask: its fixture proof). Each negative needs a kernel-checked
+refutation of `WrappingBinaryContract` from the concrete byte witness in its variant's
+`refutation.values` (`CheckedRefutationTemplate.lean.in`, via
 `checked_binary_byte_refuted`): left input at 0, right at 64, output at the witness
 base, and the actual byte the mutation stores. The unchanged production proof must
 then fail in proof checking without leaving a certificate.
 
-A case is PENDING when its method and profile have no production gate, or when a
+A case has no variant when its method and profile have no production gate, or when a
 positive changes a method body without its own fixture proof: production gates bind
 exact method bodies by `rfl`, so a body-changing refactor needs
 `<Method>_<profile>_<Case>.lean` in this directory. EquivalentMask is the one
@@ -24,8 +25,8 @@ positive refactor fixture kept for this family; the other original body-changing
 positives (LaneLocals, InlineCarry, ExtractedHelper, ReversedStore,
 FeatureExpressions) were dropped.
 
-Every case is a consumer contract or proof property, so every case is ported as
-`SIMD/<Method>/<profile>/<Case>`; none is delegated to LeanCIL.
+Every case is a consumer contract or proof property, so every case is a variant here;
+none is delegated to LeanCIL.
 
 | Case | Kind | Applicable profiles |
 | --- | --- | --- |

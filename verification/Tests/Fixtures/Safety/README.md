@@ -1,21 +1,21 @@
 # Compiled memory-safety probes
 
-Run `dotnet run --file verification/SafetyRegression.cs` (`--case NAME` selects one
-case). Each case compiles a fixture whose public `Add` calls a private `Probe` on its
-first input, discards the value, then computes the ordinary sum. The runner extracts
-the compiled DLL on the scalar profile through the pinned LeanCIL and kernel-checks a
-witness over a concrete caller memory (`WitnessTemplate.lean.in`): a read-only input
-allocation with nonzero limbs 0 and 1, a writable 32-byte output, and the empty
-static world.
+Each case is a variant of the `Add-scalar` gate in `verification/gates.json`. It compiles
+a fixture whose public `Add` calls a private `Probe` on its first input, discards the
+value, then computes the ordinary sum. `leancil gates` extracts the compiled DLL on the
+scalar profile and kernel-checks a witness over a concrete caller memory
+(`RefutationTemplate.lean.in` for negatives, `AcceptedTemplate.lean.in` for positives): a
+read-only input allocation with nonzero limbs 0 and 1, a writable 32-byte output, and the
+empty static world.
 
 - A negative certifies `¬ WrappingBinaryContract (· + ·) Extracted.program 0`: the
-  valid public call faults, and the fault is pinned exactly: method (named in
-  `Cases.props`), instruction, rule, reference and width (`checked_binary_fault_refuted`).
+  valid public call faults, and the fault is pinned exactly: method (its index in the
+  variant's `refutation.values`), instruction, rule, reference and width (`checked_binary_fault_refuted`).
   The production `AddScalar` proof must then
   fail in proof checking without leaving a certificate. That rejection is structural
   (the program contains a probe call); the semantic evidence is the pinned fault.
 - A positive certifies the calling conditions, that the public call returns the
-  initial-input sum, and that `Probe` itself returns the value in `Cases.props`.
+  initial-input sum, and that `Probe` itself returns the variant's `PROBE_VALUE`.
   Positives establish these concrete executions, not a universal contract.
 
 `VectorOutsideView` reuses the `MaskedVectorOverread` source with a 40-byte input
@@ -24,7 +24,7 @@ read authority instead of bounds. `UnalignedVector` places the input at offset 8
 a 40-byte, 8-aligned allocation.
 
 All cases except AlignedLoad are consumer properties (the public Add contract on a
-compiled shape) and are ported as `Safety/<Case>`. The upstream column gives the
+compiled shape) and are variants of `Add-scalar`. The upstream column gives the
 closest LeanCIL test; partial coverage is drafted in
 `verification/artifacts/upstream-fixture-gaps/03-semantic-shape-tests.md`.
 
@@ -52,4 +52,4 @@ closest LeanCIL test; partial coverage is drafted in
 
 AggregateOverread and StaticOverread are pinned to the identities the current
 semantics assign; a change in identity numbering will fail them loudly and needs a
-reviewed update of `Cases.props`.
+reviewed update of their variants in `verification/gates.json`.

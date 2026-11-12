@@ -4,14 +4,14 @@ The original Profiles group (`verification/uint256-memory-safety`) checked how t
 extractor classifies feature getters, guards intrinsics per execution profile, and
 rejects unsupported metadata. Every case tests extraction infrastructure rather than
 a UInt256 contract or proof, so on the LeanCIL route the behaviour belongs to LeanCIL
-and no runner certifies it here. Each case is mapped below to the LeanCIL test that
+and no gate variant certifies it here. Each case is mapped below to the LeanCIL test that
 covers it at the pinned revision, or to an unfiled issue draft under
 `verification/artifacts/upstream-fixture-gaps/` (gitignored).
 
 The original sources are kept here. To re-probe a case, build with
 `dotnet build verification/Tests/Fixtures/Profiles/Nethermind.Int256.csproj -c Release -p:FixtureName=<case>`
 (with separate output paths) and run the pinned extractor on the public `Add`
-signature from `manifests/targets.json` for each profile. At LeanCIL 7aec18e every
+signature (the `Add-scalar` method in `verification/gates.json`) for each profile. At LeanCIL 7aec18e every
 case was probed on scalar, x64-avx2 and x64-avx512 (`repro/observed-7aec18e.txt`,
 `repro/observed-original-profiles-7aec18e.txt`); all intended rejections and
 acceptances still hold. ARM and SSE profiles were not probed. "Gap" means only that no upstream

@@ -2,14 +2,17 @@
 
 This directory consumes LeanCIL through the [pinned Lake dependency](lakefile.toml).
 CIL semantics, extraction, and verification infrastructure belong to LeanCIL;
-this directory contains only UInt256 specifications and proofs.
+this directory contains only UInt256 specifications, proofs, regression fixtures and the
+manifests that LeanCIL's `gates`, `bindings` and `templates` commands read.
 
 Proofs establish arithmetic results, finite return, permitted overlap and preservation of
 caller memory. Frame setup supplies typed storage evidence for numeric locals; initialized
 values and later writes require their own checked facts. Profile-parametric comparison proofs
 use `ProfileAgreement.of_flags` and a kernel-checked empty feature-read list for scalar programs.
-See LeanCIL's [proof guide](https://github.com/NethermindEth/LeanCIL/blob/7ee95435f4088d0dfdfc44eca35b438adc778d33/docs/PROOFS.md)
-for the checked execution and contract APIs.
+See LeanCIL's [proof guide](https://github.com/NethermindEth/LeanCIL/blob/1d635abc3b5f86e6876d73461d9a4a355bcc417e/docs/PROOFS.md)
+for the checked execution and contract APIs, and its
+[consumer guide](https://github.com/NethermindEth/LeanCIL/blob/1d635abc3b5f86e6876d73461d9a4a355bcc417e/docs/CONSUMERS.md)
+for the commands and manifest formats used here.
 
 The Add/Subtract Vector128 helpers use `CodeAt` placements instead of carrying
 prefixes, suffixes and their length equations through every execution lemma.
@@ -22,7 +25,7 @@ word and vector homes, retaining the helper's exact write footprint and caller-m
 
 ## Verification scope
 
-The 188 registered method/profile gates in `manifests/gates.json` include all
+The 188 method/profile gates in `gates.json` include all
 87 scalar targets: addition/subtraction and their reporting variants,
 multiplication, bitwise operations, shifts, equality, and ordering. Accelerated
 gates currently cover vector bitwise operations and shifts, vector/SSE equality,
@@ -35,7 +38,7 @@ acceleration without AVX2, which no .NET 10 runtime reports, so it has no gate.
 The Vector128 Subtract gates share one profile-parametric proof
 (`UInt256/Methods/Subtract/{BorrowRun,BorrowHelper,BorrowContract,SmallHelper,Vector128*,ScalarDispatch,AcceleratedContract}.lean`);
 the scalar gates compose the same `BorrowContract` borrow-helper `MethodContract`.
-the AVX2/AVX512 contracts (`UInt256/Methods/{Add,Subtract}/Vector256*.lean`) bind every reachable body by `rfl`.
+The AVX2/AVX512 contracts (`UInt256/Methods/{Add,Subtract}/Vector256*.lean`) bind every reachable body by `rfl`.
 The `arm64-advsimd` gates cover the public entry, the `AddScalar` dispatcher, the
 AdvSimd `AddVector128` helper, `AddScalarUInt64` and `StoreLimbs`. Their contracts
 (`UInt256/Methods/Add/{Vector128,ARM}*.lean`, `UInt256/Methods/AddSubtract/` and
@@ -58,9 +61,9 @@ preserves the same wrapping, overlap and caller-memory contracts;
 gates prove results from the initial operands, finite checked return, and
 preservation of caller memory.
 
-Each gate applies to its registered LeanCIL feature profile and a successfully
-initialized `Nethermind.Int256.UInt256` type; it does not prove the static
-constructor. All 87 signatures in `manifests/targets.json` have scalar gates,
+Each gate applies to its LeanCIL feature profile and a successfully
+initialized `Nethermind.Int256.UInt256` type (the manifest's `initializedTypes`); it does not
+prove the static constructor. Every scalar target has a scalar gate,
 but some accelerated profile and regression-fixture cases still require
 proofs. Supporting arithmetic and profile-transport lemmas do not
 replace a certificate for the extracted compiled implementation. Changes to
@@ -68,158 +71,107 @@ shared proofs require recertification against the final source snapshot.
 
 ## Run
 
-Install .NET SDK 10.0.402 or a compatible newer SDK, Git, and elan.
+Install .NET SDK 10.0.402 or a compatible newer SDK, PowerShell 7, Git, and elan.
 Lake selects Lean 4.35.0 using `lean-toolchain`.
 
-From the repository root:
-
 ```powershell
-# Build and audit the extraction-independent supporting library.
-dotnet run --file verification/Verify.cs -- --action contracts
+# Resolve the LeanCIL pin, build its tool and the Release production assembly, and write the
+# method templates and catalogued binding sources. -Check compares them instead of writing.
+./verification/prepare.ps1
 
-# Build the production assembly, extract scalar Add, and certify it.
-dotnet run --file verification/Verify.cs -- --action verify --method Add --profile scalar
+# From verification/: build and audit the extraction-independent supporting library.
+lake build
+dotnet .lake/packages/leancil/Extractor/bin/Nethermind.LeanCIL.dll audit-library --project . `
+  --module UInt256 --prefix UInt256Model --prefix UInt256Proof --axioms propext,Quot.sound,Classical.choice
 
-# Extract without claiming a certificate.
-dotnet run --file verification/Verify.cs -- --action extract --method Add --profile scalar
+# Certify scalar Add and run its regression variants.
+dotnet .lake/packages/leancil/Extractor/bin/Nethermind.LeanCIL.dll gates gates.json --only Add-scalar
 ```
 
-`Contracts` builds the library, then runs LeanCIL `audit-library` on the `UInt256`
-module closure: it kernel-replays every module outside the certified LeanCIL library
-and audits, from those replayed oleans, every theorem in the `UInt256Model` and
-`UInt256Proof` namespaces (private theorems included), allowing only `propext`,
-`Classical.choice`, and `Quot.sound`. No UInt256 code runs during replay or audit,
-and either namespace matching no theorem fails. Modules outside the `UInt256`
-import closure are neither built nor audited. It produces no assembly certificate. `Verify` checks consumer proofs and imports in a clean
-package, reuses source-bound certified artifacts where available, kernel-checks
-new consumer modules, audits axioms, and records the assembly,
-extraction and proof identities in `artifacts/Add/scalar/verified.json`.
-The 142 catalogued bindings under `proofs/` are generated by `ProofBindings.cs` from shared
-templates checked against the gate registry. They cover primitive operators, comparisons,
-bitwise operations, shifts, accelerated Add/Subtract and Multiply wrappers.
-Edit the catalog rather than its generated files.
-Selection, verification and regression snapshots materialize these bindings before reading
-their imports or capturing proof sources. Their contracts, checked method-body equalities and
-profile theorems are part of the generated Lean source that the verifier hashes and checks.
-`dotnet run --file verification/GenerateBindings.cs` materializes them explicitly;
-adding `-- --check` checks that every generated source matches its template and registered gate.
-Other proof bindings remain handwritten.
+`lake build` streams the library build, so `sorry` warnings are visible; `audit-library` then
+kernel-replays every module of the `UInt256` closure outside the certified LeanCIL library and
+audits, from those replayed oleans, every theorem in the `UInt256Model` and `UInt256Proof`
+namespaces (private theorems included), allowing only `propext`, `Classical.choice`, and
+`Quot.sound`. No UInt256 code runs during replay or audit, and either namespace matching no
+theorem fails. Import new extraction-independent modules from `UInt256.lean` so the audit covers
+them. The audit produces no assembly certificate.
 
-Generated artifacts are ignored. CI runs all registered gates on main and on
-manual dispatch. On PRs, `SelectGates.cs` walks each proof's local import graph
-and selects gates affected by changed Lean sources. Production C# and shared
-build/verification configuration changes select all gates. Documentation, test-only and benchmark-only
-changes skip the expensive jobs; the stable `Verify UInt256` check still runs
-and requires every selected check to pass. CI builds and kernel-checks the shared
-LeanCIL library once per run; certificate jobs validate the producer's manifest
-digest before reusing it. Consumer proof checks remain separate for every gate.
-Gates are divided into at most eight jobs, with four running concurrently. Regression
-suites run two at once; the separate contract audit can use one more runner. Larger
-batches share proof support across more gates. Future commits cancel obsolete verification
-runs for the same PR. These limits preserve all checks and bound runner use; they do not
-establish an end-to-end speedup. Each job pays the shared support build once.
-`VerificationSelection.cs`
-balances jobs by the measured serial seconds per gate in `manifests/gate-seconds.json`
-(module counts did not predict them; an unsampled gate takes its method's median) and
-splits a profile only when it outweighs a job. Each job builds the extractor and
-production assembly once, then runs one `verify-batch` session for all selected profiles
-(`Verify.cs --groups-json`) with two workspaces in parallel. LeanCIL builds and replays the
-union of their extraction-independent proof support once and exports that union in one artifact.
-Unchanged successful proofs can also be reused;
-changed extraction and proof inputs are checked by the upstream verifier. Every selected method still needs
-its own certificate, and any failure fails the batch while allowing the other
-methods to report their results.
-Each batch publishes stage timings and command transcripts identifying the methods.
-The verifier defaults Lean to two worker threads to bound parallel kernel-replay
-memory; set `LEAN_NUM_THREADS` explicitly to override this locally. CI uses two threads.
-Keep the environment stable within a batch: LeanCIL binds it into cache identities.
+`leancil gates` extracts each selected method from the production assembly, checks its proof and
+imports in a clean package, reuses source-bound certified artifacts where available,
+kernel-checks new consumer modules, audits axioms, and records the assembly, extraction and proof
+identities under `artifacts/gates/`. `--only` takes a gate name, a `gate/profile` or a full row
+id `gate/profile/variant` (`production` is the gate's own row); `--method` and `--profile` select
+by those fields. Every row still receives its own certificate or rejection. Lean defaults to two
+worker threads to bound parallel kernel-replay memory; set `LEAN_NUM_THREADS` to override this.
+Keep the environment stable within a run: LeanCIL binds it into cache identities.
 
-The 31 primitive comparison gates share `PrimitiveLeaf.run_template`,
-`PrimitiveLeaf.checked_template`, and `PrimitiveWrapper.checked32`/`checked64`.
-These theorems do not import `Extracted`:
-they prove the four signed/unsigned and argument-order variants for any program
-and method index whose complete method body matches the expected UInt256 helper.
-Each gate checks complete helper and wrapper method equalities against its actual
-extraction. The shared wrapper covers operand reversal, signed/unsigned widening,
-Boolean negation, the helper call and return. Changed instructions, profile or frame
-metadata must satisfy that equality; the template is not an assumed helper contract.
-The independent arithmetic, checked finite return and caller-memory guarantees
-remain part of each public certificate.
+## Manifests and generated sources
 
-Bitwise scalar prefixes and limb helpers use LeanCIL's checked stepping tactics.
-Reporting wrappers reuse LeanCIL's checked argument loading, call and return proofs.
-Helper continuations select `CallResult.framed` and `CallResult.post`, with
-`FrameInvariants.formed` and `FrameInvariants.staticWorld`, by name. Calling views
-select `ValidCall.readable` and `ValidCall.writable` by name. A caller-byte footprint
-does not establish the permission and reference-slot preservation required by `Confined`.
-Equality and comparison wrappers share the same read-only forwarder composition;
-its call and return steps use LeanCIL's checked forwarder lemmas. Vector frames
-use `LocalSnapshots` to retain exact loaded values across local stores, disjoint
-output writes and calls that preserve the older memory. These shared proofs keep
-the existing overlap, finite-return and caller-memory contracts, and each gate
-still binds the actual extracted body and verifies its own public theorem.
-LeanCIL's existing authenticated support cache can reuse these compiled theorems
-and their kernel checks across different gates in the same batch. The first gate
-still checks the shared proof; subsequent gates freshly check their extraction,
-bindings and public proof. This differs from an unchanged whole-proof cache hit.
-Successful main-branch runs also export portable support: each job's last
-profile group, ordered to hold the most shareable modules, writes one manifest
-covering every workspace of its batch session, with the compiled artifacts
-beside it. On later runs, `FindConsumerSupport.cs` discovers every job's artifact from the latest successful
-push to this repository's `main` branch and obtains their digests from GitHub's
-artifact metadata. PR artifacts cannot provide that trust anchor. Certificate
-jobs download the manifests and give the digests separately to LeanCIL. Missing
-or expired artifacts fall back to normal verification; a downloaded manifest
-with an incorrect digest fails verification.
+`gates.json` is the gate manifest. Each gate names a method selector, its profiles, its proof
+file and the theorem that states the full contract; review each new gate for that. Its regression
+cases are the gate's `variants`. The `x64-v3-v128` and `x64-v4-v128` profiles are defined in
+`manifests/profiles/`. `manifests/costs.json` holds measured serial seconds per gate and profile,
+which `--plan` uses to balance jobs; a gate without a measurement costs its method's median.
 
-Receivers set `LEANCIL_RESTORE_CONSUMER_SUPPORT=true`, so Lake reuses the
-producer's compiled support instead of rebuilding it when the sources, toolchain,
-tools and bound environment match; every restored file is checked against its
-manifest hash. Kernel replay is reused only for
-modules whose complete compiled import closure, source snapshot, verifier,
-toolchain and pinned dependencies match. Changes invalidate the affected
-dependency closure, and `verified.json` records the support manifest digest.
-No machine-local signing secret is exported. Publishing during existing main
-batches avoids adding a producer gate to every PR's critical path. The first
-main run, or a changed proof snapshot, performs normal kernel replay.
-Schema 2 portable fingerprints exclude only Lean's persisted linter diagnostics,
-whose temporary source filenames previously prevented comparison-helper reuse.
-Declarations, semantic path strings, imports and all other extensions remain
-covered, including private module parts. Original compiled artifacts retain
-their raw-byte stability checks. Older manifests fall back to normal replay;
-the next successful main run exports manifests for the new verifier and pin.
+`bindings.json` is the binding catalog. `leancil bindings bindings.json` expands its families
+from `templates/*.lean.in` into the 142 generated proofs under `proofs/Bindings/`; the other 8
+catalog entries and the remaining gate proofs are handwritten. Edit the catalog or a template
+rather than a generated file. The catalog covers primitive operators, comparisons, bitwise
+operations, shifts, accelerated Add/Subtract and Multiply wrappers. The contracts, checked
+method-body equalities and profile theorems are part of the generated source that the verifier
+hashes and checks. `--check` fails if a generated file differs from its template.
 
-To verify several methods with one build locally, invoke the single-file C# app:
+The scalar and vector Add/Subtract, Multiply, LeftShift and RightShift body families come from
+`leancil templates`: `prepare.ps1` extracts 20 method/profile inputs from the production assembly
+into `artifacts/templates/` and writes one `UInt256/Generated/MethodTemplates.lean` module that
+shares each managed method across all roots and profiles; the proof modules specialize its flags
+and callee indices. The module embeds the assembly identity, so every machine regenerates it.
+It changes only the generated Lean namespace and omits unused per-PC equations with checked
+schema/name guards. Generated sources are ignored by git, materialized before planning,
+verification and the library audit, and remain part of the audited source closure.
+Specialization wrappers retain their total definitions, including exact profile metadata and
+callee parameters. The compiled-method gates still check the exact extraction-to-body
+equalities; generating a template does not produce a certificate.
 
-```powershell
-dotnet run --file verification/Verify.cs -- --action verify --method Subtract --method SubtractUnderflow --profile scalar
-```
+Alternative masked-prepare and blended-subtract regression bodies replace only their changed
+instruction ranges and branch targets in the production templates. Multiply's full-entry body
+remains handwritten because its merged profile template has different instruction positions.
+Fixed-flag wrappers use Lean's built-in elaboration and reduction once to materialize their
+specialized definitions; the kernel still checks the resulting ordinary terms. The `PrepareAdd`
+flag remains a parameter. Whole-entry Add generation is blocked by the reachable
+`get_BroadcastLookup` static-site metadata; the generated helpers avoid that unsupported input
+without removing metadata or checks.
 
-The runner extracts every selected method, then checks them in one LeanCIL
-`verify-batch` session, which builds and replays the shared support once;
-`--parallel <n>` bounds its concurrent workspaces (LeanCIL default: processor
-count / 8). With `--groups-json`, all profiles share that same session and workspace limit;
-there is no separate group-concurrency setting. Each method/profile still receives its own
-certificate, and failures name the affected profile. `LEANCIL_EXPORT_CONSUMER_SUPPORT`
-exports the complete session's shared support without splitting out a request. The regression runners
-share one loop in `RegressionBatch.cs`: it prepares the consumer snapshot, builds each fixture case
-into its own output tree, extracts it, writes the generated proofs into the snapshot, and submits
-every check, including each refutation and its `expect: rejected` production proof, through one batch.
-Each runner file holds its case table and the proof text specific to its family. CI runs every regression runner,
-sharded by profile, whenever it runs the contract audit: on changes to any
-verification source, the LeanCIL pin or production code. `SelectGates.cs`
-generates that matrix from `manifests/regressions.json`; each sharded runner
-fails if the manifest's profiles differ from the ones it supports, and
-`TestVerification.cs` fails if a runner is missing from the manifest.
+## Continuous integration
 
-`SelectGates.cs`, `Verify.cs`, and `TestVerification.cs` are single-file C# apps;
-their shared source files are included with `#:include`, as in LeanCIL.
+`.github/workflows/verification.yml` runs every gate and variant on main and on manual dispatch.
+On PRs, `leancil gates --plan 8 --changed <path>...` selects the rows whose extraction, proof
+imports, fixture project or template depend on a changed file. A change under `selection.all`
+in `gates.json` (build configuration, the LeanCIL pin, the catalog, its templates, `prepare.ps1`,
+`native-witness.ps1`, the workflow) selects every row, and test-only or benchmark-only changes
+select none. The contract audit runs when a PR changes production code, build inputs, this
+workflow or any verification source other than documentation. The stable `Verify UInt256` check
+always runs and requires every selected check to pass.
 
-The runner resolves defaults from `manifests/gates.json`. Unregistered
-method/profile combinations require
-both `--proof` and `--theorem`; proof paths are relative to `verification/` and
-must be sources inside this package, outside build/artifact directories. Each
-gate must be reviewed to ensure its selected theorem states the full contract.
+CI builds and kernel-checks the shared LeanCIL library once per run; certificate jobs validate the
+producer's manifest digest before reusing it. The plan divides the selected rows into at most
+eight groups, four running concurrently. A regression variant stays in the group of its gate and
+profile, since it reuses the production extraction and statement. Each group job runs
+`--plan-group` with two workspaces, uploads its results, and the final job runs
+`--require-results`, which fails unless every planned row has exactly one passing result. Each
+group publishes stage timings and command transcripts.
+
+Successful main-branch runs also export portable support: each group writes one manifest of the
+extraction-independent support it certified, with the compiled artifacts beside it. On later
+runs the select job looks up the latest successful push to this repository's `main` branch and
+takes each manifest's digest from its artifact name in GitHub's metadata. PR artifacts cannot
+provide that trust anchor. Group jobs download the manifests and give the digests separately to
+LeanCIL with `LEANCIL_RESTORE_CONSUMER_SUPPORT=true`, so Lake reuses the producer's compiled
+support when the sources, toolchain, tools and bound environment match; every restored file is
+checked against its manifest hash. Kernel replay is reused only for modules whose complete
+compiled import closure, source snapshot, verifier, toolchain and pinned dependencies match.
+Missing or expired artifacts fall back to normal verification; a downloaded manifest with an
+incorrect digest fails verification. No machine-local signing secret is exported.
 
 ## Upstream status and remaining work
 
@@ -228,87 +180,75 @@ The pinned extractor handles initialization assumptions, consumer proof packages
 SkipInit preserves memory; the proof establishes initialization through subsequent writes.
 Extraction output is ignored. Each gate checks its expected UInt256 helper bodies against
 that output, including byte-offset fields, parameter homes and Boolean return normalization.
-The extractor and CIL semantics remain upstream.
-
-`manifests/gates.json` registers 188 method/profile pairs covering all 87 scalar targets
-and distinct accelerated implementations. Extraction admission is separate from certification:
-a certificate requires a successful proof of the selected contract for the extracted method.
-The migration inventory records its own tested revision and validation evidence.
-
-`BitwiseRegression.cs` and `ShiftRegression.cs` take a profile argument (default `scalar`),
-so a complete run also passes `x64-v3`.
+The extractor and CIL semantics remain upstream. Extraction admission is separate from
+certification: a certificate requires a successful proof of the selected contract for the
+extracted method.
 
 ## Regression fixtures
 
-The fixture cases run through `BitwiseRegression.cs`,
-`BitwisePositiveRegression.cs`, `ShiftRegression.cs`, `ShiftPositiveRegression.cs`,
-`MultiplyRegression.cs` and `AddSubtractRegression.cs` (`dotnet run --file verification/<runner>`).
-Each runner freezes a consumer snapshot, certifies positive fixtures, and for
-each mutation certifies a checked contract refutation, then requires the
-unchanged production proof to be rejected without leaving a certificate.
-Besides its Baseline (and, where present, Renamed) control, each kernel family
-keeps one positive refactor fixture, a changed method body proved against the
-production contract: Add and Subtract `ExtractedHelper`, Multiply `AlternativeOrder`,
-Bitwise `BitwiseHelper`, Shift `LshHelper`, SIMD and Reporting `EquivalentMask`,
-Equality `EquivalentReduction` and Compare `ComparisonAlternative`.
-`AddSubtractRegression.cs` reports fixtures without a proof as PENDING and
-exits nonzero until each has one. Extractor rejection fixtures (unsupported instructions, static
-initializers, metadata mutations) are covered by LeanCIL's own tests.
+Each variant in `gates.json` builds a fixture project under `Tests/Fixtures/<group>/` with its
+`FixtureCase`, extracts the gate's method from it, and states what must hold:
 
-`ShiftPositiveRegression.cs [dir] [all|scalar|x64-v3]` (default `all`) certifies
-`LshHelper` (count computed by a compiled helper) for `Lsh`, `LeftShift` and `op<<`.
-Each case must extract differently from Baseline and is proved against the production
-gate contract by `Tests/Fixtures/Shift/LshHelper/<Method>_<profile>.lean`.
+- `program` compares the extracted program with the production one or with another variant's
+  (`programOf`): `same` for controls that must not change the extraction, `different` for
+  mutations and refactors that must.
+- `expect: certifies` proves the production contract for the changed body, with the production
+  proof or a fixture proof.
+- `expect: rejected` requires the production proof to fail without leaving a certificate, and
+  its `refutation` certifies a checked contract refutation from a fixture template filled with
+  the case's witness values.
+- `expect: unchanged` checks only the program relation, for a mutation that no gated
+  extraction of that profile reaches.
+
+Fixture builds enforce code style and documentation comments, so an unused directive fails them.
+Besides its Baseline (and, where present, Renamed) control, each kernel family keeps one positive
+refactor fixture, a changed method body proved against the production contract: Add and Subtract
+`ExtractedHelper`, Multiply `AlternativeOrder`, Bitwise `BitwiseHelper`, Shift `LshHelper`, SIMD
+and Reporting `EquivalentMask`, Equality `EquivalentReduction` and Compare `ComparisonAlternative`.
+Extractor rejection fixtures (unsupported instructions, static initializers, metadata mutations)
+are covered by LeanCIL's own tests. Each group's `Tests/Fixtures/<group>/README.md` maps its cases.
+
+`LshHelper` (count computed by a compiled helper) is certified for `Lsh`, `LeftShift` and `op<<`
+on scalar and `x64-v3` by `Tests/Fixtures/Shift/LshHelper/<Method>_<profile>.lean`.
 The proofs bind the changed bodies by `program[i]? = some body` and reuse the canonical
 proof through checked-run transport of the relocated suffix (`UInt256/Safety/Region*.lean`);
 that transport is CIL-generic and belongs upstream in LeanCIL. `LshEarlyStore` (output
-limb zeroed before the input is read) is an aliasing negative in `ShiftRegression.cs`.
+limb zeroed before the input is read) is an aliasing negative.
 
-`SimdRegression.cs` runs the SIMD (Add/Subtract) and Reporting
-(AddOverflow/SubtractUnderflow) groups per profile; cases on a profile without a
-production gate, and refactors that change a method body without their own
-fixture proof, are PENDING. `SafetyRegression.cs` runs the compiled memory-safety
-probes: each negative certifies a checked refutation of the public Add contract
-from a fault pinned to its method, instruction, rule, reference and width, and each
-positive certifies a valid call and
-the probe's own value. The Profiles group is extractor infrastructure only. Each
-group's `Tests/Fixtures/<group>/README.md` maps every original case to a runner
-case, the LeanCIL test that covers it, an unfiled upstream issue draft, or names
-it as a dropped positive refactor.
+The rejected Bitwise mutations `BitwiseWrongOperator` and `BitwiseEarlyStore` also run natively:
+after each group, `native-witness.ps1` checks that every such row in its results was rejected,
+confirms the fixture assembly still matches its extraction, and runs
+`Tests/Fixtures/Bitwise/NativeWitness` against it with `DOTNET_EnableHWIntrinsic` set to 1 and
+to 0, so each refutation witness matches what .NET computes.
 
-`EqualityRegression.cs [dir] [all|scalar|x64-v3|x64-sse42] [all|<case>] [method]`
-covers representative equality implementations and targeted wrapper faults. The optional method
-selects one retained representative for local verification; an empty selection fails.
-All 52 production equality method/profile certificates remain registered.
-Baseline and Renamed are checked against the
-production proof or a renamed copy of it; EquivalentReduction (xor-to-zero vector
-leaf, scalar-direct vector primitive, high-half-first SSE reduction) is checked on
-the vector profiles by fixture proofs under `Tests/Fixtures/Equality/EquivalentReduction/`
-that state the production contract verbatim. Their extraction-independent leaf proofs
-live once in `Tests/Fixtures/Equality/Shared/`, so each fixture file only binds its extraction.
-WrongLane, WrongReduction, WrongReceiver, WrongSnapshot, WrongSignedEmbedding
-and WrongPolarity each get a checked refutation from `witnesses.json` and rejection of the
-production proof. Helper mutations run at direct `Equals` entries; wrapper-local polarity
-and snapshot mutations retain their own cases. Polarity counterexamples compose a checked
+The Safety variants of scalar Add are the compiled memory-safety probes: each negative certifies
+a checked refutation of the public Add contract from a fault pinned to its method, instruction,
+rule, reference and width, and each positive certifies a valid call and the probe's own value.
+The Profiles group is extractor infrastructure only.
+
+Equality variants cover representative implementations and targeted wrapper faults, and every
+production equality gate keeps its certificate. Baseline and Renamed are checked against the
+production proof; EquivalentReduction (xor-to-zero vector leaf, scalar-direct vector primitive,
+high-half-first SSE reduction) is checked on the vector profiles by fixture proofs under
+`Tests/Fixtures/Equality/EquivalentReduction/` that state the production contract verbatim. Their
+extraction-independent leaf proofs live once in `Tests/Fixtures/Equality/Shared/`, so each fixture
+file only binds its extraction. WrongLane, WrongReduction, WrongReceiver, WrongSnapshot,
+WrongSignedEmbedding and WrongPolarity each get a checked refutation and rejection of the
+production proof. Helper mutations run at direct `Equals` entries; wrapper-local polarity and
+snapshot mutations attach to their own wrappers. Polarity counterexamples compose a checked
 child observation through the exact extracted wrapper instead of unfolding its execution again.
 The [coverage map](Tests/Fixtures/Equality/README.md) explains the representatives and limits.
-The equality matrix issues 130 verification requests:
-scalar 50, x64-v3 59, SSE 21. These are request counts, not measured wall-time savings.
 
-`CompareRegression.cs [dir] [all|<profile>]` covers `op<` on scalar,
-x64-v3 and x64-v4, and `CompareTo(in UInt256)` on scalar.
-ComparisonAlternative is proved per profile under
-`Tests/Fixtures/Compare/ComparisonAlternative/`; ComparisonLowFirst,
-ComparisonSigned and ThreeWayAlternative are refuted. The alternative proofs reuse checked stepping
-with the complementary order facts required by the compiled branches, at the default proof limit. ComparisonWrongLane mutates the
-Vector256-only path, which no .NET 10 profile reaches; the runner only checks that it leaves every gated extraction unchanged.
-ThreeWayAlternative (returns -7/9) is a
-refutation because the CompareTo contract is the exact -1/0/1 result; the
-vector mutations use `Vector256.LessThan` on sign-flipped lanes and
-`GetElement` because the extractor rejects `Vector256.LessThan<long>` and
-`Vector256.GreaterThan`; x64-v4 runs Baseline only because its native
-`op<` path is not touched by any mutation, which the runner checks by
-requiring an unchanged extraction for every inapplicable case.
+Compare variants cover `op<` on scalar, x64-v3 and x64-v4, and `CompareTo(in UInt256)` on scalar.
+ComparisonAlternative is proved per profile under `Tests/Fixtures/Compare/ComparisonAlternative/`;
+ComparisonLowFirst, ComparisonSigned and ThreeWayAlternative are refuted. The alternative proofs
+reuse checked stepping with the complementary order facts required by the compiled branches, at
+the default proof limit. ComparisonWrongLane mutates the Vector256-only path, which no .NET 10
+profile reaches, so its variants expect an unchanged extraction. ThreeWayAlternative (returns
+-7/9) is a refutation because the CompareTo contract is the exact -1/0/1 result; the vector
+mutations use `Vector256.LessThan` on sign-flipped lanes and `GetElement` because the extractor
+rejects `Vector256.LessThan<long>` and `Vector256.GreaterThan`. Mutations that do not touch the
+native x64-v4 `op<` path expect an unchanged extraction there.
 
 Each public gate must retain independent arithmetic and safety contracts,
 including initial operands under valid overlap, normal finite return,
@@ -316,38 +256,3 @@ caller-byte preservation, and its claimed feature coverage. Re-run the original
 mutation/refutation cases before claiming equivalent verification scope.
 Further extraction or proof-composition gaps should be reproduced upstream
 rather than hidden behind consumer copies of CIL infrastructure.
-
-## Generated method bodies
-
-The scalar and vector Add/Subtract, Multiply, LeftShift and RightShift body families come
-from the pinned LeanCIL `templates` command. One `UInt256/Generated/MethodTemplates.lean`
-module shares each managed method across all selected roots and profiles; the proof modules
-specialize its flags and callee indices.
-The compiled-method gates still check the exact extraction-to-body equalities. Generating
-a template does not produce a certificate, and no arithmetic or caller-memory contract changes.
-
-Materialize the templates and their implementation/extractor dependencies:
-
-```sh
-dotnet run --file verification/GenerateTemplates.cs -- --prepare
-dotnet run --file verification/GenerateTemplates.cs -- --check
-```
-
-The generator uses independently rechecked extractions for the profiles declared in
-`GenerateTemplates.cs`. It changes only the generated Lean namespace and omits unused
-per-PC equations with checked schema/name guards.
-The original command output, including those equations, remains in `artifacts/generated-templates`.
-Generated `*Templates.lean` files are ignored by git and materialized before selection,
-verification, the compiled-library audit and regression snapshot creation. They remain part
-of the audited source closure. Specialization wrappers retain their total definitions,
-including exact profile metadata and callee parameters.
-Alternative masked-prepare and blended-subtract regression bodies replace only their changed
-instruction ranges and branch targets in the production templates. Multiply's full-entry body
-remains handwritten because its merged profile template has different instruction positions.
-Regression witnesses and gate registrations cover the actual specialized bodies.
-
-Fixed-flag wrappers use Lean's built-in elaboration and reduction once to materialize their
-specialized definitions; the kernel still checks the resulting ordinary terms. The `PrepareAdd`
-flag remains a parameter. This removes handwritten instruction lists, not proof obligations.
-Whole-entry Add generation is currently blocked by the reachable `get_BroadcastLookup` static-site
-metadata; the generated helpers avoid that unsupported input without removing metadata or checks.
