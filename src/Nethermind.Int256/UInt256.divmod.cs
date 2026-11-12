@@ -218,7 +218,7 @@ public readonly partial struct UInt256
         {
             // y < x < 2^64, so the divisor is single-limb too. One div leaves the remainder in rdx;
             // reconstructing it from the quotient would put a dependent imul on the critical path.
-            res = Create(x.u0 % y0, 0, 0, 0);
+            StoreLowLimb(out res, x.u0 % y0);
             return;
         }
 
@@ -3283,51 +3283,25 @@ public readonly partial struct UInt256
     {
         // mask == 0 would mean y == 1, which the wrapper already returned for.
         Debug.Assert(mask != 0, "divisor must be 2^1..2^63; the wrapper returns for y <= 1");
-        ulong x0 = x.u0;
-        Unsafe.SkipInit(out remainder);
-        Unsafe.AsRef(in remainder.u0) = x0 & mask;
-        Unsafe.AsRef(in remainder.u1) = 0;
-        Unsafe.AsRef(in remainder.u2) = 0;
-        Unsafe.AsRef(in remainder.u3) = 0;
+        StoreLowLimb(out remainder, x.u0 & mask);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void ModByPowerOfTwo128(in UInt256 x, ulong mask, out UInt256 remainder)
     {
-        ulong x0 = x.u0;
-        ulong x1 = x.u1;
-        Unsafe.SkipInit(out remainder);
-        Unsafe.AsRef(in remainder.u0) = x0;
-        Unsafe.AsRef(in remainder.u1) = x1 & mask;
-        Unsafe.AsRef(in remainder.u2) = 0;
-        Unsafe.AsRef(in remainder.u3) = 0;
+        StoreProduct(out remainder, x.u0, x.u1 & mask, 0, 0);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void ModByPowerOfTwo192(in UInt256 x, ulong mask, out UInt256 remainder)
     {
-        ulong x0 = x.u0;
-        ulong x1 = x.u1;
-        ulong x2 = x.u2;
-        Unsafe.SkipInit(out remainder);
-        Unsafe.AsRef(in remainder.u0) = x0;
-        Unsafe.AsRef(in remainder.u1) = x1;
-        Unsafe.AsRef(in remainder.u2) = x2 & mask;
-        Unsafe.AsRef(in remainder.u3) = 0;
+        StoreProduct(out remainder, x.u0, x.u1, x.u2 & mask, 0);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void ModByPowerOfTwo256(in UInt256 x, ulong mask, out UInt256 remainder)
     {
-        ulong x0 = x.u0;
-        ulong x1 = x.u1;
-        ulong x2 = x.u2;
-        ulong x3 = x.u3;
-        Unsafe.SkipInit(out remainder);
-        Unsafe.AsRef(in remainder.u0) = x0;
-        Unsafe.AsRef(in remainder.u1) = x1;
-        Unsafe.AsRef(in remainder.u2) = x2;
-        Unsafe.AsRef(in remainder.u3) = x3 & mask;
+        StoreProduct(out remainder, x.u0, x.u1, x.u2, x.u3 & mask);
     }
 
     [SkipLocalsInit]
