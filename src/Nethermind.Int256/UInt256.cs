@@ -659,6 +659,19 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         StoreLimbs(out res, r0, r1, r2, r3);
     }
 
+    // One limb as one 32-byte store: the scalar move already zeroes the upper lanes, so no lane inserts are needed.
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void StoreLowLimb(out UInt256 res, ulong r0)
+    {
+        if (Vector256.IsHardwareAccelerated)
+        {
+            Unsafe.SkipInit(out res);
+            Unsafe.As<UInt256, Vector256<ulong>>(ref res) = Vector256.CreateScalar(r0);
+            return;
+        }
+        StoreLimbs(out res, r0, 0, 0, 0);
+    }
+
     [SkipLocalsInit]
     [MethodImpl(BigOpInlining)]
     private static void MultiplyByUInt64(in UInt256 x, ulong y, out UInt256 res)
