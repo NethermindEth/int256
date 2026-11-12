@@ -1,0 +1,22 @@
+import UInt256.Methods.Compare.PrimitiveSafetyWrapper@width@
+import UInt256.Safety.ScalarOperatorResult
+
+namespace UInt256Proof.Compare.@name@@pre@@prim@@width@@post@
+open UInt256Model.Safety UInt256Proof.Compare.PrimitiveSafety
+
+/-- Exact comparison of the initial UInt256 and scalar values, with checked
+    finite return and preservation of caller memory. -/
+theorem scalar_correctness : ScalarOperatorContract @first@ false CIL.Value.i@width@
+    (fun input word => decide (@left@ @operation@ @right@))
+    Extracted.program Extracted.entryIndex := by
+  have meaning (input : BitVec 256) (word : BitVec @width@) :
+      (predicate leafSigned leafScalarFirst input @widened@ != wrapperNegate) =
+        decide (@left@ @operation@ @right@) := by
+    simp [show leafSigned = @leafSigned@ from rfl,
+      show leafScalarFirst = @leafFirst@ from rfl,
+      show wrapperNegate = @negated@ from rfl, predicate@widenProof@]
+    <;> (by_cases ordered : @left@ @operation@ @right@ <;> simp_all <;> omega)
+  simpa only [show wrapperScalarFirst = @first@ from rfl] using
+    ScalarOperatorContract.result_congr meaning checked@width@
+
+end UInt256Proof.Compare.@name@@pre@@prim@@width@@post@

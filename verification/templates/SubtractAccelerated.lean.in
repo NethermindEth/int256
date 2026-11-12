@@ -1,0 +1,12 @@
+import Extracted
+import UInt256.Methods.Subtract.AcceleratedContract
+
+namespace UInt256Proof.Subtract
+open Profile
+
+/-- @prefix@ @method@: @documentation@ -/
+theorem @ssePrefix@@flag@profile_correctness :
+    UInt256Model.Safety.@contract@ Extracted.program 0 :=
+  checked_accelerated_@kind@_contract Extracted.program 0 1 2 3 4 5 6 Extracted.profile rfl (by decide) (by decide) (by decide)
+    rfl rfl rfl rfl rfl rfl rfl
+end UInt256Proof.Subtract

@@ -1,0 +1,707 @@
+{
+  "schema": 1,
+  "generatedRoot": "proofs/Bindings",
+  "families": [
+    {
+      "template": "templates/EqualityOperator.lean.in",
+      "dimensions": [
+        [
+          { "op": "Eq", "operator": "op_Equality", "negated": "false" },
+          { "op": "Ne", "operator": "op_Inequality", "negated": "true" }
+        ],
+        [
+          { "pre": "UInt256", "post": "", "first": "false", "before": "Nethermind.Int256.UInt256&,", "after": "" },
+          { "pre": "", "post": "UInt256", "first": "true", "before": "", "after": ",Nethermind.Int256.UInt256&" }
+        ],
+        [
+          { "prim": "UInt", "signedPredicate": "", "signedImport": "", "signedWrap": "", "signedClose": "" },
+          {
+            "prim": "Int", "signedPredicate": "!decide (word.toInt < 0) && ",
+            "signedImport": "import UInt256.Methods.Equality.SignedPrimitive\n", "signedClose": ")"
+          }
+        ],
+        [{ "width": "32" }, { "width": "64" }],
+        [
+          { "profile": "scalar", "family": "scalar", "suffix": "Scalar", "vectorImport": "", "helper": "UnsignedPrimitive" },
+          {
+            "profile": "x64-v3", "family": "vector", "suffix": "Vector",
+            "vectorImport": "import UInt256.Methods.Equality.VectorPrimitiveWrapper\n", "helper": "VectorPrimitiveWrapper"
+          }
+        ]
+      ],
+      "assign": [
+        { "match": { "prim": "UInt", "width": "32" }, "set": { "type": "uint" } },
+        { "match": { "prim": "UInt", "width": "64" }, "set": { "type": "ulong" } },
+        {
+          "match": { "prim": "Int", "width": "32" },
+          "set": {
+            "type": "int",
+            "signedWrap": "UInt256Proof.Equality.SignedPrimitive.checked32 Extracted.profile Extracted.program 1 2 rfl\n      ("
+          }
+        },
+        {
+          "match": { "prim": "Int", "width": "64" },
+          "set": {
+            "type": "long",
+            "signedWrap": "UInt256Proof.Equality.SignedPrimitive.checked64 Extracted.profile Extracted.program 1 2 rfl\n      ("
+          }
+        },
+        { "match": { "prim": "UInt", "family": "scalar" }, "set": { "helperArgs": "1 2 3 rfl rfl rfl rfl" } },
+        { "match": { "prim": "Int", "family": "scalar" }, "set": { "helperArgs": "2 3 4 rfl rfl rfl rfl" } },
+        { "match": { "prim": "UInt", "family": "vector" }, "set": { "helperArgs": "1 2 rfl rfl rfl" } },
+        { "match": { "prim": "Int", "family": "vector" }, "set": { "helperArgs": "2 3 rfl rfl rfl" } }
+      ],
+      "gate": {
+        "name": "@op@@pre@@prim@@width@@post@-@profile@",
+        "method": "UInt256::@operator@(@before@@type@@after@)",
+        "profiles": ["@profile@"],
+        "proof": "@op@@pre@@prim@@width@@post@@suffix@.lean",
+        "theorem": "UInt256Proof.Equality.@op@@pre@@prim@@width@@post@.@family@_correctness"
+      }
+    },
+    {
+      "template": "templates/PrimitiveComparison.lean.in",
+      "dimensions": [
+        [
+          { "name": "Lt", "operation": "<", "operator": "op_LessThan", "negated": "false", "swap": "false" },
+          { "name": "Le", "operation": "≤", "operator": "op_LessThanOrEqual", "negated": "true", "swap": "true" },
+          { "name": "Gt", "operation": ">", "operator": "op_GreaterThan", "negated": "false", "swap": "true" },
+          { "name": "Ge", "operation": "≥", "operator": "op_GreaterThanOrEqual", "negated": "true", "swap": "false" }
+        ],
+        [
+          { "pre": "UInt256", "post": "", "first": "false", "before": "Nethermind.Int256.UInt256&,", "after": "" },
+          { "pre": "", "post": "UInt256", "first": "true", "before": "", "after": ",Nethermind.Int256.UInt256&" }
+        ],
+        [{ "prim": "UInt" }, { "prim": "Int" }],
+        [{ "width": "32", "widened": "(widen32 word)" }, { "width": "64", "widened": "word" }]
+      ],
+      "exclude": [{ "name": "Le", "first": "true", "prim": "UInt", "width": "64" }],
+      "assign": [
+        {
+          "match": { "prim": "UInt", "width": "32" },
+          "set": {
+            "type": "uint", "leafSigned": "true",
+            "widenProof": ", show wrapperSigned32 = false from rfl, widen32, UInt256Proof.Compare.zeroExtend32_toInt"
+          }
+        },
+        { "match": { "prim": "UInt", "width": "64" }, "set": { "type": "ulong", "leafSigned": "false", "widenProof": "" } },
+        {
+          "match": { "prim": "Int", "width": "32" },
+          "set": {
+            "type": "int", "leafSigned": "true",
+            "widenProof": ", show wrapperSigned32 = true from rfl, widen32, BitVec.toInt_signExtend_of_le (by decide : 32 ≤ 64)"
+          }
+        },
+        { "match": { "prim": "Int", "width": "64" }, "set": { "type": "long", "leafSigned": "true", "widenProof": "" } },
+        { "match": { "swap": "false", "first": "false" }, "set": { "leafFirst": "false" } },
+        { "match": { "swap": "false", "first": "true" }, "set": { "leafFirst": "true" } },
+        { "match": { "swap": "true", "first": "false" }, "set": { "leafFirst": "true" } },
+        { "match": { "swap": "true", "first": "true" }, "set": { "leafFirst": "false" } },
+        { "match": { "first": "false", "prim": "UInt" }, "set": { "left": "(input.toNat : Int)", "right": "(word.toNat : Int)" } },
+        { "match": { "first": "false", "prim": "Int" }, "set": { "left": "(input.toNat : Int)", "right": "word.toInt" } },
+        { "match": { "first": "true", "prim": "UInt" }, "set": { "left": "(word.toNat : Int)", "right": "(input.toNat : Int)" } },
+        { "match": { "first": "true", "prim": "Int" }, "set": { "left": "word.toInt", "right": "(input.toNat : Int)" } }
+      ],
+      "gate": {
+        "name": "@name@@pre@@prim@@width@@post@",
+        "method": "UInt256::@operator@(@before@@type@@after@)",
+        "profiles": ["scalar"],
+        "proof": "@name@@pre@@prim@@width@@post@Scalar.lean",
+        "theorem": "UInt256Proof.Compare.@name@@pre@@prim@@width@@post@.scalar_correctness"
+      }
+    },
+    {
+      "template": "templates/BitwiseScalar.lean.in",
+      "dimensions": [
+        [
+          {
+            "op": "And", "argument": ".and ", "applied": "BinaryContract (UInt256Model.Bitwise.applyBinary .and)",
+            "contractBreak": "\n      ", "module": "ScalarSafetyContract", "head": "scalar_correctness ",
+            "call": "And(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)"
+          },
+          {
+            "op": "Or", "argument": ".or ", "applied": "BinaryContract (UInt256Model.Bitwise.applyBinary .or)",
+            "contractBreak": "\n      ", "module": "ScalarSafetyContract", "head": "scalar_correctness ",
+            "call": "Or(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)"
+          },
+          {
+            "op": "Xor", "argument": ".xor ", "applied": "BinaryContract (UInt256Model.Bitwise.applyBinary .xor)",
+            "contractBreak": "\n      ", "module": "ScalarSafetyContract", "head": "scalar_correctness ",
+            "call": "Xor(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)"
+          },
+          {
+            "op": "Not", "argument": "", "applied": "UnaryContract (~~~·)", "contractBreak": " ",
+            "module": "NotScalar", "head": "not_correctness ",
+            "call": "Not(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)"
+          }
+        ],
+        [{ "prefix": "", "contractRoot": "UInt256Model.Safety.Wrapping", "indices": "0 1 (by rfl) (by rfl)" }]
+      ],
+      "gate": {
+        "name": "@prefix@@op@-scalar",
+        "method": "UInt256::@call@",
+        "profiles": ["scalar"],
+        "proof": "@prefix@@op@Scalar.lean",
+        "theorem": "UInt256Proof.@prefix@@op@.scalar_correctness"
+      }
+    },
+    {
+      "template": "templates/BitwiseScalar.lean.in",
+      "dimensions": [
+        [
+          {
+            "op": "And", "argument": ".and ", "applied": "BinaryContract (UInt256Model.Bitwise.applyBinary .and)",
+            "contractBreak": "\n      ", "module": "ScalarReturn", "head": "ReturnSafety.binary_correctness ",
+            "call": "op_BitwiseAnd(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)"
+          },
+          {
+            "op": "Or", "argument": ".or ", "applied": "BinaryContract (UInt256Model.Bitwise.applyBinary .or)",
+            "contractBreak": "\n      ", "module": "ScalarReturn", "head": "ReturnSafety.binary_correctness ",
+            "call": "op_BitwiseOr(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)"
+          },
+          {
+            "op": "Xor", "argument": ".xor ", "applied": "BinaryContract (UInt256Model.Bitwise.applyBinary .xor)",
+            "contractBreak": "\n      ", "module": "ScalarReturn", "head": "ReturnSafety.binary_correctness ",
+            "call": "op_ExclusiveOr(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)"
+          },
+          {
+            "op": "Not", "argument": "", "applied": "UnaryContract (~~~·)", "contractBreak": " ",
+            "module": "NotReturn", "head": "ReturnSafety.unary_correctness ",
+            "call": "op_OnesComplement(Nethermind.Int256.UInt256&)"
+          }
+        ],
+        [
+          {
+            "prefix": "Operator", "contractRoot": "UInt256Proof.Bitwise.ReturnSafety.",
+            "indices": "0 1 2 (by rfl) (by rfl) (by rfl)"
+          }
+        ]
+      ],
+      "gate": {
+        "name": "@prefix@@op@-scalar",
+        "method": "UInt256::@call@",
+        "profiles": ["scalar"],
+        "proof": "@prefix@@op@Scalar.lean",
+        "theorem": "UInt256Proof.@prefix@@op@.scalar_correctness"
+      }
+    },
+    {
+      "template": "templates/BitwiseVector.lean.in",
+      "dimensions": [
+        [
+          {
+            "op": "And", "vectorArgument": ".and ", "applied": "BinaryContract (UInt256Model.Bitwise.applyBinary .and)",
+            "module": "VectorSafety", "head": "VectorSafety.correctness ",
+            "call": "And(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)"
+          },
+          {
+            "op": "Or", "vectorArgument": ".or ", "applied": "BinaryContract (UInt256Model.Bitwise.applyBinary .or)",
+            "module": "VectorSafety", "head": "VectorSafety.correctness ",
+            "call": "Or(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)"
+          },
+          {
+            "op": "Xor", "vectorArgument": ".xor ", "applied": "BinaryContract (UInt256Model.Bitwise.applyBinary .xor)",
+            "module": "VectorSafety", "head": "VectorSafety.correctness ",
+            "call": "Xor(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)"
+          },
+          {
+            "op": "Not", "vectorArgument": "", "applied": "UnaryContract (~~~·)",
+            "module": "NotVectorSafety", "head": "NotVectorSafety.correctness ",
+            "call": "Not(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)"
+          }
+        ],
+        [{ "prefix": "", "contractRoot": "UInt256Model.Safety.Wrapping", "indices": "0 1 (by rfl) (by rfl)" }]
+      ],
+      "gate": {
+        "name": "@prefix@@op@-x64-v3",
+        "method": "UInt256::@call@",
+        "profiles": ["x64-v3"],
+        "proof": "@prefix@@op@Vector.lean",
+        "theorem": "UInt256Proof.@prefix@@op@.vector_correctness"
+      }
+    },
+    {
+      "template": "templates/BitwiseVector.lean.in",
+      "dimensions": [
+        [
+          {
+            "op": "And", "applied": "BinaryContract (UInt256Model.Bitwise.applyBinary .and)",
+            "head": "VectorReturn.binary_correctness .and ",
+            "call": "op_BitwiseAnd(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)"
+          },
+          {
+            "op": "Or", "applied": "BinaryContract (UInt256Model.Bitwise.applyBinary .or)",
+            "head": "VectorReturn.binary_correctness .or ",
+            "call": "op_BitwiseOr(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)"
+          },
+          {
+            "op": "Xor", "applied": "BinaryContract (UInt256Model.Bitwise.applyBinary .xor)",
+            "head": "VectorReturn.binary_correctness .xor ",
+            "call": "op_ExclusiveOr(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)"
+          },
+          {
+            "op": "Not", "applied": "UnaryContract (~~~·)", "head": "VectorReturn.unary_correctness ",
+            "call": "op_OnesComplement(Nethermind.Int256.UInt256&)"
+          }
+        ],
+        [
+          {
+            "prefix": "Operator", "contractRoot": "UInt256Proof.Bitwise.ReturnSafety.", "module": "VectorReturn",
+            "vectorArgument": "", "indices": "0 1 2 (by rfl) (by rfl) (by rfl)"
+          }
+        ]
+      ],
+      "gate": {
+        "name": "@prefix@@op@-x64-v3",
+        "method": "UInt256::@call@",
+        "profiles": ["x64-v3"],
+        "proof": "@prefix@@op@Vector.lean",
+        "theorem": "UInt256Proof.@prefix@@op@.vector_correctness"
+      }
+    },
+    {
+      "template": "templates/Shift.lean.in",
+      "dimensions": [
+        [{ "direction": "left", "short": "Lsh" }, { "direction": "right", "short": "Rsh" }],
+        [
+          { "profile": "scalar", "family": "scalar", "storage": "Scalar", "accelerated": "false" },
+          { "profile": "x64-v3", "family": "vector", "storage": "Vector", "accelerated": "true" }
+        ]
+      ],
+      "gate": {
+        "name": "@short@-@profile@",
+        "method": "UInt256::@short@(Nethermind.Int256.UInt256&,int,Nethermind.Int256.UInt256&)",
+        "profiles": ["@profile@"],
+        "proof": "@short@@storage@.lean",
+        "theorem": "UInt256Proof.@short@.@family@_correctness"
+      }
+    },
+    {
+      "template": "templates/ShiftWrapper.lean.in",
+      "dimensions": [
+        [{ "direction": "left", "long": "LeftShift" }, { "direction": "right", "long": "RightShift" }],
+        [
+          { "profile": "scalar", "family": "scalar", "storage": "Scalar", "accelerated": "false" },
+          { "profile": "x64-v3", "family": "vector", "storage": "Vector", "accelerated": "true" }
+        ]
+      ],
+      "gate": {
+        "name": "@long@-@profile@",
+        "method": "UInt256::@long@(int,Nethermind.Int256.UInt256&)",
+        "profiles": ["@profile@"],
+        "proof": "@long@@storage@.lean",
+        "theorem": "UInt256Proof.@long@.@family@_correctness"
+      }
+    },
+    {
+      "template": "templates/ShiftOperator.lean.in",
+      "dimensions": [
+        [
+          { "direction": "left", "short": "Lsh", "operator": "op_LeftShift" },
+          { "direction": "right", "short": "Rsh", "operator": "op_RightShift" }
+        ],
+        [
+          { "profile": "scalar", "family": "scalar", "storage": "Scalar", "accelerated": "false" },
+          { "profile": "x64-v3", "family": "vector", "storage": "Vector", "accelerated": "true" }
+        ]
+      ],
+      "gate": {
+        "name": "Operator@short@-@profile@",
+        "method": "UInt256::@operator@(Nethermind.Int256.UInt256&,int)",
+        "profiles": ["@profile@"],
+        "proof": "Operator@short@@storage@.lean",
+        "theorem": "UInt256Proof.Operator@short@.@family@_correctness"
+      }
+    },
+    {
+      "template": "templates/PrimitiveEquals.lean.in",
+      "dimensions": [
+        [
+          {
+            "prim": "UInt", "signedPredicate": "", "gap": " ", "signedWrap": "", "signedClose": "",
+            "documentation": "Primitive equality with finite checked return and preservation of all caller bytes."
+          },
+          {
+            "prim": "Int", "signedPredicate": "!decide (word.toInt < 0) && ", "gap": "\n      ", "signedClose": ")",
+            "documentation": "Signed primitive equality rejects negative inputs and preserves caller bytes."
+          }
+        ],
+        [{ "width": "32" }, { "width": "64" }],
+        [
+          { "profile": "scalar", "family": "scalar", "suffix": "Scalar", "helper": "UnsignedPrimitive" },
+          { "profile": "x64-v3", "family": "vector", "suffix": "Vector", "helper": "VectorPrimitiveWrapper" }
+        ]
+      ],
+      "assign": [
+        { "match": { "prim": "UInt", "width": "32" }, "set": { "type": "uint" } },
+        { "match": { "prim": "UInt", "width": "64" }, "set": { "type": "ulong" } },
+        {
+          "match": { "prim": "Int", "width": "32" },
+          "set": {
+            "type": "int",
+            "signedWrap": "UInt256Proof.Equality.SignedPrimitive.checked32 Extracted.profile Extracted.program 0 1 rfl\n    ("
+          }
+        },
+        {
+          "match": { "prim": "Int", "width": "64" },
+          "set": {
+            "type": "long",
+            "signedWrap": "UInt256Proof.Equality.SignedPrimitive.checked64 Extracted.profile Extracted.program 0 1 rfl\n    ("
+          }
+        },
+        {
+          "match": { "prim": "UInt", "family": "scalar" },
+          "set": {
+            "module": "UnsignedPrimitive", "wrapperImport": "",
+            "helperArgs": "\n    Extracted.profile Extracted.program 0 1 2 rfl rfl rfl rfl"
+          }
+        },
+        {
+          "match": { "prim": "UInt", "family": "vector" },
+          "set": {
+            "module": "VectorPrimitiveWrapper", "wrapperImport": "",
+            "helperArgs": "\n    Extracted.profile Extracted.program 0 1 rfl rfl rfl"
+          }
+        },
+        {
+          "match": { "prim": "Int", "family": "scalar" },
+          "set": {
+            "module": "SignedPrimitive", "wrapperImport": "",
+            "helperArgs": " Extracted.profile Extracted.program 1 2 3 rfl rfl rfl rfl"
+          }
+        },
+        {
+          "match": { "prim": "Int", "family": "vector" },
+          "set": {
+            "module": "SignedPrimitive", "wrapperImport": "import UInt256.Methods.Equality.VectorPrimitiveWrapper\n",
+            "helperArgs": " Extracted.profile Extracted.program 1 2 rfl rfl rfl"
+          }
+        }
+      ],
+      "gate": {
+        "name": "Equals@prim@@width@-@profile@",
+        "method": "UInt256::Equals(@type@)",
+        "profiles": ["@profile@"],
+        "proof": "Equals@prim@@width@@suffix@.lean",
+        "theorem": "UInt256Proof.Equality.Equals@prim@@width@.@family@_correctness"
+      }
+    },
+    {
+      "template": "templates/FullComparison.lean.in",
+      "dimensions": [
+        [
+          { "name": "Lt", "operation": "<", "operator": "op_LessThan", "audit": "", "binding": "less" },
+          { "name": "Le", "operation": "≤", "operator": "op_LessThanOrEqual", "audit": "LessEqual", "binding": "less_equal" },
+          { "name": "Gt", "operation": ">", "operator": "op_GreaterThan", "audit": "Greater", "binding": "greater" },
+          {
+            "name": "Ge", "operation": "≥", "operator": "op_GreaterThanOrEqual", "audit": "GreaterEqual",
+            "binding": "greater_equal"
+          }
+        ],
+        [
+          { "profile": "scalar", "family": "scalar", "suffix": "Scalar" },
+          { "profile": "x64-v3", "family": "avx2", "suffix": "Avx2" }
+        ]
+      ],
+      "gate": {
+        "name": "@name@UInt256UInt256-@profile@",
+        "method": "UInt256::@operator@(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+        "profiles": ["@profile@"],
+        "proof": "@name@UInt256UInt256@suffix@.lean",
+        "theorem": "UInt256Proof.Compare.@name@UInt256UInt256.@family@_correctness"
+      }
+    },
+    {
+      "template": "templates/NativeComparison.lean.in",
+      "dimensions": [
+        [
+          { "name": "Lt", "operation": "<", "operator": "op_LessThan", "less": "true", "inclusive": "false" },
+          { "name": "Le", "operation": "≤", "operator": "op_LessThanOrEqual", "less": "true", "inclusive": "true" },
+          { "name": "Gt", "operation": ">", "operator": "op_GreaterThan", "less": "false", "inclusive": "false" },
+          { "name": "Ge", "operation": "≥", "operator": "op_GreaterThanOrEqual", "less": "false", "inclusive": "true" }
+        ]
+      ],
+      "gate": {
+        "name": "@name@UInt256UInt256-x64-v4",
+        "method": "UInt256::@operator@(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+        "profiles": ["x64-v4"],
+        "proof": "@name@UInt256UInt256Avx512.lean",
+        "theorem": "UInt256Proof.Compare.@name@UInt256UInt256.avx512_correctness"
+      }
+    },
+    {
+      "template": "templates/AddAccelerated.lean.in",
+      "dimensions": [
+        [
+          {
+            "method": "Add", "flag": "", "suffix": "",
+            "signature": " UInt256Model.Safety.WrappingBinaryContract (· + ·) Extracted.program 0 :=",
+            "documentation": "wrapping sum of the initial operands, checked finite return, writable output, caller bytes kept."
+          },
+          {
+            "method": "AddOverflow", "flag": "overflow_", "suffix": "_overflow",
+            "signature": "\n    UInt256Model.Safety.ReportingBinaryContract (fun left right => left + right)\n      (fun left right => decide (2^256 ≤ left.toNat + right.toNat)) Extracted.program 0 :=",
+            "documentation": "exact unsigned carry and wrapping sum of the initial operands, checked return, caller bytes kept."
+          }
+        ],
+        [
+          {
+            "profile": "arm64-advsimd", "file": "arm64_advsimd", "prefix": "AdvSimd", "ssePrefix": "", "unit": "arm",
+            "extra": "", "checks": "rfl rfl rfl rfl rfl rfl rfl"
+          },
+          {
+            "profile": "x64-sse42", "file": "x64_sse42", "prefix": "SSE4.2", "ssePrefix": "sse_", "unit": "sse",
+            "extra": "5 ", "checks": "rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl", "module": "SSEContract"
+          }
+        ]
+      ],
+      "assign": [
+        { "match": { "profile": "arm64-advsimd", "method": "Add" }, "set": { "module": "ARMContract" } },
+        { "match": { "profile": "arm64-advsimd", "method": "AddOverflow" }, "set": { "module": "ARMOverflowContract" } }
+      ],
+      "gate": {
+        "name": "@method@-@profile@",
+        "method": "UInt256::@method@(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+        "profiles": ["@profile@"],
+        "proof": "@method@Profile_@file@.lean",
+        "theorem": "UInt256Proof.Add.@ssePrefix@@flag@profile_correctness"
+      },
+      "handwritten": [
+        {
+          "method": "Add", "profile": "scalar", "proof": "proofs/AddScalar.lean",
+          "theorem": "UInt256Proof.Add.scalar_correctness"
+        },
+        {
+          "method": "AddOverflow", "profile": "scalar", "proof": "proofs/AddOverflowScalar.lean",
+          "theorem": "UInt256Proof.Add.overflow_scalar_correctness"
+        }
+      ]
+    },
+    {
+      "template": "templates/SubtractAccelerated.lean.in",
+      "dimensions": [
+        [
+          {
+            "method": "Subtract", "flag": "", "kind": "subtract", "contract": "WrappingBinaryContract (· - ·)",
+            "documentation": "wrapping difference of the initial operands, checked finite return, writable output, caller bytes kept."
+          },
+          {
+            "method": "SubtractUnderflow", "flag": "underflow_", "kind": "underflow",
+            "contract": "ReportingBinaryContract (· - ·) (fun a b => decide (a.toNat < b.toNat))",
+            "documentation": "exact underflow flag and wrapping difference through the same certified call graph."
+          }
+        ],
+        [
+          { "profile": "arm64-advsimd", "file": "arm64_advsimd", "prefix": "AdvSimd", "ssePrefix": "" },
+          { "profile": "x64-sse42", "file": "x64_sse42", "prefix": "SSE4.2", "ssePrefix": "sse_" }
+        ]
+      ],
+      "gate": {
+        "name": "@method@-@profile@",
+        "method": "UInt256::@method@(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+        "profiles": ["@profile@"],
+        "proof": "@method@Profile_@file@.lean",
+        "theorem": "UInt256Proof.Subtract.@ssePrefix@@flag@profile_correctness"
+      },
+      "handwritten": [
+        {
+          "method": "Subtract", "profile": "scalar", "proof": "proofs/SubtractScalar.lean",
+          "theorem": "UInt256Proof.Subtract.scalar_correctness"
+        },
+        {
+          "method": "SubtractUnderflow", "profile": "scalar", "proof": "proofs/SubtractUnderflowScalar.lean",
+          "theorem": "UInt256Proof.Subtract.underflow_scalar_correctness"
+        }
+      ]
+    },
+    {
+      "template": "templates/AddSubtractVector.lean.in",
+      "dimensions": [
+        [
+          {
+            "name": "Add", "method": "Add", "flag": "", "contract": "add_contract",
+            "signature": " UInt256Model.Safety.WrappingBinaryContract (· + ·) Extracted.program 0 :=",
+            "documentation": "wrapping sum of the initial operands, checked return, writable output, caller bytes kept.",
+            "checks": " rfl rfl rfl rfl\n    ⟨rfl, rfl, rfl, rfl⟩"
+          },
+          {
+            "name": "Add", "method": "AddOverflow", "flag": "overflow_", "contract": "add_overflow_contract",
+            "signature": "\n    UInt256Model.Safety.ReportingBinaryContract (· + ·)\n      (fun left right => decide (2^256 ≤ left.toNat + right.toNat)) Extracted.program 0 :=",
+            "documentation": "exact initial-operand carry, wrapping sum, writable output, caller bytes kept.",
+            "checks": " rfl rfl rfl rfl\n    ⟨rfl, rfl, rfl, rfl⟩"
+          },
+          {
+            "name": "Subtract", "method": "Subtract", "flag": "", "contract": "subtract_contract",
+            "signature": " UInt256Model.Safety.WrappingBinaryContract (· - ·) Extracted.program 0 :=",
+            "documentation": "wrapping difference of the initial operands, checked return, writable output, caller bytes kept.",
+            "checks": " true rfl rfl rfl\n    ⟨rfl, rfl, rfl, rfl, rfl⟩"
+          },
+          {
+            "name": "Subtract", "method": "SubtractUnderflow", "flag": "underflow_", "contract": "subtract_underflow_contract",
+            "signature": "\n    UInt256Model.Safety.ReportingBinaryContract (· - ·) (fun left right => decide (left.toNat < right.toNat))\n      Extracted.program 0 :=",
+            "documentation": "exact initial-operand borrow, wrapping difference, writable output, caller bytes kept.",
+            "checks": " true rfl rfl rfl\n    ⟨rfl, rfl, rfl, rfl, rfl⟩"
+          }
+        ],
+        [
+          { "profile": "x64-v3", "file": "x64_v3", "wide": "false" },
+          { "profile": "x64-v4", "file": "x64_v4", "wide": "true" }
+        ]
+      ],
+      "gate": {
+        "name": "@method@-@profile@",
+        "method": "UInt256::@method@(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+        "profiles": ["@profile@"],
+        "proof": "@method@Profile_@file@.lean",
+        "theorem": "UInt256Proof.@name@.@flag@profile_correctness"
+      }
+    },
+    {
+      "template": "templates/Multiply.lean.in",
+      "dimensions": [
+        [
+          {
+            "method": "Multiply",
+            "selector": "Multiply(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+            "imports": "", "opened": "Entry", "slot": "1", "offset": "0", "body": "4 6", "primitiveContext": "",
+            "contract": "WrappingBinaryContract (· * ·)", "adaptation": "WrappingBinaryContract",
+            "call": "multiply_checked_contract context (profile_word_contract context rfl) (profile_top_contract context rfl)"
+          },
+          {
+            "method": "MultiplyInstance",
+            "selector": "Multiply(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+            "imports": "import UInt256.Safety.BinaryForwarder\n", "opened": "UInt256Proof.Multiply UInt256Proof.Multiply.Entry",
+            "slot": "2", "offset": "1", "body": "5 7", "primitiveContext": "",
+            "contract": "WrappingBinaryContract (· * ·)", "adaptation": "WrappingBinaryContract",
+            "call": "UInt256Model.Safety.forward_wrapping_binary embedded 0 1 Extracted.method0 (· * ·)\n    rfl rfl rfl rfl rfl rfl rfl\n    (multiply_checked_contract context (profile_word_contract context rfl) (profile_top_contract context rfl))"
+          },
+          {
+            "method": "OperatorMultiplyUInt256UInt256",
+            "selector": "op_Multiply(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+            "imports": "", "opened": "UInt256Proof.Multiply UInt256Proof.Multiply.Entry",
+            "slot": "2", "offset": "1", "body": "5 7", "primitiveContext": "",
+            "contract": "AggregateReturn.BinaryContract (· * ·)", "adaptation": "AggregateReturn.BinaryContract",
+            "call": "UInt256Model.Safety.AggregateReturn.binary_checked (· * ·) Extracted.profile embedded 0 1 rfl\n    (initialized_result context (profile_word_contract context rfl) (profile_top_contract context rfl))"
+          },
+          {
+            "method": "OperatorMultiplyUInt256UInt32",
+            "selector": "op_Multiply(Nethermind.Int256.UInt256&,uint)",
+            "imports": "import UInt256.Methods.Multiply.EntryPrimitiveSafety\n",
+            "opened": "UInt256Proof.Multiply UInt256Proof.Multiply.Entry", "slot": "2", "offset": "1", "body": "5 7",
+            "primitiveContext": "private def primitiveContext : PrimitiveContext := ⟨context, 0, (profileIndices Extracted.profile 1).word + 1, (profileIndices Extracted.profile 1).word + 2, true, false, rfl, rfl, rfl⟩\n",
+            "contract": "OrderedScalarContract false CIL.Value.i32 (fun input word => encoded (input * BitVec.ofNat 256 word.toNat))",
+            "adaptation": "OrderedScalarContract",
+            "call": "primitive32_with_contracts primitiveContext rfl (profile_word_contract context rfl) (profile_top_contract context rfl)"
+          },
+          {
+            "method": "OperatorMultiplyUInt256UInt64",
+            "selector": "op_Multiply(Nethermind.Int256.UInt256&,ulong)",
+            "imports": "import UInt256.Methods.Multiply.EntryPrimitiveSafety\n",
+            "opened": "UInt256Proof.Multiply UInt256Proof.Multiply.Entry", "slot": "2", "offset": "1", "body": "5 7",
+            "primitiveContext": "private def primitiveContext : PrimitiveContext := ⟨context, 0, (profileIndices Extracted.profile 1).word + 1, (profileIndices Extracted.profile 1).word + 2, false, false, rfl, rfl, rfl⟩\n",
+            "contract": "OrderedScalarContract false CIL.Value.i64 (fun input word => encoded (input * BitVec.ofNat 256 word.toNat))",
+            "adaptation": "OrderedScalarContract",
+            "call": "primitive64_with_contracts primitiveContext rfl (profile_word_contract context rfl) (profile_top_contract context rfl)"
+          },
+          {
+            "method": "OperatorMultiplyUInt32UInt256",
+            "selector": "op_Multiply(uint,Nethermind.Int256.UInt256&)",
+            "imports": "import UInt256.Methods.Multiply.EntryPrimitiveSafety\n",
+            "opened": "UInt256Proof.Multiply UInt256Proof.Multiply.Entry", "slot": "2", "offset": "1", "body": "5 7",
+            "primitiveContext": "private def primitiveContext : PrimitiveContext := ⟨context, 0, (profileIndices Extracted.profile 1).word + 1, (profileIndices Extracted.profile 1).word + 2, true, true, rfl, rfl, rfl⟩\n",
+            "contract": "OrderedScalarContract true CIL.Value.i32 (fun input word => encoded (input * BitVec.ofNat 256 word.toNat))",
+            "adaptation": "OrderedScalarContract",
+            "call": "primitive32_with_contracts primitiveContext rfl (profile_word_contract context rfl) (profile_top_contract context rfl)"
+          },
+          {
+            "method": "OperatorMultiplyUInt64UInt256",
+            "selector": "op_Multiply(ulong,Nethermind.Int256.UInt256&)",
+            "imports": "import UInt256.Methods.Multiply.EntryPrimitiveSafety\n",
+            "opened": "UInt256Proof.Multiply UInt256Proof.Multiply.Entry", "slot": "2", "offset": "1", "body": "5 7",
+            "primitiveContext": "private def primitiveContext : PrimitiveContext := ⟨context, 0, (profileIndices Extracted.profile 1).word + 1, (profileIndices Extracted.profile 1).word + 2, false, true, rfl, rfl, rfl⟩\n",
+            "contract": "OrderedScalarContract true CIL.Value.i64 (fun input word => encoded (input * BitVec.ofNat 256 word.toNat))",
+            "adaptation": "OrderedScalarContract",
+            "call": "primitive64_with_contracts primitiveContext rfl (profile_word_contract context rfl) (profile_top_contract context rfl)"
+          }
+        ]
+      ],
+      "gate": {
+        "name": "@method@",
+        "method": "UInt256::@selector@",
+        "profiles": ["scalar", "arm64-advsimd", "x64-v3", "x64-v3-v128", "x64-v4", "x64-v4-v128"],
+        "proof": "@method@Profile.lean",
+        "theorem": "UInt256Proof.@method@.profile_correctness"
+      }
+    },
+    {
+      "template": "templates/ReferenceEquality.lean.in",
+      "dimensions": [
+        [
+          {
+            "method": "EqUInt256UInt256",
+            "selector": "op_Equality(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+            "module": "Equality.ReferenceOperator", "contractName": "ReadOnlyContract", "arity": " 2",
+            "meaning": "(fun values => .i32 (if values[0]?.getD 0 = values[1]?.getD 0 then 1 else 0))",
+            "before": "  apply (by simpa using UInt256Proof.Equality.ReferenceOperator.readOnly_contract (fun a b => decide (a = b)) Extracted.program 0)\n  intro memory left right call\n  simpa using UInt256Proof.Equality.ReferenceOperator.checked (fun a b => decide (a = b)) Extracted.profile false Extracted.program 0 1 rfl\n    (fun m l r c => by simpa using ",
+            "indices": "1 2", "after": " m l r c) memory left right call"
+          },
+          {
+            "method": "NeUInt256UInt256",
+            "selector": "op_Inequality(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+            "module": "Equality.ReferenceOperator", "contractName": "ReadOnlyContract", "arity": " 2",
+            "meaning": "(fun values => .i32 (if values[0]?.getD 0 ≠ values[1]?.getD 0 then 1 else 0))",
+            "before": "  simp only [ne_eq, ite_not]\n  apply (by simpa using UInt256Proof.Equality.ReferenceOperator.readOnly_contract (fun a b => decide (a ≠ b)) Extracted.program 0)\n  intro memory left right call\n  simpa using UInt256Proof.Equality.ReferenceOperator.checked (fun a b => decide (a = b)) Extracted.profile true Extracted.program 0 1 rfl (by\n    intro m l r c\n    simpa using UInt256Proof.Equality.ReferenceOperator.checked (fun a b => decide (a = b)) Extracted.profile false Extracted.program 1 2 rfl (by\n      intro m2 l2 r2 c2\n      simpa using ",
+            "indices": "2 3", "after": " m2 l2 r2 c2) m l r c) memory left right call"
+          },
+          {
+            "method": "EqualsUInt256Ref",
+            "selector": "Equals(Nethermind.Int256.UInt256&)",
+            "module": "Equality.ReferenceOperator", "contractName": "ReadOnlyContract", "arity": " 2",
+            "meaning": "(fun values => .i32 (if values[0]?.getD 0 = values[1]?.getD 0 then 1 else 0))",
+            "before": "  apply (by simpa using UInt256Proof.Equality.ReferenceOperator.readOnly_contract (fun a b => decide (a = b)) Extracted.program 0)\n  intro memory left right call\n  simpa using ",
+            "indices": "0 1", "after": " memory left right call"
+          },
+          {
+            "method": "EqualsUInt256Value",
+            "selector": "Equals(Nethermind.Int256.UInt256)",
+            "module": "ValueForwarder32", "contractName": "ReadOnlyScalarContract", "arity": "",
+            "meaning": "UInt256Proof.ValueForwarder32.encode\n      (fun left right => .i32 (if left = right then 1 else 0))",
+            "before": "  apply UInt256Proof.ValueForwarder32.checked Extracted.profile Extracted.program 0 1 true\n    (fun left right => if left = right then 1 else 0)\n  · intro left right _; split <;> simp\n  · rfl\n  · exact ",
+            "indices": "1 2", "after": ""
+          }
+        ],
+        [
+          { "profile": "x64-sse42", "family": "sse", "wrapper": "Sse", "checks": "rfl rfl rfl rfl" },
+          { "profile": "x64-v3", "family": "vector", "wrapper": "Vector", "checks": "rfl rfl rfl" }
+        ]
+      ],
+      "gate": {
+        "name": "@method@-@profile@",
+        "method": "UInt256::@selector@",
+        "profiles": ["@profile@"],
+        "proof": "@method@@wrapper@.lean",
+        "theorem": "UInt256Proof.Equality.@method@.@family@_correctness"
+      },
+      "handwritten": [
+        {
+          "method": "EqUInt256UInt256", "selector": "op_Equality(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+          "profile": "scalar", "proof": "proofs/EqualityScalar.lean", "theorem": "UInt256Proof.Equality.scalar_correctness"
+        },
+        {
+          "method": "NeUInt256UInt256", "selector": "op_Inequality(Nethermind.Int256.UInt256&,Nethermind.Int256.UInt256&)",
+          "profile": "scalar", "proof": "proofs/InequalityScalar.lean",
+          "theorem": "UInt256Proof.Equality.scalar_inequality_correctness"
+        },
+        {
+          "method": "EqualsUInt256Ref", "selector": "Equals(Nethermind.Int256.UInt256&)",
+          "profile": "scalar", "proof": "proofs/EqualityScalar.lean", "theorem": "UInt256Proof.Equality.scalar_correctness"
+        },
+        {
+          "method": "EqualsUInt256Value", "selector": "Equals(Nethermind.Int256.UInt256)",
+          "profile": "scalar", "proof": "proofs/EqualsUInt256ValueScalar.lean",
+          "theorem": "UInt256Proof.Equality.EqualsUInt256Value.scalar_correctness"
+        }
+      ]
+    }
+  ]
+}
