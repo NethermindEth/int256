@@ -74,6 +74,15 @@ public readonly partial struct UInt256
             // else y is 2^64 or larger - not a special-case, continue.
         }
 
+        // Powers of two are the most common divisors in contract code. The shift also answers x < y with zero
+        // and x == y with one, so it needs neither the compare chain below nor the call to DivideFull. Only
+        // where popcnt is one instruction: a software population count costs more than the chain it skips.
+        if (Popcnt.X64.IsSupported && PopCount(in y) == 1)
+        {
+            DivideByPowerOfTwo(in x, in y, out res);
+            return;
+        }
+
         // Decide "u64 fast path" vs "wide path" with minimal register pressure
         //
         // Key idea: do not read x1 unless we already know x3|x2 == 0.
@@ -495,6 +504,18 @@ public readonly partial struct UInt256
         }
 
         result = intermediate;
+    }
+
+    // y is a power of two. Its one set bit sits in the only non-zero limb, so the bit position within that limb
+    // comes from the OR of all limbs and the limb index from which limbs are non-zero, without a branch.
+    [SkipLocalsInit]
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void DivideByPowerOfTwo(in UInt256 x, in UInt256 y, out UInt256 res)
+    {
+        ulong y1 = y.u1, y2 = y.u2, y3 = y.u3;
+        int shift = BitOperations.TrailingZeroCount(y.u0 | y1 | y2 | y3)
+            + ((y1 != 0 ? 64 : 0) | (y2 != 0 ? 128 : 0) | (y3 != 0 ? 192 : 0));
+        Rsh(in x, shift, out res);
     }
 
     [SkipLocalsInit]
