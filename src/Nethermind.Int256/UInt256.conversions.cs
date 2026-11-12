@@ -23,16 +23,17 @@ public readonly partial struct UInt256
     public TypeCode GetTypeCode() => TypeCode.Object;
     public bool ToBoolean(IFormatProvider? provider) => !IsZero;
     public byte ToByte(IFormatProvider? provider) => checked((byte)ToUInt64(provider));
-    public char ToChar(IFormatProvider? provider) => System.Convert.ToChar(ToDecimal(provider), provider);
-    public DateTime ToDateTime(IFormatProvider? provider) => System.Convert.ToDateTime(ToDecimal(provider), provider);
+    public char ToChar(IFormatProvider? provider) => System.Convert.ToChar(ToDecimal(provider));
+    public DateTime ToDateTime(IFormatProvider? provider) => System.Convert.ToDateTime(ToDecimal(provider));
     public decimal ToDecimal(IFormatProvider? provider) => (decimal)this;
     public double ToDouble(IFormatProvider? provider) => (double)this;
     public short ToInt16(IFormatProvider? provider) => checked((short)ToUInt64(provider));
     public int ToInt32(IFormatProvider? provider) => checked((int)ToUInt64(provider));
     public long ToInt64(IFormatProvider? provider) => checked((long)ToUInt64(provider));
     public sbyte ToSByte(IFormatProvider? provider) => checked((sbyte)ToUInt64(provider));
-    public float ToSingle(IFormatProvider? provider) => System.Convert.ToSingle(ToDouble(provider), provider);
-    public string ToString(IFormatProvider? provider) => ((BigInteger)this).ToString(provider);
+    public float ToSingle(IFormatProvider? provider) => (float)ToDouble(provider);
+    // Digits are ASCII under every culture, so the provider changes nothing.
+    public string ToString(IFormatProvider? provider) => ToString();
     public object ToType(Type conversionType, IFormatProvider? provider) =>
         conversionType == typeof(BigInteger)
             ? (BigInteger)this
