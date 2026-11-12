@@ -41,5 +41,10 @@ theorem call : CallingConditions Extracted.program memory [⟨0, @INPUT_BASE@⟩
     subst output
     rfl
   · exact empty_static_world_valid _ _ (by decide) (by decide) rfl
-@THEOREM@
+theorem accepted : CallingConditions Extracted.program memory [⟨0, @INPUT_BASE@⟩, ⟨0, @INPUT_BASE@⟩] [⟨1, 0⟩] ∧
+    (invoke Extracted.program 1024 0 (binaryArguments ⟨0, @INPUT_BASE@⟩ ⟨0, @INPUT_BASE@⟩ ⟨1, 0⟩) memory).map
+      (fun outcome => (inputValue outcome.1 ⟨1, 0⟩, outcome.2)) =
+      .ok (inputValue memory ⟨0, @INPUT_BASE@⟩ + inputValue memory ⟨0, @INPUT_BASE@⟩, []) ∧
+    (invoke Extracted.program 1024 @PROBE@ [.reference (.address ⟨0, @INPUT_BASE@⟩)] memory).map Prod.snd =
+      .ok [.scalar (.i64 @PROBE_VALUE@)] := ⟨call, by rfl, by rfl⟩
 end SafetyWitness

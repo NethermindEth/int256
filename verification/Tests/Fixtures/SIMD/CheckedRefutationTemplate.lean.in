@@ -21,18 +21,18 @@ theorem wellFormed : memory.WellFormed := by
       exact ⟨by decide, by simp [Allocation.WellFormed, nativeLimit]⟩
     · simp [memory, h] at present
   · simp [memory]
-theorem call : CallingConditions Extracted.program memory @INPUTS@ @OUTPUTS@ := by
+theorem call : CallingConditions Extracted.program memory [⟨0,0⟩,⟨0,64⟩] [⟨0,@OUTPUT@⟩] := by
   refine ⟨⟨wellFormed, ?_, ?_⟩, ?_⟩
   · intro input member
     simp only [List.map_cons, List.map_nil, List.mem_cons, List.not_mem_nil, or_false] at member
-    @INPUT_CASES@
+    rcases member with rfl | rfl <;> exact ⟨_, rfl⟩
   · intro output member
     simp only [List.map_cons, List.map_nil, List.mem_cons, List.not_mem_nil, or_false] at member
-    @OUTPUT_CASE@
+    subst output; rfl
   · exact empty_static_world_valid _ memory (by decide) (by decide) rfl
 theorem refuted : ¬ @CONTRACT@ @ARGUMENTS@ Extracted.program 0 := by
   apply UInt256Model.Safety.ContractRefutation.@LEMMA@ Extracted.program 0 1024 @ARGUMENTS@
-    memory @REFERENCES@ @WITNESS@ call
+    memory ⟨0,0⟩ ⟨0,64⟩ ⟨0,@OUTPUT@⟩ @WITNESS@ call
   · rfl
   · decide
 end FixtureWitness

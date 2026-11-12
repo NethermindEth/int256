@@ -1,4 +1,6 @@
 import Extracted
+import UInt256.Methods.Bitwise.Contract
+import UInt256.Methods.Bitwise.ReturnComposition
 import UInt256.Methods.Bitwise.SafetyRefutation
 namespace BitwiseWitness
 open CIL.Safety UInt256Model.Safety
@@ -27,11 +29,11 @@ theorem call : CallingConditions Extracted.program memory @INPUTS@ @OUTPUTS@ := 
     simp only [List.map_cons, List.map_nil, List.mem_cons, List.not_mem_nil, or_false] at member
     @INPUT_CASES@
   · intro output member
-    simp only [List.map_cons, List.map_nil, List.mem_cons, List.not_mem_nil, or_false] at member
     @OUTPUT_CASE@
   · change StaticWorldValid [] memory
     exact empty_static_world_valid [] memory (by decide) (by decide) rfl
-theorem refuted : ¬ @CONTRACT@ @OPERATION@ Extracted.program 0 := by
+-- The statement restates the production contract, so the gate checks it at production's negation.
+theorem refuted : ¬ @STATEMENT@ Extracted.program 0 := by
   apply UInt256Proof.Bitwise.@REFUTATION@ Extracted.program 0 256 @OPERATION@
     memory @REFERENCES@ @ACTUAL@ call
   · rfl

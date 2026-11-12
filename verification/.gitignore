@@ -6,4 +6,5 @@ generated/
 __pycache__/
 # Binding sources and method templates are generated before verification.
 /proofs/Bindings/
+/proofs/Variants/
 /UInt256/Generated/

@@ -19,10 +19,10 @@ jobs:
     name: Select verification gates
     runs-on: ubuntu-24.04
     outputs:
-      contracts: ${{ steps.gates.outputs.contracts }}
-      matrix: ${{ steps.gates.outputs.matrix }}
-      regressions: ${{ steps.gates.outputs.regressions }}
-      count: ${{ steps.gates.outputs.count }}
+      contracts: ${{ steps.plan.outputs.contracts }}
+      count: ${{ steps.plan.outputs.count }}
+      matrix: ${{ steps.plan.outputs.matrix }}
+      plan: ${{ steps.plan.outputs.plan }}
       support-run: ${{ steps.support.outputs.run-id }}
       support-artifacts: ${{ steps.support.outputs.artifact-ids }}
       support-sha256: ${{ steps.support.outputs.sha256 }}
@@ -34,62 +34,76 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
-      - name: Install Lean toolchain for template materialization
+      - name: Install Lean toolchain for dependency resolution
         uses: leanprover/lean-action@24581d74d674803a25a81b10b059c5c0cdd344c6 # v1.6.2
         with:
           lake-package-directory: verification
           auto-config: false
           use-github-cache: false
           use-mathlib-cache: false
-      - id: gates
+      - name: Generate method templates and binding sources
+        shell: pwsh
+        run: ./verification/prepare.ps1
+      - name: Plan gate groups
+        id: plan
         shell: pwsh
         env:
           EVENT_NAME: ${{ github.event_name }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          dotnet run --file verification/SelectGates.cs -- --event "$env:EVENT_NAME" --base "$env:BASE_SHA" --head "$env:HEAD_SHA" --output "$env:GITHUB_OUTPUT"
-          if ($LASTEXITCODE -ne 0) { throw 'Gate selection failed' }
-          dotnet run --file verification/TestVerification.cs
-          if ($LASTEXITCODE -ne 0) { throw 'Verification runner regression checks failed' }
+          $changed = @()
+          if ($env:EVENT_NAME -eq 'pull_request') {
+            $changed = @(git diff --name-only --no-renames "$env:BASE_SHA...$env:HEAD_SHA")
+            if ($LASTEXITCODE -ne 0) { throw 'Changed-file listing failed' }
+          }
+          # Contracts depend on production code, build inputs, this workflow and every verification source.
+          $trigger = '^(src/(?!Nethermind\.Int256\.(Tests|Benchmark)/)|verification/|\.github/workflows/verification\.yml$|' +
+            '(.*/)?(global\.json|NuGet\.Config|Directory\.(Build|Packages)\..*|\.editorconfig)$)'
+          $contracts = $env:EVENT_NAME -ne 'pull_request' -or
+            @($changed | Where-Object { $_ -match $trigger -and $_ -notmatch '\.(md|txt)$' }).Count -gt 0
+          $selection = @($changed | ForEach-Object { '--changed'; $_ })
+          $tool = 'verification/.lake/packages/leancil/Extractor/bin/Nethermind.LeanCIL.dll'
+          $plan = dotnet $tool gates verification/gates.json --plan 8 --costs verification/manifests/costs.json @selection --format json
+          if ($LASTEXITCODE -ne 0) { throw 'Gate planning failed' }
+          $document = ($plan -join "`n") | ConvertFrom-Json
+          $groups = @($document.groups | ForEach-Object id)
+          # A placeholder keeps the matrix valid when the verify job is skipped.
+          $matrix = @{ group = $groups.Count -gt 0 ? $groups : @('none') } | ConvertTo-Json -Compress
+          "Planned $($document.selected.Count) rows in $($groups.Count) groups; contracts: $contracts"
+          "contracts=$("$contracts".ToLowerInvariant())", "count=$($groups.Count)", "matrix=$matrix",
+            "plan=$($document | ConvertTo-Json -Depth 10 -Compress)" | Out-File -Append $env:GITHUB_OUTPUT
       - name: Find certified support from a successful main run
         id: support
-        if: steps.gates.outputs.count != '0'
+        if: steps.plan.outputs.count != '0'
+        shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-        run: dotnet run --file verification/FindConsumerSupport.cs
-
-  contracts:
-    name: Contracts and supporting theorem audit
-    needs: [select, prepare]
-    if: needs.select.outputs.contracts == 'true'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    env:
-      LEAN_NUM_THREADS: 2
-      LEANCIL_CERTIFIED_LIBRARY: ${{ github.workspace }}/verification/artifacts/certified-library
-      LEANCIL_CERTIFIED_LIBRARY_SHA256: ${{ needs.prepare.outputs.manifest-sha256 }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Install Lean toolchain
-        uses: leanprover/lean-action@24581d74d674803a25a81b10b059c5c0cdd344c6 # v1.6.2
-        with:
-          lake-package-directory: verification
-          auto-config: false
-          use-github-cache: false
-          use-mathlib-cache: false
-      - uses: actions/setup-dotnet@v6
-        with:
-          dotnet-version: 10.0.x
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          artifact-ids: ${{ needs.prepare.outputs.artifact-id }}
-          path: verification/artifacts/certified-library
-      - name: Build contracts and audit supporting theorems
-        shell: pwsh
-        run: dotnet run --file verification/Verify.cs -- --action contracts
+        run: |
+          if ($env:GITHUB_REPOSITORY -notmatch '\A[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\z') { throw 'Invalid GITHUB_REPOSITORY' }
+          # Only a successful push to this repository's main branch may supply support; PR artifacts never do.
+          # Each digest comes from the trusted run's artifact name, never from downloaded content.
+          $run = $null; $artifacts = @(); $digests = @()
+          try {
+            $runs = gh api "repos/$env:GITHUB_REPOSITORY/actions/workflows/verification.yml/runs?event=push&branch=main&status=success&per_page=1" | ConvertFrom-Json
+            if ($LASTEXITCODE -ne 0) { throw 'Run lookup failed' }
+            $trusted = @($runs.workflow_runs | Where-Object {
+              $_.event -ceq 'push' -and $_.head_branch -ceq 'main' -and $_.conclusion -ceq 'success' -and
+              $_.head_repository.full_name -ceq $env:GITHUB_REPOSITORY }) | Select-Object -First 1
+            if ($trusted) {
+              $listing = gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/$($trusted.id)/artifacts?per_page=100" | ConvertFrom-Json
+              if ($LASTEXITCODE -ne 0) { throw 'Artifact lookup failed' }
+              # Every group of the trusted run exports its own manifest; receivers combine them.
+              foreach ($artifact in $listing.artifacts) {
+                if ($artifact.expired -or $artifact.name -cnotmatch '\Aconsumer-support-job-\d+-\d+-([a-f0-9]{64})\z') { continue }
+                if ($digests -cnotcontains $Matches[1]) { $digests += $Matches[1]; $artifacts += $artifact.id }
+              }
+              if ($artifacts) { $run = $trusted.id }
+            }
+          }
+          catch { "Previous consumer support unavailable; verification will check fresh proofs. $_" }
+          "run-id=$run", "artifact-ids=$($artifacts -join ',')", "sha256=$($digests -join ',')" | Out-File -Append $env:GITHUB_OUTPUT
+          if ($run) { "Consumer support from main run $run, artifacts $($artifacts -join ', ')." } else { 'No reusable main-branch artifact found.' }
 
   prepare:
     name: Prepare certified LeanCIL library
@@ -132,17 +146,17 @@ jobs:
           retention-days: 7
 
   verify:
-    name: Certificates (${{ matrix.id }})
+    name: Certificates and regressions (${{ matrix.group }})
     needs: [select, prepare]
     if: needs.select.outputs.count != '0'
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 150
     env:
       LEAN_NUM_THREADS: 2
       LEANCIL_CERTIFIED_LIBRARY: ${{ github.workspace }}/verification/artifacts/certified-library
       LEANCIL_CERTIFIED_LIBRARY_SHA256: ${{ needs.prepare.outputs.manifest-sha256 }}
       LEANCIL_TRACE_DIRECTORY: ${{ github.workspace }}/verification/artifacts/verification-traces
-      LEANCIL_SUITE: ${{ matrix.id }}
+      LEANCIL_SUITE: ${{ matrix.group }}
       LEANCIL_EXPORT_CONSUMER_SUPPORT: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && format('{0}/verification/artifacts/consumer-support-export', github.workspace) || '' }}
     strategy:
       fail-fast: false
@@ -177,11 +191,16 @@ jobs:
           github-token: ${{ github.token }}
           path: verification/artifacts/consumer-support-import
           merge-multiple: true
-      - name: Verify compiled methods
+      - name: Generate method templates and binding sources
+        shell: pwsh
+        run: ./verification/prepare.ps1
+      - name: Verify the group's rows
         id: certificate
         shell: pwsh
+        working-directory: verification
         env:
-          VERIFY_GROUPS: ${{ toJSON(matrix.groups) }}
+          PLAN: ${{ needs.select.outputs.plan }}
+          GROUP: ${{ matrix.group }}
           SUPPORT_DIGESTS: ${{ steps.support.outcome == 'success' && needs.select.outputs.support-sha256 || '' }}
           LEANCIL_RESTORE_CONSUMER_SUPPORT: 'true'
         run: |
@@ -191,13 +210,29 @@ jobs:
             $env:LEANCIL_CONSUMER_SUPPORT = (($env:SUPPORT_DIGESTS -split ',') | ForEach-Object { "$directory/$_.json" }) -join [IO.Path]::PathSeparator
             $env:LEANCIL_CONSUMER_SUPPORT_SHA256 = $env:SUPPORT_DIGESTS
           }
-          # Two workspaces at -j2 fill the 4 vCPUs; verify-batch defaults to one per 8 cores.
-          dotnet run --file verification/Verify.cs -- --action verify --groups-json "$env:VERIFY_GROUPS" --parallel 2
+          New-Item -ItemType Directory -Force artifacts/gate-results | Out-Null
+          Set-Content -LiteralPath artifacts/plan.json -Value $env:PLAN
+          # Two workspaces at -j2 fill the 4 vCPUs.
+          dotnet .lake/packages/leancil/Extractor/bin/Nethermind.LeanCIL.dll gates gates.json --plan-group artifacts/plan.json $env:GROUP `
+            --results "artifacts/gate-results/$env:GROUP.json" --parallel 2
+          if ($LASTEXITCODE -ne 0) { throw 'A planned row did not pass' }
+      - name: Run rejected Bitwise mutations natively
+        shell: pwsh
+        working-directory: verification
+        run: ./native-witness.ps1 -Results artifacts/gate-results/${{ matrix.group }}.json
+      - name: Retain gate results
+        if: always() && steps.certificate.outcome != 'skipped'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: gate-results-${{ matrix.group }}-${{ github.run_attempt }}
+          path: verification/artifacts/gate-results
+          if-no-files-found: warn
+          retention-days: 7
       - name: Publish certified consumer support for future runs
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.certificate.outputs.consumer-support-sha256 != ''
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: consumer-support-${{ matrix.id }}-${{ github.run_attempt }}-${{ steps.certificate.outputs.consumer-support-sha256 }}
+          name: consumer-support-${{ matrix.group }}-${{ github.run_attempt }}-${{ steps.certificate.outputs.consumer-support-sha256 }}
           path: verification/artifacts/consumer-support-export
           # Compiled support lives under .lake paths inside <digest>.files.
           include-hidden-files: true
@@ -214,7 +249,7 @@ jobs:
         if: always() && steps.certificate.outcome != 'skipped'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: verification-${{ matrix.id }}-${{ github.run_attempt }}
+          name: verification-${{ matrix.group }}-${{ github.run_attempt }}
           path: |
             verification/artifacts/verification-traces
             verification/artifacts/timings.json
@@ -222,28 +257,24 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
-  regressions:
-    name: Regressions (${{ matrix.id }})
-    needs: [select, prepare]
-    # Same trigger as the contract audit: any verification source, the LeanCIL pin or production code.
-    if: needs.select.outputs.contracts == 'true'
+  verification:
+    name: Verify UInt256
+    needs: [select, prepare, verify]
+    if: always()
     runs-on: ubuntu-24.04
-    timeout-minutes: 150
+    timeout-minutes: 45
     env:
+      LEAN_NUM_THREADS: 2
       LEANCIL_CERTIFIED_LIBRARY: ${{ github.workspace }}/verification/artifacts/certified-library
       LEANCIL_CERTIFIED_LIBRARY_SHA256: ${{ needs.prepare.outputs.manifest-sha256 }}
-      LEANCIL_TRACE_DIRECTORY: ${{ github.workspace }}/verification/artifacts/verification-traces
-      LEANCIL_SUITE: regressions-${{ matrix.id }}
-    strategy:
-      fail-fast: false
-      max-parallel: 2
-      # Generated from manifests/regressions.json, which each sharded runner checks against its profiles.
-      matrix: ${{ fromJSON(needs.select.outputs.regressions) }}
+      SELECTED: ${{ needs.select.result == 'success' && (needs.select.outputs.count != '0' || needs.select.outputs.contracts == 'true') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: env.SELECTED == 'true'
         with:
           persist-credentials: false
       - name: Install Lean toolchain
+        if: env.SELECTED == 'true'
         uses: leanprover/lean-action@24581d74d674803a25a81b10b059c5c0cdd344c6 # v1.6.2
         with:
           lake-package-directory: verification
@@ -251,78 +282,69 @@ jobs:
           use-github-cache: false
           use-mathlib-cache: false
       - uses: actions/setup-dotnet@v6
+        if: env.SELECTED == 'true'
         with:
           dotnet-version: 10.0.x
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: env.SELECTED == 'true' && needs.select.outputs.contracts == 'true' && needs.prepare.result == 'success'
         with:
           artifact-ids: ${{ needs.prepare.outputs.artifact-id }}
           path: verification/artifacts/certified-library
-      - name: Refute incorrect implementations and reject their production proofs
+      - name: Generate method templates and binding sources
+        id: sources
+        if: env.SELECTED == 'true'
+        shell: pwsh
+        run: ./verification/prepare.ps1
+      - name: Build contracts and audit supporting theorems
+        id: contracts
+        if: always() && steps.sources.outcome == 'success' && needs.select.outputs.contracts == 'true' && needs.prepare.result == 'success'
+        shell: pwsh
+        working-directory: verification
+        run: |
+          # The streamed build surfaces sorry warnings; the audit then kernel-replays the oleans without running UInt256 code.
+          lake build
+          if ($LASTEXITCODE -ne 0) { throw 'Contract build failed' }
+          # UInt256 roots every library module; both namespaces must match a theorem, and only the core axioms are allowed.
+          dotnet .lake/packages/leancil/Extractor/bin/Nethermind.LeanCIL.dll audit-library --project . --module UInt256 `
+            --prefix UInt256Model --prefix UInt256Proof --axioms propext,Quot.sound,Classical.choice
+          if ($LASTEXITCODE -ne 0) { throw 'Supporting theorem audit failed' }
+          'UInt256 contracts and supporting lemmas checked. No compiled-method certificate was produced.'
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: always() && steps.sources.outcome == 'success' && needs.select.outputs.count != '0'
+        with:
+          pattern: gate-results-*-${{ github.run_attempt }}
+          path: verification/artifacts/gate-results
+          merge-multiple: true
+      - name: Require a passing result for every planned row
+        id: results
+        if: always() && steps.sources.outcome == 'success' && needs.select.outputs.count != '0'
         shell: pwsh
         working-directory: verification
         env:
-          RUNS: ${{ toJSON(matrix.runs) }}
+          PLAN: ${{ needs.select.outputs.plan }}
         run: |
-          lake update
-          if ($LASTEXITCODE -ne 0) { throw 'Dependency resolution failed' }
-          dotnet build .lake/packages/leancil/Extractor -c Release
-          if ($LASTEXITCODE -ne 0) { throw 'Extractor build failed' }
-          $failed = @()
-          foreach ($run in ($env:RUNS | ConvertFrom-Json -NoEnumerate)) {
-            $file = $run[0]
-            $arguments = @($run | Select-Object -Skip 1)
-            dotnet run --file $file -- . @arguments
-            if ($LASTEXITCODE -ne 0) { $failed += ($run -join ' ') }
-          }
-          if ($failed) { throw "Regression runners failed: $($failed -join '; ')" }
-      - name: Summarize verification timings
-        if: always()
-        shell: pwsh
-        working-directory: verification
-        run: |
-          dotnet run --file .lake/packages/leancil/scripts/SummarizeVerification.cs -- --root artifacts/verification-traces --output artifacts/timings.json --markdown artifacts/timings.md --github-summary
-          if ($LASTEXITCODE -ne 0) { throw 'Timing summary failed' }
-      - name: Retain timings and failure logs
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: regressions-${{ matrix.id }}-${{ github.run_attempt }}
-          path: |
-            verification/artifacts/verification-traces
-            verification/artifacts/timings.json
-            verification/artifacts/timings.md
-            verification/artifacts/*-regressions/**/*.log
-          if-no-files-found: warn
-          retention-days: 7
-
-  verification:
-    name: Verify UInt256
-    needs: [select, contracts, prepare, verify, regressions]
-    if: always()
-    runs-on: ubuntu-24.04
-    steps:
+          New-Item -ItemType Directory -Force artifacts/gate-results | Out-Null
+          Set-Content -LiteralPath artifacts/plan.json -Value $env:PLAN
+          dotnet .lake/packages/leancil/Extractor/bin/Nethermind.LeanCIL.dll gates gates.json --require-results artifacts/gate-results --plan artifacts/plan.json
+          if ($LASTEXITCODE -ne 0) { throw 'A planned row has no passing result' }
       - name: Require every selected verification check
+        if: always()
         shell: pwsh
         env:
           SELECT_RESULT: ${{ needs.select.result }}
           CONTRACTS_SELECTED: ${{ needs.select.outputs.contracts }}
-          CONTRACTS_RESULT: ${{ needs.contracts.result }}
-          CERTIFICATE_COUNT: ${{ needs.select.outputs.count }}
+          CONTRACTS_OUTCOME: ${{ steps.contracts.outcome }}
+          GROUP_COUNT: ${{ needs.select.outputs.count }}
           PREPARE_RESULT: ${{ needs.prepare.result }}
           VERIFY_RESULT: ${{ needs.verify.result }}
-          REGRESSIONS_RESULT: ${{ needs.regressions.result }}
+          RESULTS_OUTCOME: ${{ steps.results.outcome }}
         run: |
           if ($env:SELECT_RESULT -ne 'success') { throw 'Gate selection failed' }
-          if ($env:CONTRACTS_SELECTED -eq 'true' -and $env:CONTRACTS_RESULT -ne 'success') {
-            throw 'Contract audit did not pass'
-          }
-          if ($env:CONTRACTS_SELECTED -eq 'true' -and $env:REGRESSIONS_RESULT -ne 'success') {
-            throw 'A mutation regression suite did not pass'
-          }
-          if ([int]$env:CERTIFICATE_COUNT -gt 0 -and $env:VERIFY_RESULT -ne 'success') {
-            throw 'A selected certificate did not pass'
-          }
-          if (([int]$env:CERTIFICATE_COUNT -gt 0 -or $env:CONTRACTS_SELECTED -eq 'true') -and $env:PREPARE_RESULT -ne 'success') {
+          if (([int]$env:GROUP_COUNT -gt 0 -or $env:CONTRACTS_SELECTED -eq 'true') -and $env:PREPARE_RESULT -ne 'success') {
             throw 'Shared library certification did not pass'
+          }
+          if ($env:CONTRACTS_SELECTED -eq 'true' -and $env:CONTRACTS_OUTCOME -ne 'success') { throw 'Contract audit did not pass' }
+          if ([int]$env:GROUP_COUNT -gt 0 -and ($env:VERIFY_RESULT -ne 'success' -or $env:RESULTS_OUTCOME -ne 'success')) {
+            throw 'A selected certificate or regression did not pass'
           }
           'All selected verification checks passed.'

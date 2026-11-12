@@ -5,5 +5,5 @@ import UInt256.Methods.Add.OverflowSafetyAudit
 theorem UInt256Proof.Add.overflow_scalar_correctness :
     UInt256Model.Safety.ReportingBinaryContract (fun left right => left + right)
       (fun left right => decide (2^256 ≤ left.toNat + right.toNat))
-      Extracted.program Extracted.entryIndex :=
+      Extracted.program 0 :=
   UInt256Proof.Safety.checked_overflow_binding
