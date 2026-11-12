@@ -367,7 +367,7 @@ public readonly partial struct UInt256
         => MultiplyModWideCore(in x, in y, in m, out res);
 
     [SkipLocalsInit]
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(BigOpInlining)]
     private static void MultiplyModWideCore(in UInt256 x, in UInt256 y, in UInt256 m, out UInt256 res)
     {
         Multiply256To512Bit(in x, in y, out UInt256 lo, out UInt256 hi);
@@ -1633,7 +1633,7 @@ public readonly partial struct UInt256
     // One Knuth D step against a two-limb divisor: divide (hi:mid) by v1, then take q*v0 off
     // (rhat:low). Writing the correction as p -= v0 keeps a second product out of it.
     [SkipLocalsInit]
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(BigOpInlining)]
     private static ulong Remainder128Step(
         ulong high, ulong mid, ref ulong low, ulong v0, ulong v1, ulong recip, bool guardSaturation)
     {
@@ -1677,7 +1677,7 @@ public readonly partial struct UInt256
     // Finish one Knuth D digit against a three-limb divisor: the divide left rhat in place of qhat*v2,
     // so only qhat*(v1:v0) remains and D3's own product is its top limb. Returns the new top limb.
     [SkipLocalsInit]
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(BigOpInlining)]
     private static ulong Remainder192Step(ulong qhat, ulong rhat, ulong rcarry, ref ulong m1, ref ulong m0, ulong v0, ulong v1, ulong v2)
     {
         ulong a1 = m1;
@@ -2679,7 +2679,7 @@ public readonly partial struct UInt256
         public ulong w0, w1, w2, w3, w4, w5, w6, w7, w8;
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(BigOpInlining)]
     private static void KnuthStep(ref ulong u0, ref ulong u1, ref ulong u2, ulong d0, ulong d1, ulong reciprocal)
     {
         ulong oldU2 = u2;
@@ -2859,9 +2859,10 @@ public readonly partial struct UInt256
     // Dispatch on the narrower operand alone: an n x 4 product still needs only n*4
     // multiplies, so requiring both operands to be narrow leaves the common n x 4 shapes
     // on the full-width path. Every helper takes four arguments so none of them spills an
-    // operand to the stack on win-x64, and inlining keeps the 64x64 case in the caller.
+    // operand to the stack on win-x64, and inlining keeps the 64x64 case in the caller (except in
+    // the compact zkEVM variant, which keeps this method out of line).
     [SkipLocalsInit]
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(BigOpInlining)]
     private static void Multiply256To512Bit(in UInt256 x, in UInt256 y, out UInt256 low, out UInt256 high)
     {
         if ((x.u2 | x.u3) == 0)
@@ -3082,7 +3083,7 @@ public readonly partial struct UInt256
     }
 
     [SkipLocalsInit]
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(BigOpInlining)]
     private static void Multiply256To512BitLarge(in UInt256 x, in UInt256 y, out UInt256 low, out UInt256 high)
     {
         // Copy inputs up front - this breaks aliasing with out params so we can store early.
@@ -4397,7 +4398,7 @@ public readonly partial struct UInt256
     // Knuth steps (unrolled)
     // qhat correction (at most twice in Knuth D)
     [SkipLocalsInit]
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(BigOpInlining)]
     private static ulong SubMul4(in UInt256 u, ref ulong u4, in UInt256 v, ulong q, out UInt256 rem)
     {
         ulong borrow = 0;
@@ -4431,7 +4432,7 @@ public readonly partial struct UInt256
         return borrow;
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(BigOpInlining)]
     private static ulong SubMul4(ref ulong u0, ref ulong u1, ref ulong u2, ref ulong u3, ref ulong u4, ulong v0, ulong v1, ulong v2, ulong v3, ulong q)
     {
         ulong borrow = 0;

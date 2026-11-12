@@ -184,7 +184,7 @@ public readonly partial struct UInt256
         result = sum;
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(BigOpInlining)]
     private static void MultiplyExpTruncated(in UInt256 x, in UInt256 y, int limbs, out UInt256 result)
     {
         if (limbs == 4) { Multiply(x, y, out result); return; }
@@ -234,7 +234,7 @@ public readonly partial struct UInt256
         MultiplyExpNearOne(value, power, out result);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(BigOpInlining)]
     private static void MultiplyExpPrefix(in UInt256 value, in UInt256 power, out UInt256 result)
     {
         if ((uint)power.u0 == 1)
@@ -243,7 +243,7 @@ public readonly partial struct UInt256
             MultiplyExpPower(value, power, out result);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(BigOpInlining)]
     private static void MultiplyExpLowOne32(in UInt256 x, in UInt256 y, out UInt256 res)
     {
         // Repeated odd squares eventually make y = 1 + q*2^32 (mod 2^64).
@@ -275,7 +275,7 @@ public readonly partial struct UInt256
         StoreProduct(out res, r0, r1, r2, r3);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(BigOpInlining)]
     private static void MultiplyExpNearOne(in UInt256 value, in UInt256 power, out UInt256 result)
     {
         if (value.IsUint64)
@@ -298,7 +298,7 @@ public readonly partial struct UInt256
         StoreProduct(out result, value.u0, r1, r2, r3);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(BigOpInlining)]
     private static void SquareExpPrefix(in UInt256 value, out UInt256 result)
     {
         if (Bmi2.X64.IsSupported || ArmBase.Arm64.IsSupported || (uint)value.u0 != 1)
@@ -309,7 +309,7 @@ public readonly partial struct UInt256
         SquareExpLowOne32(value, out result);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(BigOpInlining)]
     private static void SquareExpLowOne32(in UInt256 value, out UInt256 result)
     {
         ulong q = value.u0 >> 32;
