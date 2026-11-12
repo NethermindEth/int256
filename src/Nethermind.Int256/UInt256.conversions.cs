@@ -23,16 +23,17 @@ public readonly partial struct UInt256
     public TypeCode GetTypeCode() => TypeCode.Object;
     public bool ToBoolean(IFormatProvider? provider) => !IsZero;
     public byte ToByte(IFormatProvider? provider) => checked((byte)ToUInt64(provider));
-    public char ToChar(IFormatProvider? provider) => System.Convert.ToChar(ToDecimal(provider), provider);
-    public DateTime ToDateTime(IFormatProvider? provider) => System.Convert.ToDateTime(ToDecimal(provider), provider);
+    public char ToChar(IFormatProvider? provider) => System.Convert.ToChar(ToDecimal(provider));
+    public DateTime ToDateTime(IFormatProvider? provider) => System.Convert.ToDateTime(ToDecimal(provider));
     public decimal ToDecimal(IFormatProvider? provider) => (decimal)this;
     public double ToDouble(IFormatProvider? provider) => (double)this;
     public short ToInt16(IFormatProvider? provider) => checked((short)ToUInt64(provider));
     public int ToInt32(IFormatProvider? provider) => checked((int)ToUInt64(provider));
     public long ToInt64(IFormatProvider? provider) => checked((long)ToUInt64(provider));
     public sbyte ToSByte(IFormatProvider? provider) => checked((sbyte)ToUInt64(provider));
-    public float ToSingle(IFormatProvider? provider) => System.Convert.ToSingle(ToDouble(provider), provider);
-    public string ToString(IFormatProvider? provider) => ((BigInteger)this).ToString(provider);
+    public float ToSingle(IFormatProvider? provider) => (float)ToDouble(provider);
+    // Digits are ASCII under every culture, so the provider changes nothing.
+    public string ToString(IFormatProvider? provider) => ToString();
     public object ToType(Type conversionType, IFormatProvider? provider) =>
         conversionType == typeof(BigInteger)
             ? (BigInteger)this
@@ -257,6 +258,11 @@ public readonly partial struct UInt256
             return TryParseHex(TrimWhiteSpace(value), out result);
         }
 
+        if (style == NumberStyles.None)
+        {
+            return TryParseDigits(value, out result, out _);
+        }
+
         NumberFormatInfo numberFormatInfo = NumberFormatInfo.GetInstance(provider);
         if (style == NumberStyles.Integer &&
             numberFormatInfo.PositiveSign == "+" &&
@@ -383,6 +389,25 @@ public readonly partial struct UInt256
         return true;
     }
 
+    /// <summary>
+    /// Reads <see cref="NumberStyles.None"/> text from the limbs: only the digits 0-9, with trailing NUL characters
+    /// ignored as the framework parsers ignore them. Text of digits only that still fails to parse overflows 256 bits.
+    /// </summary>
+    /// <remarks>Keeps BigInteger, and its allocation, off the digits-only path.</remarks>
+    internal static bool TryParseDigits(ReadOnlySpan<char> value, out UInt256 result, out bool overflow)
+    {
+        value = value.TrimEnd('\0');
+        if (value.IsEmpty || value.ContainsAnyExceptInRange('0', '9'))
+        {
+            result = Zero;
+            overflow = false;
+            return false;
+        }
+
+        overflow = !TryParseDecimal(value, out result);
+        return !overflow;
+    }
+
     private static bool TryParseHexChunk(ReadOnlySpan<char> value, ref int end, int start, out ulong chunk)
     {
         chunk = 0;
@@ -419,7 +444,7 @@ public readonly partial struct UInt256
         return true;
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(BigOpInlining)]
     private static bool TryMultiplyByUInt64AndAdd(in UInt256 value, ulong multiplier, ulong addend, out UInt256 result)
     {
         ulong high = Multiply64(value.u0, multiplier, out ulong u0);

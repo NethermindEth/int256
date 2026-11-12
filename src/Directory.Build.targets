@@ -5,6 +5,11 @@
     <None Include="**/*.std.cs" />
   </ItemGroup>
 
+  <!-- The compact zkEVM variant (Int256ZkEvmCompact) trades a few cycles for code size. -->
+  <PropertyGroup Condition="'$(EnableZkEvm)' == 'true' and '$(Int256ZkEvmCompact)' == 'true'">
+    <DefineConstants>$(DefineConstants);ZKEVM_COMPACT</DefineConstants>
+  </PropertyGroup>
+
   <ItemGroup Condition="'$(EnableZkEvm)' != 'true'">
     <Compile Remove="**/*.zkevm.cs" />
     <None Include="**/*.zkevm.cs" />

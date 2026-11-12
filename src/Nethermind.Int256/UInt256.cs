@@ -38,14 +38,8 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
 
     public static UInt256 Negate(in UInt256 a)
     {
-        ulong cs0 = 0 - a.u0;
-        ulong cs1 = 0 - a.u1;
-        ulong cs2 = 0 - a.u2;
-        ulong cs3 = 0 - a.u3;
-        if (a.u0 > 0)
-            cs3--;
-
-        return new UInt256(cs0, cs1, cs2, cs3);
+        Subtract(in Zero, in a, out UInt256 res);
+        return res;
     }
 
     public (ulong value, bool overflow) UlongWithOverflow => (u0, (u1 | u2 | u3) != 0);
@@ -608,7 +602,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     /// <param name="y">The second 256‑bit unsigned integer.</param>
     /// <param name="res">When this method returns, contains the 256‑bit product of x and y.</param>
     [SkipLocalsInit]
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(BigOpInlining)]
     public static void Multiply(in UInt256 x, in UInt256 y, out UInt256 res)
     {
         ulong x0 = x.u0;
@@ -666,7 +660,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     }
 
     [SkipLocalsInit]
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(BigOpInlining)]
     private static void MultiplyByUInt64(in UInt256 x, ulong y, out UInt256 res)
     {
         if (y <= 1)
@@ -730,7 +724,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
 
     // x fits in two limbs: five full products and two low halves instead of six and four.
     [SkipLocalsInit]
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(BigOpInlining)]
     private static void MultiplyLimbs2x4(in UInt256 x, in UInt256 y, out UInt256 res)
     {
         ulong x0 = x.u0;
@@ -770,7 +764,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     // ValueOperands takes the scalar top limb, so by-value operands are read as limbs only. A type argument rather than
     // a bool: without AVX2 the JIT keeps this kernel out of line, where a bool would cost the direct path an argument.
     [SkipLocalsInit]
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(BigOpInlining)]
     private static void MultiplyLimbs4x4<TOperands>(in UInt256 x, in UInt256 y, out UInt256 res) where TOperands : struct
     {
         ulong x0 = x.u0;
@@ -842,21 +836,20 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
         ulong c0 = s0 < a0 ? 1UL : 0UL;
         a0 = s0;
 
-        // a1 += hi + c0; c1 = carry out (0..2)
+        // The high half of a 64x64 product is at most 2^64 - 2, so hi + c0 cannot wrap and one carry test
+        // covers a1 + hi + c0 instead of two.
+        hi += c0;
         ulong s1 = a1 + hi;
-        ulong c1 = s1 < a1 ? 1UL : 0UL;
-        s1 += c0;
-        c1 += s1 < c0 ? 1UL : 0UL;
         a1 = s1;
 
-        // a2 += c1 (a2 stays small here)
-        a2 += c1;
+        // a2 stays small here
+        a2 += s1 < hi ? 1UL : 0UL;
     }
 
     public void Multiply(in UInt256 a, out UInt256 res) => Multiply(this, a, out res);
 
     [SkipLocalsInit]
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(BigOpInlining)]
     public static bool MultiplyOverflow(in UInt256 x, in UInt256 y, out UInt256 res)
     {
         ulong xTop = x.u2 | x.u3;
@@ -929,7 +922,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
     }
 
     [SkipLocalsInit]
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(BigOpInlining)]
     private static bool MultiplyOverflow2x3(in UInt256 x, in UInt256 y, out UInt256 res)
     {
         ulong x0 = x.u0, x1 = x.u1;
@@ -975,7 +968,7 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
                     : 64 - BitOperations.LeadingZeroCount(u0);
 
     [SkipLocalsInit]
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(BigOpInlining)]
     private void Squared(out UInt256 result)
     {
         ulong x0 = u0;
@@ -1591,9 +1584,34 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
 
     public int CompareTo(object? obj) => obj is not UInt256 int256 ? throw new InvalidOperationException() : CompareTo(int256);
 
+    /// <summary>
+    /// Formats the value as <see cref="BigInteger"/> formats it. <c>D</c>, <c>G</c> without a precision, <c>X</c> and
+    /// <c>B</c> are written from the limbs; any other format goes through <see cref="BigInteger"/>.
+    /// </summary>
     public string ToString(string format)
     {
-        return ((BigInteger)this).ToString(format);
+        if (!TryParseLimbFormat(format, out char kind, out int precision))
+        {
+            return ((BigInteger)this).ToString(format);
+        }
+
+        Span<char> buffer = stackalloc char[LimbFormatDigits + 1];
+        int start = WriteLimbDigits(in this, signed: false, kind, buffer, out _);
+        // BigInteger reads a leading hex digit above 7, or a leading binary 1, as a sign, so it writes a 0 before it.
+        if (kind != 'D' && !IsZero && (kind == 'B' || BitLen % 4 == 0))
+        {
+            buffer[--start] = '0';
+        }
+
+        ReadOnlySpan<char> digits = buffer[start..];
+        if (precision <= digits.Length)
+        {
+            return new string(digits);
+        }
+
+        Span<char> text = precision <= 512 ? stackalloc char[precision] : new char[precision];
+        Compose(text, default, digits);
+        return new string(text);
     }
 
     public bool IsUint64 => (u1 | u2 | u3) == 0;

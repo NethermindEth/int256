@@ -13,7 +13,10 @@ public class MulModOptimizationBenchmarks
     private readonly UInt256[] _right = new UInt256[Count];
     private readonly UInt256[] _moduli = new UInt256[Count];
 
-    [Params("full", "shift", "192", "192shift", "128", "128shift", "64", "max", "narrow", "pow64")]
+    private static readonly UInt256 Bn254ScalarField = UInt256.Parse("21888242871839275222246405745257275088548364400416034343698204186575808495617");
+    private static readonly UInt256 Bn254BaseField = UInt256.Parse("21888242871839275222246405745257275088696311157297823662689037894645226208583");
+
+    [Params("full", "shift", "192", "192shift", "128", "128shift", "64", "max", "narrow", "pow64", "bn254reduced", "shiftreduced")]
     public string Shape { get; set; } = "full";
 
     [GlobalSetup]
@@ -36,9 +39,19 @@ public class MulModOptimizationBenchmarks
                 "64" => new(Next() | 1),
                 "pow64" => new(1UL << (i % 63 + 1)),
                 "max" => UInt256.MaxValue,
+                "bn254reduced" => i % 2 == 0 ? Bn254ScalarField : Bn254BaseField,
+                "shiftreduced" => new(Next(), Next(), Next(), (Next() >> (i % 63 + 1)) | 1),
                 _ => new(Next(), Next(), Next(), Next() | 1),
             };
             if (Shape == "narrow") _left[i] = new(Next());
+            if (Shape is "bn254reduced" or "shiftreduced")
+            {
+                // Field arithmetic keeps both operands below the modulus.
+                UInt256.Mod(in _left[i], in _moduli[i], out UInt256 left);
+                UInt256.Mod(in _right[i], in _moduli[i], out UInt256 right);
+                _left[i] = left;
+                _right[i] = right;
+            }
         }
     }
 

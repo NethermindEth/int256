@@ -283,7 +283,8 @@ public readonly partial struct UInt256
             a = -a;
         }
 
-        if (a <= ulong.MaxValue)
+        // (double)ulong.MaxValue rounds up to 2^64, which does not fit in one limb.
+        if (a < 18446744073709551616.0)
         {
             ulong cu0 = (ulong)a;
             ulong cu1 = 0;
@@ -302,17 +303,15 @@ public readonly partial struct UInt256
             c.LeftShift(shift, out c);
         }
 
-        if (negate)
-            Negate(in c);
-
-        return c;
+        return negate ? Negate(in c) : c;
     }
 
-    public static explicit operator decimal(in UInt256 a) => (decimal)(BigInteger)a;
+    public static explicit operator decimal(in UInt256 a) => ToDecimal(in a, negative: false, ConversionMode.Checked);
 
     public static explicit operator UInt256(decimal a)
     {
-        int[] bits = decimal.GetBits(decimal.Truncate(a));
+        Span<int> bits = stackalloc int[4];
+        decimal.GetBits(decimal.Truncate(a), bits);
         UInt256 c = new((uint)bits[0], (uint)bits[1], (uint)bits[2], 0, 0, 0, 0, 0);
         return a < 0 ? Negate(c) : c;
     }

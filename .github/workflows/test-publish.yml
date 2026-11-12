@@ -84,6 +84,11 @@ jobs:
             intrinsics: NoHWIntrinsics
             avx2: NoAvx2
             variant: zkevm
+          - os: ubuntu-latest
+            build-config: release
+            intrinsics: NoHWIntrinsics
+            avx2: NoAvx2
+            variant: zkevm-compact
 
           # linux-arm64: validates the AdvSimd paths on the production ARM target
           # (the AVX2/AVX-512 env toggles are no-ops there).
@@ -100,7 +105,8 @@ jobs:
       DOTNET_EnableAVX512: ${{ matrix.avx512 == 'NoAvx512' && '0' || '1' }}
       DOTNET_EnableAVX2: ${{ matrix.avx2 == 'NoAvx2' && '0' || '1' }}
       DOTNET_EnableHWIntrinsic: ${{ matrix.intrinsics == 'NoHWIntrinsics' && '0' || '1' }}
-      ENABLE_ZKEVM: ${{ matrix.variant == 'zkevm' && 'true' || 'false' }}
+      ENABLE_ZKEVM: ${{ startsWith(matrix.variant, 'zkevm') && 'true' || 'false' }}
+      ZKEVM_COMPACT: ${{ matrix.variant == 'zkevm-compact' && 'true' || 'false' }}
 
     steps:
       - name: Check out repository
@@ -111,7 +117,7 @@ jobs:
 
       - name: Test
         working-directory: src/Nethermind.Int256.Tests
-        run: dotnet test -c ${{ matrix.build-config }} -p:EnableZkEvm=${{ env.ENABLE_ZKEVM }}
+        run: dotnet test -c ${{ matrix.build-config }} -p:EnableZkEvm=${{ env.ENABLE_ZKEVM }} -p:Int256ZkEvmCompact=${{ env.ZKEVM_COMPACT }}
 
       - name: Report comparison ISA coverage
         working-directory: src/Nethermind.Int256.Tests
@@ -156,10 +162,10 @@ jobs:
           nupkg=$(ls ./artifacts/package/release/*.nupkg | head -1)
           snupkg=$(ls ./artifacts/package/release/*.snupkg | head -1)
           echo "Verifying $nupkg and $snupkg"
-          for f in impl/std/net10.0/Nethermind.Int256.dll impl/zkevm/net10.0/Nethermind.Int256.dll; do
+          for f in impl/std/net10.0/Nethermind.Int256.dll impl/zkevm/net10.0/Nethermind.Int256.dll impl/zkevm-compact/net10.0/Nethermind.Int256.dll; do
             unzip -l "$nupkg" | grep -qF "$f" || { echo "::error::missing $f in $(basename "$nupkg")"; exit 1; }
           done
-          for f in impl/std/net10.0/Nethermind.Int256.pdb impl/zkevm/net10.0/Nethermind.Int256.pdb; do
+          for f in impl/std/net10.0/Nethermind.Int256.pdb impl/zkevm/net10.0/Nethermind.Int256.pdb impl/zkevm-compact/net10.0/Nethermind.Int256.pdb; do
             unzip -l "$snupkg" | grep -qF "$f" || { echo "::error::missing $f in $(basename "$snupkg")"; exit 1; }
           done
           dotnet nuget push "$nupkg" \

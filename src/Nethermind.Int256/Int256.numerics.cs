@@ -602,6 +602,20 @@ public readonly partial struct Int256 : IBinaryInteger<Int256>, IMinMaxValue<Int
             return parsed;
         }
 
+        if (style == NumberStyles.None)
+        {
+            bool parsed = UInt256.TryParseDigits(s, out UInt256 digits, out overflow);
+            // No sign is allowed, so only values below 2^255 are in range.
+            if (parsed && digits.u3 >= SignBit)
+            {
+                overflow = true;
+                parsed = false;
+            }
+
+            result = parsed ? new Int256(digits) : default;
+            return parsed;
+        }
+
         overflow = false;
         NumberFormatInfo info = NumberFormatInfo.GetInstance(provider);
         if (style == NumberStyles.Integer && info.PositiveSign == "+" && info.NegativeSign == "-")

@@ -42,6 +42,10 @@
                       ReferenceOutputAssembly="false"
                       AdditionalProperties="EnableZkEvm=true"
                       PrivateAssets="all" />
+    <ProjectReference Include="Nethermind.Int256.ZkEvmCompact.csproj"
+                      ReferenceOutputAssembly="false"
+                      AdditionalProperties="EnableZkEvm=true;Int256ZkEvmCompact=true"
+                      PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>
@@ -61,9 +65,16 @@
              Properties="Configuration=$(Configuration);EnableZkEvm=true">
       <Output TaskParameter="TargetOutputs" ItemName="_ZkEvmTargetPath" />
     </MSBuild>
+    <MSBuild Projects="Nethermind.Int256.ZkEvmCompact.csproj"
+             Targets="GetTargetPath"
+             Properties="Configuration=$(Configuration);EnableZkEvm=true;Int256ZkEvmCompact=true">
+      <Output TaskParameter="TargetOutputs" ItemName="_ZkEvmCompactTargetPath" />
+    </MSBuild>
     <PropertyGroup>
       <_ZkEvmDll>@(_ZkEvmTargetPath)</_ZkEvmDll>
       <_ZkEvmPdb>$([System.IO.Path]::ChangeExtension('$(_ZkEvmDll)', '.pdb'))</_ZkEvmPdb>
+      <_ZkEvmCompactDll>@(_ZkEvmCompactTargetPath)</_ZkEvmCompactDll>
+      <_ZkEvmCompactPdb>$([System.IO.Path]::ChangeExtension('$(_ZkEvmCompactDll)', '.pdb'))</_ZkEvmCompactPdb>
     </PropertyGroup>
   </Target>
 
@@ -72,6 +83,9 @@
       <TfmSpecificPackageFile Include="$(_ZkEvmDll)">
         <PackagePath>impl/zkevm/net10.0/$(TargetFileName)</PackagePath>
       </TfmSpecificPackageFile>
+      <TfmSpecificPackageFile Include="$(_ZkEvmCompactDll)">
+        <PackagePath>impl/zkevm-compact/net10.0/$(TargetFileName)</PackagePath>
+      </TfmSpecificPackageFile>
     </ItemGroup>
   </Target>
 
@@ -79,6 +93,10 @@
     <ItemGroup>
       <TfmSpecificDebugSymbolsFile Include="$(_ZkEvmPdb)" Condition="Exists('$(_ZkEvmPdb)')">
         <TargetPath>/impl/zkevm/net10.0/$(TargetName).pdb</TargetPath>
+        <TargetFramework>$(TargetFramework)</TargetFramework>
+      </TfmSpecificDebugSymbolsFile>
+      <TfmSpecificDebugSymbolsFile Include="$(_ZkEvmCompactPdb)" Condition="Exists('$(_ZkEvmCompactPdb)')">
+        <TargetPath>/impl/zkevm-compact/net10.0/$(TargetName).pdb</TargetPath>
         <TargetFramework>$(TargetFramework)</TargetFramework>
       </TfmSpecificDebugSymbolsFile>
     </ItemGroup>

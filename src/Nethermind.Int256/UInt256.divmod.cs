@@ -367,7 +367,7 @@ public readonly partial struct UInt256
         => MultiplyModWideCore(in x, in y, in m, out res);
 
     [SkipLocalsInit]
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(BigOpInlining)]
     private static void MultiplyModWideCore(in UInt256 x, in UInt256 y, in UInt256 m, out UInt256 res)
     {
         Multiply256To512Bit(in x, in y, out UInt256 lo, out UInt256 hi);
@@ -1581,20 +1581,21 @@ public readonly partial struct UInt256
     }
 
     // Hardware div needs no normalisation: the running remainder starts at zero and stays below the
-    // divisor, so it can go straight into rdx.
+    // divisor, so it can go straight into rdx. While it is still zero, a limb below the divisor is
+    // already the remainder, so the leading divide of a dividend whose top limb is below the divisor goes.
     [SkipLocalsInit]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static ulong RemainderBy64Hardware(in UInt256 x, ulong d)
     {
-        ulong r = 0;
         ulong u3 = x.u3;
-        if (u3 != 0) (_, r) = X86Base.X64.DivRem(u3, r, d);
+        ulong r = u3;
+        if (u3 >= d) (_, r) = X86Base.X64.DivRem(u3, 0, d);
         ulong u2 = x.u2;
-        if ((u2 | r) != 0) (_, r) = X86Base.X64.DivRem(u2, r, d);
+        if (r != 0 || u2 >= d) (_, r) = X86Base.X64.DivRem(u2, r, d); else r = u2;
         ulong u1 = x.u1;
-        if ((u1 | r) != 0) (_, r) = X86Base.X64.DivRem(u1, r, d);
+        if (r != 0 || u1 >= d) (_, r) = X86Base.X64.DivRem(u1, r, d); else r = u1;
         ulong u0 = x.u0;
-        if ((u0 | r) != 0) (_, r) = X86Base.X64.DivRem(u0, r, d);
+        if (r != 0 || u0 >= d) (_, r) = X86Base.X64.DivRem(u0, r, d); else r = u0;
         return r;
     }
 
@@ -1632,7 +1633,7 @@ public readonly partial struct UInt256
     // One Knuth D step against a two-limb divisor: divide (hi:mid) by v1, then take q*v0 off
     // (rhat:low). Writing the correction as p -= v0 keeps a second product out of it.
     [SkipLocalsInit]
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(BigOpInlining)]
     private static ulong Remainder128Step(
         ulong high, ulong mid, ref ulong low, ulong v0, ulong v1, ulong recip, bool guardSaturation)
     {
@@ -1676,7 +1677,7 @@ public readonly partial struct UInt256
     // Finish one Knuth D digit against a three-limb divisor: the divide left rhat in place of qhat*v2,
     // so only qhat*(v1:v0) remains and D3's own product is its top limb. Returns the new top limb.
     [SkipLocalsInit]
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(BigOpInlining)]
     private static ulong Remainder192Step(ulong qhat, ulong rhat, ulong rcarry, ref ulong m1, ref ulong m0, ulong v0, ulong v1, ulong v2)
     {
         ulong a1 = m1;
@@ -2243,6 +2244,9 @@ public readonly partial struct UInt256
             nd0 = d0 << shift;
             nd1 = (d1 << shift) | (d0 >> rshift);
             nd2 = (d2 << shift) | (d1 >> rshift);
+
+            // Same zero leading digit test as the 256-bit reducer, on the limbs before the shift.
+            if (u7 < d2 && (u7 != 0 || (u6 != 0 ? u6 : (u5 != 0 ? u5 : u4)) < d2)) uLen--;
         }
 
         ref ulong un0 = ref unBuf.w0;
@@ -2463,9 +2467,11 @@ public readonly partial struct UInt256
             nd2 = (d2 << shift) | (d1 >> rshift);
             nd3 = (d3 << shift) | (d2 >> rshift);
 
-            // The extra top limb holds only the bits shifted out. When it is zero and the next limb is
-            // below nd3, the leading quotient digit is zero, as for the product of two values below d.
-            if (Unsafe.Add(ref unBuf.w0, uLen) == 0 && Unsafe.Add(ref unBuf.w0, uLen - 1) < nd3) uLen--;
+            // The no-shift test before normalisation: a top limb below d3 keeps the extra limb at zero
+            // (d3 < 2^rshift) and the next window below nd3, so the leading quotient digit is zero. A
+            // product of operands already below d always passes. u7 >= d3 is the only test that
+            // unreduced full-width operands pay; u7 == 0 passes it and picks the lower top limb.
+            if (u7 < d3 && (u7 != 0 || (u6 != 0 ? u6 : (u5 != 0 ? u5 : u4)) < d3)) uLen--;
         }
 
         ref ulong un0 = ref unBuf.w0;
@@ -2673,7 +2679,7 @@ public readonly partial struct UInt256
         public ulong w0, w1, w2, w3, w4, w5, w6, w7, w8;
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(BigOpInlining)]
     private static void KnuthStep(ref ulong u0, ref ulong u1, ref ulong u2, ulong d0, ulong d1, ulong reciprocal)
     {
         ulong oldU2 = u2;
@@ -2853,9 +2859,10 @@ public readonly partial struct UInt256
     // Dispatch on the narrower operand alone: an n x 4 product still needs only n*4
     // multiplies, so requiring both operands to be narrow leaves the common n x 4 shapes
     // on the full-width path. Every helper takes four arguments so none of them spills an
-    // operand to the stack on win-x64, and inlining keeps the 64x64 case in the caller.
+    // operand to the stack on win-x64, and inlining keeps the 64x64 case in the caller (except in
+    // the compact zkEVM variant, which keeps this method out of line).
     [SkipLocalsInit]
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(BigOpInlining)]
     private static void Multiply256To512Bit(in UInt256 x, in UInt256 y, out UInt256 low, out UInt256 high)
     {
         if ((x.u2 | x.u3) == 0)
@@ -3076,7 +3083,7 @@ public readonly partial struct UInt256
     }
 
     [SkipLocalsInit]
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(BigOpInlining)]
     private static void Multiply256To512BitLarge(in UInt256 x, in UInt256 y, out UInt256 low, out UInt256 high)
     {
         // Copy inputs up front - this breaks aliasing with out params so we can store early.
@@ -3327,30 +3334,44 @@ public readonly partial struct UInt256
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void DivideBy64BitsX86Base(in UInt256 x, ulong divisor, out UInt256 q, out UInt256 remainder)
     {
-        ulong rem = 0;
-        ulong q3 = 0;
+        // While the running remainder is zero, a limb below the divisor is a zero digit and becomes the
+        // remainder as it is, so the leading divide of a dividend whose top limb is below the divisor goes.
         ulong u3 = x.u3;
-        if (u3 != 0)
+        ulong rem = u3;
+        ulong q3 = 0;
+        if (u3 >= divisor)
         {
-            (q3, rem) = X86Base.X64.DivRem(lower: u3, upper: rem, divisor);
+            (q3, rem) = X86Base.X64.DivRem(lower: u3, upper: 0, divisor);
         }
         ulong u2 = x.u2;
         ulong q2 = 0;
-        if ((u2 | rem) != 0)
+        if (rem != 0 || u2 >= divisor)
         {
             (q2, rem) = X86Base.X64.DivRem(lower: u2, upper: rem, divisor);
         }
+        else
+        {
+            rem = u2;
+        }
         ulong u1 = x.u1;
         ulong q1 = 0;
-        if ((u1 | rem) != 0)
+        if (rem != 0 || u1 >= divisor)
         {
             (q1, rem) = X86Base.X64.DivRem(lower: u1, upper: rem, divisor);
         }
+        else
+        {
+            rem = u1;
+        }
         ulong u0 = x.u0;
         ulong q0 = 0;
-        if ((u0 | rem) != 0)
+        if (rem != 0 || u0 >= divisor)
         {
             (q0, rem) = X86Base.X64.DivRem(lower: u0, upper: rem, divisor);
+        }
+        else
+        {
+            rem = u0;
         }
 
         q = Create(q0, q1, q2, q3);
@@ -3430,79 +3451,90 @@ public readonly partial struct UInt256
         }
 
         ulong vRecip = X86Base.X64.IsSupported ? 0 : Reciprocal2By1(v2n);
-        // The saturating u4d == v2n case cannot arise on the first digit: at shift 0 u4d is 0,
-        // otherwise u4d = x.u3 >> (64 - shift) <= 2^63 - 1 while normalised v2n >= 2^63. The divide
-        // is therefore unconditionally safe and needs no guard. The second digit below does need it.
-        Debug.Assert(u4d < v2n, "first quotient digit cannot saturate after normalisation");
-        ulong qhat, rhat;
-        ulong rcarry = 0;
-        if (X86Base.X64.IsSupported)
+        // A dividend shorter than x.u3 leaves u4d zero and u3d below v2n: the first digit is then a divide
+        // that can only produce zero and a subtract of nothing, so skip both.
+        ulong q1;
+        if (u4d == 0 && u3d < v2n)
         {
-            (qhat, rhat) = X86Base.X64.DivRem(u3d, u4d, v2n); // (upper:lower) = (u4d:u3d)
+            q1 = 0;
         }
         else
         {
-            qhat = UDivRem2By1(u4d, vRecip, v2n, u3d, out rhat);
-        }
-
-        if (rcarry == 0)
-        {
-            ulong pHi = Multiply64(qhat, v1n, out ulong pLo);
-
-            // if qhat*vNext > rhat*b + uCorr then decrement
-            if (pHi > rhat || (pHi == rhat && pLo > u2d))
+            // The saturating u4d == v2n case cannot arise on the first digit: at shift 0 u4d is 0,
+            // otherwise u4d = x.u3 >> (64 - shift) <= 2^63 - 1 while normalised v2n >= 2^63. The divide
+            // is therefore unconditionally safe and needs no guard. The second digit below does need it.
+            Debug.Assert(u4d < v2n, "first quotient digit cannot saturate after normalisation");
+            ulong qhat, rhat;
+            ulong rcarry = 0;
+            if (X86Base.X64.IsSupported)
             {
-                qhat--;
+                (qhat, rhat) = X86Base.X64.DivRem(u3d, u4d, v2n); // (upper:lower) = (u4d:u3d)
+            }
+            else
+            {
+                qhat = UDivRem2By1(u4d, vRecip, v2n, u3d, out rhat);
+            }
 
-                ulong sum1 = rhat + v2n;
-                if (sum1 < rhat)
+            if (rcarry == 0)
+            {
+                ulong pHi = Multiply64(qhat, v1n, out ulong pLo);
+
+                // if qhat*vNext > rhat*b + uCorr then decrement
+                if (pHi > rhat || (pHi == rhat && pLo > u2d))
                 {
-                    rcarry = 1;
+                    qhat--;
+
+                    ulong sum1 = rhat + v2n;
+                    if (sum1 < rhat)
+                    {
+                        rcarry = 1;
+                    }
+
+                    rhat = sum1;
                 }
-
-                rhat = sum1;
             }
-        }
 
-        if (rcarry == 0)
-        {
-            ulong pHi = Multiply64(qhat, v1n, out ulong pLo);
-
-            // if qhat*vNext > rhat*b + uCorr then decrement
-            if (pHi > rhat || (pHi == rhat && pLo > u2d))
+            if (rcarry == 0)
             {
+                ulong pHi = Multiply64(qhat, v1n, out ulong pLo);
+
+                // if qhat*vNext > rhat*b + uCorr then decrement
+                if (pHi > rhat || (pHi == rhat && pLo > u2d))
+                {
+                    qhat--;
+                }
+            }
+
+            ulong borrow1 = 0;
+
+            ulong pHi1 = Multiply64(qhat, v0, out ulong pLo1);
+            u1d = Sub(u1d, pLo1, ref borrow1);
+
+            ulong carry = pHi1;
+            pHi1 = Multiply64(qhat, v1n, out pLo1);
+            ulong sum2 = pLo1 + carry;
+            ulong c2 = (sum2 < pLo1) ? 1UL : 0UL;
+            carry = pHi1 + c2;
+            u2d = Sub(u2d, sum2, ref borrow1);
+
+            pHi1 = Multiply64(qhat, v2n, out pLo1);
+            sum2 = pLo1 + carry;
+            c2 = (sum2 < pLo1) ? 1UL : 0UL;
+            carry = pHi1 + c2;
+            u3d = Sub(u3d, sum2, ref borrow1);
+
+            u4d = Sub(u4d, carry, ref borrow1);
+            ulong borrow = borrow1;
+
+            if (borrow != 0)
+            {
+                AddBack3(ref u1d, ref u2d, ref u3d, ref u4d, v0, v1n, v2n);
                 qhat--;
             }
+
+            q1 = qhat;
         }
 
-        ulong borrow1 = 0;
-
-        ulong pHi1 = Multiply64(qhat, v0, out ulong pLo1);
-        u1d = Sub(u1d, pLo1, ref borrow1);
-
-        ulong carry = pHi1;
-        pHi1 = Multiply64(qhat, v1n, out pLo1);
-        ulong sum2 = pLo1 + carry;
-        ulong c2 = (sum2 < pLo1) ? 1UL : 0UL;
-        carry = pHi1 + c2;
-        u2d = Sub(u2d, sum2, ref borrow1);
-
-        pHi1 = Multiply64(qhat, v2n, out pLo1);
-        sum2 = pLo1 + carry;
-        c2 = (sum2 < pLo1) ? 1UL : 0UL;
-        carry = pHi1 + c2;
-        u3d = Sub(u3d, sum2, ref borrow1);
-
-        u4d = Sub(u4d, carry, ref borrow1);
-        ulong borrow = borrow1;
-
-        if (borrow != 0)
-        {
-            AddBack3(ref u1d, ref u2d, ref u3d, ref u4d, v0, v1n, v2n);
-            qhat--;
-        }
-
-        ulong q1 = qhat;
         ulong qhat1, rhat1, rcarry1;
         if (u3d == v2n)
         {
@@ -3882,6 +3914,14 @@ public readonly partial struct UInt256
         // This removes the qhat*v1n multiply and the full 3-limb subtract/add-back.
 
         // Step j=2: q2 from (u4:u3:u2)
+        // A step whose top limb is zero and whose next limb is below the normalised divisor's top limb
+        // divides to a zero digit and leaves the partial remainder as it was, so a dividend shorter than
+        // x.u3 skips the divide, the correction and the subtract.
+        if (u4 == 0 && u3 < v1n)
+        {
+            Unsafe.Add(ref qRef, 2) = 0;
+        }
+        else
         {
             // Always true for this setup: u4 < v1n, so DivRem is safe here.
             Debug.Assert(u4 < v1n);
@@ -3921,6 +3961,11 @@ public readonly partial struct UInt256
         }
 
         // Step j=1: q1 from (u3:u2:u1)
+        if (u3 == 0 && u2 < v1n)
+        {
+            Unsafe.Add(ref qRef, 1) = 0;
+        }
+        else
         {
             ulong rhat;
             bool rcarry;
@@ -4099,6 +4144,14 @@ public readonly partial struct UInt256
         Unsafe.SkipInit(out q);
 
         // Step j=2: q2 from (u4:u3:u2)
+        // A step whose top limb is zero and whose next limb is below the normalised divisor's top limb
+        // divides to a zero digit and leaves the partial remainder as it was, so a dividend shorter than
+        // x.u3 skips the divide, the correction and the subtract.
+        if (u4 == 0 && u3 < v1n)
+        {
+            Unsafe.AsRef(in q.u2) = 0;
+        }
+        else
         {
             ulong qhat;
             ulong rhat;
@@ -4173,6 +4226,11 @@ public readonly partial struct UInt256
         }
 
         // Step j=1: q1 from (u3:u2:u1)
+        if (u3 == 0 && u2 < v1n)
+        {
+            Unsafe.AsRef(in q.u1) = 0;
+        }
+        else
         {
             ulong qhat;
             ulong rhat;
@@ -4340,7 +4398,7 @@ public readonly partial struct UInt256
     // Knuth steps (unrolled)
     // qhat correction (at most twice in Knuth D)
     [SkipLocalsInit]
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(BigOpInlining)]
     private static ulong SubMul4(in UInt256 u, ref ulong u4, in UInt256 v, ulong q, out UInt256 rem)
     {
         ulong borrow = 0;
@@ -4374,7 +4432,7 @@ public readonly partial struct UInt256
         return borrow;
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(BigOpInlining)]
     private static ulong SubMul4(ref ulong u0, ref ulong u1, ref ulong u2, ref ulong u3, ref ulong u4, ulong v0, ulong v1, ulong v2, ulong v3, ulong q)
     {
         ulong borrow = 0;
