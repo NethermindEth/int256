@@ -7,16 +7,17 @@
 # MethodTemplates.lean embeds the assembly's identity, so each machine regenerates it rather than committing it.
 param([switch]$Check)
 $ErrorActionPreference = 'Stop'
-function Invoke([string]$failure) {
-    & $args[0] $args[1..($args.Count - 1)]
+# Commands pass as one array: PowerShell would bind `--name` and `-name:value` arguments of a function itself.
+function Invoke([string]$failure, [string[]]$command) {
+    & $command[0] $command[1..($command.Count - 1)]
     if ($LASTEXITCODE -ne 0) { throw $failure }
 }
 Push-Location $PSScriptRoot
 try {
-    Invoke 'Dependency resolution failed' lake update
-    Invoke 'LeanCIL build failed' dotnet build .lake/packages/leancil/Extractor -c Release
-    Invoke 'Production build failed' dotnet build ../src/Nethermind.Int256/Nethermind.Int256.csproj -c Release `
-        -p:GenerateDocumentationFile=true -p:WarningsNotAsErrors=CS1591 -nowarn:CS1591
+    Invoke 'Dependency resolution failed' @('lake', 'update')
+    Invoke 'LeanCIL build failed' @('dotnet', 'build', '.lake/packages/leancil/Extractor', '-c', 'Release')
+    Invoke 'Production build failed' @('dotnet', 'build', '../src/Nethermind.Int256/Nethermind.Int256.csproj',
+        '-c', 'Release', '-p:GenerateDocumentationFile=true', '-p:WarningsNotAsErrors=CS1591', '-nowarn:CS1591')
     $tool = '.lake/packages/leancil/Extractor/bin/Nethermind.LeanCIL.dll'
     $assembly = '../src/artifacts/bin/Nethermind.Int256/release/Nethermind.Int256.dll'
     $value = 'Nethermind.Int256.UInt256'
@@ -37,14 +38,15 @@ try {
     $extractions = foreach ($method in $methods) {
         foreach ($profile in $method[2..($method.Count - 1)]) {
             $output = "artifacts/templates/$($method[0])-$profile"
-            Invoke "Extraction of $($method[0]) for $profile failed" dotnet $tool extract $assembly $method[1] `
-                $output $profile --assume-initialized $value | Out-Null
+            Invoke "Extraction of $($method[0]) for $profile failed" @('dotnet', $tool, 'extract', $assembly,
+                $method[1], $output, $profile, '--assume-initialized', $value) | Out-Null
             $output
         }
     }
     $mode = if ($Check) { @('--check') } else { @() }
-    Invoke 'Method templates failed' dotnet $tool templates UInt256/Generated @extractions `
-        --namespace UInt256Proof.Generated.Method --omit-equations --module UInt256/Generated/MethodTemplates.lean @mode
-    Invoke 'Binding sources failed' dotnet $tool bindings bindings.json @mode
+    Invoke 'Method templates failed' (@('dotnet', $tool, 'templates', 'UInt256/Generated') + $extractions +
+        @('--namespace', 'UInt256Proof.Generated.Method', '--omit-equations',
+            '--module', 'UInt256/Generated/MethodTemplates.lean') + $mode)
+    Invoke 'Binding sources failed' (@('dotnet', $tool, 'bindings', 'bindings.json') + $mode)
 }
 finally { Pop-Location }
