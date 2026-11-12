@@ -344,14 +344,18 @@ public readonly partial struct UInt256
             return;
         }
 
-        // Trivial no-mul cases (cheap relative to the full multiply + reduction).
-        if (x.IsZero || y.IsZero)
+        // Zero and one operands need no product. One scalar test per operand covers both values: the vector
+        // IsZero and IsOne tests cost four 256-bit compares on every full-width call.
+        if (((x.u0 >> 1) | x.u1 | x.u2 | x.u3) == 0)
         {
-            res = default;
+            if (x.u0 == 0) res = default; else Mod(in y, in m, out res);
             return;
         }
-        if (y.IsOne) { Mod(in x, in m, out res); return; }
-        if (x.IsOne) { Mod(in y, in m, out res); return; }
+        if (((y.u0 >> 1) | y.u1 | y.u2 | y.u3) == 0)
+        {
+            if (y.u0 == 0) res = default; else Mod(in x, in m, out res);
+            return;
+        }
 
         // ARM's register allocation favors keeping the wide body in this frame.
         if (ArmBase.Arm64.IsSupported)
