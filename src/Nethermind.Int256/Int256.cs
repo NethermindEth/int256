@@ -336,6 +336,7 @@ public readonly partial struct Int256 : IEquatable<Int256>, IComparable, ICompar
     }
 
     // Mod sets res to (sign x) * { abs(x) modulus abs(y) }, and throws when y is zero.
+    [SkipLocalsInit]
     public static void Mod(in Int256 x, in Int256 y, out Int256 res)
     {
         bool xIsNegative = x.IsNegative;
@@ -351,12 +352,24 @@ public readonly partial struct Int256 : IEquatable<Int256>, IComparable, ICompar
             return;
         }
 
-        Int256 xIn = x, yIn = y;
-        if (xIsNegative) Neg(x, out xIn);
-        if (yIsNegative) Neg(y, out yIn);
-        UInt256.Mod(in xIn._value, in yIn._value, out UInt256 value);
-        res = new Int256(value);
-        if (xIsNegative) Neg(res, out res);
+        UInt256 dividend, divisor;
+        if (xIsNegative) NegateLimbs(in x._value, out dividend); else dividend = x._value;
+        if (yIsNegative) NegateLimbs(in y._value, out divisor); else divisor = y._value;
+        UInt256.Mod(in dividend, in divisor, out UInt256 remainder);
+        if (xIsNegative) NegateLimbs(in remainder, out remainder);
+        res = new Int256(remainder);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void NegateLimbs(in UInt256 x, out UInt256 res)
+    {
+        ulong x0 = x.u0, x1 = x.u1, x2 = x.u2, x3 = x.u3;
+        ulong borrow = x0 != 0 ? 1UL : 0UL;
+        ulong r1 = 0UL - x1 - borrow;
+        borrow |= x1 != 0 ? 1UL : 0UL;
+        ulong r2 = 0UL - x2 - borrow;
+        borrow |= x2 != 0 ? 1UL : 0UL;
+        res = new UInt256(0UL - x0, r1, r2, 0UL - x3 - borrow);
     }
 
     public void Mod(in Int256 m, out Int256 res) => Mod(this, m, out res);
