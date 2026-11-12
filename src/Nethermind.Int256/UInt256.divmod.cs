@@ -411,7 +411,7 @@ public readonly partial struct UInt256
 
         if (m.u3 != 0)
         {
-            Remainder512By256Bits(in lo, in hi, in m, out res);
+            Remainder512ByFullModulus(in lo, in hi, in m, out res);
         }
         else
         {
