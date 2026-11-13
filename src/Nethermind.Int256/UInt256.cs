@@ -1150,6 +1150,11 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
                 return;
             }
         }
+        else if (ExpShortWindow && bitLen > 8 && BitOperations.PopCount(e.u0) > ExpWindowMinSetBits(bitLen))
+        {
+            ExpWindow(b, e, bitLen, out result);
+            return;
+        }
 
         // Seed with b so we do not need to "include" the always-set top bit via a multiply.
         UInt256 val = b;

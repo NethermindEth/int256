@@ -80,7 +80,7 @@ public class UInt256ExpTests
     {
         Random random = new(0xE4D);
         UInt256[] bases = [new(3), new(0xFFFF_FFFF_FFFF_FFC5), new(3, 5, 7, 11), new(ulong.MaxValue - 2, 1, 0, 1UL << 63)];
-        for (int bits = 33; bits <= 80; ++bits)
+        for (int bits = 9; bits <= 80; ++bits)
         {
             for (int setBits = 1; setBits <= bits; ++setBits)
             {
