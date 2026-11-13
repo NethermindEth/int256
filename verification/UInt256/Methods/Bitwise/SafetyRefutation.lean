@@ -1,0 +1,8 @@
+import UInt256.Safety.ContractRefutation
+namespace UInt256Proof.Bitwise
+abbrev checked_observation_unique := @UInt256Model.Safety.ContractRefutation.checked_observation_unique
+abbrev checked_binary_refuted := @UInt256Model.Safety.ContractRefutation.checked_binary_refuted
+abbrev checked_binary_return_refuted := @UInt256Model.Safety.ContractRefutation.checked_binary_return_refuted
+abbrev checked_unary_refuted := @UInt256Model.Safety.ContractRefutation.checked_unary_refuted
+abbrev checked_unary_return_refuted := @UInt256Model.Safety.ContractRefutation.checked_unary_return_refuted
+end UInt256Proof.Bitwise

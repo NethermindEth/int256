@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>Nethermind.Int256</AssemblyName>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <Target Name="CheckFixtureCase" BeforeTargets="CoreCompile"
+      Condition="'$(FixtureCase)' != 'Baseline' And '$(FixtureCase)' != 'ExtractedHelper' And '$(FixtureCase)' != 'Renamed' And '$(FixtureCase)' != 'WrongAliasing' And '$(FixtureCase)' != 'WrongBorrow'">
+    <Error Text="Unknown Subtract fixture case: $(FixtureCase)" />
+  </Target>
+  <Import Project="Fixtures.props" />
+  <ItemGroup>
+    <Compile Include="$(FixtureCase).cs" />
+  </ItemGroup>
+</Project>

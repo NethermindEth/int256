@@ -1,0 +1,10 @@
+import Extracted
+import UInt256.Methods.Add.@module@
+
+namespace UInt256Proof.Add
+open Safety
+
+/-- @prefix@ @method@: @documentation@ -/
+theorem @ssePrefix@@flag@profile_correctness :@signature@
+  checked_@unit@_add@suffix@_contract Extracted.program 0 1 2 3 4 @extra@Extracted.profile @checks@
+end UInt256Proof.Add

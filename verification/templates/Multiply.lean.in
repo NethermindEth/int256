@@ -1,0 +1,15 @@
+import Extracted
+import UInt256.Safety.EmbeddingTransport
+import UInt256.Methods.Multiply.ProfileLayout
+@imports@
+namespace UInt256Proof.@method@
+open @opened@
+-- The extraction may add dead blocks to the full-width body; `fullEmbeds` checks every live instruction.
+private abbrev embedded : CIL.Program := Extracted.program.set @slot@ (Full.fullBody Extracted.profile (profileIndices Extracted.profile @offset@).word @body@)
+private theorem fullEmbeds : CIL.MethodEmbeds Extracted.program @slot@ (Full.fullBody Extracted.profile (profileIndices Extracted.profile @offset@).word @body@) := by cil_embed
+private def context : Context :=
+  profileContext (profileIndices Extracted.profile @offset@) Extracted.profile embedded rfl rfl rfl rfl rfl rfl rfl rfl
+@primitiveContext@theorem profile_correctness : UInt256Model.Safety.@contract@ Extracted.program 0 :=
+  UInt256Model.Safety.@adaptation@.of_embeds fullEmbeds <|
+  @call@
+end UInt256Proof.@method@

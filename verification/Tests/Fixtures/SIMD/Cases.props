@@ -1,0 +1,16 @@
+<Project>
+  <ItemGroup>
+    <SimdCase Include="Baseline" Symbol="" />
+    <SimdCase Include="Renamed" Symbol="RENAMED" />
+    <SimdCase Include="EquivalentMask" Symbol="EQUIVALENT_MASK" />
+    <SimdCase Include="WrongAlignment" Symbol="WRONG_ALIGNMENT" />
+    <SimdCase Include="WrongAvxAlignment" Symbol="WRONG_AVX_ALIGNMENT" />
+    <SimdCase Include="WrongBlend" Symbol="WRONG_BLEND" />
+    <SimdCase Include="WrongTernary" Symbol="WRONG_TERNARY" />
+    <SimdCase Include="WrongPredicate" Symbol="WRONG_PREDICATE" />
+    <SimdCase Include="WrongTable" Symbol="WRONG_TABLE" />
+    <SimdCase Include="WrongScale" Symbol="WRONG_SCALE" />
+    <SimdCase Include="EarlyReread" Symbol="EARLY_REREAD" />
+    <SimdCase Include="WrongTop" Symbol="WRONG_TOP" />
+  </ItemGroup>
+</Project>

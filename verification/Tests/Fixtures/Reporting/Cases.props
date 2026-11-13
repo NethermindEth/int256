@@ -1,0 +1,12 @@
+<Project>
+  <ItemGroup>
+    <ReportingCase Include="Baseline" Symbol="" />
+    <ReportingCase Include="Renamed" Symbol="RENAMED" />
+    <ReportingCase Include="EquivalentMask" Symbol="EQUIVALENT_MASK" />
+    <ReportingCase Include="WrongFlag" Symbol="WRONG_REPORTING_FLAG" />
+    <ReportingCase Include="WrongArgumentOrder" Symbol="WRONG_ARGUMENT_ORDER" />
+    <ReportingCase Include="WrongAlignment" Symbol="WRONG_ALIGNMENT" />
+    <ReportingCase Include="WrongTop" Symbol="WRONG_TOP" />
+    <ReportingCase Include="EarlyReread" Symbol="EARLY_REREAD" />
+  </ItemGroup>
+</Project>
