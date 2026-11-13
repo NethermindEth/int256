@@ -25,21 +25,24 @@ public class MultiplyModBarrettTests
     private static readonly Type ModulusInterface = typeof(UInt256).GetNestedType("IBarrettModulus", BindingFlags.NonPublic)!;
     private static readonly MethodInfo ReduceBarrett = typeof(UInt256).GetMethod("Remainder512ByBarrett", BindingFlags.NonPublic | BindingFlags.Static)!;
 
+    private static readonly BigInteger Secp256k1P = Hex("fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f");
+
     // The moduli with a Barrett reduction, by the name of their constants.
     private static readonly Dictionary<string, BigInteger> Known = new()
     {
         ["Bn254R"] = Hex("30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001"),
         ["Bn254P"] = Hex("30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47"),
-        ["Secp256k1P"] = Hex("fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f"),
         ["Secp256k1N"] = Hex("fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141"),
         ["P256P"] = Hex("ffffffff00000001000000000000000000000000ffffffffffffffffffffffff"),
         ["P256N"] = Hex("ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551"),
+        ["Prime251"] = Hex("0800000000000011000000000000000000000000000000000000000000000001"),
     };
 
     // The known moduli, other field moduli and the boundaries of the four-limb range.
     private static readonly BigInteger[] FullWidthModuli =
     [
         .. Known.Values,
+        Secp256k1P,
         Hex("73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001"), // BLS12-381 r
         (BigInteger.One << 255) - 19,
         Two192,
@@ -63,10 +66,18 @@ public class MultiplyModBarrettTests
         Known["Bn254R"] ^ (BigInteger.One << 64),
         Known["Bn254R"] ^ (BigInteger.One << 128),
         Known["Bn254P"] ^ (BigInteger.One << 70),
-        Known["Secp256k1P"] - Two64,
+        Secp256k1P - Two64,
         Known["Secp256k1N"] ^ (BigInteger.One << 3),
         Known["P256P"] ^ (BigInteger.One << 140),
         Known["P256N"] ^ (BigInteger.One << 190),
+        Known["Prime251"] ^ 1,
+        Known["Prime251"] ^ (BigInteger.One << 100),
+        Known["Prime251"] + Two192,
+        Two256 - 189,
+        Two256 - (BigInteger.One << 63),
+        Two256 - Two64 + 2,
+        Two256 - Two64 + 1,
+        Two256 - Two64 - 2,
     ];
 
     private static IEnumerable<TestCaseData> Moduli() =>
@@ -285,7 +296,7 @@ public class MultiplyModBarrettTests
     public void MultiplyMod_matches_BigInteger_for_random_cases()
     {
         int cases = CaseCount(400_000);
-        BigInteger[] known = [.. Known.Values];
+        BigInteger[] known = [.. Known.Values, Secp256k1P];
         int chunks = 64;
         int failures = 0;
         string? first = null;
@@ -310,7 +321,7 @@ public class MultiplyModBarrettTests
     public void MultiplyMod_matches_BigInteger_for_field_products()
     {
         int cases = CaseCount(400_000);
-        BigInteger[] fields = [.. Known.Values];
+        BigInteger[] fields = [.. Known.Values, Secp256k1P];
         int chunks = 60;
         int failures = 0;
         string? first = null;
