@@ -48,7 +48,6 @@ public readonly partial struct UInt256
     [SkipLocalsInit]
     public static void Divide(in UInt256 x, in UInt256 y, out UInt256 res)
     {
-        if (y.IsZero) ThrowDivideByZeroException();
         // Handle y == 0 and y == 1 cheaply
         //
         // y0 is the low limb.
@@ -66,11 +65,8 @@ public readonly partial struct UInt256
             // which would force the JIT to use callee-saved regs (rbx/rsi/rdi/rbp/r14/r15) and emit pushes.
             if (y.IsUint64)
             {
-                // Exact: if y == 0 -> quotient is 0 (we return default)
-                //        if y == 1 -> quotient is x (copy x)
-                //
-                // Note: written as a conditional expression for brevity.
-                res = (y0 == 0) ? default : x;
+                if (y0 == 0) ThrowDivideByZeroException();
+                res = x;
                 return;
             }
             // else y is 2^64 or larger - not a special-case, continue.
@@ -109,10 +105,10 @@ public readonly partial struct UInt256
             if (yy0 > x0) { res = default; return; }
 
             // If x == y then quotient is 1.
-            if (yy0 == x0) { res = Create(1, 0, 0, 0); return; }
+            if (yy0 == x0) { StoreLowLimb(out res, 1); return; }
 
             // Normal 64-bit division.
-            res = Create(x0 / yy0, 0, 0, 0);
+            StoreLowLimb(out res, x0 / yy0);
             return;
         }
 
@@ -148,7 +144,7 @@ public readonly partial struct UInt256
         ulong x0b = x.u0;
         ulong y0b = y.u0;
         if (x0b < y0b) { res = default; return; }               // x < y
-        if (x0b == y0b) { res = Create(1, 0, 0, 0); return; }   // x == y -> quotient 1
+        if (x0b == y0b) { StoreLowLimb(out res, 1); return; }   // x == y -> quotient 1
 
         // Remaining case: x > y.
         DivideFull(in x, in y, out res);
@@ -218,7 +214,7 @@ public readonly partial struct UInt256
         {
             // y < x < 2^64, so the divisor is single-limb too. One div leaves the remainder in rdx;
             // reconstructing it from the quotient would put a dependent imul on the critical path.
-            res = Create(x.u0 % y0, 0, 0, 0);
+            StoreLowLimb(out res, x.u0 % y0);
             return;
         }
 
@@ -509,7 +505,7 @@ public readonly partial struct UInt256
         // One test replaces normalization, a div, the qhat correction and four products.
         if ((long)y3 < 0)
         {
-            Store4(out res, 1, 0, 0, 0);
+            StoreLowLimb(out res, 1);
             return;
         }
 
@@ -520,38 +516,61 @@ public readonly partial struct UInt256
                 DivideByPowerOfTwo256(in x, BitOperations.TrailingZeroCount(y3), out res);
                 return;
             }
+
+            DivideBy256Bits(in x, in y, out res, out _);
+            return;
         }
-        else if (y.u2 != 0)
+
+        ulong y2 = y.u2;
+        if (y2 != 0)
         {
-            ulong y2 = y.u2;
             if ((y.u0 | y.u1 | (y2 & (y2 - 1))) == 0)
             {
                 DivideByPowerOfTwo192(in x, BitOperations.TrailingZeroCount(y2), out res);
                 return;
             }
+
+            DivideBy192Bits(in x, in y, out res, out _);
+            return;
         }
-        else if (y.u1 != 0)
+
+        ulong y1 = y.u1;
+        if (y1 != 0)
         {
-            ulong y1 = y.u1;
             if ((y.u0 | (y1 & (y1 - 1))) == 0)
             {
                 DivideByPowerOfTwo128(in x, BitOperations.TrailingZeroCount(y1), out res);
                 return;
             }
+
+            if (X86Base.X64.IsSupported)
+            {
+                DivideBy128BitsX86Base(in x, in y, out res, out _);
+            }
+            else
+            {
+                DivideBy128Bits(in x, in y, out res, out _);
+            }
+            return;
+        }
+
+        // Single-limb divisor. The wrapper returned already for y == 0 and y == 1, so y >= 2
+        // and the shift count is never zero. Otherwise this is four dependent hardware divs.
+        ulong y0 = y.u0;
+        if ((y0 & (y0 - 1)) == 0)
+        {
+            DivideByPowerOfTwo64(in x, BitOperations.TrailingZeroCount(y0), out res);
+            return;
+        }
+
+        if (X86Base.X64.IsSupported)
+        {
+            QuotientBy64BitsX86Base(in x, y0, out res);
         }
         else
         {
-            // Single-limb divisor. The wrapper returned already for y == 0 and y == 1, so y >= 2
-            // and the shift count is never zero. Otherwise this is four dependent hardware divs.
-            ulong y0 = y.u0;
-            if ((y0 & (y0 - 1)) == 0)
-            {
-                DivideByPowerOfTwo64(in x, BitOperations.TrailingZeroCount(y0), out res);
-                return;
-            }
+            DivideBy64Bits(in x, y0, out res, out _);
         }
-
-        DivideImpl(in x, in y, out res, out _);
     }
 
     [SkipLocalsInit]
@@ -3212,11 +3231,8 @@ public readonly partial struct UInt256
         ulong x2 = x.u2;
         ulong x3 = x.u3;
         int inverseShift = 64 - bitShift;
-        Unsafe.SkipInit(out q);
-        Unsafe.AsRef(in q.u0) = (x0 >> bitShift) | (x1 << inverseShift);
-        Unsafe.AsRef(in q.u1) = (x1 >> bitShift) | (x2 << inverseShift);
-        Unsafe.AsRef(in q.u2) = (x2 >> bitShift) | (x3 << inverseShift);
-        Unsafe.AsRef(in q.u3) = x3 >> bitShift;
+        StoreProduct(out q, (x0 >> bitShift) | (x1 << inverseShift), (x1 >> bitShift) | (x2 << inverseShift),
+            (x2 >> bitShift) | (x3 << inverseShift), x3 >> bitShift);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -3225,23 +3241,15 @@ public readonly partial struct UInt256
         ulong x1 = x.u1;
         ulong x2 = x.u2;
         ulong x3 = x.u3;
-        Unsafe.SkipInit(out q);
-
         if (bitShift == 0)
         {
-            Unsafe.AsRef(in q.u0) = x1;
-            Unsafe.AsRef(in q.u1) = x2;
-            Unsafe.AsRef(in q.u2) = x3;
+            StoreProduct(out q, x1, x2, x3, 0);
         }
         else
         {
             int inverseShift = 64 - bitShift;
-            Unsafe.AsRef(in q.u0) = (x1 >> bitShift) | (x2 << inverseShift);
-            Unsafe.AsRef(in q.u1) = (x2 >> bitShift) | (x3 << inverseShift);
-            Unsafe.AsRef(in q.u2) = x3 >> bitShift;
+            StoreProduct(out q, (x1 >> bitShift) | (x2 << inverseShift), (x2 >> bitShift) | (x3 << inverseShift), x3 >> bitShift, 0);
         }
-
-        Unsafe.AsRef(in q.u3) = 0;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -3249,33 +3257,21 @@ public readonly partial struct UInt256
     {
         ulong x2 = x.u2;
         ulong x3 = x.u3;
-        Unsafe.SkipInit(out q);
-
         if (bitShift == 0)
         {
-            Unsafe.AsRef(in q.u0) = x2;
-            Unsafe.AsRef(in q.u1) = x3;
+            StoreProduct(out q, x2, x3, 0, 0);
         }
         else
         {
             int inverseShift = 64 - bitShift;
-            Unsafe.AsRef(in q.u0) = (x2 >> bitShift) | (x3 << inverseShift);
-            Unsafe.AsRef(in q.u1) = x3 >> bitShift;
+            StoreProduct(out q, (x2 >> bitShift) | (x3 << inverseShift), x3 >> bitShift, 0, 0);
         }
-
-        Unsafe.AsRef(in q.u2) = 0;
-        Unsafe.AsRef(in q.u3) = 0;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void DivideByPowerOfTwo256(in UInt256 x, int bitShift, out UInt256 q)
     {
-        ulong x3 = x.u3;
-        Unsafe.SkipInit(out q);
-        Unsafe.AsRef(in q.u0) = x3 >> bitShift;
-        Unsafe.AsRef(in q.u1) = 0;
-        Unsafe.AsRef(in q.u2) = 0;
-        Unsafe.AsRef(in q.u3) = 0;
+        StoreLowLimb(out q, x.u3 >> bitShift);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -3283,51 +3279,65 @@ public readonly partial struct UInt256
     {
         // mask == 0 would mean y == 1, which the wrapper already returned for.
         Debug.Assert(mask != 0, "divisor must be 2^1..2^63; the wrapper returns for y <= 1");
-        ulong x0 = x.u0;
-        Unsafe.SkipInit(out remainder);
-        Unsafe.AsRef(in remainder.u0) = x0 & mask;
-        Unsafe.AsRef(in remainder.u1) = 0;
-        Unsafe.AsRef(in remainder.u2) = 0;
-        Unsafe.AsRef(in remainder.u3) = 0;
+        StoreLowLimb(out remainder, x.u0 & mask);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void ModByPowerOfTwo128(in UInt256 x, ulong mask, out UInt256 remainder)
     {
-        ulong x0 = x.u0;
-        ulong x1 = x.u1;
-        Unsafe.SkipInit(out remainder);
-        Unsafe.AsRef(in remainder.u0) = x0;
-        Unsafe.AsRef(in remainder.u1) = x1 & mask;
-        Unsafe.AsRef(in remainder.u2) = 0;
-        Unsafe.AsRef(in remainder.u3) = 0;
+        StoreProduct(out remainder, x.u0, x.u1 & mask, 0, 0);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void ModByPowerOfTwo192(in UInt256 x, ulong mask, out UInt256 remainder)
     {
-        ulong x0 = x.u0;
-        ulong x1 = x.u1;
-        ulong x2 = x.u2;
-        Unsafe.SkipInit(out remainder);
-        Unsafe.AsRef(in remainder.u0) = x0;
-        Unsafe.AsRef(in remainder.u1) = x1;
-        Unsafe.AsRef(in remainder.u2) = x2 & mask;
-        Unsafe.AsRef(in remainder.u3) = 0;
+        StoreProduct(out remainder, x.u0, x.u1, x.u2 & mask, 0);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void ModByPowerOfTwo256(in UInt256 x, ulong mask, out UInt256 remainder)
     {
-        ulong x0 = x.u0;
-        ulong x1 = x.u1;
-        ulong x2 = x.u2;
-        ulong x3 = x.u3;
-        Unsafe.SkipInit(out remainder);
-        Unsafe.AsRef(in remainder.u0) = x0;
-        Unsafe.AsRef(in remainder.u1) = x1;
-        Unsafe.AsRef(in remainder.u2) = x2;
-        Unsafe.AsRef(in remainder.u3) = x3 & mask;
+        StoreProduct(out remainder, x.u0, x.u1, x.u2, x.u3 & mask);
+    }
+
+    [SkipLocalsInit]
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void QuotientBy64BitsX86Base(in UInt256 x, ulong divisor, out UInt256 q)
+    {
+        ulong u3 = x.u3;
+        ulong rem = u3;
+        ulong q3 = 0;
+        if (u3 >= divisor)
+        {
+            (q3, rem) = X86Base.X64.DivRem(lower: u3, upper: 0, divisor);
+        }
+        ulong u2 = x.u2;
+        ulong q2 = 0;
+        if (rem != 0 || u2 >= divisor)
+        {
+            (q2, rem) = X86Base.X64.DivRem(lower: u2, upper: rem, divisor);
+        }
+        else
+        {
+            rem = u2;
+        }
+        ulong u1 = x.u1;
+        ulong q1 = 0;
+        if (rem != 0 || u1 >= divisor)
+        {
+            (q1, rem) = X86Base.X64.DivRem(lower: u1, upper: rem, divisor);
+        }
+        else
+        {
+            rem = u1;
+        }
+        ulong q0 = 0;
+        if (rem != 0 || x.u0 >= divisor)
+        {
+            (q0, _) = X86Base.X64.DivRem(lower: x.u0, upper: rem, divisor);
+        }
+
+        StoreProduct(out q, q0, q1, q2, q3);
     }
 
     [SkipLocalsInit]
