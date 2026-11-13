@@ -76,6 +76,39 @@ public class ModTopLimbTests
         }
     }
 
+    [Test]
+    public void Mod_matches_BigInteger_when_the_product_carries_between_limbs()
+    {
+        BigInteger top = Top;
+        int checkedCount = 0;
+        for (ulong d = 2; d <= 6; d++)
+        {
+            ulong near = ulong.MaxValue / d;
+            ulong[] limbs = [near - 1, near, near + 1, ulong.MaxValue, ulong.MaxValue - 1, 0];
+            foreach (ulong y2 in limbs)
+                foreach (ulong y1 in limbs)
+                    foreach (ulong y0 in limbs)
+                    {
+                        BigInteger y = (top << 192) | ((BigInteger)y2 << 128) | ((BigInteger)y1 << 64) | y0;
+                        for (int k = 1; k <= 5; k++)
+                        {
+                            BigInteger aligned = k * (top + 1) << 192;
+                            foreach (BigInteger x in new[] { aligned, aligned - 1, aligned + 1, aligned + (Two192 - 1), k * y, k * y - 1, k * y + y - 1 })
+                            {
+                                if (x > y && x < Two256)
+                                {
+                                    AssertMod(x, y);
+                                    checkedCount++;
+                                }
+                            }
+                        }
+                    }
+        }
+
+        AssertMod(3 * (top + 1) << 192, Hex("30644e72e131a02955555555555555555555555555555555ffffffffffffffff"));
+        Assert.That(checkedCount, Is.GreaterThan(5_000));
+    }
+
     private static void AssertMod(BigInteger x, BigInteger y)
     {
         UInt256 a = FromBig(x), b = FromBig(y);

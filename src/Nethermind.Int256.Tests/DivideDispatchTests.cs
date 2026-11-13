@@ -62,6 +62,8 @@ public class DivideDispatchTests
             AssertDivide(TwoPow256 - 1, divisor);
             AssertDivide(divisor, divisor);
             AssertDivide(divisor + 1, divisor);
+            AssertDivide(TwoPow256 - 1, divisor + 1);
+            AssertDivide(RandomBits(random, 256), divisor + 1);
         }
     }
 
@@ -95,6 +97,7 @@ public class DivideDispatchTests
                 AssertDivide(aligned - 1, d);
                 AssertDivide(aligned, d);
                 AssertDivide(aligned + 1, d);
+                AssertDivide(aligned + d, d);
                 AssertDivide(((BigInteger)(d - 1) << (64 * limb)) | RandomBits(random, 64 * limb), d);
             }
         }
