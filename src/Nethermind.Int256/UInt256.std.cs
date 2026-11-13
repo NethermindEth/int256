@@ -37,6 +37,8 @@ public readonly partial struct UInt256
 
     private const int ExpBinomialMinBits = 80;
 
+    private const bool AddModReducedSmallModulus = true;
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void SquareExpLong(in UInt256 value, out UInt256 result)
         => value.Squared(out result);

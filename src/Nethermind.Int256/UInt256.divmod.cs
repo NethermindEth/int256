@@ -262,7 +262,11 @@ public readonly partial struct UInt256
 
         if (m.IsUint64)
         {
-            if (X86Base.X64.IsSupported)
+            if (AddModReducedSmallModulus && (s4 | sum.u2 | sum.u3) == 0 && sum.u1 <= 1 && TryReduceSumBelowTwice64(sum.u0, sum.u1 != 0, m.u0, out ulong reduced))
+            {
+                StoreLowLimb(out res, reduced);
+            }
+            else if (X86Base.X64.IsSupported)
             {
                 Remainder257By64BitsX86Base(in sum, s4, m.u0, out res);
             }
@@ -571,6 +575,20 @@ public readonly partial struct UInt256
         {
             DivideBy64Bits(in x, y0, out res, out _);
         }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool TryReduceSumBelowTwice64(ulong low, bool wrapped, ulong d, out ulong reduced)
+    {
+        bool borrow = low < d;
+        if (!wrapped && borrow)
+        {
+            reduced = low;
+            return true;
+        }
+
+        reduced = low - d;
+        return wrapped == borrow && reduced < d;
     }
 
     [SkipLocalsInit]
