@@ -390,7 +390,8 @@ public readonly partial struct UInt256
         // Below 2^384 the division needs at most three quotient digits (two when both operands are below m) and costs
         // no more than the reduction.
         ulong top = m.u3;
-        if ((hi.u2 | hi.u3) != 0 && (top == Bn254R.Top || top == Secp256k1P.Top || top == P256P.Top || top == P256N.Top))
+        if ((hi.u2 | hi.u3) != 0 &&
+            (top == Bn254R.Top || top == Secp256k1N.Top || top == P256P.Top || top == P256N.Top || top == Prime251.Top))
         {
             Remainder512ByKnownModulus(in lo, in hi, in m, out rem);
             return;
@@ -409,21 +410,21 @@ public readonly partial struct UInt256
             case Bn254R.Top:
                 if (IsModulus<Bn254R>(in m))
                 {
-                    Remainder512ByBarrettOrDivide<Bn254R>(in lo, in hi, in m, out rem);
+                    Remainder512ByShortBarrettOrDivide<Bn254R>(in lo, in hi, in m, out rem);
                     return;
                 }
 
                 if (IsModulus<Bn254P>(in m))
                 {
-                    Remainder512ByBarrettOrDivide<Bn254P>(in lo, in hi, in m, out rem);
+                    Remainder512ByShortBarrettOrDivide<Bn254P>(in lo, in hi, in m, out rem);
                     return;
                 }
 
                 break;
-            case Secp256k1P.Top:
-                if (IsModulus<Secp256k1P>(in m))
+            case Secp256k1N.Top:
+                if ((m.u1 & m.u2) == ulong.MaxValue && m.u0 > 1)
                 {
-                    Remainder512ByBarrettOrDivide<Secp256k1P>(in lo, in hi, in m, out rem);
+                    Remainder512ByPseudoMersenne(in lo, in hi, 0UL - m.u0, out rem);
                     return;
                 }
 
@@ -438,6 +439,14 @@ public readonly partial struct UInt256
                 if (IsModulus<P256P>(in m))
                 {
                     Remainder512ByBarrettOrDivide<P256P>(in lo, in hi, in m, out rem);
+                    return;
+                }
+
+                break;
+            case Prime251.Top:
+                if (IsModulus<Prime251>(in m))
+                {
+                    Remainder512ByShortBarrettOrDivide<Prime251>(in lo, in hi, in m, out rem);
                     return;
                 }
 
