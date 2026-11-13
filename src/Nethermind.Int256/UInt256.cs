@@ -1143,8 +1143,8 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
                 ExpOddLong(b, e, precision, out result);
                 return;
             }
-            // Remaining exponents have at most 79 bits, so the density cutoff is 32.
-            if (BitOperations.PopCount(e.u0) + BitOperations.PopCount(e.u1) > 32)
+            // Remaining exponents have at most 79 bits.
+            if (BitOperations.PopCount(e.u0) + BitOperations.PopCount(e.u1) > ExpWindowMinSetBits(bitLen))
             {
                 ExpWindow(b, e, bitLen, out result);
                 return;
