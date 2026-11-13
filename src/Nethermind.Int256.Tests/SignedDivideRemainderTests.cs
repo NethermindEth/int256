@@ -51,6 +51,12 @@ public class SignedDivideRemainderTests
         Int256 aliasedDividend = x;
         Int256.Divide(in aliasedDividend, in y, out aliasedDividend);
         Assert.That(aliasedDividend, Is.EqualTo(quotient), label);
+        Int256 aliasedQuotientDivisor = y;
+        Int256.Divide(in x, in aliasedQuotientDivisor, out aliasedQuotientDivisor);
+        Assert.That(aliasedQuotientDivisor, Is.EqualTo(quotient), label);
+        Int256 aliasedRemainderDividend = x;
+        Int256.Mod(in aliasedRemainderDividend, in y, out aliasedRemainderDividend);
+        Assert.That(aliasedRemainderDividend, Is.EqualTo(remainder), label);
         Int256 aliasedDivisor = y;
         Int256.Mod(in x, in aliasedDivisor, out aliasedDivisor);
         Assert.That(aliasedDivisor, Is.EqualTo(remainder), label);

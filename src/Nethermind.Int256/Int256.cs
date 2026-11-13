@@ -245,44 +245,24 @@ public readonly partial struct Int256 : IEquatable<Int256>, IComparable, ICompar
 
     public void MultiplyMod(in Int256 a, in Int256 m, out Int256 res) => MultiplyMod(this, a, m, out res);
 
+    [SkipLocalsInit]
     public static void Divide(in Int256 n, in Int256 d, out Int256 res)
     {
         bool nIsNegative = n.IsNegative;
         bool dIsNegative = d.IsNegative;
-        UInt256 value;
-        if (!nIsNegative)
+        if (!(nIsNegative | dIsNegative))
         {
-            if (!dIsNegative)
-            {
-                // pos / pos
-                UInt256.Divide(n._value, d._value, out value);
-                res = new Int256(value);
-                return;
-            }
-            else
-            {
-                // pos / neg
-                Neg(d, out Int256 neg);
-                UInt256.Divide(n._value, neg._value, out value);
-                res = new Int256(value);
-                res.Neg(out res);
-                return;
-            }
-        }
-
-        Neg(n, out Int256 nNeg);
-        if (dIsNegative)
-        {
-            // neg / neg
-            Neg(d, out Int256 dNeg);
-            UInt256.Divide(nNeg._value, dNeg._value, out value);
-            res = new Int256(value);
+            UInt256.Divide(in n._value, in d._value, out UInt256 positive);
+            res = new Int256(positive);
             return;
         }
-        // neg / pos
-        UInt256.Divide(nNeg._value, d._value, out value);
-        res = new Int256(value);
-        res.Neg(out res);
+
+        UInt256 dividend, divisor;
+        if (nIsNegative) NegateLimbs(in n._value, out dividend); else dividend = n._value;
+        if (dIsNegative) NegateLimbs(in d._value, out divisor); else divisor = d._value;
+        UInt256.Divide(in dividend, in divisor, out UInt256 quotient);
+        if (nIsNegative != dIsNegative) NegateLimbs(in quotient, out quotient);
+        res = new Int256(quotient);
     }
 
     public void Divide(in Int256 a, out Int256 res) => Divide(this, a, out res);
