@@ -274,4 +274,8 @@ public readonly partial struct UInt256
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static partial void Remainder512ByFullModulus(in UInt256 lo, in UInt256 hi, in UInt256 m, out UInt256 rem)
         => Remainder512By256Bits(in lo, in hi, in m, out rem);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static partial void Remainder256ByFullModulus(in UInt256 x, in UInt256 y, out UInt256 res)
+        => Remainder256By256(in x, in y, out res);
 }
