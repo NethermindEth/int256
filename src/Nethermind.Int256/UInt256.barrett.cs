@@ -7,8 +7,8 @@ namespace Nethermind.Int256;
 
 public readonly partial struct UInt256
 {
-    // Reduces hi:lo modulo a modulus with m.u3 != 0. The standard build reduces the moduli below by Barrett
-    // reduction with their reciprocals as constants; the zkEVM build divides.
+    // Reduces hi:lo modulo a modulus with m.u3 != 0. Both builds reduce the moduli below by Barrett reduction with
+    // their reciprocals as constants.
     private static partial void Remainder512ByFullModulus(in UInt256 lo, in UInt256 hi, in UInt256 m, out UInt256 rem);
 
     // A full-width modulus m (m.u3 != 0) and mu = floor((2^512 - 1) / m), 2^256 < mu < 2^320, as constants, so each
@@ -455,5 +455,69 @@ public readonly partial struct UInt256
             Sub(a3, TModulus.M3, ref borrow);
             return borrow != 0;
         }
+    }
+
+    [SkipLocalsInit]
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void Remainder512ByKnownModulus(in UInt256 lo, in UInt256 hi, in UInt256 m, out UInt256 rem)
+    {
+        // BN254 r and p share their top two limbs, as do secp256k1 p and n.
+        switch (m.u3)
+        {
+            case Bn254R.Top:
+                if (IsModulus<Bn254R>(in m))
+                {
+                    Remainder512ByShortBarrettOrDivide<Bn254R>(in lo, in hi, in m, out rem);
+                    return;
+                }
+
+                if (IsModulus<Bn254P>(in m))
+                {
+                    Remainder512ByShortBarrettOrDivide<Bn254P>(in lo, in hi, in m, out rem);
+                    return;
+                }
+
+                break;
+            case Secp256k1N.Top:
+                if ((m.u1 & m.u2) == ulong.MaxValue && m.u0 > 1)
+                {
+                    Remainder512ByPseudoMersenne(in lo, in hi, 0UL - m.u0, out rem);
+                    return;
+                }
+
+                if (IsModulus<Secp256k1N>(in m))
+                {
+                    Remainder512ByBarrettOrDivide<Secp256k1N>(in lo, in hi, in m, out rem);
+                    return;
+                }
+
+                break;
+            case P256P.Top:
+                if (IsModulus<P256P>(in m))
+                {
+                    Remainder512ByBarrettOrDivide<P256P>(in lo, in hi, in m, out rem);
+                    return;
+                }
+
+                break;
+            case Prime251.Top:
+                if (IsModulus<Prime251>(in m))
+                {
+                    Remainder512ByShortBarrettOrDivide<Prime251>(in lo, in hi, in m, out rem);
+                    return;
+                }
+
+                break;
+            case P256N.Top:
+                if (IsModulus<P256N>(in m))
+                {
+                    Remainder512ByBarrettOrDivide<P256N>(in lo, in hi, in m, out rem);
+                    return;
+                }
+
+                break;
+        }
+
+        Remainder512By256Bits(in lo, in hi, in m, out rem);
     }
 }
