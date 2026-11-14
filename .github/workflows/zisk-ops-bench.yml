@@ -12,8 +12,8 @@ env:
   BFLAT_IMAGE: nethermindeth/bflat-riscv64-11:dd05dd8af0a14065a9974492007dd5e568acfecc@sha256:34235a4a8050b171dd03562a875752c08db5b6fdb33bb505be1eeeb7c4ea19be
   ZISK_IMAGE: nethermindeth/zisk:1.4.0-alpha@sha256:76bc753857e1807b724979a119ba919af0d857b3ea5deda982fd84b1be2cb930
   ZISKOS_VERSION: 1.4.0-alpha.155
-  VARIANTS: base=b2ec5bb pr184=63d261d mb=b2ec5bb mx=b2ec5bb mx3=b2ec5bb mxs=b2ec5bb mq=b2ec5bb pr183=5fffeb1 dy=b2ec5bb
-  DISASM: base pr184 mx mq pr183 dy
+  VARIANTS: base=b2ec5bb c184=b2ec5bb c183=b2ec5bb
+  DISASM: c184 c183
 
 jobs:
   measure:
