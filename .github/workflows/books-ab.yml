@@ -16,10 +16,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest]
-        pair:
-          - { name: mg, a: 7e01460, b: 81db518, filter: "*ReciprocalDivisionBench*" }
-          - { name: knuth3by2, a: 81db518, b: 7c04061, filter: "*ReciprocalDivisionBench*" }
+        include:
+          - { os: ubuntu-24.04-arm, pair: { name: mg, a: 7e01460, b: 81db518, filter: "*ReciprocalDivisionBench*" } }
+          - { os: ubuntu-latest, pair: { name: mg, a: 7e01460, b: 81db518, filter: "*ReciprocalDivisionBench* *FormatBench.UInt256ToString" } }
+          - { os: ubuntu-24.04-arm, pair: { name: knuth3by2, a: 81db518, b: 49033f1, filter: "*ReciprocalDivisionBench.Divide* *ReciprocalDivisionBench.Mod*" } }
     steps:
       - uses: actions/checkout@v7
         with:
