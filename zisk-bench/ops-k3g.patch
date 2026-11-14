@@ -141,7 +141,7 @@ index dcce9a0..fc7e68d 100644
          // Start touching out params only after all input loads are done (alias-safe).
          Unsafe.SkipInit(out q);
  
-+        if (true)
++        if (!X86Base.X64.IsSupported)
 +        {
 +            // Each 3-by-2 step returns the exact digit and remainder, so no step needs the add-back.
 +            ulong recip3 = Reciprocal3By2(v1n, v0, vRecip);
