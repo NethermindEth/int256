@@ -1286,7 +1286,13 @@ public readonly partial struct UInt256
                 return;
             }
 
-            Remainder256ByFullModulus(in x, in y, out res);
+            if (y3 == Bn254R.Top)
+            {
+                Remainder256ByTopLimb254(in x, in y, out res);
+                return;
+            }
+
+            Remainder256By256(in x, in y, out res);
             return;
         }
 
@@ -1323,8 +1329,6 @@ public readonly partial struct UInt256
 
         Remainder256By64(in x, y0, out res);
     }
-
-    private static partial void Remainder256ByFullModulus(in UInt256 x, in UInt256 y, out UInt256 res);
 
     [SkipLocalsInit]
     [MethodImpl(MethodImplOptions.NoInlining)]
