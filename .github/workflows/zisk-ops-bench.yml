@@ -12,8 +12,8 @@ env:
   BFLAT_IMAGE: nethermindeth/bflat-riscv64-11:dd05dd8af0a14065a9974492007dd5e568acfecc@sha256:34235a4a8050b171dd03562a875752c08db5b6fdb33bb505be1eeeb7c4ea19be
   ZISK_IMAGE: nethermindeth/zisk:1.4.0-alpha@sha256:76bc753857e1807b724979a119ba919af0d857b3ea5deda982fd84b1be2cb930
   ZISKOS_VERSION: 1.4.0-alpha.155
-  VARIANTS: base=b2ec5bb pr184=63d261d mf=b2ec5bb mt=b2ec5bb ms=b2ec5bb mb=b2ec5bb mh=b2ec5bb pr183=5fffeb1 ds=b2ec5bb
-  DISASM: base pr184 mt ms pr183 ds
+  VARIANTS: base=b2ec5bb pr184=63d261d mb=b2ec5bb mx=b2ec5bb mx3=b2ec5bb mxs=b2ec5bb mq=b2ec5bb pr183=5fffeb1 dy=b2ec5bb
+  DISASM: base pr184 mx mq pr183 dy
 
 jobs:
   measure:
@@ -126,7 +126,7 @@ jobs:
               -o /n/dis/sym-$version \
               /n/$version/Program.cs
             bin="$work/dis/sym-$version"
-            riscv64-linux-gnu-nm "$bin" | grep -E 'UInt256__(MultiplyMod|ModFull|Mod$|Remainder512ByFullModulus|Remainder512ByKnownModulus|Remainder256ByFullModulus|Remainder256ByTopLimb)' > "$work/dis/syms-$version.txt" || true
+            riscv64-linux-gnu-nm "$bin" | grep -E 'UInt256__(MultiplyMod|ModFull|Mod$|Remainder512ByFullModulus|Remainder512ByKnownModulus|Remainder256ByFullModulus|Remainder256ByTopLimb|Remainder512ByTopLimbMax)|ZiskExpBench_Program__Run' > "$work/dis/syms-$version.txt" || true
             : > "$work/dis/dis-$version.txt"
             for sym in $(awk '{print $3}' "$work/dis/syms-$version.txt"); do
               riscv64-linux-gnu-objdump -d --no-show-raw-insn --disassemble="$sym" "$bin" | sed -n '/>:$/,$p' >> "$work/dis/dis-$version.txt"

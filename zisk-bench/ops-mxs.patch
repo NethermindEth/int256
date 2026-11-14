@@ -1,0 +1,262 @@
+diff --git a/src/Nethermind.Int256/UInt256.barrett.cs b/src/Nethermind.Int256/UInt256.barrett.cs
+index fd0cb6c..4435142 100644
+--- a/src/Nethermind.Int256/UInt256.barrett.cs
++++ b/src/Nethermind.Int256/UInt256.barrett.cs
+@@ -7,8 +7,8 @@ namespace Nethermind.Int256;
+ 
+ public readonly partial struct UInt256
+ {
+-    // Reduces hi:lo modulo a modulus with m.u3 != 0. The standard build reduces the moduli below by Barrett
+-    // reduction with their reciprocals as constants; the zkEVM build divides.
++    // Reduces hi:lo modulo a modulus with m.u3 != 0. Both builds reduce the moduli below by Barrett reduction with
++    // their reciprocals as constants.
+     private static partial void Remainder512ByFullModulus(in UInt256 lo, in UInt256 hi, in UInt256 m, out UInt256 rem);
+ 
+     // A full-width modulus m (m.u3 != 0) and mu = floor((2^512 - 1) / m), 2^256 < mu < 2^320, as constants, so each
+@@ -456,4 +456,68 @@ public readonly partial struct UInt256
+             return borrow != 0;
+         }
+     }
++
++    [SkipLocalsInit]
++    [MethodImpl(MethodImplOptions.NoInlining)]
++    private static void Remainder512ByKnownModulus(in UInt256 lo, in UInt256 hi, in UInt256 m, out UInt256 rem)
++    {
++        // BN254 r and p share their top two limbs, as do secp256k1 p and n.
++        switch (m.u3)
++        {
++            case Bn254R.Top:
++                if (IsModulus<Bn254R>(in m))
++                {
++                    Remainder512ByShortBarrettOrDivide<Bn254R>(in lo, in hi, in m, out rem);
++                    return;
++                }
++
++                if (IsModulus<Bn254P>(in m))
++                {
++                    Remainder512ByShortBarrettOrDivide<Bn254P>(in lo, in hi, in m, out rem);
++                    return;
++                }
++
++                break;
++            case Secp256k1N.Top:
++                if ((m.u1 & m.u2) == ulong.MaxValue && m.u0 > 1)
++                {
++                    Remainder512ByPseudoMersenne(in lo, in hi, 0UL - m.u0, out rem);
++                    return;
++                }
++
++                if (IsModulus<Secp256k1N>(in m))
++                {
++                    Remainder512ByBarrettOrDivide<Secp256k1N>(in lo, in hi, in m, out rem);
++                    return;
++                }
++
++                break;
++            case P256P.Top:
++                if (IsModulus<P256P>(in m))
++                {
++                    Remainder512ByBarrettOrDivide<P256P>(in lo, in hi, in m, out rem);
++                    return;
++                }
++
++                break;
++            case Prime251.Top:
++                if (IsModulus<Prime251>(in m))
++                {
++                    Remainder512ByShortBarrettOrDivide<Prime251>(in lo, in hi, in m, out rem);
++                    return;
++                }
++
++                break;
++            case P256N.Top:
++                if (IsModulus<P256N>(in m))
++                {
++                    Remainder512ByBarrettOrDivide<P256N>(in lo, in hi, in m, out rem);
++                    return;
++                }
++
++                break;
++        }
++
++        Remainder512By256Bits(in lo, in hi, in m, out rem);
++    }
+ }
+diff --git a/src/Nethermind.Int256/UInt256.divmod.cs b/src/Nethermind.Int256/UInt256.divmod.cs
+index dcce9a0..2614b94 100644
+--- a/src/Nethermind.Int256/UInt256.divmod.cs
++++ b/src/Nethermind.Int256/UInt256.divmod.cs
+@@ -376,32 +376,38 @@ public readonly partial struct UInt256
+             return;
+         }
+ 
+-        if (m.u3 == ulong.MaxValue && (m.u0 & m.u1 & m.u2) == ulong.MaxValue)
++        if (m.u3 == ulong.MaxValue)
+         {
+-            // 2^256 is congruent to 1 modulo 2^256 - 1, so fold the high half into the low half.
+-            bool carry = AddOverflow(in lo, in hi, out res);
+-            if (carry)
++            if ((m.u0 & m.u1 & m.u2) == ulong.MaxValue)
+             {
+-                ref ulong limb = ref Unsafe.AsRef(in res.u0);
+-                if (++limb == 0)
++                // 2^256 is congruent to 1 modulo 2^256 - 1, so fold the high half into the low half.
++                bool carry = AddOverflow(in lo, in hi, out res);
++                if (carry)
+                 {
+-                    limb = ref Unsafe.AsRef(in res.u1);
++                    ref ulong limb = ref Unsafe.AsRef(in res.u0);
+                     if (++limb == 0)
+                     {
+-                        limb = ref Unsafe.AsRef(in res.u2);
++                        limb = ref Unsafe.AsRef(in res.u1);
+                         if (++limb == 0)
+                         {
+-                            Unsafe.AsRef(in res.u3)++;
++                            limb = ref Unsafe.AsRef(in res.u2);
++                            if (++limb == 0)
++                            {
++                                Unsafe.AsRef(in res.u3)++;
++                            }
+                         }
+                     }
+                 }
+-            }
+ 
+-            if (res.u3 == ulong.MaxValue && (res.u0 & res.u1 & res.u2) == ulong.MaxValue)
+-            {
+-                res = default;
++                if (res.u3 == ulong.MaxValue && (res.u0 & res.u1 & res.u2) == ulong.MaxValue)
++                {
++                    res = default;
++                }
++
++                return;
+             }
+ 
++            Remainder512ByTopLimbMax(in lo, in hi, in m, out res);
+             return;
+         }
+ 
+@@ -1326,6 +1332,8 @@ public readonly partial struct UInt256
+ 
+     private static partial void Remainder256ByFullModulus(in UInt256 x, in UInt256 y, out UInt256 res);
+ 
++    private static partial void Remainder512ByTopLimbMax(in UInt256 lo, in UInt256 hi, in UInt256 m, out UInt256 rem);
++
+     // The kernels below answer x % y without assembling the quotient, and stay in general registers:
+     // normalising through a UInt256 costs four 8-byte stores then one 32-byte load, which cannot forward.
+ 
+diff --git a/src/Nethermind.Int256/UInt256.std.cs b/src/Nethermind.Int256/UInt256.std.cs
+index 14c221a..3fe7ef8 100644
+--- a/src/Nethermind.Int256/UInt256.std.cs
++++ b/src/Nethermind.Int256/UInt256.std.cs
+@@ -406,69 +406,9 @@ public readonly partial struct UInt256
+         Remainder512By256Bits(in lo, in hi, in m, out rem);
+     }
+ 
+-    [SkipLocalsInit]
+-    [MethodImpl(MethodImplOptions.NoInlining)]
+-    private static void Remainder512ByKnownModulus(in UInt256 lo, in UInt256 hi, in UInt256 m, out UInt256 rem)
+-    {
+-        // BN254 r and p share their top two limbs, as do secp256k1 p and n.
+-        switch (m.u3)
+-        {
+-            case Bn254R.Top:
+-                if (IsModulus<Bn254R>(in m))
+-                {
+-                    Remainder512ByShortBarrettOrDivide<Bn254R>(in lo, in hi, in m, out rem);
+-                    return;
+-                }
+-
+-                if (IsModulus<Bn254P>(in m))
+-                {
+-                    Remainder512ByShortBarrettOrDivide<Bn254P>(in lo, in hi, in m, out rem);
+-                    return;
+-                }
+-
+-                break;
+-            case Secp256k1N.Top:
+-                if ((m.u1 & m.u2) == ulong.MaxValue && m.u0 > 1)
+-                {
+-                    Remainder512ByPseudoMersenne(in lo, in hi, 0UL - m.u0, out rem);
+-                    return;
+-                }
+-
+-                if (IsModulus<Secp256k1N>(in m))
+-                {
+-                    Remainder512ByBarrettOrDivide<Secp256k1N>(in lo, in hi, in m, out rem);
+-                    return;
+-                }
+-
+-                break;
+-            case P256P.Top:
+-                if (IsModulus<P256P>(in m))
+-                {
+-                    Remainder512ByBarrettOrDivide<P256P>(in lo, in hi, in m, out rem);
+-                    return;
+-                }
+-
+-                break;
+-            case Prime251.Top:
+-                if (IsModulus<Prime251>(in m))
+-                {
+-                    Remainder512ByShortBarrettOrDivide<Prime251>(in lo, in hi, in m, out rem);
+-                    return;
+-                }
+-
+-                break;
+-            case P256N.Top:
+-                if (IsModulus<P256N>(in m))
+-                {
+-                    Remainder512ByBarrettOrDivide<P256N>(in lo, in hi, in m, out rem);
+-                    return;
+-                }
+-
+-                break;
+-        }
+-
+-        Remainder512By256Bits(in lo, in hi, in m, out rem);
+-    }
++    [MethodImpl(MethodImplOptions.AggressiveInlining)]
++    private static partial void Remainder512ByTopLimbMax(in UInt256 lo, in UInt256 hi, in UInt256 m, out UInt256 rem)
++        => Remainder512ByFullModulus(in lo, in hi, in m, out rem);
+ 
+     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+     private static partial void Remainder256ByFullModulus(in UInt256 x, in UInt256 y, out UInt256 res)
+diff --git a/src/Nethermind.Int256/UInt256.zkevm.cs b/src/Nethermind.Int256/UInt256.zkevm.cs
+index f1c7684..290a42e 100644
+--- a/src/Nethermind.Int256/UInt256.zkevm.cs
++++ b/src/Nethermind.Int256/UInt256.zkevm.cs
+@@ -273,10 +273,29 @@ public readonly partial struct UInt256
+     private static FormatException UnsupportedFormat(ReadOnlySpan<char> format) =>
+         new($"Format '{format}' is not supported in the zkEVM build; use D, G, X or B.");
+ 
+-    // The guest keeps the division: the Barrett kernels are not measured in guest steps.
+     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+     private static partial void Remainder512ByFullModulus(in UInt256 lo, in UInt256 hi, in UInt256 m, out UInt256 rem)
+-        => Remainder512By256Bits(in lo, in hi, in m, out rem);
++    {
++        if (m.u3 >> 52 == Bn254R.Top >> 52 && (hi.u2 | hi.u3) != 0)
++        {
++            Remainder512ByKnownModulus(in lo, in hi, in m, out rem);
++            return;
++        }
++
++        Remainder512By256Bits(in lo, in hi, in m, out rem);
++    }
++
++    [MethodImpl(MethodImplOptions.AggressiveInlining)]
++    private static partial void Remainder512ByTopLimbMax(in UInt256 lo, in UInt256 hi, in UInt256 m, out UInt256 rem)
++    {
++        if ((hi.u2 | hi.u3) != 0)
++        {
++            Remainder512ByKnownModulus(in lo, in hi, in m, out rem);
++            return;
++        }
++
++        Remainder512By256Bits(in lo, in hi, in m, out rem);
++    }
+ 
+     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+     private static partial void Remainder256ByFullModulus(in UInt256 x, in UInt256 y, out UInt256 res)
