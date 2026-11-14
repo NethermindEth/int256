@@ -14,7 +14,7 @@ env:
   MAIN_SHA: b2ec5bb
   GRID: full
   MODES: M,C
-  CAND_BASE: 2761228
+  CAND_BASE: b2ec5bb
   BASES: b3,b64,bfull
 
 jobs:
