@@ -17,9 +17,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { os: ubuntu-24.04-arm, pair: { name: mg, a: 7e01460, b: 81db518, filter: "*ReciprocalDivisionBench*" } }
-          - { os: ubuntu-latest, pair: { name: mg, a: 7e01460, b: 81db518, filter: "*ReciprocalDivisionBench* *FormatBench.UInt256ToString" } }
-          - { os: ubuntu-24.04-arm, pair: { name: knuth3by2, a: 81db518, b: 49033f1, filter: "*ReciprocalDivisionBench.Divide* *ReciprocalDivisionBench.Mod*" } }
+          - { os: ubuntu-24.04-arm, pair: { name: mg, a: 7e01460, b: 856c703, filter: "*ReciprocalDivisionBench*" } }
+          - { os: ubuntu-latest, pair: { name: mg, a: 7e01460, b: 856c703, filter: "*ReciprocalDivisionBench* *FormatBench.UInt256ToString" } }
     steps:
       - uses: actions/checkout@v7
         with:
