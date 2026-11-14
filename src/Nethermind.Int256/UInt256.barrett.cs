@@ -440,6 +440,22 @@ public readonly partial struct UInt256
                 return;
             }
 
+            // a * (2^64 - 1) = a * 2^64 - a and a * (2^32 - 1) = a * 2^32 - a take a shift and a subtract.
+            if (b == ulong.MaxValue)
+            {
+                s = AddAndCountCarry(s, 0UL - a, ref k);
+                t = AddAndCountCarry(t, a - (a != 0 ? 1UL : 0UL), ref j);
+                return;
+            }
+
+            if (b == uint.MaxValue)
+            {
+                ulong shifted = a << 32;
+                s = AddAndCountCarry(s, shifted - a, ref k);
+                t = AddAndCountCarry(t, (a >> 32) - (shifted < a ? 1UL : 0UL), ref j);
+                return;
+            }
+
             ulong high = Multiply64(a, b, out ulong low);
             s = AddAndCountCarry(s, low, ref k);
             t = AddAndCountCarry(t, high, ref j);
