@@ -75,6 +75,7 @@ jobs:
               -r '{std}/System.Memory.dll' \
               -r '{std}/System.Runtime.dll' \
               -r '{std}/System.Runtime.InteropServices.dll' \
+              -r '{std}/System.Runtime.Numerics.dll' \
               -r /n/$version/Nethermind.Int256.dll \
               --extlib "/n/$NUPKG" \
               --error-on-float-binary --error-on-compressed --error-on-atomic \
