@@ -60,10 +60,10 @@ public readonly partial struct UInt256
     // Base ten first removes three guest steps from each table lookup.
     private const bool ExpPreferDecimalLookup = true;
 
-    private const int ExpWindowMaxWidth = 5;
+    private const int ExpWindowMaxWidth = 4;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static int ExpWindowMinSetBits(int bitLen) => 32;
+    private static int ExpWindowMinSetBits(int bitLen) => 14;
 
     // General width dispatch produces fewer guest steps and memory operations.
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
