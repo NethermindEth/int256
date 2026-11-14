@@ -67,6 +67,9 @@ public readonly partial struct UInt256
 
     private const bool ExpShortWindow = true;
 
+    // A guest has no branch predictor: the select form adds steps to each remainder digit.
+    private static bool DivRemBranchlessCorrection => false;
+
     // General width dispatch produces fewer guest steps and memory operations.
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void MultiplyExpPower(in UInt256 value, in UInt256 power, out UInt256 result)
