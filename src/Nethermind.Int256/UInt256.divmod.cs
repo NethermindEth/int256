@@ -1548,6 +1548,11 @@ public readonly partial struct UInt256
             return;
         }
 
+        if (!X86Base.X64.IsSupported && DivRemBranchlessCorrection)
+        {
+            recip = Reciprocal3By2(v1, v0, recip);
+        }
+
         // One step per dividend limb past the divisor: a step whose window is below the normalised
         // divisor produces a zero digit and leaves the remainder alone, so a short dividend skips it.
         if (x3 != 0)
@@ -1658,6 +1663,13 @@ public readonly partial struct UInt256
     private static ulong Remainder128Step(
         ulong high, ulong mid, ref ulong low, ulong v0, ulong v1, ulong recip, bool guardSaturation)
     {
+        // recip is the 3-by-2 reciprocal here; the window is below the divisor, so no digit saturates.
+        if (!X86Base.X64.IsSupported && DivRemBranchlessCorrection)
+        {
+            _ = UDivRem3By2(high, mid, low, v1, v0, recip, out ulong r1, out low);
+            return r1;
+        }
+
         ulong qhat, rhat;
         ulong rcarry = 0;
         if (guardSaturation && high == v1)
@@ -1824,6 +1836,75 @@ public readonly partial struct UInt256
         if (r1 >= d) { q++; r1 -= d; }
 
         rem = r1;
+        return q;
+    }
+
+    // floor((2^192 - 1) / (d1:d0)) - 2^64 for a normalised two-limb divisor, from the 2-by-1 reciprocal v of d1.
+    [SkipLocalsInit]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static ulong Reciprocal3By2(ulong d1, ulong d0, ulong v)
+    {
+        ulong p = d1 * v + d0;
+        if (p < d0)
+        {
+            v--;
+            if (p >= d1)
+            {
+                v--;
+                p -= d1;
+            }
+
+            p -= d1;
+        }
+
+        ulong t1 = Multiply64(d0, v, out ulong t0);
+        p += t1;
+        if (p < t1)
+        {
+            v--;
+            if (p > d1 || (p == d1 && t0 >= d0))
+            {
+                v--;
+            }
+        }
+
+        return v;
+    }
+
+    // (n2:n1:n0) / (d1:d0) with the 3-by-2 reciprocal v: one quotient digit and the two-limb remainder, without
+    // a separate correction product. Preconditions: d1 normalised, (n2:n1) < (d1:d0).
+    [SkipLocalsInit]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static ulong UDivRem3By2(ulong n2, ulong n1, ulong n0, ulong d1, ulong d0, ulong v, out ulong r1, out ulong r0)
+    {
+        ulong q = Multiply64(n2, v, out ulong q0);
+        q0 += n1;
+        q += n2 + (q0 < n1 ? 1UL : 0UL);
+
+        // The top two limbs of n - (q + 1) * d.
+        ulong t1 = Multiply64(d0, q, out ulong t0);
+        ulong h = n1 - d1 * q - d1 - (n0 < d0 ? 1UL : 0UL);
+        ulong l = n0 - d0;
+        h = h - t1 - (l < t0 ? 1UL : 0UL);
+        l -= t0;
+        q++;
+
+        // The estimate is one too large for about two digits in three, so a branch on it mispredicts.
+        ulong mask = 0UL - (h >= q0 ? 1UL : 0UL);
+        q += mask;
+        ulong sum = l + (d0 & mask);
+        h += (d1 & mask) + (sum < l ? 1UL : 0UL);
+        l = sum;
+
+        if (h >= d1 && (h > d1 || l >= d0))
+        {
+            q++;
+            h = h - d1 - (l < d0 ? 1UL : 0UL);
+            l -= d0;
+        }
+
+        r1 = h;
+        r0 = l;
         return q;
     }
 
@@ -4163,6 +4244,16 @@ public readonly partial struct UInt256
         // Start touching out params only after all input loads are done (alias-safe).
         Unsafe.SkipInit(out q);
 
+        if (DivRemBranchlessCorrection)
+        {
+            // Each 3-by-2 step returns the exact digit and remainder, so no step needs the add-back.
+            ulong recip3 = Reciprocal3By2(v1n, v0, vRecip);
+            Unsafe.AsRef(in q.u2) = u4 == 0 && u3 < v1n ? 0 : UDivRem3By2(u4, u3, u2, v1n, v0, recip3, out u3, out u2);
+            Unsafe.AsRef(in q.u1) = u3 == 0 && u2 < v1n ? 0 : UDivRem3By2(u3, u2, u1, v1n, v0, recip3, out u2, out u1);
+            Unsafe.AsRef(in q.u0) = UDivRem3By2(u2, u1, u0, v1n, v0, recip3, out u1, out u0);
+            goto Unnormalise;
+        }
+
         // Step j=2: q2 from (u4:u3:u2)
         // A step whose top limb is zero and whose next limb is below the normalised divisor's top limb
         // divides to a zero digit and leaves the partial remainder as it was, so a dividend shorter than
@@ -4393,6 +4484,7 @@ public readonly partial struct UInt256
             Unsafe.AsRef(in q.u0) = qhat;
         }
 
+    Unnormalise:
         // q3 is always 0 for 256/128 here.
         Unsafe.AsRef(in q.u3) = 0;
 
