@@ -1,0 +1,66 @@
+diff --git a/src/Nethermind.Int256/UInt256.divmod.cs b/src/Nethermind.Int256/UInt256.divmod.cs
+index dcce9a0..98c1f92 100644
+--- a/src/Nethermind.Int256/UInt256.divmod.cs
++++ b/src/Nethermind.Int256/UInt256.divmod.cs
+@@ -1766,11 +1766,8 @@ public readonly partial struct UInt256
+     {
+         // Precondition: d is normalised (bit 63 set).
+ 
+-        // For normalised d: (d >> 55) is in [256..511], so subtracting 256 yields [0..255].
+-        // This form stays identical for valid inputs, but is more obviously "byte range" to humans and JITs.
+-        int idx = (int)((d >> 55) - 256UL);
+-
+-        ulong v0 = ReciprocalSeedTable[idx];
++        // For normalised d: (d >> 55) is in [256..511]; the byte cast drops bit 8, so the index needs no bounds check.
++        ulong v0 = ReciprocalSeedTable[(byte)(d >> 55)];
+ 
+         ulong d40 = (d >> 24) + 1UL;
+ 
+@@ -1812,7 +1809,18 @@ public readonly partial struct UInt256
+ 
+         ulong r1 = ul - (q * d);
+ 
+-        if (r1 > low) { q--; r1 += d; }
++        if (DivRemBranchlessCorrection)
++        {
++            ulong mask = 0UL - (r1 > low ? 1UL : 0UL);
++            q += mask;
++            r1 += d & mask;
++        }
++        else if (r1 > low)
++        {
++            q--;
++            r1 += d;
++        }
++
+         if (r1 >= d) { q++; r1 -= d; }
+ 
+         rem = r1;
+diff --git a/src/Nethermind.Int256/UInt256.std.cs b/src/Nethermind.Int256/UInt256.std.cs
+index 6802c6b..bf6ecf1 100644
+--- a/src/Nethermind.Int256/UInt256.std.cs
++++ b/src/Nethermind.Int256/UInt256.std.cs
+@@ -57,6 +57,9 @@ public readonly partial struct UInt256
+ 
+     private const bool ExpShortWindow = true;
+ 
++    // The first reciprocal division correction applies to about two digits in three, so a branch mispredicts.
++    private static bool DivRemBranchlessCorrection => true;
++
+     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+     private static void MultiplyExpPower(in UInt256 value, in UInt256 power, out UInt256 result)
+     {
+diff --git a/src/Nethermind.Int256/UInt256.zkevm.cs b/src/Nethermind.Int256/UInt256.zkevm.cs
+index 8cb6de7..5b4fde2 100644
+--- a/src/Nethermind.Int256/UInt256.zkevm.cs
++++ b/src/Nethermind.Int256/UInt256.zkevm.cs
+@@ -67,6 +67,9 @@ public readonly partial struct UInt256
+ 
+     private const bool ExpShortWindow = true;
+ 
++    // A guest has no branch predictor: the mask form adds two to three steps to each quotient digit.
++    private static bool DivRemBranchlessCorrection => false;
++
+     // General width dispatch produces fewer guest steps and memory operations.
+     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+     private static void MultiplyExpPower(in UInt256 value, in UInt256 power, out UInt256 result)
