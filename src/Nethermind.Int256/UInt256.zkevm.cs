@@ -273,10 +273,25 @@ public readonly partial struct UInt256
     private static FormatException UnsupportedFormat(ReadOnlySpan<char> format) =>
         new($"Format '{format}' is not supported in the zkEVM build; use D, G, X or B.");
 
-    // The guest keeps the division: the Barrett kernels are not measured in guest steps.
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static partial void Remainder512ByFullModulus(in UInt256 lo, in UInt256 hi, in UInt256 m, out UInt256 rem)
-        => Remainder512By256Bits(in lo, in hi, in m, out rem);
+    {
+        if ((hi.u2 | hi.u3) != 0)
+        {
+            switch (m.u3)
+            {
+                case Bn254R.Top:
+                case Secp256k1N.Top:
+                case P256P.Top:
+                case P256N.Top:
+                case Prime251.Top:
+                    Remainder512ByKnownModulus(in lo, in hi, in m, out rem);
+                    return;
+            }
+        }
+
+        Remainder512By256Bits(in lo, in hi, in m, out rem);
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static partial void Remainder256ByFullModulus(in UInt256 x, in UInt256 y, out UInt256 res)
