@@ -481,42 +481,4 @@ public readonly partial struct UInt256
 
         Remainder256By256(in x, in y, out res);
     }
-
-    [SkipLocalsInit]
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void Remainder256ByTopLimb254(in UInt256 x, in UInt256 y, out UInt256 res)
-    {
-        const ulong top = Bn254R.Top;
-        Debug.Assert(y.u3 == top);
-        ulong x0 = x.u0, x1 = x.u1, x2 = x.u2, x3 = x.u3;
-        ulong y0 = y.u0, y1 = y.u1, y2 = y.u2;
-        ulong q = x3 / (top + 1);
-
-        ulong h0 = Multiply64(q, y0, out ulong p0);
-        ulong h1 = Multiply64(q, y1, out ulong l1);
-        ulong h2 = Multiply64(q, y2, out ulong l2);
-        ulong carry = 0;
-        AddWithCarry(l1, h0, ref carry, out ulong p1);
-        AddWithCarry(l2, h1, ref carry, out ulong p2);
-        ulong p3 = q * top + h2 + carry;
-
-        ulong borrow = 0;
-        ulong r0 = Sub(x0, p0, ref borrow);
-        ulong r1 = Sub(x1, p1, ref borrow);
-        ulong r2 = Sub(x2, p2, ref borrow);
-        ulong r3 = x3 - p3 - borrow;
-
-        borrow = 0;
-        ulong d0 = Sub(r0, y0, ref borrow);
-        ulong d1 = Sub(r1, y1, ref borrow);
-        ulong d2 = Sub(r2, y2, ref borrow);
-        ulong d3 = Sub(r3, top, ref borrow);
-        if (borrow == 0)
-        {
-            Store4(out res, d0, d1, d2, d3);
-            return;
-        }
-
-        Store4(out res, r0, r1, r2, r3);
-    }
 }
