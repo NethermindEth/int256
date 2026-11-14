@@ -2,7 +2,7 @@ name: Zisk EXP bench
 
 on:
   push:
-    branches: [bench/zkvm-exp-cutoff-1114]
+    branches: [bench/zkvm-exp-cutoff-1114-disabled]
     paths: [.github/workflows/zisk-exp-bench.yml, zisk-bench/bench.py, zisk-bench/ProgramSweep.cs, zisk-bench/ProgramMain.cs, zisk-bench/candidate.patch]
 
 permissions:

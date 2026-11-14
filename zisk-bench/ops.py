@@ -73,6 +73,10 @@ def cases():
         for x, y in [(256, 32), (256, 64), (256, 128), (256, 192), (256, 256), (192, 64), (192, 128), (128, 64), (128, 128), (100, 90), (64, 64), (64, 128)]:
             out.append(("DIV", f"{x}d{y}", r(x), r(y), 0))
             out.append(("MOD", f"{x}r{y}", r(x), r(y), 0))
+        for name, y in [("wad", 10**18), ("ten", 10), ("u16", r(16))]:
+            out.append(("DIV", f"256d{name}", r(256), y, 0))
+            out.append(("MOD", f"256r{name}", r(256), y, 0))
+            out.append(("DIV", f"200d{name}", r(200), y, 0))
         for name, mod in [("bn254r", BN254_R), ("bn254p", BN254_P), ("secpP", SECP_P), ("secpN", SECP_N)]:
             out.append(("MOD", f"256r{name}", r(256), mod, 0))
         for x, y in [(255, 255), (255, 128), (255, 64), (64, 64), (128, 64)]:
