@@ -36,10 +36,10 @@ jobs:
           mkdir -p "$work"
           dotnet build -c Release src/Nethermind.Int256/Nethermind.Int256.ZkEvm.csproj
           mkdir -p "$work/sweep" "$work/main"
-          cp "$(find artifacts/bin/Nethermind.Int256.ZkEvm -name Nethermind.Int256.dll | head -1)" "$work/sweep/"
+          cp "$(find src/artifacts/bin/Nethermind.Int256.ZkEvm -name Nethermind.Int256.dll | head -1)" "$work/sweep/"
           git worktree add "$RUNNER_TEMP/main-src" "$MAIN_SHA"
           (cd "$RUNNER_TEMP/main-src" && dotnet build -c Release src/Nethermind.Int256/Nethermind.Int256.ZkEvm.csproj)
-          cp "$(find "$RUNNER_TEMP/main-src/artifacts/bin/Nethermind.Int256.ZkEvm" -name Nethermind.Int256.dll | head -1)" "$work/main/"
+          cp "$(find "$RUNNER_TEMP/main-src/src/artifacts/bin/Nethermind.Int256.ZkEvm" -name Nethermind.Int256.dll | head -1)" "$work/main/"
           cp zisk-bench/ProgramSweep.cs "$work/sweep/Program.cs"
           cp zisk-bench/ProgramMain.cs "$work/main/Program.cs"
           nupkg="nethermind.ziskos.runtime.$ZISKOS_VERSION.nupkg"
