@@ -1,67 +1,21 @@
-diff --git a/src/Nethermind.Int256.Tests/UInt256ExpTests.cs b/src/Nethermind.Int256.Tests/UInt256ExpTests.cs
-index 470d5b5..f59b752 100644
---- a/src/Nethermind.Int256.Tests/UInt256ExpTests.cs
-+++ b/src/Nethermind.Int256.Tests/UInt256ExpTests.cs
-@@ -80,7 +80,7 @@ public class UInt256ExpTests
-     {
-         Random random = new(0xE4D);
-         UInt256[] bases = [new(3), new(0xFFFF_FFFF_FFFF_FFC5), new(3, 5, 7, 11), new(ulong.MaxValue - 2, 1, 0, 1UL << 63)];
--        for (int bits = 33; bits <= 80; ++bits)
-+        for (int bits = 9; bits <= 80; ++bits)
-         {
-             for (int setBits = 1; setBits <= bits; ++setBits)
-             {
-diff --git a/src/Nethermind.Int256/UInt256.cs b/src/Nethermind.Int256/UInt256.cs
-index 6f6bb8b..84de564 100644
---- a/src/Nethermind.Int256/UInt256.cs
-+++ b/src/Nethermind.Int256/UInt256.cs
-@@ -1150,6 +1150,11 @@ public readonly partial struct UInt256 : IEquatable<UInt256>, IComparable, IComp
-                 return;
-             }
-         }
-+        else if (ExpShortWindow && bitLen > 8 && BitOperations.PopCount(e.u0) > ExpWindowMinSetBits(bitLen))
-+        {
-+            ExpWindow(b, e, bitLen, out result);
-+            return;
-+        }
- 
-         // Seed with b so we do not need to "include" the always-set top bit via a multiply.
-         UInt256 val = b;
 diff --git a/src/Nethermind.Int256/UInt256.exp.cs b/src/Nethermind.Int256/UInt256.exp.cs
-index a8e0def..7d58196 100644
+index a8e0def..a54da87 100644
 --- a/src/Nethermind.Int256/UInt256.exp.cs
 +++ b/src/Nethermind.Int256/UInt256.exp.cs
-@@ -428,8 +428,8 @@ public readonly partial struct UInt256
+@@ -428,7 +428,7 @@ public readonly partial struct UInt256
      private static void ExpWindow(in UInt256 b, in UInt256 e, int bitLen, out UInt256 result)
      {
          // The caller routes long and suitable structured powers through binomial reduction.
 -        // Host code favors eight entries; the guest amortizes sixteen better.
--        int width = bitLen <= 64 ? 4 : ExpWindowMaxWidth;
 +        // Native ARM amortizes sixteen entries; other targets favor eight.
-+        int width = ExpShortWindow && bitLen <= 32 ? 3 : bitLen <= 64 ? 4 : ExpWindowMaxWidth;
+         int width = bitLen <= 64 ? 4 : ExpWindowMaxWidth;
          // ExpWindowMaxWidth folds to a target constant. Keep the allocation fixed:
          // a runtime size adds stack-probing code, and slicing adds bounds checks.
-         // SkipLocalsInit is safe: every table entry used below is written first.
-diff --git a/src/Nethermind.Int256/UInt256.std.cs b/src/Nethermind.Int256/UInt256.std.cs
-index 14c221a..6802c6b 100644
---- a/src/Nethermind.Int256/UInt256.std.cs
-+++ b/src/Nethermind.Int256/UInt256.std.cs
-@@ -53,7 +53,9 @@ public readonly partial struct UInt256
- 
-     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-     private static int ExpWindowMinSetBits(int bitLen)
--        => bitLen <= 64 || ExpWindowMaxWidth == 4 ? 9 + bitLen / 5 : 17 + bitLen / 6;
-+        => bitLen <= 32 ? 1 + bitLen / 4 : bitLen <= 64 || ExpWindowMaxWidth == 4 ? 9 + bitLen / 5 : 17 + bitLen / 6;
-+
-+    private const bool ExpShortWindow = true;
- 
-     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-     private static void MultiplyExpPower(in UInt256 value, in UInt256 power, out UInt256 result)
 diff --git a/src/Nethermind.Int256/UInt256.zkevm.cs b/src/Nethermind.Int256/UInt256.zkevm.cs
-index f1c7684..8cb6de7 100644
+index f1c7684..4b41493 100644
 --- a/src/Nethermind.Int256/UInt256.zkevm.cs
 +++ b/src/Nethermind.Int256/UInt256.zkevm.cs
-@@ -60,10 +60,12 @@ public readonly partial struct UInt256
+@@ -60,10 +60,10 @@ public readonly partial struct UInt256
      // Base ten first removes three guest steps from each table lookup.
      private const bool ExpPreferDecimalLookup = true;
  
@@ -70,9 +24,7 @@ index f1c7684..8cb6de7 100644
  
      [MethodImpl(MethodImplOptions.AggressiveInlining)]
 -    private static int ExpWindowMinSetBits(int bitLen) => 32;
-+    private static int ExpWindowMinSetBits(int bitLen) => bitLen <= 32 ? 6 + bitLen / 6 : 14;
-+
-+    private const bool ExpShortWindow = true;
++    private static int ExpWindowMinSetBits(int bitLen) => 14;
  
      // General width dispatch produces fewer guest steps and memory operations.
      [MethodImpl(MethodImplOptions.AggressiveInlining)]
