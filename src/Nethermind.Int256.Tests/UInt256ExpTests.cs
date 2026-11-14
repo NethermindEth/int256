@@ -76,6 +76,31 @@ public class UInt256ExpTests
     }
 
     [Test]
+    public void MidLengthExponentsMatchAtEverySetBitCount()
+    {
+        Random random = new(0xE4D);
+        UInt256[] bases = [new(3), new(0xFFFF_FFFF_FFFF_FFC5), new(3, 5, 7, 11), new(ulong.MaxValue - 2, 1, 0, 1UL << 63)];
+        for (int bits = 33; bits <= 80; ++bits)
+        {
+            for (int setBits = 1; setBits <= bits; ++setBits)
+            {
+                BigInteger e = BigInteger.One << (bits - 1);
+                int placed = 1;
+                while (placed < setBits)
+                {
+                    BigInteger bit = BigInteger.One << random.Next(bits - 1);
+                    if ((e & bit).IsZero)
+                    {
+                        e |= bit;
+                        ++placed;
+                    }
+                }
+                foreach (UInt256 b in bases) Check(b, (UInt256)e);
+            }
+        }
+    }
+
+    [Test]
     public void WindowFactorsCrossProductWidthBoundaries()
     {
         foreach (int bit in new[] { 2, 4, 8, 16, 32, 63, 64, 65, 127, 128, 129, 191, 192, 255 })
