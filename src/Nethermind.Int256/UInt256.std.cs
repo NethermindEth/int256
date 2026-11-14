@@ -57,6 +57,9 @@ public readonly partial struct UInt256
 
     private const bool ExpShortWindow = true;
 
+    // The first reciprocal division correction applies to about two digits in three, so a branch mispredicts.
+    private static bool DivRemBranchlessCorrection => true;
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void MultiplyExpPower(in UInt256 value, in UInt256 power, out UInt256 result)
     {

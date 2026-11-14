@@ -67,6 +67,9 @@ public readonly partial struct UInt256
 
     private const bool ExpShortWindow = true;
 
+    // A guest has no branch predictor: the mask form adds two to three steps to each quotient digit.
+    private static bool DivRemBranchlessCorrection => false;
+
     // General width dispatch produces fewer guest steps and memory operations.
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void MultiplyExpPower(in UInt256 value, in UInt256 power, out UInt256 result)

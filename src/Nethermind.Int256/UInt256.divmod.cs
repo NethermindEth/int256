@@ -1809,10 +1809,18 @@ public readonly partial struct UInt256
 
         ulong r1 = ul - (q * d);
 
-        // The first correction applies to about two digits in three, so a branch on it mispredicts.
-        ulong mask = 0UL - (r1 > low ? 1UL : 0UL);
-        q += mask;
-        r1 += d & mask;
+        if (DivRemBranchlessCorrection)
+        {
+            ulong mask = 0UL - (r1 > low ? 1UL : 0UL);
+            q += mask;
+            r1 += d & mask;
+        }
+        else if (r1 > low)
+        {
+            q--;
+            r1 += d;
+        }
+
         if (r1 >= d) { q++; r1 -= d; }
 
         rem = r1;
