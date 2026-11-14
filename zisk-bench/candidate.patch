@@ -1,0 +1,46 @@
+From 87bfdaea62a73c3ae28630e938f7beedbf9595a3 Mon Sep 17 00:00:00 2001
+From: Stavros Vlachakis <89769224+svlachakis@users.noreply.github.com>
+Date: Sat, 14 Nov 2026 14:41:28 +0200
+Subject: [PATCH] perf: tune the zkEVM EXP window cutoffs from guest steps
+
+---
+ src/Nethermind.Int256/UInt256.exp.cs   | 2 +-
+ src/Nethermind.Int256/UInt256.zkevm.cs | 6 +++---
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/src/Nethermind.Int256/UInt256.exp.cs b/src/Nethermind.Int256/UInt256.exp.cs
+index 7486642..7d58196 100644
+--- a/src/Nethermind.Int256/UInt256.exp.cs
++++ b/src/Nethermind.Int256/UInt256.exp.cs
+@@ -428,7 +428,7 @@ public readonly partial struct UInt256
+     private static void ExpWindow(in UInt256 b, in UInt256 e, int bitLen, out UInt256 result)
+     {
+         // The caller routes long and suitable structured powers through binomial reduction.
+-        // Host code favors eight entries; the guest amortizes sixteen better.
++        // Native ARM amortizes sixteen entries; other targets favor eight.
+         int width = ExpShortWindow && bitLen <= 32 ? 3 : bitLen <= 64 ? 4 : ExpWindowMaxWidth;
+         // ExpWindowMaxWidth folds to a target constant. Keep the allocation fixed:
+         // a runtime size adds stack-probing code, and slicing adds bounds checks.
+diff --git a/src/Nethermind.Int256/UInt256.zkevm.cs b/src/Nethermind.Int256/UInt256.zkevm.cs
+index 43651f5..8cb6de7 100644
+--- a/src/Nethermind.Int256/UInt256.zkevm.cs
++++ b/src/Nethermind.Int256/UInt256.zkevm.cs
+@@ -60,12 +60,12 @@ public readonly partial struct UInt256
+     // Base ten first removes three guest steps from each table lookup.
+     private const bool ExpPreferDecimalLookup = true;
+ 
+-    private const int ExpWindowMaxWidth = 5;
++    private const int ExpWindowMaxWidth = 4;
+ 
+     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+-    private static int ExpWindowMinSetBits(int bitLen) => 32;
++    private static int ExpWindowMinSetBits(int bitLen) => bitLen <= 32 ? 6 + bitLen / 6 : 14;
+ 
+-    private const bool ExpShortWindow = false;
++    private const bool ExpShortWindow = true;
+ 
+     // General width dispatch produces fewer guest steps and memory operations.
+     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+-- 
+2.56.0
+

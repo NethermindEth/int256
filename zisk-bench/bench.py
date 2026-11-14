@@ -28,6 +28,7 @@ MODES = {
     "W4": ("sweep", -1, -1, 4),
     "W5": ("sweep", -1, -1, 5),
     "M": ("main", 0, 0, 0),
+    "C": ("cand", 0, 0, 0),
 }
 
 STEPS = re.compile(r"^STEPS\s+(\d[\d,]*)\s*$", re.MULTILINE)
