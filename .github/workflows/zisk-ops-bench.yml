@@ -12,7 +12,8 @@ env:
   BFLAT_IMAGE: nethermindeth/bflat-riscv64-11:dd05dd8af0a14065a9974492007dd5e568acfecc@sha256:34235a4a8050b171dd03562a875752c08db5b6fdb33bb505be1eeeb7c4ea19be
   ZISK_IMAGE: nethermindeth/zisk:1.4.0-alpha@sha256:76bc753857e1807b724979a119ba919af0d857b3ea5deda982fd84b1be2cb930
   ZISKOS_VERSION: 1.4.0-alpha.155
-  VARIANTS: base=b2ec5bb mulk=b2ec5bb mulk2=b2ec5bb mulk3=b2ec5bb
+  VARIANTS: base=b2ec5bb pr184=63d261d mf=b2ec5bb mt=b2ec5bb ms=b2ec5bb mb=b2ec5bb mh=b2ec5bb pr183=5fffeb1 ds=b2ec5bb
+  DISASM: base pr184 mt ms pr183 ds
 
 jobs:
   measure:
@@ -89,6 +90,50 @@ jobs:
           done
           sha256sum "$work"/ops-*
 
+      - name: Disassemble
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y -qq binutils-riscv64-linux-gnu > /dev/null
+          work="$RUNNER_TEMP/work"
+          mkdir -p "$work/dis"
+          for version in $DISASM; do
+            docker run --platform linux/amd64 --rm \
+              -e DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 \
+              -e DOTNET_TYPELOADER_TRACE_INTERFACE_RESOLUTION=0 \
+              -w /n/$version \
+              --mount type=bind,source="$work",target=/n \
+              "$BFLAT_IMAGE" \
+              bflat build --arch riscv64 --os linux --stdlib dotnet --libc zisk \
+              -Ot \
+              --codegenopt JitInlineBudget=100 \
+              --codegenopt JitExtDefaultPolicyMaxIL=400 \
+              --codegenopt JitExtDefaultPolicyMaxILRoot=800 \
+              --codegenopt JitExtDefaultPolicyMaxBB=40 \
+              --codegenopt JitMaxLocalsToTrack=10000 \
+              --codegenopt JitCloneLoopsSizeLimit=1000 \
+              --codegenopt JitLoopInversionSizeLimit=400 \
+              --codegenopt 'JitOptRepeat=*' \
+              --codegenopt JitOptRepeatCount=2 \
+              --codegenopt JitEnableHeadTailMerge=0 \
+              --no-pie --no-pthread --no-globalization --nostdlibrefs \
+              -r '{std}/System.Memory.dll' \
+              -r '{std}/System.Runtime.dll' \
+              -r '{std}/System.Runtime.InteropServices.dll' \
+              -r '{std}/System.Runtime.Numerics.dll' \
+              -r /n/$version/Nethermind.Int256.dll \
+              --extlib "/n/$NUPKG" \
+              --error-on-float-binary --error-on-compressed --error-on-atomic \
+              -o /n/dis/sym-$version \
+              /n/$version/Program.cs
+            bin="$work/dis/sym-$version"
+            riscv64-linux-gnu-nm "$bin" | grep -E 'UInt256__(MultiplyMod|ModFull|Mod$|Remainder512ByFullModulus|Remainder512ByKnownModulus|Remainder256ByFullModulus|Remainder256ByTopLimb)' > "$work/dis/syms-$version.txt" || true
+            : > "$work/dis/dis-$version.txt"
+            for sym in $(awk '{print $3}' "$work/dis/syms-$version.txt"); do
+              riscv64-linux-gnu-objdump -d --no-show-raw-insn --disassemble="$sym" "$bin" | sed -n '/>:$/,$p' >> "$work/dis/dis-$version.txt"
+            done
+            echo "== $version"; cat "$work/dis/syms-$version.txt"; wc -l "$work/dis/dis-$version.txt"
+          done
+
       - name: Measure
         run: |
           set -euo pipefail
@@ -105,3 +150,4 @@ jobs:
           path: |
             ${{ runner.temp }}/work/ops-results.csv
             ${{ runner.temp }}/work/ops.json
+            ${{ runner.temp }}/work/dis/*.txt
