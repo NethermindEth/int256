@@ -1811,9 +1811,9 @@ public readonly partial struct UInt256
 
         if (DivRemBranchlessCorrection)
         {
-            ulong mask = 0UL - (r1 > low ? 1UL : 0UL);
-            q += mask;
-            r1 += d & mask;
+            // Selects keep one conditional instruction on the remainder chain after the compare.
+            q = r1 > low ? q - 1 : q;
+            r1 = r1 > low ? r1 + d : r1;
         }
         else if (r1 > low)
         {
