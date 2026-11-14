@@ -1,0 +1,63 @@
+name: Books AB
+
+on:
+  push:
+    branches: [bench/books-ab-1114]
+    paths: [.github/workflows/books-ab.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  ab:
+    name: AB ${{ matrix.pair.name }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-26.04-arm]
+        pair:
+          - { name: mg, a: 7e01460, b: 81db518, filter: "*ReciprocalDivisionBench* *FormatBench.UInt256ToString" }
+          - { name: barrett, a: 18d061e, b: 9b68818, filter: "*BarrettModulusBench*" }
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Machine
+        run: lscpu | grep -E "Model name|^CPU\(s\)|Flags" | cut -c1-200; nproc
+
+      - name: Build arms
+        run: |
+          set -euo pipefail
+          for arm in a b; do
+            sha=${{ matrix.pair.a }}; [ $arm = b ] && sha=${{ matrix.pair.b }}
+            git worktree add -q "$RUNNER_TEMP/$arm" "$sha"
+            (cd "$RUNNER_TEMP/$arm" && git log --oneline -1 && dotnet build -c Release src/Nethermind.Int256.Benchmark -v q --nologo | tail -2)
+          done
+
+      - name: Run A1 B1 A2 B2
+        run: |
+          set -euo pipefail
+          set -f
+          for round in 1 2; do
+            for arm in a b; do
+              echo "::group::$arm$round"
+              (cd "$RUNNER_TEMP/$arm/src/Nethermind.Int256.Benchmark" && \
+                dotnet run -c Release --no-build -- --filter ${{ matrix.pair.filter }} \
+                  --warmupCount 3 --iterationCount 10 --launchCount 1 --memory \
+                  --exporters csv github --artifacts "$RUNNER_TEMP/res/$arm$round" | grep -E "^\||Runtime=|BenchmarkDotNet v|^Intel|^AMD|Neoverse|^Unknown processor")
+              echo "::endgroup::"
+            done
+          done
+
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: ab-${{ matrix.pair.name }}-${{ matrix.os }}
+          path: ${{ runner.temp }}/res/
