@@ -1,0 +1,104 @@
+name: Zisk EXP bench
+
+on:
+  push:
+    branches: [bench/zkvm-exp-cutoff-1114]
+
+permissions:
+  contents: read
+
+env:
+  BFLAT_IMAGE: nethermindeth/bflat-riscv64-11:dd05dd8af0a14065a9974492007dd5e568acfecc@sha256:34235a4a8050b171dd03562a875752c08db5b6fdb33bb505be1eeeb7c4ea19be
+  ZISK_IMAGE: nethermindeth/zisk:1.4.0-alpha@sha256:76bc753857e1807b724979a119ba919af0d857b3ea5deda982fd84b1be2cb930
+  ZISKOS_VERSION: 1.4.0-alpha.155
+  MAIN_SHA: b2ec5bb
+  GRID: pilot
+  MODES: B,W3,W4,W5,M
+  BASES: b3,b64,bfull
+
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Build Int256 variants
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/work"
+          mkdir -p "$work"
+          dotnet build -c Release src/Nethermind.Int256/Nethermind.Int256.ZkEvm.csproj
+          mkdir -p "$work/sweep" "$work/main"
+          cp "$(find artifacts/bin/Nethermind.Int256.ZkEvm -name Nethermind.Int256.dll | head -1)" "$work/sweep/"
+          git worktree add "$RUNNER_TEMP/main-src" "$MAIN_SHA"
+          (cd "$RUNNER_TEMP/main-src" && dotnet build -c Release src/Nethermind.Int256/Nethermind.Int256.ZkEvm.csproj)
+          cp "$(find "$RUNNER_TEMP/main-src/artifacts/bin/Nethermind.Int256.ZkEvm" -name Nethermind.Int256.dll | head -1)" "$work/main/"
+          cp zisk-bench/ProgramSweep.cs "$work/sweep/Program.cs"
+          cp zisk-bench/ProgramMain.cs "$work/main/Program.cs"
+          nupkg="nethermind.ziskos.runtime.$ZISKOS_VERSION.nupkg"
+          curl --retry 3 -fsSL "https://api.nuget.org/v3-flatcontainer/nethermind.ziskos.runtime/$ZISKOS_VERSION/$nupkg" -o "$work/$nupkg"
+          echo "NUPKG=$nupkg" >> "$GITHUB_ENV"
+          sha256sum "$work"/*/Nethermind.Int256.dll
+
+      - name: Compile guests
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/work"
+          for variant in sweep main; do
+            docker run --platform linux/amd64 --rm \
+              -e DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 \
+              -e DOTNET_TYPELOADER_TRACE_INTERFACE_RESOLUTION=0 \
+              -w /n/$variant \
+              --mount type=bind,source="$work",target=/n \
+              "$BFLAT_IMAGE" \
+              bflat build --arch riscv64 --os linux --stdlib dotnet --libc zisk \
+              -Ot \
+              --codegenopt JitInlineBudget=100 \
+              --codegenopt JitExtDefaultPolicyMaxIL=400 \
+              --codegenopt JitExtDefaultPolicyMaxILRoot=800 \
+              --codegenopt JitExtDefaultPolicyMaxBB=40 \
+              --codegenopt JitMaxLocalsToTrack=10000 \
+              --codegenopt JitCloneLoopsSizeLimit=1000 \
+              --codegenopt JitLoopInversionSizeLimit=400 \
+              --codegenopt 'JitOptRepeat=*' \
+              --codegenopt JitOptRepeatCount=2 \
+              --codegenopt JitEnableHeadTailMerge=0 \
+              --no-stacktrace-data --ldflags=--strip-all \
+              --no-pie --no-pthread --no-globalization --nostdlibrefs \
+              -r '{std}/System.Memory.dll' \
+              -r '{std}/System.Runtime.dll' \
+              -r '{std}/System.Runtime.InteropServices.dll' \
+              -r /n/$variant/Nethermind.Int256.dll \
+              --extlib "/n/$NUPKG" \
+              --error-on-float-binary --error-on-compressed --error-on-atomic \
+              -o /n/exp-$variant \
+              /n/$variant/Program.cs
+          done
+          ls -la "$work"
+          sha256sum "$work"/exp-*
+
+      - name: Measure
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/work"
+          python3 zisk-bench/bench.py gen --work "$work" --grid "$GRID" --modes "$MODES" --bases "$BASES"
+          docker run -d --name zisk --entrypoint sleep --mount type=bind,source="$work",target=/n "$ZISK_IMAGE" infinity
+          docker exec zisk ziskemu --help | head -80 || true
+          nproc
+          python3 zisk-bench/bench.py run --work "$work" --container zisk
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: zisk-exp-results
+          path: |
+            ${{ runner.temp }}/work/results.csv
+            ${{ runner.temp }}/work/cases.json

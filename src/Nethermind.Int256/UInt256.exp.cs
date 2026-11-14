@@ -429,7 +429,7 @@ public readonly partial struct UInt256
     {
         // The caller routes long and suitable structured powers through binomial reduction.
         // Host code favors eight entries; the guest amortizes sixteen better.
-        int width = bitLen <= 64 ? 4 : ExpWindowMaxWidth;
+        int width = ExpBenchWidth != 0 ? ExpBenchWidth : bitLen <= 64 ? 4 : ExpWindowMaxWidth;
         // ExpWindowMaxWidth folds to a target constant. Keep the allocation fixed:
         // a runtime size adds stack-probing code, and slicing adds bounds checks.
         // SkipLocalsInit is safe: every table entry used below is written first.

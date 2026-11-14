@@ -63,7 +63,13 @@ public readonly partial struct UInt256
     private const int ExpWindowMaxWidth = 5;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static int ExpWindowMinSetBits(int bitLen) => 32;
+    private static int ExpWindowMinSetBits(int bitLen) => ExpBenchCutoff;
+
+    public static int ExpBenchCutoff = 32;
+
+    public static int ExpBenchShortCutoff = 1000;
+
+    public static int ExpBenchWidth;
 
     // General width dispatch produces fewer guest steps and memory operations.
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
