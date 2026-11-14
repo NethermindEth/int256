@@ -428,7 +428,7 @@ public readonly partial struct UInt256
     private static void ExpWindow(in UInt256 b, in UInt256 e, int bitLen, out UInt256 result)
     {
         // The caller routes long and suitable structured powers through binomial reduction.
-        // Host code favors eight entries; the guest amortizes sixteen better.
+        // Native ARM amortizes sixteen entries; other targets favor eight.
         int width = ExpShortWindow && bitLen <= 32 ? 3 : bitLen <= 64 ? 4 : ExpWindowMaxWidth;
         // ExpWindowMaxWidth folds to a target constant. Keep the allocation fixed:
         // a runtime size adds stack-probing code, and slicing adds bounds checks.
