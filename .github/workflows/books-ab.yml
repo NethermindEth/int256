@@ -16,10 +16,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, ubuntu-26.04-arm]
+        os: [ubuntu-26.04-arm]
         pair:
-          - { name: mg, a: 7e01460, b: 81db518, filter: "*ReciprocalDivisionBench* *FormatBench.UInt256ToString" }
-          - { name: barrett, a: 18d061e, b: 9b68818, filter: "*BarrettModulusBench*" }
+          - { name: knuth3by2, a: 81db518, b: 7c04061, filter: "*ReciprocalDivisionBench*" }
     steps:
       - uses: actions/checkout@v7
         with:
