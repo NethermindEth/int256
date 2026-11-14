@@ -1548,11 +1548,6 @@ public readonly partial struct UInt256
             return;
         }
 
-        if (!X86Base.X64.IsSupported && DivRemBranchlessCorrection)
-        {
-            recip = Reciprocal3By2(v1, v0, recip);
-        }
-
         // One step per dividend limb past the divisor: a step whose window is below the normalised
         // divisor produces a zero digit and leaves the remainder alone, so a short dividend skips it.
         if (x3 != 0)
@@ -1663,13 +1658,6 @@ public readonly partial struct UInt256
     private static ulong Remainder128Step(
         ulong high, ulong mid, ref ulong low, ulong v0, ulong v1, ulong recip, bool guardSaturation)
     {
-        // recip is the 3-by-2 reciprocal here; the window is below the divisor, so no digit saturates.
-        if (!X86Base.X64.IsSupported && DivRemBranchlessCorrection)
-        {
-            _ = UDivRem3By2(high, mid, low, v1, v0, recip, out ulong r1, out low);
-            return r1;
-        }
-
         ulong qhat, rhat;
         ulong rcarry = 0;
         if (guardSaturation && high == v1)
@@ -4244,7 +4232,8 @@ public readonly partial struct UInt256
         // Start touching out params only after all input loads are done (alias-safe).
         Unsafe.SkipInit(out q);
 
-        if (DivRemBranchlessCorrection)
+        // A single step (u4 = u3 = 0, u2 below the divisor top) costs less without the 3-by-2 reciprocal.
+        if (DivRemBranchlessCorrection && ((u4 | u3) != 0 || u2 >= v1n))
         {
             // Each 3-by-2 step returns the exact digit and remainder, so no step needs the add-back.
             ulong recip3 = Reciprocal3By2(v1n, v0, vRecip);
