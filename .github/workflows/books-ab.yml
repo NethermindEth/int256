@@ -16,8 +16,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-26.04-arm]
+        os: [macos-latest]
         pair:
+          - { name: mg, a: 7e01460, b: 81db518, filter: "*ReciprocalDivisionBench*" }
           - { name: knuth3by2, a: 81db518, b: 7c04061, filter: "*ReciprocalDivisionBench*" }
     steps:
       - uses: actions/checkout@v7
@@ -29,7 +30,7 @@ jobs:
           global-json-file: global.json
 
       - name: Machine
-        run: lscpu | grep -E "Model name|^CPU\(s\)|Flags" | cut -c1-200; nproc
+        run: (lscpu 2>/dev/null || sysctl -n machdep.cpu.brand_string hw.ncpu) | grep -vE "^Flags" | head -20
 
       - name: Build arms
         run: |
