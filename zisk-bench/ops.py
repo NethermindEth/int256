@@ -22,6 +22,8 @@ SECP_P = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F
 SECP_N = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
 P251 = (1 << 251) + 17 * (1 << 192) + 1
 P25519 = (1 << 255) - 19
+P256P = 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF
+P256N = 0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551
 OPS = {"MUL": 1, "DIV": 2, "MOD": 3, "SMOD": 4, "SDIV": 5, "MULMOD": 6, "ADDMOD": 7, "EXP": 8}
 STEPS = re.compile(r"^STEPS\s+(\d[\d,]*)\s*$", re.MULTILINE)
 VARIABLE = re.compile(r"^VARIABLE\s+(\d[\d,]*)\s", re.MULTILINE)
@@ -82,7 +84,7 @@ def cases():
                     out.append(("SMOD", tag, a, b, 0))
                     out.append(("SDIV", tag, a, b, 0))
         out.append(("SDIV", "min_d_-1", 1 << 255, M256 - 1, 0))
-        for name, mod in [("m64", r(64)), ("m128", r(128)), ("m192", r(192)), ("m256", r(256)), ("bn254p", BN254_P), ("bn254r", BN254_R), ("secpP", SECP_P), ("secpN", SECP_N), ("p251", P251), ("p25519", P25519)]:
+        for name, mod in [("m64", r(64)), ("m128", r(128)), ("m192", r(192)), ("m256", r(256)), ("bn254p", BN254_P), ("bn254r", BN254_R), ("secpP", SECP_P), ("secpN", SECP_N), ("p251", P251), ("p25519", P25519), ("p256p", P256P), ("p256n", P256N)]:
             out.append(("MULMOD", f"fullx{name}", r(256), r(256), mod))
             out.append(("MULMOD", f"redx{name}", rng.randrange(mod), rng.randrange(mod), mod))
         for name, mod in [("m64", r(64)), ("m128", r(128)), ("m256", r(256))]:
