@@ -32,11 +32,14 @@ public class ReciprocalDivisionTests
             foreach (ulong low in new[] { 0UL, (1UL << 55) - 1, NextUlong(random) & ((1UL << 55) - 1) })
             {
                 ulong normalised = top | low;
-                int shift = (int)(entry % 64);
-                ulong divisor = Math.Max(normalised >> shift, 2UL);
-                AssertDivisor(random, divisor);
+                // Shifts up to 55 keep the nine top bits, so the divisor still selects this entry.
+                int shift = (int)(entry % 56);
+                AssertDivisor(random, normalised >> shift);
             }
         }
+
+        AssertDivisor(random, ulong.MaxValue);
+        AssertDivisor(random, 1UL << 63);
     }
 
     [Test]

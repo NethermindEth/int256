@@ -1764,7 +1764,7 @@ public readonly partial struct UInt256
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static ulong Reciprocal2By1(ulong d)
     {
-        // Precondition: d is normalised (bit 63 set).
+        Debug.Assert((long)d < 0, "d must be normalised");
 
         // For normalised d: (d >> 55) is in [256..511]; the byte cast drops bit 8, so the index needs no bounds check.
         ulong v0 = ReciprocalSeedTable[(byte)(d >> 55)];
