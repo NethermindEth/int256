@@ -23,6 +23,7 @@ BASES = {
 
 MODES = {
     "B": ("sweep", 1000, 1000, 0),
+    "W2": ("sweep", -1, -1, 2),
     "W3": ("sweep", -1, -1, 3),
     "W4": ("sweep", -1, -1, 4),
     "W5": ("sweep", -1, -1, 5),
@@ -31,6 +32,7 @@ MODES = {
 
 STEPS = re.compile(r"^STEPS\s+(\d[\d,]*)\s*$", re.MULTILINE)
 TOTAL = re.compile(r"^TOTAL\s+(\d[\d,]*)\s", re.MULTILINE)
+VARIABLE = re.compile(r"^VARIABLE\s+(\d[\d,]*)\s", re.MULTILINE)
 
 
 def grid(name):
@@ -97,16 +99,17 @@ def run_one(container, case):
     log = proc.stdout + proc.stderr
     steps = STEPS.search(log)
     total = TOTAL.search(log)
+    variable = VARIABLE.search(log)
     base = BASES[case["base"]]
     expected = (case["reps"] * pow(base, int(case["exp"], 16), 1 << 256)) % (1 << 256)
     le = expected.to_bytes(32, "little").hex()
     be = expected.to_bytes(32, "big").hex()
-    words = "".join(expected.to_bytes(32, "little")[i:i + 4][::-1].hex() for i in range(0, 32, 4))
-    ok = le in log or be in log or words in log
+    ok = le in log
     return {
         "id": case["id"], "mode": case["mode"], "base": case["base"], "n": case["n"], "k": case["k"],
         "steps": int(steps.group(1).replace(",", "")) if steps else -1,
         "total": int(total.group(1).replace(",", "")) if total else -1,
+        "variable": int(variable.group(1).replace(",", "")) if variable else -1,
         "ok": ok, "rc": proc.returncode, "seconds": round(time.monotonic() - started, 3), "log": log if (not ok or steps is None) else "",
     }
 
@@ -141,7 +144,7 @@ def main():
     gen = sub.add_parser("gen")
     gen.add_argument("--work", required=True)
     gen.add_argument("--grid", default="pilot")
-    gen.add_argument("--modes", default="B,W3,W4,W5,M")
+    gen.add_argument("--modes", default="B,W2,W3,W4,W5,M")
     gen.add_argument("--bases", default="b3,b64,bfull")
     runner = sub.add_parser("run")
     runner.add_argument("--work", required=True)

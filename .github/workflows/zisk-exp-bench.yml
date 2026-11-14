@@ -12,8 +12,8 @@ env:
   ZISK_IMAGE: nethermindeth/zisk:1.4.0-alpha@sha256:76bc753857e1807b724979a119ba919af0d857b3ea5deda982fd84b1be2cb930
   ZISKOS_VERSION: 1.4.0-alpha.155
   MAIN_SHA: b2ec5bb
-  GRID: pilot
-  MODES: B,W3,W4,W5,M
+  GRID: full
+  MODES: B,W2,W3,W4,W5,M
   BASES: b3,b64,bfull
 
 jobs:

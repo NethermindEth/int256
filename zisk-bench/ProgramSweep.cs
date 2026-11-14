@@ -16,6 +16,9 @@ static unsafe class Program
     [DllImport("__Internal")]
     private static extern void write_output(byte* output, nuint size);
 
+    [DllImport("__Internal")]
+    private static extern void sys_write(uint fd, byte* buffer, nuint size);
+
     static int Main()
     {
         byte* pointer = null;
@@ -37,6 +40,14 @@ static unsafe class Program
         byte* output = stackalloc byte[32];
         acc.ToLittleEndian(new Span<byte>(output, 32));
         write_output(output, 32);
+        byte* text = stackalloc byte[65];
+        for (int i = 0; i < 32; i++)
+        {
+            text[2 * i] = (byte)"0123456789abcdef"[output[i] >> 4];
+            text[2 * i + 1] = (byte)"0123456789abcdef"[output[i] & 15];
+        }
+        text[64] = (byte)'\n';
+        sys_write(1, text, 65);
         return 0;
     }
 
