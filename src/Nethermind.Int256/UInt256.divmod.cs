@@ -620,7 +620,7 @@ public readonly partial struct UInt256
         {
             // The sum fits in 128 bits (u1:u0) - the common ADDMOD case with already-reduced
             // operands. Normalise just the two low limbs; the bits shifted out of u1 seed the
-            // remainder (they are < 2^s <= dn, satisfying UDivRem2By1's r < d precondition).
+            // remainder (they are < 2^s <= dn, satisfying URem2By1's r < d precondition).
             ulong l0, l1;
             if (s == 0)
             {
@@ -636,8 +636,8 @@ public readonly partial struct UInt256
                 l0 = a.u0 << s;
             }
 
-            _ = UDivRem2By1(r, recip, dn, l1, out r);
-            _ = UDivRem2By1(r, recip, dn, l0, out r);
+            r = URem2By1(r, recip, dn, l1);
+            r = URem2By1(r, recip, dn, l0);
 
             rem = default;
             Unsafe.AsRef(in rem.u0) = (s == 0) ? r : (r >> s);
@@ -669,12 +669,12 @@ public readonly partial struct UInt256
         // Horner-like remainder using exact 2-by-1 divisions:
         // r = (((((u5*b + u4)*b + u3)*b + u2)*b + u1)*b + u0) % dn
         r = 0;
-        _ = UDivRem2By1(r, recip, dn, u5, out r);
-        _ = UDivRem2By1(r, recip, dn, u4, out r);
-        _ = UDivRem2By1(r, recip, dn, u3, out r);
-        _ = UDivRem2By1(r, recip, dn, u2, out r);
-        _ = UDivRem2By1(r, recip, dn, u1, out r);
-        _ = UDivRem2By1(r, recip, dn, u0, out r);
+        r = URem2By1(r, recip, dn, u5);
+        r = URem2By1(r, recip, dn, u4);
+        r = URem2By1(r, recip, dn, u3);
+        r = URem2By1(r, recip, dn, u2);
+        r = URem2By1(r, recip, dn, u1);
+        r = URem2By1(r, recip, dn, u0);
 
         rem = default;
         Unsafe.AsRef(in rem.u0) = (s == 0) ? r : (r >> s);
@@ -1686,10 +1686,10 @@ public readonly partial struct UInt256
 
         // Skip a step whose limb and running remainder are both zero, the same way the hardware arm
         // does: without it a two-limb dividend pays four reciprocal divides instead of two.
-        if ((r | u3) != 0) _ = UDivRem2By1(r, recip, dn, u3, out r);
-        if ((r | u2) != 0) _ = UDivRem2By1(r, recip, dn, u2, out r);
-        if ((r | u1) != 0) _ = UDivRem2By1(r, recip, dn, u1, out r);
-        if ((r | u0) != 0) _ = UDivRem2By1(r, recip, dn, u0, out r);
+        if ((r | u3) != 0) r = URem2By1(r, recip, dn, u3);
+        if ((r | u2) != 0) r = URem2By1(r, recip, dn, u2);
+        if ((r | u1) != 0) r = URem2By1(r, recip, dn, u1);
+        if ((r | u0) != 0) r = URem2By1(r, recip, dn, u0);
         return r >> shift;
     }
 
@@ -1806,13 +1806,10 @@ public readonly partial struct UInt256
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static ulong Reciprocal2By1(ulong d)
     {
-        // Precondition: d is normalised (bit 63 set).
+        Debug.Assert((long)d < 0, "d must be normalised");
 
-        // For normalised d: (d >> 55) is in [256..511], so subtracting 256 yields [0..255].
-        // This form stays identical for valid inputs, but is more obviously "byte range" to humans and JITs.
-        int idx = (int)((d >> 55) - 256UL);
-
-        ulong v0 = ReciprocalSeedTable[idx];
+        // For normalised d: (d >> 55) is in [256..511]; the byte cast drops bit 8, so the index needs no bounds check.
+        ulong v0 = ReciprocalSeedTable[(byte)(d >> 55)];
 
         ulong d40 = (d >> 24) + 1UL;
 
@@ -1859,6 +1856,37 @@ public readonly partial struct UInt256
 
         rem = r1;
         return q;
+    }
+
+    // The remainder of UDivRem2By1 alone, for chains that discard the quotient (MOD and MULMOD by one limb).
+    // Same preconditions.
+    [SkipLocalsInit]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static ulong URem2By1(ulong uh, ulong reciprocal, ulong d, ulong ul)
+    {
+        ulong hi = Multiply64(reciprocal, uh, out ulong low);
+
+        low += ul;
+        ulong q = hi + uh + 1UL;
+        if (low < ul)
+        {
+            q++;
+        }
+
+        ulong r1 = ul - (q * d);
+
+        if (DivRemBranchlessCorrection)
+        {
+            // The remainder is the next digit's input, so a select keeps the mispredicted branch off the chain.
+            r1 = r1 > low ? r1 + d : r1;
+        }
+        else if (r1 > low)
+        {
+            r1 += d;
+        }
+
+        if (r1 >= d) r1 -= d;
+        return r1;
     }
 
     [SkipLocalsInit]
@@ -1951,8 +1979,8 @@ public readonly partial struct UInt256
         if (shift == 0)
         {
             ulong r = 0;
-            _ = UDivRem2By1(r, reciprocal, dn, hi, out r);
-            _ = UDivRem2By1(r, reciprocal, dn, lo, out r);
+            r = URem2By1(r, reciprocal, dn, hi);
+            r = URem2By1(r, reciprocal, dn, lo);
             return r;
         }
         else
@@ -1964,8 +1992,8 @@ public readonly partial struct UInt256
             ulong un0 = lo << shift;
 
             ulong r = un2;
-            _ = UDivRem2By1(r, reciprocal, dn, un1, out r);
-            _ = UDivRem2By1(r, reciprocal, dn, un0, out r);
+            r = URem2By1(r, reciprocal, dn, un1);
+            r = URem2By1(r, reciprocal, dn, un0);
 
             return r >> shift;
         }
