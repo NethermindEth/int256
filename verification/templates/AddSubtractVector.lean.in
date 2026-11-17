@@ -1,0 +1,9 @@
+import Extracted
+import UInt256.Methods.@name@.Vector256Entry
+
+namespace UInt256Proof.@name@
+
+/-- AVX2 @method@: @documentation@ -/
+theorem @flag@profile_correctness :@signature@
+  Vector256.@contract@ Extracted.program Extracted.profile @wide@@checks@
+end UInt256Proof.@name@

@@ -1,0 +1,19 @@
+import UInt256.Methods.Equality.PrimitiveProfileBindings
+@vectorImport@import Extracted
+import UInt256.Methods.Equality.PrimitiveOperator
+@signedImport@
+/-- Primitive equality operator with checked argument order, polarity and caller-memory preservation. -/
+theorem UInt256Proof.Equality.@op@@pre@@prim@@width@@post@.@family@_correctness :
+    UInt256Model.Safety.ScalarOperatorContract @first@ @negated@ CIL.Value.i@width@
+      (fun input word => @signedPredicate@decide (input = BitVec.ofNat 256 word.toNat)) Extracted.program 0 :=
+  UInt256Proof.Equality.PrimitiveOperator.checked CIL.Value.i@width@ _
+    Extracted.profile @first@ @negated@ Extracted.program 0 1 rfl (fun _ => rfl)
+    (@signedWrap@UInt256Proof.Equality.@helper@.checked@width@ Extracted.profile Extracted.program @helperArgs@)@signedClose@
+
+theorem UInt256Proof.Equality.@op@@pre@@prim@@width@@post@.@family@_family (profile : CIL.FeatureProfile)
+    (vector : Extracted.profile.vector256Accelerated = profile.vector256Accelerated) :
+    UInt256Model.Safety.ScalarOperatorContract @first@ @negated@ CIL.Value.i@width@
+      (fun input word => @signedPredicate@decide (input = BitVec.ofNat 256 word.toNat)) (CIL.reprofile Extracted.program profile) 0 :=
+  UInt256Model.Safety.ScalarOperatorContract.reprofile UInt256Proof.Equality.ProfileBindings.uniform
+    (UInt256Proof.Equality.ProfileBindings.primitive_agreement profile vector) UInt256Proof.Equality.@op@@pre@@prim@@width@@post@.@family@_correctness
+

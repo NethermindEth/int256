@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>Nethermind.Int256</AssemblyName>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <FixtureCase Condition="'$(FixtureCase)' == ''">Baseline</FixtureCase>
+  </PropertyGroup>
+  <Import Project="Cases.props" />
+  <ItemGroup>
+    <_Fixture Include="@(CompareCase->WithMetadataValue('Identity', '$(FixtureCase)'))" />
+    <Compile Include="../Common/Support.cs" />
+    <Compile Include="Compare.cs" />
+  </ItemGroup>
+  <PropertyGroup>
+    <DefineConstants>$(DefineConstants);@(_Fixture->'%(Symbol)')</DefineConstants>
+  </PropertyGroup>
+  <Target Name="CheckFixtureCase" BeforeTargets="CoreCompile" Condition="'@(_Fixture)' == ''">
+    <Error Text="Unknown Compare fixture case: $(FixtureCase)" />
+  </Target>
+</Project>

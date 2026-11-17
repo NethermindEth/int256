@@ -1,0 +1,10 @@
+<Project>
+  <ItemGroup>
+    <Compile Include="../Common/Support.cs" />
+    <Compile Include="../Common/Add/Add.cs" Condition="'$(FixtureCase)' == 'Baseline' Or '$(FixtureCase)' == 'ExtractedHelper' Or '$(FixtureCase)' == 'ReversedStore' Or '$(FixtureCase)' == 'WrongAliasing' Or '$(FixtureCase)' == 'WrongCarry'" />
+    <Compile Include="../Common/Add/AddScalar.cs" Condition="'$(FixtureCase)' == 'Baseline' Or '$(FixtureCase)' == 'ExpandedHardware' Or '$(FixtureCase)' == 'ExtractedHelper' Or '$(FixtureCase)' == 'WrongAliasing' Or '$(FixtureCase)' == 'WrongCarry'" />
+    <Compile Include="../Common/Add/AddScalarUInt64.cs" Condition="'$(FixtureCase)' == 'Baseline' Or '$(FixtureCase)' == 'ExpandedHardware' Or '$(FixtureCase)' == 'ExtractedHelper' Or '$(FixtureCase)' == 'WrongCarry'" />
+    <Compile Include="../Common/Add/AddWithCarry.cs" Condition="'$(FixtureCase)' == 'Baseline' Or '$(FixtureCase)' == 'ExpandedHardware' Or '$(FixtureCase)' == 'ReversedStore' Or '$(FixtureCase)' == 'WrongAliasing'" />
+    <Compile Include="../Common/Add/StoreLimbs.cs" Condition="'$(FixtureCase)' == 'Baseline' Or '$(FixtureCase)' == 'ExpandedHardware' Or '$(FixtureCase)' == 'ExtractedHelper' Or '$(FixtureCase)' == 'WrongAliasing' Or '$(FixtureCase)' == 'WrongCarry'" />
+  </ItemGroup>
+</Project>

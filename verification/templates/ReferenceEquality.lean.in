@@ -1,0 +1,15 @@
+import UInt256.Methods.Equality.ReferenceProfileBindings
+import Extracted
+import UInt256.Methods.Equality.Reference@wrapper@Wrapper
+import UInt256.Methods.@module@
+
+ theorem UInt256Proof.Equality.@method@.@family@_correctness :
+    UInt256Model.Safety.@contractName@ @meaning@ Extracted.program 0@arity@ := by
+@before@UInt256Proof.Equality.Reference@wrapper@Wrapper.checked Extracted.profile Extracted.program @indices@ @checks@@after@
+
+theorem UInt256Proof.Equality.@method@.@family@_family (profile : CIL.FeatureProfile)
+    (vector : Extracted.profile.vector256Accelerated = profile.vector256Accelerated)
+    (sse : Extracted.profile.vector256Accelerated = false → Extracted.profile.sse41 = profile.sse41) :
+    UInt256Model.Safety.@contractName@ @meaning@ (CIL.reprofile Extracted.program profile) 0@arity@ :=
+  UInt256Model.Safety.@contractName@.reprofile UInt256Proof.Equality.ProfileBindings.uniform
+    (UInt256Proof.Equality.ProfileBindings.reference_agreement profile vector sse) UInt256Proof.Equality.@method@.@family@_correctness

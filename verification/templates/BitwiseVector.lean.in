@@ -1,0 +1,15 @@
+import Extracted
+import CIL.ProfileEquivalence
+import UInt256.Methods.Bitwise.@module@
+
+namespace UInt256Proof.@prefix@@op@
+
+theorem vector_correctness : @contractRoot@@applied@ Extracted.program 0 :=
+  UInt256Proof.Bitwise.@head@Extracted.profile (by rfl) @vectorArgument@Extracted.program @indices@
+
+theorem vector_family_correctness (profile : CIL.FeatureProfile)
+    (enabled : profile.vector256Accelerated = true) :
+    @contractRoot@@applied@ (CIL.reprofile Extracted.program profile) 0 :=
+  UInt256Proof.Bitwise.@head@profile enabled @vectorArgument@(CIL.reprofile Extracted.program profile) @indices@
+
+end UInt256Proof.@prefix@@op@

@@ -38,3 +38,14 @@ High-performance 256-bit integer types for .NET. See [global.json](./global.json
 - Match the file's naming style; use NUnit `Assert.That` constraints and no Arrange/Act/Assert comments.
 - Do not leave tests disabled or commented out.
 - Run from `src/Nethermind.Int256.Tests` with `dotnet test`; add `-p:EnableZkEvm=true` for the zkVM variant and set `DOTNET_EnableHWIntrinsic=0` for the software fallbacks. When filtering, check the run count to confirm tests actually ran.
+
+## Verification
+
+- Consume pinned LeanCIL from `verification/lakefile.toml`; keep CIL infrastructure upstream.
+- Run `verification/prepare.ps1` first: it builds the LeanCIL tool and the production assembly and writes the generated method templates and catalogued bindings that proofs import.
+- Audit the supporting library with `lake build` and LeanCIL `audit-library` as in `verification/README.md`, which kernel-replays the oleans; import new extraction-independent `UInt256` modules from `verification/UInt256.lean` so the audit covers them, and do not audit with elaborated Lean (`run_cmd`, `#print axioms`).
+- Register completed method/profile proofs in `verification/gates.json`, or as a family in `verification/bindings.json` with its template under `verification/templates/`; add each regression case as a variant of the gate it exercises.
+- Validate gates with `leancil gates gates.json --only <gate>[/<profile>[/<variant>]]` from `verification/`; a supporting-library build or successful extraction is not a compiled-method certificate. One run shares builds and LeanCIL's authenticated local consumer cache across its rows; every row still requires its own certificate or rejection.
+- Keep reusable execution and contract theorems independent of `Extracted`; bind them to each extraction with checked method-body equalities.
+- Portable consumer support must come from a successful main-branch workflow run, with its trusted digest supplied separately from the downloaded manifest; PR artifacts cannot certify another run.
+- Preserve independent arithmetic, overlap, finite-return, and caller-memory contracts when porting proofs. Report unsupported extraction or composition upstream instead of changing production C# to suit a proof.

@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>Nethermind.Int256</AssemblyName>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <FixtureCase Condition="'$(FixtureCase)' == ''">Baseline</FixtureCase>
+    <DefineConstants Condition="'$(FixtureCase)' == 'BitwiseHelper'">$(DefineConstants);RETURN_HELPER</DefineConstants>
+    <DefineConstants Condition="'$(FixtureCase)' == 'BitwiseWrongOperator'">$(DefineConstants);RETURN_WRONG</DefineConstants>
+    <DefineConstants Condition="'$(FixtureCase)' == 'BitwiseEarlyStore'">$(DefineConstants);RETURN_EARLY</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Support.cs" />
+
+    <Compile Include="Operators.cs" />
+    <Compile Include="ReturnOperations.cs" />
+    <Compile Include="$(FixtureCase).cs" />
+  </ItemGroup>
+  <Target Name="ValidateFixtureCase" BeforeTargets="CoreCompile">
+    <Error Condition="'$(FixtureCase)' != 'Baseline' and '$(FixtureCase)' != 'BitwiseHelper' and '$(FixtureCase)' != 'BitwiseWrongOperator' and '$(FixtureCase)' != 'BitwiseEarlyStore'" Text="Unknown bitwise fixture case" />
+  </Target>
+</Project>

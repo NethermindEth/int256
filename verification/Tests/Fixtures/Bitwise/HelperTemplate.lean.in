@@ -1,0 +1,11 @@
+import Extracted
+import UInt256.Methods.Bitwise.Contract
+import UInt256.Methods.Bitwise.ReturnComposition
+import UInt256.Methods.Bitwise.@SUPPORT@
+import UInt256.Safety.AggregateReturn
+namespace HelperFixture
+open UInt256Proof.Bitwise UInt256Model.Safety UInt256Model.Bitwise
+-- A compiled word helper still meets the production contract, stated as production states it.
+theorem correct : @STATEMENT@ Extracted.program 0 :=
+  @TERM@
+end HelperFixture

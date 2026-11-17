@@ -1,0 +1,23 @@
+<Project>
+  <!-- Each case names its source; its expectation and witness values live in verification/gates.json. -->
+  <ItemGroup>
+    <SafetyCase Include="Interior" Source="Interior.cs" />
+    <SafetyCase Include="EndThenInterior" Source="EndThenInterior.cs" />
+    <SafetyCase Include="AggregateHome" Source="AggregateHome.cs" />
+    <SafetyCase Include="StaticLookup" Source="StaticLookup.cs" />
+    <SafetyCase Include="InitializedVector" Source="InitializedVector.cs" />
+    <SafetyCase Include="UnalignedVector" Source="UnalignedVector.cs" />
+    <SafetyCase Include="Overread" Source="Overread.cs" />
+    <SafetyCase Include="InvalidThenRepaired" Source="InvalidThenRepaired.cs" />
+    <SafetyCase Include="AggregateOverread" Source="AggregateOverread.cs" />
+    <SafetyCase Include="StaticOverread" Source="StaticOverread.cs" />
+    <SafetyCase Include="UninitializedVector" Source="UninitializedVector.cs" />
+    <SafetyCase Include="MaskedVectorOverread" Source="MaskedVectorOverread.cs" />
+    <SafetyCase Include="VectorOutsideView" Source="MaskedVectorOverread.cs" />
+    <SafetyCase Include="WriteThenRestore" Source="WriteThenRestore.cs" />
+    <SafetyCase Include="InvalidNativeOffset" Source="InvalidNativeOffset.cs" />
+    <SafetyCase Include="EscapedLocal" Source="EscapedLocal.cs" />
+    <SafetyCase Include="ReusedLocal" Source="ReusedLocal.cs" />
+    <SafetyCase Include="AlignedLoad" Source="AlignedLoad.cs" />
+  </ItemGroup>
+</Project>
